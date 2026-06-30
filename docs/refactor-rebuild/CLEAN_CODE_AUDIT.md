@@ -156,3 +156,49 @@ Task chi tiết trước khi sửa code:
 - [ ] Không đổi behavior public.
 - [ ] Inventory/log/API contract được cập nhật.
 - [ ] Validation hoặc smoke checklist liên quan đã pass.
+
+## 8. Phase A Duplicate Scan - 2026-06-30
+
+Scope scan có kiểm soát, không xem kết quả là lệnh xóa tự động. Các lệnh đã chạy:
+
+```bash
+rg -n "router\.(get|post|put|patch|delete)" backend/src/domains/orders/controller -g "*.js"
+rg -n "\b(new|old|v2|fixed|temp|helper2)\b|function .*2\b|const .*2\s*=" backend/src frontend/src -g "*.js" -g "*.ts" -g "*.tsx"
+rg -n "(function|const)\s+(normalize|format|parse|build|map)[A-Za-z0-9_]+|export\s+(const|function)\s+(normalize|format|parse|build|map)" backend/src/domains frontend/src/features frontend/src/shared backend/src/shared -g "*.js" -g "*.ts" -g "*.tsx"
+Get-ChildItem -Path backend/src,frontend/src -Recurse -File | Where-Object { $_.Name -match '(helper|helpers|normalizer|normalizers|utils)\.(js|ts|tsx)$' }
+```
+
+### 8.1 Findings Theo Cụm
+
+| Cụm | File/Pattern | Finding | Source-of-truth quyết định | Trạng thái |
+| --- | --- | --- | --- | --- |
+| Route/API Phase A | `orders`, `wallet`, `shop-bank-accounts`, `usdt-wallets`, `payment-slots` | Routes thật đã inventory vào `docs/API_CONTRACTS.md`; payment-slots là internal domain API, không phải HTTP router. | Route contract nằm ở `docs/API_CONTRACTS.md`; implementation source giữ ở domain route/controller hiện tại. | `recorded` |
+| Generic shared primitives | `frontend/src/shared/money`, `number`, `html`, `text`, `http`, `vietqr`; `backend/src/shared/text`, `validation`, `money` | Có shared primitives thật sự dùng lại bởi nhiều domain/feature. | Giữ ở `shared/<capability>`; không thêm business rule vào `shared/utils`. | `keep` |
+| Compatibility barrels | `frontend/src/shared/utils/*`, `frontend/src/features/pricing/utils.ts` | Một số file `utils` hiện là barrel/compatibility để không gãy import cũ. | Không thêm logic mới; khi chạm caller thì import trực tiếp từ module cụ thể. | `compatibility` |
+| Orders frontend mapper | `frontend/src/features/orders/utils/orderListTransform.ts`, `ordersHelpers.ts`, Create/Edit/Bill Order modal helpers | Scan cho thấy còn nhiều `normalize/format/parse` quanh order code, money, status/view model. | Chưa merge trong Phase A; E1 phải chốt source-of-truth DTO -> view model trước khi sửa code. | `open` |
+| Invoices/receipts QR/status | `frontend/src/features/invoices/helpers.ts`, `components/qr-modal/helpers.ts`, `parseBatchOrderCodes.ts`, `parseBatchTransactionCodes.ts` | QR/batch token/status/action logic vẫn ở invoices feature. | Giữ trong `features/invoices`; không đưa vào shared vì là receipt business rule. | `open` |
+| Pricing frontend split | `frontend/src/features/pricing/utils.ts`, `priceCalculations.ts`, `priceFormatters.ts`, `priceLabels.ts`, `priceParsing.ts`, `productPriceMapper.ts` | Frontend pricing đã tách thành module cụ thể; `utils.ts` là compatibility barrel. | Giữ owner ở `features/pricing`; backend pricing owner vẫn cần audit/test. | `partial` |
+| Product description API | `frontend/src/features/product-info/api/productDescApi.ts` và file con | `frontend/src/lib/productDescApi.ts` không còn tồn tại; API đã về owner `product-info`. | Giữ `product-info/api` làm owner; không tạo lại lib global. | `done` |
+| Supplier/NCC capability | `backend/src/domains/supplies/services/supplierLookupService.js`, `supplierCostService.js` | Supplier lookup/cost đã có owner service trong supplies. | Caller khác gọi supplies service/repository, không tự query NCC. | `partial` |
+| Product lookup capability | `backend/src/domains/products/services/productLookupService.js` | Product lookup owner đã có nhưng Phase A chưa audit hết caller backend. | E-BE1 tiếp tục audit/cutover caller product/variant/package. | `partial` |
+| Payment-slot exact amount | `backend/src/domains/payment-slots/helpers/paymentSlotInputs.js` | Contract exact amount khác integer VND parser. | Giữ domain-local, không gom vào `shared/money`. | `done` |
+| Shop-bank/USDT input rules | `shopBankInputs.js`, `usdtWalletInputs.js`, shared text/boolean primitives | Domain input rules đã tách; primitive generic ở shared. | Domain rules giữ ở owner; only primitive shared. | `done` |
+| Renew Adobe backend helpers | `backend/src/services/renew-adobe/adobe-renew-v2/*helpers.js`, `facade.js` | Còn nhiều helper/service flow theo renew-adobe; D6-D7 vẫn mở. | Tách theo login/account lookup/renew/post-check trong owner renew-adobe, không đưa shared. | `open` |
+| Dashboard/wallet UI utils | `frontend/src/features/dashboard/components/WalletBalancesCard/utils.ts` | Feature-local display/column helpers còn ở dashboard wallet card. | Giữ feature-local; chỉ tách tiếp nếu file lớn hoặc reuse thật. | `keep feature-local` |
+
+### 8.2 Source-Of-Truth Decisions Cho Phase A
+
+- API route contract Phase A: `docs/API_CONTRACTS.md` là tài liệu contract; source code route hiện tại không đổi.
+- Generic primitive shared: theo `docs/refactor-rebuild/SHARED_CONTRACTS.md`.
+- Business capability dùng nhiều nơi: thuộc domain owner (`products`, `supplies`, `pricing`, `orders`, `invoices`, `renew-adobe`), không đưa vào shared chỉ vì nhiều caller cần dùng.
+- `orders` DTO/view-model vẫn chưa chốt; không refactor mapper order trước khi E1 hoàn tất.
+- `pricing` frontend đã tách; backend `backend/src/services/pricing/core.js` phải có baseline test trước khi split.
+- `payment-slots` không có HTTP route public; là internal domain API, exact amount matching là source-of-truth riêng.
+
+### 8.3 Candidate Clusters Cho Phase Tiếp Theo
+
+1. `orders` frontend mapper/modal overlap: `orderListTransform.ts`, `ordersHelpers.ts`, Create/Edit/Bill Order helpers.
+2. Backend product/pricing capability: `products/services/productLookupService.js`, `services/pricing/core.js`, orders create/update pricing callers.
+3. Invoices/receipts mapping: `invoices/index.tsx`, `ReceiptsTable.tsx`, `invoices/helpers.ts`, QR modal helpers.
+4. Renew Adobe backend facade: `services/renew-adobe/adobe-renew-v2/facade.js` và các helper flow.
+5. Legacy compatibility barrels: `frontend/src/shared/utils/*`, `frontend/src/features/pricing/utils.ts`, only after callers are cut over.

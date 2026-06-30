@@ -2,13 +2,10 @@ import React from "react";
 import { BoltIcon, EyeIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import {
   AugmentedRow,
-  DEFAULT_CAPACITY_LIMIT,
-  DEFAULT_SLOT_LIMIT,
   formatCapacityLabel,
   formatDisplayDate,
-  getCapacityAvailabilityState,
-  getSlotAvailabilityState,
 } from "../utils/packageHelpers";
+import { buildPackageRowMetrics } from "./packageRowMetrics";
 
 type PackageRowProps = {
   row: AugmentedRow;
@@ -31,51 +28,19 @@ export const PackageRow: React.FC<PackageRowProps> = ({
   onView,
   onDelete,
 }) => {
-  const totalSlots = row.slotLimit || DEFAULT_SLOT_LIMIT;
-  const slotUsed = row.slotUsed;
-  const remainingSlots = row.remainingSlots;
-  /** Cột “SỐ LƯỢNG”: thanh tô = tỷ lệ **đã dùng** (0 dùng → thanh trống). */
-  const slotUsedFillRatio =
-    totalSlots > 0
-      ? Math.min((Math.min(slotUsed, totalSlots) / totalSlots) * 100, 100)
-      : 0;
-  const slotAvailabilityState = getSlotAvailabilityState(remainingSlots);
-  const slotColorClass =
-    slotAvailabilityState === "out"
-      ? "bg-red-500"
-      : slotAvailabilityState === "low"
-      ? "bg-yellow-500"
-      : "bg-green-500";
-
-  const capacityLimit = row.capacityLimit || DEFAULT_CAPACITY_LIMIT;
-  const capacityUsed = row.capacityUsed;
-  const remainingCapacity = row.remainingCapacity;
-  /** Cột dung lượng: thanh tô = tỷ lệ **đã dùng** GB. */
-  const capacityUsedFillRatio =
-    capacityLimit > 0
-      ? Math.min(
-          (Math.min(capacityUsed, capacityLimit) / capacityLimit) * 100,
-          100
-        )
-      : 0;
-  const capacityAvailabilityState = getCapacityAvailabilityState(
+  const {
+    totalSlots,
+    slotUsed,
+    remainingSlots,
+    slotUsedFillRatio,
+    slotColorClass,
+    capacityLimit,
+    capacityUsed,
     remainingCapacity,
-    capacityLimit
-  );
-  const capacityColorClass =
-    capacityAvailabilityState === "out"
-      ? "bg-red-500"
-      : capacityAvailabilityState === "low"
-      ? "bg-yellow-500"
-      : "bg-green-500";
-  const usedWithinLimit = Math.min(slotUsed, totalSlots);
-  const slotAssignments = row.slotAssignments ?? [];
-  const slotCells = Array.from({ length: Math.max(totalSlots, 0) }, (_, idx) => {
-    const slotNumber = idx + 1;
-    const isUsed = slotNumber <= usedWithinLimit;
-    const assignment = slotAssignments[slotNumber - 1] ?? null;
-    return { slotNumber, isUsed, assignment };
-  });
+    capacityUsedFillRatio,
+    capacityColorClass,
+    slotCells,
+  } = buildPackageRowMetrics(row);
   const showRowCapacity = showCapacityColumn && !!row.hasCapacityField;
 
   return (

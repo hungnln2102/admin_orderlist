@@ -20,18 +20,9 @@ import {
   sanitizeDateLike,
   sanitizeNumberLike,
 } from "./ordersHelpers";
-import {
-  BASE_REFUND_STATS,
-  BASE_STOCK_STATS,
-  type BaseStat,
-} from "../constants";
 
-export type OrderFinancialStats = {
-  totalSellingPrice: number;
-  totalCostPrice: number;
-  totalRemainingValue: number;
-  totalSupplierRemainingValue: number;
-};
+export type { OrderFinancialStats } from "./orderFinancialStats";
+export { computeOrderFinancialStats } from "./orderFinancialStats";
 
 /** Gắn các trường ảo (số ngày còn lại, giá trị còn lại, trạng thái, ngày hiển thị) vào từng đơn. */
 export function enrichOrdersWithVirtualFields(
@@ -293,108 +284,4 @@ export function filterAndSortOrders(
   return sorted;
 }
 
-/** Tính thống kê từ danh sách đơn đã có trường ảo (dùng toàn bộ orders, không phải filtered). */
-export function computeOrderStats(
-  ordersWithVirtual: Order[],
-  dataset: OrderDatasetKey
-): {
-  updatedStats: BaseStat[];
-  totalRecords: number;
-} {
-  const totalOrders = ordersWithVirtual.length;
-
-  if (dataset === "canceled") {
-    const refundedOrders = ordersWithVirtual.filter((order) => {
-      const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
-      return status === ORDER_STATUSES.DA_HOAN;
-    }).length;
-    const pendingRefundOrders = ordersWithVirtual.filter((order) => {
-      const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
-      return status === ORDER_STATUSES.CHO_HOAN;
-    }).length;
-    const convertedCreditOrders = ordersWithVirtual.filter((order) => {
-      const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
-      return status === ORDER_STATUSES.CHUYEN_DOI_CREDIT;
-    }).length;
-
-    const updatedStats = [
-      { ...BASE_REFUND_STATS[0], value: String(totalOrders) },
-      { ...BASE_REFUND_STATS[1], value: String(refundedOrders) },
-      { ...BASE_REFUND_STATS[2], value: String(pendingRefundOrders) },
-      { ...BASE_REFUND_STATS[3], value: String(convertedCreditOrders) },
-    ];
-
-    return { updatedStats, totalRecords: totalOrders };
-  }
-
-  const needsRenewal = ordersWithVirtual.filter((order) => {
-    const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
-    return Number.isFinite(remaining) && remaining > 0 && remaining <= 4;
-  }).length;
-  const processingOrders = ordersWithVirtual.filter((order) => {
-    const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
-    return status === ORDER_STATUSES.DANG_XU_LY;
-  }).length;
-
-  const registeredTodayCount = ordersWithVirtual.filter((order) => {
-    const registrationSource = sanitizeDateLike(
-      order.registration_date ||
-        order.registration_date_display ||
-        order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
-        order[ORDER_FIELDS.ORDER_DATE]
-    );
-    return isRegisteredToday(registrationSource);
-  }).length;
-
-  const updatedStats = [
-    { ...BASE_STOCK_STATS[0], value: String(totalOrders) },
-    { ...BASE_STOCK_STATS[1], value: String(needsRenewal) },
-    { ...BASE_STOCK_STATS[2], value: String(processingOrders) },
-    { ...BASE_STOCK_STATS[3], value: String(registeredTodayCount) },
-  ];
-
-  return { updatedStats, totalRecords: totalOrders };
-}
-
-/** Tính tổng tiền từ danh sách đã lọc để đồng bộ với search/status/date filters. */
-export function computeOrderFinancialStats(
-  orders: Order[]
-): OrderFinancialStats {
-  return orders.reduce<OrderFinancialStats>(
-    (totals, order) => {
-      const orderCode = order[ORDER_FIELDS.ID_ORDER];
-      const isGiftOrder = isGiftOrderCode(orderCode);
-      const sellingPrice = isGiftOrder
-        ? 0
-        : roundGiaBanValue(
-            Number.parseFloat(String(order[ORDER_FIELDS.PRICE] ?? 0)) || 0
-          );
-      const costPrice = roundGiaBanValue(
-        Number.parseFloat(String(order[ORDER_FIELDS.COST] ?? 0)) || 0
-      );
-      const remainingValue = Number(order[VIRTUAL_FIELDS.GIA_TRI_CON_LAI] ?? 0);
-      const supplierRemainingValue = Number(
-        order[VIRTUAL_FIELDS.HOAN_TU_NCC] ?? 0
-      );
-
-      totals.totalSellingPrice += Number.isFinite(sellingPrice) ? sellingPrice : 0;
-      totals.totalCostPrice += Number.isFinite(costPrice) ? costPrice : 0;
-      totals.totalRemainingValue += Number.isFinite(remainingValue)
-        ? remainingValue
-        : 0;
-      totals.totalSupplierRemainingValue += Number.isFinite(
-        supplierRemainingValue
-      )
-        ? supplierRemainingValue
-        : 0;
-
-      return totals;
-    },
-    {
-      totalSellingPrice: 0,
-      totalCostPrice: 0,
-      totalRemainingValue: 0,
-      totalSupplierRemainingValue: 0,
-    }
-  );
-}
+export { computeOrderStats } from "./orderStatsTransform";

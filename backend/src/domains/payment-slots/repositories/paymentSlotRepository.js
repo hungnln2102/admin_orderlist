@@ -9,6 +9,7 @@ const {
   SLOT_COLS,
   SLOT_STATUS,
   SUFFIX_SEQUENCE,
+  SUFFIX_MAX,
 } = require("../constants");
 
 /** Hỗ trợ cả pg.Client (.query) và knex (.raw); chuẩn hoá về {rows}. */
@@ -84,8 +85,44 @@ const fetchNextSuffix = async (executor) => {
 };
 
 /**
- * INSERT slot. Có thể throw 23505 nếu trùng (receiver_account, expected_amount)
- * trên một pending khác — caller retry với suffix kế.
+ * Pick the next suffix that is not occupied by a pending slot for this receiver/base amount.
+ * The sequence value is still used as a rotating start point, but occupied suffixes are skipped.
+ */
+const fetchNextAvailableSuffix = async (executor, { receiverAccount, baseAmount }) => {
+  const { rows } = await run(
+    executor,
+    `
+      WITH config AS (
+        SELECT $3::int AS max_suffix
+      ), seed AS (
+        SELECT nextval('${SUFFIX_SEQUENCE}')::int AS suffix
+      ), candidates AS (
+        SELECT ((seed.suffix - 1 + gs.offset) % config.max_suffix)::int + 1 AS suffix,
+               gs.offset AS offset
+        FROM seed
+        CROSS JOIN config
+        CROSS JOIN generate_series(0, config.max_suffix - 1) AS gs(offset)
+      )
+      SELECT candidates.suffix
+      FROM candidates
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM ${SLOTS_TABLE} slots
+        WHERE slots.${SLOT_COLS.RECEIVER_ACCOUNT} = $1
+          AND slots.${SLOT_COLS.STATUS} = '${SLOT_STATUS.PENDING}'
+          AND slots.${SLOT_COLS.EXPECTED_AMOUNT} = ($2::numeric + candidates.suffix)
+      )
+      ORDER BY candidates.offset ASC
+      LIMIT 1
+    `,
+    [receiverAccount, baseAmount, SUFFIX_MAX]
+  );
+  return Number(rows?.[0]?.suffix || 0);
+};
+
+/**
+ * INSERT slot. Pending amount conflicts return null via DO NOTHING,
+ * so caller can retry next suffix without aborting the transaction.
  */
 const insertSlot = async (executor, payload) => {
   const {
@@ -111,6 +148,9 @@ const insertSlot = async (executor, payload) => {
         ${SLOT_COLS.EXPECTED_AMOUNT}
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (${SLOT_COLS.RECEIVER_ACCOUNT}, ${SLOT_COLS.EXPECTED_AMOUNT})
+      WHERE ${SLOT_COLS.STATUS} = '${SLOT_STATUS.PENDING}'
+      DO NOTHING
       RETURNING ${SELECT_SLOT_FIELDS}
     `,
     [
@@ -261,6 +301,7 @@ module.exports = {
   fetchNextCycleIndex,
   cancelPendingSlotsForOrder,
   fetchNextSuffix,
+  fetchNextAvailableSuffix,
   insertSlot,
   findPendingSlotByAmount,
   findLatestPendingSlotByOrder,

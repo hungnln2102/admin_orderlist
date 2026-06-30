@@ -3,6 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CreateProductFormState, ProductPricingRow } from "../../../types";
 import { isExistingSanPhamCode } from "../../../hooks/productActionHelpers";
 import { inputBase, labelBase } from "./shared";
+import {
+  buildNextLabel,
+  getFirstPackageForProduct,
+  getPackageOptionsForProduct,
+  includeCurrentLabel,
+  uniqueSortedLabels,
+} from "./productBasicsRules";
 
 type ProductBasicsSectionProps = {
   createForm: CreateProductFormState;
@@ -10,20 +17,6 @@ type ProductBasicsSectionProps = {
   productNameOptions: string[];
   productPackageOptionsByName: Record<string, string[]>;
   onFormChange: (field: keyof CreateProductFormState, value: string) => void;
-};
-
-const buildNextLabel = (baseLabel: string, usedLabels: string[]) => {
-  const used = new Set(
-    usedLabels
-      .map((label) => String(label || "").trim().toLowerCase())
-      .filter(Boolean)
-  );
-  if (!used.has(baseLabel.toLowerCase())) return baseLabel;
-  let suffix = 2;
-  while (used.has(`${baseLabel} ${suffix}`.toLowerCase())) {
-    suffix += 1;
-  }
-  return `${baseLabel} ${suffix}`;
 };
 
 export function ProductBasicsSection({
@@ -39,63 +32,25 @@ export function ProductBasicsSection({
     string | null
   >(null);
 
-  const availableProductNameOptions = useMemo(() => {
-    const seen = new Set<string>();
-    return productNameOptions
-      .map((name) => String(name || "").trim())
-      .filter(Boolean)
-      .filter((name) => {
-        const key = name.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort((left, right) =>
-        left.localeCompare(right, "vi", { sensitivity: "base" })
-      );
-  }, [productNameOptions]);
+  const availableProductNameOptions = useMemo(
+    () => uniqueSortedLabels(productNameOptions),
+    [productNameOptions]
+  );
 
-  const dropdownProductNameOptions = useMemo(() => {
-    const currentName = createForm.packageName.trim();
-    if (!currentName) return availableProductNameOptions;
-    const exists = availableProductNameOptions.some(
-      (option) => option.toLowerCase() === currentName.toLowerCase()
-    );
-    return exists
-      ? availableProductNameOptions
-      : [currentName, ...availableProductNameOptions];
-  }, [availableProductNameOptions, createForm.packageName]);
+  const dropdownProductNameOptions = useMemo(
+    () => includeCurrentLabel(availableProductNameOptions, createForm.packageName),
+    [availableProductNameOptions, createForm.packageName]
+  );
 
-  const availablePackageOptions = useMemo(() => {
-    const currentProductName = createForm.packageName.trim().toLowerCase();
-    if (!currentProductName) return [] as string[];
-    const matchedEntry = Object.entries(productPackageOptionsByName).find(
-      ([productName]) => productName.trim().toLowerCase() === currentProductName
-    );
-    const options = matchedEntry?.[1] ?? [];
-    const seen = new Set<string>();
-    return options
-      .map((name) => String(name || "").trim())
-      .filter(Boolean)
-      .filter((name) => {
-        const key = name.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort((left, right) =>
-        left.localeCompare(right, "vi", { sensitivity: "base" })
-      );
-  }, [createForm.packageName, productPackageOptionsByName]);
+  const availablePackageOptions = useMemo(
+    () => getPackageOptionsForProduct(productPackageOptionsByName, createForm.packageName),
+    [createForm.packageName, productPackageOptionsByName]
+  );
 
-  const dropdownPackageOptions = useMemo(() => {
-    const currentPackage = createForm.packageProduct.trim();
-    if (!currentPackage) return availablePackageOptions;
-    const exists = availablePackageOptions.some(
-      (option) => option.toLowerCase() === currentPackage.toLowerCase()
-    );
-    return exists ? availablePackageOptions : [currentPackage, ...availablePackageOptions];
-  }, [availablePackageOptions, createForm.packageProduct]);
+  const dropdownPackageOptions = useMemo(
+    () => includeCurrentLabel(availablePackageOptions, createForm.packageProduct),
+    [availablePackageOptions, createForm.packageProduct]
+  );
 
   useEffect(() => {
     setDuplicateSanPhamHint(null);
@@ -132,14 +87,10 @@ export function ProductBasicsSection({
   const handleProductNameSelectChange = (nextProductName: string) => {
     onFormChange("packageName", nextProductName);
     if (isCustomPackage) return;
-    const nextPackages = Object.entries(productPackageOptionsByName).find(
-      ([productName]) =>
-        productName.trim().toLowerCase() === nextProductName.trim().toLowerCase()
-    )?.[1];
-    const fallbackPackage =
-      (nextPackages || [])
-        .map((name) => String(name || "").trim())
-        .find(Boolean) || "";
+    const fallbackPackage = getFirstPackageForProduct(
+      productPackageOptionsByName,
+      nextProductName
+    );
     onFormChange("packageProduct", fallbackPackage);
   };
 

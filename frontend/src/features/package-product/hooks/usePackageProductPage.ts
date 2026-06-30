@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
-import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { usePackageData } from "./usePackageData";
 import { usePackageDeleteActions } from "./usePackageDeleteActions";
 import { usePackageMutationActions } from "./usePackageMutationActions";
 import { usePackageTemplateActions } from "./usePackageTemplateActions";
+import { buildPackageSlotCards } from "./packageSlotCards";
+import { usePackageCategoryRouteSync } from "./usePackageCategoryRouteSync";
 import type {
   AugmentedRow,
   EditContext,
@@ -70,55 +64,10 @@ export const usePackageProductPage = () => {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewRow, setViewRow] = useState<AugmentedRow | null>(null);
 
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const packageParam = params.get("package");
-    const normalizedCategory = packageParam || "all";
-
-    setCategoryFilter((prev) =>
-      prev === normalizedCategory ? prev : normalizedCategory
-    );
-  }, [location.search, setCategoryFilter]);
-
-  const handleCategorySelect = useCallback(
-    (value: string) => {
-      const next =
-        value === "all" ? "all" : categoryFilter === value ? "all" : value;
-
-      if (next !== categoryFilter) {
-        setCategoryFilter(next);
-      }
-
-      const params = new URLSearchParams(location.search);
-      if (next === "all") {
-        params.delete("package");
-      } else {
-        params.set("package", next);
-      }
-
-      const search = params.toString();
-      const nextSearch = search ? `?${search}` : "";
-      if (nextSearch !== location.search) {
-        navigate(
-          {
-            pathname: location.pathname,
-            search: nextSearch,
-          },
-          { replace: true }
-        );
-      }
-    },
-    [
-      categoryFilter,
-      location.pathname,
-      location.search,
-      navigate,
-      setCategoryFilter,
-    ]
-  );
+  const { handleCategorySelect } = usePackageCategoryRouteSync({
+    categoryFilter,
+    setCategoryFilter,
+  });
 
   const openCreateModal = useCallback(
     (options?: OpenCreateModalOptions) => {
@@ -279,32 +228,7 @@ export const usePackageProductPage = () => {
   );
 
   const slotCards = useMemo(
-    () => [
-      {
-        name: "Số dòng bảng",
-        value: String(slotStats.total),
-        icon: CheckCircleIcon,
-        accent: STAT_CARD_ACCENTS.sky,
-      },
-      {
-        name: "Gói sắp hết",
-        value: String(slotStats.low),
-        icon: ExclamationTriangleIcon,
-        accent: STAT_CARD_ACCENTS.amber,
-      },
-      {
-        name: "Gói đã hết",
-        value: String(slotStats.out),
-        icon: ArrowDownIcon,
-        accent: STAT_CARD_ACCENTS.rose,
-      },
-      {
-        name: "Thêm hôm nay",
-        value: "0",
-        icon: ArrowUpIcon,
-        accent: STAT_CARD_ACCENTS.emerald,
-      },
-    ],
+    () => buildPackageSlotCards(slotStats),
     [slotStats]
   );
 

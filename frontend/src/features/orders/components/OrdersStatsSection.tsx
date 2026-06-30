@@ -8,7 +8,7 @@ import {
 import StatCard, { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { STAT_FILTER_MAP, type BaseStat, type StatFilterKey } from "../constants";
 import { formatCurrency } from "../utils/ordersHelpers";
-import type { OrderFinancialStats } from "../utils/orderListTransform";
+import type { OrderFinancialStats } from "../utils/orderFinancialStats";
 
 type OrdersStatsSectionProps = {
   isExpiredDataset: boolean;

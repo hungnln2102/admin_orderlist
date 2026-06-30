@@ -2,7 +2,8 @@
 
 Mục đích: định nghĩa rõ cái gì được phép dùng chung trong dự án mới, tránh lặp helper/API/component và tránh biến `shared` thành bãi rác mới.
 
-> Trạng thái hiện tại: tài liệu chuẩn bị, chưa triển khai refactor.
+> Trạng thái hiện tại: đã bắt đầu triển khai. File này là nguồn tham chiếu để quyết định helper nào được ở `shared`, helper nào phải nằm trong domain/feature owner.
+> Sync gần nhất: 2026-06-30.
 
 ## 1. Nguyên Tắc Shared
 
@@ -12,7 +13,26 @@ Mục đích: định nghĩa rõ cái gì được phép dùng chung trong dự 
 - Shared phải ổn định hơn feature-local code; thay đổi shared cần kiểm tra các nơi dùng.
 - Không tạo file tên chung chung như `helpers.ts`, `utils2.ts`, `misc.ts`, `common.ts` nếu không có phạm vi cụ thể.
 
-## 2. Frontend Shared Đề Xuất
+## 2. Frontend Shared Hiện Có Và Hướng Đích
+
+### 2.0 Contract Hiện Có
+
+Các shared contract đã tồn tại và được phép tiếp tục dùng:
+
+| Contract | Trách nhiệm | Trạng thái | Ghi chú boundary |
+| --- | --- | --- | --- |
+| `frontend/src/shared/api/client.ts` | HTTP/API client primitive | `keep` | Không thêm endpoint nghiệp vụ vào đây. |
+| `frontend/src/shared/http/responseBody.ts` | Đọc/chuẩn hóa response body generic | `keep` | Không map response riêng của orders/invoices/pricing. |
+| `frontend/src/shared/money/format.ts` | Format tiền generic | `keep` | Không chứa rule pricing hoặc lợi nhuận. |
+| `frontend/src/shared/money/input.ts` | Parse/format draft input tiền generic | `keep` | Shop-bank/USDT dùng lại; payment-slot exact amount vẫn domain-local. |
+| `frontend/src/shared/number/finite.ts` | Parse/clamp số generic | `keep` | Không chứa parser giá theo business rule. |
+| `frontend/src/shared/html/*` | Sanitize/normalize/plain text HTML generic | `keep` | Product-specific merge/image/variant rule vẫn ở `product-info`. |
+| `frontend/src/shared/text/normalize.ts` | Text normalize generic | `keep` | Không chứa normalize tên sản phẩm/NCC nếu có rule nghiệp vụ. |
+| `frontend/src/shared/pricing/ratio.ts` | Ratio primitive dùng chung | `keep` | Không chứa pricing calculation theo sản phẩm/NCC. |
+| `frontend/src/shared/vietqr/imageUrl.ts` | Build VietQR image URL generic | `keep` | Receipt/payment flow action vẫn ở feature owner. |
+| `frontend/src/shared/utils/*` | Compatibility re-export cũ | `compatibility` | Không thêm logic mới; caller mới nên import từ contract cụ thể. |
+
+Các contract chưa có hoặc chưa chuẩn hóa đầy đủ thì vẫn là hướng đích, không tự tạo nếu chưa có 2+ nơi dùng thật.
 
 ```txt
 frontend/src/shared/
@@ -44,11 +64,12 @@ frontend/src/shared/
     permissions.ts
 ```
 
-### 2.1 `shared/api`
+### 2.1 `shared/api` / `shared/http`
 
 | Contract | Trách nhiệm | Không làm |
 | --- | --- | --- |
-| `httpClient.ts` | Cấu hình HTTP client duy nhất, base URL, headers, auth/session handling cơ bản | Không chứa endpoint nghiệp vụ |
+| `client.ts` | Cấu hình HTTP client duy nhất, base URL, headers, auth/session handling cơ bản | Không chứa endpoint nghiệp vụ |
+| `responseBody.ts` | Response body extraction/normalization generic | Không chứa mapper response riêng của feature |
 | `apiError.ts` | Chuẩn hóa lỗi API cho UI/toast/log | Không hard-code message nghiệp vụ của một feature |
 | `queryParams.ts` | Build/parse query params generic | Không chứa filter riêng của orders/invoices |
 
@@ -101,7 +122,28 @@ Không đưa vào shared:
 
 Các hook nghiệp vụ phải nằm trong feature owner.
 
-### 2.4 `shared/utils`
+### 2.4 `shared/utils` Và Compatibility Barrels
+
+`frontend/src/shared/utils/*` hiện được xem là lớp compatibility cho import cũ. Quy tắc:
+
+- Không thêm business logic mới vào `shared/utils`.
+- Nếu cần logic generic mới, tạo contract cụ thể như `shared/money`, `shared/date`, `shared/html`, `shared/text`, `shared/http`.
+- Nếu logic chỉ thuộc một feature, để trong `features/<feature>/utils`, `model`, `hooks`, hoặc `api`.
+- Khi chạm caller, ưu tiên đổi import từ `shared/utils/*` sang contract cụ thể nếu an toàn.
+
+### 2.5 Frontend Feature Owner Capabilities
+
+Các capability sau không đưa vào `shared` dù nhiều nơi cần gọi; phải gọi owner feature/domain qua API/hook/mapper rõ contract:
+
+| Capability | Owner hiện tại/hướng đích | Caller được phép dùng bằng cách |
+| --- | --- | --- |
+| Product description/image/SEO API | `frontend/src/features/product-info/api` | Import API từ owner, không tạo lại `lib/productDescApi.ts`. |
+| Pricing display/calculation frontend | `frontend/src/features/pricing/*` | Import module cụ thể như `priceCalculations`, `productPriceMapper`, `priceFormatters`; `utils.ts` chỉ là compatibility barrel. |
+| Order DTO -> view model | `frontend/src/features/orders` | Chưa chốt xong; không copy mapper sang Create/Edit/Bill Order. |
+| Receipt status/action/QR mapping | `frontend/src/features/invoices` | Chưa chốt xong; không đưa vào shared vì là invoice/receipt rule. |
+| Renew Adobe account/check flow | `frontend/src/features/renew-adobe` | Dùng hook/component owner; không tạo shared renew helper. |
+
+### 2.6 Generic Utility Boundary
 
 Được phép shared:
 
@@ -120,7 +162,17 @@ Không đưa vào shared:
 - Rule Renew Adobe.
 - Rule hoàn tiền/ledger.
 
-## 3. Backend Shared Đề Xuất
+## 3. Backend Shared Hiện Có Và Hướng Đích
+
+### 3.0 Contract Hiện Có
+
+| Contract | Trách nhiệm | Trạng thái | Ghi chú boundary |
+| --- | --- | --- | --- |
+| `backend/src/shared/text/normalizeOptionalText.js` | Normalize optional text primitive | `keep` | Dùng cho wallet-related validators/use-cases; không chứa rule domain. |
+| `backend/src/shared/validation/normalizeBoolean.js` | Normalize boolean primitive | `keep` | Dùng cho input validators; không chứa status/permission rule. |
+| `backend/src/shared/money/normalizers.js` | Integer VND parser/money primitive | `keep` | Không dùng cho payment-slot exact amount hoặc pricing-specific parser/rule. |
+
+Những phần còn lại trong mục này là hướng đích, chỉ tạo khi có nhu cầu thật và contract rõ.
 
 ```txt
 backend/src/shared/
@@ -194,20 +246,29 @@ Nếu code chỉ phục vụ `orders`, để trong `domains/orders`, không đư
 
 Trước khi tạo shared mới, trả lời đủ các câu hỏi:
 
-- [ ] Có ít nhất 2 feature/domain đang dùng hoặc sẽ dùng ngay trong cùng phase không?
-- [ ] Tên file/module có mô tả đúng trách nhiệm không?
-- [ ] Input/output có rõ không?
-- [ ] Có chứa business rule của một domain không?
-- [ ] Nếu thay đổi module này, cần test/smoke những feature nào?
-- [ ] Có duplicate cũ nào sẽ được merge/delete sau khi tạo shared này không?
+> Checklist kiểm tra cho từng shared proposal, không tính là task tồn đọng toàn cục.
+
+- Có ít nhất 2 feature/domain đang dùng hoặc sẽ dùng ngay trong cùng phase không?
+- Tên file/module có mô tả đúng trách nhiệm không?
+- Input/output có rõ không?
+- Có chứa business rule của một domain không?
+- Nếu thay đổi module này, cần test/smoke những feature nào?
+- Có duplicate cũ nào sẽ được merge/delete sau khi tạo shared này không?
 
 ## 6. Bảng Theo Dõi Shared Contract
 
 | Contract | Loại | Owner | Dùng bởi | Trạng thái | Replacement cho duplicate nào |
 | --- | --- | --- | --- | --- | --- |
-| `frontend/src/shared/api/httpClient.ts` | frontend api | `shared` | TBD | `planned` | Các axios/fetch wrapper trùng |
-| `frontend/src/shared/utils/currency.ts` | frontend util | `shared` | TBD | `planned` | Các format currency trùng |
-| `frontend/src/shared/utils/date.ts` | frontend util | `shared` | TBD | `planned` | Các format date trùng |
+| `frontend/src/shared/api/client.ts` | frontend api | `shared` | feature API clients | `keep` | HTTP client primitive |
+| `frontend/src/shared/http/responseBody.ts` | frontend http | `shared` | feature API clients | `keep` | Response extraction duplicate |
+| `frontend/src/shared/money/format.ts` | frontend money | `shared` | orders/pricing/wallet UI via imports | `keep` | Format VND duplicate |
+| `frontend/src/shared/money/input.ts` | frontend money | `shared` | shop-bank, USDT wallet | `keep` | Money input parser/draft duplicate |
+| `frontend/src/shared/number/finite.ts` | frontend number | `shared` | money/pricing primitives | `keep` | Finite number parser duplicate |
+| `frontend/src/shared/html/*` | frontend html | `shared` | product-info, product-price quote formatting | `keep` | HTML sanitize/plain/normalize duplicate |
+| `frontend/src/shared/text/normalize.ts` | frontend text | `shared` | generic text normalization callers | `keep` | Generic text normalize duplicate |
+| `frontend/src/shared/pricing/ratio.ts` | frontend pricing primitive | `shared` | pricing-related primitive callers | `keep` | Ratio primitive only, not pricing business rule |
+| `frontend/src/shared/vietqr/imageUrl.ts` | frontend vietqr | `shared` | receipt/payment display callers | `keep` | VietQR image URL builder duplicate |
+| `frontend/src/shared/utils/*` | frontend compatibility | `shared` | legacy imports | `compatibility` | Re-export only; avoid adding logic |
 | `frontend/src/shared/hooks/useDisclosure.ts` | frontend hook | `shared` | TBD | `planned` | Modal open/close state lặp |
 | `frontend/src/shared/hooks/usePagination.ts` | frontend hook | `shared` | TBD | `planned` | Pagination state lặp |
 | `backend/src/shared/errors` | backend infra | `shared` | TBD | `planned` | Error response rời rạc |
@@ -216,6 +277,20 @@ Trước khi tạo shared mới, trả lời đủ các câu hỏi:
 | `backend/src/shared/text/normalizeOptionalText.js` | backend text primitive | `shared` | `shop-bank-accounts`, `usdt-wallets` | `keep` | Optional text normalizer trùng trong wallet-related domains |
 | `backend/src/shared/validation/normalizeBoolean.js` | backend validation primitive | `shared` | `shop-bank-accounts`, `usdt-wallets` | `keep` | Boolean input normalizer trùng trong wallet-related domains |
 | `backend/src/shared/money/normalizers.js` | backend money primitive | `shared` | `orders/finance`, `payments` | `keep` | Integer VND parser trùng; không dùng cho payment-slot exact amount hoặc pricing-specific parser |
+
+## 6A. Domain Capability Không Được Đưa Vào Shared
+
+| Capability | Owner | Trạng thái | Ghi chú |
+| --- | --- | --- | --- |
+| Payment slot amount/account normalization | `backend/src/domains/payment-slots/helpers/paymentSlotInputs.js` | `keep domain-local` | Exact amount contract khác integer VND parser. |
+| Shop bank account input rules | `backend/src/domains/shop-bank-accounts` | `keep domain-local` | Chỉ primitive text/boolean dùng shared. |
+| USDT wallet input rules | `backend/src/domains/usdt-wallets` | `keep domain-local` | Chỉ primitive text/boolean/money dùng shared. |
+| Supplier lookup/cost/import payment | `backend/src/domains/supplies` | `in-progress owner` | Caller khác gọi owner service/repository, không tự query lại. |
+| Product lookup/product description/package lookup | `backend/src/domains/products` hoặc domain product-related owner | `open` | Cần hoàn thiện E-BE1 trước khi cutover callers. |
+| Pricing calculation/parser/rule | `backend/src/services/pricing/core.js` -> pricing owner service | `open` | Không gom vào `shared/money`; cần baseline test trước khi tách. |
+| Order create validation/payment allocation | `backend/src/domains/orders` | `open` | Không đưa vào shared dù pricing/product có tham gia. |
+| Receipt status/action/QR mapping | `frontend/src/features/invoices` | `open` | Không đưa vào shared UI helper. |
+| Renew Adobe login/check/renew/post-check flow | `backend/src/domains/renew-adobe` / `backend/src/services/renew-adobe` | `open` | Facade cần tách theo D6-D7. |
 
 ## 7. Điều Cấm Trong Giai Đoạn Rebuild
 

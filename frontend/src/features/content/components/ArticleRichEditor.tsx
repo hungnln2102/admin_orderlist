@@ -1,64 +1,19 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
-import {
-  BoldIcon,
-  CodeBracketIcon,
-  CodeBracketSquareIcon,
-  ItalicIcon,
-  LinkIcon,
-  ListBulletIcon,
-  NumberedListIcon,
-  PhotoIcon,
-  ArrowUturnLeftIcon,
-  ArrowUturnRightIcon,
-  MinusIcon,
-  ChatBubbleBottomCenterTextIcon,
-} from "@heroicons/react/24/outline";
 import { UrlPromptModal } from "@/components/modals/UrlPromptModal/UrlPromptModal";
 import { ArticleImageInsertModal } from "@/features/content/components/ArticleImageInsertModal";
+import { ArticleRichEditorToolbar } from "./ArticleRichEditorToolbar";
 
 export type ArticleRichEditorProps = {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
 };
-
-const barBtn =
-  "inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg border border-transparent px-2 text-slate-300 transition-colors hover:border-white/15 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-35";
-
-const barBtnActive = "border-sky-500/40 bg-sky-500/15 text-sky-200";
-
-function ToolbarButton({
-  onClick,
-  active,
-  disabled,
-  title,
-  children,
-}: {
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onClick}
-      disabled={disabled}
-      className={`${barBtn} ${active ? barBtnActive : ""}`}
-    >
-      {children}
-    </button>
-  );
-}
 
 export function ArticleRichEditor({
   value,
@@ -169,154 +124,16 @@ export function ArticleRichEditor({
     );
   }
 
-  const toolDisabled = htmlMode;
 
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
-      <div
-        className="flex flex-wrap items-center gap-0.5 border-b border-white/10 bg-slate-950/40 px-2 py-2"
-        role="toolbar"
-        aria-label="Thanh định dạng nội dung"
-      >
-        <ToolbarButton
-          title="Đậm"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          active={editor.isActive("bold")}
-          disabled={toolDisabled}
-        >
-          <BoldIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Nghiêng"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          active={editor.isActive("italic")}
-          disabled={toolDisabled}
-        >
-          <ItalicIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Gạch chân"
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          active={editor.isActive("underline")}
-          disabled={toolDisabled}
-        >
-          <span className="text-sm font-bold underline">U</span>
-        </ToolbarButton>
-        <ToolbarButton
-          title="Gạch ngang"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          active={editor.isActive("strike")}
-          disabled={toolDisabled}
-        >
-          <span className="text-sm font-bold line-through">S</span>
-        </ToolbarButton>
-        <ToolbarButton
-          title="Mã inline"
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          active={editor.isActive("code")}
-          disabled={toolDisabled}
-        >
-          <CodeBracketIcon className="h-5 w-5" />
-        </ToolbarButton>
-
-        <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
-
-        <ToolbarButton
-          title="Tiêu đề cấp 2"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          active={editor.isActive("heading", { level: 2 })}
-          disabled={toolDisabled}
-        >
-          H2
-        </ToolbarButton>
-        <ToolbarButton
-          title="Tiêu đề cấp 3"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          active={editor.isActive("heading", { level: 3 })}
-          disabled={toolDisabled}
-        >
-          H3
-        </ToolbarButton>
-
-        <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
-
-        <ToolbarButton
-          title="Danh sách bullet"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          active={editor.isActive("bulletList")}
-          disabled={toolDisabled}
-        >
-          <ListBulletIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Danh sách số"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={editor.isActive("orderedList")}
-          disabled={toolDisabled}
-        >
-          <NumberedListIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Trích dẫn"
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          active={editor.isActive("blockquote")}
-          disabled={toolDisabled}
-        >
-          <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
-        </ToolbarButton>
-
-        <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
-
-        <ToolbarButton
-          title="Chèn liên kết"
-          onClick={openLinkModal}
-          active={editor.isActive("link")}
-          disabled={toolDisabled}
-        >
-          <LinkIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Chèn ảnh"
-          onClick={() => setImageModalOpen(true)}
-          disabled={toolDisabled}
-        >
-          <PhotoIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Đường kẻ ngang"
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          disabled={toolDisabled}
-        >
-          <MinusIcon className="h-5 w-5" />
-        </ToolbarButton>
-
-        <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
-
-        <ToolbarButton
-          title="Hoàn tác"
-          onClick={() => editor.chain().focus().undo().run()}
-          disabled={toolDisabled || !editor.can().undo()}
-        >
-          <ArrowUturnLeftIcon className="h-5 w-5" />
-        </ToolbarButton>
-        <ToolbarButton
-          title="Làm lại"
-          onClick={() => editor.chain().focus().redo().run()}
-          disabled={toolDisabled || !editor.can().redo()}
-        >
-          <ArrowUturnRightIcon className="h-5 w-5" />
-        </ToolbarButton>
-
-        <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
-
-        <ToolbarButton
-          title={htmlMode ? "Quay lại soạn thảo (WYSIWYG)" : "Sửa HTML thô"}
-          onClick={toggleHtmlMode}
-          active={htmlMode}
-        >
-          <CodeBracketSquareIcon className="h-5 w-5" />
-        </ToolbarButton>
-      </div>
+      <ArticleRichEditorToolbar
+        editor={editor}
+        htmlMode={htmlMode}
+        onOpenLink={openLinkModal}
+        onOpenImage={() => setImageModalOpen(true)}
+        onToggleHtmlMode={toggleHtmlMode}
+      />
       <div className={htmlMode ? "hidden" : undefined} aria-hidden={htmlMode}>
         <EditorContent editor={editor} />
       </div>

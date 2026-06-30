@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { CheckCircle2, ChevronRight, Loader2, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, ShieldCheck, X } from "lucide-react";
 import { useStorefrontRenewCheck } from "./hooks/useStorefrontRenewCheck";
 import { RenewStatusPanel } from "./components/RenewStatusPanel";
 import { STOREFRONT_RENEW_CHECK_STYLES } from "./styles/storefrontRenewCheck.styles";
 import { Link } from "react-router-dom";
+import { RenewProfileCheckActionButton } from "./components/RenewProfileCheckActionButton";
 
 /**
  * Kiểm tra / kích hoạt profile Renew qua API public storefront (`/api/renew-adobe/public/*`).
@@ -223,73 +224,15 @@ export default function RenewProfileCheckDeskPage() {
                 urlAccess={urlAccess}
               />
 
-              {canShowSyncButton ? (
-                <button
-                  type="button"
-                  onClick={handleSyncFixAdes}
-                  disabled={syncing || loading || activating}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-500 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition-all hover:shadow-sky-500/45 disabled:opacity-60"
-                >
-                  {syncing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang đồng bộ dữ liệu...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 storefront-renew-refresh-nudge" strokeWidth={2} />
-                      Đồng bộ dữ liệu Ades
-                    </>
-                  )}
-                </button>
-              ) : canShowActivateButton ? (
-                <button
-                  type="button"
-                  onClick={handleActivate}
-                  disabled={activating || syncing}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-sm font-semibold text-white shadow-lg shadow-amber-500/30 transition-all hover:shadow-amber-500/45 disabled:opacity-60"
-                >
-                  {activating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang kích hoạt...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 storefront-renew-refresh-nudge" strokeWidth={2} />
-                      Kích hoạt lại ngay
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={loading || activating || syncing}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-sm font-semibold text-white shadow-lg shadow-purple-500/35 transition-all hover:shadow-purple-500/50 disabled:opacity-60"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang kiểm tra...
-                    </>
-                  ) : activating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang kích hoạt...
-                    </>
-                  ) : syncing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang đồng bộ dữ liệu...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4 storefront-renew-search-btn" strokeWidth={2} />
-                      Kiểm tra Profile
-                    </>
-                  )}
-                </button>
-              )}
+              <RenewProfileCheckActionButton
+                loading={loading}
+                activating={activating}
+                syncing={syncing}
+                canShowSyncButton={canShowSyncButton}
+                canShowActivateButton={canShowActivateButton}
+                onSyncFixAdes={handleSyncFixAdes}
+                onActivate={handleActivate}
+              />
             </form>
           </div>
         </div>

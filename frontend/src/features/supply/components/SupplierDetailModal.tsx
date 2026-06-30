@@ -1,4 +1,3 @@
-import { formatCurrency } from "@/shared/money";
 import { buildSepayQrUrl } from "@/shared/vietqr";
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
@@ -10,6 +9,8 @@ import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/u
 import { fetchShopBankAccounts } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
 import { SupplierSettlementPanel } from "./SupplierSettlementPanel";
+import { SupplierMonthlyOrdersPanel } from "./SupplierMonthlyOrdersPanel";
+import { SupplierOverviewCards } from "./SupplierOverviewCards";
 import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
 
 interface Props {
@@ -227,59 +228,14 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
             </div>
           ) : (
             <>
-              <div className="grid md:grid-cols-2 gap-3 mt-5">
-                <div className="bg-white/5 rounded-2xl border border-white/5 p-5 space-y-4">
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80">Thông tin chung</h3>
-                  <div className="text-sm text-white/80 space-y-2">
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                      <span className="text-white/40">Tên NCC</span>
-                      <span className="font-bold text-white">{supply?.sourceName || "--"}</span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                      <span className="text-white/40">Ngân hàng</span>
-                      <span className="font-semibold text-white">{bankNameResolved}</span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                      <span className="text-white/40">Số tài khoản</span>
-                      <span className="font-mono font-semibold text-white">{supply?.numberBank || "--"}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/40">Trạng thái</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${supply?.isActive ? "text-emerald-400 bg-emerald-500/10" : "text-white/50 bg-white/5"}`}>{statusLabel}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white/5 rounded-2xl border border-white/5 p-5 space-y-4">
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80">Tổng quan thanh toán</h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm text-white/80">
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Đã trả</p>
-                      <p className="text-lg font-bold text-white mt-1">{formatCurrency(stats?.totalPaidAmount || 0)}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Còn nợ</p>
-                      <p className="text-lg font-bold text-orange-400 mt-1">{formatCurrency(totalUnpaid)}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Hoàn tiền</p>
-                      <p className="text-lg font-bold text-rose-400 mt-1">{formatCurrency(totalSupplierRefund)}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Nợ đơn</p>
-                      <p className="text-lg font-bold text-white mt-1">{stats?.unpaidOrders ?? 0}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                {statCards.map((card) => (
-                  <div key={card.label} className="bg-white/5 rounded-lg p-3 border border-white/5">
-                    <p className="text-white/50 text-xs">{card.label}</p>
-                    <p className="text-xl font-semibold">{card.value}</p>
-                  </div>
-                ))}
-              </div>
+              <SupplierOverviewCards
+                supply={supply}
+                stats={stats}
+                bankName={bankNameResolved}
+                statusLabel={statusLabel}
+                totalUnpaid={totalUnpaid}
+                totalSupplierRefund={totalSupplierRefund}
+              />
 
               <div className="grid md:grid-cols-2 gap-3 mt-3 items-start">
                 <SupplierSettlementPanel
@@ -299,51 +255,14 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 />
 
                 {/* Đơn theo tháng */}
-                <div className="bg-white/5 rounded-xl border border-white/10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-white/80">Đơn theo tháng</h3>
-                    <span className="text-xs text-white/60">{monthlyLogOrders.length} tháng</span>
-                  </div>
-                  {monthlyLogOrders.length === 0 ? (
-                    <p className="text-white/50 text-sm">Chưa có dữ liệu đơn trong log.</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scroll scroll-overlay">
-                      {monthlyLogOrders.map((m) => {
-                        const monthLogOrders = logOrdersByMonthMap.get(m.month) || [];
-                        const isExpanded = expandedMonth === m.month;
-                        return (
-                          <div key={m.month} className="rounded-lg border border-white/5 bg-white/5">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedMonth((prev) => (prev === m.month ? null : m.month))}
-                              className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition"
-                            >
-                              <span className="text-sm font-semibold">Tháng {m.month}</span>
-                              <span className="text-sm">{m.orders} đơn</span>
-                            </button>
-                            {isExpanded && (
-                              <div className="border-t border-white/5 px-3 py-2 space-y-1.5 bg-black/10">
-                                {monthLogOrders.length === 0 ? (
-                                  <p className="text-xs text-white/50">Chưa có đơn log trong tháng này.</p>
-                                ) : (
-                                  monthLogOrders.map((order) => (
-                                    <div key={`${m.month}-${order.orderListId}-${order.idOrder}`} className="rounded-md border border-white/10 px-2 py-1.5">
-                                      <p className="text-xs font-semibold text-white/90 truncate">{order.idOrder || `#${order.orderListId}`}</p>
-                                      <p className="text-[11px] text-white/60 truncate">{order.nccPaymentStatus || "—"}</p>
-                                      <p className="text-[11px] text-emerald-300 mt-0.5">
-                                        Chi phí: {formatCurrency(order.importCost)}
-                                      </p>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <SupplierMonthlyOrdersPanel
+                  monthlyLogOrders={monthlyLogOrders}
+                  logOrdersByMonthMap={logOrdersByMonthMap}
+                  expandedMonth={expandedMonth}
+                  onToggleMonth={(month) =>
+                    setExpandedMonth((prev) => (prev === month ? null : month))
+                  }
+                />
               </div>
 
               <div className="mt-4 text-right">

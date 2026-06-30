@@ -1,11 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  MagnifyingGlassIcon,
-  PlusIcon,
-  ShieldCheckIcon,
-} from "@heroicons/react/24/outline";
-import Pagination from "@/components/ui/Pagination";
-import GradientButton from "@/components/ui/GradientButton";
 import { showAppNotification } from "@/lib/notifications";
 import {
   createIpWhitelistItem,
@@ -21,7 +14,9 @@ import {
   DeleteIpWhitelistModal,
 } from "../components/DeleteIpWhitelistModal";
 import { IpWhitelistFormModal } from "../components/IpWhitelistFormModal";
-import { IpWhitelistTable } from "../components/IpWhitelistTable";
+import { IpWhitelistListPanel } from "../components/IpWhitelistListPanel";
+import { IpWhitelistPageHeader } from "../components/IpWhitelistPageHeader";
+import { IpWhitelistSearchSummary } from "../components/IpWhitelistSearchSummary";
 import { SiteMaintenancePanel } from "../components/SiteMaintenancePanel";
 import type {
   IpWhitelistItem,
@@ -237,30 +232,7 @@ export function IpWhitelistPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">
-            <ShieldCheckIcon className="h-4 w-4" />
-            IP whitelist
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">
-              Quản lý IP whitelist
-            </h1>
-            <p className="mt-1 text-sm font-medium tracking-wide text-white/50">
-              Thêm, chỉnh sửa và gỡ các địa chỉ IP được phép truy cập hệ thống.
-            </p>
-          </div>
-        </div>
-
-        <GradientButton
-          icon={PlusIcon}
-          onClick={handleOpenCreate}
-          className="shrink-0"
-        >
-          Thêm IP whitelist
-        </GradientButton>
-      </div>
+      <IpWhitelistPageHeader onCreate={handleOpenCreate} />
 
       <SiteMaintenancePanel
         status={maintenanceStatus}
@@ -271,44 +243,15 @@ export function IpWhitelistPage() {
         onToggle={handleToggleMaintenance}
       />
 
-      <div className="rounded-[32px] border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-4 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm lg:p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px] lg:items-start">
-          {/*
-            self-start: cột search không stretch theo chiều cao hàng grid.
-            flex + shrink-0 icon: tránh absolute đè lên placeholder.
-          */}
-          <div className="flex w-full min-w-0 items-center gap-3 self-start rounded-2xl border border-white/10 bg-slate-950/40 py-2.5 pl-4 pr-4 transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/50">
-            <MagnifyingGlassIcon
-              className="pointer-events-none h-5 w-5 shrink-0 text-indigo-300/70"
-              aria-hidden
-            />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => {
-                setSearchTerm(event.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Tìm theo IP hoặc mô tả..."
-              className="min-w-0 flex-1 border-0 bg-transparent text-sm text-white outline-none ring-0 placeholder:text-slate-400/70"
-            />
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-slate-950/35 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/35">
-              Tổng IP
-            </p>
-            <p className="mt-2 text-2xl font-bold text-white">{items.length}</p>
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-slate-950/35 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/35">
-              Hiển thị
-            </p>
-            <p className="mt-2 text-2xl font-bold text-white">{totalItems}</p>
-          </div>
-        </div>
-      </div>
+      <IpWhitelistSearchSummary
+        searchTerm={searchTerm}
+        totalCount={items.length}
+        visibleCount={totalItems}
+        onSearchChange={(value) => {
+          setSearchTerm(value);
+          setCurrentPage(1);
+        }}
+      />
 
       {error && (
         <div className="rounded-2xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
@@ -316,33 +259,17 @@ export function IpWhitelistPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-[18px] border border-white/12 bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)]">
-        {loading ? (
-          <div className="px-4 py-14 text-center text-white/70">
-            Đang tải danh sách IP whitelist...
-          </div>
-        ) : (
-          <>
-            <IpWhitelistTable
-              items={currentRows}
-              startIndex={startIndex}
-              onEdit={handleOpenEdit}
-              onDelete={setDeleteItem}
-            />
-
-            {totalItems > 0 && (
-              <div className="flex flex-col gap-3 border-t border-white/10 bg-slate-900/85 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <Pagination
-                  currentPage={currentPage}
-                  totalItems={totalItems}
-                  pageSize={PAGE_SIZE}
-                  onPageChange={setCurrentPage}
-                />
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <IpWhitelistListPanel
+        loading={loading}
+        items={currentRows}
+        startIndex={startIndex}
+        currentPage={currentPage}
+        totalItems={totalItems}
+        pageSize={PAGE_SIZE}
+        onPageChange={setCurrentPage}
+        onEdit={handleOpenEdit}
+        onDelete={setDeleteItem}
+      />
 
       <IpWhitelistFormModal
         isOpen={formOpen}

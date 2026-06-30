@@ -7,13 +7,9 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ProductPricingRow } from "../types";
 import {
-  computeHighestSupplyPrice,
   formatCurrencyValue,
-  formatDateLabel,
-  formatProfitPercentBySale,
-  parseRatioInput,
-  pickCheapestSupplier,
 } from "../utils";
+import { buildProductRowViewModel } from "./productRowViewModel";
 import { ProductEditPanel } from "./ProductEditPanel";
 import { ProductExpandedDetails } from "./ProductExpandedDetails";
 import type {
@@ -49,95 +45,38 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
   onToggleProductDetails,
   onToggleStatus,
 }) => {
-  const supplierItems = supplyState?.items ?? [];
   const resolvedPendingNewSupply = pendingNewSupply ?? null;
-  const cheapestSupplier = pickCheapestSupplier(supplierItems);
-  const cheapestPrice = cheapestSupplier?.price ?? item.baseSupplyPrice;
-  const cheapestSupplierName = cheapestSupplier?.sourceName ?? "-";
-  const highestSupplyPrice = computeHighestSupplyPrice(
-    supplierItems,
-    item.baseSupplyPrice
-  );
-  const resolvedIsActive = statusOverride ?? item.isActive ?? false;
-  const displayUpdated = updatedTimestamp ?? item.lastUpdated ?? "";
-  const formattedUpdated = displayUpdated
-    ? formatDateLabel(displayUpdated)
-    : "-";
-  const hasPromoForRow =
-    typeof item.promoPrice === "number" &&
-    Number.isFinite(item.promoPrice) &&
-    item.promoPrice > 0;
-  const isEditingProduct = editControls.editingProductId === item.id;
-  const currentEditForm = isEditingProduct ? editControls.productEditForm : null;
-  const previewPrices = currentEditForm
-    ? {
-        ctv: parseRatioInput(currentEditForm.pctCtv),
-        customer: parseRatioInput(currentEditForm.pctKhach),
-        promo: parseRatioInput(currentEditForm.pctPromo),
-        student: parseRatioInput(currentEditForm.pctStu),
-      }
-    : null;
-  const previewWholesalePrice = previewPrices?.ctv ?? null;
-  const previewRetailPrice = previewPrices?.customer ?? null;
-  const previewPromoPrice = previewPrices?.promo ?? null;
-  const showPreviewPromo =
-    typeof previewPromoPrice === "number" &&
-    Number.isFinite(previewPromoPrice) &&
-    previewPromoPrice > 0;
-  const previewStudentPriceVal = previewPrices?.student ?? null;
-  const showPreviewStudent =
-    Boolean(previewPrices) &&
-    typeof previewStudentPriceVal === "number" &&
-    Number.isFinite(previewStudentPriceVal) &&
-    previewStudentPriceVal > 0;
-  const displayStudentPrice =
-    isEditingProduct && currentEditForm ? previewStudentPriceVal : item.studentPrice;
-  const highestSupplyPriceDisplay =
-    typeof highestSupplyPrice === "number" &&
-    Number.isFinite(highestSupplyPrice) &&
-    highestSupplyPrice > 0
-      ? formatCurrencyValue(highestSupplyPrice)
-      : "Chưa có dữ liệu";
-  const profitBasePrice =
-    typeof highestSupplyPrice === "number" &&
-    Number.isFinite(highestSupplyPrice) &&
-    highestSupplyPrice > 0
-      ? highestSupplyPrice
-      : item.baseSupplyPrice;
-
-  const wholesaleProfitLabel =
-    formatProfitPercentBySale(item.wholesalePrice, profitBasePrice, "short") ??
-    "Chưa có %";
-  const retailProfitLabel =
-    formatProfitPercentBySale(item.retailPrice, profitBasePrice, "short") ??
-    "Chưa có %";
-  const studentProfitLabel =
-    formatProfitPercentBySale(displayStudentPrice, profitBasePrice, "short") ??
-    "Chưa có %";
-  const promoProfitLabel =
-    formatProfitPercentBySale(item.promoPrice, profitBasePrice, "short") ??
-    "Chưa có %";
-
-  const previewWholesaleProfitLabel = formatProfitPercentBySale(
+  const {
+    cheapestPrice,
+    cheapestSupplierName,
+    resolvedIsActive,
+    formattedUpdated,
+    hasPromoForRow,
+    isEditingProduct,
+    currentEditForm,
     previewWholesalePrice,
-    profitBasePrice,
-    "full"
-  );
-  const previewRetailProfitLabel = formatProfitPercentBySale(
     previewRetailPrice,
-    profitBasePrice,
-    "full"
-  );
-  const previewStudentBlendHint = formatProfitPercentBySale(
-    previewStudentPriceVal,
-    profitBasePrice,
-    "full"
-  );
-  const previewPromoPercentLabel = formatProfitPercentBySale(
     previewPromoPrice,
-    profitBasePrice,
-    "full"
-  );
+    showPreviewPromo,
+    previewStudentPriceVal,
+    showPreviewStudent,
+    displayStudentPrice,
+    highestSupplyPriceDisplay,
+    wholesaleProfitLabel,
+    retailProfitLabel,
+    studentProfitLabel,
+    promoProfitLabel,
+    previewWholesaleProfitLabel,
+    previewRetailProfitLabel,
+    previewStudentBlendHint,
+    previewPromoPercentLabel,
+  } = buildProductRowViewModel({
+    item,
+    supplyState,
+    statusOverride,
+    updatedTimestamp,
+    editControls,
+  });
 
   const handleReloadSupply = () => {
     supplyControls.fetchSupplyPricesForProduct(item.sanPhamRaw);

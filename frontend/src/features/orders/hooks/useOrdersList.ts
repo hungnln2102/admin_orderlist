@@ -5,8 +5,8 @@ import {
   enrichOrdersWithVirtualFields,
   filterAndSortOrders,
   computeOrderStats,
-  computeOrderFinancialStats,
 } from "../utils/orderListTransform";
+import { computeOrderFinancialStats } from "../utils/orderFinancialStats";
 import { getPaginated, buildPaginationPages } from "../utils/orderPagination";
 import { orderCreatedWithinIsoRange } from "../utils/ordersHelpers";
 

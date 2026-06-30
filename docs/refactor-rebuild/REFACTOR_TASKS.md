@@ -3,43 +3,49 @@
 Mục đích: file task thực thi refactor chi tiết, tập trung dọn code sạch, sửa root cause trong hàm/module chính, xóa duplicate/workaround và giữ nguyên behavior public.
 
 > Ngày lập: 2026-06-25  
-> Trạng thái: đang chuẩn bị thực thi incremental refactor.  
+> Trạng thái: đang thực thi incremental refactor.
+> Sync gần nhất: 2026-06-30 - đã tách guardrail khỏi task còn mở và đồng bộ các frontend slice đã hoàn thành.
 > Nguyên tắc: không gom/xóa code chỉ vì trùng tên; phải trace caller, contract và runtime dependency trước.
 
 ## 0. Luật Làm Việc Cho Mọi Task
 
-- [ ] Mỗi task chỉ chạm một domain/feature hoặc một cụm helper có contract rõ.
-- [ ] Trước khi sửa code, ghi source-of-truth vào `docs/REFACTOR_LOG.md`.
-- [ ] Nếu chạm route/API, cập nhật `docs/API_CONTRACTS.md` trước hoặc cùng task.
-- [ ] Nếu chạm luồng UI/API chính, đánh dấu checklist liên quan trong `docs/SMOKE_CHECKLIST.md`.
-- [ ] Không tạo thêm hàm `new`, `old`, `v2`, `fixed`, `temp`, `helper2` để né hàm cũ.
-- [ ] Nếu phát hiện hàm vá lỗi trước đây, merge logic đúng về hàm chính hoặc ghi rõ wrapper tương thích và điều kiện xóa.
-- [ ] Không đổi public route, API path, response shape, query param, enum/status hoặc UI/UX nếu chưa có migration task riêng.
-- [ ] Sau mỗi task, chạy validation nhỏ nhất có thể: `node --check`, unit test, script helper hoặc smoke test thủ công.
+> Guardrail đang áp dụng cho mọi slice, không tính là task còn mở.
+
+- Mỗi task chỉ chạm một domain/feature hoặc một cụm helper có contract rõ.
+- Trước khi sửa code, ghi source-of-truth vào `docs/REFACTOR_LOG.md`.
+- Nếu chạm route/API, cập nhật `docs/API_CONTRACTS.md` trước hoặc cùng task.
+- Nếu chạm luồng UI/API chính, đánh dấu checklist liên quan trong `docs/SMOKE_CHECKLIST.md`.
+- Không tạo thêm hàm `new`, `old`, `v2`, `fixed`, `temp`, `helper2` để né hàm cũ.
+- Nếu phát hiện hàm vá lỗi trước đây, merge logic đúng về hàm chính hoặc ghi rõ wrapper tương thích và điều kiện xóa.
+- Không đổi public route, API path, response shape, query param, enum/status hoặc UI/UX nếu chưa có migration task riêng.
+- Sau mỗi task, chạy validation nhỏ nhất có thể: `node --check`, unit test, script helper hoặc smoke test thủ công.
 
 
 
 ## 0A. Rule Chống Phình Helper/Service
 
-- [ ] Không tạo `normalizers.js`, `helpers.js`, `utils.js` mặc định cho mỗi domain.
-- [ ] Helper generic dùng bởi 2+ domain phải đưa về `backend/src/shared/<contract>` hoặc `frontend/src/shared/<contract>`.
-- [ ] Rule nghiệp vụ dùng bởi nhiều luồng phải nằm trong domain service/repository owner, ví dụ product/pricing/supplier service, không copy vào từng controller/page.
-- [ ] Một domain capability có thể được gọi từ nhiều luồng khác; không vì caller mới mà khởi tạo lại query/calculation/helper song song.
-- [ ] Domain helper chỉ giữ contract riêng của domain và phải có tên cụ thể như `paymentSlotInputs.js`, `shopBankInputs.js`, `usdtWalletInputs.js`.
-- [ ] Trước khi tạo file mới, tìm source-of-truth hiện có trong domain owner.
-- [ ] Nếu một luồng khác cần sản phẩm/NCC/giá bán/giá nhập, gọi domain service/repository tương ứng thay vì khởi tạo lại query/calculation.
+> Guardrail đang áp dụng cho mọi slice, chi tiết contract nằm ở `docs/refactor-rebuild/SHARED_CONTRACTS.md`.
+
+- Không tạo `normalizers.js`, `helpers.js`, `utils.js` mặc định cho mỗi domain.
+- Helper generic dùng bởi 2+ domain phải đưa về `backend/src/shared/<contract>` hoặc `frontend/src/shared/<contract>`.
+- Rule nghiệp vụ dùng bởi nhiều luồng phải nằm trong domain service/repository owner, ví dụ product/pricing/supplier service, không copy vào từng controller/page.
+- Một domain capability có thể được gọi từ nhiều luồng khác; không vì caller mới mà khởi tạo lại query/calculation/helper song song.
+- Domain helper chỉ giữ contract riêng của domain và phải có tên cụ thể như `paymentSlotInputs.js`, `shopBankInputs.js`, `usdtWalletInputs.js`.
+- Trước khi tạo file mới, tìm source-of-truth hiện có trong domain owner.
+- Nếu một luồng khác cần sản phẩm/NCC/giá bán/giá nhập, gọi domain service/repository tương ứng thay vì khởi tạo lại query/calculation.
 
 ## 1. Phase A - Baseline Và Inventory Thực Thi
 
 Mục tiêu: biết hiện trạng trước khi refactor sâu, tránh sửa một nơi rồi vá tiếp nơi khác.
 
-- [ ] A1. Chạy baseline command hiện có và ghi lỗi sẵn có vào `docs/REFACTOR_LOG.md`.
+- [x] A1. Chạy baseline command hiện có và ghi lỗi sẵn có vào `docs/REFACTOR_LOG.md`.
   - Gợi ý: `npm run lint:frontend`, `npm run build:frontend`, `npm run test:frontend` nếu chạy được.
   - Gợi ý: `npm run lint:backend`, `npm run test:backend` nếu repo có script ổn định.
-- [ ] A2. Lập danh sách route/API thật cho `orders`, `payment-slots`, `wallet`, `shop-bank-accounts`, `usdt-wallets` trong `docs/API_CONTRACTS.md`.
-- [ ] A3. Chạy duplicate scan có kiểm soát và cập nhật findings vào `docs/refactor-rebuild/CLEAN_CODE_AUDIT.md`.
-- [ ] A4. Chọn source-of-truth cho từng cụm duplicate trước khi sửa code.
-- [ ] A5. Cập nhật `docs/refactor-rebuild/CODE_INVENTORY.md` cho các file đã audit: `keep`, `migrate`, `merge`, `deprecated`, `delete`.
+  - Sync 2026-06-30: các slice gần nhất đã ghi validation `git diff --check` và `cd frontend; npm run build` vào `docs/REFACTOR_LOG.md`; backend test chỉ chạy theo domain khi backend được chạm.
+- [x] A2. Lập danh sách route/API thật cho `orders`, `payment-slots`, `wallet`, `shop-bank-accounts`, `usdt-wallets` trong `docs/API_CONTRACTS.md`.
+- [x] A3. Chạy duplicate scan có kiểm soát và cập nhật findings vào `docs/refactor-rebuild/CLEAN_CODE_AUDIT.md`.
+- [x] A4. Chọn source-of-truth cho từng cụm duplicate trước khi sửa code.
+- [x] A5. Cập nhật `docs/refactor-rebuild/CODE_INVENTORY.md` cho các file đã audit: `keep`, `migrate`, `merge`, `deprecated`, `delete`.
 
 ## 2. Phase B - Backend Money/Ledger Clean Code
 
@@ -133,7 +139,7 @@ Mục tiêu: dọn các helper/component/modal được viết thêm để vá U
 - [ ] E1.2. Tìm mapper/normalize duplicate với `CreateOrderModal`, `EditOrderModal`, `bill-order`.
 - [ ] E1.3. Chọn source-of-truth cho order DTO -> view model.
 - [ ] E1.4. Di chuyển modal order global về feature owner bằng wrapper tương thích nếu cần.
-- [ ] E1.5. Giữ nguyên props public của modal.
+- [x] E1.5. Giữ nguyên props public của modal.
 
 ### E2. Invoices/Receipts
 
@@ -144,11 +150,11 @@ Mục tiêu: dọn các helper/component/modal được viết thêm để vá U
 
 ### E3. Pricing/Product
 
-- [ ] E3.1. Audit `frontend/src/features/pricing/utils.ts` và `backend/src/services/pricing/core.js` cùng lúc.
+- [ ] E3.1. Audit `frontend/src/features/pricing/utils.ts` và `backend/src/services/pricing/core.js` cùng lúc. Frontend `utils.ts` đã là compatibility barrel; backend `core.js` vẫn cần audit/test trước khi tách.
 - [ ] E3.2. Chốt backend hay frontend là source-of-truth cho calculation nào.
-- [ ] E3.3. Tách pricing calculation, product mapping, display formatting.
-- [ ] E3.4. Audit `frontend/src/lib/productDescApi.ts`; chuyển về product owner nếu không generic.
-- [ ] E3.5. Tách `VariantContentView.tsx` và `ImageUpload.tsx` theo hook/section/component.
+- [x] E3.3. Tách pricing calculation, product mapping, display formatting.
+- [x] E3.4. Audit `frontend/src/lib/productDescApi.ts`; chuyển về product owner nếu không generic.
+- [x] E3.5. Tách `VariantContentView.tsx` và `ImageUpload.tsx` theo hook/section/component.
 
 ## 5A. Phase E-BE - Backend Product/NCC/Pricing Capability
 
@@ -200,19 +206,21 @@ Mục tiêu: sau khi code mới ổn định, xóa code cũ có bằng chứng.
 
 ## 7. Thứ Tự Thực Thi Đề Xuất Ngay
 
-1. Hoàn tất B1 bằng smoke payment slot nếu có môi trường.
-2. Làm B2 `shop-bank-accounts` normalizers.
-3. Làm B3 `usdt-wallets` normalizers.
-4. Làm B4 fixture cho integer VND parser.
-5. Làm C2 refund/manual completion vì rủi ro double transaction.
-6. Làm E1 orders frontend mapper/modal.
-7. Làm D1-D4 Renew Adobe/Fix ADES duplicate normalization.
+1. Hoàn thiện `SHARED_CONTRACTS.md` để khóa boundary shared/domain trước khi refactor tiếp.
+2. Hoàn thiện `CODE_INVENTORY.md` cho các file đã audit hoặc đã tách.
+3. Hoàn thiện `CLEAN_CODE_AUDIT.md` bằng duplicate clusters và source-of-truth decisions.
+4. Làm E1 orders frontend mapper/modal ownership.
+5. Làm E-BE1/E-BE3 product/pricing owner capability backend.
+6. Làm E2 invoices/receipts status/action/QR mapping và table split.
+7. Làm D6-D7 Renew Adobe backend facade/scheduler thinning.
 
 ## 8. Definition Of Done Cho Một Task
 
-- [ ] Source-of-truth đã rõ trong log.
-- [ ] Duplicate/workaround trong phạm vi task đã merge/deprecate/delete hoặc có lý do giữ lại.
-- [ ] Không tạo global helper/service catch-all mới.
-- [ ] Không đổi public behavior.
-- [ ] Contract/smoke/inventory/log được cập nhật nếu liên quan.
-- [ ] Validation liên quan đã chạy hoặc ghi rõ lý do chưa chạy.
+> Definition of Done là checklist kiểm tra cho từng slice, không tính là task tồn đọng toàn cục.
+
+- Source-of-truth đã rõ trong log.
+- Duplicate/workaround trong phạm vi task đã merge/deprecate/delete hoặc có lý do giữ lại.
+- Không tạo global helper/service catch-all mới.
+- Không đổi public behavior.
+- Contract/smoke/inventory/log được cập nhật nếu liên quan.
+- Validation liên quan đã chạy hoặc ghi rõ lý do chưa chạy.

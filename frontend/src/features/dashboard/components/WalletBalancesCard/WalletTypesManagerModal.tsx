@@ -3,6 +3,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { apiFetch } from "@/shared/api/client";
 import { type WalletColumn } from "../../hooks/useWalletBalances";
+import { WalletTypesTable } from "./WalletTypesTable";
 
 type Props = {
   isOpen: boolean;
@@ -261,56 +262,12 @@ export const WalletTypesManagerModal: React.FC<Props> = ({
             </div>
           </form>
 
-          <div className="overflow-x-auto rounded-2xl border border-white/10">
-            <table className="min-w-full text-left text-sm text-white">
-              <thead className="bg-white/10 text-xs uppercase tracking-wide text-white/70">
-                <tr>
-                  <th className="px-3 py-2">ID</th>
-                  <th className="px-3 py-2">Tên</th>
-                  <th className="px-3 py-2">Mã</th>
-                  <th className="px-3 py-2">Loại</th>
-                  <th className="px-3 py-2 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {[...columns]
-                  .sort((a, b) => a.id - b.id)
-                  .map((col) => (
-                    <tr key={col.id} className="bg-white/[0.02]">
-                      <td className="px-3 py-2 font-mono text-white/80">{col.id}</td>
-                      <td className="px-3 py-2">{col.name}</td>
-                      <td className="px-3 py-2 text-white/70">
-                        {col.assetCode || "—"}
-                        {col.isInvestment ? (
-                          <span className="ml-2 text-[10px] text-amber-300/90">đầu tư</span>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-white/75">
-                        {col.balanceScope === "column_total" ? "Tổng cột" : "Theo ngày"}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(col)}
-                          className="mr-2 text-indigo-300 hover:text-indigo-200"
-                          disabled={loading}
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(col.id)}
-                          className="text-rose-300 hover:text-rose-200"
-                          disabled={loading}
-                        >
-                          Xóa
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+          <WalletTypesTable
+            columns={columns}
+            loading={loading}
+            onEdit={startEdit}
+            onDelete={(id) => void handleDelete(id)}
+          />
 
           <div className="mt-4 flex justify-end">
             <button

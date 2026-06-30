@@ -4,24 +4,15 @@
  * - Backend: POST /api/renew-adobe/user-orders/track { order_ids: string[] }
  */
 
-import { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
-  addOrdersToTracking,
-  fetchMatchableOrders,
-  type MatchableOrder,
-} from "@/features/renew-adobe/user-orders/api";
-import {
   ADOBE_SYSTEM_OPTIONS,
-  DEFAULT_ADOBE_SYSTEM_CODE,
   type AdobeSystemCode,
 } from "@/features/renew-adobe/user-orders/system-options";
-import {
-  DEFAULT_TRACKING_OTP_SOURCE,
-  TRACKING_OTP_SOURCE_OPTIONS,
-} from "@/features/renew-adobe/user-orders/otp-options";
-import type { TrackingOtpSource } from "@/features/renew-adobe/user-orders/types";
+import { TRACKING_OTP_SOURCE_OPTIONS } from "@/features/renew-adobe/user-orders/otp-options";
+import { useAddTrackingOrdersModal } from "./useAddTrackingOrdersModal";
+import { AddTrackingOrdersTable } from "./AddTrackingOrdersTable";
 
 export type AddTrackingOrdersModalProps = {
   open: boolean;
@@ -29,147 +20,35 @@ export type AddTrackingOrdersModalProps = {
   onSaved?: (result: { upserted: number; accepted: number }) => void;
 };
 
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  "Đã Thanh Toán": "bg-emerald-500/15 text-emerald-300 border-emerald-400/40",
-  "Đang Xử Lý": "bg-sky-500/15 text-sky-300 border-sky-400/40",
-  "Cần Gia Hạn": "bg-amber-500/15 text-amber-300 border-amber-400/40",
-};
-
-function StatusPill({ status }: { status: string | null }) {
-  const cls =
-    (status && STATUS_BADGE_CLASS[status]) ||
-    "bg-slate-500/20 text-slate-300 border-slate-400/35";
-  return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${cls}`}
-    >
-      {status || "—"}
-    </span>
-  );
-}
 
 export function AddTrackingOrdersModal({
   open,
   onClose,
   onSaved,
 }: AddTrackingOrdersModalProps) {
-  const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [excludeTracked, setExcludeTracked] = useState(true);
-  const [items, setItems] = useState<MatchableOrder[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [systemNote, setSystemNote] = useState<AdobeSystemCode>(
-    DEFAULT_ADOBE_SYSTEM_CODE
-  );
-  const [otpSource, setOtpSource] = useState<TrackingOtpSource>(
-    DEFAULT_TRACKING_OTP_SOURCE
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitInfo, setSubmitInfo] = useState<string | null>(null);
-
-  // Load mỗi khi mở modal hoặc đổi search/filter
-  useEffect(() => {
-    if (!open) return;
-    let aborted = false;
-    setLoading(true);
-    setLoadError(null);
-    fetchMatchableOrders({
-      q: appliedSearch,
-      excludeTracked,
-    })
-      .then((rows) => {
-        if (aborted) return;
-        setItems(rows);
-      })
-      .catch((err) => {
-        if (aborted) return;
-        setLoadError(
-          (err as Error)?.message ?? "Không tải được danh sách đơn match."
-        );
-        setItems([]);
-      })
-      .finally(() => {
-        if (!aborted) setLoading(false);
-      });
-    return () => {
-      aborted = true;
-    };
-  }, [open, appliedSearch, excludeTracked]);
-
-  // Reset state khi đóng
-  useEffect(() => {
-    if (open) return;
-    setSearch("");
-    setAppliedSearch("");
-    setExcludeTracked(true);
-    setItems([]);
-    setSelected(new Set());
-    setSystemNote(DEFAULT_ADOBE_SYSTEM_CODE);
-    setOtpSource(DEFAULT_TRACKING_OTP_SOURCE);
-    setLoadError(null);
-    setSubmitError(null);
-    setSubmitInfo(null);
-  }, [open]);
-
-  const selectableItems = useMemo(
-    () => items.filter((it) => !it.in_tracking),
-    [items]
-  );
-
-  const toggleSelect = (orderCode: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(orderCode)) next.delete(orderCode);
-      else next.add(orderCode);
-      return next;
-    });
-  };
-
-  const allSelectableSelected =
-    selectableItems.length > 0 &&
-    selectableItems.every((it) => selected.has(it.order_code));
-
-  const toggleSelectAll = () => {
-    if (allSelectableSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(selectableItems.map((it) => it.order_code)));
-    }
-  };
-
-  const handleSubmit = async () => {
-    setSubmitError(null);
-    setSubmitInfo(null);
-    const ids = [...selected];
-    if (ids.length === 0) {
-      setSubmitError("Chọn ít nhất 1 đơn để thêm vào tracking.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const result = await addOrdersToTracking(ids, systemNote, otpSource);
-      onSaved?.({ upserted: result.upserted, accepted: result.accepted });
-      const skippedNote =
-        result.skipped && result.skipped.length > 0
-          ? ` Bỏ qua ${result.skipped.length} đơn không hợp lệ.`
-          : "";
-      setSubmitInfo(`Đã lưu ${result.upserted}/${result.requested} đơn.${skippedNote}`);
-      // Reload list để cập nhật cờ in_tracking + clear selection
-      setSelected(new Set());
-      const refreshed = await fetchMatchableOrders({
-        q: appliedSearch,
-        excludeTracked,
-      });
-      setItems(refreshed);
-    } catch (err) {
-      setSubmitError((err as Error)?.message ?? "Không thể lưu.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const {
+    search,
+    setSearch,
+    excludeTracked,
+    setExcludeTracked,
+    items,
+    loading,
+    loadError,
+    selected,
+    systemNote,
+    setSystemNote,
+    otpSource,
+    setOtpSource,
+    submitting,
+    submitError,
+    submitInfo,
+    selectableItems,
+    allSelectableSelected,
+    applySearch,
+    toggleSelect,
+    toggleSelectAll,
+    handleSubmit,
+  } = useAddTrackingOrdersModal({ open, onSaved });
 
   if (!open) return null;
 
@@ -214,14 +93,14 @@ export function AddTrackingOrdersModal({
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    setAppliedSearch(search.trim());
+                    applySearch();
                   }
                 }}
                 disabled={submitting}
               />
               <button
                 type="button"
-                onClick={() => setAppliedSearch(search.trim())}
+                onClick={() => applySearch()}
                 disabled={submitting}
                 className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/85 hover:bg-white/5"
               >
@@ -294,80 +173,15 @@ export function AddTrackingOrdersModal({
                 Không có đơn nào khớp điều kiện.
               </p>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-white/10">
-                <table className="min-w-full divide-y divide-white/5 text-white text-sm">
-                  <thead className="bg-white/[0.04] text-[10px] uppercase tracking-[0.1em] text-indigo-300/70">
-                    <tr>
-                      <th className="px-3 py-2 w-10 text-left">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 accent-emerald-500"
-                          checked={allSelectableSelected}
-                          onChange={toggleSelectAll}
-                          disabled={submitting || selectableItems.length === 0}
-                          aria-label="Chọn tất cả"
-                        />
-                      </th>
-                      <th className="px-3 py-2 text-left">Mã đơn</th>
-                      <th className="px-3 py-2 text-left">Khách hàng</th>
-                      <th className="px-3 py-2 text-left">Email/Profile</th>
-                      <th className="px-3 py-2 text-left">Hạn</th>
-                      <th className="px-3 py-2 text-left">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {items.map((it) => {
-                      const checked = selected.has(it.order_code);
-                      const disabled = it.in_tracking;
-                      return (
-                        <tr
-                          key={it.order_code}
-                          className={
-                            disabled
-                              ? "bg-white/[0.015] text-white/45"
-                              : "hover:bg-white/[0.04]"
-                          }
-                        >
-                          <td className="px-3 py-2 align-top">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-emerald-500"
-                              checked={checked}
-                              onChange={() => toggleSelect(it.order_code)}
-                              disabled={disabled || submitting}
-                            />
-                          </td>
-                          <td className="px-3 py-2 font-mono text-xs">
-                            {it.order_code}
-                            {disabled && (
-                              <span className="ml-2 inline-flex rounded-md border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-emerald-300">
-                                Đã track
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="text-white/90">
-                              {it.customer || "—"}
-                            </div>
-                            <div className="text-[11px] text-white/55">
-                              {it.contact || ""}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-xs break-all">
-                            {it.information_order || "—"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs">
-                            {it.expiry_date || "—"}
-                          </td>
-                          <td className="px-3 py-2">
-                            <StatusPill status={it.status} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <AddTrackingOrdersTable
+                items={items}
+                selected={selected}
+                submitting={submitting}
+                selectableCount={selectableItems.length}
+                allSelectableSelected={allSelectableSelected}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
+              />
             )}
           </div>
 

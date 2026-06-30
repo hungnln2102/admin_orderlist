@@ -8,14 +8,10 @@ import {
   type MailBackupMailboxOption,
 } from "../api/renewAdobeApi";
 import type { OtpSource } from "../types";
+import { AddAdminImapSection } from "./AddAdminImapSection";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function formatMailboxOptionLine(m: MailBackupMailboxOption): string {
-  const ap = m.alias_prefix?.trim();
-  if (ap) return `${ap} — ${m.email}`;
-  return m.email + (m.note ? ` — ${m.note}` : "");
-}
 
 export type AddAdminAccountModalProps = {
   open: boolean;
@@ -220,89 +216,24 @@ export function AddAdminAccountModal({
           </div>
 
           {otpSource === "imap" && (
-            <>
-              <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 space-y-2">
-                <p className="text-xs font-medium text-emerald-200/90">
-                  Thêm Alias IMAP (chỉ alias_prefix)
-                </p>
-                <p className="text-[11px] text-white/45 leading-relaxed">
-                  Nguồn IMAP bắt buộc phải chọn Alias. Nếu chưa có, tạo nhanh bằng
-                  <code className="text-white/55"> alias_prefix</code> ở đây.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    className={`${inputClass} flex-1`}
-                    placeholder="vd. kelvindevil210299+acc4"
-                    value={newAliasPrefix}
-                    onChange={(ev) => {
-                      setNewAliasPrefix(ev.target.value);
-                      setQuickAddError(null);
-                    }}
-                    disabled={loading || quickAddLoading || mbLoading}
-                    autoComplete="off"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleQuickAddMailbox}
-                    disabled={
-                      loading ||
-                      quickAddLoading ||
-                      mbLoading ||
-                      !newAliasPrefix.trim()
-                    }
-                    className="rounded-xl bg-emerald-500/25 text-emerald-200 border border-emerald-400/35 px-4 py-2.5 text-sm font-semibold hover:bg-emerald-500/35 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {quickAddLoading ? "Đang tạo…" : "Tạo & chọn"}
-                  </button>
-                </div>
-                {quickAddError && (
-                  <p className="text-xs text-amber-400/90">{quickAddError}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label
-                  htmlFor="add-admin-mail-backup"
-                  className="text-xs font-medium text-white/60"
-                >
-                  Alias IMAP (mail dự phòng)
-                </label>
-                {mbLoading ? (
-                  <p className="text-xs text-white/45 py-2">
-                    Đang tải danh sách hộp thư…
-                  </p>
-                ) : mbLoadError ? (
-                  <p className="text-xs text-amber-400/90 py-1">{mbLoadError}</p>
-                ) : mailboxes.length === 0 ? (
-                  <p className="text-xs text-white/45 py-1">
-                    Chưa có Alias IMAP khả dụng. Hãy tạo mới bằng ô phía trên.
-                  </p>
-                ) : (
-                  <select
-                    id="add-admin-mail-backup"
-                    className={selectClass}
-                    value={mailBackupId}
-                    onChange={(ev) => setMailBackupId(ev.target.value)}
-                    disabled={loading}
-                    required={otpSource === "imap" && mailboxes.length > 0}
-                  >
-                    <option value="">— Chọn Alias IMAP —</option>
-                    {mailboxes.map((m) => (
-                      <option key={m.id} value={String(m.id)}>
-                        {formatMailboxOptionLine(m)}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {!mbLoading && !mbLoadError && mailboxes.length > 0 && (
-                  <p className="text-[11px] text-white/40">
-                    Hiển thị theo cột alias_prefix trong database; email IMAP
-                    thường giống dòng mẫu.
-                  </p>
-                )}
-              </div>
-            </>
+            <AddAdminImapSection
+              inputClass={inputClass}
+              selectClass={selectClass}
+              loading={loading}
+              quickAddLoading={quickAddLoading}
+              mbLoading={mbLoading}
+              quickAddError={quickAddError}
+              mbLoadError={mbLoadError}
+              mailboxes={mailboxes}
+              mailBackupId={mailBackupId}
+              newAliasPrefix={newAliasPrefix}
+              onNewAliasPrefixChange={(value) => {
+                setNewAliasPrefix(value);
+                setQuickAddError(null);
+              }}
+              onQuickAddMailbox={handleQuickAddMailbox}
+              onMailBackupIdChange={setMailBackupId}
+            />
           )}
           {error && (
             <p className="text-sm text-amber-400/90" role="alert">

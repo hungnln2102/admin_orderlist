@@ -1,8 +1,8 @@
 import { convertDMYToYMD, formatDateToDMY } from "@/shared/date";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { DashboardDateRangePopover } from "./DashboardDateRangePopover";
 import { CalendarDaysIcon } from "@heroicons/react/24/outline";
-import { toDisplayDate, toISODate } from "@/features/invoices/helpers";
 
 /** chartBucket: preset — day | month | year (một cột mỗi năm dương lịch). */
 export type DashboardDateRangeValue = {
@@ -152,11 +152,6 @@ export const DashboardDateRangeFilter: React.FC<Props> = ({
     }
   };
 
-  const fieldClass =
-    "w-full rounded-xl border border-white/[0.1] bg-slate-950/65 px-3 py-2.5 text-sm text-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.28)] outline-none transition-[box-shadow,border-color,background-color] " +
-    "focus:border-indigo-400/50 focus:bg-slate-950/85 focus:ring-2 focus:ring-indigo-500/28 " +
-    "[color-scheme:dark]";
-
   const widthClasses = className.trim()
     ? className.trim()
     : "relative w-full min-w-0 sm:min-w-[272px] lg:w-[min(100%,320px)] lg:flex-shrink-0";
@@ -168,82 +163,22 @@ export const DashboardDateRangeFilter: React.FC<Props> = ({
   const popover =
     popoverOpen && typeof document !== "undefined"
       ? createPortal(
-          <div
-            ref={popoverRef}
-            className="fixed z-[10000] w-[min(calc(100vw-1.5rem),20rem)] max-h-[min(90vh,480px)] overflow-y-auto rounded-[20px] border border-white/10 bg-gradient-to-b from-slate-900/98 via-slate-950/98 to-slate-950 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.88),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl [color-scheme:dark]"
-            style={{ top: popoverPos.top, left: popoverPos.left }}
-            role="dialog"
-            aria-label="Chọn khoảng ngày"
-          >
-            <div className="relative border-b border-white/[0.07] bg-gradient-to-r from-indigo-950/50 via-slate-900/40 to-slate-950/20 px-4 py-3">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(99,102,241,0.12),transparent_55%)]" />
-              <p className="relative text-[10px] font-bold uppercase tracking-[0.22em] text-indigo-200/75">
-                Chu kỳ
-              </p>
-              <p className="relative mt-1 text-sm font-semibold leading-snug text-white">
-                Chọn khoảng thời gian
-              </p>
-            </div>
-
-            <div className="space-y-4 p-4 pt-3">
-              <div className="space-y-2">
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400/95">
-                  Từ ngày
-                </label>
-                <input
-                  type="date"
-                  className={fieldClass}
-                  value={toISODate(localStart)}
-                  onChange={(e) =>
-                    setLocalStart(e.target.value ? toDisplayDate(e.target.value) : "")
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400/95">
-                  Đến ngày
-                </label>
-                <input
-                  type="date"
-                  className={fieldClass}
-                  value={toISODate(localEnd)}
-                  onChange={(e) =>
-                    setLocalEnd(e.target.value ? toDisplayDate(e.target.value) : "")
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] bg-slate-950/50 px-4 py-3">
-              <button
-                type="button"
-                className="rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-300/90 transition-colors hover:bg-white/5 hover:text-indigo-200"
-                onClick={() => {
-                  setLocalStart("");
-                  setLocalEnd("");
-                  applyRange(null);
-                }}
-              >
-                Xóa lọc
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl px-3.5 py-2 text-xs font-semibold text-white/65 transition-colors hover:bg-white/5 hover:text-white/90"
-                  onClick={() => setPopoverOpen(false)}
-                >
-                  Đóng
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-950/50 ring-1 ring-white/10 transition-all hover:from-indigo-500 hover:to-sky-500 hover:shadow-lg hover:shadow-indigo-900/35 active:scale-[0.98]"
-                  onClick={handleCalendarApply}
-                >
-                  Áp dụng
-                </button>
-              </div>
-            </div>
-          </div>,
+          <DashboardDateRangePopover
+            refNode={popoverRef}
+            top={popoverPos.top}
+            left={popoverPos.left}
+            localStart={localStart}
+            localEnd={localEnd}
+            onLocalStartChange={setLocalStart}
+            onLocalEndChange={setLocalEnd}
+            onClear={() => {
+              setLocalStart("");
+              setLocalEnd("");
+              applyRange(null);
+            }}
+            onClose={() => setPopoverOpen(false)}
+            onApply={handleCalendarApply}
+          />,
           document.body
         )
       : null;

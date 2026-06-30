@@ -13,7 +13,6 @@
 const {
   SLOT_KIND,
   MAX_SUFFIX_ATTEMPTS,
-  PG_UNIQUE_VIOLATION,
 } = require("../constants");
 const repo = require("../repositories/paymentSlotRepository");
 const {
@@ -71,19 +70,17 @@ async function openPaymentSlot(executor, params) {
 
   const cycleIndex = await repo.fetchNextCycleIndex(executor, orderCode);
 
-  const usedSuffixes = new Set();
+  const triedSuffixes = new Set();
   let lastErr = null;
   for (let attempt = 0; attempt < MAX_SUFFIX_ATTEMPTS; attempt += 1) {
-    const suffix = await repo.fetchNextSuffix(executor);
+    const suffix = await repo.fetchNextAvailableSuffix(executor, {
+      receiverAccount,
+      baseAmount,
+    });
     if (!(suffix > 0)) {
-      lastErr = new Error("nextval returned invalid suffix");
-      continue;
-    }
-    if (usedSuffixes.has(suffix)) {
-      // Đã thử toàn bộ range — sequence quay vòng → không còn slot trống.
       break;
     }
-    usedSuffixes.add(suffix);
+    triedSuffixes.add(suffix);
 
     const expectedAmount = baseAmount + suffix;
     try {
@@ -109,10 +106,6 @@ async function openPaymentSlot(executor, params) {
       }
     } catch (err) {
       lastErr = err;
-      if (err && err.code === PG_UNIQUE_VIOLATION) {
-        // Trùng (receiver_account, expected_amount) trên pending khác → thử suffix kế.
-        continue;
-      }
       throw err;
     }
   }
@@ -122,7 +115,7 @@ async function openPaymentSlot(executor, params) {
     `(receiver=${receiverAccount}, base=${baseAmount}). ` +
     `Tăng MAXVALUE của payment_amount_suffix_seq hoặc gỡ slot pending cũ.`;
   logger.error(exhaustedMsg, {
-    triedSuffixes: Array.from(usedSuffixes).sort((a, b) => a - b),
+    triedSuffixes: Array.from(triedSuffixes).sort((a, b) => a - b),
     lastErr: lastErr && lastErr.message,
   });
   throw new Error(exhaustedMsg);

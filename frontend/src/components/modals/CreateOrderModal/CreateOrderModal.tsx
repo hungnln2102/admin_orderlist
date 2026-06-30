@@ -1,19 +1,16 @@
-﻿import React, { useCallback, useRef, useState } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+﻿import React, { useState } from "react";
 import { ORDER_FIELDS } from "../../../constants";
 import { usePricingTiers } from "@/shared/hooks/usePricingTiers";
 import useCreateOrderLogic from "./hooks/useCreateOrderLogic";
-import type { CreateOrderModalProps, Order } from "./types";
-import { CreateOrderSharedCustomerSection } from "./components/CreateOrderSharedCustomerSection";
-import { CreateOrderDetailLinesSection } from "./components/CreateOrderDetailLinesSection";
-import { CreateOrderPricingSection } from "./components/CreateOrderPricingSection";
-import { CreateOrderProductSection } from "./components/CreateOrderProductSection";
-import { CreateOrderCreditPanels } from "./components/CreateOrderCreditPanels";
-import { CreateOrderPaymentMethodSection } from "./components/CreateOrderPaymentMethodSection";
+import type { CreateOrderModalProps } from "./types";
+import { CreateOrderModalFooter } from "./components/CreateOrderModalFooter";
+import { CreateOrderModalHeader } from "./components/CreateOrderModalHeader";
+import { CreateOrderModalBody } from "./components/CreateOrderModalBody";
 import { useCreateOrderModalDerived } from "./hooks/useCreateOrderModalDerived";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import ImportPackageBlock from "@/features/warehouse/components/ImportPackageBlock";
-import { useImportPackageSubmit } from "@/features/warehouse/hooks/useImportPackageSubmit";
+import { useCreateOrderImportPackageFlow } from "./hooks/useCreateOrderImportPackageFlow";
+import { useCreateOrderImportPackageSave } from "./hooks/useCreateOrderImportPackageSave";
+import { getCreateOrderSubmitState } from "./hooks/createOrderSubmitState";
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
@@ -22,34 +19,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   orderCreationKind = "sales",
 }) => {
   const [customMode, setCustomMode] = useState(false);
-  const pendingImportPackageRef = useRef<Record<string, unknown> | null>(null);
-  const handleSaveWithImportPackage = useCallback(
-    (newOrderData: Parameters<CreateOrderModalProps["onSave"]>[0]) => {
-      const meta = pendingImportPackageRef.current;
-      pendingImportPackageRef.current = null;
-      if (!meta) {
-        onSave(newOrderData);
-        return;
-      }
-
-      type NewOrderData = Parameters<CreateOrderModalProps["onSave"]>[0];
-      type OrderSavePayload = Partial<Order> | Order;
-
-      const attachMeta = (payload: OrderSavePayload) => ({
-        ...(payload as Record<string, unknown>),
-        __import_package: meta,
-      });
-
-      const payloadWithImport = (
-        Array.isArray(newOrderData)
-          ? newOrderData.map(attachMeta)
-          : attachMeta(newOrderData)
-      ) as unknown as NewOrderData;
-
-      onSave(payloadWithImport);
-    },
-    [onSave]
-  );
+  const { pendingImportPackageRef, handleSaveWithImportPackage } =
+    useCreateOrderImportPackageSave(onSave);
   const { orderCodeOptions } = usePricingTiers();
   const {
     formData,
@@ -90,42 +61,22 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   } = useCreateOrderLogic(isOpen, handleSaveWithImportPackage, customMode, prefillContext, orderCreationKind);
   const hasPrefillCredit = Boolean(prefillContext && Number(prefillContext.creditNoteId) > 0);
 
-  // Import-package block: hiển thị khi orderCreationKind = "import"
-  const isImportOrder = orderCreationKind === "import";
   const {
-    rule: importRule,
-    ruleLoading: importRuleLoading,
-    data: importPackageData,
-    updateField: updateImportField,
-    loadRule: loadImportRule,
-  } = useImportPackageSubmit();
-
-  // Khi sản phẩm thay đổi trong đơn nhập hàng -> tải rule
-  const selectedProductId = products.find(
-    (p) => p.san_pham === (formData[ORDER_FIELDS.ID_PRODUCT] as string)
-  )?.id ?? null;
-
-  React.useEffect(() => {
-    if (isImportOrder && isOpen) {
-      void loadImportRule(typeof selectedProductId === "number" ? selectedProductId : null);
-    }
-  }, [isImportOrder, isOpen, selectedProductId, loadImportRule]);
-
-  // Override handleSubmit để sau khi tạo đơn -> tạo import package
-  const originalHandleSubmit = handleSubmit;
-  const handleSubmitWithPackage = (e: React.FormEvent) => {
-    if (isImportOrder && importRule?.enabled && selectedProductId) {
-      pendingImportPackageRef.current = {
-        productId: selectedProductId,
-        supplierId: selectedSupplyId,
-        importPrice: Number(formData[ORDER_FIELDS.COST]) || null,
-        data: importPackageData,
-      };
-    } else {
-      pendingImportPackageRef.current = null;
-    }
-    originalHandleSubmit(e);
-  };
+    isImportOrder,
+    importRule,
+    importRuleLoading,
+    importPackageData,
+    updateImportField,
+    handleSubmitWithPackage,
+  } = useCreateOrderImportPackageFlow({
+    isOpen,
+    orderCreationKind,
+    products,
+    formData,
+    selectedSupplyId,
+    pendingImportPackageRef,
+    handleSubmit,
+  });
   const {
     prefillCreditNoteRemaining,
     manualCreditMoney,
@@ -166,201 +117,137 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     prefillContext,
   });
   if (!isOpen) return null;
-  const hasCustomer = Boolean(String(formData[ORDER_FIELDS.CUSTOMER] || "").trim());
-  const canSubmitMulti = multiOrderEnabled && isMultiReady && hasCustomer && !isLoading;
-  const canSubmitSingle = !multiOrderEnabled && isDraftComplete && !isLoading;
-  const canSubmit = multiOrderEnabled ? canSubmitMulti : canSubmitSingle;
-  const submitLabel = multiOrderEnabled
-    ? isLoading
-      ? "Đang tính giá..."
-      : totalOrdersToCreate > 1
-        ? `Tạo đơn hàng gộp (${totalOrdersToCreate} đơn)`
-        : "Tạo đơn hàng gộp"
-    : isLoading
-      ? "Đang tính giá..."
-      : "Tạo đơn hàng";
+  const { canSubmit, submitLabel } = getCreateOrderSubmitState({
+    formData,
+    multiOrderEnabled,
+    isMultiReady,
+    isDraftComplete,
+    isLoading,
+    totalOrdersToCreate,
+  });
   const unitPrice = Number(formData[ORDER_FIELDS.PRICE]) || 0;
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/92 backdrop-blur-sm p-3 sm:p-4">
         <div className="relative w-full max-w-5xl max-h-[84vh] overflow-hidden rounded-[24px] border border-slate-600/70 bg-slate-900 text-slate-100 shadow-[0_28px_70px_-25px_rgba(2,6,23,0.95)] flex flex-col">
-          <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-slate-700/70 bg-slate-900 flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.26em] text-cyan-200/70 font-bold">
-                Order Builder
-              </p>
-              <h3 className="mt-1 text-base sm:text-lg font-black text-white tracking-tight">
-                {multiOrderEnabled ? "Tạo đơn hàng gộp" : "Tạo đơn hàng mới"}
-              </h3>
-              <p className="mt-2 text-xs text-slate-300/75">
-                {multiOrderEnabled
-                  ? "Nhập nhiều dòng chi tiết cho cùng một khách; hệ thống sẽ tạo các đơn thành phần rồi tự gộp theo đúng luồng gộp biên nhận."
-                  : "Hoàn thiện thông tin khách hàng, sản phẩm và chi phí trong một form duy nhất."}
-              </p>
-              {reservedOrderCode ? (
-                <p className="mt-2 text-[11px] font-semibold text-cyan-200/90">
-                  Mã đơn dự kiến: {reservedOrderCode}
-                </p>
-              ) : null}
-            </div>
-            <div className="mt-1 flex items-center gap-2 shrink-0">
-              {orderCreationKind === "sales" && !hasPrefillCredit ? (
-                <button
-                  type="button"
-                  onClick={toggleCreditMode}
-                  className={`inline-flex items-center justify-center h-11 px-3.5 rounded-xl border text-sm font-bold transition-colors ${
-                    creditMode
-                      ? "border-amber-400/60 bg-amber-500/20 text-amber-100 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]"
-                      : "border-slate-500/70 bg-slate-800/90 text-slate-200 hover:bg-slate-700 hover:text-white"
-                  }`}
-                  title="Chuyển đổi: chọn khách từ phiếu credit còn khả dụng"
-                >
-                  Credit
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex items-center justify-center h-11 w-11 rounded-xl border border-slate-500/70 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
-                aria-label="Close"
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-4 py-3">
-            <form id="create-order-form" onSubmit={handleSubmitWithPackage}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
-                <CreateOrderSharedCustomerSection
-                  formData={formData}
-                  onFieldChange={handleChange}
-                  creditMode={Boolean(creditMode && !hasPrefillCredit)}
-                  creditListLoading={creditListLoading}
-                  availableCreditOptions={availableCreditOptions}
-                  onSelectCreditRow={selectCreditNoteRow}
-                  onClearCreditSelection={clearSelectedCreditNote}
-                  creditNoteById={creditNoteById}
-                  selectedCreditNoteId={
-                    selectedCreditNote?.id != null && Number.isFinite(Number(selectedCreditNote.id))
-                      ? Number(selectedCreditNote.id)
-                      : null
+          <CreateOrderModalHeader
+            multiOrderEnabled={multiOrderEnabled}
+            reservedOrderCode={reservedOrderCode}
+            orderCreationKind={orderCreationKind}
+            hasPrefillCredit={hasPrefillCredit}
+            creditMode={creditMode}
+            onToggleCreditMode={toggleCreditMode}
+            onClose={onClose}
+          />
+          <CreateOrderModalBody
+            onSubmit={handleSubmitWithPackage}
+            customer={{
+              formData,
+              onFieldChange: handleChange,
+              creditMode: Boolean(creditMode && !hasPrefillCredit),
+              creditListLoading,
+              availableCreditOptions,
+              onSelectCreditRow: selectCreditNoteRow,
+              onClearCreditSelection: clearSelectedCreditNote,
+              creditNoteById,
+              selectedCreditNoteId:
+                selectedCreditNote?.id != null &&
+                Number.isFinite(Number(selectedCreditNote.id))
+                  ? Number(selectedCreditNote.id)
+                  : null,
+              multiOrderEnabled,
+              detailLineCount: completeLineCount,
+            }}
+            product={{
+              customMode,
+              formData,
+              selectedSupplyId,
+              productOptions,
+              supplyOptions,
+              customerType,
+              canSelectCustomerType,
+              filteredCustomerTypeOptions,
+              onToggleCustomMode: () => {
+                setCustomProductTouched(false);
+                setCustomMode((value) => {
+                  const next = !value;
+                  if (next) {
+                    clearSelectedSupplySelection();
                   }
-                  multiOrderEnabled={multiOrderEnabled}
-                  detailLineCount={completeLineCount}
-                />
-                <CreateOrderProductSection
-                  customMode={customMode}
-                  formData={formData}
-                  selectedSupplyId={selectedSupplyId}
-                  productOptions={productOptions}
-                  supplyOptions={supplyOptions}
-                  customerType={customerType}
-                  canSelectCustomerType={canSelectCustomerType}
-                  filteredCustomerTypeOptions={filteredCustomerTypeOptions}
-                  onToggleCustomMode={() => {
-                    setCustomProductTouched(false);
-                    setCustomMode((value) => {
-                      const next = !value;
-                      if (next) {
-                        clearSelectedSupplySelection();
-                      }
-                      return next;
-                    });
-                  }}
-                  onFieldChange={handleChange}
-                  onProductSelect={handleProductSelect}
-                  onSourceSelect={handleSourceSelect}
-                  onCustomerTypeChange={handleCustomerTypeChange}
-                  onClearSelectedSupplySelection={clearSelectedSupplySelection}
-                  onCustomProductBlur={markCustomProductTouched}
-                />
-                <CreateOrderDetailLinesSection
-                  lines={detailLines}
-                  multiOrderEnabled={multiOrderEnabled}
-                  completeLineCount={completeLineCount}
-                  estimatedTotalPrice={estimatedTotalPrice}
-                  unitPrice={unitPrice}
-                  onAddLine={addDetailLine}
-                  onRemoveLine={removeDetailLine}
-                  onUpdateLine={updateDetailLine}
-                  singleMode={
-                    !multiOrderEnabled
-                      ? {
-                          slot: (formData[ORDER_FIELDS.SLOT] as string) || "",
-                          informationOrder:
-                            (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "",
-                          onFieldChange: handleChange,
-                        }
-                      : undefined
+                  return next;
+                });
+              },
+              onFieldChange: handleChange,
+              onProductSelect: handleProductSelect,
+              onSourceSelect: handleSourceSelect,
+              onCustomerTypeChange: handleCustomerTypeChange,
+              onClearSelectedSupplySelection: clearSelectedSupplySelection,
+              onCustomProductBlur: markCustomProductTouched,
+            }}
+            detailLines={{
+              lines: detailLines,
+              multiOrderEnabled,
+              completeLineCount,
+              estimatedTotalPrice,
+              unitPrice,
+              onAddLine: addDetailLine,
+              onRemoveLine: removeDetailLine,
+              onUpdateLine: updateDetailLine,
+              singleMode: !multiOrderEnabled
+                ? {
+                    slot: (formData[ORDER_FIELDS.SLOT] as string) || "",
+                    informationOrder:
+                      (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "",
+                    onFieldChange: handleChange,
                   }
-                />
-                <CreateOrderPricingSection
-                  customMode={customMode}
-                  customerType={customerType}
-                  formData={formData}
-                  registerDateDMY={registerDateDMY}
-                  isMavrykSupply={isMavrykSupply}
-                  costValue={costValue}
-                  priceValue={priceValue}
-                  onRegisterDateChange={handleRegisterDateChange}
-                  onRegisterDateBlur={handleRegisterDateBlur}
-                  onExpiryDateChange={handleExpiryDateChange}
-                  onExpiryDateBlur={handleExpiryDateBlur}
-                  onCostChange={handlePriceInput(ORDER_FIELDS.COST)}
-                  onPriceChange={handlePriceInput(ORDER_FIELDS.PRICE)}
-                />
-                <CreateOrderPaymentMethodSection
-                  customerType={customerType}
-                  orderCreationKind={orderCreationKind}
-                  priceValue={priceValue}
-                  paymentMethod={paymentMethod}
-                  onPaymentMethodChange={setPaymentMethod}
-                />
-              </div>
-              {/* Import Package Block: chỉ hiển thị với đơn nhập hàng và sản phẩm có rule */}
-              {isImportOrder && !importRuleLoading && (
-                <ImportPackageBlock
-                  rule={importRule}
-                  data={importPackageData}
-                  onChange={updateImportField}
-                />
-              )}
-              <CreateOrderCreditPanels
-                creditMode={creditMode}
-                hasPrefillCredit={hasPrefillCredit}
-                selectedCreditNote={selectedCreditNote}
-                manualCreditMoney={manualCreditMoney}
-                prefillContext={prefillContext}
-                prefillCreditNoteRemaining={prefillCreditNoteRemaining}
-                formDataPrice={formData[ORDER_FIELDS.PRICE]}
-              />
-            </form>
-          </div>
-          <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-t border-slate-700/70 bg-slate-900 flex flex-wrap justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 text-sm font-bold text-slate-100 bg-slate-800 border border-slate-600 rounded-xl hover:bg-slate-700 transition-colors"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              form="create-order-form"
-              className={`px-7 py-2.5 text-sm font-black text-white rounded-xl transition-all ${
-                canSubmit
-                  ? "bg-emerald-500 hover:bg-emerald-400 shadow-[0_14px_30px_-14px_rgba(16,185,129,0.75)] hover:-translate-y-0.5"
-                  : "bg-slate-700/80 opacity-60 cursor-not-allowed"
-              }`}
-              disabled={!canSubmit}
-            >
-              {submitLabel}
-            </button>
-          </div>
+                : undefined,
+            }}
+            pricing={{
+              customMode,
+              customerType,
+              formData,
+              registerDateDMY,
+              isMavrykSupply,
+              costValue,
+              priceValue,
+              onRegisterDateChange: handleRegisterDateChange,
+              onRegisterDateBlur: handleRegisterDateBlur,
+              onExpiryDateChange: handleExpiryDateChange,
+              onExpiryDateBlur: handleExpiryDateBlur,
+              onCostChange: handlePriceInput(ORDER_FIELDS.COST),
+              onPriceChange: handlePriceInput(ORDER_FIELDS.PRICE),
+            }}
+            paymentMethod={{
+              customerType,
+              orderCreationKind,
+              priceValue,
+              paymentMethod,
+              onPaymentMethodChange: setPaymentMethod,
+            }}
+            importPackage={{
+              visible: isImportOrder && !importRuleLoading,
+              rule: importRule,
+              data: importPackageData,
+              onChange: updateImportField,
+            }}
+            creditPanels={{
+              creditMode,
+              hasPrefillCredit,
+              selectedCreditNote,
+              manualCreditMoney,
+              prefillContext,
+              prefillCreditNoteRemaining,
+              formDataPrice: formData[ORDER_FIELDS.PRICE],
+            }}
+          />
+          <CreateOrderModalFooter
+            canSubmit={canSubmit}
+            submitLabel={submitLabel}
+            onClose={onClose}
+          />
         </div>
       </div>
     </ModalPortal>
   );
 };
 export default CreateOrderModal;
-

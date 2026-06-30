@@ -405,10 +405,10 @@ const attachCreateOrderRoute = (router) => {
             }
 
             writeUserEventLog(req, {
-                action: "T?o ??n h?ng",
-                entity: "??n h?ng",
+                action: "Tạo đơn hàng",
+                entity: "Đơn hàng",
                 entityId: normalized.id_order || normalized.id || newOrder?.[idOrderCol],
-                message: `T?o ??n h?ng ${normalized.id_order || newOrder?.[idOrderCol] || ""} - kh?ch: ${normalized.customer || normalized.contact || "kh?ng r?"}`,
+                message: `Tạo đơn hàng ${normalized.id_order || newOrder?.[idOrderCol] || ""} - khách: ${normalized.customer || normalized.contact || "không rõ"}`,
                 source: "orders.order_list",
                 metadata: {
                     orderId: normalized.id || newOrder?.id || null,

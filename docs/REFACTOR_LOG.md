@@ -1310,3 +1310,245 @@ Mục đích: ghi từng clean-code/refactor slice, source-of-truth đã chọn,
 - Moved order pagination helpers into `frontend/src/features/orders/utils/orderPagination.ts`.
 - Updated `useOrdersList` to import pagination helpers from the focused order pagination module.
 - Reduced `orderListTransform.ts` to transformation/stat responsibilities only.
+
+
+## Frontend Pricing Supplier Helpers Split
+- Extracted supplier entry creation, supplier list dedupe/sort, row keys, timestamp selection, cheapest/highest supplier calculations into `frontend/src/features/pricing/supplyPriceUtils.ts`.
+- Kept `frontend/src/features/pricing/utils.ts` as the existing public import surface by re-exporting the moved helpers.
+
+
+## Frontend Pricing Formatters Split
+- Extracted VND input/display formatting, currency/profit display, rate description, date label, and rounding helpers into `frontend/src/features/pricing/priceFormatters.ts`.
+- Kept `frontend/src/features/pricing/utils.ts` re-exporting formatter helpers to preserve existing imports.
+
+
+## Frontend Pricing Utils Barrel Split
+- Split pricing label helpers into `frontend/src/features/pricing/priceLabels.ts`.
+- Split numeric parsing helpers into `frontend/src/features/pricing/priceParsing.ts`.
+- Split pricing calculations into `frontend/src/features/pricing/priceCalculations.ts`.
+- Split product pricing row mapping into `frontend/src/features/pricing/productPriceMapper.ts`.
+- Reduced `frontend/src/features/pricing/utils.ts` to a compatibility barrel preserving existing imports.
+
+
+## Frontend Orders Financial Stats Split
+- Moved order financial totals type and calculation into `frontend/src/features/orders/utils/orderFinancialStats.ts`.
+- Updated orders list hook and stats section type import to use the focused financial stats module.
+- Kept compatibility re-export in `orderListTransform.ts`.
+
+
+## Remaining Refactor Task Plan
+- Added `docs/REFACTOR_TASKS_REMAINING.md` with prioritized frontend/backend cleanup tasks and validation checklist.
+
+
+## Frontend Expenses Allocation Toolbar Split
+- Extracted expenses allocation table toolbar into `frontend/src/features/expenses/components/expense-cost-allocation-table/ExpenseAllocationTableToolbar.tsx`.
+- Kept table view rendering behavior unchanged while reducing header responsibility from the main view component.
+
+
+## Frontend Receipts Table Match State Hook
+- Extracted receipt matching/manual edit state and actions into `frontend/src/features/invoices/components/receipts-table/useReceiptMatchState.ts`.
+- Kept `ReceiptsTable` behavior and markup stable while reducing embedded workflow logic.
+
+
+## Frontend Expenses Allocation Types Constants Split
+- Extracted allocation table row/column types into `types.ts`.
+- Extracted allocation table sizing/sticky-column constants into `constants.ts`.
+- Kept `helpers.ts` re-exporting public names for existing imports.
+
+
+## Frontend Renew Adobe Add Tracking Hook
+- Extracted AddTrackingOrdersModal loading, selection, search, reset, and submit workflow into `useAddTrackingOrdersModal.ts`.
+- Kept modal markup and API behavior stable while reducing component logic.
+
+
+## Frontend Bill Order Print Styles Split
+- Extracted invoice print CSS builder into `frontend/src/features/bill-order/components/invoicePrintStyles.ts`.
+- Reduced `InvoicePreview.tsx` by moving print-only styling out of the render component.
+
+
+## 2026-06-29 - Frontend refactor continuation
+- Split `InvoicePreview` into `InvoiceDocument` + print style module, keeping invoice UI/print contract unchanged.
+- Split expense allocation table into toolbar/container/grid/header/footer domain-local components.
+- Split pricing `supplyActionHelpers` into `supply-actions` response/draft/state mutation/record modules with the original barrel preserved.
+- Split Renew Adobe system log page metadata/formatter logic into `pages/system-logs`.
+- Split dashboard financial chart rendering into `FinancialLineChart`, leaving `FinancialChartsPanel` as data/header orchestration.
+- Validation: `git diff --check` and `cd frontend; npm run build` passed after each major slice.
+
+
+## 2026-06-29 - Frontend refactor continuation batch 2
+- Split expense allocation `helpers.ts` into domain-local helper modules: format, period columns/totals, package row mapping, merge row spans.
+- Split `RenewAdobeAccountsTable` into table shell and `RenewAdobeAccountsResponsiveTable`.
+- Split `RenewStatusPanel` into orchestration panel and `RenewStatusCards`.
+- Split `IpWhitelistPage` into page header, search summary, and list panel components.
+- Validation: `git diff --check` and `cd frontend; npm run build` passed.
+
+
+## 2026-06-29 - Frontend refactor continuation batch 3
+- Split pricing `ProductEditPanel` into form sections, action footer, and style/constants modules.
+- Split warehouse mobile storage card actions/details into feature-local mobile components.
+- Split supply detail monthly log orders panel out of `SupplierDetailModal`.
+- Validation: `git diff --check` and `cd frontend; npm run build` passed after the batch.
+
+
+## 2026-06-29 - Frontend refactor continuation batch 4
+- Split Active Keys page into header, success banner, search, and table panel components.
+- Split Package Form Modal slot config and modal actions into package-form components.
+- Split package product page hook route-sync and slot-card derivation into focused hook/helper modules.
+- Split order stats calculation out of `orderListTransform`.
+- Split Create Order modal footer into a focused component, with modal behavior restored and validated.
+- Validation: `git diff --check` and `cd frontend; npm run build` passed.
+
+
+## 2026-06-29 - Frontend refactor continuation batch 5
+- Split package matching utilities into lookup/column helpers and order matcher modules while preserving public exports.
+- Split shared HTML normalization helpers into DOM tree helpers and combined-content splitter.
+- Split order row action cell and QR prefetch behavior into `OrderRowActionsCell`.
+- Validation: `git diff --check` and `cd frontend; npm run build` passed.
+
+* 2026-06-29 - Frontend refactor continuation batch 6
+  - Split `CreateOrderModalHeader` out of `CreateOrderModal` to keep the modal container focused on orchestration/form composition.
+  - Kept header behavior/UI unchanged: title, reserved order code, credit toggle, and close action remain in the same modal domain.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - EditOrder modal rule cleanup
+  - Extracted pure edit-order pricing/order-code helpers into `editOrderPricingRules.ts` inside the modal domain.
+  - Reused the supply domain's `getImportPriceBySupplyName` instead of leaving an implicit/missing local helper reference.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Add Mcoin feature split
+  - Moved the add-coin modal into `features/add-mcoin/components/AddCoinModal.tsx` so the page no longer owns modal form/reset/validation details.
+  - Moved history table/card rendering into `features/add-mcoin/components/AddMcoinHistoryTable.tsx` so `index.tsx` focuses on page state, search, and pagination orchestration.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Content rich editor toolbar split
+  - Extracted the TipTap toolbar into `features/content/components/ArticleRichEditorToolbar.tsx`.
+  - Kept editor state, link modal, image modal, and HTML mode orchestration in `ArticleRichEditor.tsx`.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Package stock dropdown split
+  - Extracted manual warehouse entry fields into `StockManualEntryFields.tsx` inside package-form.
+  - Extracted dropdown search/list rendering into `StockDropdownMenu.tsx` inside package-form.
+  - Kept selected-item display and inline-edit orchestration in `StockDropdown.tsx`.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - CreateOrder derived rules split
+  - Extracted pure derived rules from `useCreateOrderModalDerived` into `createOrderDerivedRules.ts` inside the CreateOrder modal domain.
+  - Moved credit option mapping, product/supply options, promo filtering, and draft-ready checks out of the hook without changing public behavior.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Renew Adobe add-admin IMAP section split
+  - Extracted the IMAP alias quick-add and mailbox select UI into `AddAdminImapSection.tsx` inside the Renew Adobe feature.
+  - Kept account creation state, API calls, validation, and submit flow in `AddAdminAccountModal.tsx`.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - One-pass safe refactor batch
+  - Extracted pricing create-product option/name rules into `productBasicsRules.ts` inside the create-product modal feature.
+  - Extracted dashboard wallet type table rendering into `WalletTypesTable.tsx`, leaving CRUD state/API flow in `WalletTypesManagerModal.tsx`.
+  - Extracted CreateOrder credit-note mode into `useCreateOrderCredit.ts`, leaving the main order hook focused on orchestration.
+  - Rebuilt after each slice to keep behavior stable.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Supply and warehouse UI split
+  - Extracted supplier overview/payment stat cards into `SupplierOverviewCards.tsx` inside the supply feature.
+  - Extracted warehouse mobile `ViewCard` into `storage-mobile/ViewCard.tsx`, leaving `StorageItemCard.tsx` focused on list/edit orchestration.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - CTV list table split
+  - Extracted responsive CTV/customer table, mobile cards, and pagination into `CtvListTable.tsx` inside the CTV feature.
+  - Kept page-level fetch/filter/tab state in `features/ctv-list/index.tsx`.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Tracking and package row cleanup
+  - Extracted add-tracking order selection table/status pill into `AddTrackingOrdersTable.tsx` inside Renew Adobe.
+  - Extracted package row slot/capacity metrics into `packageRowMetrics.ts` inside package-product.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Pricing product row view-model split
+  - Extracted `ProductRow` display/profit/preview calculations into `productRowViewModel.ts` inside pricing components.
+  - Kept row rendering, edit panel, and expanded supplier details behavior unchanged.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Renew Adobe Admin feature-flow refactor
+  - Refactored the large `useRenewAdobeAdmin` hook into feature-local flow hooks under `hooks/use-renew-adobe-admin/`.
+  - Added `accountsData.ts` for account loading state, `checkFlow.ts` for single/check-all/cron flow, `userActions.ts` for delete/fix user flows, `adminDeletion.ts` for admin-account delete modal flow, and `urlAccess.ts` for access URL updates.
+  - Kept the public return contract of `useRenewAdobeAdmin` stable so `RenewAdobeAdminPage` and child components do not need behavior changes.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Package form state flow refactor
+  - Extracted package form import formatting and validation into `packageFormRules.ts` inside the package-form feature folder.
+  - Extracted warehouse fetch/filter/update flow into `usePackageWarehouseItems.ts` and stock/storage dropdown/manual controls into `usePackageStockStorageControls.ts`.
+  - Reduced `usePackageFormState.ts` to orchestration while keeping its public return contract stable.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - EditOrder resources hook refactor
+  - Extracted EditOrder product options, supplies, supply prices, and current-supply merging into `useEditOrderResources.ts` inside the EditOrder modal domain.
+  - Kept `useEditOrderLogic.ts` focused on modal state, pricing orchestration, and user actions without moving business logic to global shared helpers.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Article SEO text helper split
+  - Extracted HTML stripping, word counting, slug validation, and title keyword extraction into `articleSeoText.ts` inside the content feature utils.
+  - Kept `articleSeoReview.ts` focused on composing SEO check items and score output.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Dashboard date range popover split
+  - Extracted dashboard date-range calendar popover rendering into `DashboardDateRangePopover.tsx` inside the dashboard feature.
+  - Kept `DashboardDateRangeFilter.tsx` focused on input state, range parsing, positioning, and portal orchestration.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - Product rich editor toolbar action split
+  - Extracted rich editor mode/action button rows into `RichTextEditorToolbarActions.tsx` inside the product edit rich-text editor feature.
+  - Kept field selects and public toolbar props in `RichTextEditorToolbar.tsx` unchanged.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-29 - CreateOrder import-package flow split
+  - Extracted import-order package rule loading and submit metadata attachment into `useCreateOrderImportPackageFlow.ts` inside the CreateOrder modal hooks.
+  - Kept `CreateOrderModal.tsx` focused on modal composition and section orchestration.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - Rich editor toolbar action cleanup
+  - Reworked `RichTextEditorToolbarActions.tsx` to render command groups from local action configs instead of long repeated button JSX.
+  - Kept toolbar commands, icons, disabled state, and public props unchanged.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - Renew Adobe account table split
+  - Extracted repeated account action buttons into `RenewAdobeAccountActions.tsx` inside the Renew Adobe feature.
+  - Extracted mobile account card plus OTP/slot display helpers into `RenewAdobeAccountMobileCard.tsx`.
+  - Kept `RenewAdobeAccountsResponsiveTable.tsx` focused on responsive table composition and desktop rows.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - CreateOrder modal body split
+  - Extracted the CreateOrder form section composition into `CreateOrderModalBody.tsx` inside the modal component folder.
+  - Kept `CreateOrderModal.tsx` focused on hook orchestration, submit state, header, and footer wiring.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - EditOrder supply selection rules split
+  - Extracted selected-supply name, import-price fallback, unpaid-order recalc rules, and fallback cost calculation into `editOrderSupplySelection.ts`.
+  - Kept `useEditOrderLogic.ts` focused on state and user action orchestration.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - CreateOrder save and submit-state split
+  - Extracted import-package metadata attachment into `useCreateOrderImportPackageSave.ts`.
+  - Extracted submit availability and submit label rules into `createOrderSubmitState.ts`.
+  - Reduced `CreateOrderModal.tsx` to hook orchestration and modal composition.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - CreateOrder date input flow split
+  - Extracted register/expiry date input handlers and custom-month expiry sync into `useCreateOrderDateInputs.ts`.
+  - Kept `useCreateOrderModalDerived.ts` focused on derived options, credit metadata, and customer type rules.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - EditOrder lifecycle hook split
+  - Extracted open/reset initialization and product-dependent supply/price refresh effects into `useEditOrderLifecycle.ts`.
+  - Kept `useEditOrderLogic.ts` focused on pricing bridge and user action handlers.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - Wallet balances withdraw flow split
+  - Extracted withdraw rows loading, error/loading state, withdraw modal state, and success refresh into `useWalletWithdrawFlow.ts` inside `WalletBalancesCard`.
+  - Extracted wallet card tab buttons and withdraw action button into `WalletBalancesTabs.tsx`.
+  - Kept `WalletBalancesCard.tsx` focused on daily balance entry and composing wallet panels.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.
+
+* 2026-06-30 - Renew profile check action button split
+  - Extracted storefront renew profile action button states into `RenewProfileCheckActionButton.tsx`.
+  - Kept `RenewProfileCheckDeskPage.tsx` focused on page state, guide/hint orchestration, and form composition.
+  - Validation: `git diff --check`; `cd frontend; npm run build`.

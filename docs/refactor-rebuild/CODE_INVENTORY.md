@@ -120,3 +120,40 @@ Mục đích: phân loại toàn bộ code hiện tại trước khi rebuild. Fi
 | Backend | `backend/src/domains/products/services/productLookupService.js` | `products` | `keep` | Source-of-truth cho lookup product/variant by name | `controller/finders.js` đã xóa sau khi caller cutover. |
 | Frontend | `frontend/src/features/product-info/api/productDescApi.ts` | `products` | `keep` | API client owner cho product description/SEO/image c?a product-info | Di chuy?n t? `frontend/src/lib/productDescApi.ts`; m?i caller ?? cutover. |
 | Frontend | `frontend/src/shared/utils/pricing.ts` | `shared` | `keep` | Shared pricing primitives reused across pricing and bill-order | `multiplyValue` moved here to remove cross-feature dependency. |
+
+## 9. Phase A Inventory Sync - 2026-06-30
+
+| Khu vực | File/Folder | Owner | Trạng thái | Hành động đề xuất | Ghi chú |
+| --- | --- | --- | --- | --- | --- |
+| Backend | `backend/src/routes/index.js` | `system/api` | `keep` | Source-of-truth mount table cho `/api` và `/api/v1` | Phase A dùng để map route prefix; không refactor trong slice này. |
+| Backend | `backend/src/domains/orders/controller/index.js` | `orders` | `keep` | Route composer cho orders | Giữ thin composer; sub-route files là source-of-truth từng flow. |
+| Backend | `backend/src/domains/orders/controller/listRoutes.js` | `orders` | `keep` | Source-of-truth list/tax/redirect routes | E1 frontend mapper phải giữ response row shape. |
+| Backend | `backend/src/domains/orders/controller/crud/createOrder.js` | `orders` | `migrate` | Tách validation/payment allocation sau khi chốt C1.3/C1.4 | Không tạo helper song song; sửa/tách từ hàm chính. |
+| Backend | `backend/src/domains/orders/controller/crud/updateOrder.js` | `orders` | `keep` | Update route hiện tại | Chỉ tách khi audit EditOrder/update flow. |
+| Backend | `backend/src/domains/orders/controller/crud/deleteOrder.js` | `orders` | `keep` | Delete route hiện tại | Không xóa nếu chưa check side effects. |
+| Backend | `backend/src/domains/orders/controller/calculatePriceRoute.js` | `orders/pricing` | `migrate` | Sau khi pricing owner rõ, route gọi pricing service owner | Preserve response shape. |
+| Backend | `backend/src/domains/orders/controller/manualWebhookCompletionRoute.js` | `orders` | `keep` | Thin route wrapper | Use-case là idempotency source-of-truth. |
+| Backend | `backend/src/domains/orders/controller/manualUsdtCompletionRoute.js` | `orders` | `keep` | Thin route wrapper | Use-case là idempotency source-of-truth. |
+| Backend | `backend/src/domains/orders/controller/refundCreditRoutes.js` | `orders/finance` | `migrate` | Split further only after refund source-of-truth audit | Money-risk area; keep route contracts. |
+| Backend | `backend/src/domains/orders/controller/renewRoutes.js` | `orders/renew` | `keep` | Orders renew/refund route | Renew backend facade split remains D6-D7. |
+| Backend | `backend/src/domains/payment-slots/index.js` | `payment-slots` | `keep` | Internal domain public API | Not an HTTP route; preserve exports. |
+| Backend | `backend/src/domains/payment-slots/helpers/paymentSlotInputs.js` | `payment-slots` | `keep` | Exact amount/account source-of-truth | Do not merge into integer VND parser. |
+| Backend | `backend/src/domains/wallet/routes.js` | `wallet` | `keep` | HTTP route source for `/api/wallets/*` | Controller thinning is future backend task. |
+| Backend | `backend/src/domains/wallet/controller/index.js` | `wallet` | `migrate` | Split by transaction/type when refactoring wallet | Keep route response shape first. |
+| Backend | `backend/src/domains/shop-bank-accounts/routes.js` | `shop-bank-accounts` | `keep` | HTTP route source for `/api/shop-bank-accounts/*` | Input helpers already domain-local/shared primitive split. |
+| Backend | `backend/src/domains/shop-bank-accounts/helpers/shopBankInputs.js` | `shop-bank-accounts` | `keep` | Domain input source-of-truth | Shared only text/boolean primitives. |
+| Backend | `backend/src/domains/usdt-wallets/routes.js` | `usdt-wallets` | `keep` | HTTP route source for `/api/usdt-wallets/*` | Input helpers already domain-local/shared primitive split. |
+| Backend | `backend/src/domains/usdt-wallets/helpers/usdtWalletInputs.js` | `usdt-wallets` | `keep` | Domain input source-of-truth | Shared only text/boolean/money primitives. |
+| Backend | `backend/src/services/pricing/core.js` | `pricing` | `migrate` | Add baseline tests before split into parser/rules/calculators | Do not move pricing parser into `shared/money`. |
+| Frontend | `frontend/src/features/orders/utils/orderListTransform.ts` | `orders` | `migrate` | Chốt DTO -> view-model source-of-truth then split mapper/filter/sort/stats | Candidate next slice. |
+| Frontend | `frontend/src/features/orders/utils/ordersHelpers.ts` | `orders` | `migrate` | Audit overlap with order transform/Create/Edit/Bill Order | Keep feature-local until source-of-truth chosen. |
+| Frontend | `frontend/src/components/modals/CreateOrderModal/*` | `orders` | `migrate` | Move/own under orders feature via compatibility wrapper if needed | Public props already preserved in recent split. |
+| Frontend | `frontend/src/components/modals/EditOrderModal/*` | `orders` | `migrate` | Move/own under orders feature via compatibility wrapper if needed | Public props already preserved in recent split. |
+| Frontend | `frontend/src/features/invoices/index.tsx` | `invoices` | `migrate` | Split page/hook/toolbar after mapping audit | Candidate E2. |
+| Frontend | `frontend/src/features/invoices/components/ReceiptsTable.tsx` | `invoices` | `migrate` | Split row/action/status/QR sections after source-of-truth chosen | Candidate E2. |
+| Frontend | `frontend/src/features/invoices/helpers.ts` | `invoices` | `migrate` | Audit receipt status/action mapping | Do not move to shared. |
+| Frontend | `frontend/src/features/pricing/utils.ts` | `pricing` | `compatibility` | Keep as barrel only; cut callers to concrete modules when touched | Do not add new logic. |
+| Frontend | `frontend/src/features/pricing/priceCalculations.ts` | `pricing` | `keep` | Frontend calculation module | Backend ownership decision still open. |
+| Frontend | `frontend/src/features/pricing/productPriceMapper.ts` | `pricing` | `keep` | Product price row mapper | Feature owner, not shared. |
+| Frontend | `frontend/src/features/product-info/api/productDescApi.ts` | `product-info` | `keep` | Product description API owner | `frontend/src/lib/productDescApi.ts` removed. |
+| Frontend | `frontend/src/shared/utils/*` | `shared` | `compatibility` | Re-export layer only | New code should import from concrete shared contracts. |

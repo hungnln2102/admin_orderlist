@@ -1,26 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type React from "react";
-import { apiFetch } from "@/shared/api/client";
-import { API_ENDPOINTS } from "@/constants";
-import type { WarehouseItem } from "../../../../../Personal/Storage/types";
 import type {
   PackageFormValues,
   SlotLinkMode,
 } from "../../../utils/packageHelpers";
+import { EMPTY_FORM_VALUES } from "../../../utils/packageHelpers";
 import {
-  EMPTY_FORM_VALUES,
-  EMPTY_MANUAL_ENTRY,
-} from "../../../utils/packageHelpers";
-import {
-  normalizeWarehouseId,
-  type EditableWarehouseFields,
-} from "./shared";
+  formatImportValue,
+  getPackageFormValidation,
+} from "./packageFormRules";
+import { usePackageStockStorageControls } from "./usePackageStockStorageControls";
+import { usePackageWarehouseItems } from "./usePackageWarehouseItems";
 
 type UsePackageFormStateParams = {
   open: boolean;
   initialValues?: PackageFormValues;
   onSubmit: (values: PackageFormValues) => void;
-  /** Bật khi loại gói có trường «activation» — khi false, không bắt buộc kích hoạt dù chọn match theo thông tin đơn. */
+  /** B?t khi lo?i g?i c? tr??ng ?activation? ? khi false, kh?ng b?t bu?c k?ch ho?t d? ch?n match theo th?ng tin ??n. */
   requireActivationForInformation: boolean;
 };
 
@@ -35,25 +31,23 @@ export const usePackageFormState = ({
     [initialValues]
   );
   const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
-  const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
-  const [warehouseLoading, setWarehouseLoading] = useState(false);
 
-  const [stockDropdownOpen, setStockDropdownOpen] = useState(false);
-  const [stockSearch, setStockSearch] = useState("");
-  const [stockManual, setStockManual] = useState(false);
-  const stockRef = useRef<HTMLDivElement>(null);
+  const {
+    warehouseLoading,
+    inStockItems,
+    filterItems,
+    findWarehouseItemById,
+    handleUpdateWarehouseInfo,
+  } = usePackageWarehouseItems(open);
 
-  const [storageDropdownOpen, setStorageDropdownOpen] = useState(false);
-  const [storageSearch, setStorageSearch] = useState("");
-  const [storageManual, setStorageManual] = useState(false);
-  const storageRef = useRef<HTMLDivElement>(null);
+  const stockStorageControls = usePackageStockStorageControls({
+    values,
+    setValues,
+    filterItems,
+    findWarehouseItemById,
+  });
 
-  const formatImportValue = useCallback((raw: string): string => {
-    const digitsOnly = raw.replace(/[^0-9]/g, "");
-    if (!digitsOnly) return "";
-    const numeric = Number(digitsOnly);
-    return Number.isFinite(numeric) ? numeric.toLocaleString("vi-VN") : "";
-  }, []);
+  const { stockManual, resetStockStorageControls } = stockStorageControls;
 
   useEffect(() => {
     if (!open) return;
@@ -62,151 +56,8 @@ export const usePackageFormState = ({
       ...mergedInitialValues,
       import: formatImportValue(mergedInitialValues.import),
     });
-    setStockSearch("");
-    setStockDropdownOpen(false);
-    setStockManual(false);
-    setStorageSearch("");
-    setStorageDropdownOpen(false);
-    setStorageManual(false);
-  }, [open, mergedInitialValues, formatImportValue]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-    const fetchWarehouse = async () => {
-      setWarehouseLoading(true);
-      try {
-        const response = await apiFetch(API_ENDPOINTS.WAREHOUSE);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = (await response.json()) as WarehouseItem[];
-        if (!cancelled) setWarehouseItems(data);
-      } catch {
-        if (!cancelled) setWarehouseItems([]);
-      } finally {
-        if (!cancelled) setWarehouseLoading(false);
-      }
-    };
-
-    fetchWarehouse();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (stockRef.current && !stockRef.current.contains(event.target as Node)) {
-        setStockDropdownOpen(false);
-      }
-      if (
-        storageRef.current &&
-        !storageRef.current.contains(event.target as Node)
-      ) {
-        setStorageDropdownOpen(false);
-      }
-    };
-
-    if (stockDropdownOpen || storageDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [stockDropdownOpen, storageDropdownOpen]);
-
-  const inStockItems = useMemo(
-    () =>
-      warehouseItems.filter((item) =>
-        (item.status || "").toLowerCase().includes("tồn")
-      ),
-    [warehouseItems]
-  );
-
-  const filterItems = useCallback(
-    (search: string) => {
-      if (!search.trim()) return inStockItems;
-      const query = search.toLowerCase();
-      return inStockItems.filter(
-        (item) =>
-          (item.account || "").toLowerCase().includes(query) ||
-          (item.category || "").toLowerCase().includes(query) ||
-          (item.note || "").toLowerCase().includes(query)
-      );
-    },
-    [inStockItems]
-  );
-
-  const filteredStockItems = useMemo(
-    () => filterItems(stockSearch),
-    [filterItems, stockSearch]
-  );
-  const filteredStorageItems = useMemo(
-    () => filterItems(storageSearch),
-    [filterItems, storageSearch]
-  );
-
-  const selectedStockItem = useMemo(() => {
-    const targetId = normalizeWarehouseId(values.stockId);
-    if (targetId == null) return null;
-    return (
-      warehouseItems.find((item) => normalizeWarehouseId(item.id) === targetId) ??
-      null
-    );
-  }, [values.stockId, warehouseItems]);
-
-  const selectedStorageItem = useMemo(() => {
-    const targetId = normalizeWarehouseId(values.storageId);
-    if (targetId == null) return null;
-    return (
-      warehouseItems.find((item) => normalizeWarehouseId(item.id) === targetId) ??
-      null
-    );
-  }, [values.storageId, warehouseItems]);
-
-  const handleUpdateWarehouseInfo = useCallback(
-    async (id: number, fields: EditableWarehouseFields) => {
-      const targetId = normalizeWarehouseId(id);
-      const currentItem =
-        targetId == null
-          ? undefined
-          : warehouseItems.find(
-              (item) => normalizeWarehouseId(item.id) === targetId
-            );
-
-      if (!currentItem) throw new Error("WAREHOUSE_ITEM_NOT_FOUND");
-
-      const payload = {
-        category: currentItem.category ?? null,
-        account: fields.account || null,
-        password: fields.password || null,
-        backup_email: fields.backup_email || null,
-        two_fa: fields.two_fa || null,
-        note: fields.note || null,
-        status: currentItem.status ?? null,
-        expires_at: fields.expires_at?.trim() || null,
-        is_verified: currentItem.is_verified ?? false,
-      };
-
-      const response = await apiFetch(`${API_ENDPOINTS.WAREHOUSE}/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const updated = (await response.json()) as WarehouseItem;
-      setWarehouseItems((prev) =>
-        prev.map((item) =>
-          normalizeWarehouseId(item.id) === targetId
-            ? { ...item, ...updated }
-            : item
-        )
-      );
-    },
-    [warehouseItems]
-  );
+    resetStockStorageControls();
+  }, [open, mergedInitialValues, resetStockStorageControls]);
 
   const handleChange = useCallback(
     (
@@ -221,74 +72,15 @@ export const usePackageFormState = ({
 
       setValues((prev) => ({ ...prev, [field]: value }));
     },
-    [formatImportValue]
+    []
   );
 
-  const handleSelectStock = useCallback((item: WarehouseItem) => {
-    setValues((prev) => ({
-      ...prev,
-      stockId: item.id ?? null,
-    }));
-    setStockDropdownOpen(false);
-    setStockSearch("");
-  }, []);
-
-  const handleClearStock = useCallback(() => {
-    setValues((prev) => ({ ...prev, stockId: null }));
-  }, []);
-
-  const handleToggleStockManual = useCallback(() => {
-    setStockManual((prev) => !prev);
-    setStockDropdownOpen(false);
-    if (!stockManual) {
-      setValues((prev) => ({
-        ...prev,
-        stockId: null,
-        manualStock: { ...EMPTY_MANUAL_ENTRY },
-      }));
-    }
-  }, [stockManual]);
-
-  const handleSelectStorage = useCallback((item: WarehouseItem) => {
-    setValues((prev) => ({ ...prev, storageId: item.id ?? null }));
-    setStorageDropdownOpen(false);
-    setStorageSearch("");
-  }, []);
-
-  const handleClearStorage = useCallback(() => {
-    setValues((prev) => ({ ...prev, storageId: null }));
-  }, []);
-
-  const handleToggleStorageManual = useCallback(() => {
-    setStorageManual((prev) => !prev);
-    setStorageDropdownOpen(false);
-    if (!storageManual) {
-      setValues((prev) => ({
-        ...prev,
-        storageId: null,
-        manualStorage: { ...EMPTY_MANUAL_ENTRY },
-      }));
-    }
-  }, [storageManual]);
-
-  const matchRequiresAccountError =
-    (values.slotLinkMode === "slot" || values.slotLinkMode === "information") &&
-    !values.stockId &&
-    !stockManual
-      ? "Cần chọn tài khoản gốc (kho) để gán gói."
-      : null;
-
-  // Khớp với mutation: có storageId hoặc account nhập tay (POST kho khi submit). Không phụ thuộc cờ storageManual để tránh lệch validation vs dữ liệu gửi đi.
-  const hasActivation =
-    values.storageId != null ||
-    Boolean(values.manualStorage?.account?.trim());
-
-  const matchRequiresActivationError =
-    values.slotLinkMode === "information" &&
-    requireActivationForInformation &&
-    !hasActivation
-      ? "Chế độ theo thông tin đơn cần chọn tài khoản kích hoạt (kho kích hoạt)."
-      : null;
+  const { matchRequiresAccountError, matchRequiresActivationError } =
+    getPackageFormValidation({
+      values,
+      stockManual,
+      requireActivationForInformation,
+    });
 
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
@@ -314,30 +106,9 @@ export const usePackageFormState = ({
     setValues,
     warehouseLoading,
     inStockItemsCount: inStockItems.length,
-    stockDropdownOpen,
-    setStockDropdownOpen,
-    stockSearch,
-    setStockSearch,
-    stockManual,
-    stockRef,
-    storageDropdownOpen,
-    setStorageDropdownOpen,
-    storageSearch,
-    setStorageSearch,
-    storageManual,
-    storageRef,
-    filteredStockItems,
-    filteredStorageItems,
-    selectedStockItem,
-    selectedStorageItem,
+    ...stockStorageControls,
     handleUpdateWarehouseInfo,
     handleChange,
-    handleSelectStock,
-    handleClearStock,
-    handleToggleStockManual,
-    handleSelectStorage,
-    handleClearStorage,
-    handleToggleStorageManual,
     matchRequiresAccountError,
     matchRequiresActivationError,
     handleSubmit,
