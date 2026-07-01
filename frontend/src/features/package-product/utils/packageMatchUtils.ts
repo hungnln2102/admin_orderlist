@@ -20,7 +20,12 @@ import {
   resolveOrderDisplayValue,
 } from "./packageHelpers";
 
-import { buildOrderLookupKey, getDisplayColumn, getMatchColumn } from "./packageMatchKeys";
+import {
+  buildOrderLookupKey,
+  collectOrdersByProductCodes,
+  getDisplayColumn,
+  getMatchColumn,
+} from "./packageMatchKeys";
 
 export { orderBelongsToPackageByProduct, orderMatchesPackageLink } from "./packageOrderMatchers";
 import { orderBelongsToPackageByProduct, orderMatchesPackageLink } from "./packageOrderMatchers";
