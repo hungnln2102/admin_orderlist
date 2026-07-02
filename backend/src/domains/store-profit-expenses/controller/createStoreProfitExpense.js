@@ -142,10 +142,10 @@ const createStoreProfitExpense = async (req, res) => {
 
     const mapped = mapExpenseRow(row || {});
     writeUserEventLog(req, {
-      action: "T?o log chi ph?",
-      entity: "Chi ph?",
+      action: "Tạo log chi phí",
+      entity: "Chi phí",
       entityId: mapped.id || row?.[COLS.ID],
-      message: `T?o log chi ph? ${mapped.reason || reason || "kh?ng c? l? do"} - s? ti?n: ${mapped.amount ?? amount}`,
+      message: `Tạo log chi phí ${mapped.reason || reason || "không có lý do"} - số tiền: ${mapped.amount ?? amount}`,
       source: "finance.store_profit_expenses",
       metadata: {
         expenseId: mapped.id || row?.[COLS.ID] || null,

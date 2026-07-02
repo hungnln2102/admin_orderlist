@@ -25,13 +25,13 @@ export const getCreateOrderSubmitState = ({
   const canSubmit = multiOrderEnabled ? canSubmitMulti : canSubmitSingle;
   const submitLabel = multiOrderEnabled
     ? isLoading
-      ? "?ang t?nh gi?..."
+      ? "Đang tính giá..."
       : totalOrdersToCreate > 1
-        ? `T?o ??n h?ng g?p (${totalOrdersToCreate} ??n)`
-        : "T?o ??n h?ng g?p"
+        ? `Tạo đơn hàng gộp (${totalOrdersToCreate} đơn)`
+        : "Tạo đơn hàng gộp"
     : isLoading
-      ? "?ang t?nh gi?..."
-      : "T?o ??n h?ng";
+      ? "Đang tính giá..."
+      : "Tạo đơn hàng";
 
   return { canSubmit, submitLabel };
 };

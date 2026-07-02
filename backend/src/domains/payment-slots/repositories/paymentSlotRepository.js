@@ -99,27 +99,30 @@ const fetchNextAvailableSuffix = async (executor, { receiverAccount, baseAmount 
   const { rows } = await run(
     executor,
     `
-      WITH config AS (
-        SELECT $3::int AS max_suffix
+      WITH params AS (
+        SELECT $1::text AS receiver_account,
+               $2::numeric AS base_amount,
+               $3::int AS max_suffix
       ), seed AS (
         SELECT nextval('${SUFFIX_SEQUENCE}')::int AS suffix
       ), candidates AS (
-        SELECT ((seed.suffix - 1 + gs.offset) % config.max_suffix)::int + 1 AS suffix,
-               gs.offset AS offset
+        SELECT ((seed.suffix - 1 + gs.suffix_offset) % params.max_suffix)::int + 1 AS suffix,
+               gs.suffix_offset AS suffix_offset
         FROM seed
-        CROSS JOIN config
-        CROSS JOIN generate_series(0, config.max_suffix - 1) AS gs(offset)
+        CROSS JOIN params
+        CROSS JOIN generate_series(0, params.max_suffix - 1) AS gs(suffix_offset)
       )
       SELECT candidates.suffix
       FROM candidates
+      CROSS JOIN params
       WHERE NOT EXISTS (
         SELECT 1
         FROM ${SLOTS_TABLE} slots
-        WHERE slots.${SLOT_COLS.RECEIVER_ACCOUNT} = $1
+        WHERE slots.${SLOT_COLS.RECEIVER_ACCOUNT} = params.receiver_account
           AND slots.${SLOT_COLS.STATUS} = '${SLOT_STATUS.PENDING}'
-          AND slots.${SLOT_COLS.EXPECTED_AMOUNT} = ($2::numeric + candidates.suffix)
+          AND slots.${SLOT_COLS.EXPECTED_AMOUNT} = (params.base_amount + candidates.suffix)
       )
-      ORDER BY candidates.offset ASC
+      ORDER BY candidates.suffix_offset ASC
       LIMIT 1
     `,
     [receiverAccount, baseAmount, SUFFIX_MAX]
