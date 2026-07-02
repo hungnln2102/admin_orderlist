@@ -17,12 +17,12 @@ const pgPlaceholdersToKnex = (sql) =>
   String(sql || "").replace(/\$(\d+)/g, "?");
 
 const run = async (executor, sql, params = []) => {
-  if (executor && typeof executor.query === "function") {
-    return executor.query(sql, params);
-  }
   if (executor && typeof executor.raw === "function") {
     const res = await executor.raw(pgPlaceholdersToKnex(sql), params);
     return { rows: res.rows || [], rowCount: res.rowCount ?? (res.rows ? res.rows.length : 0) };
+  }
+  if (executor && typeof executor.query === "function") {
+    return executor.query(sql, params);
   }
   throw new Error("paymentSlotRepository: executor must be pg client or knex");
 };
