@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import type { ProductImageItem } from "@/lib/productImagesApi";
@@ -54,7 +54,7 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
         <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
           <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <h3 className="text-lg font-semibold text-white shrink-0">
-              Chá»n hÃ¬nh áº£nh sáº£n pháº©m
+              Chọn hình ảnh sản phẩm
             </h3>
             <div className="relative w-full sm:max-w-xs">
               <MagnifyingGlassIcon
@@ -65,7 +65,7 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
                 type="search"
                 value={nameFilter}
                 onChange={(e) => setNameFilter(e.target.value)}
-                placeholder="Lá»c theo tÃªn file..."
+                placeholder="Lọc theo tên file..."
                 className="w-full rounded-lg border border-white/15 bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/40 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
                 autoComplete="off"
                 spellCheck={false}
@@ -74,12 +74,12 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
           </div>
           <div className="p-4 space-y-4">
             {loading ? (
-              <p className="text-sm text-white/70">Äang táº£i hÃ¬nh áº£nh...</p>
+              <p className="text-sm text-white/70">Đang tải hình ảnh...</p>
             ) : images.length === 0 ? (
-              <p className="text-sm text-white/70">ChÆ°a cÃ³ hÃ¬nh áº£nh nÃ o.</p>
+              <p className="text-sm text-white/70">Chưa có hình ảnh nào.</p>
             ) : filteredImages.length === 0 ? (
               <p className="text-sm text-white/70">
-                KhÃ´ng cÃ³ áº£nh khá»›p &quot;{nameFilter.trim()}&quot;. Thá»­ tá»« khÃ³a khÃ¡c.
+                Không có ảnh khớp &quot;{nameFilter.trim()}&quot;. Thử từ khóa khác.
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto">
@@ -129,7 +129,7 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
                   onClick={onUploadClick}
                   disabled={uploading}
                 >
-                  {uploading ? "Äang táº£i..." : "Táº£i hÃ¬nh má»›i"}
+                  {uploading ? "Đang tải..." : "Tải hình mới"}
                 </button>
                 <button
                   type="button"
@@ -137,7 +137,7 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
                   onClick={onDeleteSelected}
                   disabled={!selectedImage || deleting}
                 >
-                  {deleting ? "Äang xÃ³a..." : "XoÃ¡ hÃ¬nh Ä‘Ã£ chá»n"}
+                  {deleting ? "Đang xóa..." : "Xoá hình đã chọn"}
                 </button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -146,7 +146,7 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
                   className="px-4 py-2 text-sm font-semibold text-white/70 hover:text-white"
                   onClick={onClose}
                 >
-                  Há»§y
+                  Hủy
                 </button>
                 <button
                   type="button"
@@ -154,7 +154,7 @@ export const ProductImagePickerModal: React.FC<ProductImagePickerModalProps> = (
                   onClick={onUseSelected}
                   disabled={!selectedImage}
                 >
-                  Sá»­ dá»¥ng hÃ¬nh Ä‘Ã£ chá»n
+                  Sử dụng hình đã chọn
                 </button>
               </div>
             </div>

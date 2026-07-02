@@ -1,1 +1,1 @@
-﻿export * from "@/shared/date";
+export * from "@/shared/date";

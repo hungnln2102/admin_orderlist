@@ -1,4 +1,4 @@
-﻿const { completeProcessingOrderWithManualUsdt } = require("./manualUsdtCompletion");
+const { completeProcessingOrderWithManualUsdt } = require("./manualUsdtCompletion");
 
 const attachManualUsdtCompletionRoute = (router) => {
   router.post("/:id/complete-manual-usdt", async (req, res) => {
@@ -9,7 +9,7 @@ const attachManualUsdtCompletionRoute = (router) => {
         action: "Xac nhan thanh toan USDT thu cong",
         entity: "Don hang",
         entityId: req.params.id,
-        message: `Xac nhan thanh toan USDT thu cong cho Ä‘Æ¡n ${req.params.id}`,
+        message: `Xac nhan thanh toan USDT thu cong cho đơn ${req.params.id}`,
         source: "orders.order_list",
         metadata: {
           orderId: Number(req.params.id),

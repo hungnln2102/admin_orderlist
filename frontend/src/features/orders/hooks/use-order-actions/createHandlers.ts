@@ -4,7 +4,7 @@ import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
 import { createImportPackage } from "@/features/warehouse/api/importPackageApi";
 import { formatCurrency, parseErrorResponse } from "../../utils/ordersHelpers";
-import type { RefundCreatePrefill } from "../useOrdersModals";
+import type { CreatedOrderBatchView, RefundCreatePrefill } from "../useOrdersModals";
 import type { CreateOrderPayload } from "./types";
 
 type ImportPackageMeta = {
@@ -101,12 +101,12 @@ const createReceiptBatchFromCreatedOrders = async (
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(String(body?.error || "Khong the gop don theo luong gop bien nhan."));
+    throw new Error(String(body?.error || t("orders.batch.create_failed")));
   }
 
   const batchCode = String(body?.batchCode || "").trim().toUpperCase();
   if (!batchCode) {
-    throw new Error("Khong nhan duoc ma batch gop don tu server.");
+    throw new Error(t("orders.batch.missing_code"));
   }
 
   return {
@@ -119,7 +119,7 @@ const createReceiptBatchFromCreatedOrders = async (
 };
 
 export const buildSaveNewOrderHandler =
-  ({ isCreatingOrderRef, closeCreateModal, fetchOrders, handleViewOrder }: BuildSaveNewOrderHandlerArgs) =>
+  ({ isCreatingOrderRef, closeCreateModal, fetchOrders, handleViewOrder, handleViewCreatedBatch }: BuildSaveNewOrderHandlerArgs) =>
   async (newOrderData: CreateOrderPayload | CreateOrderPayload[]) => {
     if (isCreatingOrderRef.current) return;
     isCreatingOrderRef.current = true;
@@ -152,8 +152,8 @@ export const buildSaveNewOrderHandler =
       await fetchOrders();
       emitRefresh(["orders", "dashboard"]);
 
-      if (createdOrders.length > 0) {
-        handleViewOrder(createdOrders[createdOrders.length - 1], "create");
+      if (createdOrders.length === 1) {
+        handleViewOrder(createdOrders[0], "create");
       }
 
       if (createdOrders.length > 1 && failures.length === 0) {
@@ -162,12 +162,24 @@ export const buildSaveNewOrderHandler =
           0
         );
         const batch = await createReceiptBatchFromCreatedOrders(createdOrders);
+        if (batch) {
+          handleViewCreatedBatch({
+            batchCode: batch.batchCode,
+            orders: createdOrders,
+            totalPrice,
+            totalAmount: batch.totalAmount,
+            baseTotal: batch.baseTotal,
+            amountSuffix: batch.amountSuffix,
+          });
+        } else {
+          handleViewOrder(createdOrders[createdOrders.length - 1], "create");
+        }
         showAppNotification({
           type: "success",
-          title: `Da tao ${createdOrders.length} don gop`,
+          title: t("orders.batch.created_title", { count: createdOrders.length }),
           message: batch
-            ? `Tong gia ban: ${formatCurrency(totalPrice)}. Da gop bien nhan thanh batch ${batch.batchCode} voi so tien ${formatCurrency(batch.totalAmount)}.`
-            : `Tong gia ban: ${formatCurrency(totalPrice)}.`,
+            ? t("orders.batch.created_message", { totalPrice: formatCurrency(totalPrice), batchCode: batch.batchCode, totalAmount: formatCurrency(batch.totalAmount) })
+            : t("orders.batch.total_price_message", { totalPrice: formatCurrency(totalPrice) }),
         });
       } else if (createdOrders.length > 0 && failures.length > 0) {
         showAppNotification({

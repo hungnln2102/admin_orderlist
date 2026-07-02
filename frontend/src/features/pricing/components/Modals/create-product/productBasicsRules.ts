@@ -1,4 +1,4 @@
-﻿export const buildNextLabel = (baseLabel: string, usedLabels: string[]) => {
+export const buildNextLabel = (baseLabel: string, usedLabels: string[]) => {
   const used = new Set(
     usedLabels
       .map((label) => String(label || "").trim().toLowerCase())

@@ -1,4 +1,4 @@
-﻿import type { PackageFormValues } from "../../../utils/packageHelpers";
+import type { PackageFormValues } from "../../../utils/packageHelpers";
 
 export const formatImportValue = (raw: string): string => {
   const digitsOnly = raw.replace(/[^0-9]/g, "");
@@ -20,7 +20,7 @@ export const getPackageFormValidation = ({
     (values.slotLinkMode === "slot" || values.slotLinkMode === "information") &&
     !values.stockId &&
     !stockManual
-      ? "Cáº§n chá»n tÃ i khoáº£n gá»‘c (kho) Ä‘á»ƒ gÃ¡n gÃ³i."
+      ? "Cần chọn tài khoản gốc (kho) để gán gói."
       : null;
 
   const hasActivation =
@@ -30,7 +30,7 @@ export const getPackageFormValidation = ({
     values.slotLinkMode === "information" &&
     requireActivationForInformation &&
     !hasActivation
-      ? "Cháº¿ Ä‘á»™ theo thÃ´ng tin Ä‘Æ¡n cáº§n chá»n tÃ i khoáº£n kÃ­ch hoáº¡t (kho kÃ­ch hoáº¡t)."
+      ? "Chế độ theo thông tin đơn cần chọn tài khoản kích hoạt (kho kích hoạt)."
       : null;
 
   return { matchRequiresAccountError, matchRequiresActivationError };

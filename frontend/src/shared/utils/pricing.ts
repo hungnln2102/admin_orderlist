@@ -1,1 +1,1 @@
-﻿export * from "@/shared/pricing";
+export * from "@/shared/pricing";

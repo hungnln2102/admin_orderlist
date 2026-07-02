@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { deleteAdobeAdminAccount } from "../../api/renewAdobeApi";
 import type { AdobeAdminAccount } from "../../types";
 
@@ -39,7 +39,7 @@ export function useAdminAccountDeletion({
         setAdminAccountPendingDelete(null);
       })
       .catch((err) =>
-        setCheckError(err?.message ?? "Lá»—i khi xÃ³a tÃ i khoáº£n admin.")
+        setCheckError(err?.message ?? "Lỗi khi xóa tài khoản admin.")
       )
       .finally(() => setDeletingAdminAccountId(null));
   }, [adminAccountPendingDelete, loadAccounts, setCheckError]);

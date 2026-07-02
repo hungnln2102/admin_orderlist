@@ -1,6 +1,6 @@
 import type { Order } from "@/constants";
 import type { EditableOrder } from "../../types";
-import type { RefundCreatePrefill } from "../useOrdersModals";
+import type { CreatedOrderBatchView, RefundCreatePrefill } from "../useOrdersModals";
 import type { Dispatch, SetStateAction } from "react";
 
 export type OrderActionsDeps = {
@@ -10,6 +10,7 @@ export type OrderActionsDeps = {
   closeModal: () => void;
   openCreateModal: (prefill?: RefundCreatePrefill | null) => void;
   handleViewOrder: (order: Order, source: "create" | "view") => void;
+  handleViewCreatedBatch: (batch: CreatedOrderBatchView) => void;
   orderToDelete: Order | null;
   setOrderToDelete: (order: Order | null) => void;
   setOrders: Dispatch<SetStateAction<Order[]>>;

@@ -14,25 +14,25 @@ type PackageSlotStats = {
 
 export const buildPackageSlotCards = (slotStats: PackageSlotStats) => [
   {
-    name: "Sá»‘ dÃ²ng báº£ng",
+    name: "Số dòng bảng",
     value: String(slotStats.total),
     icon: CheckCircleIcon,
     accent: STAT_CARD_ACCENTS.sky,
   },
   {
-    name: "GÃ³i sáº¯p háº¿t",
+    name: "Gói sắp hết",
     value: String(slotStats.low),
     icon: ExclamationTriangleIcon,
     accent: STAT_CARD_ACCENTS.amber,
   },
   {
-    name: "GÃ³i Ä‘Ã£ háº¿t",
+    name: "Gói đã hết",
     value: String(slotStats.out),
     icon: ArrowDownIcon,
     accent: STAT_CARD_ACCENTS.rose,
   },
   {
-    name: "ThÃªm hÃ´m nay",
+    name: "Thêm hôm nay",
     value: "0",
     icon: ArrowUpIcon,
     accent: STAT_CARD_ACCENTS.emerald,

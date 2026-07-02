@@ -84,7 +84,7 @@ const RENEW_ADOBE_SCHEMA = {
 };
 
 /** Domain key kích hoạt (Key active): dữ liệu nằm trong schema PostgreSQL `system_automation`
- * — `order_list_keys`, `systems`. Đây là bảng “key active” sau merge (078); không còn bảng trong schema DB `key_active`. */
+ * — `order_list_keys`, `systems`. Đây là bảng "key active" sau merge (078); không còn bảng trong schema DB `key_active`. */
 const KEY_ACTIVE_SCHEMA = {
   /** Key kích hoạt ánh xạ orders.order_list (FK order_list_id); expires_at đồng bộ expired_at. */
   ORDER_LIST_KEYS: {

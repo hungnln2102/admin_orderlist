@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { normalizeSavedProductDescription } from "./productDescNormalizer";
 import type {
@@ -172,3 +172,4 @@ export const fetchProductDescriptions = async (
         : params.limit ?? data.items.length,
   };
 };
+

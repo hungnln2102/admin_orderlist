@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 import {
@@ -100,7 +100,7 @@ export const useVariantContentActions = ({
       } catch (e) {
         setSaveError(
           normalizeErrorMessage(e instanceof Error ? e.message : String(e ?? ""), {
-            fallback: "KhÃ´ng thá»ƒ lÆ°u desc_variant.",
+            fallback: "Không thể lưu desc_variant.",
           })
         );
       } finally {
@@ -135,7 +135,7 @@ export const useVariantContentActions = ({
     } catch (e) {
       setDeleteError(
         normalizeErrorMessage(e instanceof Error ? e.message : String(e ?? ""), {
-          fallback: "KhÃ´ng thá»ƒ xÃ³a desc_variant.",
+          fallback: "Không thể xóa desc_variant.",
         })
       );
     } finally {

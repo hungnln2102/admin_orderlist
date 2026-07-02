@@ -1,4 +1,4 @@
-﻿import { getCostPeriodAmount } from "@/features/dashboard/utils/spreadCostAcrossPeriod";
+import { getCostPeriodAmount } from "@/features/dashboard/utils/spreadCostAcrossPeriod";
 import type { ExpenseFormRow, PeriodColumn } from "../types";
 import { START_DATE } from "../constants";
 

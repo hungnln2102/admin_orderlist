@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { type OrderDatasetKey } from "@/constants";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import ViewOrderModal from "@/components/modals/ViewOrderModal/ViewOrderModal";
+import { CreatedBatchOrderModal } from "./components/CreatedBatchOrderModal";
 import EditOrderModal from "@/components/modals/EditOrderModal/EditOrderModal";
 import CreateOrderModal from "@/components/modals/CreateOrderModal/CreateOrderModal";
 import { useOrdersData, type EditableOrder } from "./hooks/useOrdersData";
@@ -185,6 +186,11 @@ export default function Orders() {
         order={orderToView}
         formatCurrency={formatCurrency}
         keepOrderPrice={viewModalSource === "create"}
+      />
+      <CreatedBatchOrderModal
+        isOpen={isCreatedBatchModalOpen}
+        onClose={closeCreatedBatchModal}
+        batch={createdBatchToView}
       />
       <EditOrderModal
         isOpen={isEditModalOpen}

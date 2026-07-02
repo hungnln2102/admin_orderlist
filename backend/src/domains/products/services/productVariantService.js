@@ -1,4 +1,4 @@
-﻿const { db } = require("../../../db");
+const { db } = require("../../../db");
 const { PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../../config/dbSchema");
 const { nextId } = require("../../../services/idService");
 const { getTiers } = require("../../../services/pricing/tierCache");

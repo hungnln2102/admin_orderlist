@@ -1,4 +1,4 @@
-﻿import type { WalletColumn } from "../../hooks/useWalletBalances";
+import type { WalletColumn } from "../../hooks/useWalletBalances";
 
 type WalletTypesTableProps = {
   columns: WalletColumn[];
@@ -19,10 +19,10 @@ export function WalletTypesTable({
         <thead className="bg-white/10 text-xs uppercase tracking-wide text-white/70">
           <tr>
             <th className="px-3 py-2">ID</th>
-            <th className="px-3 py-2">TÃªn</th>
-            <th className="px-3 py-2">MÃ£</th>
-            <th className="px-3 py-2">Loáº¡i</th>
-            <th className="px-3 py-2 text-right">Thao tÃ¡c</th>
+            <th className="px-3 py-2">Tên</th>
+            <th className="px-3 py-2">Mã</th>
+            <th className="px-3 py-2">Loại</th>
+            <th className="px-3 py-2 text-right">Thao tác</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/10">
@@ -33,13 +33,13 @@ export function WalletTypesTable({
                 <td className="px-3 py-2 font-mono text-white/80">{column.id}</td>
                 <td className="px-3 py-2">{column.name}</td>
                 <td className="px-3 py-2 text-white/70">
-                  {column.assetCode || "â€”"}
+                  {column.assetCode || "—"}
                   {column.isInvestment ? (
-                    <span className="ml-2 text-[10px] text-amber-300/90">Ä‘áº§u tÆ°</span>
+                    <span className="ml-2 text-[10px] text-amber-300/90">đầu tư</span>
                   ) : null}
                 </td>
                 <td className="px-3 py-2 text-xs text-white/75">
-                  {column.balanceScope === "column_total" ? "Tá»•ng cá»™t" : "Theo ngÃ y"}
+                  {column.balanceScope === "column_total" ? "Tổng cột" : "Theo ngày"}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button
@@ -48,7 +48,7 @@ export function WalletTypesTable({
                     className="mr-2 text-indigo-300 hover:text-indigo-200"
                     disabled={loading}
                   >
-                    Sá»­a
+                    Sửa
                   </button>
                   <button
                     type="button"
@@ -56,7 +56,7 @@ export function WalletTypesTable({
                     className="text-rose-300 hover:text-rose-200"
                     disabled={loading}
                   >
-                    XÃ³a
+                    Xóa
                   </button>
                 </td>
               </tr>

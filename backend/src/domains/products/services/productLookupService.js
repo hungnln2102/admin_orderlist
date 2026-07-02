@@ -1,4 +1,4 @@
-﻿const { db } = require("../../../db");
+const { db } = require("../../../db");
 const { quoteIdent } = require("../../../utils/sql");
 const { normalizeTextInput } = require("../../../utils/normalizers");
 const { TABLES, variantCols, productCols } = require("../controller/constants");

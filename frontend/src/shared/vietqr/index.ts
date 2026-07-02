@@ -1,1 +1,1 @@
-﻿export * from "./imageUrl";
+export * from "./imageUrl";

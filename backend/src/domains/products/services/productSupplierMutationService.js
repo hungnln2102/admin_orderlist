@@ -1,4 +1,4 @@
-﻿const { ensureSupplierRecord } = require("../../supplies/services/supplierLookupService");
+const { ensureSupplierRecord } = require("../../supplies/services/supplierLookupService");
 const {
   deleteSupplierCostPrice,
   upsertSupplierCostPrice,

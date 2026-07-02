@@ -24,6 +24,7 @@ export function useOrderActions(deps: OrderActionsDeps) {
     closeModal,
     openCreateModal,
     handleViewOrder,
+    handleViewCreatedBatch,
     orderToDelete,
     setOrderToDelete,
     setOrders,
@@ -40,8 +41,9 @@ export function useOrderActions(deps: OrderActionsDeps) {
         closeCreateModal,
         fetchOrders,
         handleViewOrder,
+        handleViewCreatedBatch,
       }),
-    [closeCreateModal, fetchOrders, handleViewOrder]
+    [closeCreateModal, fetchOrders, handleViewOrder, handleViewCreatedBatch]
   );
 
   const handleCreateTopupOrderFromRefund = useMemo(

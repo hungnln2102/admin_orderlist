@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   RenewCheckResultKind,
   StorefrontRenewStatusCode,
 } from "../types/storefrontRenew.types";

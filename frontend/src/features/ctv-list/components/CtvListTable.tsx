@@ -1,4 +1,4 @@
-﻿import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
+import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import type { CtvItem } from "../types";
 import { ROLE_ID_CUSTOMER } from "../constants";
@@ -38,10 +38,10 @@ export function CtvListTable({
           currentRows.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-white/70 text-lg mb-2">
-                KhÃ´ng tÃ¬m tháº¥y CTV / khÃ¡ch hÃ ng nÃ o
+                Không tìm thấy CTV / khách hàng nào
               </p>
               <p className="text-white/60 text-sm">
-                Thá»­ thay Ä‘á»•i tá»« khÃ³a hoáº·c bá»™ lá»c
+                Thử thay đổi từ khóa hoặc bộ lọc
               </p>
             </div>
           ) : (
@@ -65,23 +65,23 @@ export function CtvListTable({
           <thead>
             <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:py-3 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 [&>th]:text-left [&>th]:bg-white/[0.03] [&>th]:whitespace-nowrap">
               <th className="w-12 text-center">STT</th>
-              <th className="min-w-[100px]">TÃ€I KHOáº¢N</th>
+              <th className="min-w-[100px]">TÀI KHOẢN</th>
               {roleTab === ROLE_ID_CUSTOMER ? (
                 <>
-                  <th className="min-w-[100px]">Há»Œ</th>
-                  <th className="min-w-[80px]">TÃŠN</th>
+                  <th className="min-w-[100px]">HỌ</th>
+                  <th className="min-w-[80px]">TÊN</th>
                 </>
               ) : (
-                <th className="min-w-[120px]">TÃŠN</th>
+                <th className="min-w-[120px]">TÊN</th>
               )}
               <th className="min-w-[160px]">EMAIL</th>
-              <th className="w-28 text-right">Sá» DÆ¯</th>
-              <th className="w-28 text-right">Tá»”NG TIÃŠU</th>
+              <th className="w-28 text-right">SỐ DƯ</th>
+              <th className="w-28 text-right">TỔNG TIÊU</th>
               {roleTab === ROLE_ID_CUSTOMER && (
-                <th className="w-24 text-center">Háº NG</th>
+                <th className="w-24 text-center">HẠNG</th>
               )}
-              <th className="w-28">TRáº NG THÃI</th>
-              <th className="w-28 text-right pr-4">THAO TÃC</th>
+              <th className="w-28">TRẠNG THÁI</th>
+              <th className="w-28 text-right pr-4">THAO TÁC</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -91,9 +91,9 @@ export function CtvListTable({
                   colSpan={roleTab === ROLE_ID_CUSTOMER ? 10 : 8}
                   className="px-4 py-12 text-center text-white/70"
                 >
-                  <p className="text-lg mb-2">KhÃ´ng tÃ¬m tháº¥y CTV / khÃ¡ch hÃ ng nÃ o</p>
+                  <p className="text-lg mb-2">Không tìm thấy CTV / khách hàng nào</p>
                   <p className="text-sm text-white/60">
-                    Thá»­ thay Ä‘á»•i tá»« khÃ³a hoáº·c bá»™ lá»c
+                    Thử thay đổi từ khóa hoặc bộ lọc
                   </p>
                 </td>
               </tr>

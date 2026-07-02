@@ -1,4 +1,4 @@
-﻿import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
+import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
 import {
   isImportOrderCodeOption,
   type OrderCodeSelectOption,
@@ -51,11 +51,11 @@ export const buildCreditNoteMap = (availableCreditNotes: AvailableRefundCredit[]
 
 export const buildAvailableCreditOptions = (availableCreditNotes: AvailableRefundCredit[]) =>
   availableCreditNotes.map((row) => {
-    const name = (row.customer_name || "â€”").trim();
+    const name = (row.customer_name || "—").trim();
     const avail = Math.max(0, Number(row.available_amount) || 0);
     return {
       value: Number(row.id),
-      label: `${name} â€” ${formatCurrency(avail)}`,
+      label: `${name} — ${formatCurrency(avail)}`,
     };
   });
 

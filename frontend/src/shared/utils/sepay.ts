@@ -1,1 +1,1 @@
-﻿export * from "@/shared/vietqr";
+export * from "@/shared/vietqr";

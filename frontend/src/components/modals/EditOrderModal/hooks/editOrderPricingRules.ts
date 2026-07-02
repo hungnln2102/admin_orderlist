@@ -1,4 +1,4 @@
-﻿import { DEFAULT_ORDER_CODE_PREFIX, ORDER_CODE_PREFIXES } from "../../../../constants";
+import { DEFAULT_ORDER_CODE_PREFIX, ORDER_CODE_PREFIXES } from "../../../../constants";
 import { resolveOrderType } from "@/features/bill-order/helpers";
 import type { CustomerType } from "../../CreateOrderModal/types";
 

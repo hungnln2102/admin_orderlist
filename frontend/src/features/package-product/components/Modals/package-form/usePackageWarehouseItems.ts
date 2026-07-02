@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import type { WarehouseItem } from "../../../../../Personal/Storage/types";
@@ -35,7 +35,7 @@ export function usePackageWarehouseItems(open: boolean) {
   const inStockItems = useMemo(
     () =>
       warehouseItems.filter((item) =>
-        (item.status || "").toLowerCase().includes("tá»“n")
+        (item.status || "").toLowerCase().includes("tồn")
       ),
     [warehouseItems]
   );

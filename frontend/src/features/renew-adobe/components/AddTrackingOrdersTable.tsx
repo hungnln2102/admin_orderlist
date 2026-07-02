@@ -1,9 +1,9 @@
-﻿import type { MatchableOrder } from "@/features/renew-adobe/user-orders/api";
+import type { MatchableOrder } from "@/features/renew-adobe/user-orders/api";
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
-  "ÄÃ£ Thanh ToÃ¡n": "bg-emerald-500/15 text-emerald-300 border-emerald-400/40",
-  "Äang Xá»­ LÃ½": "bg-sky-500/15 text-sky-300 border-sky-400/40",
-  "Cáº§n Gia Háº¡n": "bg-amber-500/15 text-amber-300 border-amber-400/40",
+  "Đã Thanh Toán": "bg-emerald-500/15 text-emerald-300 border-emerald-400/40",
+  "Đang Xử Lý": "bg-sky-500/15 text-sky-300 border-sky-400/40",
+  "Cần Gia Hạn": "bg-amber-500/15 text-amber-300 border-amber-400/40",
 };
 
 function StatusPill({ status }: { status: string | null }) {
@@ -14,7 +14,7 @@ function StatusPill({ status }: { status: string | null }) {
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${cls}`}
     >
-      {status || "â€”"}
+      {status || "—"}
     </span>
   );
 }
@@ -50,14 +50,14 @@ export function AddTrackingOrdersTable({
                 checked={allSelectableSelected}
                 onChange={onToggleSelectAll}
                 disabled={submitting || selectableCount === 0}
-                aria-label="Chá»n táº¥t cáº£"
+                aria-label="Chọn tất cả"
               />
             </th>
-            <th className="px-3 py-2 text-left">MÃ£ Ä‘Æ¡n</th>
-            <th className="px-3 py-2 text-left">KhÃ¡ch hÃ ng</th>
+            <th className="px-3 py-2 text-left">Mã đơn</th>
+            <th className="px-3 py-2 text-left">Khách hàng</th>
             <th className="px-3 py-2 text-left">Email/Profile</th>
-            <th className="px-3 py-2 text-left">Háº¡n</th>
-            <th className="px-3 py-2 text-left">Tráº¡ng thÃ¡i</th>
+            <th className="px-3 py-2 text-left">Hạn</th>
+            <th className="px-3 py-2 text-left">Trạng thái</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
@@ -84,19 +84,19 @@ export function AddTrackingOrdersTable({
                   {item.order_code}
                   {disabled && (
                     <span className="ml-2 inline-flex rounded-md border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-emerald-300">
-                      ÄÃ£ track
+                      Đã track
                     </span>
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <div className="text-white/90">{item.customer || "â€”"}</div>
+                  <div className="text-white/90">{item.customer || "—"}</div>
                   <div className="text-[11px] text-white/55">{item.contact || ""}</div>
                 </td>
                 <td className="px-3 py-2 text-xs break-all">
-                  {item.information_order || "â€”"}
+                  {item.information_order || "—"}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs">
-                  {item.expiry_date || "â€”"}
+                  {item.expiry_date || "—"}
                 </td>
                 <td className="px-3 py-2">
                   <StatusPill status={item.status} />

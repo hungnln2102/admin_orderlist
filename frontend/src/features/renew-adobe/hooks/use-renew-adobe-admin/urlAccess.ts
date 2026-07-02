@@ -1,4 +1,4 @@
-﻿import { useCallback } from "react";
+import { useCallback } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import type { AdobeAdminAccount } from "../../types";

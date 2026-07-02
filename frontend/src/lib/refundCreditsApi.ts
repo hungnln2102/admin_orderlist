@@ -7,7 +7,7 @@ export type AvailableRefundCredit = {
   customer_name: string | null;
   customer_contact: string | null;
   available_amount: number;
-  /** Tiền hoàn gốc ghi trên phiếu — dùng hiển thị tham chiếu cạnh “đơn cũ”. */
+  /** Tiền hoàn gốc ghi trên phiếu — dùng hiển thị tham chiếu cạnh "đơn cũ". */
   refund_amount?: number;
   source_order_code: string;
   source_order_list_id: number | string | null;

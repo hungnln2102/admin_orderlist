@@ -1,4 +1,4 @@
-﻿import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ClockIcon,
   CubeIcon,
@@ -59,7 +59,7 @@ export function ViewCard({
 
   const exp = item.expires_at
     ? new Date(item.expires_at).toLocaleDateString("vi-VN")
-    : "â€”";
+    : "—";
 
   return (
     <div
@@ -69,10 +69,10 @@ export function ViewCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.accentTextClass}`}>
-              {item.category || "â€”"}
+              {item.category || "—"}
             </p>
             <p className="mt-0.5 truncate text-sm font-bold text-white">
-              {item.account || "â€”"}
+              {item.account || "—"}
             </p>
           </div>
           {item.status ? (
@@ -105,13 +105,13 @@ export function ViewCard({
           className={`mt-4 min-w-0 max-w-full overflow-hidden animate-in fade-in slide-in-from-top-2 rounded-[20px] border p-4 duration-300 ${theme.expandablePanelClass}`}
         >
           <p className="mb-3 text-center text-xs font-semibold text-indigo-50">
-            Chi tiáº¿t tÃ i khoáº£n
+            Chi tiết tài khoản
           </p>
           <div className="space-y-3">
-            <MobileDetail label="Máº­t kháº©u" theme={theme}>
+            <MobileDetail label="Mật khẩu" theme={theme}>
               <CopyableValue value={item.password} mono showButtonOnHover={false} />
             </MobileDetail>
-            <MobileDetail label="Mail dá»± phÃ²ng" theme={theme}>
+            <MobileDetail label="Mail dự phòng" theme={theme}>
               <CopyableValue value={item.backup_email} showButtonOnHover={false} />
             </MobileDetail>
             <MobileDetail label="2FA" theme={theme}>
@@ -120,12 +120,12 @@ export function ViewCard({
             <div
               className={`min-w-0 overflow-hidden rounded-xl border p-3 text-center ${theme.detailItemClass}`}
             >
-              <p className={`text-[10px] font-bold uppercase ${theme.detailLabelClass}`}>Ghi chÃº</p>
+              <p className={`text-[10px] font-bold uppercase ${theme.detailLabelClass}`}>Ghi chú</p>
               <p
                 className="mt-1 line-clamp-4 break-words text-sm text-indigo-50"
                 title={String(item.note || "").trim() || undefined}
               >
-                {String(item.note || "").trim() || "KhÃ´ng cÃ³ ghi chÃº."}
+                {String(item.note || "").trim() || "Không có ghi chú."}
               </p>
             </div>
           </div>
@@ -134,7 +134,7 @@ export function ViewCard({
             onClick={() => void copyRow()}
             className="mt-3 w-full rounded-full bg-gradient-to-r from-emerald-500 to-green-600 py-2 text-xs font-semibold text-white"
           >
-            {rowCopied ? "ÄÃ£ sao chÃ©p" : "Sao chÃ©p táº¥t cáº£"}
+            {rowCopied ? "Đã sao chép" : "Sao chép tất cả"}
           </button>
         </div>
       )}

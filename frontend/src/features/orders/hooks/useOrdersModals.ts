@@ -2,6 +2,15 @@ import { useCallback, useState } from "react";
 import { ORDER_FIELDS, Order } from "@/constants";
 import type { EditableOrder, ViewModalSource } from "../types";
 
+export type CreatedOrderBatchView = {
+  batchCode: string;
+  orders: Order[];
+  totalPrice: number;
+  totalAmount: number;
+  baseTotal?: number;
+  amountSuffix?: number | null;
+};
+
 export type RefundCreatePrefill = {
   initialFormData: Partial<Order>;
   creditNoteId: number;
@@ -19,6 +28,8 @@ export function useOrdersModals() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreatedBatchModalOpen, setIsCreatedBatchModalOpen] = useState(false);
+  const [createdBatchToView, setCreatedBatchToView] = useState<CreatedOrderBatchView | null>(null);
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [viewModalSource, setViewModalSource] = useState<ViewModalSource>("view");
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
@@ -38,6 +49,10 @@ export function useOrdersModals() {
     setOrderToView(null);
     setViewModalSource("view");
   }, []);
+  const closeCreatedBatchModal = useCallback(() => {
+    setIsCreatedBatchModalOpen(false);
+    setCreatedBatchToView(null);
+  }, []);
   const closeEditModal = useCallback(() => {
     setIsEditModalOpen(false);
     setOrderToEdit(null);
@@ -51,6 +66,14 @@ export function useOrdersModals() {
     setOrderToView(order);
     setViewModalSource(source);
     setIsViewModalOpen(true);
+  }, []);
+
+  const handleViewCreatedBatch = useCallback((batch: CreatedOrderBatchView) => {
+    setCreatedBatchToView(batch);
+    setIsViewModalOpen(false);
+    setOrderToView(null);
+    setViewModalSource("create");
+    setIsCreatedBatchModalOpen(true);
   }, []);
 
   const handleEditOrder = useCallback((order: Order) => {
@@ -73,6 +96,8 @@ export function useOrdersModals() {
     setIsViewModalOpen(false);
     setIsEditModalOpen(false);
     setIsCreateModalOpen(false);
+    setIsCreatedBatchModalOpen(false);
+    setCreatedBatchToView(null);
     setOrderToView(null);
     setViewModalSource("view");
     setOrderToDelete(null);
@@ -86,6 +111,8 @@ export function useOrdersModals() {
     viewModalSource,
     isEditModalOpen,
     isCreateModalOpen,
+    isCreatedBatchModalOpen,
+    createdBatchToView,
     orderToView,
     orderToDelete,
     orderToEdit,
@@ -93,9 +120,11 @@ export function useOrdersModals() {
     openCreateModal,
     closeCreateModal,
     closeViewModal,
+    closeCreatedBatchModal,
     closeEditModal,
     closeModal,
     handleViewOrder,
+    handleViewCreatedBatch,
     handleEditOrder,
     handleDeleteOrder,
     resetModals,

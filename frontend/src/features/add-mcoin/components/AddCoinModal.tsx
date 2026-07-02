@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import { showAppNotification } from "@/lib/notifications";
@@ -35,12 +35,12 @@ export function AddCoinModal({
     setError(null);
     const acc = account.trim();
     if (!acc) {
-      setError("Vui lÃ²ng nháº­p tÃ i khoáº£n.");
+      setError("Vui lòng nhập tài khoản.");
       return;
     }
     const amount = amountStr === "" ? 0 : parseInt(amountStr.replace(/\D/g, ""), 10) || 0;
     if (amount <= 0) {
-      setError("Sá»‘ xu pháº£i lá»›n hÆ¡n 0.");
+      setError("Số xu phải lớn hơn 0.");
       return;
     }
     const newItem: CoinHistoryItem = {
@@ -55,7 +55,7 @@ export function AddCoinModal({
     onClose();
     showAppNotification({
       type: "success",
-      message: `ÄÃ£ náº¡p ${formatCoinAmount(amount)} cho tÃ i khoáº£n ${acc}.`,
+      message: `Đã nạp ${formatCoinAmount(amount)} cho tài khoản ${acc}.`,
     });
   };
 
@@ -84,36 +84,36 @@ export function AddCoinModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest text-indigo-300/50 mb-2 ml-1">
-              TÃ i khoáº£n
+              Tài khoản
             </label>
             <input
               type="text"
               className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-white/30"
-              placeholder="Nháº­p tÃ i khoáº£n..."
+              placeholder="Nhập tài khoản..."
               value={account}
               onChange={(e) => setAccount(e.target.value)}
             />
           </div>
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest text-indigo-300/50 mb-2 ml-1">
-              Sá»‘ xu
+              Số xu
             </label>
             <input
               type="text"
               inputMode="numeric"
               className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-white/30 tabular-nums"
-              placeholder="Nháº­p sá»‘ xu..."
+              placeholder="Nhập số xu..."
               value={amountStr}
               onChange={handleAmountChange}
             />
           </div>
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest text-indigo-300/50 mb-2 ml-1">
-              MÃ´ táº£
+              Mô tả
             </label>
             <textarea
               className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-white/30 resize-none"
-              placeholder="MÃ´ táº£ (tÃ¹y chá»n)"
+              placeholder="Mô tả (tùy chọn)"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -125,10 +125,10 @@ export function AddCoinModal({
               onClick={onClose}
               className="px-6 py-2.5 text-sm font-bold text-white/40 hover:text-white transition-colors"
             >
-              Há»§y
+              Hủy
             </button>
             <GradientButton type="submit" className="!py-2.5 !px-8 text-sm">
-              XÃ¡c nháº­n
+              Xác nhận
             </GradientButton>
           </div>
         </form>

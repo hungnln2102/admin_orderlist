@@ -10,7 +10,7 @@ const toSafeString = (value) =>
 const escapeHtml = (value) =>
   toSafeString(value)
     .replace(/[\u0000-\u001F\u007F]/g, " ")
-    .replace(/&/g, "&amp;")
+    .replace(/&/g, "&")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")

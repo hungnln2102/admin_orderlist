@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import type { ProductSeoAuditPayload, ProductSeoAuditResult } from "./productDescTypes";
 
@@ -39,3 +39,4 @@ export const auditProductSeo = async (
 
   return data as ProductSeoAuditResult;
 };
+

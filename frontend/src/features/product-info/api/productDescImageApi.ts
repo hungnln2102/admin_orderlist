@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+﻿import { apiFetch } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import type { ProductImageListResponse, ProductImageUploadResponse } from "./productDescTypes";
 
@@ -70,3 +70,4 @@ export const deleteProductImage = async (fileName: string): Promise<void> => {
     );
   }
 };
+

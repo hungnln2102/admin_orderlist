@@ -1,4 +1,4 @@
-﻿/** Payload public API `/api/renew-adobe/public/*` — đồng bộ với storefront. */
+/** Payload public API `/api/renew-adobe/public/*` — đồng bộ với storefront. */
 
 export type AdobeSystemCode = "renew_adobe" | "fix_adobe_edu" | "fix_ades";
 

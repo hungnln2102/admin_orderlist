@@ -1,4 +1,4 @@
-﻿import type { ManualWarehouseEntry } from "../../../utils/packageHelpers";
+import type { ManualWarehouseEntry } from "../../../utils/packageHelpers";
 import { MANUAL_FIELDS, manualFieldCls } from "./shared";
 
 type StockManualEntryFieldsProps = {
@@ -13,7 +13,7 @@ export function StockManualEntryFields({
   return (
     <div className="space-y-2.5 rounded-lg border border-amber-500/10 bg-amber-500/[0.02] p-3">
       <p className="text-[10px] font-medium uppercase tracking-wider text-amber-400/60">
-        ThÃ´ng tin sáº½ Ä‘Æ°á»£c lÆ°u vÃ o Kho HÃ ng
+        Thông tin sẽ được lưu vào Kho Hàng
       </p>
       {MANUAL_FIELDS.map((field) => (
         <div key={field.key}>

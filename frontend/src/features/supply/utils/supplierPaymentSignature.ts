@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Supplier Payment Signature — tạo lệch âm nhỏ cho khoản chi NCC.
  *
  * Quy tắc:

@@ -1,4 +1,4 @@
-﻿import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import { runSchedulerRenewAdobeCheck } from "../../api/renewAdobeApi";
@@ -71,13 +71,13 @@ export function useAdminCheckFlow({
     runSchedulerRenewAdobeCheck()
       .then(() => {
         setCronTestBanner(
-          "ÄÃ£ cháº¡y xong job giá»‘ng cron (check all + auto-assign) trÃªn process API. Cron tháº­t cháº¡y trong `scheduler` â€” xem log service Ä‘Ã³ Ä‘á»ƒ so sÃ¡nh."
+          "Đã chạy xong job giống cron (check all + auto-assign) trên process API. Cron thật chạy trong `scheduler` — xem log service đó để so sánh."
         );
         loadAccounts();
       })
       .catch((err) =>
         setCheckError(
-          err?.message ?? "Lá»—i khi cháº¡y test job cron (scheduler/run-adobe-check)."
+          err?.message ?? "Lỗi khi chạy test job cron (scheduler/run-adobe-check)."
         )
       )
       .finally(() => setCronTestLoading(false));
@@ -94,7 +94,7 @@ export function useAdminCheckFlow({
       })
         .then((res) => {
           if (!res.ok) {
-            throw new Error(res.statusText || "Check tháº¥t báº¡i");
+            throw new Error(res.statusText || "Check thất bại");
           }
           return res.json();
         })
@@ -102,10 +102,10 @@ export function useAdminCheckFlow({
           if (data.success) {
             loadAccounts();
           } else {
-            throw new Error(data.error || "Check tháº¥t báº¡i");
+            throw new Error(data.error || "Check thất bại");
           }
         })
-        .catch((err) => setCheckError(err?.message ?? "Lá»—i khi cháº¡y check."))
+        .catch((err) => setCheckError(err?.message ?? "Lỗi khi chạy check."))
         .finally(() => setCheckingId(null));
     },
     [loadAccounts]

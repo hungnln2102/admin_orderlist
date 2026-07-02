@@ -1,4 +1,4 @@
-﻿const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
 
 const WALLET_TYPES_TABLE = tableName(
   FINANCE_SCHEMA.MASTER_WALLETTYPES.TABLE,

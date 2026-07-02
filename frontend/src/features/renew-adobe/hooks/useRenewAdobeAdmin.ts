@@ -1,4 +1,4 @@
-﻿import { useAdminAccountDeletion } from "./use-renew-adobe-admin/adminDeletion";
+import { useAdminAccountDeletion } from "./use-renew-adobe-admin/adminDeletion";
 import { useAdminAccountsData } from "./use-renew-adobe-admin/accountsData";
 import { useAdminCheckFlow } from "./use-renew-adobe-admin/checkFlow";
 import { useAdminUrlAccess } from "./use-renew-adobe-admin/urlAccess";

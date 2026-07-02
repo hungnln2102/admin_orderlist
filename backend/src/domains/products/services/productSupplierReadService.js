@@ -1,4 +1,4 @@
-﻿const { db } = require("../../../db");
+const { db } = require("../../../db");
 const { quoteIdent } = require("../../../utils/sql");
 const { isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
 const {

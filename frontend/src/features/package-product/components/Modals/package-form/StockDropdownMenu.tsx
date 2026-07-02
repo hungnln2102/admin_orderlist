@@ -1,4 +1,4 @@
-﻿import { CheckIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import type { WarehouseItem } from "../../../../../Personal/Storage/types";
 
 type StockDropdownMenuProps = {
@@ -29,7 +29,7 @@ export function StockDropdownMenu({
             type="text"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="TÃ¬m tÃ i khoáº£n..."
+            placeholder="Tìm tài khoản..."
             className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-white/20 focus:border-indigo-500/40 focus:outline-none"
             autoFocus
           />
@@ -39,8 +39,8 @@ export function StockDropdownMenu({
         {filteredItems.length === 0 ? (
           <div className="px-3 py-4 text-center text-xs text-white/30">
             {loading
-              ? "Äang táº£i kho hÃ ng..."
-              : "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n tá»“n kho nÃ o."}
+              ? "Đang tải kho hàng..."
+              : "Không tìm thấy tài khoản tồn kho nào."}
           </div>
         ) : (
           filteredItems.map((item) => {
@@ -59,7 +59,7 @@ export function StockDropdownMenu({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-white">
-                      {item.account || "â€”"}
+                      {item.account || "—"}
                     </span>
                     {item.category && (
                       <span className="inline-flex shrink-0 items-center rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-white/40">
@@ -82,7 +82,7 @@ export function StockDropdownMenu({
         )}
       </div>
       <div className="border-t border-white/[0.06] px-3 py-1.5 text-[10px] text-white/20">
-        {totalCount} tÃ i khoáº£n tá»“n kho
+        {totalCount} tài khoản tồn kho
       </div>
     </div>
   );

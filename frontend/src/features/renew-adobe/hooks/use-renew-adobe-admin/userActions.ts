@@ -1,4 +1,4 @@
-﻿import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import type { FixAllProgress } from "./types";
@@ -31,15 +31,15 @@ export function useAdminUserActions({
         .then((res) => res.json())
         .then((data) => {
           if (data?.success === false) {
-            throw new Error(data?.error ?? data?.message ?? "XÃ³a tháº¥t báº¡i");
+            throw new Error(data?.error ?? data?.message ?? "Xóa thất bại");
           }
           if (Array.isArray(data?.failed) && data.failed.length > 0) {
             const firstError = data.failed[0]?.error;
-            throw new Error(firstError ?? "XÃ³a tháº¥t báº¡i");
+            throw new Error(firstError ?? "Xóa thất bại");
           }
           loadAccounts();
         })
-        .catch((err) => setCheckError(err?.message ?? "Lá»—i khi xÃ³a user."))
+        .catch((err) => setCheckError(err?.message ?? "Lỗi khi xóa user."))
         .finally(() => setDeletingId(null));
     },
     [loadAccounts, setCheckError]
@@ -63,10 +63,10 @@ export function useAdminUserActions({
           if (data?.success) {
             loadAccounts();
           } else {
-            throw new Error(data?.error ?? "Fix tháº¥t báº¡i");
+            throw new Error(data?.error ?? "Fix thất bại");
           }
         })
-        .catch((err) => setCheckError(err?.message ?? "Lá»—i khi fix user."))
+        .catch((err) => setCheckError(err?.message ?? "Lỗi khi fix user."))
         .finally(() => setFixingId(null));
     },
     [loadAccounts, setCheckError]
@@ -103,7 +103,7 @@ export function useAdminUserActions({
         };
 
         if (!data?.success) {
-          const msg = typeof data?.error === "string" ? data.error : "Fix tháº¥t báº¡i";
+          const msg = typeof data?.error === "string" ? data.error : "Fix thất bại";
           throw new Error(msg);
         }
 
@@ -114,7 +114,7 @@ export function useAdminUserActions({
         });
       } catch (err) {
         setCheckError(
-          err instanceof Error ? err.message : "Lá»—i khi fix hÃ ng loáº¡t."
+          err instanceof Error ? err.message : "Lỗi khi fix hàng loạt."
         );
       } finally {
         fixAllInFlightRef.current = false;

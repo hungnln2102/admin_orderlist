@@ -13,6 +13,7 @@
     "lint:backend": "npm --prefix backend run lint",
     "lint:frontend": "npm --prefix frontend run lint",
     "test:backend": "npm --prefix backend run test",
-    "test:frontend": "npm --prefix frontend run test"
+    "test:frontend": "npm --prefix frontend run test",
+    "i18n:extract": "node scripts/i18n/extract-lang.mjs"
   }
 }

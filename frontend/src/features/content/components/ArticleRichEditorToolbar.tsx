@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   BoldIcon,
@@ -70,10 +70,10 @@ export function ArticleRichEditorToolbar({
     <div
       className="flex flex-wrap items-center gap-0.5 border-b border-white/10 bg-slate-950/40 px-2 py-2"
       role="toolbar"
-      aria-label="Thanh Ä‘á»‹nh dáº¡ng ná»™i dung"
+      aria-label="Thanh định dạng nội dung"
     >
       <ToolbarButton
-        title="Äáº­m"
+        title="Đậm"
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive("bold")}
         disabled={toolDisabled}
@@ -81,7 +81,7 @@ export function ArticleRichEditorToolbar({
         <BoldIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="NghiÃªng"
+        title="Nghiêng"
         onClick={() => editor.chain().focus().toggleItalic().run()}
         active={editor.isActive("italic")}
         disabled={toolDisabled}
@@ -89,7 +89,7 @@ export function ArticleRichEditorToolbar({
         <ItalicIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="Gáº¡ch chÃ¢n"
+        title="Gạch chân"
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         active={editor.isActive("underline")}
         disabled={toolDisabled}
@@ -97,7 +97,7 @@ export function ArticleRichEditorToolbar({
         <span className="text-sm font-bold underline">U</span>
       </ToolbarButton>
       <ToolbarButton
-        title="Gáº¡ch ngang"
+        title="Gạch ngang"
         onClick={() => editor.chain().focus().toggleStrike().run()}
         active={editor.isActive("strike")}
         disabled={toolDisabled}
@@ -105,7 +105,7 @@ export function ArticleRichEditorToolbar({
         <span className="text-sm font-bold line-through">S</span>
       </ToolbarButton>
       <ToolbarButton
-        title="MÃ£ inline"
+        title="Mã inline"
         onClick={() => editor.chain().focus().toggleCode().run()}
         active={editor.isActive("code")}
         disabled={toolDisabled}
@@ -116,7 +116,7 @@ export function ArticleRichEditorToolbar({
       <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
 
       <ToolbarButton
-        title="TiÃªu Ä‘á» cáº¥p 2"
+        title="Tiêu đề cấp 2"
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         active={editor.isActive("heading", { level: 2 })}
         disabled={toolDisabled}
@@ -124,7 +124,7 @@ export function ArticleRichEditorToolbar({
         H2
       </ToolbarButton>
       <ToolbarButton
-        title="TiÃªu Ä‘á» cáº¥p 3"
+        title="Tiêu đề cấp 3"
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         active={editor.isActive("heading", { level: 3 })}
         disabled={toolDisabled}
@@ -135,7 +135,7 @@ export function ArticleRichEditorToolbar({
       <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
 
       <ToolbarButton
-        title="Danh sÃ¡ch bullet"
+        title="Danh sách bullet"
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={editor.isActive("bulletList")}
         disabled={toolDisabled}
@@ -143,7 +143,7 @@ export function ArticleRichEditorToolbar({
         <ListBulletIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="Danh sÃ¡ch sá»‘"
+        title="Danh sách số"
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         active={editor.isActive("orderedList")}
         disabled={toolDisabled}
@@ -151,7 +151,7 @@ export function ArticleRichEditorToolbar({
         <NumberedListIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="TrÃ­ch dáº«n"
+        title="Trích dẫn"
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         active={editor.isActive("blockquote")}
         disabled={toolDisabled}
@@ -162,7 +162,7 @@ export function ArticleRichEditorToolbar({
       <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
 
       <ToolbarButton
-        title="ChÃ¨n liÃªn káº¿t"
+        title="Chèn liên kết"
         onClick={onOpenLink}
         active={editor.isActive("link")}
         disabled={toolDisabled}
@@ -170,14 +170,14 @@ export function ArticleRichEditorToolbar({
         <LinkIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="ChÃ¨n áº£nh"
+        title="Chèn ảnh"
         onClick={onOpenImage}
         disabled={toolDisabled}
       >
         <PhotoIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="ÄÆ°á»ng káº» ngang"
+        title="Đường kẻ ngang"
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
         disabled={toolDisabled}
       >
@@ -187,14 +187,14 @@ export function ArticleRichEditorToolbar({
       <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
 
       <ToolbarButton
-        title="HoÃ n tÃ¡c"
+        title="Hoàn tác"
         onClick={() => editor.chain().focus().undo().run()}
         disabled={toolDisabled || !editor.can().undo()}
       >
         <ArrowUturnLeftIcon className="h-5 w-5" />
       </ToolbarButton>
       <ToolbarButton
-        title="LÃ m láº¡i"
+        title="Làm lại"
         onClick={() => editor.chain().focus().redo().run()}
         disabled={toolDisabled || !editor.can().redo()}
       >
@@ -204,7 +204,7 @@ export function ArticleRichEditorToolbar({
       <span className="mx-1 hidden h-6 w-px bg-white/15 sm:inline" aria-hidden />
 
       <ToolbarButton
-        title={htmlMode ? "Quay láº¡i soáº¡n tháº£o (WYSIWYG)" : "Sá»­a HTML thÃ´"}
+        title={htmlMode ? "Quay lại soạn thảo (WYSIWYG)" : "Sửa HTML thô"}
         onClick={onToggleHtmlMode}
         active={htmlMode}
       >

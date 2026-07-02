@@ -1,4 +1,4 @@
-﻿import type { ProductPricingRow } from "../types";
+import type { ProductPricingRow } from "../types";
 import {
   computeHighestSupplyPrice,
   formatCurrencyValue,
@@ -67,7 +67,7 @@ export const buildProductRowViewModel = ({
     Number.isFinite(highestSupplyPrice) &&
     highestSupplyPrice > 0
       ? formatCurrencyValue(highestSupplyPrice)
-      : "ChÆ°a cÃ³ dá»¯ liá»‡u";
+      : "Chưa có dữ liệu";
   const profitBasePrice =
     typeof highestSupplyPrice === "number" &&
     Number.isFinite(highestSupplyPrice) &&
@@ -94,16 +94,16 @@ export const buildProductRowViewModel = ({
     highestSupplyPriceDisplay,
     wholesaleProfitLabel:
       formatProfitPercentBySale(item.wholesalePrice, profitBasePrice, "short") ??
-      "ChÆ°a cÃ³ %",
+      "Chưa có %",
     retailProfitLabel:
       formatProfitPercentBySale(item.retailPrice, profitBasePrice, "short") ??
-      "ChÆ°a cÃ³ %",
+      "Chưa có %",
     studentProfitLabel:
       formatProfitPercentBySale(displayStudentPrice, profitBasePrice, "short") ??
-      "ChÆ°a cÃ³ %",
+      "Chưa có %",
     promoProfitLabel:
       formatProfitPercentBySale(item.promoPrice, profitBasePrice, "short") ??
-      "ChÆ°a cÃ³ %",
+      "Chưa có %",
     previewWholesaleProfitLabel: formatProfitPercentBySale(
       previewWholesalePrice,
       profitBasePrice,

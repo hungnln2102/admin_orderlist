@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchAdobeAdminAccounts } from "../../api/renewAdobeApi";
 import type { AdobeAdminAccount } from "../../types";
 
@@ -13,7 +13,7 @@ export function useAdminAccountsData() {
     fetchAdobeAdminAccounts()
       .then(setAccounts)
       .catch((err) =>
-        setError(err?.message ?? "KhÃ´ng thá»ƒ táº£i danh sÃ¡ch tÃ i khoáº£n.")
+        setError(err?.message ?? "Không thể tải danh sách tài khoản.")
       )
       .finally(() => setLoading(false));
   }, []);

@@ -1,4 +1,4 @@
-﻿import {
+import {
   DEFAULT_CAPACITY_LIMIT,
   DEFAULT_SLOT_LIMIT,
   getCapacityAvailabilityState,

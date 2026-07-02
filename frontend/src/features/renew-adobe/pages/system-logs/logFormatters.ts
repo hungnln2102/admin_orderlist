@@ -1,9 +1,9 @@
-﻿import type { RenewSystemLogEntry, RenewSystemLogLevel, RenewSystemLogSource } from "@/features/renew-adobe/api/renewAdobeApi";
+import type { RenewSystemLogEntry, RenewSystemLogLevel, RenewSystemLogSource } from "@/features/renew-adobe/api/renewAdobeApi";
 
 export const vi = (value: string) => value;
 
 export const LEVEL_OPTIONS: { value: RenewSystemLogLevel; label: string }[] = [
-  { value: "all", label: vi("Táº¥t cáº£") },
+  { value: "all", label: vi("Tất cả") },
   { value: "error", label: "Error" },
   { value: "warn", label: "Warn" },
   { value: "info", label: "Info" },
@@ -13,13 +13,13 @@ export const LEVEL_OPTIONS: { value: RenewSystemLogLevel; label: string }[] = [
 export const LOG_SOURCE_TABS: { value: RenewSystemLogSource; label: string; description: string }[] = [
   {
     value: "system",
-    label: vi("Log há»‡ thá»‘ng"),
-    description: vi("Lá»—i backend, webhook, Redis, Telegram vÃ  cáº£nh bÃ¡o váº­n hÃ nh."),
+    label: vi("Log hệ thống"),
+    description: vi("Lỗi backend, webhook, Redis, Telegram và cảnh báo vận hành."),
   },
   {
     value: "user",
-    label: vi("Log ngÆ°á»i dÃ¹ng"),
-    description: vi("Hoáº¡t Ä‘á»™ng nhÆ° táº¡o Ä‘Æ¡n hÃ ng, sá»­a Ä‘Æ¡n hÃ ng, táº¡o log chi phÃ­."),
+    label: vi("Log người dùng"),
+    description: vi("Hoạt động như tạo đơn hàng, sửa đơn hàng, tạo log chi phí."),
   },
 ];
 
@@ -49,7 +49,7 @@ export const getUserLogBadgeText = (item: RenewSystemLogEntry): string => {
 
 export const getUserLogActionText = (item: RenewSystemLogEntry): string => {
   const action = item.action == null ? "" : String(item.action).trim();
-  return action || "Thao tÃ¡c ngÆ°á»i dÃ¹ng";
+  return action || "Thao tác người dùng";
 };
 
 export const formatMetaValue = (value: unknown): string => {
@@ -64,38 +64,38 @@ export const formatMetaValue = (value: unknown): string => {
 
 export const describeLogLevelVi = (level: string): string => {
   const normalized = level.toLowerCase();
-  if (normalized === "error") return vi("Lá»—i nghiÃªm trá»ng cáº§n xá»­ lÃ½");
-  if (normalized === "warn") return vi("Cáº£nh bÃ¡o, há»‡ thá»‘ng váº«n cháº¡y nhÆ°ng cÃ³ Ä‘iá»ƒm cáº§n kiá»ƒm tra");
-  if (normalized === "info") return vi("ThÃ´ng tin váº­n hÃ nh bÃ¬nh thÆ°á»ng");
-  if (normalized === "debug") return vi("Log ghi láº¡i chi tiáº¿t");
-  if (normalized === "http") return vi("Log yÃªu cáº§u HTTP");
-  return vi("Log há»‡ thá»‘ng");
+  if (normalized === "error") return vi("Lỗi nghiêm trọng cần xử lý");
+  if (normalized === "warn") return vi("Cảnh báo, hệ thống vẫn chạy nhưng có điểm cần kiểm tra");
+  if (normalized === "info") return vi("Thông tin vận hành bình thường");
+  if (normalized === "debug") return vi("Log ghi lại chi tiết");
+  if (normalized === "http") return vi("Log yêu cầu HTTP");
+  return vi("Log hệ thống");
 };
 
 export const describeLogMessageVi = (message: string): string => {
   const text = String(message || "").toLowerCase();
-  if (!text) return vi("ChÆ°a cÃ³ ná»™i dung mÃ´ táº£.");
+  if (!text) return vi("Chưa có nội dung mô tả.");
   if (text.includes("redis") && text.includes("session")) {
-    return vi("Lá»—i session Redis: mÃ´i trÆ°á»ng production Ä‘ang yÃªu cáº§u Redis session store nhÆ°ng Redis chÆ°a báº­t hoáº·c chÆ°a cÃ³ cáº¥u hÃ¬nh/káº¿t ná»‘i.");
+    return vi("Lỗi session Redis: môi trường production đang yêu cầu Redis session store nhưng Redis chưa bật hoặc chưa có cấu hình/kết nối.");
   }
   if (text.includes("redis") && text.includes("refusing to boot")) {
-    return vi("á»¨ng dá»¥ng tá»« chá»‘i khá»Ÿi Ä‘á»™ng vÃ¬ thiáº¿u Redis cáº§n thiáº¿t cho session.");
+    return vi("Ứng dụng từ chối khởi động vì thiếu Redis cần thiết cho session.");
   }
   if (text.includes("webhook") && text.includes("failed")) {
-    return vi("Webhook xá»­ lÃ½ tháº¥t báº¡i, cáº§n xem chi tiáº¿t payload vÃ  stacktrace.");
+    return vi("Webhook xử lý thất bại, cần xem chi tiết payload và stacktrace.");
   }
   if (text.includes("telegram")) {
-    return vi("Lá»—i hoáº·c cáº£nh bÃ¡o khi gá»­i thÃ´ng bÃ¡o Telegram.");
+    return vi("Lỗi hoặc cảnh báo khi gửi thông báo Telegram.");
   }
   if (text.includes("renewal")) {
-    return vi("Log liÃªn quan luá»“ng gia háº¡n Renew Adobe.");
+    return vi("Log liên quan luồng gia hạn Renew Adobe.");
   }
   if (text.includes("payment_receipt") || text.includes("payment receipt")) {
-    return vi("Log liÃªn quan biÃªn nháº­n thanh toÃ¡n hoáº·c Ä‘á»“ng bá»™ giao dá»‹ch.");
+    return vi("Log liên quan biên nhận thanh toán hoặc đồng bộ giao dịch.");
   }
   if (text.includes("auto assign")) {
-    return vi("Log liÃªn quan tá»± Ä‘á»™ng gáº¯n tÃ i khoáº£n hoáº·c user cho Renew.");
+    return vi("Log liên quan tự động gắn tài khoản hoặc user cho Renew.");
   }
-  return vi("Log váº­n hÃ nh cáº§n kiá»ƒm tra thÃªm ná»™i dung gá»‘c.");
+  return vi("Log vận hành cần kiểm tra thêm nội dung gốc.");
 };
 

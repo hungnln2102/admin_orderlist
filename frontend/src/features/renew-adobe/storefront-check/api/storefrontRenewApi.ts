@@ -1,4 +1,4 @@
-﻿import { apiFetch } from "@/shared/api/client";
+import { apiFetch } from "@/shared/api/client";
 import type {
   AdobeSystemCode,
   StorefrontRenewStatusPayload,
