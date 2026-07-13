@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useApiQuery } from "@/shared/hooks/useApiQuery";
 import {
   fetchTaxOrdersWithFallback,
   TAX_ORDER_START_DATE,
@@ -6,26 +7,13 @@ import {
 } from "../api/taxApi";
 
 export const useTaxOrders = () => {
-  const [orders, setOrders] = useState<TaxOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const fetcher = useCallback(() => fetchTaxOrdersWithFallback(TAX_ORDER_START_DATE), []);
+  const { data, loading, error, refetch } = useApiQuery<TaxOrder[]>(fetcher, { initialData: [] });
 
-  const refetch = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchTaxOrdersWithFallback(TAX_ORDER_START_DATE);
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tải đơn tính thuế.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
-
-  return { orders, loading, error, refetch };
+  return { 
+    orders: data || [], 
+    loading, 
+    error: error ? error.message : null, 
+    refetch 
+  };
 };

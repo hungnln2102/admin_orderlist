@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ORDER_FIELDS } from "../../../constants";
 import { usePricingTiers } from "@/shared/hooks/usePricingTiers";
-import useCreateOrderLogic from "./hooks/useCreateOrderLogic";
+import { useCreateOrderLogic } from "./hooks/useCreateOrderLogic";
 import type { CreateOrderModalProps } from "./types";
 import { CreateOrderModalFooter } from "./components/CreateOrderModalFooter";
 import { CreateOrderModalHeader } from "./components/CreateOrderModalHeader";

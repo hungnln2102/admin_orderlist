@@ -4,15 +4,7 @@ const {
   SCHEMA_FINANCE,
   tableName,
 } = require("../config/dbSchema");
-const {
-  TELEGRAM_BOT_TOKEN,
-  TELEGRAM_CHAT_ID,
-  TELEGRAM_FINANCE_TOPIC_ID,
-  SEND_FINANCE_DELTA_NOTIFICATION,
-} = require("./telegramOrderNotificationLib/constants");
-const {
-  sendTelegramMessage,
-} = require("./telegramOrderNotificationLib/telegramApi");
+const { financeNotifier } = require("../domains/notifications/telegram");
 const {
   sumActiveShopBankBalances,
 } = require("../domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
@@ -347,8 +339,6 @@ const notifyFinanceMonthlyDelta = async ({
       bankBalanceSnapshot: bankAfterForDisplay,
       context,
     });
-    if (!SEND_FINANCE_DELTA_NOTIFICATION) return;
-    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
     const messageRows = [
       buildFlowLine("📊 Doanh thu tháng", snapshotBefore.revenue, snapshotAfter.revenue, revenue),
       buildFlowLine("💰 Lợi nhuận tháng", snapshotBefore.profit, snapshotAfter.profit, profit),
@@ -368,18 +358,12 @@ const notifyFinanceMonthlyDelta = async ({
         bankDeltaForDisplay
       ),
     ];
-    const payload = {
-      chat_id: TELEGRAM_CHAT_ID,
-      text: buildFinanceDeltaMessage({
-        monthKey,
-        rows: messageRows,
-        context,
-      }),
-    };
-    if (Number.isFinite(TELEGRAM_FINANCE_TOPIC_ID)) {
-      payload.message_thread_id = TELEGRAM_FINANCE_TOPIC_ID;
-    }
-    await sendTelegramMessage(payload);
+    
+    financeNotifier.notifyFinanceDelta(buildFinanceDeltaMessage({
+      monthKey,
+      rows: messageRows,
+      context,
+    }));
   } catch (error) {
     logger.warn("[finance-delta-notifier] Telegram notify failed", {
       error: error?.message || String(error),

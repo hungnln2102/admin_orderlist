@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { CategoryItem } from "../utils/productInfoHelpers";
 
@@ -27,16 +27,7 @@ export const useCategoryOptions = (): UseCategoryOptionsResult => {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiFetch("/api/categories");
-      if (!response.ok) {
-        const message = await response.text().catch(() => "");
-        throw new Error(
-          message || `Failed to load categories (${response.status}).`
-        );
-      }
-      const data = (await response.json().catch(() => [])) as
-        | CategoryItem[]
-        | [];
+      const data = await apiGet<CategoryItem[]>("/api/categories");
       if (!isMountedRef.current) return;
       const nextOptions = Array.isArray(data) ? data : [];
       nextOptions.sort((left, right) =>

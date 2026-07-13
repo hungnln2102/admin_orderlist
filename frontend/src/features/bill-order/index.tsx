@@ -1,11 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  API_ENDPOINTS,
-  ORDER_CODE_PREFIXES,
-} from "@/constants";
-import { multiplyValue } from "@/shared/pricing";
+import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
-import { ORDER_COLS, VARIANT_PRICING_COLS } from "@/lib/tableSql";
+import { ORDER_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
@@ -17,13 +13,13 @@ import {
   OrderRow,
   ProductPriceRow,
   buildInvoiceEntry,
-  extractMonths,
-  normalizeDiscountRatio,
   normalizeKey,
-  resolveOrderType,
-  stripVariantDurationSuffix,
-  toPositiveNumber,
 } from "./helpers";
+import {
+  buildInvoiceLines,
+  buildOrderMap,
+  buildProductPriceMap,
+} from "./invoiceLineMapper";
 
 export default function BillOrder() {
   const { config: shopBankConfig } = useDefaultShopBankAccount();
@@ -87,114 +83,17 @@ export default function BillOrder() {
     };
   }, []);
 
-  const orderMap = useMemo(() => {
-    const map = new Map<string, OrderRow>();
-    orders.forEach((row) => {
-      const key = normalizeKey(row?.[ORDER_COLS.idOrder]);
-      if (key) {
-        map.set(key, row);
-      }
-    });
-    return map;
-  }, [orders]);
+  const orderMap = useMemo(() => buildOrderMap(orders), [orders]);
 
-  const productMap = useMemo(() => {
-    const map = new Map<string, ProductPriceRow>();
-    productPrices.forEach((row) => {
-      const key = normalizeKey(row?.[VARIANT_PRICING_COLS.code]);
-      if (key) {
-        map.set(key, row);
-      }
-    });
-    return map;
-  }, [productPrices]);
+  const productMap = useMemo(
+    () => buildProductPriceMap(productPrices),
+    [productPrices]
+  );
 
-  const invoiceLines: InvoiceLine[] = useMemo(() => {
-    return invoiceCodes.map((entry) => {
-      const order = orderMap.get(normalizeKey(entry.code));
-      const productKey = normalizeKey(order?.[ORDER_COLS.idProduct]);
-      const product = productMap.get(productKey);
-
-      const orderType = resolveOrderType(order?.[ORDER_COLS.idOrder] || entry.code);
-      const months =
-        extractMonths(order?.[ORDER_COLS.idProduct]) ||
-        extractMonths(product?.[VARIANT_PRICING_COLS.code]);
-      const monthsLabel = months ? `${months} tháng` : "";
-      const variantNameRaw = String(
-        product?.[VARIANT_PRICING_COLS.variantName] || ""
-      ).trim();
-      const fallbackFromDisplay = stripVariantDurationSuffix(
-        String(
-          product?.[VARIANT_PRICING_COLS.code] ||
-            order?.[ORDER_COLS.idProduct] ||
-            ""
-        )
-      );
-      const baseName =
-        variantNameRaw ||
-        fallbackFromDisplay ||
-        (product?.[VARIANT_PRICING_COLS.packageName] as string) ||
-        entry.code;
-      const description = monthsLabel ? `${baseName} ${monthsLabel}` : baseName;
-
-      const wholesalePrice =
-        toPositiveNumber(product?.computed_wholesale_price) ||
-        toPositiveNumber(order?.[ORDER_COLS.price]);
-      const retailPrice =
-        toPositiveNumber(product?.computed_retail_price) || wholesalePrice;
-
-      let unitPrice = retailPrice;
-      if (orderType === ORDER_CODE_PREFIXES.COLLABORATOR) {
-        unitPrice = wholesalePrice;
-      } else if (orderType === ORDER_CODE_PREFIXES.STUDENT) {
-        const pctStuRaw =
-          product?.[VARIANT_PRICING_COLS.pctStu] ?? product?.pct_stu ?? null;
-        const pctStuProvided =
-          pctStuRaw !== null &&
-          pctStuRaw !== undefined &&
-          !(typeof pctStuRaw === "string" && String(pctStuRaw).trim() === "");
-        const marginForStudent = pctStuProvided
-          ? pctStuRaw
-          : product?.[VARIANT_PRICING_COLS.pctKhach] ??
-            product?.pct_khach ??
-            null;
-        const studentUnit = multiplyValue(wholesalePrice, marginForStudent);
-        unitPrice =
-          typeof studentUnit === "number" &&
-          Number.isFinite(studentUnit) &&
-          studentUnit > 0
-            ? studentUnit
-            : wholesalePrice;
-      } else if (orderType === ORDER_CODE_PREFIXES.GIFT) {
-        unitPrice = 0;
-      } else if (
-        orderType === ORDER_CODE_PREFIXES.CUSTOMER ||
-        orderType === ORDER_CODE_PREFIXES.PROMO
-      ) {
-        unitPrice = retailPrice;
-      } else {
-        unitPrice = retailPrice || wholesalePrice;
-      }
-
-      const discountRatio =
-        orderType === ORDER_CODE_PREFIXES.PROMO
-          ? normalizeDiscountRatio(product?.[VARIANT_PRICING_COLS.pctPromo])
-          : 0;
-      const discountPct = Number((discountRatio * 100).toFixed(2));
-      const quantity = 1;
-      const total = Math.max(0, unitPrice * quantity * (1 - discountRatio));
-
-      return {
-        id: entry.id,
-        code: entry.code,
-        description,
-        unitPrice,
-        quantity,
-        discountPct,
-        total,
-      };
-    });
-  }, [invoiceCodes, orderMap, productMap]);
+  const invoiceLines: InvoiceLine[] = useMemo(
+    () => buildInvoiceLines(invoiceCodes, orderMap, productMap),
+    [invoiceCodes, orderMap, productMap]
+  );
 
   const totals = useMemo(() => {
     const subtotal = invoiceLines.reduce((sum, item) => sum + item.total, 0);

@@ -1,4 +1,4 @@
-const { deriveOrderCode } = require("./utils");
+
 
 const pickFirst = (source, keys = []) => {
   for (const key of keys) {
@@ -85,5 +85,4 @@ const normalizeTransactionPayload = (payload) => {
 
 module.exports = {
   normalizeTransactionPayload,
-  deriveOrderCode,
 };

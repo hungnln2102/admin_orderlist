@@ -5,9 +5,9 @@ import { CreateOrderDetailLinesSection } from "./CreateOrderDetailLinesSection";
 import { CreateOrderPaymentMethodSection } from "./CreateOrderPaymentMethodSection";
 import { CreateOrderPricingSection } from "./CreateOrderPricingSection";
 import { CreateOrderProductSection } from "./CreateOrderProductSection";
-import { CreateOrderSharedCustomerSection } from "./CreateOrderSharedCustomerSection";
+import { CustomerSelectionForm } from "./CustomerSelectionForm";
 
-type SharedCustomerProps = React.ComponentProps<typeof CreateOrderSharedCustomerSection>;
+type SharedCustomerProps = React.ComponentProps<typeof CustomerSelectionForm>;
 type ProductProps = React.ComponentProps<typeof CreateOrderProductSection>;
 type DetailLinesProps = React.ComponentProps<typeof CreateOrderDetailLinesSection>;
 type PricingProps = React.ComponentProps<typeof CreateOrderPricingSection>;
@@ -44,7 +44,7 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
   <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-4 py-3">
     <form id="create-order-form" onSubmit={onSubmit}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
-        <CreateOrderSharedCustomerSection {...customer} />
+        <CustomerSelectionForm {...customer} />
         <CreateOrderProductSection {...product} />
         <CreateOrderDetailLinesSection {...detailLines} />
         <CreateOrderPricingSection {...pricing} />

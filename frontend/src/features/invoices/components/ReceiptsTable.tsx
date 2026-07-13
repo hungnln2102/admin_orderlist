@@ -1,16 +1,8 @@
-import { formatDateToDMY } from "@/shared/date";
 import React, { useMemo } from "react";
-import {
-  extractTransactionCodeFromNote,
-  MatchableOrder,
-  PaymentReceipt,
-  formatCurrencyVnd,
-  resolveSender,
-  type ShopBankDisplay,
-} from "../helpers";
-import ReceiptsExpandedDetailsRow from "./receipts-table/ReceiptsExpandedDetailsRow";
+import { MatchableOrder, PaymentReceipt, type ShopBankDisplay } from "../helpers";
 import ReceiptsMatchConfirmModal from "./receipts-table/ReceiptsMatchConfirmModal";
 import { useReceiptMatchState } from "./receipts-table/useReceiptMatchState";
+import ReceiptTableRow from "./receipts-table/ReceiptTableRow";
 
 type ReceiptsTableProps = {
   receipts: PaymentReceipt[];
@@ -57,6 +49,15 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
     saveEditedOrderCode,
   } = useReceiptMatchState({ onMatchReceipt });
 
+  const orderOptions = useMemo(
+    () => matchableOrders.filter((order) => String(order.orderCode || "").trim()),
+    [matchableOrders]
+  );
+  const expandedColSpan = 6 + (enableMatching ? 1 : 0) + (showOrderCode ? 1 : 0);
+  const expandedGridClass = showOrderCode
+    ? "grid grid-cols-1 md:grid-cols-5 gap-6"
+    : "grid grid-cols-1 md:grid-cols-4 gap-6";
+
   return (
     <div className="bg-transparent overflow-visible">
       <div className="overflow-x-auto">
@@ -74,211 +75,41 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
             </tr>
           </thead>
           <tbody className="">
-            {receipts.map((receipt) => {
-              const isExpanded = expandedReceiptId === receipt.id;
-              const selectedValue = getSelectedValue(receipt);
-              const isManualInput = selectedValue === "__manual__";
-              const rowError = rowErrorByReceiptId[receipt.id] || "";
-              const isMatching = matchingReceiptId === receipt.id;
-              const isEditingOrderCode =
-                enableOrderCodeEdit && editingReceiptId === receipt.id;
-              const isOutboundTransfer = Boolean(receipt.outboundReasonLabel || receipt.outboundAmount);
-              const amountClassName = isOutboundTransfer
-                ? "text-red-400"
-                : "text-emerald-400";
-              return (
-                <React.Fragment key={receipt.id}>
-                  <tr
-                    className="group/row cursor-pointer transition-all duration-500 relative z-10"
-                    onClick={() => onToggle(receipt.id)}
-                    onDoubleClick={() =>
-                      onSelectReceipt ? onSelectReceipt(receipt) : undefined
-                    }
-                  >
-                    {enableMatching ? (
-                      <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                        <div
-                          className="space-y-2"
-                          onClick={(event) => event.stopPropagation()}
-                          onDoubleClick={(event) => event.stopPropagation()}
-                        >
-                          <select
-                            value={selectedValue}
-                            onChange={(event) =>
-                              void handleSelectMatch(receipt, event.target.value)
-                            }
-                            disabled={isMatching}
-                            className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-                          >
-                            <option value="">Chọn đơn cần ghép...</option>
-                            <option value="__manual__">Tự điền mã đơn hàng</option>
-                            {orderOptions.map((order) => (
-                              <option key={order.orderCode} value={order.orderCode}>
-                                {order.orderCode} - {order.status}
-                              </option>
-                            ))}
-                          </select>
-                          {String(receipt.orderCode || "").trim() ? (
-                            <p className="text-[10px] text-white/55 font-medium leading-snug">
-                              CK đã gắn mã parse{" "}
-                              <span className="font-bold text-indigo-200/95">
-                                {String(receipt.orderCode).trim().toUpperCase()}
-                              </span>
-                              . Ghép sang đơn khả dụng để đưa vào tab Biên nhận.
-                            </p>
-                          ) : null}
-                          {isManualInput && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={manualCodeByReceiptId[receipt.id] || ""}
-                                onChange={(event) =>
-                                  setManualCodeByReceiptId((prev) => ({
-                                    ...prev,
-                                    [receipt.id]: event.target.value.toUpperCase(),
-                                  }))
-                                }
-                                disabled={isMatching}
-                                placeholder="Nhập mã đơn (VD: MAVC...)"
-                                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => void handleSubmitManualMatch(receipt)}
-                                disabled={isMatching}
-                                className="shrink-0 rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
-                              >
-                                Ghép
-                              </button>
-                            </div>
-                          )}
-                          {isMatching ? (
-                            <p className="text-[10px] font-semibold text-indigo-200/70">
-                              Đang ghép biên lai...
-                            </p>
-                          ) : null}
-                          {rowError ? (
-                            <p className="text-[10px] font-semibold text-rose-300">
-                              {rowError}
-                            </p>
-                          ) : null}
-                        </div>
-                      </td>
-                    ) : null}
-                    {showOrderCode ? (
-                      <td
-                        className={`px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 ${
-                          enableMatching ? "" : "first:rounded-l-[24px]"
-                        }`}
-                      >
-                        <div
-                          className="space-y-2"
-                          onClick={(event) => event.stopPropagation()}
-                          onDoubleClick={(event) => event.stopPropagation()}
-                        >
-                          {isEditingOrderCode ? (
-                            <div className="space-y-2">
-                              <input
-                                type="text"
-                                value={editingOrderCode}
-                                onChange={(event) =>
-                                  setEditingOrderCode(
-                                    event.target.value.toUpperCase()
-                                  )
-                                }
-                                disabled={isMatching}
-                                placeholder="Nhập mã đơn..."
-                                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-                              />
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void saveEditedOrderCode(receipt)}
-                                  disabled={isMatching}
-                                  className="rounded-xl border border-emerald-300/40 bg-emerald-500/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100 disabled:opacity-60"
-                                >
-                                  Lưu
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={cancelEditOrderCode}
-                                  disabled={isMatching}
-                                  className="rounded-xl border border-white/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/80 disabled:opacity-60"
-                                >
-                                  Hủy
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-white tracking-wider uppercase">
-                                {receipt.orderCode || "—"}
-                              </span>
-                              {enableOrderCodeEdit ? (
-                                <button
-                                  type="button"
-                                  onClick={() => startEditOrderCode(receipt)}
-                                  disabled={isMatching}
-                                  className="rounded-lg border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
-                                >
-                                  Sửa
-                                </button>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    ) : null}
-                    <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                      <div className="text-sm font-bold text-white tracking-tight">
-                        {resolveSender(receipt) || "—"}
-                      </div>
-                    </td>
-                    <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                      <div className="text-xs font-medium text-white/80">
-                        {receipt.receiver || shopBank.accountNumber}
-                      </div>
-                    </td>
-                    <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                      <span className={`text-sm font-bold ${amountClassName} tracking-tight`}>
-                        {formatCurrencyVnd(isOutboundTransfer ? -Math.abs(receipt.outboundAmount || receipt.amount) : receipt.amount)}
-                      </span>
-                    </td>
-                    <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 max-w-xs">
-                      {isOutboundTransfer ? (
-                        <div className="mb-1 inline-flex items-center rounded-full border border-red-400/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-red-200">
-                          {receipt.outboundReasonLabel || "Tiền ra"}
-                        </div>
-                      ) : null}
-                      <span className="block truncate text-[13px] text-white/60 font-medium">
-                        {receipt.outboundContent || receipt.note || "—"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                      <span className="text-sm font-bold text-indigo-100/90">
-                        {extractTransactionCodeFromNote(receipt.note) || "—"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-5 last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-right pr-6">
-                      <span className="text-xs font-bold text-indigo-300/80 tracking-tighter">
-                        {receipt.paidAt
-                          ? formatDateToDMY(receipt.paidAt)
-                          : "—"}
-                      </span>
-                    </td>
-                  </tr>
-                  {isExpanded ? (
-                    <ReceiptsExpandedDetailsRow
-                      receipt={receipt}
-                      expandedColSpan={expandedColSpan}
-                      expandedGridClass={expandedGridClass}
-                      showOrderCode={showOrderCode}
-                      shopBank={shopBank}
-                    />
-                  ) : null}
-                </React.Fragment>
-              );
-            })}
+            {receipts.map((receipt) => (
+              <ReceiptTableRow
+                key={receipt.id}
+                receipt={receipt}
+                orderOptions={orderOptions}
+                selectedValue={getSelectedValue(receipt)}
+                manualCode={manualCodeByReceiptId[receipt.id] || ""}
+                rowError={rowErrorByReceiptId[receipt.id] || ""}
+                isMatching={matchingReceiptId === receipt.id}
+                isManualInput={getSelectedValue(receipt) === "__manual__"}
+                isEditingOrderCode={enableOrderCodeEdit && editingReceiptId === receipt.id}
+                isExpanded={expandedReceiptId === receipt.id}
+                enableMatching={enableMatching}
+                showOrderCode={showOrderCode}
+                enableOrderCodeEdit={enableOrderCodeEdit}
+                editingOrderCode={editingOrderCode}
+                expandedColSpan={expandedColSpan}
+                expandedGridClass={expandedGridClass}
+                shopBank={shopBank}
+                onToggle={onToggle}
+                onSelectReceipt={onSelectReceipt}
+                onSelectMatch={handleSelectMatch}
+                onSubmitManualMatch={handleSubmitManualMatch}
+                onManualCodeChange={(nextCode) =>
+                  setManualCodeByReceiptId((prev) => ({
+                    ...prev,
+                    [receipt.id]: nextCode.toUpperCase(),
+                  }))
+                }
+                onStartEditOrderCode={startEditOrderCode}
+                onCancelEditOrderCode={cancelEditOrderCode}
+                onSaveEditedOrderCode={saveEditedOrderCode}
+                onEditingOrderCodeChange={(nextCode) => setEditingOrderCode(nextCode.toUpperCase())}
+              />
+            ))}
           </tbody>
         </table>
       </div>

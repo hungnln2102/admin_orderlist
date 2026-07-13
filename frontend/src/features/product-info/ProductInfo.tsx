@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { ProductInfoHeader } from "./components/ProductInfoHeader";
-import { ViewModeToggle } from "./components/ViewModeToggle";
+import { ProductInfoHeader } from "./components/product/ProductInfoHeader";
+import { ViewModeToggle } from "./components/product/ViewModeToggle";
 import { ProductView } from "./views/ProductView";
 import { CategoryView } from "./views/CategoryView";
 import { VariantContentView } from "./views/VariantContentView";
-import { CreateCategoryModal } from "./components/CreateCategoryModal";
-import { EditCategoryModal } from "./components/EditCategoryModal";
-import { EditProductModal } from "./components/EditProductModal";
+import { CreateCategoryModal, EditCategoryModal } from "./components/category/CategoryFormModal";
+import { EditProductModal } from "./components/modals/EditProductModal";
 import { useCategoryCreate } from "./hooks/useCategoryCreate";
 import { useCategoryEdit } from "./hooks/useCategoryEdit";
 import { useCategoryOptions } from "./hooks/useCategoryOptions";

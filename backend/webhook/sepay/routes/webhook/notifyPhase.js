@@ -11,6 +11,7 @@ async function notifyCombinedMonthlyDelta({
   financeSnapshotBefore,
   alreadyFinancialPosted,
 }) {
+  return; // Bỏ qua thông báo tài chính
   if (!paidMonthKey || !financeSnapshotBefore || alreadyFinancialPosted) {
     return;
   }

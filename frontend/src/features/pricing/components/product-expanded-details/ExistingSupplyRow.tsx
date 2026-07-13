@@ -6,7 +6,11 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import type { ProductPricingRow, SupplyPriceItem } from "../../types";
-import { buildSupplyRowKey, formatCurrencyValue, formatProfitRange } from "../../utils";
+import { buildSupplyRowKey } from "../../supplyPriceUtils";
+import {
+  formatCurrencyValue,
+  formatProfitRange,
+} from "../../priceFormatters";
 
 type ExistingSupplyRowProps = {
   item: ProductPricingRow;

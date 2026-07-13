@@ -12,7 +12,7 @@ describe("paymentReference extraction", () => {
   });
 
   test("parseWebhookTransaction exposes paymentReferenceCodes", () => {
-    const { parseWebhookTransaction } = require("../../../webhook/sepay/routes/webhook/parsePhase");
+    const { parseWebhookTransaction } = require("../../../src/domains/payments/use-cases/parseTransaction");
     const parsed = parseWebhookTransaction({
       transaction: {
         content: "CK ABC12XY9",

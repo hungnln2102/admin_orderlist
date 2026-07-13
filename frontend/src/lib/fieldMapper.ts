@@ -162,17 +162,4 @@ export const SUPPLIER_COST_FIELD_MAP = {
   UPDATED_AT: SUPPLIER_COST_COLS.updatedAt,
 } as const;
 
-export type OrderFieldKey = keyof typeof ORDER_FIELD_MAP;
-export type PurchaseOrderFieldKey = keyof typeof PURCHASE_ORDER_FIELD_MAP;
-export type VariantPricingFieldKey = keyof typeof VARIANT_PRICING_FIELD_MAP;
-export type SupplyFieldKey = keyof typeof SUPPLY_FIELD_MAP;
-export type SupplyPriceFieldKey = keyof typeof SUPPLY_PRICE_FIELD_MAP;
-export type PaymentReceiptFieldKey = keyof typeof PAYMENT_RECEIPT_FIELD_MAP;
-export type RefundFieldKey = keyof typeof REFUND_FIELD_MAP;
-export type BankListFieldKey = keyof typeof BANK_LIST_FIELD_MAP;
-export type WarehouseFieldKey = keyof typeof WAREHOUSE_FIELD_MAP;
-export type CategoryFieldKey = keyof typeof CATEGORY_FIELD_MAP;
-export type ProductFieldKey = keyof typeof PRODUCT_FIELD_MAP;
-export type VariantFieldKey = keyof typeof VARIANT_FIELD_MAP;
-export type ProductSchemaDescFieldKey = keyof typeof PRODUCT_SCHEMA_DESC_FIELD_MAP;
-export type SupplierCostFieldKey = keyof typeof SUPPLIER_COST_FIELD_MAP;
+// End of mappings

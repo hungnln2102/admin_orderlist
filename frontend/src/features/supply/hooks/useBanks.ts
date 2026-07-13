@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import type { BankOption } from "../types";
 
 export function useBanks() {
@@ -8,8 +8,7 @@ export function useBanks() {
   useEffect(() => {
     let cancelled = false;
 
-    apiFetch("/api/banks")
-      .then((response) => response.json())
+    apiGet<unknown[]>("/api/banks")
       .then((data) => {
         if (!cancelled && Array.isArray(data)) {
           setBanks(
@@ -19,18 +18,18 @@ export function useBanks() {
                   ? (bank as Record<string, unknown>)
                   : {};
               return {
-              bin: String(row.bin ?? ""),
-              name:
-                String(
-                  row.bank_name ??
-                    row.bankName ??
-                    row.name ??
-                    row.bank ??
-                    row.bin ??
-                    ""
-                ),
-            };
-          })
+                bin: String(row.bin ?? ""),
+                name:
+                  String(
+                    row.bank_name ??
+                      row.bankName ??
+                      row.name ??
+                      row.bank ??
+                      row.bin ??
+                      ""
+                  ),
+              };
+            })
           );
         }
       })

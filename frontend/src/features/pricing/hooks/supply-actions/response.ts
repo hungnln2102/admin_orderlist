@@ -1,12 +1,14 @@
 import type { ProductPricingRow, SupplyPriceItem } from "../../types";
 import {
   applyBasePriceToProduct,
+  hasValidPromoRatio,
+} from "../../priceCalculations";
+import {
   computeHighestSupplyPrice,
   dedupeSupplyItems,
-  hasValidPromoRatio,
-  normalizeProductKey,
   sortSupplyItems,
-} from "../../utils";
+} from "../../supplyPriceUtils";
+import { normalizeProductKey } from "../../priceLabels";
 
 export function mapSupplyPriceResponse(payload: unknown): {
   items: SupplyPriceItem[];

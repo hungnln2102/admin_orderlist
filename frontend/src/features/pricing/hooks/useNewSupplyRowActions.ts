@@ -7,7 +7,7 @@ import type {
   ProductPricingRow,
   SupplyPriceState,
 } from "../types";
-import { normalizeProductKey } from "../utils";
+import { normalizeProductKey } from "../priceLabels";
 import {
   buildAddedSupplyState,
   createEmptyNewSupplyRow,

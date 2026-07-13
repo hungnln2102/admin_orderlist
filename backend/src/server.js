@@ -2,7 +2,10 @@ const app = require("./app");
 const { port } = require("./config/appConfig");
 const { ensureDefaultAdmin } = require("./domains/auth/controller");
 const logger = require("./utils/logger");
-const { notifyCritical } = require("./utils/telegramErrorNotifier");
+const { notifyCritical } = require("./domains/notifications/telegram").systemNotifier;
+const { registerAllSubscribers } = require("./events");
+
+registerAllSubscribers();
 
 process.on("uncaughtException", (err) => {
   logger.error("[FATAL] uncaughtException", { error: err.message, stack: err.stack });

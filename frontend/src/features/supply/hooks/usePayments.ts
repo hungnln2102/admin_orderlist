@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiPost } from "@/shared/api/client";
 import { buildSepayQrUrl } from "@/shared/vietqr";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
@@ -70,21 +70,8 @@ export const usePayments = ({
       ) {
         bodyPayload.shopBankAccountId = Math.round(opts.shopBankAccountId);
       }
-      const body =
-        Object.keys(bodyPayload).length > 0
-          ? JSON.stringify(bodyPayload)
-          : undefined;
-      const res = await apiFetch(`/api/payment-supply/${paymentId}/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        ...(body !== undefined ? { body } : {}),
-      });
-      if (!res.ok) {
-        const data = (await res
-          .json()
-          .catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || "Không thể thanh toán chu kỳ");
-      }
+      const payload = Object.keys(bodyPayload).length > 0 ? bodyPayload : undefined;
+      await apiPost(`/api/payment-supply/${paymentId}/confirm`, payload);
       await fetchOverview();
       setQrPayment(null);
       onRefreshList?.();

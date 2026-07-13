@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/shared/api/client";
+import { apiPost } from "@/shared/api/client";
 import type { CreditActionType } from "../components/CreditTableBlock";
 
 type CreditActionResponse = {
@@ -27,13 +27,8 @@ export async function submitCreditLogAction(
   if (action === "complete" && options.shopBankAccountId != null) {
     payload.shopBankAccountId = options.shopBankAccountId;
   }
-  const response = await apiFetch(API_ENDPOINTS.CREDIT_LOG_ACTION(id), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const body = (await response.json().catch(() => ({}))) as CreditActionResponse;
-  if (!response.ok || !body?.success) {
+  const body = await apiPost<CreditActionResponse>(API_ENDPOINTS.CREDIT_LOG_ACTION(id), payload);
+  if (!body?.success) {
     throw new Error(String(body?.error || "Không thể cập nhật credit log."));
   }
   return body.item;

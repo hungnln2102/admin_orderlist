@@ -6,7 +6,7 @@ import {
   PencilIcon,
 } from "@heroicons/react/24/outline";
 import { PricingStat, ProductPricingRow } from "../types";
-import { normalizeProductKey } from "../utils";
+import { normalizeProductKey } from "../priceLabels";
 import { useProductData } from "./useProductData";
 import { useProductActions } from "./useProductActions";
 import { useSupplyActions } from "./useSupplyActions";

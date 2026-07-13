@@ -4,7 +4,7 @@ import type {
   ProductRowSupplyControls,
   ProductRowSupplyState,
 } from "../productRowContracts";
-import { buildSupplyRowKey } from "../../utils";
+import { buildSupplyRowKey } from "../../supplyPriceUtils";
 import { ExistingSupplyRow } from "./ExistingSupplyRow";
 import { NewSupplyRow } from "./NewSupplyRow";
 

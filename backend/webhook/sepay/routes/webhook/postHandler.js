@@ -3,11 +3,7 @@ const {
   ORDER_TABLE,
   pool,
 } = require("../../config");
-const {
-  PARTNER_SCHEMA,
-  SCHEMA_PARTNER,
-  tableName,
-} = require("../../../../src/config/dbSchema");
+
 const {
   safeStringify,
   normalizeAmount,
@@ -45,7 +41,6 @@ const {
   resolveBatchOrderAmountsByBatchCodes,
 } = require("./matchPhase");
 const {
-  isBatchCode,
   PAYMENT_RECEIPT_BATCH_TABLE,
   PAYMENT_RECEIPT_BATCH_ITEM_TABLE,
   REFUND_CREDIT_APPLICATIONS_TABLE,
@@ -61,12 +56,7 @@ const {
   resolveOrderPriceForWebhookMatch,
   fetchSupplierNameBySupplyId,
 } = require("./postingPhase");
-const { tryAutoSettleSupplierPaymentByOutbound } = require("./autoSettleSupplierPayment");
-const { creditShopBankFromPaymentReceipt, findAccountIdByReceiver, debitShopBankSupplierPayment } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
-const { decodeSupplierSignature } = require("./supplierPaymentSignature");
-const { notifyFinanceMonthlyDelta } = require("../../../../src/services/telegramFinanceDeltaNotifier");
-const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
-const { withSavepoint } = require("../../savepoint");
+const { creditShopBankFromPaymentReceipt } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
 const {
@@ -77,233 +67,8 @@ const {
 const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
 const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpectedAmount");
 const { STATUS } = require("../../../../src/utils/statuses");
-
-const SUPPLIER_ORDER_COST_LOG_TABLE = tableName(
-  PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE,
-  SCHEMA_PARTNER
-);
-const PAYMENT_SUPPLY_TABLE = tableName(
-  PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
-  SCHEMA_PARTNER
-);
-const SUPPLIER_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER);
-const supplierOrderCostCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
-const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
-const supplierCols = PARTNER_SCHEMA.SUPPLIER.COLS;
-const SUPPLIER_REFUND_MATCH_TOLERANCE = 5000;
-
-const parseRfNccDirective = (contentRaw) => {
-  const content = String(contentRaw || "")
-    .replace(/\s+/g, " ")
-    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
-    .replace(/\bTT\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!content) return null;
-  const match = content.match(/\bRF\s+NCC\s+(.+?)\s+(\d{8})(?:\b|$)/i);
-  if (!match?.[1] || !match?.[2]) return null;
-  const supplierHint = String(match[1]).trim();
-  const ymd = String(match[2]).trim();
-  if (!supplierHint || !/^\d{8}$/.test(ymd)) return null;
-  return { supplierHint, ymd };
-};
-
-const isPotentialSupplierRefundTransfer = (contentRaw) => {
-  if (parseRfNccDirective(contentRaw)) return true;
-  const content = String(contentRaw || "").toUpperCase();
-  if (!content) return false;
-  return (
-    /\bRF\b/.test(content) ||
-    /\bND\s+RE\b/.test(content) ||
-    /\bHOAN\b/.test(content) ||
-    /\bREFUND\b/.test(content) ||
-    /\bTRA\b/.test(content)
-  );
-};
-
-const normalizeSupplierHintText = (value) =>
-  String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-
-const extractSupplierHintFromContent = (contentRaw) => {
-  const parsed = parseRfNccDirective(contentRaw);
-  return parsed?.supplierHint || "";
-};
-
-async function resolveSupplierByHint(client, hintRaw) {
-  const hintNormalized = normalizeSupplierHintText(hintRaw);
-  if (!hintNormalized) return null;
-
-  const { rows } = await client.query(
-    `
-      SELECT ${supplierCols.ID} AS id, ${supplierCols.SUPPLIER_NAME} AS supplier_name
-      FROM ${SUPPLIER_TABLE}
-      WHERE COALESCE(${supplierCols.SUPPLIER_NAME}::text, '') <> ''
-    `
-  );
-
-  const matches = (rows || [])
-    .map((row) => {
-      const supplierName = String(row.supplier_name || "").trim();
-      const normalizedName = normalizeSupplierHintText(supplierName);
-      if (!normalizedName) return null;
-      const exact = normalizedName === hintNormalized;
-      const include =
-        normalizedName.includes(hintNormalized) || hintNormalized.includes(normalizedName);
-      if (!exact && !include) return null;
-      return {
-        id: Number(row.id) || 0,
-        supplierName,
-        score: exact ? 0 : 1,
-        lengthGap: Math.abs(normalizedName.length - hintNormalized.length),
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.score - b.score || a.lengthGap - b.lengthGap);
-
-  if (matches.length === 0) return null;
-  if (
-    matches.length > 1 &&
-    matches[0].score === matches[1].score &&
-    matches[0].lengthGap === matches[1].lengthGap
-  ) {
-    return null;
-  }
-  return matches[0];
-}
-
-async function tryAutoSettleSupplierRefundByReceipt({
-  client,
-  receiptId,
-  transferAmount,
-  paidMonthKey,
-  transactionContent,
-}) {
-  const incoming = normalizeMoney(transferAmount);
-  if (!(incoming > 0)) return null;
-  const rfDirective = parseRfNccDirective(transactionContent);
-  const supplierHint = extractSupplierHintFromContent(transactionContent);
-  if (String(transactionContent || "").toUpperCase().includes("RF") && !rfDirective) return null;
-  const hintedSupplier = supplierHint
-    ? await resolveSupplierByHint(client, supplierHint)
-    : null;
-  if (supplierHint && !hintedSupplier) return null;
-
-  const result = await client.query(
-    `
-      WITH latest AS (
-        SELECT DISTINCT ON (l.${supplierOrderCostCols.ORDER_LIST_ID})
-          l.${supplierOrderCostCols.SUPPLY_ID} AS supply_id,
-          COALESCE(l.${supplierOrderCostCols.IMPORT_COST}, 0)::numeric AS import_cost,
-          COALESCE(l.${supplierOrderCostCols.REFUND_AMOUNT}, 0)::numeric AS refund_amount,
-          COALESCE(l.${supplierOrderCostCols.NCC_PAYMENT_STATUS}::text, '') AS ncc_payment_status
-        FROM ${SUPPLIER_ORDER_COST_LOG_TABLE} l
-        ORDER BY l.${supplierOrderCostCols.ORDER_LIST_ID}, l.${supplierOrderCostCols.ID} DESC
-      ),
-      agg AS (
-        SELECT
-          supply_id,
-          COUNT(*) FILTER (
-            WHERE TRIM(COALESCE(ncc_payment_status, '')) <> $1
-          )::int AS unpaid_count,
-          COALESCE(
-            SUM(
-              CASE
-                WHEN TRIM(COALESCE(ncc_payment_status, '')) <> $1
-                THEN import_cost - refund_amount
-                ELSE 0::numeric
-              END
-            ),
-            0
-          )::numeric AS net_unpaid_amount
-        FROM latest
-        GROUP BY supply_id
-      )
-      SELECT supply_id, unpaid_count, net_unpaid_amount
-      FROM agg
-      WHERE unpaid_count > 0
-        AND net_unpaid_amount < 0
-    `,
-    [STATUS.PAID]
-  );
-
-  const candidates = (result.rows || [])
-    .map((row) => {
-      const expectedRefund = Math.abs(normalizeMoney(row.net_unpaid_amount));
-      const gap = Math.abs(expectedRefund - incoming);
-      return {
-        supplyId: Number(row.supply_id) || 0,
-        unpaidCount: Number(row.unpaid_count) || 0,
-        expectedRefund,
-        gap,
-      };
-    })
-    .filter(
-      (row) =>
-        row.supplyId > 0 &&
-        row.unpaidCount > 0 &&
-        row.expectedRefund > 0 &&
-        row.gap <= SUPPLIER_REFUND_MATCH_TOLERANCE
-    )
-    .sort((a, b) => a.gap - b.gap);
-
-  const targetPool = hintedSupplier
-    ? candidates.filter((candidate) => candidate.supplyId === hintedSupplier.id)
-    : candidates;
-  if (targetPool.length !== 1) return null;
-  const target = targetPool[0];
-
-  const paymentDate = new Date();
-  const day = String(paymentDate.getDate()).padStart(2, "0");
-  const month = String(paymentDate.getMonth() + 1).padStart(2, "0");
-  const year = String(paymentDate.getFullYear());
-  const roundLabel = `${day}/${month}/${year} - ${day}/${month}/${year}`;
-
-  await client.query(
-    `
-      INSERT INTO ${PAYMENT_SUPPLY_TABLE}
-        (${paymentSupplyCols.SOURCE_ID}, ${paymentSupplyCols.ROUND}, ${paymentSupplyCols.STATUS}, ${paymentSupplyCols.PAID})
-      VALUES ($1, $2, $3, $4)
-    `,
-    [target.supplyId, roundLabel, STATUS.PAID, -target.expectedRefund]
-  );
-
-  await client.query(
-    `
-      UPDATE ${SUPPLIER_ORDER_COST_LOG_TABLE}
-      SET ${supplierOrderCostCols.NCC_PAYMENT_STATUS} = $1,
-          ${supplierOrderCostCols.LOGGED_AT} = NOW()
-      WHERE ${supplierOrderCostCols.SUPPLY_ID} = $2
-        AND TRIM(COALESCE(${supplierOrderCostCols.NCC_PAYMENT_STATUS}::text, '')) <> $1
-    `,
-    [STATUS.PAID, target.supplyId]
-  );
-
-  if (receiptId) {
-    await insertFinancialAuditLog(client, {
-      payment_receipt_id: receiptId,
-      order_code: "",
-      rule_branch: "SUPPLIER_REFUND_AUTO_SETTLED",
-      delta: {
-        supplier_id: target.supplyId,
-        supplier_hint: supplierHint || null,
-        supplier_name: hintedSupplier?.supplierName || null,
-        rf_ymd: rfDirective?.ymd || null,
-        expected_refund_amount: target.expectedRefund,
-        incoming_receipt_amount: incoming,
-        match_gap: target.gap,
-        month_key: paidMonthKey || null,
-      },
-      source: "webhook",
-    });
-  }
-
-  return target;
-}
+const { withSavepoint } = require("../../savepoint");
+const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
 
 async function handleWebhookPost(req, res) {
   logger.debug("Incoming Sepay webhook", {
@@ -334,6 +99,20 @@ async function handleWebhookPost(req, res) {
     return res.status(400).json({ message: "Missing transaction" });
   }
 
+  // Phát sự kiện ra EventBus để tách biệt logic xử lý khỏi HTTP response
+  const eventBus = require("../../../../src/events/eventBus");
+  const EVENTS = require("../../../../src/events/eventTypes");
+  eventBus.emit(EVENTS.SEPAY_WEBHOOK_RECEIVED, {
+    reqBody: req.body,
+    parsed,
+  });
+
+  // Trả về 200 ngay lập tức cho Sepay
+  return res.status(200).json({ message: "Webhook accepted and queued for processing" });
+}
+
+async function processWebhookTransactionAsync(reqBody, parsed) {
+  const transaction = parsed?.transaction || null;
   const {
     orderCode,
     paymentReferenceCodes,
@@ -342,9 +121,8 @@ async function handleWebhookPost(req, res) {
     transferAmountNormalized,
     supplierSettlementTransfer,
   } = parsed;
-  const potentialSupplierRefundTransfer = isPotentialSupplierRefundTransfer(
-    transaction.transaction_content
-  );
+  const potentialSupplierRefundTransfer = Boolean(parsed?.potentialSupplierRefundTransfer);
+  const autoSupplierSettlement = parsed?.autoSupplierSettlement || null;
   logger.debug("Order codes from webhook", { orderCodes, count: orderCodes.length });
 
   try {
@@ -508,9 +286,9 @@ async function handleWebhookPost(req, res) {
           code,
           state
             ? isEligibleForRenewal(
-                state[ORDER_COLS.status],
-                state[ORDER_COLS.expiryDate]
-              )
+              state[ORDER_COLS.status],
+              state[ORDER_COLS.expiryDate]
+            )
             : null
         );
       }
@@ -819,30 +597,11 @@ async function handleWebhookPost(req, res) {
         }
       }
 
-      let autoSupplierSettlement = null;
       if (
         !alreadyFinancialPosted &&
         (!loopOrderCodes.length && !orderCode) &&
         transferAmountNormalized > 0 &&
-        receiptId &&
-        (supplierSettlementTransfer || potentialSupplierRefundTransfer)
-      ) {
-        autoSupplierSettlement = await tryAutoSettleSupplierRefundByReceipt({
-          client,
-          receiptId,
-          transferAmount: transferAmountNormalized,
-          paidMonthKey,
-          transactionContent: transaction.transaction_content,
-        });
-      }
-
-      if (
-        !alreadyFinancialPosted &&
-        (!loopOrderCodes.length && !orderCode) &&
-        transferAmountNormalized > 0 &&
-        !supplierSettlementTransfer &&
-        !potentialSupplierRefundTransfer &&
-        !autoSupplierSettlement
+        !supplierSettlementTransfer
       ) {
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
           offFlowDelta: transferAmountNormalized,
@@ -933,66 +692,48 @@ async function handleWebhookPost(req, res) {
           logger.warn("[Webhook] findAccountIdByReceiver failed", { error: e.message });
         }
 
-        let autoSettleResult = null;
-        if (bankAccountId) {
-          try {
-            autoSettleResult = await tryAutoSettleSupplierPaymentByOutbound({
-              client,
-              receiptId,
-              transferAmountNormalized,
-              paidMonthKey,
-              shopBankAccountId: bankAccountId,
-            });
-          } catch (e) {
-            logger.error("[Webhook] tryAutoSettleSupplierPaymentByOutbound error", { error: e.message, stack: e.stack });
-          }
-        }
 
-        if (autoSettleResult) {
-          logger.info("[Webhook] Auto settled supplier payment from outbound", { ...autoSettleResult, receiptId });
-        } else {
-          // Phân loại lý do tiền ra dựa trên nội dung chuyển khoản
-          const contentLower = contentRaw.toLowerCase();
-          const isSupplierPayment =
-            /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||
-            /nhap\s*hang|nhap\s*kho|thanh\s*toan\s*ncc|chuyen\s*tien\s*ncc|tt\s*ncc/i.test(contentLower);
-          const outboundReason = isSupplierPayment
-            ? "supplier_payment"
-            : "withdrawal";
-          const outboundReasonLabel = isSupplierPayment
-            ? "Nhập hàng / Thanh toán NCC"
-            : "Rút tiền / Chuyển ra";
+        // Phân loại lý do tiền ra dựa trên nội dung chuyển khoản
+        const contentLower = contentRaw.toLowerCase();
+        const isSupplierPayment =
+          /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||
+          /nhap\s*hang|nhap\s*kho|thanh\s*toan\s*ncc|chuyen\s*tien\s*ncc|tt\s*ncc/i.test(contentLower);
+        const outboundReason = isSupplierPayment
+          ? "supplier_payment"
+          : "withdrawal";
+        const outboundReasonLabel = isSupplierPayment
+          ? "Nhập hàng / Thanh toán NCC"
+          : "Rút tiền / Chuyển ra";
 
-          // Ghi nhận giao dịch tiền ra vào audit log (đối soát).
-          // KHÔNG gọi debitShopBankExternalOut — các luồng nghiệp vụ (Thanh toán NCC,
-          // chi phí shop, v.v.) đã trừ bank rồi. Webhook chỉ ghi nhận biên lai.
+        // Ghi nhận giao dịch tiền ra vào audit log (đối soát).
+        // KHÔNG gọi debitShopBankExternalOut — các luồng nghiệp vụ (Thanh toán NCC,
+        // chi phí shop, v.v.) đã trừ bank rồi. Webhook chỉ ghi nhận biên lai.
 
-          if (receiptId) {
-            await insertFinancialAuditLog(client, {
-              payment_receipt_id: receiptId,
-              order_code: "",
-              rule_branch: "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT",
-              delta: {
-                bank_balance_delta: transferAmountNormalized,
-                outbound_amount: outboundAmount,
-                outbound_reason: outboundReason,
-                outbound_reason_label: outboundReasonLabel,
-                month_key: paidMonthKey,
-                content: contentRaw,
-              },
-              source: "webhook",
-            });
-          }
-          logger.info("[Webhook] Ghi nhận tiền ra — audit log", {
-            receiptId,
-            amount: transferAmountNormalized,
-            outboundAmount,
-            outboundReason,
-            outboundReasonLabel,
-            monthKey: paidMonthKey,
-            content: contentRaw.slice(0, 120),
+        if (receiptId) {
+          await insertFinancialAuditLog(client, {
+            payment_receipt_id: receiptId,
+            order_code: "",
+            rule_branch: "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT",
+            delta: {
+              bank_balance_delta: transferAmountNormalized,
+              outbound_amount: outboundAmount,
+              outbound_reason: outboundReason,
+              outbound_reason_label: outboundReasonLabel,
+              month_key: paidMonthKey,
+              content: contentRaw,
+            },
+            source: "webhook",
           });
         }
+        logger.info("[Webhook] Ghi nhận tiền ra — audit log", {
+          receiptId,
+          amount: transferAmountNormalized,
+          outboundAmount,
+          outboundReason,
+          outboundReasonLabel,
+          monthKey: paidMonthKey,
+          content: contentRaw.slice(0, 120),
+        });
       }
 
       if (receiptResult?.inserted) {
@@ -1139,6 +880,33 @@ async function handleWebhookPost(req, res) {
 
       await client.query("COMMIT");
 
+      // Bắn event tiền vào / ra cho FinancialMetricsSubscriber (và các module khác)
+      if (receiptResult?.inserted) {
+        const eventBus = require("../../../../src/events/eventBus");
+        const EVENTS = require("../../../../src/events/eventTypes");
+
+        if (transferAmountNormalized > 0) {
+          const hasEligibleRenewal = loopOrderCodes.some(code => eligibilityByOrderCode.get(code)?.eligible);
+          eventBus.emit(EVENTS.SEPAY_MONEY_IN, {
+            transactionId: transaction.transaction_id || transaction.id || null,
+            amount: transferAmountNormalized,
+            cost: postedImportDelta, // Cost từ vòng lặp được cộng dồn (importDelta)
+            monthKey: paidMonthKey,
+            orderCode: loopOrderCodes[0] || null, // Lấy mã đơn đầu tiên
+            bankAccountId: transaction.account_number || transaction.accountNumber || null,
+            isOrderPayment: loopOrderCodes.length > 0 && !hasEligibleRenewal,
+            isRenewal: hasEligibleRenewal,
+          });
+        } else if (transferAmountNormalized < 0) {
+          eventBus.emit(EVENTS.SEPAY_MONEY_OUT, {
+            transactionId: transaction.transaction_id || transaction.id || null,
+            amount: transferAmountNormalized,
+            bankAccountId: transaction.account_number || transaction.accountNumber || null,
+            reason: String(transaction.transaction_content || "").trim(),
+          });
+        }
+      }
+
       // Gia hạn: sau COMMIT, vẫn dùng cùng client (trước release).
       try {
         await dispatchWebhookRenewals({
@@ -1170,13 +938,14 @@ async function handleWebhookPost(req, res) {
       client.release();
     }
 
-    return res.json({ message: "OK" });
+    return { message: "OK" };
   } catch (err) {
     logger.error("Error saving payment", { error: err.message, stack: err.stack });
-    return res.status(500).json({ message: "Internal Error" });
+    throw err;
   }
 }
 
 module.exports = {
   handleWebhookPost,
+  processWebhookTransactionAsync,
 };

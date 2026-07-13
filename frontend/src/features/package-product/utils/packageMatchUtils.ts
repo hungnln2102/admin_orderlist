@@ -45,10 +45,7 @@ export type ComputeAugmentationInput = {
 /**
  * Computes slotAssignments, slotUsed, capacity, and related fields for one package row.
  */
-export function computeAugmentationForPackage(input: ComputeAugmentationInput): Omit<
-  AugmentedRow,
-  keyof PackageRow
-> & { normalizedProductCodes: string[] } {
+export function computeAugmentationForPackage(input: ComputeAugmentationInput) {
   const { item, orderMatchers, ordersByProductCode, ordersReady } = input;
   const includeCapacity = Boolean(item.hasCapacityField);
   const slotLimitRaw = parseNumericValue(item.slot);

@@ -31,6 +31,7 @@ type OrdersTableSectionProps = {
   onCreateTopupOrderFromRefund: (order: Order) => void;
   onMarkPaid: (order: Order) => void;
   onRenew: (order: Order) => void;
+  onMockWebhook: (order: Order) => void;
   setCurrentPage: (value: number | ((prev: number) => number)) => void;
   setRowsPerPage: (value: number) => void;
 };
@@ -70,6 +71,7 @@ export function OrdersTableSection({
   onCreateTopupOrderFromRefund,
   onMarkPaid,
   onRenew,
+  onMockWebhook,
   setCurrentPage,
   setRowsPerPage,
 }: OrdersTableSectionProps) {
@@ -156,6 +158,7 @@ export function OrdersTableSection({
                   onCreateTopupOrderFromRefund={onCreateTopupOrderFromRefund}
                   onMarkPaid={onMarkPaid}
                   onRenew={onRenew}
+                  onMockWebhook={onMockWebhook}
                 />
               ))
             )}

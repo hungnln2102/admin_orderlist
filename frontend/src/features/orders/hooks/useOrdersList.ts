@@ -2,12 +2,12 @@ import { useEffect, useMemo } from "react";
 import { Order, OrderDatasetKey } from "@/constants";
 import { useDebounce } from "./useDebounce";
 import {
-  enrichOrdersWithVirtualFields,
   filterAndSortOrders,
   computeOrderStats,
 } from "../utils/orderListTransform";
+import { buildOrderListViewModels } from "../utils/orderViewModel";
 import { computeOrderFinancialStats } from "../utils/orderFinancialStats";
-import { getPaginated, buildPaginationPages } from "../utils/orderPagination";
+import { getPaginated, buildPaginationPages } from "@/shared/utils/pagination";
 import { orderCreatedWithinIsoRange } from "../utils/ordersHelpers";
 
 export type OrdersDurationRange = { from: string; to: string };
@@ -38,7 +38,7 @@ export function useOrdersList({
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const listData = useMemo(() => {
-    const ordersWithVirtual = enrichOrdersWithVirtualFields(orders, dataset);
+    const ordersWithVirtual = buildOrderListViewModels(orders, dataset);
     const narrowed =
       durationRange?.from && durationRange?.to
         ? ordersWithVirtual.filter((o) =>
@@ -54,7 +54,7 @@ export function useOrdersList({
     });
     const { updatedStats, totalRecords } = computeOrderStats(narrowed, dataset);
     const financialStats = computeOrderFinancialStats(filteredOrders);
-    const { currentOrders, totalPages } = getPaginated(
+    const { currentItems: currentOrders, totalPages } = getPaginated(
       filteredOrders,
       currentPage,
       rowsPerPage

@@ -224,4 +224,3 @@ export function AddTrackingOrdersModal({
   );
 }
 
-export default AddTrackingOrdersModal;

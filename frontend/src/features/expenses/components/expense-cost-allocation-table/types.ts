@@ -1,4 +1,4 @@
-import type { PeriodColumn as AllocPeriodColumn } from "@/features/dashboard/utils/spreadCostAcrossPeriod";
+import { PeriodColumn } from "@/shared/date/dateRanges";
 
 export type ViewMode = "day" | "month";
 export type FixedColumnKey =
@@ -16,7 +16,7 @@ export type FixedColumn = {
   left: number;
 };
 
-export type PeriodColumn = AllocPeriodColumn;
+export type { PeriodColumn };
 
 export type OrderListRow = {
   id?: number;

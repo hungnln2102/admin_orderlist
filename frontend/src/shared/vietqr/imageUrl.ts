@@ -50,5 +50,3 @@ export const buildSepayQrUrl = ({
   }`;
 };
 
-/** Alias — cùng buildSepayQrUrl, tên rõ ràng cho ảnh VietQR chuẩn quốc gia */
-export const buildVietQrImageUrl = buildSepayQrUrl;

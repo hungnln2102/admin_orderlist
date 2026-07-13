@@ -1,4 +1,4 @@
-const { notifyWarn } = require("../../../../utils/telegramErrorNotifier");
+const { notifyWarn } = require("../../../../domains/notifications/telegram").systemNotifier;
 const {
   purgeAndDeleteNoLicenseAdobeAdminAccount,
 } = require("../../../../services/renew-adobe/renewAdobePurgeNoLicenseAccount");

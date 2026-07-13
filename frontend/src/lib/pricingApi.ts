@@ -34,6 +34,10 @@ export type CalculatePriceResponse = {
   error?: string;
 };
 
+/**
+ * Giữ apiFetch vì cần readJsonOrText (đọc response body đặc biệt)
+ * và hỗ trợ AbortSignal cho cancellation.
+ */
 export const fetchCalculatedPrice = async (
   payload: CalculatePriceRequest,
   options?: { signal?: AbortSignal }

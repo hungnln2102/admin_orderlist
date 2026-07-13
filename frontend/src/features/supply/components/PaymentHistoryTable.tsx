@@ -1,6 +1,6 @@
 import { formatCurrency as formatMoney } from "@/shared/money";
 import React, { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import { Payment } from "../types";
 
 interface Props {
@@ -14,14 +14,13 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
   const loadPayments = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/supplies/${supplyId}/payments?offset=0&limit=20`);
-      if (res.ok) {
-        const data = await res.json();
-        setPayments(data.payments || []);
-      }
+      const data = await apiGet<Record<string, unknown>>(`/api/supplies/${supplyId}/payments?offset=0&limit=20`);
+      setPayments((data.payments as Payment[]) || []);
+    } catch {
+      setPayments([]);
     } finally {
       setLoading(false);
-    }
+    }
   }, [supplyId]);
 
   useEffect(() => {

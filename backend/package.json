@@ -28,6 +28,7 @@
         "test:webhook-finance": "node tests/manual/run-webhook-financial-reconcile-tests.js",
         "test:webhook-profit": "node tests/manual/run-webhook-profit-scenarios-tests.js",
         "test:webhook-scenarios": "node tests/manual/run-scenario-webhook-validation-suite.js",
+        "test:sepay-order-notification-flow": "node tests/manual/run-sepay-order-notification-flow-tests.js",
         "start:scheduler": "node scheduler.js",
         "start:scheduler:cron-once": "node scheduler.js --run-cron-once",
         "start:scheduler:daily-revenue-once": "node scheduler.js --run-daily-revenue-once",

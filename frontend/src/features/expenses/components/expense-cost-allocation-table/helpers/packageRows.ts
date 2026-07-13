@@ -1,4 +1,4 @@
-import { addDaysUtc } from "@/features/dashboard/utils/spreadCostAcrossPeriod";
+import { addDaysUtc } from "@/shared/date/dateRanges";
 import {
   buildIdentifierKeys,
   enhancePackageRow,

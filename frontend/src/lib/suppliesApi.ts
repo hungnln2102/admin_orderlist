@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "./api";
+import { apiGet, apiFetch, apiDelete as apiDeleteFn } from "./api";
 
 export interface SupplyOrderCostRow {
   orderPk: number;
@@ -7,7 +7,7 @@ export interface SupplyOrderCostRow {
   supplierName: string;
   cost: number;
   refund: number;
-  /** Chưa Thanh Toán / Đã Thanh Toán — theo đơn (order_list.status). */
+  /** Chưa Thanh Toán / Đã Thanh Toán, theo đơn (order_list.status). */
   nccPaymentStatus?: string;
   orderDate: string | null;
   canceledAt: string | null;
@@ -46,12 +46,7 @@ export const fetchSupplyOrderCosts = async (params: {
   const url = qs
     ? `${API_ENDPOINTS.SUPPLIES_ORDER_COSTS}?${qs}`
     : API_ENDPOINTS.SUPPLIES_ORDER_COSTS;
-  const response = await apiFetch(url);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Không thể tải danh sách chi phí NCC.");
-  }
-  return response.json() as Promise<SupplyOrderCostsResponse>;
+  return apiGet<SupplyOrderCostsResponse>(url);
 };
 
 export interface SupplyDeleteResponse {
@@ -62,6 +57,7 @@ export interface SupplyDeleteResponse {
 export const deleteSupplyById = async (
   supplyId: number
 ): Promise<SupplyDeleteResponse> => {
+  // Special case: 404 treated as success (already deleted)
   const response = await apiFetch(`/api/supplies/${supplyId}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },

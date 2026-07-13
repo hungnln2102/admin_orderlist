@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 
 export interface CategoryItem {
   id: number;
@@ -16,68 +16,14 @@ export interface UpdateCategoryData {
   color?: string;
 }
 
-/**
- * Fetch all categories
- */
-export const fetchCategories = async (): Promise<CategoryItem[]> => {
-  const response = await apiFetch("/api/categories");
-  if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(message || `Failed to load categories (${response.status}).`);
-  }
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
-};
+export const fetchCategories = (): Promise<CategoryItem[]> =>
+  apiGet<CategoryItem[]>("/api/categories");
 
-/**
- * Create a new category
- */
-export const createCategory = async (data: CreateCategoryData): Promise<CategoryItem> => {
-  const response = await apiFetch("/api/categories", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(message || `Failed to create category (${response.status}).`);
-  }
-  
-  return await response.json();
-};
+export const createCategory = (data: CreateCategoryData): Promise<CategoryItem> =>
+  apiPost<CategoryItem>("/api/categories", data);
 
-/**
- * Update an existing category
- */
-export const updateCategory = async (
-  id: number,
-  data: UpdateCategoryData
-): Promise<CategoryItem> => {
-  const response = await apiFetch(`/api/categories/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(message || `Failed to update category (${response.status}).`);
-  }
-  
-  return await response.json();
-};
+export const updateCategory = (id: number, data: UpdateCategoryData): Promise<CategoryItem> =>
+  apiPut<CategoryItem>(`/api/categories/${id}`, data);
 
-/**
- * Delete a category
- */
-export const deleteCategory = async (id: number): Promise<void> => {
-  const response = await apiFetch(`/api/categories/${id}`, {
-    method: "DELETE",
-  });
-  
-  if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(message || `Failed to delete category (${response.status}).`);
-  }
-};
+export const deleteCategory = (id: number): Promise<void> =>
+  apiDelete(`/api/categories/${id}`);

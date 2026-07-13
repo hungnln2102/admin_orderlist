@@ -39,7 +39,7 @@ export const useEditOrderResources = (
   const fetchProductOptions = useCallback(async () => {
     try {
       const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
-      if (!response.ok) throw new Error("L???i t???i danh s??ch s???n ph???m.");
+      if (!response.ok) throw new Error("Lỗi tải danh sách sản phẩm.");
       const data = (await response.json()) as Array<Record<string, unknown>>;
       const names = data
         .map((item) => {
@@ -50,7 +50,7 @@ export const useEditOrderResources = (
         .filter(Boolean);
       setProductOptions(Array.from(new Set(names)));
     } catch (error) {
-      console.error("L???i khi fetch product options:", error);
+      console.error("Lỗi khi fetch product options:", error);
       setProductOptions([]);
     }
   }, []);
@@ -66,13 +66,13 @@ export const useEditOrderResources = (
         const response = await apiFetch(
           API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)
         );
-        if (!response.ok) throw new Error("L???i t???i danh s??ch ngu???n.");
+        if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
         const data: Supply[] = await response.json();
         const merged = mergeCurrentSupply(data);
         setSupplies(merged);
         return merged;
       } catch (error) {
-        console.error("L???i khi fetch supplies cho s???n ph???m:", error);
+        console.error("Lỗi khi fetch supplies cho sản phẩm:", error);
         const merged = mergeCurrentSupply([]);
         setSupplies(merged);
         return merged;
@@ -90,12 +90,12 @@ export const useEditOrderResources = (
       const response = await apiFetch(
         API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(productName)
       );
-      if (!response.ok) throw new Error("L???i t???i danh s??ch gi?? ngu???n.");
+      if (!response.ok) throw new Error("Lỗi tải danh sách giá nguồn.");
       const data: SupplyPrice[] = await response.json();
       setSupplyPrices(data);
       return data;
     } catch (error) {
-      console.error("L???i khi fetch gi?? ngu???n cho s???n ph???m:", error);
+      console.error("Lỗi khi fetch giá nguồn cho sản phẩm:", error);
       setSupplyPrices([]);
       return [];
     }

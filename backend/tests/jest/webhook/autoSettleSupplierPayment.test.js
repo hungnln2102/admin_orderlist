@@ -39,7 +39,7 @@ describe("auto settle supplier payment", () => {
   test("parseWebhookTransaction marks outbound transfer as negative", () => {
     const {
       parseWebhookTransaction,
-    } = require("../../../webhook/sepay/routes/webhook/parsePhase");
+    } = require("../../../src/domains/payments/use-cases/parseTransaction");
 
     const parsed = parseWebhookTransaction({
       transaction: {

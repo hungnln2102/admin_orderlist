@@ -66,8 +66,10 @@ describe("POST /orders createOrder flow", () => {
       VALID_PREFIXES: ["MAVC", "MAVL", "MAVN", "MAVT", "MAVK", "MAVS"],
       generateUniqueOrderCode: jest.fn().mockResolvedValue("MAVC0001"),
     }));
-    jest.doMock("../../../../src/services/telegramOrderNotification", () => ({
-      sendOrderCreatedNotification,
+    jest.doMock("../../../../src/domains/notifications/telegram", () => ({
+      orderNotifier: {
+        sendOrderCreatedNotification,
+      },
     }));
     jest.doMock("../../../../src/domains/payment-slots", () => ({
       openPaymentSlot: jest.fn().mockResolvedValue({ expected_amount: 100000 }),
@@ -112,7 +114,7 @@ describe("POST /orders createOrder flow", () => {
         resolveDashboardImportDeltaOnPaid: jest.fn(),
       })
     );
-    jest.doMock("../../../../src/domains/orders/controller/orderFinanceHelpers", () => ({
+    jest.doMock("../../../../src/domains/orders/services/orderFinanceSyncService", () => ({
       syncMavnStoreProfitExpense: jest.fn(),
     }));
     jest.doMock("../../../../src/utils/logger", () => ({

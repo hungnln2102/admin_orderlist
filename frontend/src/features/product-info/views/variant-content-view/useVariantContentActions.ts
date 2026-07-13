@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 
 import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 import {
+  createProductDescription,
   deleteProductDescriptionRecord,
   saveProductDescription,
 } from "@/features/product-info/api/productDescApi";
@@ -80,21 +81,31 @@ export const useVariantContentActions = ({
   }, [reload, onReloadProductList]);
 
   const handleSave = useCallback(
-    async (payload: SavePayload) => {
+    async (payload: SavePayload, mode: "create" | "edit" | "view") => {
       setSaving(true);
       setSaveError(null);
       try {
-        await saveProductDescription({
-          ...(payload.productId.trim()
-            ? { productId: payload.productId.trim() }
-            : {}),
-          descVariantId: payload.descVariantId,
-          rules: payload.rules,
-          description: payload.description,
-          shortDesc: payload.shortDesc,
-          imageUrl: payload.imageUrl,
-        });
-        closeEdit();
+        if (mode === "create") {
+          await createProductDescription({
+            productId: payload.productId,
+            rules: payload.rules,
+            description: payload.description,
+            shortDesc: payload.shortDesc,
+          });
+          setCreateOpen(false);
+        } else {
+          await saveProductDescription({
+            ...(payload.productId.trim()
+              ? { productId: payload.productId.trim() }
+              : {}),
+            descVariantId: payload.descVariantId,
+            rules: payload.rules,
+            description: payload.description,
+            shortDesc: payload.shortDesc,
+            imageUrl: payload.imageUrl,
+          });
+          closeEdit();
+        }
         await reload();
         await onReloadProductList();
       } catch (e) {

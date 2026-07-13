@@ -3,9 +3,9 @@ import { FormTabs } from "./components/FormTabs";
 import { FormListSection } from "./components/FormListSection";
 import { InputListSection } from "./components/InputListSection";
 import { FormDetailModal } from "./components/FormDetailModal";
-import CreateInputModal from "./CreateInputModal";
-import CreateFormModal from "./CreateFormModal";
-import EditFormModal from "./EditFormModal";
+import { GenericFormModal } from "@/shared/components/GenericModal/GenericFormModal";
+import { createInput } from "@/lib/formsApi";
+import DynamicFormModal from "./DynamicFormModal";
 
 export default function FormInfo() {
   const {
@@ -83,26 +83,59 @@ export default function FormInfo() {
         onClose={handleCloseView}
       />
 
-      <CreateInputModal
+      <GenericFormModal
         isOpen={createInputOpen}
         onClose={handleCreateInputClose}
-        onSuccess={handleCreateInputSuccess}
+        title="Tạo input"
+        submitText="Tạo input"
+        loadingText="Đang tạo..."
+        fields={[
+          {
+            name: "name",
+            label: "Tên input",
+            type: "text",
+            required: true,
+            placeholder: "Nhập tên input...",
+          },
+          {
+            name: "type",
+            label: "Kiểu dữ liệu",
+            type: "select",
+            required: true,
+            options: [
+              { value: "text", label: "Text" },
+              { value: "password", label: "Password" },
+              { value: "email", label: "Email" },
+              { value: "number", label: "Number" },
+              { value: "tel", label: "Tel" },
+              { value: "url", label: "URL" },
+              { value: "date", label: "Date" },
+              { value: "datetime-local", label: "Date Time Local" },
+              { value: "search", label: "Search" },
+              { value: "textarea", label: "Textarea" },
+            ]
+          }
+        ]}
+        initialData={{ type: "text" }}
+        onSubmit={async (data) => {
+          const created = await createInput({
+            name: data.name,
+            type: data.type || "text",
+          });
+          handleCreateInputSuccess(created);
+        }}
       />
 
-      <CreateFormModal
-        isOpen={createFormOpen}
-        onClose={handleCreateFormClose}
-        onSuccess={handleCreateFormSuccess}
-        inputItems={inputItems}
-      />
-
-      <EditFormModal
-        isOpen={editFormOpen}
-        onClose={handleEditFormClose}
-        onSuccess={handleEditFormSuccess}
-        inputItems={inputItems}
-        editingItem={editingItem}
-      />
+      {(createFormOpen || editFormOpen) && (
+        <DynamicFormModal
+          mode={editFormOpen ? "edit" : "create"}
+          isOpen={true}
+          onClose={editFormOpen ? handleEditFormClose : handleCreateFormClose}
+          onSuccess={editFormOpen ? handleEditFormSuccess : handleCreateFormSuccess}
+          inputItems={inputItems}
+          editingItem={editFormOpen ? editingItem : undefined}
+        />
+      )}
     </div>
   );
 }

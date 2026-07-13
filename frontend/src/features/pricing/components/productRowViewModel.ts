@@ -1,12 +1,14 @@
 import type { ProductPricingRow } from "../types";
 import {
   computeHighestSupplyPrice,
+  pickCheapestSupplier,
+} from "../supplyPriceUtils";
+import {
   formatCurrencyValue,
   formatDateLabel,
   formatProfitPercentBySale,
   parseRatioInput,
-  pickCheapestSupplier,
-} from "../utils";
+} from "../priceFormatters";
 import type { ProductRowEditControls, ProductRowSupplyState } from "./productRowContracts";
 
 export const buildProductRowViewModel = ({

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { BankOption, SupplierOption } from "../types";
 import {
@@ -28,13 +28,8 @@ export function useProductReferenceOptions({
     setIsLoadingBanks(true);
 
     try {
-      const response = await apiFetch(API_ENDPOINTS.BANK_LIST);
-      if (!response.ok) {
-        throw new Error("Không thể tải danh sách ngân hàng.");
-      }
-
-      const payload = await response.json();
-      setBankOptions(normalizeBankOptions(payload));
+      const payload = await apiGet<unknown>(API_ENDPOINTS.BANK_LIST);
+      setBankOptions(normalizeBankOptions(payload));
     } catch (err) {
       console.error("Lỗi khi tải danh sách ngân hàng:", err);
     } finally {
@@ -55,13 +50,8 @@ export function useProductReferenceOptions({
       setIsLoadingSuppliers(true);
 
       try {
-        const response = await apiFetch(API_ENDPOINTS.SUPPLIES);
-        if (!response.ok) {
-          throw new Error("Không thể tải danh sách NCC.");
-        }
-
-        const payload = await response.json().catch(() => null);
-        setSupplierOptions(normalizeSupplierOptions(payload));
+        const payload = await apiGet<unknown>(API_ENDPOINTS.SUPPLIES);
+        setSupplierOptions(normalizeSupplierOptions(payload));
       } catch (err) {
         console.error("Lỗi khi tải danh sách NCC:", err);
       } finally {

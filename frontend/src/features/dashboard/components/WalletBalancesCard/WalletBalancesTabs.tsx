@@ -15,24 +15,22 @@ export const WalletBalancesTabs: React.FC<WalletBalancesTabsProps> = ({
     <button
       type="button"
       onClick={() => onTabChange("daily_flow")}
-      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-        activeTab === "daily_flow"
-          ? "bg-indigo-500/70 text-white"
-          : "text-white/70 hover:text-white"
-      }`}
+      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${activeTab === "daily_flow"
+        ? "bg-indigo-500/70 text-white"
+        : "text-white/70 hover:text-white"
+        }`}
     >
-      D??ng ti???n theo ng??y
+      Dòng tiền theo ngày
     </button>
     <button
       type="button"
       onClick={() => onTabChange("withdraw")}
-      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-        activeTab === "withdraw"
-          ? "bg-indigo-500/70 text-white"
-          : "text-white/70 hover:text-white"
-      }`}
+      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${activeTab === "withdraw"
+        ? "bg-indigo-500/70 text-white"
+        : "text-white/70 hover:text-white"
+        }`}
     >
-      R??t ti???n
+      Rút tiền
     </button>
   </div>
 );
@@ -52,6 +50,6 @@ export const WalletWithdrawActionButton: React.FC<WalletWithdrawActionButtonProp
       onClick={onClick}
       className="inline-flex items-center gap-2 rounded-lg border border-indigo-300/40 bg-indigo-500/20 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500/30"
     >
-      + R??t ti???n
+      + Rút tiền
     </button>
   ) : null;

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/shared/api/client";
+import { apiGet, apiPost, apiPut, apiDelete, apiFetch } from "@/shared/api/client";
 
 export type ImportPackagePayload = {
   productId: number;
@@ -62,79 +62,33 @@ export type ExpireImportPackageResult = {
 
 // ---- API calls ----
 
-/** Tao PRODUCT_STOCK + PACKAGE_PRODUCT trong 1 atomic transaction */
-export const createImportPackage = async (
-  payload: ImportPackagePayload
-): Promise<ImportPackageResult> => {
-  const res = await apiFetch("/api/import-packages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
-};
+/** Tạo PRODUCT_STOCK + PACKAGE_PRODUCT trong 1 atomic transaction */
+export const createImportPackage = (payload: ImportPackagePayload): Promise<ImportPackageResult> =>
+  apiPost<ImportPackageResult>("/api/import-packages", payload);
 
-/** Xu ly het han: xoa package, tuy chon xoa stock */
-export const expireImportPackage = async (
-  stockId: number,
-  deleteStock: boolean
-): Promise<ExpireImportPackageResult> => {
-  const res = await apiFetch(`/api/import-packages/${stockId}/expire`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ deleteStock }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
-};
+/** Xử lý hết hạn: xóa package, tùy chọn xóa stock */
+export const expireImportPackage = (stockId: number, deleteStock: boolean): Promise<ExpireImportPackageResult> =>
+  apiPost<ExpireImportPackageResult>(`/api/import-packages/${stockId}/expire`, { deleteStock });
 
-/** Lay rule cau hinh cua 1 san pham */
-export const getImportPackageRule = async (
-  productId: number
-): Promise<ImportPackageRule | null> => {
+/** Lấy rule cấu hình của 1 sản phẩm (404 = null) */
+export const getImportPackageRule = async (productId: number): Promise<ImportPackageRule | null> => {
   const res = await apiFetch(`/api/import-packages/rules/${productId}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
 
-/** Lay tat ca rules */
-export const listImportPackageRules = async (): Promise<ImportPackageRule[]> => {
-  const res = await apiFetch("/api/import-packages/rules");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
+/** Lấy tất cả rules */
+export const listImportPackageRules = (): Promise<ImportPackageRule[]> =>
+  apiGet<ImportPackageRule[]>("/api/import-packages/rules");
 
-/** Tao hoac cap nhat rule cho san pham */
-export const upsertImportPackageRule = async (
+/** Tạo hoặc cập nhật rule cho sản phẩm */
+export const upsertImportPackageRule = (
   productId: number,
   data: Partial<Omit<ImportPackageRule, "id" | "productId" | "createdAt" | "updatedAt">>
-): Promise<ImportPackageRule> => {
-  const res = await apiFetch(`/api/import-packages/rules/${productId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
-};
+): Promise<ImportPackageRule> =>
+  apiPut<ImportPackageRule>(`/api/import-packages/rules/${productId}`, data);
 
-/** Xoa rule */
-export const deleteImportPackageRule = async (
-  productId: number
-): Promise<void> => {
-  const res = await apiFetch(`/api/import-packages/rules/${productId}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-};
+/** Xóa rule */
+export const deleteImportPackageRule = (productId: number): Promise<void> =>
+  apiDelete(`/api/import-packages/rules/${productId}`);

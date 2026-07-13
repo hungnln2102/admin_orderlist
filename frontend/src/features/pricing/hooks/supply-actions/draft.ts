@@ -1,5 +1,5 @@
 import type { NewSupplyRowState } from "../../types";
-import { formatVndInput } from "../../utils";
+import { formatVndInput } from "../../priceFormatters";
 
 export type SupplyDraftField =
   | "sourceName"

@@ -44,7 +44,7 @@ export const useWalletWithdrawFlow = ({
       );
     } catch (errorFetch) {
       console.error("Failed to fetch withdraw rows:", errorFetch);
-      setWithdrawError("Kh??ng th??? t???i d??? li???u r??t ti???n.");
+      setWithdrawError("Không thể tải dữ liệu rút tiền.");
     } finally {
       setWithdrawLoading(false);
     }

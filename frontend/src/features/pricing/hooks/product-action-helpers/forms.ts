@@ -4,7 +4,7 @@ import type {
   ProductEditFormState,
   ProductPricingRow,
 } from "../../types";
-import { formatVndDisplay } from "../../utils";
+import { formatVndDisplay } from "../../priceFormatters";
 
 export function buildProductEditForm(
   product: ProductPricingRow

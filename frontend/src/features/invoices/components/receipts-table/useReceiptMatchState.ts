@@ -54,7 +54,7 @@ export function useReceiptMatchState({ onMatchReceipt }: UseReceiptMatchStatePar
       setRowErrorByReceiptId((prev) => ({
         ...prev,
         [receiptId]:
-          err instanceof Error ? err.message : "Kh?ng th? gh?p m? ??n cho bi?n lai.",
+          err instanceof Error ? err.message : "Không thể ghép mã đơn cho biên lai.",
       }));
     }
   };
@@ -75,7 +75,7 @@ export function useReceiptMatchState({ onMatchReceipt }: UseReceiptMatchStatePar
     if (!nextCode) {
       setRowErrorByReceiptId((prev) => ({
         ...prev,
-        [receipt.id]: "B?n ch?a nh?p m? ??n h?ng.",
+        [receipt.id]: "Bạn chưa nhập mã đơn hàng.",
       }));
       return;
     }
@@ -87,7 +87,7 @@ export function useReceiptMatchState({ onMatchReceipt }: UseReceiptMatchStatePar
       setRowErrorByReceiptId((prev) => ({
         ...prev,
         [receipt.id]:
-          err instanceof Error ? err.message : "Kh?ng th? c?p nh?t m? ??n.",
+          err instanceof Error ? err.message : "Không thể cập nhật mã đơn.",
       }));
     }
   };

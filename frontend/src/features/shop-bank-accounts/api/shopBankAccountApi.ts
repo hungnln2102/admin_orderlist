@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet, apiPost, apiPut, apiDelete, apiPatch } from "@/shared/api/client";
 import type {
   ShopBankAccountItem,
   ShopBankAccountBalanceItem,
@@ -72,27 +72,15 @@ export const normalizeShopBankAccountBalanceItem = (value: unknown): ShopBankAcc
   };
 };
 
-const parseResponse = async <T>(response: Response, map: (value: unknown) => T): Promise<T> => {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(String((body as { error?: string })?.error || response.statusText));
-  }
-  return map(body);
-};
-
 export async function fetchShopBankAccounts(): Promise<ShopBankAccountItem[]> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNTS);
-  const data = await parseResponse(response, (payload) => payload);
-  const body = data as ListResponse;
-  const items = Array.isArray(body.items) ? body.items : [];
+  const data = await apiGet<ListResponse>(API_ENDPOINTS.SHOP_BANK_ACCOUNTS);
+  const items = Array.isArray(data?.items) ? data.items : [];
   return items.map(normalizeShopBankAccountItem);
 }
 
 export async function fetchShopBankAccountBalances(): Promise<ShopBankAccountBalanceItem[]> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BALANCES);
-  const data = await parseResponse(response, (payload) => payload);
-  const body = data as ListResponse;
-  const items = Array.isArray(body.items) ? body.items : [];
+  const data = await apiGet<ListResponse>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BALANCES);
+  const items = Array.isArray(data?.items) ? data.items : [];
   return items.map(normalizeShopBankAccountBalanceItem);
 }
 
@@ -101,73 +89,42 @@ export async function recordShopBankAccountWithdrawal(
   amount: number,
   reason?: string | null
 ): Promise<ShopBankAccountBalanceItem> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAW(id), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, reason: reason?.trim() || null }),
+  const data = await apiPost<{ item?: unknown }>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAW(id), {
+    amount,
+    reason: reason?.trim() || null,
   });
-  return parseResponse(response, (payload) =>
-    normalizeShopBankAccountBalanceItem((payload as { item?: unknown })?.item)
-  );
+  return normalizeShopBankAccountBalanceItem(data?.item);
 }
 
 export async function updateShopBankAccountWithdrawn(
   id: number,
   totalWithdrawn: number
 ): Promise<ShopBankAccountBalanceItem> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAWN(id), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ totalWithdrawn }),
+  const data = await apiPatch<{ item?: unknown }>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAWN(id), {
+    totalWithdrawn,
   });
-  return parseResponse(response, (payload) =>
-    normalizeShopBankAccountBalanceItem((payload as { item?: unknown })?.item)
-  );
+  return normalizeShopBankAccountBalanceItem(data?.item);
 }
 
 export async function fetchDefaultShopBankAccount(): Promise<ShopBankAccountItem> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_DEFAULT);
-  return parseResponse(response, (payload) =>
-    normalizeShopBankAccountItem((payload as { item?: unknown })?.item)
-  );
+  const data = await apiGet<{ item?: unknown }>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_DEFAULT);
+  return normalizeShopBankAccountItem(data?.item);
 }
 
-export async function createShopBankAccount(
-  payload: ShopBankAccountPayload
-): Promise<ShopBankAccountItem> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNTS, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return parseResponse(response, normalizeShopBankAccountItem);
-}
+export const createShopBankAccount = async (payload: ShopBankAccountPayload): Promise<ShopBankAccountItem> => {
+  const raw = await apiPost<unknown>(API_ENDPOINTS.SHOP_BANK_ACCOUNTS, payload);
+  return normalizeShopBankAccountItem(raw);
+};
 
-export async function updateShopBankAccount(
-  id: number,
-  payload: Partial<ShopBankAccountPayload>
-): Promise<ShopBankAccountItem> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BY_ID(id), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return parseResponse(response, normalizeShopBankAccountItem);
-}
+export const updateShopBankAccount = async (id: number, payload: Partial<ShopBankAccountPayload>): Promise<ShopBankAccountItem> => {
+  const raw = await apiPut<unknown>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BY_ID(id), payload);
+  return normalizeShopBankAccountItem(raw);
+};
 
-export async function setDefaultShopBankAccount(id: number): Promise<ShopBankAccountItem> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_SET_DEFAULT(id), {
-    method: "POST",
-  });
-  return parseResponse(response, normalizeShopBankAccountItem);
-}
+export const setDefaultShopBankAccount = async (id: number): Promise<ShopBankAccountItem> => {
+  const raw = await apiPost<unknown>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_SET_DEFAULT(id));
+  return normalizeShopBankAccountItem(raw);
+};
 
-export async function deleteShopBankAccount(id: number): Promise<void> {
-  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BY_ID(id), {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(String((body as { error?: string })?.error || response.statusText));
-  }
-}
+export const deleteShopBankAccount = (id: number): Promise<void> =>
+  apiDelete(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BY_ID(id));

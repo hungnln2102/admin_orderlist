@@ -2,7 +2,7 @@ const {
   buildWebhookLoopOrderCodes,
   createWebhookAmountForCodeResolver,
   resolveWebhookPostedRevenue,
-} = require("../../../webhook/sepay/routes/webhook/orderCodeResolution");
+} = require("../../../src/domains/payments/use-cases/resolveOrderCode");
 const {
   computeDashboardPaymentDecision,
 } = require("../../../src/domains/orders/controller/finance/dashboardPaymentPostingPolicy");

@@ -8,8 +8,7 @@ import SupplyStatsCards from "./components/SupplyStatsCards";
 import SupplyOrderCostsPanel from "./components/SupplyOrderCostsPanel";
 import SupplyList from "./components/SupplyList";
 import SupplierDetailModal from "./components/SupplierDetailModal";
-import { AddSupplierModal } from "./components/AddSupplierModal";
-import { EditSupplierModal } from "./components/EditSupplierModal";
+import { SupplierFormModal } from "./components/SupplierFormModal";
 import { DeleteSupplyModal } from "./components/DeleteSupplyModal";
 import { SupplyFiltersBar } from "./components/SupplyFiltersBar";
 import { useSupplyList } from "./hooks/useSupplyList";
@@ -186,17 +185,15 @@ export default function Sources() {
         />
       )}
 
-      <AddSupplierModal
-        isOpen={addModal}
-        onClose={() => setAddModal(false)}
-        onSuccess={fetchSupplies}
-        banks={banks}
-      />
-      <EditSupplierModal
-        isOpen={!!editSupply}
-        onClose={() => setEditSupply(null)}
-        onSuccess={fetchSupplies}
+      <SupplierFormModal
+        isOpen={addModal || !!editSupply}
+        mode={editSupply ? "edit" : "create"}
         supply={editSupply}
+        onClose={() => {
+          setAddModal(false);
+          setEditSupply(null);
+        }}
+        onSuccess={fetchSupplies}
         banks={banks}
       />
       <DeleteSupplyModal

@@ -1,0 +1,5073 @@
+{
+  "duplicates": [
+    {
+      "firstFile": {
+        "end": 15,
+        "endLoc": {
+          "column": 4,
+          "line": 15,
+          "position": 460
+        },
+        "name": "components\\modals\\CreateOrderModal\\components\\CreateOrderCustomerSection.tsx",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 15,
+        "endLoc": {
+          "column": 4,
+          "line": 15,
+          "position": 460
+        },
+        "name": "components\\modals\\CreateOrderModal\\components\\CreateOrderSharedCustomerSection.tsx",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "tokens": 60
+    },
+    {
+      "firstFile": {
+        "end": 29,
+        "endLoc": {
+          "column": 38,
+          "line": 29,
+          "position": 1021
+        },
+        "name": "components\\modals\\CreateOrderModal\\components\\CreateOrderCustomerSection.tsx",
+        "start": 15,
+        "startLoc": {
+          "column": 37,
+          "line": 15,
+          "position": 493
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 28,
+        "endLoc": {
+          "column": 38,
+          "line": 28,
+          "position": 957
+        },
+        "name": "components\\modals\\CreateOrderModal\\components\\CreateOrderSharedCustomerSection.tsx",
+        "start": 15,
+        "startLoc": {
+          "column": 43,
+          "line": 15,
+          "position": 499
+        }
+      },
+      "tokens": 74
+    },
+    {
+      "firstFile": {
+        "end": 119,
+        "endLoc": {
+          "column": 14,
+          "line": 119,
+          "position": 4559
+        },
+        "name": "components\\modals\\CreateOrderModal\\components\\CreateOrderCustomerSection.tsx",
+        "start": 55,
+        "startLoc": {
+          "column": 12,
+          "line": 55,
+          "position": 1931
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 65,
+      "secondFile": {
+        "end": 129,
+        "endLoc": {
+          "column": 14,
+          "line": 129,
+          "position": 4923
+        },
+        "name": "components\\modals\\CreateOrderModal\\components\\CreateOrderSharedCustomerSection.tsx",
+        "start": 65,
+        "startLoc": {
+          "column": 17,
+          "line": 65,
+          "position": 2295
+        }
+      },
+      "tokens": 352
+    },
+    {
+      "firstFile": {
+        "end": 15,
+        "endLoc": {
+          "column": 12,
+          "line": 15,
+          "position": 546
+        },
+        "name": "components\\modals\\CreateOrderModal\\helpers.ts",
+        "start": 2,
+        "startLoc": {
+          "column": 31,
+          "line": 2,
+          "position": 99
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 49,
+        "endLoc": {
+          "column": 12,
+          "line": 49,
+          "position": 1770
+        },
+        "name": "shared\\date\\calendar.ts",
+        "start": 40,
+        "startLoc": {
+          "column": 1,
+          "line": 40,
+          "position": 1488
+        }
+      },
+      "tokens": 75
+    },
+    {
+      "firstFile": {
+        "end": 29,
+        "endLoc": {
+          "column": 42,
+          "line": 29,
+          "position": 990
+        },
+        "name": "components\\modals\\CreateOrderModal\\helpers.ts",
+        "start": 17,
+        "startLoc": {
+          "column": 6,
+          "line": 17,
+          "position": 610
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 71,
+        "endLoc": {
+          "column": 42,
+          "line": 71,
+          "position": 2560
+        },
+        "name": "shared\\date\\calendar.ts",
+        "start": 62,
+        "startLoc": {
+          "column": 11,
+          "line": 62,
+          "position": 2195
+        }
+      },
+      "tokens": 109
+    },
+    {
+      "firstFile": {
+        "end": 38,
+        "endLoc": {
+          "column": 12,
+          "line": 38,
+          "position": 1224
+        },
+        "name": "components\\modals\\CreateOrderModal\\helpers.ts",
+        "start": 31,
+        "startLoc": {
+          "column": 2,
+          "line": 31,
+          "position": 996
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 81,
+        "endLoc": {
+          "column": 12,
+          "line": 81,
+          "position": 2888
+        },
+        "name": "shared\\date\\calendar.ts",
+        "start": 75,
+        "startLoc": {
+          "column": 2,
+          "line": 75,
+          "position": 2668
+        }
+      },
+      "tokens": 62
+    },
+    {
+      "firstFile": {
+        "end": 70,
+        "endLoc": {
+          "column": 35,
+          "line": 70,
+          "position": 2214
+        },
+        "name": "components\\modals\\CreateOrderModal\\hooks\\useProductSelection.ts",
+        "start": 63,
+        "startLoc": {
+          "column": 13,
+          "line": 63,
+          "position": 1980
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 89,
+        "endLoc": {
+          "column": 37,
+          "line": 89,
+          "position": 2818
+        },
+        "name": "components\\modals\\CreateOrderModal\\hooks\\useProductSelection.ts",
+        "start": 82,
+        "startLoc": {
+          "column": 31,
+          "line": 82,
+          "position": 2570
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 92,
+        "endLoc": {
+          "column": 20,
+          "line": 92,
+          "position": 2911
+        },
+        "name": "components\\modals\\CreateOrderModal\\hooks\\useProductSelection.ts",
+        "start": 84,
+        "startLoc": {
+          "column": 39,
+          "line": 84,
+          "position": 2632
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 107,
+        "endLoc": {
+          "column": 18,
+          "line": 107,
+          "position": 3361
+        },
+        "name": "components\\modals\\CreateOrderModal\\hooks\\useProductSelection.ts",
+        "start": 100,
+        "startLoc": {
+          "column": 42,
+          "line": 100,
+          "position": 3109
+        }
+      },
+      "tokens": 54
+    },
+    {
+      "firstFile": {
+        "end": 54,
+        "endLoc": {
+          "column": 24,
+          "line": 54,
+          "position": 1557
+        },
+        "name": "components\\modals\\UrlPromptModal\\UrlPromptModal.tsx",
+        "start": 45,
+        "startLoc": {
+          "column": 26,
+          "line": 45,
+          "position": 1274
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 75,
+        "endLoc": {
+          "column": 24,
+          "line": 75,
+          "position": 2461
+        },
+        "name": "features\\content\\components\\ArticleImageInsertModal.tsx",
+        "start": 66,
+        "startLoc": {
+          "column": 24,
+          "line": 66,
+          "position": 2178
+        }
+      },
+      "tokens": 71
+    },
+    {
+      "firstFile": {
+        "end": 54,
+        "endLoc": {
+          "column": 6,
+          "line": 54,
+          "position": 1539
+        },
+        "name": "components\\modals\\UrlPromptModal\\UrlPromptModal.tsx",
+        "start": 48,
+        "startLoc": {
+          "column": 15,
+          "line": 48,
+          "position": 1317
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 28,
+        "endLoc": {
+          "column": 6,
+          "line": 28,
+          "position": 737
+        },
+        "name": "features\\content\\components\\ArticlePreviewModal.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 13,
+          "line": 22,
+          "position": 515
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 26,
+        "endLoc": {
+          "column": 2,
+          "line": 26,
+          "position": 660
+        },
+        "name": "components\\modals\\ViewOrderModal\\utils.ts",
+        "start": 17,
+        "startLoc": {
+          "column": 48,
+          "line": 17,
+          "position": 445
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 133,
+        "endLoc": {
+          "column": 2,
+          "line": 133,
+          "position": 4413
+        },
+        "name": "features\\orders\\utils\\ordersHelpers.ts",
+        "start": 124,
+        "startLoc": {
+          "column": 16,
+          "line": 124,
+          "position": 4189
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 91,
+        "endLoc": {
+          "column": 31,
+          "line": 91,
+          "position": 3096
+        },
+        "name": "components\\modals\\ViewSupplierModal\\ViewSupplierModal.tsx",
+        "start": 84,
+        "startLoc": {
+          "column": 2,
+          "line": 84,
+          "position": 2731
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 93,
+        "endLoc": {
+          "column": 31,
+          "line": 93,
+          "position": 4024
+        },
+        "name": "features\\supply\\components\\SupplierDetailModal.tsx",
+        "start": 85,
+        "startLoc": {
+          "column": 13,
+          "line": 85,
+          "position": 3595
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 51,
+        "endLoc": {
+          "column": 1,
+          "line": 51,
+          "position": 1957
+        },
+        "name": "features\\active-keys\\components\\ActiveKeyRow.tsx",
+        "start": 36,
+        "startLoc": {
+          "column": 10,
+          "line": 36,
+          "position": 1495
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 16,
+      "secondFile": {
+        "end": 91,
+        "endLoc": {
+          "column": 1,
+          "line": 91,
+          "position": 3627
+        },
+        "name": "features\\ctv-list\\components\\CtvRow.tsx",
+        "start": 76,
+        "startLoc": {
+          "column": 10,
+          "line": 76,
+          "position": 3165
+        }
+      },
+      "tokens": 69
+    },
+    {
+      "firstFile": {
+        "end": 81,
+        "endLoc": {
+          "column": 27,
+          "line": 81,
+          "position": 2688
+        },
+        "name": "features\\content\\components\\ArticleImageInsertModal.tsx",
+        "start": 75,
+        "startLoc": {
+          "column": 21,
+          "line": 75,
+          "position": 2458
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 47,
+        "endLoc": {
+          "column": 27,
+          "line": 47,
+          "position": 1242
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImagePickerModal.tsx",
+        "start": 41,
+        "startLoc": {
+          "column": 10,
+          "line": 41,
+          "position": 1018
+        }
+      },
+      "tokens": 65
+    },
+    {
+      "firstFile": {
+        "end": 226,
+        "endLoc": {
+          "column": 6,
+          "line": 226,
+          "position": 8560
+        },
+        "name": "features\\content\\pages\\ArticleCategoriesPage.tsx",
+        "start": 212,
+        "startLoc": {
+          "column": 64,
+          "line": 212,
+          "position": 8155
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 218,
+        "endLoc": {
+          "column": 6,
+          "line": 218,
+          "position": 8572
+        },
+        "name": "features\\content\\pages\\ArticlesPage.tsx",
+        "start": 204,
+        "startLoc": {
+          "column": 67,
+          "line": 204,
+          "position": 8167
+        }
+      },
+      "tokens": 56
+    },
+    {
+      "firstFile": {
+        "end": 21,
+        "endLoc": {
+          "column": 15,
+          "line": 21,
+          "position": 729
+        },
+        "name": "features\\ctv-list\\components\\CtvCard.tsx",
+        "start": 6,
+        "startLoc": {
+          "column": 18,
+          "line": 6,
+          "position": 228
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 16,
+      "secondFile": {
+        "end": 21,
+        "endLoc": {
+          "column": 15,
+          "line": 21,
+          "position": 762
+        },
+        "name": "features\\ctv-list\\components\\CtvRow.tsx",
+        "start": 6,
+        "startLoc": {
+          "column": 17,
+          "line": 6,
+          "position": 227
+        }
+      },
+      "tokens": 69
+    },
+    {
+      "firstFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 80,
+          "line": 30,
+          "position": 1277
+        },
+        "name": "features\\ctv-list\\components\\CtvCard.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 39,
+          "line": 22,
+          "position": 844
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 27,
+        "endLoc": {
+          "column": 80,
+          "line": 27,
+          "position": 1162
+        },
+        "name": "features\\promo-codes\\components\\PromoCodeCard.tsx",
+        "start": 19,
+        "startLoc": {
+          "column": 41,
+          "line": 19,
+          "position": 729
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 88,
+        "endLoc": {
+          "column": 1,
+          "line": 88,
+          "position": 3574
+        },
+        "name": "features\\ctv-list\\components\\CtvCard.tsx",
+        "start": 73,
+        "startLoc": {
+          "column": 10,
+          "line": 73,
+          "position": 3127
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 16,
+      "secondFile": {
+        "end": 53,
+        "endLoc": {
+          "column": 1,
+          "line": 53,
+          "position": 2664
+        },
+        "name": "features\\promo-codes\\components\\PromoCodeCard.tsx",
+        "start": 43,
+        "startLoc": {
+          "column": 183,
+          "line": 43,
+          "position": 2281
+        }
+      },
+      "tokens": 69
+    },
+    {
+      "firstFile": {
+        "end": 199,
+        "endLoc": {
+          "column": 16,
+          "line": 199,
+          "position": 7789
+        },
+        "name": "features\\ctv-list\\index.tsx",
+        "start": 189,
+        "startLoc": {
+          "column": 33,
+          "line": 189,
+          "position": 7485
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 144,
+        "endLoc": {
+          "column": 16,
+          "line": 144,
+          "position": 5054
+        },
+        "name": "features\\form-info\\CreateInputModal.tsx",
+        "start": 134,
+        "startLoc": {
+          "column": 33,
+          "line": 134,
+          "position": 4750
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 64,
+        "endLoc": {
+          "column": 1,
+          "line": 64,
+          "position": 1808
+        },
+        "name": "features\\dashboard\\api\\dashboardApi.ts",
+        "start": 56,
+        "startLoc": {
+          "column": 40,
+          "line": 56,
+          "position": 1409
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 37,
+        "endLoc": {
+          "column": 1,
+          "line": 37,
+          "position": 1314
+        },
+        "name": "features\\dashboard\\hooks\\useDashboardStats.ts",
+        "start": 29,
+        "startLoc": {
+          "column": 27,
+          "line": 29,
+          "position": 915
+        }
+      },
+      "tokens": 89
+    },
+    {
+      "firstFile": {
+        "end": 25,
+        "endLoc": {
+          "column": 12,
+          "line": 25,
+          "position": 770
+        },
+        "name": "features\\dashboard\\components\\FinancialChartsPanel.tsx",
+        "start": 12,
+        "startLoc": {
+          "column": 26,
+          "line": 12,
+          "position": 337
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 28,
+        "endLoc": {
+          "column": 12,
+          "line": 28,
+          "position": 764
+        },
+        "name": "features\\dashboard\\components\\OverviewSection.tsx",
+        "start": 17,
+        "startLoc": {
+          "column": 28,
+          "line": 17,
+          "position": 490
+        }
+      },
+      "tokens": 55
+    },
+    {
+      "firstFile": {
+        "end": 180,
+        "endLoc": {
+          "column": 54,
+          "line": 180,
+          "position": 4617
+        },
+        "name": "features\\dashboard\\components\\FinancialLineChart.tsx",
+        "start": 165,
+        "startLoc": {
+          "column": 49,
+          "line": 165,
+          "position": 4046
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 16,
+      "secondFile": {
+        "end": 98,
+        "endLoc": {
+          "column": 54,
+          "line": 98,
+          "position": 4157
+        },
+        "name": "features\\dashboard\\components\\OrderChartCard.tsx",
+        "start": 84,
+        "startLoc": {
+          "column": 70,
+          "line": 84,
+          "position": 3598
+        }
+      },
+      "tokens": 103
+    },
+    {
+      "firstFile": {
+        "end": 59,
+        "endLoc": {
+          "column": 64,
+          "line": 59,
+          "position": 2434
+        },
+        "name": "features\\dashboard\\components\\ProfitChartCard.tsx",
+        "start": 33,
+        "startLoc": {
+          "column": 10,
+          "line": 33,
+          "position": 1401
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 27,
+      "secondFile": {
+        "end": 59,
+        "endLoc": {
+          "column": 64,
+          "line": 59,
+          "position": 2428
+        },
+        "name": "features\\dashboard\\components\\RevenueChartCard.tsx",
+        "start": 33,
+        "startLoc": {
+          "column": 10,
+          "line": 33,
+          "position": 1395
+        }
+      },
+      "tokens": 221
+    },
+    {
+      "firstFile": {
+        "end": 23,
+        "endLoc": {
+          "column": 9,
+          "line": 23,
+          "position": 972
+        },
+        "name": "features\\dashboard\\components\\WalletBalancesCard\\WithdrawMoneyModal.tsx",
+        "start": 14,
+        "startLoc": {
+          "column": 58,
+          "line": 14,
+          "position": 687
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 40,
+        "endLoc": {
+          "column": 9,
+          "line": 40,
+          "position": 1411
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 31,
+        "startLoc": {
+          "column": 66,
+          "line": 31,
+          "position": 1126
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 38,
+        "endLoc": {
+          "column": 18,
+          "line": 38,
+          "position": 1490
+        },
+        "name": "features\\dashboard\\components\\WalletBalancesCard\\WithdrawMoneyModal.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 26,
+          "line": 22,
+          "position": 944
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 17,
+      "secondFile": {
+        "end": 56,
+        "endLoc": {
+          "column": 18,
+          "line": 56,
+          "position": 1992
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 40,
+        "startLoc": {
+          "column": 44,
+          "line": 40,
+          "position": 1446
+        }
+      },
+      "tokens": 131
+    },
+    {
+      "firstFile": {
+        "end": 57,
+        "endLoc": {
+          "column": 15,
+          "line": 57,
+          "position": 1957
+        },
+        "name": "features\\dashboard\\components\\WalletBalancesCard\\WithdrawMoneyModal.tsx",
+        "start": 42,
+        "startLoc": {
+          "column": 72,
+          "line": 42,
+          "position": 1604
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 16,
+      "secondFile": {
+        "end": 79,
+        "endLoc": {
+          "column": 15,
+          "line": 79,
+          "position": 2524
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 62,
+        "startLoc": {
+          "column": 67,
+          "line": 62,
+          "position": 2162
+        }
+      },
+      "tokens": 75
+    },
+    {
+      "firstFile": {
+        "end": 87,
+        "endLoc": {
+          "column": 60,
+          "line": 87,
+          "position": 3106
+        },
+        "name": "features\\dashboard\\components\\WalletBalancesCard\\WithdrawMoneyModal.tsx",
+        "start": 66,
+        "startLoc": {
+          "column": 116,
+          "line": 66,
+          "position": 2330
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 22,
+      "secondFile": {
+        "end": 134,
+        "endLoc": {
+          "column": 60,
+          "line": 134,
+          "position": 4420
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 113,
+        "startLoc": {
+          "column": 68,
+          "line": 113,
+          "position": 3644
+        }
+      },
+      "tokens": 80
+    },
+    {
+      "firstFile": {
+        "end": 103,
+        "endLoc": {
+          "column": 23,
+          "line": 103,
+          "position": 3902
+        },
+        "name": "features\\dashboard\\components\\WalletBalancesCard\\WithdrawMoneyModal.tsx",
+        "start": 91,
+        "startLoc": {
+          "column": 93,
+          "line": 91,
+          "position": 3316
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 150,
+        "endLoc": {
+          "column": 23,
+          "line": 150,
+          "position": 5211
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 138,
+        "startLoc": {
+          "column": 91,
+          "line": 138,
+          "position": 4625
+        }
+      },
+      "tokens": 97
+    },
+    {
+      "firstFile": {
+        "end": 154,
+        "endLoc": {
+          "column": 44,
+          "line": 154,
+          "position": 6291
+        },
+        "name": "features\\dashboard\\components\\WalletBalancesCard\\WithdrawMoneyModal.tsx",
+        "start": 128,
+        "startLoc": {
+          "column": 16,
+          "line": 128,
+          "position": 4995
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 27,
+      "secondFile": {
+        "end": 221,
+        "endLoc": {
+          "column": 44,
+          "line": 221,
+          "position": 8378
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 195,
+        "startLoc": {
+          "column": 16,
+          "line": 195,
+          "position": 7082
+        }
+      },
+      "tokens": 102
+    },
+    {
+      "firstFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 2,
+          "line": 30,
+          "position": 1106
+        },
+        "name": "features\\dashboard\\utils\\spreadCostAcrossPeriod.ts",
+        "start": 11,
+        "startLoc": {
+          "column": 24,
+          "line": 11,
+          "position": 245
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 20,
+      "secondFile": {
+        "end": 151,
+        "endLoc": {
+          "column": 2,
+          "line": 151,
+          "position": 4557
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 132,
+        "startLoc": {
+          "column": 14,
+          "line": 132,
+          "position": 3715
+        }
+      },
+      "tokens": 297
+    },
+    {
+      "firstFile": {
+        "end": 52,
+        "endLoc": {
+          "column": 31,
+          "line": 52,
+          "position": 1975
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\packageRows.ts",
+        "start": 38,
+        "startLoc": {
+          "column": 63,
+          "line": 38,
+          "position": 1482
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 36,
+        "endLoc": {
+          "column": 33,
+          "line": 36,
+          "position": 1350
+        },
+        "name": "features\\package-product\\hooks\\use-package-data\\orderMatchers.ts",
+        "start": 21,
+        "startLoc": {
+          "column": 83,
+          "line": 21,
+          "position": 844
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 12,
+        "endLoc": {
+          "column": 12,
+          "line": 12,
+          "position": 436
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\periodColumns.ts",
+        "start": 3,
+        "startLoc": {
+          "column": 41,
+          "line": 3,
+          "position": 192
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 39,
+        "endLoc": {
+          "column": 12,
+          "line": 39,
+          "position": 1248
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 30,
+        "startLoc": {
+          "column": 50,
+          "line": 30,
+          "position": 1004
+        }
+      },
+      "tokens": 73
+    },
+    {
+      "firstFile": {
+        "end": 10,
+        "endLoc": {
+          "column": 2,
+          "line": 10,
+          "position": 422
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\periodColumns.ts",
+        "start": 5,
+        "startLoc": {
+          "column": 0,
+          "line": 5,
+          "position": 195
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 21,
+        "endLoc": {
+          "column": 2,
+          "line": 21,
+          "position": 628
+        },
+        "name": "features\\tax\\utils\\taxAggregates.ts",
+        "start": 16,
+        "startLoc": {
+          "column": 0,
+          "line": 16,
+          "position": 396
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 57,
+        "endLoc": {
+          "column": 31,
+          "line": 57,
+          "position": 1803
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\periodColumns.ts",
+        "start": 48,
+        "startLoc": {
+          "column": 30,
+          "line": 48,
+          "position": 1548
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 83,
+        "endLoc": {
+          "column": 31,
+          "line": 83,
+          "position": 2399
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\periodColumns.ts",
+        "start": 74,
+        "startLoc": {
+          "column": 31,
+          "line": 74,
+          "position": 2144
+        }
+      },
+      "tokens": 79
+    },
+    {
+      "firstFile": {
+        "end": 78,
+        "endLoc": {
+          "column": 25,
+          "line": 78,
+          "position": 2254
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\periodColumns.ts",
+        "start": 66,
+        "startLoc": {
+          "column": 17,
+          "line": 66,
+          "position": 2034
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 71,
+        "endLoc": {
+          "column": 25,
+          "line": 71,
+          "position": 2001
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 59,
+        "startLoc": {
+          "column": 32,
+          "line": 59,
+          "position": 1781
+        }
+      },
+      "tokens": 62
+    },
+    {
+      "firstFile": {
+        "end": 105,
+        "endLoc": {
+          "column": 2,
+          "line": 105,
+          "position": 3063
+        },
+        "name": "features\\expenses\\components\\expense-cost-allocation-table\\helpers\\periodColumns.ts",
+        "start": 82,
+        "startLoc": {
+          "column": 2,
+          "line": 82,
+          "position": 2332
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 24,
+      "secondFile": {
+        "end": 101,
+        "endLoc": {
+          "column": 2,
+          "line": 101,
+          "position": 2825
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 78,
+        "startLoc": {
+          "column": 2,
+          "line": 78,
+          "position": 2094
+        }
+      },
+      "tokens": 179
+    },
+    {
+      "firstFile": {
+        "end": 24,
+        "endLoc": {
+          "column": 48,
+          "line": 24,
+          "position": 935
+        },
+        "name": "features\\form-info\\CreateFormModal.tsx",
+        "start": 19,
+        "startLoc": {
+          "column": 23,
+          "line": 19,
+          "position": 653
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 32,
+        "endLoc": {
+          "column": 48,
+          "line": 32,
+          "position": 1028
+        },
+        "name": "features\\form-info\\EditFormModal.tsx",
+        "start": 27,
+        "startLoc": {
+          "column": 21,
+          "line": 27,
+          "position": 751
+        }
+      },
+      "tokens": 73
+    },
+    {
+      "firstFile": {
+        "end": 43,
+        "endLoc": {
+          "column": 15,
+          "line": 43,
+          "position": 1360
+        },
+        "name": "features\\form-info\\CreateFormModal.tsx",
+        "start": 30,
+        "startLoc": {
+          "column": 27,
+          "line": 30,
+          "position": 1053
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 51,
+        "endLoc": {
+          "column": 15,
+          "line": 51,
+          "position": 1517
+        },
+        "name": "features\\form-info\\CreateInputModal.tsx",
+        "start": 38,
+        "startLoc": {
+          "column": 20,
+          "line": 38,
+          "position": 1210
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 49,
+        "endLoc": {
+          "column": 11,
+          "line": 49,
+          "position": 1462
+        },
+        "name": "features\\form-info\\CreateFormModal.tsx",
+        "start": 36,
+        "startLoc": {
+          "column": 13,
+          "line": 36,
+          "position": 1145
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 87,
+        "endLoc": {
+          "column": 11,
+          "line": 87,
+          "position": 2698
+        },
+        "name": "features\\form-info\\EditFormModal.tsx",
+        "start": 74,
+        "startLoc": {
+          "column": 29,
+          "line": 74,
+          "position": 2394
+        }
+      },
+      "tokens": 62
+    },
+    {
+      "firstFile": {
+        "end": 143,
+        "endLoc": {
+          "column": 42,
+          "line": 143,
+          "position": 5086
+        },
+        "name": "features\\form-info\\CreateFormModal.tsx",
+        "start": 132,
+        "startLoc": {
+          "column": 11,
+          "line": 132,
+          "position": 4605
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 12,
+      "secondFile": {
+        "end": 155,
+        "endLoc": {
+          "column": 42,
+          "line": 155,
+          "position": 5534
+        },
+        "name": "features\\form-info\\CreateInputModal.tsx",
+        "start": 144,
+        "startLoc": {
+          "column": 15,
+          "line": 144,
+          "position": 5053
+        }
+      },
+      "tokens": 54
+    },
+    {
+      "firstFile": {
+        "end": 52,
+        "endLoc": {
+          "column": 53,
+          "line": 52,
+          "position": 1521
+        },
+        "name": "features\\form-info\\components\\FormListSection.tsx",
+        "start": 39,
+        "startLoc": {
+          "column": 8,
+          "line": 39,
+          "position": 932
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 41,
+        "endLoc": {
+          "column": 53,
+          "line": 41,
+          "position": 1325
+        },
+        "name": "features\\form-info\\components\\InputListSection.tsx",
+        "start": 28,
+        "startLoc": {
+          "column": 8,
+          "line": 28,
+          "position": 736
+        }
+      },
+      "tokens": 61
+    },
+    {
+      "firstFile": {
+        "end": 119,
+        "endLoc": {
+          "column": 17,
+          "line": 119,
+          "position": 4513
+        },
+        "name": "features\\form-info\\components\\FormListSection.tsx",
+        "start": 98,
+        "startLoc": {
+          "column": 40,
+          "line": 98,
+          "position": 3835
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 22,
+      "secondFile": {
+        "end": 84,
+        "endLoc": {
+          "column": 17,
+          "line": 84,
+          "position": 3039
+        },
+        "name": "features\\form-info\\components\\InputListSection.tsx",
+        "start": 63,
+        "startLoc": {
+          "column": 43,
+          "line": 63,
+          "position": 2361
+        }
+      },
+      "tokens": 63
+    },
+    {
+      "firstFile": {
+        "end": 165,
+        "endLoc": {
+          "column": 31,
+          "line": 165,
+          "position": 6146
+        },
+        "name": "features\\form-info\\components\\FormListSection.tsx",
+        "start": 153,
+        "startLoc": {
+          "column": 18,
+          "line": 153,
+          "position": 5674
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 124,
+        "endLoc": {
+          "column": 31,
+          "line": 124,
+          "position": 4438
+        },
+        "name": "features\\form-info\\components\\InputListSection.tsx",
+        "start": 112,
+        "startLoc": {
+          "column": 18,
+          "line": 112,
+          "position": 3966
+        }
+      },
+      "tokens": 66
+    },
+    {
+      "firstFile": {
+        "end": 20,
+        "endLoc": {
+          "column": 18,
+          "line": 20,
+          "position": 713
+        },
+        "name": "features\\invoices\\components\\qr-modal\\parseBatchOrderCodes.ts",
+        "start": 12,
+        "startLoc": {
+          "column": 34,
+          "line": 12,
+          "position": 477
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 21,
+        "endLoc": {
+          "column": 18,
+          "line": 21,
+          "position": 773
+        },
+        "name": "features\\invoices\\components\\qr-modal\\parseBatchTransactionCodes.ts",
+        "start": 13,
+        "startLoc": {
+          "column": 40,
+          "line": 13,
+          "position": 537
+        }
+      },
+      "tokens": 67
+    },
+    {
+      "firstFile": {
+        "end": 169,
+        "endLoc": {
+          "column": 17,
+          "line": 169,
+          "position": 5518
+        },
+        "name": "features\\invoices\\components\\qr-modal\\useQrModalController.ts",
+        "start": 161,
+        "startLoc": {
+          "column": 6,
+          "line": 161,
+          "position": 5178
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 104,
+        "endLoc": {
+          "column": 27,
+          "line": 104,
+          "position": 4010
+        },
+        "name": "features\\orders\\hooks\\use-order-actions\\createHandlers.ts",
+        "start": 96,
+        "startLoc": {
+          "column": 2,
+          "line": 96,
+          "position": 3708
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 75,
+        "endLoc": {
+          "column": 21,
+          "line": 75,
+          "position": 2199
+        },
+        "name": "features\\ip-whitelist\\api\\ipWhitelistApi.ts",
+        "start": 35,
+        "startLoc": {
+          "column": 114,
+          "line": 35,
+          "position": 1093
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 41,
+      "secondFile": {
+        "end": 68,
+        "endLoc": {
+          "column": 21,
+          "line": 68,
+          "position": 1745
+        },
+        "name": "features\\ip-whitelist\\api\\siteMaintenanceApi.ts",
+        "start": 24,
+        "startLoc": {
+          "column": 33,
+          "line": 24,
+          "position": 599
+        }
+      },
+      "tokens": 221
+    },
+    {
+      "firstFile": {
+        "end": 34,
+        "endLoc": {
+          "column": 15,
+          "line": 34,
+          "position": 913
+        },
+        "name": "features\\ip-whitelist\\components\\IpWhitelistTable.tsx",
+        "start": 23,
+        "startLoc": {
+          "column": 2,
+          "line": 23,
+          "position": 692
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 12,
+      "secondFile": {
+        "end": 33,
+        "endLoc": {
+          "column": 15,
+          "line": 33,
+          "position": 767
+        },
+        "name": "features\\ip-whitelist\\components\\SiteMaintenancePanel.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 2,
+          "line": 22,
+          "position": 546
+        }
+      },
+      "tokens": 56
+    },
+    {
+      "firstFile": {
+        "end": 197,
+        "endLoc": {
+          "column": 1,
+          "line": 197,
+          "position": 8310
+        },
+        "name": "features\\ip-whitelist\\components\\IpWhitelistTable.tsx",
+        "start": 185,
+        "startLoc": {
+          "column": 20,
+          "line": 185,
+          "position": 8066
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 135,
+        "endLoc": {
+          "column": 1,
+          "line": 135,
+          "position": 5612
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountTable.tsx",
+        "start": 123,
+        "startLoc": {
+          "column": 20,
+          "line": 123,
+          "position": 5368
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 37,
+        "endLoc": {
+          "column": 34,
+          "line": 37,
+          "position": 1160
+        },
+        "name": "features\\orders\\components\\OrderRow.tsx",
+        "start": 29,
+        "startLoc": {
+          "column": 36,
+          "line": 29,
+          "position": 829
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 33,
+        "endLoc": {
+          "column": 34,
+          "line": 33,
+          "position": 1167
+        },
+        "name": "features\\orders\\components\\OrdersTableSection.tsx",
+        "start": 25,
+        "startLoc": {
+          "column": 41,
+          "line": 25,
+          "position": 844
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 35,
+        "endLoc": {
+          "column": 55,
+          "line": 35,
+          "position": 1085
+        },
+        "name": "features\\orders\\components\\OrderRow.tsx",
+        "start": 30,
+        "startLoc": {
+          "column": 35,
+          "line": 30,
+          "position": 867
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 28,
+        "endLoc": {
+          "column": 55,
+          "line": 28,
+          "position": 844
+        },
+        "name": "features\\orders\\components\\order-row\\OrderRowActionsCell.tsx",
+        "start": 23,
+        "startLoc": {
+          "column": 57,
+          "line": 23,
+          "position": 626
+        }
+      },
+      "tokens": 54
+    },
+    {
+      "firstFile": {
+        "end": 85,
+        "endLoc": {
+          "column": 18,
+          "line": 85,
+          "position": 4081
+        },
+        "name": "features\\orders\\components\\OrdersFiltersBar.tsx",
+        "start": 75,
+        "startLoc": {
+          "column": 37,
+          "line": 75,
+          "position": 3755
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 102,
+        "endLoc": {
+          "column": 18,
+          "line": 102,
+          "position": 4151
+        },
+        "name": "features\\package-product\\sections\\SelectedPackageSection.tsx",
+        "start": 96,
+        "startLoc": {
+          "column": 31,
+          "line": 96,
+          "position": 3904
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 89,
+        "endLoc": {
+          "column": 31,
+          "line": 89,
+          "position": 3528
+        },
+        "name": "features\\orders\\hooks\\use-order-actions\\paymentHandlers.ts",
+        "start": 81,
+        "startLoc": {
+          "column": 6,
+          "line": 81,
+          "position": 3086
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 172,
+        "endLoc": {
+          "column": 29,
+          "line": 172,
+          "position": 6755
+        },
+        "name": "features\\orders\\hooks\\use-order-actions\\paymentHandlers.ts",
+        "start": 164,
+        "startLoc": {
+          "column": 4,
+          "line": 164,
+          "position": 6329
+        }
+      },
+      "tokens": 82
+    },
+    {
+      "firstFile": {
+        "end": 36,
+        "endLoc": {
+          "column": 1,
+          "line": 36,
+          "position": 1299
+        },
+        "name": "features\\orders\\utils\\orderPagination.ts",
+        "start": 13,
+        "startLoc": {
+          "column": 24,
+          "line": 13,
+          "position": 540
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 24,
+      "secondFile": {
+        "end": 32,
+        "endLoc": {
+          "column": 1,
+          "line": 32,
+          "position": 1095
+        },
+        "name": "features\\warehouse\\utils\\pagination.ts",
+        "start": 10,
+        "startLoc": {
+          "column": 23,
+          "line": 10,
+          "position": 421
+        }
+      },
+      "tokens": 204
+    },
+    {
+      "firstFile": {
+        "end": 45,
+        "endLoc": {
+          "column": 2,
+          "line": 45,
+          "position": 1276
+        },
+        "name": "features\\orders\\utils\\ordersHelpers.ts",
+        "start": 38,
+        "startLoc": {
+          "column": 7,
+          "line": 38,
+          "position": 1039
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 16,
+        "endLoc": {
+          "column": 2,
+          "line": 16,
+          "position": 641
+        },
+        "name": "features\\pricing\\hooks\\useProductData.ts",
+        "start": 9,
+        "startLoc": {
+          "column": 0,
+          "line": 9,
+          "position": 404
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 207,
+        "endLoc": {
+          "column": 2,
+          "line": 207,
+          "position": 7105
+        },
+        "name": "features\\orders\\utils\\ordersHelpers.ts",
+        "start": 200,
+        "startLoc": {
+          "column": 10,
+          "line": 200,
+          "position": 6890
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 222,
+        "endLoc": {
+          "column": 2,
+          "line": 222,
+          "position": 7561
+        },
+        "name": "features\\orders\\utils\\ordersHelpers.ts",
+        "start": 215,
+        "startLoc": {
+          "column": 10,
+          "line": 215,
+          "position": 7346
+        }
+      },
+      "tokens": 79
+    },
+    {
+      "firstFile": {
+        "end": 116,
+        "endLoc": {
+          "column": 12,
+          "line": 116,
+          "position": 3794
+        },
+        "name": "features\\package-product\\PackageProduct.tsx",
+        "start": 98,
+        "startLoc": {
+          "column": 12,
+          "line": 98,
+          "position": 2958
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 19,
+      "secondFile": {
+        "end": 142,
+        "endLoc": {
+          "column": 12,
+          "line": 142,
+          "position": 4821
+        },
+        "name": "features\\package-product\\PackageProduct.tsx",
+        "start": 124,
+        "startLoc": {
+          "column": 12,
+          "line": 124,
+          "position": 3985
+        }
+      },
+      "tokens": 94
+    },
+    {
+      "firstFile": {
+        "end": 55,
+        "endLoc": {
+          "column": 16,
+          "line": 55,
+          "position": 1625
+        },
+        "name": "features\\package-product\\components\\Modals\\package-form\\shared.ts",
+        "start": 27,
+        "startLoc": {
+          "column": 2,
+          "line": 27,
+          "position": 1051
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 29,
+      "secondFile": {
+        "end": 110,
+        "endLoc": {
+          "column": 16,
+          "line": 110,
+          "position": 2728
+        },
+        "name": "features\\package-product\\components\\Modals\\package-form\\shared.ts",
+        "start": 82,
+        "startLoc": {
+          "column": 2,
+          "line": 82,
+          "position": 2154
+        }
+      },
+      "tokens": 86
+    },
+    {
+      "firstFile": {
+        "end": 95,
+        "endLoc": {
+          "column": 48,
+          "line": 95,
+          "position": 3164
+        },
+        "name": "features\\package-product\\components\\Modals\\package-form\\usePackageWarehouseItems.ts",
+        "start": 88,
+        "startLoc": {
+          "column": 70,
+          "line": 88,
+          "position": 2912
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 199,
+        "endLoc": {
+          "column": 50,
+          "line": 199,
+          "position": 6815
+        },
+        "name": "features\\package-product\\hooks\\usePackageMutationActions.ts",
+        "start": 192,
+        "startLoc": {
+          "column": 70,
+          "line": 192,
+          "position": 6544
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 90,
+        "endLoc": {
+          "column": 29,
+          "line": 90,
+          "position": 3109
+        },
+        "name": "features\\package-product\\hooks\\usePackageMutationActions.ts",
+        "start": 77,
+        "startLoc": {
+          "column": 44,
+          "line": 77,
+          "position": 2530
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 168,
+        "endLoc": {
+          "column": 29,
+          "line": 168,
+          "position": 5790
+        },
+        "name": "features\\package-product\\hooks\\usePackageMutationActions.ts",
+        "start": 155,
+        "startLoc": {
+          "column": 36,
+          "line": 155,
+          "position": 5211
+        }
+      },
+      "tokens": 90
+    },
+    {
+      "firstFile": {
+        "end": 115,
+        "endLoc": {
+          "column": 40,
+          "line": 115,
+          "position": 3910
+        },
+        "name": "features\\package-product\\hooks\\usePackageMutationActions.ts",
+        "start": 103,
+        "startLoc": {
+          "column": 8,
+          "line": 103,
+          "position": 3476
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 192,
+        "endLoc": {
+          "column": 40,
+          "line": 192,
+          "position": 6514
+        },
+        "name": "features\\package-product\\hooks\\usePackageMutationActions.ts",
+        "start": 180,
+        "startLoc": {
+          "column": 8,
+          "line": 180,
+          "position": 6080
+        }
+      },
+      "tokens": 61
+    },
+    {
+      "firstFile": {
+        "end": 92,
+        "endLoc": {
+          "column": 5,
+          "line": 92,
+          "position": 3736
+        },
+        "name": "features\\package-product\\utils\\packageOrderMatchers.ts",
+        "start": 78,
+        "startLoc": {
+          "column": 70,
+          "line": 78,
+          "position": 3250
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 107,
+        "endLoc": {
+          "column": 5,
+          "line": 107,
+          "position": 4298
+        },
+        "name": "features\\package-product\\utils\\packageOrderMatchers.ts",
+        "start": 93,
+        "startLoc": {
+          "column": 67,
+          "line": 93,
+          "position": 3812
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 38,
+        "endLoc": {
+          "column": 55,
+          "line": 38,
+          "position": 1465
+        },
+        "name": "features\\pricing\\components\\Modals\\CreateProductModal.tsx",
+        "start": 30,
+        "startLoc": {
+          "column": 76,
+          "line": 30,
+          "position": 1132
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 31,
+        "endLoc": {
+          "column": 55,
+          "line": 31,
+          "position": 1018
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\CreateSupplierCard.tsx",
+        "start": 23,
+        "startLoc": {
+          "column": 25,
+          "line": 23,
+          "position": 677
+        }
+      },
+      "tokens": 63
+    },
+    {
+      "firstFile": {
+        "end": 41,
+        "endLoc": {
+          "column": 10,
+          "line": 41,
+          "position": 1555
+        },
+        "name": "features\\pricing\\components\\Modals\\CreateProductModal.tsx",
+        "start": 33,
+        "startLoc": {
+          "column": 41,
+          "line": 33,
+          "position": 1221
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 27,
+        "endLoc": {
+          "column": 1,
+          "line": 27,
+          "position": 887
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\SuppliersSection.tsx",
+        "start": 19,
+        "startLoc": {
+          "column": 41,
+          "line": 19,
+          "position": 562
+        }
+      },
+      "tokens": 66
+    },
+    {
+      "firstFile": {
+        "end": 35,
+        "endLoc": {
+          "column": 36,
+          "line": 35,
+          "position": 1113
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\CreateSupplierCard.tsx",
+        "start": 19,
+        "startLoc": {
+          "column": 36,
+          "line": 19,
+          "position": 549
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 17,
+      "secondFile": {
+        "end": 26,
+        "endLoc": {
+          "column": 49,
+          "line": 26,
+          "position": 885
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\SuppliersSection.tsx",
+        "start": 12,
+        "startLoc": {
+          "column": 40,
+          "line": 12,
+          "position": 349
+        }
+      },
+      "tokens": 100
+    },
+    {
+      "firstFile": {
+        "end": 201,
+        "endLoc": {
+          "column": 12,
+          "line": 201,
+          "position": 7488
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\ProductBasicsSection.tsx",
+        "start": 188,
+        "startLoc": {
+          "column": 16,
+          "line": 188,
+          "position": 7085
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 260,
+        "endLoc": {
+          "column": 12,
+          "line": 260,
+          "position": 9846
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\ProductBasicsSection.tsx",
+        "start": 247,
+        "startLoc": {
+          "column": 16,
+          "line": 247,
+          "position": 9443
+        }
+      },
+      "tokens": 68
+    },
+    {
+      "firstFile": {
+        "end": 29,
+        "endLoc": {
+          "column": 1,
+          "line": 29,
+          "position": 828
+        },
+        "name": "features\\pricing\\components\\Modals\\create-product\\productBasicsRules.ts",
+        "start": 18,
+        "startLoc": {
+          "column": 31,
+          "line": 18,
+          "position": 546
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 12,
+      "secondFile": {
+        "end": 72,
+        "endLoc": {
+          "column": 3,
+          "line": 72,
+          "position": 2547
+        },
+        "name": "features\\pricing\\hooks\\useProductActions.ts",
+        "start": 61,
+        "startLoc": {
+          "column": 45,
+          "line": 61,
+          "position": 2232
+        }
+      },
+      "tokens": 80
+    },
+    {
+      "firstFile": {
+        "end": 21,
+        "endLoc": {
+          "column": 30,
+          "line": 21,
+          "position": 911
+        },
+        "name": "features\\pricing\\components\\ProductEditPanel.tsx",
+        "start": 11,
+        "startLoc": {
+          "column": 2,
+          "line": 11,
+          "position": 482
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 16,
+        "endLoc": {
+          "column": 30,
+          "line": 16,
+          "position": 557
+        },
+        "name": "features\\pricing\\components\\product-edit-panel\\PricePreviewGrid.tsx",
+        "start": 6,
+        "startLoc": {
+          "column": 2,
+          "line": 6,
+          "position": 128
+        }
+      },
+      "tokens": 60
+    },
+    {
+      "firstFile": {
+        "end": 74,
+        "endLoc": {
+          "column": 12,
+          "line": 74,
+          "position": 2350
+        },
+        "name": "features\\pricing\\components\\ProductTable.tsx",
+        "start": 57,
+        "startLoc": {
+          "column": 11,
+          "line": 57,
+          "position": 1926
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 18,
+      "secondFile": {
+        "end": 38,
+        "endLoc": {
+          "column": 12,
+          "line": 38,
+          "position": 1051
+        },
+        "name": "features\\pricing\\components\\product-expanded-details\\ExistingSupplyRow.tsx",
+        "start": 21,
+        "startLoc": {
+          "column": 43,
+          "line": 21,
+          "position": 610
+        }
+      },
+      "tokens": 75
+    },
+    {
+      "firstFile": {
+        "end": 257,
+        "endLoc": {
+          "column": 10,
+          "line": 257,
+          "position": 7549
+        },
+        "name": "features\\pricing\\components\\ProductTable.tsx",
+        "start": 244,
+        "startLoc": {
+          "column": 10,
+          "line": 244,
+          "position": 7013
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 274,
+        "endLoc": {
+          "column": 8,
+          "line": 274,
+          "position": 8116
+        },
+        "name": "features\\pricing\\components\\ProductTable.tsx",
+        "start": 261,
+        "startLoc": {
+          "column": 8,
+          "line": 261,
+          "position": 7606
+        }
+      },
+      "tokens": 67
+    },
+    {
+      "firstFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 15,
+          "line": 30,
+          "position": 958
+        },
+        "name": "features\\pricing\\components\\product-table\\ProductTableDesktopSection.tsx",
+        "start": 14,
+        "startLoc": {
+          "column": 37,
+          "line": 14,
+          "position": 369
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 17,
+      "secondFile": {
+        "end": 31,
+        "endLoc": {
+          "column": 15,
+          "line": 31,
+          "position": 1000
+        },
+        "name": "features\\pricing\\components\\product-table\\ProductTableMobileSection.tsx",
+        "start": 15,
+        "startLoc": {
+          "column": 36,
+          "line": 15,
+          "position": 411
+        }
+      },
+      "tokens": 96
+    },
+    {
+      "firstFile": {
+        "end": 119,
+        "endLoc": {
+          "column": 18,
+          "line": 119,
+          "position": 4596
+        },
+        "name": "features\\pricing\\components\\product-table\\ProductTableDesktopSection.tsx",
+        "start": 109,
+        "startLoc": {
+          "column": 40,
+          "line": 109,
+          "position": 4074
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 107,
+        "endLoc": {
+          "column": 22,
+          "line": 107,
+          "position": 3877
+        },
+        "name": "features\\pricing\\components\\product-table\\ProductTableMobileSection.tsx",
+        "start": 97,
+        "startLoc": {
+          "column": 38,
+          "line": 97,
+          "position": 3315
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 27,
+        "endLoc": {
+          "column": 45,
+          "line": 27,
+          "position": 875
+        },
+        "name": "features\\pricing\\hooks\\useExistingSupplyRowActions.ts",
+        "start": 18,
+        "startLoc": {
+          "column": 44,
+          "line": 18,
+          "position": 544
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 28,
+        "endLoc": {
+          "column": 45,
+          "line": 28,
+          "position": 857
+        },
+        "name": "features\\pricing\\hooks\\useNewSupplyRowActions.ts",
+        "start": 19,
+        "startLoc": {
+          "column": 39,
+          "line": 19,
+          "position": 526
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 36,
+        "endLoc": {
+          "column": 4,
+          "line": 36,
+          "position": 1403
+        },
+        "name": "features\\pricing\\hooks\\useProductActions.ts",
+        "start": 28,
+        "startLoc": {
+          "column": 41,
+          "line": 28,
+          "position": 1114
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 37,
+        "endLoc": {
+          "column": 87,
+          "line": 37,
+          "position": 1506
+        },
+        "name": "features\\pricing\\hooks\\useProductData.ts",
+        "start": 33,
+        "startLoc": {
+          "column": 42,
+          "line": 33,
+          "position": 1237
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 36,
+        "endLoc": {
+          "column": 4,
+          "line": 36,
+          "position": 1403
+        },
+        "name": "features\\pricing\\hooks\\useProductActions.ts",
+        "start": 29,
+        "startLoc": {
+          "column": 2,
+          "line": 29,
+          "position": 1119
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 15,
+        "endLoc": {
+          "column": 4,
+          "line": 15,
+          "position": 571
+        },
+        "name": "features\\pricing\\hooks\\useProductStatusActions.ts",
+        "start": 8,
+        "startLoc": {
+          "column": 2,
+          "line": 8,
+          "position": 287
+        }
+      },
+      "tokens": 56
+    },
+    {
+      "firstFile": {
+        "end": 24,
+        "endLoc": {
+          "column": 18,
+          "line": 24,
+          "position": 430
+        },
+        "name": "features\\product-info\\ProductInfo.css",
+        "start": 16,
+        "startLoc": {
+          "column": 21,
+          "line": 16,
+          "position": 223
+        }
+      },
+      "format": "css",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 41,
+        "endLoc": {
+          "column": 18,
+          "line": 41,
+          "position": 837
+        },
+        "name": "features\\product-info\\ProductInfo.css",
+        "start": 33,
+        "startLoc": {
+          "column": 21,
+          "line": 33,
+          "position": 630
+        }
+      },
+      "tokens": 66
+    },
+    {
+      "firstFile": {
+        "end": 32,
+        "endLoc": {
+          "column": 34,
+          "line": 32,
+          "position": 1048
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 10,
+        "startLoc": {
+          "column": 74,
+          "line": 10,
+          "position": 448
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 23,
+      "secondFile": {
+        "end": 46,
+        "endLoc": {
+          "column": 34,
+          "line": 46,
+          "position": 1185
+        },
+        "name": "lib\\productImagesApi.ts",
+        "start": 24,
+        "startLoc": {
+          "column": 62,
+          "line": 24,
+          "position": 585
+        }
+      },
+      "tokens": 126
+    },
+    {
+      "firstFile": {
+        "end": 23,
+        "endLoc": {
+          "column": 5,
+          "line": 23,
+          "position": 763
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 10,
+        "startLoc": {
+          "column": 74,
+          "line": 10,
+          "position": 448
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 37,
+        "endLoc": {
+          "column": 5,
+          "line": 37,
+          "position": 900
+        },
+        "name": "lib\\variantImagesApi.ts",
+        "start": 24,
+        "startLoc": {
+          "column": 62,
+          "line": 24,
+          "position": 585
+        }
+      },
+      "tokens": 76
+    },
+    {
+      "firstFile": {
+        "end": 58,
+        "endLoc": {
+          "column": 34,
+          "line": 58,
+          "position": 1843
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 32,
+        "startLoc": {
+          "column": 68,
+          "line": 32,
+          "position": 1082
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 27,
+      "secondFile": {
+        "end": 72,
+        "endLoc": {
+          "column": 34,
+          "line": 72,
+          "position": 1967
+        },
+        "name": "lib\\productImagesApi.ts",
+        "start": 46,
+        "startLoc": {
+          "column": 55,
+          "line": 46,
+          "position": 1206
+        }
+      },
+      "tokens": 173
+    },
+    {
+      "firstFile": {
+        "end": 42,
+        "endLoc": {
+          "column": 5,
+          "line": 42,
+          "position": 1365
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 32,
+        "startLoc": {
+          "column": 68,
+          "line": 32,
+          "position": 1082
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 56,
+        "endLoc": {
+          "column": 5,
+          "line": 56,
+          "position": 1489
+        },
+        "name": "lib\\variantImagesApi.ts",
+        "start": 46,
+        "startLoc": {
+          "column": 55,
+          "line": 46,
+          "position": 1206
+        }
+      },
+      "tokens": 67
+    },
+    {
+      "firstFile": {
+        "end": 56,
+        "endLoc": {
+          "column": 12,
+          "line": 56,
+          "position": 1686
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 43,
+        "startLoc": {
+          "column": 4,
+          "line": 43,
+          "position": 1396
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 70,
+        "endLoc": {
+          "column": 12,
+          "line": 70,
+          "position": 1810
+        },
+        "name": "lib\\variantImagesApi.ts",
+        "start": 57,
+        "startLoc": {
+          "column": 4,
+          "line": 57,
+          "position": 1520
+        }
+      },
+      "tokens": 74
+    },
+    {
+      "firstFile": {
+        "end": 72,
+        "endLoc": {
+          "column": 2,
+          "line": 72,
+          "position": 2149
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 59,
+        "startLoc": {
+          "column": 40,
+          "line": 59,
+          "position": 1885
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 83,
+        "endLoc": {
+          "column": 2,
+          "line": 83,
+          "position": 2241
+        },
+        "name": "lib\\productImagesApi.ts",
+        "start": 72,
+        "startLoc": {
+          "column": 57,
+          "line": 72,
+          "position": 1990
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 72,
+        "endLoc": {
+          "column": 2,
+          "line": 72,
+          "position": 2149
+        },
+        "name": "features\\product-info\\api\\productDescImageApi.ts",
+        "start": 59,
+        "startLoc": {
+          "column": 40,
+          "line": 59,
+          "position": 1885
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 83,
+        "endLoc": {
+          "column": 2,
+          "line": 83,
+          "position": 2241
+        },
+        "name": "lib\\variantImagesApi.ts",
+        "start": 72,
+        "startLoc": {
+          "column": 57,
+          "line": 72,
+          "position": 1990
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 86,
+        "endLoc": {
+          "column": 24,
+          "line": 86,
+          "position": 2740
+        },
+        "name": "features\\product-info\\components\\CreateDescVariantModal.tsx",
+        "start": 72,
+        "startLoc": {
+          "column": 11,
+          "line": 72,
+          "position": 2260
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 57,
+        "endLoc": {
+          "column": 24,
+          "line": 57,
+          "position": 1605
+        },
+        "name": "features\\product-info\\components\\DescVariantViewModal.tsx",
+        "start": 43,
+        "startLoc": {
+          "column": 11,
+          "line": 43,
+          "position": 1125
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 100,
+        "endLoc": {
+          "column": 17,
+          "line": 100,
+          "position": 3300
+        },
+        "name": "features\\product-info\\components\\CreateDescVariantModal.tsx",
+        "start": 87,
+        "startLoc": {
+          "column": 6,
+          "line": 87,
+          "position": 2775
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 123,
+        "endLoc": {
+          "column": 17,
+          "line": 123,
+          "position": 3938
+        },
+        "name": "features\\product-info\\components\\DescVariantEditModal.tsx",
+        "start": 110,
+        "startLoc": {
+          "column": 6,
+          "line": 110,
+          "position": 3413
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 100,
+        "endLoc": {
+          "column": 17,
+          "line": 100,
+          "position": 3300
+        },
+        "name": "features\\product-info\\components\\CreateDescVariantModal.tsx",
+        "start": 87,
+        "startLoc": {
+          "column": 6,
+          "line": 87,
+          "position": 2775
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 71,
+        "endLoc": {
+          "column": 17,
+          "line": 71,
+          "position": 2163
+        },
+        "name": "features\\product-info\\components\\DescVariantViewModal.tsx",
+        "start": 58,
+        "startLoc": {
+          "column": 6,
+          "line": 58,
+          "position": 1638
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 152,
+        "endLoc": {
+          "column": 21,
+          "line": 152,
+          "position": 5362
+        },
+        "name": "features\\product-info\\components\\CreateDescVariantModal.tsx",
+        "start": 125,
+        "startLoc": {
+          "column": 11,
+          "line": 125,
+          "position": 4468
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 28,
+      "secondFile": {
+        "end": 219,
+        "endLoc": {
+          "column": 21,
+          "line": 219,
+          "position": 7839
+        },
+        "name": "features\\product-info\\components\\DescVariantEditModal.tsx",
+        "start": 192,
+        "startLoc": {
+          "column": 15,
+          "line": 192,
+          "position": 6945
+        }
+      },
+      "tokens": 95
+    },
+    {
+      "firstFile": {
+        "end": 53,
+        "endLoc": {
+          "column": 21,
+          "line": 53,
+          "position": 1321
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImagePickerModal.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 61,
+          "line": 22,
+          "position": 715
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 32,
+      "secondFile": {
+        "end": 53,
+        "endLoc": {
+          "column": 21,
+          "line": 53,
+          "position": 1340
+        },
+        "name": "features\\product-info\\components\\ProductImagePickerModal.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 75,
+          "line": 22,
+          "position": 734
+        }
+      },
+      "tokens": 148
+    },
+    {
+      "firstFile": {
+        "end": 74,
+        "endLoc": {
+          "column": 16,
+          "line": 74,
+          "position": 2634
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImagePickerModal.tsx",
+        "start": 56,
+        "startLoc": {
+          "column": 97,
+          "line": 56,
+          "position": 1772
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 19,
+      "secondFile": {
+        "end": 74,
+        "endLoc": {
+          "column": 16,
+          "line": 74,
+          "position": 2594
+        },
+        "name": "features\\product-info\\components\\ProductImagePickerModal.tsx",
+        "start": 56,
+        "startLoc": {
+          "column": 69,
+          "line": 56,
+          "position": 1732
+        }
+      },
+      "tokens": 75
+    },
+    {
+      "firstFile": {
+        "end": 86,
+        "endLoc": {
+          "column": 29,
+          "line": 86,
+          "position": 3198
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImagePickerModal.tsx",
+        "start": 76,
+        "startLoc": {
+          "column": 67,
+          "line": 76,
+          "position": 2703
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 85,
+        "endLoc": {
+          "column": 29,
+          "line": 85,
+          "position": 3130
+        },
+        "name": "features\\product-info\\components\\ProductImagePickerModal.tsx",
+        "start": 75,
+        "startLoc": {
+          "column": 40,
+          "line": 75,
+          "position": 2635
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 120,
+        "endLoc": {
+          "column": 31,
+          "line": 120,
+          "position": 4716
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImagePickerModal.tsx",
+        "start": 101,
+        "startLoc": {
+          "column": 100,
+          "line": 101,
+          "position": 4036
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 20,
+      "secondFile": {
+        "end": 118,
+        "endLoc": {
+          "column": 31,
+          "line": 118,
+          "position": 4609
+        },
+        "name": "features\\product-info\\components\\ProductImagePickerModal.tsx",
+        "start": 99,
+        "startLoc": {
+          "column": 98,
+          "line": 99,
+          "position": 3929
+        }
+      },
+      "tokens": 100
+    },
+    {
+      "firstFile": {
+        "end": 167,
+        "endLoc": {
+          "column": 2,
+          "line": 167,
+          "position": 6458
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImagePickerModal.tsx",
+        "start": 155,
+        "startLoc": {
+          "column": 18,
+          "line": 155,
+          "position": 6187
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 166,
+        "endLoc": {
+          "column": 2,
+          "line": 166,
+          "position": 6604
+        },
+        "name": "features\\product-info\\components\\ProductImagePickerModal.tsx",
+        "start": 154,
+        "startLoc": {
+          "column": 18,
+          "line": 154,
+          "position": 6333
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 15,
+        "endLoc": {
+          "column": 1,
+          "line": 15,
+          "position": 542
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImageUpload.tsx",
+        "start": 9,
+        "startLoc": {
+          "column": 57,
+          "line": 9,
+          "position": 352
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 16,
+        "endLoc": {
+          "column": 1,
+          "line": 16,
+          "position": 616
+        },
+        "name": "features\\product-info\\components\\ProductImagePicker.tsx",
+        "start": 9,
+        "startLoc": {
+          "column": 67,
+          "line": 9,
+          "position": 320
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 52,
+        "endLoc": {
+          "column": 39,
+          "line": 52,
+          "position": 1786
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImageUpload.tsx",
+        "start": 34,
+        "startLoc": {
+          "column": 70,
+          "line": 34,
+          "position": 1221
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 19,
+      "secondFile": {
+        "end": 51,
+        "endLoc": {
+          "column": 39,
+          "line": 51,
+          "position": 1994
+        },
+        "name": "features\\product-info\\components\\ProductImagePicker.tsx",
+        "start": 35,
+        "startLoc": {
+          "column": 70,
+          "line": 35,
+          "position": 1439
+        }
+      },
+      "tokens": 128
+    },
+    {
+      "firstFile": {
+        "end": 93,
+        "endLoc": {
+          "column": 7,
+          "line": 93,
+          "position": 2917
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImageUpload.tsx",
+        "start": 57,
+        "startLoc": {
+          "column": 43,
+          "line": 57,
+          "position": 1930
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 37,
+      "secondFile": {
+        "end": 90,
+        "endLoc": {
+          "column": 7,
+          "line": 90,
+          "position": 3121
+        },
+        "name": "features\\product-info\\components\\ProductImagePicker.tsx",
+        "start": 55,
+        "startLoc": {
+          "column": 43,
+          "line": 55,
+          "position": 2136
+        }
+      },
+      "tokens": 186
+    },
+    {
+      "firstFile": {
+        "end": 134,
+        "endLoc": {
+          "column": 26,
+          "line": 134,
+          "position": 3881
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImageUpload.tsx",
+        "start": 124,
+        "startLoc": {
+          "column": 27,
+          "line": 124,
+          "position": 3652
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 106,
+        "endLoc": {
+          "column": 26,
+          "line": 106,
+          "position": 3517
+        },
+        "name": "features\\product-info\\components\\ProductImagePicker.tsx",
+        "start": 98,
+        "startLoc": {
+          "column": 25,
+          "line": 98,
+          "position": 3292
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 151,
+        "endLoc": {
+          "column": 31,
+          "line": 151,
+          "position": 4412
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\ImageUpload.tsx",
+        "start": 135,
+        "startLoc": {
+          "column": 19,
+          "line": 135,
+          "position": 3928
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 17,
+      "secondFile": {
+        "end": 123,
+        "endLoc": {
+          "column": 31,
+          "line": 123,
+          "position": 4051
+        },
+        "name": "features\\product-info\\components\\ProductImagePicker.tsx",
+        "start": 107,
+        "startLoc": {
+          "column": 22,
+          "line": 107,
+          "position": 3567
+        }
+      },
+      "tokens": 96
+    },
+    {
+      "firstFile": {
+        "end": 71,
+        "endLoc": {
+          "column": 62,
+          "line": 71,
+          "position": 2097
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\rich-text-editor\\RichTextEditorToolbar.tsx",
+        "start": 62,
+        "startLoc": {
+          "column": 31,
+          "line": 62,
+          "position": 1815
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 10,
+      "secondFile": {
+        "end": 89,
+        "endLoc": {
+          "column": 62,
+          "line": 89,
+          "position": 2669
+        },
+        "name": "features\\product-info\\components\\EditProductModal\\rich-text-editor\\RichTextEditorToolbar.tsx",
+        "start": 80,
+        "startLoc": {
+          "column": 23,
+          "line": 80,
+          "position": 2387
+        }
+      },
+      "tokens": 64
+    },
+    {
+      "firstFile": {
+        "end": 48,
+        "endLoc": {
+          "column": 7,
+          "line": 48,
+          "position": 1446
+        },
+        "name": "features\\product-info\\components\\ProductCard.tsx",
+        "start": 40,
+        "startLoc": {
+          "column": 25,
+          "line": 40,
+          "position": 1061
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 51,
+        "endLoc": {
+          "column": 7,
+          "line": 51,
+          "position": 1984
+        },
+        "name": "features\\product-info\\components\\ProductRow.tsx",
+        "start": 41,
+        "startLoc": {
+          "column": 29,
+          "line": 41,
+          "position": 1364
+        }
+      },
+      "tokens": 56
+    },
+    {
+      "firstFile": {
+        "end": 37,
+        "endLoc": {
+          "column": 18,
+          "line": 37,
+          "position": 1223
+        },
+        "name": "features\\product-info\\hooks\\useCategoryOptions.ts",
+        "start": 29,
+        "startLoc": {
+          "column": 8,
+          "line": 29,
+          "position": 933
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 28,
+        "endLoc": {
+          "column": 14,
+          "line": 28,
+          "position": 641
+        },
+        "name": "lib\\categoryApi.ts",
+        "start": 22,
+        "startLoc": {
+          "column": 68,
+          "line": 22,
+          "position": 397
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 18,
+        "endLoc": {
+          "column": 15,
+          "line": 18,
+          "position": 617
+        },
+        "name": "features\\promo-codes\\components\\PromoCodeCard.tsx",
+        "start": 5,
+        "startLoc": {
+          "column": 24,
+          "line": 5,
+          "position": 191
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 18,
+        "endLoc": {
+          "column": 15,
+          "line": 18,
+          "position": 616
+        },
+        "name": "features\\promo-codes\\components\\PromoCodeRow.tsx",
+        "start": 5,
+        "startLoc": {
+          "column": 23,
+          "line": 5,
+          "position": 190
+        }
+      },
+      "tokens": 62
+    },
+    {
+      "firstFile": {
+        "end": 73,
+        "endLoc": {
+          "column": 18,
+          "line": 73,
+          "position": 2557
+        },
+        "name": "features\\renew-adobe\\api\\renewAdobeApi.ts",
+        "start": 60,
+        "startLoc": {
+          "column": 48,
+          "line": 60,
+          "position": 2262
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 157,
+        "endLoc": {
+          "column": 53,
+          "line": 157,
+          "position": 5280
+        },
+        "name": "features\\renew-adobe\\api\\renewAdobeApi.ts",
+        "start": 147,
+        "startLoc": {
+          "column": 51,
+          "line": 147,
+          "position": 5014
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 68,
+        "endLoc": {
+          "column": 18,
+          "line": 68,
+          "position": 2455
+        },
+        "name": "features\\renew-adobe\\api\\renewAdobeApi.ts",
+        "start": 63,
+        "startLoc": {
+          "column": 4,
+          "line": 63,
+          "position": 2298
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 124,
+        "endLoc": {
+          "column": 18,
+          "line": 124,
+          "position": 4230
+        },
+        "name": "features\\renew-adobe\\api\\renewAdobeApi.ts",
+        "start": 119,
+        "startLoc": {
+          "column": 23,
+          "line": 119,
+          "position": 4073
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 216,
+        "endLoc": {
+          "column": 16,
+          "line": 216,
+          "position": 7828
+        },
+        "name": "features\\renew-adobe\\components\\AddAdminAccountModal.tsx",
+        "start": 210,
+        "startLoc": {
+          "column": 12,
+          "line": 210,
+          "position": 7538
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 95,
+        "endLoc": {
+          "column": 16,
+          "line": 95,
+          "position": 3839
+        },
+        "name": "features\\renew-adobe\\components\\EditAccountModal.tsx",
+        "start": 89,
+        "startLoc": {
+          "column": 12,
+          "line": 89,
+          "position": 3549
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 137,
+        "endLoc": {
+          "column": 55,
+          "line": 137,
+          "position": 5229
+        },
+        "name": "features\\renew-adobe\\components\\AddTrackingOrdersModal.tsx",
+        "start": 131,
+        "startLoc": {
+          "column": 37,
+          "line": 131,
+          "position": 4989
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 159,
+        "endLoc": {
+          "column": 55,
+          "line": 159,
+          "position": 6264
+        },
+        "name": "features\\renew-adobe\\components\\AddTrackingOrdersModal.tsx",
+        "start": 153,
+        "startLoc": {
+          "column": 44,
+          "line": 153,
+          "position": 6024
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 121,
+        "endLoc": {
+          "column": 12,
+          "line": 121,
+          "position": 4057
+        },
+        "name": "features\\renew-adobe\\components\\EditTrackingOrderModal.tsx",
+        "start": 113,
+        "startLoc": {
+          "column": 37,
+          "line": 113,
+          "position": 3846
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 139,
+        "endLoc": {
+          "column": 12,
+          "line": 139,
+          "position": 4802
+        },
+        "name": "features\\renew-adobe\\components\\EditTrackingOrderModal.tsx",
+        "start": 131,
+        "startLoc": {
+          "column": 44,
+          "line": 131,
+          "position": 4591
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 129,
+        "endLoc": {
+          "column": 32,
+          "line": 129,
+          "position": 5848
+        },
+        "name": "features\\renew-adobe\\components\\ManageTeamTable.tsx",
+        "start": 123,
+        "startLoc": {
+          "column": 43,
+          "line": 123,
+          "position": 5494
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 144,
+        "endLoc": {
+          "column": 32,
+          "line": 144,
+          "position": 6730
+        },
+        "name": "features\\renew-adobe\\components\\ManageTeamTable.tsx",
+        "start": 138,
+        "startLoc": {
+          "column": 23,
+          "line": 138,
+          "position": 6376
+        }
+      },
+      "tokens": 56
+    },
+    {
+      "firstFile": {
+        "end": 84,
+        "endLoc": {
+          "column": 8,
+          "line": 84,
+          "position": 2770
+        },
+        "name": "features\\renew-adobe\\hooks\\use-renew-adobe-admin\\checkAll.ts",
+        "start": 71,
+        "startLoc": {
+          "column": 7,
+          "line": 71,
+          "position": 2401
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 14,
+      "secondFile": {
+        "end": 109,
+        "endLoc": {
+          "column": 8,
+          "line": 109,
+          "position": 3499
+        },
+        "name": "features\\renew-adobe\\hooks\\use-renew-adobe-admin\\checkAll.ts",
+        "start": 96,
+        "startLoc": {
+          "column": 6,
+          "line": 96,
+          "position": 3130
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 78,
+        "endLoc": {
+          "column": 44,
+          "line": 78,
+          "position": 2520
+        },
+        "name": "features\\renew-adobe\\user-orders\\api.ts",
+        "start": 73,
+        "startLoc": {
+          "column": 5,
+          "line": 73,
+          "position": 2373
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 103,
+        "endLoc": {
+          "column": 44,
+          "line": 103,
+          "position": 3428
+        },
+        "name": "features\\renew-adobe\\user-orders\\api.ts",
+        "start": 97,
+        "startLoc": {
+          "column": 31,
+          "line": 97,
+          "position": 3275
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 78,
+        "endLoc": {
+          "column": 44,
+          "line": 78,
+          "position": 2520
+        },
+        "name": "features\\renew-adobe\\user-orders\\api.ts",
+        "start": 73,
+        "startLoc": {
+          "column": 6,
+          "line": 73,
+          "position": 2374
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 122,
+        "endLoc": {
+          "column": 44,
+          "line": 122,
+          "position": 4013
+        },
+        "name": "features\\renew-adobe\\user-orders\\api.ts",
+        "start": 116,
+        "startLoc": {
+          "column": 22,
+          "line": 116,
+          "position": 3861
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 18,
+        "endLoc": {
+          "column": 12,
+          "line": 18,
+          "position": 528
+        },
+        "name": "features\\shop-bank-accounts\\api\\shopBankAccountApi.ts",
+        "start": 6,
+        "startLoc": {
+          "column": 24,
+          "line": 6,
+          "position": 184
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 19,
+        "endLoc": {
+          "column": 12,
+          "line": 19,
+          "position": 551
+        },
+        "name": "features\\usdt-wallets\\api\\usdtWalletApi.ts",
+        "start": 7,
+        "startLoc": {
+          "column": 19,
+          "line": 7,
+          "position": 195
+        }
+      },
+      "tokens": 82
+    },
+    {
+      "firstFile": {
+        "end": 64,
+        "endLoc": {
+          "column": 12,
+          "line": 64,
+          "position": 2188
+        },
+        "name": "features\\shop-bank-accounts\\api\\shopBankAccountApi.ts",
+        "start": 43,
+        "startLoc": {
+          "column": 16,
+          "line": 43,
+          "position": 1533
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 22,
+      "secondFile": {
+        "end": 48,
+        "endLoc": {
+          "column": 12,
+          "line": 48,
+          "position": 1612
+        },
+        "name": "features\\usdt-wallets\\api\\usdtWalletApi.ts",
+        "start": 27,
+        "startLoc": {
+          "column": 20,
+          "line": 27,
+          "position": 936
+        }
+      },
+      "tokens": 138
+    },
+    {
+      "firstFile": {
+        "end": 83,
+        "endLoc": {
+          "column": 21,
+          "line": 83,
+          "position": 3000
+        },
+        "name": "features\\shop-bank-accounts\\api\\shopBankAccountApi.ts",
+        "start": 65,
+        "startLoc": {
+          "column": 43,
+          "line": 65,
+          "position": 2320
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 19,
+      "secondFile": {
+        "end": 67,
+        "endLoc": {
+          "column": 21,
+          "line": 67,
+          "position": 2428
+        },
+        "name": "features\\usdt-wallets\\api\\usdtWalletApi.ts",
+        "start": 49,
+        "startLoc": {
+          "column": 38,
+          "line": 49,
+          "position": 1730
+        }
+      },
+      "tokens": 178
+    },
+    {
+      "firstFile": {
+        "end": 109,
+        "endLoc": {
+          "column": 45,
+          "line": 109,
+          "position": 4173
+        },
+        "name": "features\\shop-bank-accounts\\api\\shopBankAccountApi.ts",
+        "start": 104,
+        "startLoc": {
+          "column": 74,
+          "line": 104,
+          "position": 3971
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 152,
+        "endLoc": {
+          "column": 45,
+          "line": 152,
+          "position": 5701
+        },
+        "name": "features\\usdt-wallets\\api\\usdtWalletApi.ts",
+        "start": 147,
+        "startLoc": {
+          "column": 68,
+          "line": 147,
+          "position": 5494
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 173,
+        "endLoc": {
+          "column": 1,
+          "line": 173,
+          "position": 6406
+        },
+        "name": "features\\shop-bank-accounts\\api\\shopBankAccountApi.ts",
+        "start": 166,
+        "startLoc": {
+          "column": 71,
+          "line": 166,
+          "position": 6196
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 140,
+        "endLoc": {
+          "column": 1,
+          "line": 140,
+          "position": 5274
+        },
+        "name": "features\\usdt-wallets\\api\\usdtWalletApi.ts",
+        "start": 133,
+        "startLoc": {
+          "column": 65,
+          "line": 133,
+          "position": 5057
+        }
+      },
+      "tokens": 68
+    },
+    {
+      "firstFile": {
+        "end": 41,
+        "endLoc": {
+          "column": 49,
+          "line": 41,
+          "position": 1862
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountsPanel.tsx",
+        "start": 30,
+        "startLoc": {
+          "column": 83,
+          "line": 30,
+          "position": 1221
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 12,
+      "secondFile": {
+        "end": 39,
+        "endLoc": {
+          "column": 49,
+          "line": 39,
+          "position": 1861
+        },
+        "name": "features\\usdt-wallets\\components\\UsdtWalletsPanel.tsx",
+        "start": 28,
+        "startLoc": {
+          "column": 70,
+          "line": 28,
+          "position": 1220
+        }
+      },
+      "tokens": 146
+    },
+    {
+      "firstFile": {
+        "end": 101,
+        "endLoc": {
+          "column": 7,
+          "line": 101,
+          "position": 3598
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountsPanel.tsx",
+        "start": 89,
+        "startLoc": {
+          "column": 6,
+          "line": 89,
+          "position": 3308
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 102,
+        "endLoc": {
+          "column": 7,
+          "line": 102,
+          "position": 3757
+        },
+        "name": "features\\usdt-wallets\\components\\UsdtWalletsPanel.tsx",
+        "start": 90,
+        "startLoc": {
+          "column": 51,
+          "line": 90,
+          "position": 3467
+        }
+      },
+      "tokens": 77
+    },
+    {
+      "firstFile": {
+        "end": 152,
+        "endLoc": {
+          "column": 32,
+          "line": 152,
+          "position": 5170
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountsPanel.tsx",
+        "start": 140,
+        "startLoc": {
+          "column": 87,
+          "line": 140,
+          "position": 4844
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 141,
+        "endLoc": {
+          "column": 32,
+          "line": 141,
+          "position": 5076
+        },
+        "name": "features\\usdt-wallets\\components\\UsdtWalletsPanel.tsx",
+        "start": 129,
+        "startLoc": {
+          "column": 87,
+          "line": 129,
+          "position": 4750
+        }
+      },
+      "tokens": 63
+    },
+    {
+      "firstFile": {
+        "end": 174,
+        "endLoc": {
+          "column": 11,
+          "line": 174,
+          "position": 5816
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountsPanel.tsx",
+        "start": 155,
+        "startLoc": {
+          "column": 53,
+          "line": 155,
+          "position": 5299
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 20,
+      "secondFile": {
+        "end": 163,
+        "endLoc": {
+          "column": 11,
+          "line": 163,
+          "position": 5715
+        },
+        "name": "features\\usdt-wallets\\components\\UsdtWalletsPanel.tsx",
+        "start": 144,
+        "startLoc": {
+          "column": 47,
+          "line": 144,
+          "position": 5198
+        }
+      },
+      "tokens": 92
+    },
+    {
+      "firstFile": {
+        "end": 230,
+        "endLoc": {
+          "column": 11,
+          "line": 230,
+          "position": 7855
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountsPanel.tsx",
+        "start": 216,
+        "startLoc": {
+          "column": 10,
+          "line": 216,
+          "position": 7339
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 224,
+        "endLoc": {
+          "column": 11,
+          "line": 224,
+          "position": 7860
+        },
+        "name": "features\\usdt-wallets\\components\\UsdtWalletsPanel.tsx",
+        "start": 210,
+        "startLoc": {
+          "column": 10,
+          "line": 210,
+          "position": 7344
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 250,
+        "endLoc": {
+          "column": 7,
+          "line": 250,
+          "position": 8392
+        },
+        "name": "features\\shop-bank-accounts\\components\\ShopBankAccountsPanel.tsx",
+        "start": 233,
+        "startLoc": {
+          "column": 28,
+          "line": 233,
+          "position": 7989
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 18,
+      "secondFile": {
+        "end": 248,
+        "endLoc": {
+          "column": 7,
+          "line": 248,
+          "position": 8513
+        },
+        "name": "features\\usdt-wallets\\components\\UsdtWalletsPanel.tsx",
+        "start": 231,
+        "startLoc": {
+          "column": 13,
+          "line": 231,
+          "position": 8110
+        }
+      },
+      "tokens": 64
+    },
+    {
+      "firstFile": {
+        "end": 101,
+        "endLoc": {
+          "column": 26,
+          "line": 101,
+          "position": 2714
+        },
+        "name": "features\\supply\\components\\AddSupplierModal.tsx",
+        "start": 84,
+        "startLoc": {
+          "column": 81,
+          "line": 84,
+          "position": 2332
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 18,
+      "secondFile": {
+        "end": 93,
+        "endLoc": {
+          "column": 26,
+          "line": 93,
+          "position": 2513
+        },
+        "name": "features\\supply\\components\\EditSupplierModal.tsx",
+        "start": 76,
+        "startLoc": {
+          "column": 72,
+          "line": 76,
+          "position": 2131
+        }
+      },
+      "tokens": 61
+    },
+    {
+      "firstFile": {
+        "end": 157,
+        "endLoc": {
+          "column": 63,
+          "line": 157,
+          "position": 4803
+        },
+        "name": "features\\supply\\components\\AddSupplierModal.tsx",
+        "start": 147,
+        "startLoc": {
+          "column": 16,
+          "line": 147,
+          "position": 4362
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 153,
+        "endLoc": {
+          "column": 63,
+          "line": 153,
+          "position": 4851
+        },
+        "name": "features\\supply\\components\\EditSupplierModal.tsx",
+        "start": 143,
+        "startLoc": {
+          "column": 16,
+          "line": 143,
+          "position": 4410
+        }
+      },
+      "tokens": 62
+    },
+    {
+      "firstFile": {
+        "end": 195,
+        "endLoc": {
+          "column": 26,
+          "line": 195,
+          "position": 6129
+        },
+        "name": "features\\supply\\components\\AddSupplierModal.tsx",
+        "start": 162,
+        "startLoc": {
+          "column": 16,
+          "line": 162,
+          "position": 4953
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 34,
+      "secondFile": {
+        "end": 191,
+        "endLoc": {
+          "column": 26,
+          "line": 191,
+          "position": 6179
+        },
+        "name": "features\\supply\\components\\EditSupplierModal.tsx",
+        "start": 158,
+        "startLoc": {
+          "column": 16,
+          "line": 158,
+          "position": 5003
+        }
+      },
+      "tokens": 166
+    },
+    {
+      "firstFile": {
+        "end": 29,
+        "endLoc": {
+          "column": 5,
+          "line": 29,
+          "position": 857
+        },
+        "name": "features\\supply\\components\\EditTraceCodeModal.tsx",
+        "start": 17,
+        "startLoc": {
+          "column": 9,
+          "line": 17,
+          "position": 609
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 24,
+        "endLoc": {
+          "column": 5,
+          "line": 24,
+          "position": 804
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 12,
+        "startLoc": {
+          "column": 11,
+          "line": 12,
+          "position": 556
+        }
+      },
+      "tokens": 65
+    },
+    {
+      "firstFile": {
+        "end": 29,
+        "endLoc": {
+          "column": 2,
+          "line": 29,
+          "position": 1056
+        },
+        "name": "features\\supply\\components\\ExternalImportLogModal.tsx",
+        "start": 22,
+        "startLoc": {
+          "column": 0,
+          "line": 22,
+          "position": 793
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 34,
+        "endLoc": {
+          "column": 2,
+          "line": 34,
+          "position": 1119
+        },
+        "name": "features\\supply\\components\\SupplierSettlementPanel.tsx",
+        "start": 27,
+        "startLoc": {
+          "column": 0,
+          "line": 27,
+          "position": 856
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 204,
+        "endLoc": {
+          "column": 5,
+          "line": 204,
+          "position": 7797
+        },
+        "name": "features\\supply\\components\\SupplierDetailModal.tsx",
+        "start": 196,
+        "startLoc": {
+          "column": 2,
+          "line": 196,
+          "position": 7485
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 9,
+      "secondFile": {
+        "end": 42,
+        "endLoc": {
+          "column": 5,
+          "line": 42,
+          "position": 1054
+        },
+        "name": "features\\supply\\components\\SupplierOverviewCards.tsx",
+        "start": 34,
+        "startLoc": {
+          "column": 2,
+          "line": 34,
+          "position": 750
+        }
+      },
+      "tokens": 65
+    },
+    {
+      "firstFile": {
+        "end": 18,
+        "endLoc": {
+          "column": 1,
+          "line": 18,
+          "position": 706
+        },
+        "name": "features\\supply\\components\\SupplyList.tsx",
+        "start": 12,
+        "startLoc": {
+          "column": 27,
+          "line": 12,
+          "position": 509
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 7,
+      "secondFile": {
+        "end": 124,
+        "endLoc": {
+          "column": 1,
+          "line": 124,
+          "position": 4349
+        },
+        "name": "features\\supply\\components\\SupplyList.tsx",
+        "start": 118,
+        "startLoc": {
+          "column": 21,
+          "line": 118,
+          "position": 4152
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 51,
+        "endLoc": {
+          "column": 31,
+          "line": 51,
+          "position": 1536
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 39,
+        "startLoc": {
+          "column": 30,
+          "line": 39,
+          "position": 1266
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 13,
+      "secondFile": {
+        "end": 79,
+        "endLoc": {
+          "column": 31,
+          "line": 79,
+          "position": 2161
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 67,
+        "startLoc": {
+          "column": 31,
+          "line": 67,
+          "position": 1891
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 53,
+        "endLoc": {
+          "column": 27,
+          "line": 53,
+          "position": 1567
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 39,
+        "startLoc": {
+          "column": 7,
+          "line": 39,
+          "position": 1243
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 15,
+      "secondFile": {
+        "end": 37,
+        "endLoc": {
+          "column": 27,
+          "line": 37,
+          "position": 970
+        },
+        "name": "features\\tax\\utils\\taxAggregates.ts",
+        "start": 23,
+        "startLoc": {
+          "column": 0,
+          "line": 23,
+          "position": 632
+        }
+      },
+      "tokens": 92
+    },
+    {
+      "firstFile": {
+        "end": 54,
+        "endLoc": {
+          "column": 11,
+          "line": 54,
+          "position": 1579
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 43,
+        "startLoc": {
+          "column": 14,
+          "line": 43,
+          "position": 1365
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 12,
+      "secondFile": {
+        "end": 38,
+        "endLoc": {
+          "column": 9,
+          "line": 38,
+          "position": 981
+        },
+        "name": "features\\tax\\utils\\taxAggregates.ts",
+        "start": 27,
+        "startLoc": {
+          "column": 14,
+          "line": 27,
+          "position": 758
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 89,
+        "endLoc": {
+          "column": 18,
+          "line": 89,
+          "position": 2553
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 67,
+        "startLoc": {
+          "column": 7,
+          "line": 67,
+          "position": 1867
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 23,
+      "secondFile": {
+        "end": 68,
+        "endLoc": {
+          "column": 18,
+          "line": 68,
+          "position": 1843
+        },
+        "name": "features\\tax\\utils\\taxAggregates.ts",
+        "start": 46,
+        "startLoc": {
+          "column": 0,
+          "line": 46,
+          "position": 1135
+        }
+      },
+      "tokens": 177
+    },
+    {
+      "firstFile": {
+        "end": 109,
+        "endLoc": {
+          "column": 6,
+          "line": 109,
+          "position": 3060
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 93,
+        "startLoc": {
+          "column": 6,
+          "line": 93,
+          "position": 2669
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 17,
+      "secondFile": {
+        "end": 85,
+        "endLoc": {
+          "column": 5,
+          "line": 85,
+          "position": 2257
+        },
+        "name": "features\\tax\\utils\\taxAggregates.ts",
+        "start": 69,
+        "startLoc": {
+          "column": 6,
+          "line": 69,
+          "position": 1851
+        }
+      },
+      "tokens": 99
+    },
+    {
+      "firstFile": {
+        "end": 153,
+        "endLoc": {
+          "column": 6,
+          "line": 153,
+          "position": 4565
+        },
+        "name": "features\\tax\\components\\tax-daily-form-table\\helpers.ts",
+        "start": 124,
+        "startLoc": {
+          "column": 45,
+          "line": 124,
+          "position": 3554
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 30,
+      "secondFile": {
+        "end": 116,
+        "endLoc": {
+          "column": 5,
+          "line": 116,
+          "position": 3516
+        },
+        "name": "features\\tax\\utils\\taxAggregates.ts",
+        "start": 87,
+        "startLoc": {
+          "column": 93,
+          "line": 87,
+          "position": 2477
+        }
+      },
+      "tokens": 342
+    },
+    {
+      "firstFile": {
+        "end": 82,
+        "endLoc": {
+          "column": 12,
+          "line": 82,
+          "position": 2060
+        },
+        "name": "features\\warehouse\\api\\importPackageApi.ts",
+        "start": 72,
+        "startLoc": {
+          "column": 32,
+          "line": 72,
+          "position": 1807
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 99,
+        "endLoc": {
+          "column": 12,
+          "line": 99,
+          "position": 2601
+        },
+        "name": "features\\warehouse\\api\\importPackageApi.ts",
+        "start": 89,
+        "startLoc": {
+          "column": 40,
+          "line": 89,
+          "position": 2362
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 82,
+        "endLoc": {
+          "column": 12,
+          "line": 82,
+          "position": 2060
+        },
+        "name": "features\\warehouse\\api\\importPackageApi.ts",
+        "start": 72,
+        "startLoc": {
+          "column": 32,
+          "line": 72,
+          "position": 1807
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 133,
+        "endLoc": {
+          "column": 12,
+          "line": 133,
+          "position": 3756
+        },
+        "name": "features\\warehouse\\api\\importPackageApi.ts",
+        "start": 123,
+        "startLoc": {
+          "column": 29,
+          "line": 123,
+          "position": 3541
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 38,
+        "endLoc": {
+          "column": 6,
+          "line": 38,
+          "position": 1034
+        },
+        "name": "features\\warehouse\\components\\CopyableValue.tsx",
+        "start": 28,
+        "startLoc": {
+          "column": 46,
+          "line": 28,
+          "position": 784
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 56,
+        "endLoc": {
+          "column": 6,
+          "line": 56,
+          "position": 1598
+        },
+        "name": "features\\warehouse\\components\\warehouse-row\\WarehouseRowExpanded.tsx",
+        "start": 46,
+        "startLoc": {
+          "column": 73,
+          "line": 46,
+          "position": 1348
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 21,
+        "endLoc": {
+          "column": 45,
+          "line": 21,
+          "position": 840
+        },
+        "name": "features\\warehouse\\components\\StorageItemCard.tsx",
+        "start": 16,
+        "startLoc": {
+          "column": 18,
+          "line": 16,
+          "position": 628
+        }
+      },
+      "format": "tsx",
+      "fragment": "",
+      "lines": 6,
+      "secondFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 45,
+          "line": 30,
+          "position": 1306
+        },
+        "name": "features\\warehouse\\components\\StorageTable.tsx",
+        "start": 25,
+        "startLoc": {
+          "column": 41,
+          "line": 25,
+          "position": 1094
+        }
+      },
+      "tokens": 55
+    },
+    {
+      "firstFile": {
+        "end": 44,
+        "endLoc": {
+          "column": 30,
+          "line": 44,
+          "position": 1131
+        },
+        "name": "lib\\categoryApi.ts",
+        "start": 37,
+        "startLoc": {
+          "column": 18,
+          "line": 37,
+          "position": 917
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 8,
+      "secondFile": {
+        "end": 65,
+        "endLoc": {
+          "column": 30,
+          "line": 65,
+          "position": 1681
+        },
+        "name": "lib\\categoryApi.ts",
+        "start": 58,
+        "startLoc": {
+          "column": 17,
+          "line": 58,
+          "position": 1467
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 74,
+        "endLoc": {
+          "column": 33,
+          "line": 74,
+          "position": 1814
+        },
+        "name": "lib\\formsApi.ts",
+        "start": 64,
+        "startLoc": {
+          "column": 17,
+          "line": 64,
+          "position": 1438
+        }
+      },
+      "format": "typescript",
+      "fragment": "",
+      "lines": 11,
+      "secondFile": {
+        "end": 92,
+        "endLoc": {
+          "column": 33,
+          "line": 92,
+          "position": 2449
+        },
+        "name": "lib\\formsApi.ts",
+        "start": 82,
+        "startLoc": {
+          "column": 18,
+          "line": 82,
+          "position": 2073
+        }
+      },
+      "tokens": 101
+    }
+  ],
+  "statistics": {
+    "detectionDate": "2026-07-05T17:12:36.594Z",
+    "formats": {
+      "css": {
+        "clones": 1,
+        "duplicatedLines": 8,
+        "duplicatedTokens": 66,
+        "lines": 2525,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.31683168316831684,
+        "percentageTokens": 0.3629764065335753,
+        "sources": 6,
+        "tokens": 18183
+      },
+      "markup": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 156,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 1,
+        "tokens": 1124
+      },
+      "tsx": {
+        "clones": 80,
+        "duplicatedLines": 1105,
+        "duplicatedTokens": 6258,
+        "lines": 45101,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 2.4500565397663023,
+        "percentageTokens": 2.718045161766686,
+        "sources": 353,
+        "tokens": 230239
+      },
+      "typescript": {
+        "clones": 58,
+        "duplicatedLines": 728,
+        "duplicatedTokens": 5364,
+        "lines": 34015,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 2.1402322504777302,
+        "percentageTokens": 3.0646350033423033,
+        "sources": 318,
+        "tokens": 175029
+      }
+    },
+    "total": {
+      "clones": 139,
+      "duplicatedLines": 1841,
+      "duplicatedTokens": 11688,
+      "lines": 81797,
+      "newClones": 0,
+      "newDuplicatedLines": 0,
+      "percentage": 2.250693790725821,
+      "percentageTokens": 2.7528705175763997,
+      "sources": 678,
+      "tokens": 424575
+    }
+  }
+}

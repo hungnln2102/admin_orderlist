@@ -51,24 +51,30 @@ export const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
 /**
  * TableCard - Component for displaying table data as cards on mobile
  */
-interface TableCardProps {
-  data: Record<string, unknown>[];
-  renderCard: (item: Record<string, unknown>, index: number) => ReactNode;
+interface TableCardProps<T> {
+  data: T[];
+  renderCard: (item: T, index: number) => ReactNode;
   className?: string;
+  emptyMessage?: ReactNode;
 }
 
-export const TableCard: React.FC<TableCardProps> = ({
+export function TableCard<T>({
   data,
   renderCard,
   className = "",
-}) => {
+  emptyMessage = <div className="p-4 text-center text-sm text-slate-500">Không có dữ liệu</div>,
+}: TableCardProps<T>) {
+  if (!data || data.length === 0) {
+    return <div className={className}>{emptyMessage}</div>;
+  }
+
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {data.map((item, index) => (
-        <div key={index} className="animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
+        <React.Fragment key={index}>
           {renderCard(item, index)}
-        </div>
+        </React.Fragment>
       ))}
     </div>
   );
-};
+}

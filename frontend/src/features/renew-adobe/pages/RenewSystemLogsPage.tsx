@@ -5,6 +5,8 @@ import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
+  InformationCircleIcon,
+  BugAntIcon,
 } from "@heroicons/react/24/outline";
 import {
   fetchRenewSystemLogs,

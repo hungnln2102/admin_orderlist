@@ -6,6 +6,8 @@ const { deleteOrderWithArchive } = require("../orderDeletionService");
 const { todayYMDInVietnam } = require("../../../../utils/normalizers");
 const logger = require("../../../../utils/logger");
 const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
+const eventBus = require("../../../../events/eventBus");
+const EVENTS = require("../../../../events/eventTypes");
 
 const { orderIdParam } = require("../../validators/orderValidator");
 
@@ -61,6 +63,16 @@ const attachDeleteOrderRoute = (router) => {
                     orderCode: normalized?.id_order || null,
                     status: currentStatus || null,
                 },
+            });
+
+            eventBus.emit(EVENTS.ORDER_DELETED, {
+                order,
+                normalized,
+                result,
+                orderId: id,
+                orderCode: normalized?.id_order || null,
+                status: currentStatus || null,
+                source: "orders.delete",
             });
 
             res.json(result);

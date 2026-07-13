@@ -65,8 +65,8 @@ export function RenewAdobeAccountActions({
       <button
         type="button"
         onClick={() => onEditAccount(account)}
-        title="S???a"
-        aria-label="S???a account"
+        title="Sửa"
+        aria-label="Sửa account"
         className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-400/35 hover:bg-amber-500/25"
       >
         <PencilSquareIcon className="h-4 w-4" />

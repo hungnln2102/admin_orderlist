@@ -84,19 +84,33 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       .finally(() => setShopBankAccountsLoading(false));
   }, [isOpen]);
 
+  const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
+    const raw = Number(p.totalImport ?? p.import_value ?? 0);
+    const paid = Number(p.paid ?? 0);
+    if (raw < 0) return Math.max(0, Math.abs(raw) - paid);
+    return Math.max(0, raw - paid);
+  };
+
   // useMemo phải được gọi trước conditional return
   // Còn nợ âm = NCC trả mình → QR dùng STK của tôi; số tiền = số dương.
-  const qrImageUrl = useMemo(() => {
+  const qrTransferAmount = useMemo(() => {
     if (!supply || !selectedPayment) return null;
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
-    const paid = Number(selectedPayment.paid ?? 0);
     const isNegative = raw < 0;
-    let amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
-    if (amount <= 0) return null;
-    
+    const dueAmount = amountDueForPayment(selectedPayment);
+    if (dueAmount <= 0) return null;
+
     if (!isNegative && supply.id) {
-      amount = encodeSupplierSignature(amount, supply.id);
+      return encodeSupplierSignature(dueAmount, supply.id);
     }
+
+    return dueAmount;
+  }, [supply, selectedPayment]);
+
+  const qrImageUrl = useMemo(() => {
+    if (!supply || !selectedPayment || qrTransferAmount == null) return null;
+    const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
+    const isNegative = raw < 0;
 
     if (isNegative) {
       return buildSepayQrUrl({
@@ -105,7 +119,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
           selectedShopBankAccount?.bankShortCode ||
           selectedShopBankAccount?.bankBin ||
           shopBank.bankCode,
-        amount,
+        amount: qrTransferAmount,
         accountName: selectedShopBankAccount?.accountHolder || shopBank.accountHolder,
       });
     }
@@ -113,17 +127,10 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     return buildSepayQrUrl({
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
-      amount,
+      amount: qrTransferAmount,
       accountName: supply.nameBank || supply.sourceName || "",
     });
-  }, [supply, selectedPayment, shopBank, selectedShopBankAccount]);
-
-  const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
-    const raw = Number(p.totalImport ?? p.import_value ?? 0);
-    const paid = Number(p.paid ?? 0);
-    if (raw < 0) return Math.max(0, Math.abs(raw) - paid);
-    return Math.max(0, raw - paid);
-  };
+  }, [supply, selectedPayment, qrTransferAmount, shopBank, selectedShopBankAccount]);
 
   const handleConfirmPayment = async (p: {
     id: number;
@@ -193,13 +200,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     banks.find((b) => (b.bin || "").trim() === (supply?.binBank || "").trim())?.name ||
     supply?.binBank ||
     "--";
-  const statCards = [
-    { label: "Tổng đơn", value: stats?.totalOrders ?? 0 },
-    { label: "Đã thanh toán", value: stats?.paidOrders ?? 0 },
-    { label: "Chưa thanh toán", value: stats?.unpaidOrders ?? 0 },
-    { label: "Đã hủy", value: stats?.canceledOrders ?? 0 },
-  ];
-
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-2" onClick={handleClose}>
@@ -245,6 +245,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   totalSupplierRefund={totalSupplierRefund}
                   confirmingId={confirmingId}
                   qrImageUrl={qrImageUrl}
+                  qrTransferAmount={qrTransferAmount}
                   shopBankAccounts={shopBankAccounts}
                   selectedShopBankAccount={selectedShopBankAccount}
                   shopBankAccountsLoading={shopBankAccountsLoading}

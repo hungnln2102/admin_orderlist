@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiGet } from "./api";
 
 export interface PromotionCodeDto {
   id: number;
@@ -37,14 +37,8 @@ function mapStatus(status: string | null | undefined): "active" | "inactive" | "
 }
 
 export async function fetchPromotionCodes(): Promise<PromotionCodeDto[]> {
-  const res = await apiFetch("/api/promotion-codes");
-  if (!res.ok) {
-    throw new Error("Không thể tải danh sách mã khuyến mãi");
-  }
-  const data: PromotionCodesResponse = await res.json().catch(() => ({}));
-  if (!data || !Array.isArray(data.items)) {
-    return [];
-  }
+  const data = await apiGet<PromotionCodesResponse>("/api/promotion-codes");
+  if (!data || !Array.isArray(data.items)) return [];
   return data.items;
 }
 

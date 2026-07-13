@@ -6,6 +6,7 @@ const { attachCrudRoutes } = require("./crudRoutes");
 const { attachRefundCreditRoutes } = require("./refundCreditRoutes");
 const { attachManualWebhookCompletionRoute } = require("./manualWebhookCompletionRoute");
 const { attachManualUsdtCompletionRoute } = require("./manualUsdtCompletionRoute");
+const { attachMockWebhookRoute } = require("./mockWebhookRoute");
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ attachRenewRoutes(router);
 attachRefundCreditRoutes(router);
 attachManualWebhookCompletionRoute(router);
 attachManualUsdtCompletionRoute(router);
+attachMockWebhookRoute(router);
 attachCalculatePriceRoute(router);
 attachCrudRoutes(router);
 

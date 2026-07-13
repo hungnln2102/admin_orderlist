@@ -23,7 +23,7 @@ const {
 } = require("../helpers/matchSupplierRefundReceipt");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../../services/telegramFinanceDeltaNotifier");
+} = require("../../../../domains/notifications/telegram").financeNotifier;
 const {
   creditSupplierRefundToDailyWallet,
 } = require("../../../wallet/repositories/dailyBalanceRepository");

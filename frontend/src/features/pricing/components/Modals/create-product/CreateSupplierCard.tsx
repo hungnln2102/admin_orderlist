@@ -7,10 +7,10 @@ import type {
 } from "../../../types";
 import {
   formatVndDisplay,
-  multiplyValue,
   parseRatioInput,
   roundToNearestThousand,
-} from "../../../utils";
+} from "../../../priceFormatters";
+import { multiplyValue } from "../../../priceCalculations";
 import { inputBase, labelBase } from "./shared";
 
 type CreateSupplierCardProps = {

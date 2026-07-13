@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import type React from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { ProductPricingRow, SupplyPriceState } from "../types";
-import { normalizeProductKey } from "../utils";
+import { normalizeProductKey } from "../priceLabels";
 import {
   mapSupplyPriceResponse,
   reconcileFetchedProductPrices,
@@ -36,15 +36,10 @@ export function useSupplyPriceMap({
       }));
 
       try {
-        const response = await apiFetch(
+        const payload = await apiGet<unknown>(
           API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(productName)
         );
-        if (!response.ok) {
-          throw new Error("Không thể tải giá nguồn. Vui lòng thử lại.");
-        }
-
-        const payload = await response.json();
-        const { items, highestPrice } = mapSupplyPriceResponse(payload);
+        const { items, highestPrice } = mapSupplyPriceResponse(payload);
 
         if (
           typeof highestPrice === "number" &&

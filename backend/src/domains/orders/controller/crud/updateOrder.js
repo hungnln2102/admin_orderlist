@@ -6,11 +6,13 @@ const {
     normalizeTextInput,
 } = require("../helpers");
 const { todayYMDInVietnam } = require("../../../../utils/normalizers");
-const { updateOrderWithFinance } = require("../orderUpdateService");
+const { updateOrderWithFinance } = require("../../use-cases/updateOrder");
 const logger = require("../../../../utils/logger");
 const { orderIdParam } = require("../../validators/orderValidator");
 const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
 const { ensureSupplierRecord } = require("../../../supplies/services/supplierLookupService");
+const eventBus = require("../../../../events/eventBus");
+const EVENTS = require("../../../../events/eventTypes");
 
 const AUDIT_FIELD_LABELS = {
     customer: "Khách hàng",
@@ -129,6 +131,13 @@ const attachUpdateOrderRoute = (router) => {
                     changedFields: Object.keys(req.body || {}),
                     changes: auditDiff.changes,
                 },
+            });
+
+            eventBus.emit(EVENTS.ORDER_UPDATED, {
+                order: updated,
+                auditDiff,
+                changedFields: Object.keys(req.body || {}),
+                source: "orders.update",
             });
 
             res.json(updated);

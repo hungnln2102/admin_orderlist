@@ -21,6 +21,7 @@ async function tryAutoSettleSupplierPaymentByOutbound({
   paidMonthKey,
   shopBankAccountId,
 }) {
+  return null; // Bỏ qua móc nối NCC
   const outboundAmount = Math.abs(transferAmountNormalized);
   const { supplierId, baseAmount } = decodeSupplierSignature(outboundAmount);
   

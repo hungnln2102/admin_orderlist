@@ -161,8 +161,7 @@ const updateOrderWithFinance = async ({
     }
 
     try {
-        await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
-        await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
+        // Bỏ qua updateDashboardMonthlySummaryOnStatusChange và syncMavnStoreProfitExpense để cô lập Orders
 
         const prevStatus = String(beforeOrder?.[COLS.ORDER.STATUS] ?? beforeOrder?.status ?? "").trim();
         const nextStatus = String(updatedOrder?.[COLS.ORDER.STATUS] ?? updatedOrder?.status ?? "").trim();

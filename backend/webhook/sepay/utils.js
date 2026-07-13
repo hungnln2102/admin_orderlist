@@ -268,55 +268,6 @@ const calcGiaBan = ({
 };
 
 /**
- * Lấy danh sách mã đơn từ payload webhook.
- * Nhiều mã đơn có thể phân cách bằng "-" (vd: MAV001-MAV002-MAV003).
- */
-const extractOrderCodes = (transaction) => {
-  const fields = [
-    transaction?.code,
-    transaction?.transaction_content,
-    transaction?.note,
-    transaction?.description,
-  ];
-  const codes = new Set();
-  for (const text of fields) {
-    if (!text) continue;
-    const str = String(text).trim();
-    // Tách theo "-" để lấy từng mã đơn
-    const parts = str.split("-").map((p) => p.trim()).filter(Boolean);
-    for (const part of parts) {
-      const matches = part.match(ORDER_CODE_REGEX_GLOBAL);
-      if (matches) {
-        matches.forEach((m) => {
-          const normalized = normalizeOrderCode(m);
-          if (normalized) codes.add(normalized);
-        });
-      } else {
-        const normalizedPart = normalizeOrderCode(part);
-        if (normalizedPart) codes.add(normalizedPart);
-      }
-    }
-    // Fallback: tìm tất cả MAVxxx trong cả chuỗi
-    const globalMatches = str.match(ORDER_CODE_REGEX_GLOBAL);
-    if (globalMatches) {
-      globalMatches.forEach((m) => {
-        const normalized = normalizeOrderCode(m);
-        if (normalized) codes.add(normalized);
-      });
-    }
-  }
-  return Array.from(codes);
-};
-
-const deriveOrderCode = (transaction) => {
-  const codes = extractOrderCodes(transaction);
-  if (codes.length > 0) return codes[0];
-  // Fallback: chỉ chấp nhận nếu có prefix MAV
-  const [fromSplit] = splitTransactionContent(transaction?.transaction_content);
-  return normalizeOrderCode(fromSplit);
-};
-
-/**
  * Fallback: khi không extract được mã đơn MAV từ nội dung chuyển khoản,
  * thử match theo số tiền + trạng thái (RENEWAL hoặc UNPAID).
  * Loại MAVN: nhập hàng không match / không xử lý qua Sepay webhook.
@@ -504,8 +455,6 @@ module.exports = {
   roundToThousands,
   formatCurrency,
   calcGiaBan,
-  extractOrderCodes,
-  deriveOrderCode,
   resolveOrderByPayment,
   fetchProductPricing,
   findSupplyId,

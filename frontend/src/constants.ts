@@ -24,6 +24,8 @@ export const API_ENDPOINTS = {
     `/api/orders/${encodeURIComponent(orderCode)}/renew`,
   ORDER_COMPLETE_MANUAL_WEBHOOK: (id: number) =>
     `/api/orders/${id}/complete-manual-webhook`,
+  ORDER_MOCK_SEPAY_WEBHOOK: (id: number) =>
+    `/api/orders/${id}/mock-sepay-webhook`,
   ORDER_COMPLETE_MANUAL_USDT: (id: number) =>
     `/api/orders/${id}/complete-manual-usdt`,
   ORDER_EXPRIED: "/api/orders/expired",

@@ -9,16 +9,12 @@ export type FixedColumn = {
   left: number;
 };
 
+import { PeriodColumn } from "../../../../shared/date/dateRanges";
+
 export type TaxViewMode = "day" | "month";
 export type TaxMetric = "revenue" | "profit" | "refund";
 
-export type PeriodColumn = {
-  key: string;
-  label: string;
-  year: number;
-  startKey: string;
-  endKey: string;
-};
+export type { PeriodColumn };
 
 export type TaxFormRow = {
   id: string;

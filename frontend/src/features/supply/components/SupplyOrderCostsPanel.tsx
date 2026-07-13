@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import {
   fetchSupplyOrderCosts,
   type SupplyOrderCostAggregates,
@@ -85,14 +85,10 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
     setExternalLoading(true);
     setExternalError(null);
     try {
-      const response = await apiFetch(
+      const payload = await apiGet<Record<string, unknown>>(
         "/api/store-profit-expenses?expense_type=external_import,mavn_import"
       );
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      const items = Array.isArray(payload?.items) ? payload.items : [];
+      const items = Array.isArray(payload?.items) ? payload.items : [];
       setExternalLogs(
         items.map((item) => ({
           id: Number(item.id || 0),

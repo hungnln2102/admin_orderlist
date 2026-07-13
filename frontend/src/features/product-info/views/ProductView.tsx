@@ -1,5 +1,5 @@
 import React from "react";
-import { ProductTable } from "../components/ProductTable";
+import { ProductTable } from "../components/product/ProductTable";
 import type { MergedProduct } from "../utils/productInfoHelpers";
 
 interface ProductViewProps {

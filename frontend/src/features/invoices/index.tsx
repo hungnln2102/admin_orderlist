@@ -14,6 +14,7 @@ import { StatsGrid } from "./components/StatsGrid";
 import { FiltersBar } from "./components/FiltersBar";
 import { CategoryToggle } from "./components/CategoryToggle";
 import { ReceiptsTable } from "./components/ReceiptsTable";
+import { OffFlowReceiptsPanel } from "./components/OffFlowReceiptsPanel";
 import { QrModal } from "./components/QrModal";
 import { ReceiptDetailModal } from "./components/ReceiptDetailModal";
 import { InvoicesPagination } from "./components/InvoicesPagination";
@@ -243,19 +244,32 @@ export default function Invoices() {
           }}
         />
 
-        <ReceiptsTable
-          receipts={pagedReceipts}
-          matchableOrders={matchableOrders}
-          matchingReceiptId={matchingReceiptId}
-          onMatchReceipt={handleMatchReceipt}
-          enableMatching={categoryFilter === "out-of-flow"}
-          enableOrderCodeEdit={categoryFilter === "receipt"}
-          expandedReceiptId={expandedReceiptId}
-          onToggle={toggleRowDetails}
-          onSelectReceipt={handleSelectReceipt}
-          showOrderCode={categoryFilter !== "out-of-flow"}
-          shopBank={shopBank}
-        />
+        {categoryFilter === "out-of-flow" ? (
+          <OffFlowReceiptsPanel
+            receipts={pagedReceipts}
+            matchableOrders={matchableOrders}
+            matchingReceiptId={matchingReceiptId}
+            onMatchReceipt={handleMatchReceipt}
+            expandedReceiptId={expandedReceiptId}
+            onToggle={toggleRowDetails}
+            onSelectReceipt={handleSelectReceipt}
+            shopBank={shopBank}
+          />
+        ) : (
+          <ReceiptsTable
+            receipts={pagedReceipts}
+            matchableOrders={matchableOrders}
+            matchingReceiptId={matchingReceiptId}
+            onMatchReceipt={handleMatchReceipt}
+            enableMatching={false}
+            enableOrderCodeEdit={true}
+            expandedReceiptId={expandedReceiptId}
+            onToggle={toggleRowDetails}
+            onSelectReceipt={handleSelectReceipt}
+            showOrderCode={true}
+            shopBank={shopBank}
+          />
+        )}
 
         <InvoicesPagination
           activePage={activePage}

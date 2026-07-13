@@ -8,7 +8,7 @@ const {
 const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
 const { runCheckForAccountId } = require("../../domains/renew-adobe/controller");
 const { runCheckAllAccountsFlow } = require("../../domains/renew-adobe/controller/autoAssign");
-const { notifyWarn } = require("../../utils/telegramErrorNotifier");
+const { notifyWarn } = require("../../domains/notifications/telegram").systemNotifier;
 const {
   startJobRun,
   setCounter,

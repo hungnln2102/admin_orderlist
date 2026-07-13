@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import { ProductPricingRow, StatusFilter } from "../types";
-import {
-  applyBasePriceToProduct,
-  mapProductPriceRow,
-  toTimestamp,
-} from "../utils";
+import { applyBasePriceToProduct } from "../priceCalculations";
+import { mapProductPriceRow } from "../productPriceMapper";
+import { toTimestamp } from "../supplyPriceUtils";
+
 
 const normalizeSearchText = (value: unknown): string => {
   if (value === null || value === undefined) return "";
@@ -78,15 +77,11 @@ export const useProductData = (): UseProductDataResult => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
-      if (!response.ok) {
-        throw new Error("Không thể tải dữ liệu sản phẩm.");
-      }
-      const payload = await response.json();
+      const payload = await apiGet<unknown>(API_ENDPOINTS.PRODUCT_PRICES);
       const rows: unknown[] = Array.isArray(payload)
         ? payload
-        : Array.isArray(payload?.items)
-        ? payload.items
+        : Array.isArray((payload as Record<string, unknown>)?.items)
+        ? (payload as Record<string, unknown>).items as unknown[]
         : [];
       const normalizedRows = rows.map((row, index) =>
         mapProductPriceRow(

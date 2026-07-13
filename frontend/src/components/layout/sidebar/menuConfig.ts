@@ -161,7 +161,7 @@ export const menuSections: MenuSection[] = [
         icon: ShieldCheckIcon,
       },
       {
-        name: "Log H\u1ec7 Th\u1ed1ng",
+        name: "Log Hệ Thống",
         href: "/renew-adobe-system-logs",
         icon: RectangleStackIcon,
       },

@@ -4,7 +4,8 @@ import type {
   ProductEditFormState,
   ProductPricingRow,
 } from "../../types";
-import { normalizeProductKey, parseRatioInput } from "../../utils";
+import { normalizeProductKey } from "../../priceLabels";
+import { parseRatioInput } from "../../priceFormatters";
 import { parseBasePriceInput, parseCurrencyInput } from "./parsers";
 import type {
   CreateProductValidationResult,

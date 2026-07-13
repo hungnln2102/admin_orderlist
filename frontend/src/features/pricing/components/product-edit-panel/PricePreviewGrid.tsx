@@ -1,6 +1,6 @@
 import React from "react";
 
-import { formatCurrencyValue } from "../../utils";
+import { formatCurrencyValue } from "../../priceFormatters";
 
 type PricePreviewGridProps = {
   highestSupplyPriceDisplay: string;

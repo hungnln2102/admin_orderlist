@@ -6,9 +6,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import type { ProductPricingRow } from "../types";
-import {
-  formatCurrencyValue,
-} from "../utils";
+import { formatCurrencyValue } from "../priceFormatters";
 import { buildProductRowViewModel } from "./productRowViewModel";
 import { ProductEditPanel } from "./ProductEditPanel";
 import { ProductExpandedDetails } from "./ProductExpandedDetails";

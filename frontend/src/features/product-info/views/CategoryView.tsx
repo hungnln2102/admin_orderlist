@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { CategoryTable } from "../components/CategoryTable";
+import { CategoryTable } from "../components/category/CategoryTable";
 import { CategoryRow } from "../types";
 
 interface CategoryViewProps {

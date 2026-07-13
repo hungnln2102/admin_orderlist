@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiFetch, apiPost, apiPut, apiDelete } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import {
   buildPaginationPages,
-  getWarehousePaginated,
-} from "./utils/pagination";
+  getPaginated as getWarehousePaginated,
+} from "@/shared/utils/pagination";
 import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
@@ -102,29 +102,15 @@ export default function Storage() {
     setError(null);
     try {
       if (editingId === "new") {
-        const res = await apiFetch(API_ENDPOINTS.WAREHOUSE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draft),
-        });
-        if (!res.ok) throw new Error(`Tạo mới thất bại (${res.status})`);
-        const created = await res.json();
-        setItems((prev) => [...prev, created]);
-        cancelEdit();
+        const res = await apiPost<WarehouseItem>(API_ENDPOINTS.WAREHOUSE, draft);
+        setItems((prev) => [...prev, res]);
+        cancelEdit();
       } else {
-        const res = await apiFetch(`${API_ENDPOINTS.WAREHOUSE}/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draft),
-        });
-        if (!res.ok) {
-          throw new Error(`Cập nhật thất bại (${res.status})`);
-        }
-        const updated = await res.json();
+        const updated = await apiPut<WarehouseItem>(`${API_ENDPOINTS.WAREHOUSE}/${id}`, draft);
         setItems((prev) =>
           prev.map((it) => (it.id === id ? { ...it, ...updated } : it))
         );
-        cancelEdit();
+        cancelEdit();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi khi cập nhật");
@@ -145,13 +131,8 @@ export default function Storage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_ENDPOINTS.WAREHOUSE}/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        throw new Error(`Xoá thất bại (${res.status})`);
-      }
-      setItems((prev) => prev.filter((it) => it.id !== id));
+      await apiDelete(`${API_ENDPOINTS.WAREHOUSE}/${id}`);
+      setItems((prev) => prev.filter((it) => it.id !== id));
       if (editingId === id) cancelEdit();
       if (expandedItemId === id) setExpandedItemId(null);
       setWarehouseIdPendingDelete(null);

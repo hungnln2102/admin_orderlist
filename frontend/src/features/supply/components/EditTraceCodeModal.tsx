@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { apiFetch } from "@/shared/api/client";
+import { apiPatch } from "@/shared/api/client";
 
 export type EditTraceCodeModalProps = {
   isOpen: boolean;
@@ -17,14 +17,8 @@ export type EditTraceCodeModalProps = {
   onSaved: () => void;
 };
 
-const readError = async (res: Response) => {
-  try {
-    const data = (await res.json()) as { error?: string };
-    return data?.error || `HTTP ${res.status}`;
-  } catch {
-    return `HTTP ${res.status}`;
-  }
-};
+
+
 
 const EditTraceCodeModal: React.FC<EditTraceCodeModalProps> = ({
   isOpen,
@@ -50,26 +44,18 @@ const EditTraceCodeModal: React.FC<EditTraceCodeModalProps> = ({
     setError(null);
     setLoading(true);
     try {
-      const res = await apiFetch(
+      // gửi `null` khi clear trace để backend xóa key trong expense_meta.
+      await apiPatch(
         `/api/store-profit-expenses/${expenseId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          // gửi `null` khi clear trace để backend xóa key trong expense_meta.
-          body: JSON.stringify({ trace_code: traceCode.trim() || null }),
-        }
+        { trace_code: traceCode.trim() || null }
       );
-      if (!res.ok) {
-        setError(await readError(res));
-        return;
-      }
       onSaved();
       onClose();
-    } catch {
-      setError("Không thể lưu mã trace. Vui lòng thử lại.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể lưu mã trace. Vui lòng thử lại.");
     } finally {
       setLoading(false);
-    }
+    }
   };
 
   if (!isOpen) return null;

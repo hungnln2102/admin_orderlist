@@ -12,6 +12,7 @@ const authRoutes = require("../domains/auth/routes");
 const systemRoutes = require("../domains/system/routes");
 const schedulerRoutes = require("../domains/scheduler/routes");
 const testTelegramRoutes = require("../domains/test-telegram/routes");
+const netflixPublicRoutes = require("../domains/netflix/publicRoutes");
 const renewAdobeRoutes = require("../domains/renew-adobe/routes");
 const { getRenewAdobeProxy } = require("../domains/renew-adobe/proxy");
 const renewAdobePublicRoutes = require("../domains/renew-adobe/publicRoutes");
@@ -67,6 +68,7 @@ const router = express.Router();
 
 router.use("/auth", authRoutes);
 router.use("/renew-adobe/public", renewAdobePublicRoutes);
+router.use("/netflix/public", netflixPublicRoutes);
 const enableTestTelegramInProd =
   process.env.ENABLE_TEST_TELEGRAM === "true" || process.env.ENABLE_TEST_TELEGRAM === "1";
 if (process.env.NODE_ENV !== "production" || enableTestTelegramInProd) {

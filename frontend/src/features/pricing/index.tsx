@@ -6,7 +6,7 @@ import ProductTable from "./components/ProductTable";
 import CreateProductModal from "./components/Modals/CreateProductModal";
 import DeleteProductModal from "./components/Modals/DeleteProductModal";
 import { usePricingData } from "./hooks/usePricingData";
-import { parseRatioInput } from "./utils";
+import { parseRatioInput } from "./priceFormatters";
 
 function Pricing() {
   const {

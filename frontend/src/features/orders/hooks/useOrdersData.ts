@@ -101,6 +101,7 @@ export function useOrdersData(
     handleCreateTopupOrderFromRefund: actions.handleCreateTopupOrderFromRefund,
     handleMarkPaid: actions.handleMarkPaid,
     handleRenewOrder: actions.handleRenewOrder,
+    handleMockWebhook: actions.handleMockWebhook,
     confirmDelete: actions.confirmDelete,
     renewingOrderCode: actions.renewingOrderCode,
     completingOrderCode: actions.completingOrderCode,

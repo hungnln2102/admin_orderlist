@@ -23,26 +23,10 @@ const {
     getUsdtVndRate,
     convertVndToUsd,
 } = require("../../../usdt-wallets/services/binanceExchangeRateService");
-const { sendOrderCreatedNotification } = require("../../../../services/telegramOrderNotification");
 const logger = require("../../../../utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
-const {
-    lockRefundCreditNoteById,
-    applyRefundCreditToTargetOrder,
-    normalizeMoney,
-} = require("../finance/refundCredits");
-const {
-    mergeSummaryUpdates,
-    monthKeyFromVietnamYmd,
-} = require("../finance/dashboardSummary");
-const { resolveDashboardImportDeltaOnPaid } = require("../finance/dashboardImportDeltaOnPaid");
-const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
-const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
-const {
-    ensureSupplierRecord,
-    findSupplierById,
-} = require("../../../supplies/services/supplierLookupService");
-const { ensureSupplierCost } = require("../../../supplies/services/supplierCostService");
+const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder, normalizeMoney } = require("../finance/refundCredits");
+const { ensureSupplierRecord, findSupplierById } = require("../../../supplies/services/supplierLookupService");
 const {
     ensureVariantRecord,
     resolveProductToVariantId,
@@ -295,62 +279,9 @@ const attachCreateOrderRoute = (router) => {
                 refundCreditApplication = applyRefundResult.application;
             }
 
-            if (isMavnCreate && newOrder.status === STATUS.PAID) {
-                await syncMavnStoreProfitExpense(trx, null, newOrder);
-            }
-
-            // Đơn bán được thanh toán hoàn toàn bằng credit (không phát sinh receipt ngân hàng):
-            // vẫn phải ghi nhận doanh thu/lợi nhuận tháng và gửi notify delta tài chính.
-            if (
-                !isGiftOrderCreate &&
-                !isMavnCreate &&
-                Number(appliedCreditAmount) > 0 &&
-                String(newOrder?.status || "").trim() === STATUS.PAID
-            ) {
-                const paidMonthKey = monthKeyFromVietnamYmd(todayYMDInVietnam());
-                if (paidMonthKey) {
-                    const grossRevenue = Math.max(
-                        0,
-                        Number(newOrder?.[grossSellingPriceCol] ?? rawPriceBeforeCredit) || 0
-                    );
-                    const orderCost = Math.max(0, Number(newOrder?.[costCol]) || 0);
-                    const orderProfit = grossRevenue - orderCost;
-                    const fetchSupplierNameBySupplyId = async (executor, supplyIdRaw) => {
-                        if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";
-                        const supRow = await findSupplierById(Number(supplyIdRaw), executor);
-                        return String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] || "").trim();
-                    };
-                    const importDelta = await resolveDashboardImportDeltaOnPaid(
-                        trx,
-                        newOrder,
-                        orderCost,
-                        fetchSupplierNameBySupplyId,
-                        paidMonthKey
-                    );
-                    await mergeSummaryUpdates(
-                        trx,
-                        paidMonthKey,
-                        {
-                            total_orders: 1,
-                            total_revenue: grossRevenue,
-                            total_profit: orderProfit,
-                            total_import: importDelta,
-                        },
-                        { context: "createOrder.paidByCredit" }
-                    );
-                }
-            }
-
+            // Bỏ qua đồng bộ MAVN và Dashboard để tối giản domain Orders
             await trx.commit();
 
-            const resolvedVariantId = newOrder?.[productIdCol];
-            const resolvedSupplyId = newOrder?.[supplyIdCol];
-            const orderCost = Number(newOrder?.cost ?? payload.cost ?? 0);
-            if (resolvedVariantId && resolvedSupplyId && orderCost > 0) {
-                ensureSupplierCost(resolvedVariantId, resolvedSupplyId, orderCost).catch((error) => {
-                    logger.error("[Order] Tạo supplier_cost thất bại", { error: error.message });
-                });
-            }
 
             const normalized = normalizeOrderRow(newOrder, todayYMDInVietnam());
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
@@ -404,26 +335,7 @@ const attachCreateOrderRoute = (router) => {
                 }
             }
 
-            writeUserEventLog(req, {
-                action: "Tạo đơn hàng",
-                entity: "Đơn hàng",
-                entityId: normalized.id_order || normalized.id || newOrder?.[idOrderCol],
-                message: `Tạo đơn hàng ${normalized.id_order || newOrder?.[idOrderCol] || ""} - khách: ${normalized.customer || normalized.contact || "không rõ"}`,
-                source: "orders.order_list",
-                metadata: {
-                    orderId: normalized.id || newOrder?.id || null,
-                    orderCode: normalized.id_order || newOrder?.[idOrderCol] || null,
-                    customer: normalized.customer || null,
-                    contact: normalized.contact || null,
-                    price: normalized.price ?? newOrder?.[priceCol] ?? null,
-                    status: normalized.status || null,
-                },
-            });
-
             res.status(201).json(normalized);
-            sendOrderCreatedNotification(normalized).catch((error) => {
-                logger.error("[Order][Telegram] Notify failed", { error: error.message, stack: error.stack });
-            });
         } catch (error) {
             await trx.rollback();
             logger.error("Create order failed", {

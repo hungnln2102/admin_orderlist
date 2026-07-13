@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import type { WarehouseItem } from "../types";
 
 type CatalogProduct = {
@@ -18,9 +18,7 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      const res = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
-      if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as CatalogProduct[];
+      const data = await apiGet<CatalogProduct[]>(API_ENDPOINTS.PRODUCT_PRICES);
       setProducts(Array.isArray(data) ? data : []);
     } catch {
       setProducts([]);

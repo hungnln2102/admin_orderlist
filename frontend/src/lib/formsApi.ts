@@ -1,3 +1,4 @@
+import { apiGet, apiPost, apiPut } from "./api";
 import { apiFetch } from "./api";
 
 export interface FormNameDto {
@@ -29,16 +30,8 @@ interface FormsResponse {
 const FORM_INFO_BASE = "/api/form-info";
 
 export async function fetchFormNames(): Promise<FormNameDto[]> {
-  const res = await apiFetch(`${FORM_INFO_BASE}/forms`);
-  if (!res.ok) {
-    throw new Error("Không thể tải danh sách form");
-  }
-  const data: FormsResponse = await res.json().catch(
-    () => ({} as FormsResponse)
-  );
-  if (!data || !Array.isArray(data.items)) {
-    return [];
-  }
+  const data = await apiGet<FormsResponse>(`${FORM_INFO_BASE}/forms`);
+  if (!data || !Array.isArray(data.items)) return [];
   return data.items;
 }
 
@@ -56,44 +49,19 @@ export interface CreateFormResponse {
   createdAt?: string | null;
 }
 
-export async function updateForm(
-  formId: number,
-  data: CreateFormData
-): Promise<CreateFormResponse> {
-  const res = await apiFetch(`${FORM_INFO_BASE}/forms/${formId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: data.name?.trim() ?? "",
-      description: (data.description ?? "").trim() || null,
-      inputIds: Array.isArray(data.inputIds) ? data.inputIds : [],
-    }),
+export const updateForm = (formId: number, data: CreateFormData): Promise<CreateFormResponse> =>
+  apiPut<CreateFormResponse>(`${FORM_INFO_BASE}/forms/${formId}`, {
+    name: data.name?.trim() ?? "",
+    description: (data.description ?? "").trim() || null,
+    inputIds: Array.isArray(data.inputIds) ? data.inputIds : [],
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => null);
-    const msg = errData?.error ?? "Không thể cập nhật form";
-    throw new Error(msg);
-  }
-  return res.json();
-}
 
-export async function createForm(data: CreateFormData): Promise<CreateFormResponse> {
-  const res = await apiFetch(`${FORM_INFO_BASE}/forms`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: data.name?.trim() ?? "",
-      description: (data.description ?? "").trim() || null,
-      inputIds: Array.isArray(data.inputIds) ? data.inputIds : [],
-    }),
+export const createForm = (data: CreateFormData): Promise<CreateFormResponse> =>
+  apiPost<CreateFormResponse>(`${FORM_INFO_BASE}/forms`, {
+    name: data.name?.trim() ?? "",
+    description: (data.description ?? "").trim() || null,
+    inputIds: Array.isArray(data.inputIds) ? data.inputIds : [],
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => null);
-    const msg = errData?.error ?? "Không thể tạo form";
-    throw new Error(msg);
-  }
-  return res.json();
-}
 
 interface InputsResponse {
   items?: InputDto[];
@@ -106,15 +74,14 @@ export interface InputDto {
   createdAt?: string | null;
 }
 
+export interface CreateInputData {
+  name: string;
+  type: string;
+}
+
 export async function fetchInputs(): Promise<InputDto[]> {
-  const res = await apiFetch(`${FORM_INFO_BASE}/inputs`);
-  if (!res.ok) {
-    throw new Error("Không thể tải danh sách input");
-  }
-  const data: InputsResponse = await res.json().catch(() => ({} as InputsResponse));
-  if (!data || !Array.isArray(data.items)) {
-    return [];
-  }
+  const data = await apiGet<InputsResponse>(`${FORM_INFO_BASE}/inputs`);
+  if (!data || !Array.isArray(data.items)) return [];
   // Knex/Postgres đôi khi trả id dạng string; cần số thống nhất (Set, checkbox, v.v.)
   return data.items.map((it) => ({
     ...it,
@@ -122,32 +89,16 @@ export async function fetchInputs(): Promise<InputDto[]> {
   }));
 }
 
-export interface CreateInputData {
-  name: string;
-  type: string;
-}
-
 export async function createInput(data: CreateInputData): Promise<InputDto> {
-  const res = await apiFetch(`${FORM_INFO_BASE}/inputs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: data.name?.trim() ?? "",
-      type: (data.type ?? "text").trim().toLowerCase(),
-    }),
+  const created = await apiPost<InputDto>(`${FORM_INFO_BASE}/inputs`, {
+    name: data.name?.trim() ?? "",
+    type: (data.type ?? "text").trim().toLowerCase(),
   });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => null);
-    const msg = errData?.error ?? "Không thể tạo input";
-    throw new Error(msg);
-  }
-  const created = (await res.json()) as InputDto;
   return { ...created, id: Number(created.id) };
 }
 
-export async function fetchFormDetail(
-  formId: number
-): Promise<FormDetailDto> {
+export async function fetchFormDetail(formId: number): Promise<FormDetailDto> {
+  // Giữ apiFetch cho case 404 đặc biệt
   const res = await apiFetch(`${FORM_INFO_BASE}/forms/${formId}`);
   if (!res.ok) {
     if (res.status === 404) {
@@ -182,4 +133,3 @@ export async function fetchFormDetail(
     inputs: safeInputs,
   };
 }
-

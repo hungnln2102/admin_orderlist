@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet, apiPatch } from "@/shared/api/client";
 import { Supply, SupplyStats } from "../types";
 import { showAppNotification } from "@/lib/notifications";
 
@@ -17,9 +17,7 @@ export const useSupplyList = () => {
   const fetchSupplies = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/supply-insights");
-      if (!res.ok) throw new Error("Lỗi tải dữ liệu");
-      const data = await res.json();
+      const data = await apiGet<Record<string, unknown>>("/api/supply-insights");
       const suppliesRaw = Array.isArray(data?.supplies)
         ? (data.supplies as Array<Record<string, unknown>>)
         : [];
@@ -60,10 +58,10 @@ export const useSupplyList = () => {
 
       setSupplies(items);
       setStats({
-        totalSuppliers: Number(data.stats?.totalSuppliers) || 0,
-        activeSuppliers: Number(data.stats?.activeSuppliers) || items.filter((i) => i.isActive).length,
-        monthlyOrders: Number(data.stats?.monthlyOrders) || 0,
-        totalImportValue: Number(data.stats?.totalImportValue) || 0,
+        totalSuppliers: Number(data.stats && typeof data.stats === "object" ? (data.stats as Record<string, unknown>).totalSuppliers : 0) || 0,
+        activeSuppliers: Number(data.stats && typeof data.stats === "object" ? (data.stats as Record<string, unknown>).activeSuppliers : 0) || items.filter((i) => i.isActive).length,
+        monthlyOrders: Number(data.stats && typeof data.stats === "object" ? (data.stats as Record<string, unknown>).monthlyOrders : 0) || 0,
+        totalImportValue: Number(data.stats && typeof data.stats === "object" ? (data.stats as Record<string, unknown>).totalImportValue : 0) || 0,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi không xác định");
@@ -77,15 +75,11 @@ export const useSupplyList = () => {
       prev.map((s) => (s.id === id ? { ...s, isActive: !currentStatus, status: !currentStatus ? "active" : "inactive" } : s))
     );
     try {
-      await apiFetch(`/api/supplies/${id}/active`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isActive: !currentStatus,
-          is_active: !currentStatus,
-          active: !currentStatus,
-          active_supply: !currentStatus,
-        }),
+      await apiPatch(`/api/supplies/${id}/active`, {
+        isActive: !currentStatus,
+        is_active: !currentStatus,
+        active: !currentStatus,
+        active_supply: !currentStatus,
       });
       await fetchSupplies();
     } catch {

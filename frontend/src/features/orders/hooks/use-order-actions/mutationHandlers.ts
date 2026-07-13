@@ -7,6 +7,7 @@ import {
 import { apiFetch } from "@/shared/api/client";
 import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
+import { buildEditOrderPayload } from "../../utils/editOrderMapper";
 import { parseErrorResponse } from "../../utils/ordersHelpers";
 import type { EditableOrder } from "../../types";
 import type { Dispatch, SetStateAction } from "react";
@@ -20,19 +21,7 @@ export const buildSaveEditHandler =
   ({ closeEditModal, fetchOrders }: BuildSaveEditHandlerArgs) =>
   async (updatedOrder: EditableOrder) => {
     closeEditModal();
-    const dbFields: Partial<Order> = {
-      [ORDER_FIELDS.ID_ORDER]: updatedOrder.id_order,
-      [ORDER_FIELDS.ID_PRODUCT]: updatedOrder.id_product,
-      [ORDER_FIELDS.INFORMATION_ORDER]: updatedOrder.information_order,
-      [ORDER_FIELDS.CUSTOMER]: updatedOrder.customer,
-      [ORDER_FIELDS.CONTACT]: updatedOrder.contact,
-      [ORDER_FIELDS.SLOT]: updatedOrder.slot,
-      [ORDER_FIELDS.SUPPLY]: updatedOrder.supply,
-      [ORDER_FIELDS.COST]: Number(updatedOrder.cost ?? 0) || 0,
-      [ORDER_FIELDS.PRICE]: Number(updatedOrder.price ?? 0) || 0,
-      [ORDER_FIELDS.NOTE]: updatedOrder.note,
-      [ORDER_FIELDS.STATUS]: updatedOrder.status,
-    };
+    const dbFields = buildEditOrderPayload(updatedOrder);
 
     try {
       const response = await apiFetch(API_ENDPOINTS.ORDER_BY_ID(Number(updatedOrder.id)), {

@@ -167,4 +167,3 @@ export function EditTrackingOrderModal({
   );
 }
 
-export default EditTrackingOrderModal;

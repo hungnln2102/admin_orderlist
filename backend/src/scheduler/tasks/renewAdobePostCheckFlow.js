@@ -17,7 +17,7 @@ const {
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
 } = require("../../services/renew-adobe/orderUserTrackingService");
-const { notifyWarn } = require("../../utils/telegramErrorNotifier");
+const { notifyWarn } = require("../../domains/notifications/telegram").systemNotifier;
 const {
   startJobRun,
   setCounter,

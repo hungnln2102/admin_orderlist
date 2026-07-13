@@ -36,7 +36,7 @@ export const DashboardDateRangePopover: React.FC<DashboardDateRangePopoverProps>
     className="fixed z-[10000] w-[min(calc(100vw-1.5rem),20rem)] max-h-[min(90vh,480px)] overflow-y-auto rounded-[20px] border border-white/10 bg-gradient-to-b from-slate-900/98 via-slate-950/98 to-slate-950 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.88),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl [color-scheme:dark]"
     style={{ top, left }}
     role="dialog"
-    aria-label="Ch???n kho???ng ng??y"
+    aria-label="Chọn khoảng ngày"
   >
     <div className="relative border-b border-white/[0.07] bg-gradient-to-r from-indigo-950/50 via-slate-900/40 to-slate-950/20 px-4 py-3">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(99,102,241,0.12),transparent_55%)]" />

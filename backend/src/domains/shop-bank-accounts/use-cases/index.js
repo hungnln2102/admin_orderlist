@@ -170,6 +170,10 @@ const setDefaultShopBankAccountItem = async (id) => {
   });
 };
 
+const isForeignKeyViolation = (error) =>
+  error?.code === "23503" ||
+  /foreign key constraint/i.test(String(error?.message || ""));
+
 const deleteShopBankAccountItem = async (id) => {
   ensureDefinition();
   const normalizedId = validateDeletePayload(id);
@@ -178,7 +182,17 @@ const deleteShopBankAccountItem = async (id) => {
     throw createHttpError(404, "Không tìm thấy tài khoản.");
   }
 
-  await deleteShopBankAccount(normalizedId);
+  try {
+    await deleteShopBankAccount(normalizedId);
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      throw createHttpError(
+        409,
+        "Không thể xóa STK đã phát sinh giao dịch/sổ cái. Hãy tắt tài khoản thay vì xóa để giữ lịch sử đối soát."
+      );
+    }
+    throw error;
+  }
 
   if (current.isDefault) {
     const remaining = await listShopBankAccounts();

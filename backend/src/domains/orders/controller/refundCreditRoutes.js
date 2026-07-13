@@ -26,6 +26,11 @@ const {
     debitShopBankRefundCashout,
 } = require("../../shop-bank-accounts/services/shopBankLedgerService");
 const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+const {
+    notifyFinanceMonthlyDelta,
+} = require("../../../services/telegramFinanceDeltaNotifier");
+const eventBus = require("../../../events/eventBus");
+const EVENTS = require("../../../events/eventTypes");
 
 const detectPreviewPrefix = (orderCodeRaw) => {
     const normalized = String(orderCodeRaw || "").trim().toUpperCase();
@@ -295,6 +300,14 @@ const attachRefundCreditRoutes = (router) => {
                         creditId: id,
                         reason: ledgerResult?.reason || "unknown",
                     });
+                } else {
+                    const cashoutMonthKey = new Date().toISOString().slice(0, 7);
+                    await notifyFinanceMonthlyDelta({
+                        monthKey: cashoutMonthKey,
+                        bankBalanceDelta: -cashoutAmount,
+                        context: `orders.refundCreditCashout credit=${creditCode || `#${id}`}`,
+                        executor: trx,
+                    });
                 }
 
                 const offFlowResult = await applyOffFlowCreditCashout(trx, current, cashoutAmount);
@@ -340,6 +353,19 @@ const attachRefundCreditRoutes = (router) => {
                     shopBankAccountId: hasShopBankAccountId ? shopBankAccountId : null,
                 },
             });
+
+            eventBus.emit(EVENTS.REFUND_CREDIT_UPDATED, {
+                creditId: id,
+                creditCode: current?.[RCN.CREDIT_CODE] || null,
+                action,
+                before: current,
+                after: updated,
+                availableAmount,
+                cashoutAmount,
+                shopBankAccountId: hasShopBankAccountId ? shopBankAccountId : null,
+                source: "orders.refundCreditAction",
+            });
+
             return res.json({
                 success: true,
                 item: {

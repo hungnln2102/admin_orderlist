@@ -1,3 +1,4 @@
+import { apiPatch } from "./api";
 import { apiFetch } from "./api";
 import { normalizeErrorMessage } from "./textUtils";
 
@@ -17,31 +18,16 @@ export type ProductPriceUpdatePayload = {
   variantImageUrl?: string | null;
 };
 
-export const updateProductPrice = async (
+export const updateProductPrice = (
   productId: number,
   payload: ProductPriceUpdatePayload
-): Promise<Record<string, unknown>> => {
-  const response = await apiFetch(`/api/product-prices/${productId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload || {}),
-  });
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(
-      normalizeErrorMessage(message, {
-        fallback: "Cannot update product categories.",
-      })
-    );
-  }
-  return response
-    .json()
-    .catch(() => ({} as Record<string, unknown>));
-};
+): Promise<Record<string, unknown>> =>
+  apiPatch<Record<string, unknown>>(`/api/product-prices/${productId}`, payload || {});
 
 export const deleteProductPrice = async (
   productId: number
 ): Promise<ProductDeleteResponse> => {
+  // Giữ apiFetch vì cần đọc response.text() cho normalizeErrorMessage
   const response = await apiFetch(`/api/product-prices/${productId}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },

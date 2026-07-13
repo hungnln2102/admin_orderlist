@@ -5,7 +5,8 @@ import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 
 import type { ProductEditFormState, ProductPricingRow } from "../../types";
-import { formatVndInput, mapProductPriceRow } from "../../utils";
+import { formatVndInput } from "../../priceFormatters";
+import { mapProductPriceRow } from "../../productPriceMapper";
 import {
   buildProductEditForm,
   parseJsonResponseText,

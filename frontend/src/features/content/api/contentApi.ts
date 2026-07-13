@@ -1,47 +1,19 @@
-import { apiFetch } from "@/shared/api/client";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/shared/api/client";
 import type { Article, ArticleCategory, Banner, BannerPayload } from "../types";
-
-const json = (res: Response) => res.json();
-
-const throwIfErr = async (res: Response) => {
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
-  }
-};
 
 // ── Article Categories ──────────────────────────────────────
 
-export async function fetchCategories(): Promise<ArticleCategory[]> {
-  const res = await apiFetch("/api/content/categories");
-  await throwIfErr(res);
-  return json(res);
-}
+export const fetchCategories = (): Promise<ArticleCategory[]> =>
+  apiGet<ArticleCategory[]>("/api/content/categories");
 
-export async function createCategory(data: { name: string; slug?: string; description?: string }): Promise<ArticleCategory> {
-  const res = await apiFetch("/api/content/categories", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const createCategory = (data: { name: string; slug?: string; description?: string }): Promise<ArticleCategory> =>
+  apiPost<ArticleCategory>("/api/content/categories", data);
 
-export async function updateCategory(id: number | string, data: { name: string; slug?: string; description?: string }): Promise<ArticleCategory> {
-  const res = await apiFetch(`/api/content/categories/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const updateCategory = (id: number | string, data: { name: string; slug?: string; description?: string }): Promise<ArticleCategory> =>
+  apiPatch<ArticleCategory>(`/api/content/categories/${id}`, data);
 
-export async function deleteCategory(id: number | string): Promise<void> {
-  const res = await apiFetch(`/api/content/categories/${id}`, { method: "DELETE" });
-  await throwIfErr(res);
-}
+export const deleteCategory = (id: number | string): Promise<void> =>
+  apiDelete(`/api/content/categories/${id}`);
 
 // ── Articles ────────────────────────────────────────────────
 
@@ -66,16 +38,11 @@ export async function fetchArticles(params?: {
   if (params?.page) qs.set("page", String(params.page));
   if (params?.limit) qs.set("limit", String(params.limit));
   const q = qs.toString();
-  const res = await apiFetch(`/api/content/articles${q ? `?${q}` : ""}`);
-  await throwIfErr(res);
-  return json(res);
+  return apiGet<ArticlesListResponse>(`/api/content/articles${q ? `?${q}` : ""}`);
 }
 
-export async function fetchArticle(id: number | string): Promise<Article> {
-  const res = await apiFetch(`/api/content/articles/${id}`);
-  await throwIfErr(res);
-  return json(res);
-}
+export const fetchArticle = (id: number | string): Promise<Article> =>
+  apiGet<Article>(`/api/content/articles/${id}`);
 
 export type ArticleSavePayload = {
   title: string;
@@ -87,79 +54,31 @@ export type ArticleSavePayload = {
   status?: "draft" | "published";
 };
 
-export async function createArticle(data: ArticleSavePayload): Promise<Article> {
-  const res = await apiFetch("/api/content/articles", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const createArticle = (data: ArticleSavePayload): Promise<Article> =>
+  apiPost<Article>("/api/content/articles", data);
 
-export async function updateArticle(id: number | string, data: ArticleSavePayload): Promise<Article> {
-  const res = await apiFetch(`/api/content/articles/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const updateArticle = (id: number | string, data: ArticleSavePayload): Promise<Article> =>
+  apiPatch<Article>(`/api/content/articles/${id}`, data);
 
-export async function deleteArticle(id: number | string): Promise<void> {
-  const res = await apiFetch(`/api/content/articles/${id}`, { method: "DELETE" });
-  await throwIfErr(res);
-}
+export const deleteArticle = (id: number | string): Promise<void> =>
+  apiDelete(`/api/content/articles/${id}`);
 
 // ── Banners ─────────────────────────────────────────────────
 
-export async function fetchBanners(): Promise<Banner[]> {
-  const res = await apiFetch("/api/content/banners");
-  await throwIfErr(res);
-  return json(res);
-}
+export const fetchBanners = (): Promise<Banner[]> =>
+  apiGet<Banner[]>("/api/content/banners");
 
-export async function createBanner(data: BannerPayload): Promise<Banner> {
-  const res = await apiFetch("/api/content/banners", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const createBanner = (data: BannerPayload): Promise<Banner> =>
+  apiPost<Banner>("/api/content/banners", data);
 
-export async function updateBanner(
-  id: number | string,
-  data: Partial<BannerPayload>
-): Promise<Banner> {
-  const res = await apiFetch(`/api/content/banners/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const updateBanner = (id: number | string, data: Partial<BannerPayload>): Promise<Banner> =>
+  apiPatch<Banner>(`/api/content/banners/${id}`, data);
 
-export async function toggleBanner(id: number | string): Promise<Banner> {
-  const res = await apiFetch(`/api/content/banners/${id}/toggle`, { method: "PATCH" });
-  await throwIfErr(res);
-  return json(res);
-}
+export const toggleBanner = (id: number | string): Promise<Banner> =>
+  apiPatch<Banner>(`/api/content/banners/${id}/toggle`);
 
-export async function reorderBanners(ids: number[]): Promise<Banner[]> {
-  const res = await apiFetch("/api/content/banners/reorder", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ids }),
-  });
-  await throwIfErr(res);
-  return json(res);
-}
+export const reorderBanners = (ids: number[]): Promise<Banner[]> =>
+  apiPost<Banner[]>("/api/content/banners/reorder", { ids });
 
-export async function deleteBanner(id: number | string): Promise<void> {
-  const res = await apiFetch(`/api/content/banners/${id}`, { method: "DELETE" });
-  await throwIfErr(res);
-}
+export const deleteBanner = (id: number | string): Promise<void> =>
+  apiDelete(`/api/content/banners/${id}`);

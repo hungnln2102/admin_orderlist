@@ -1,0 +1,206 @@
+/**
+ * Build nội dung tin nhắn Telegram: đơn tạo mới, đơn cần gia hạn (4 ngày), đơn hết hạn (0 ngày).
+ */
+
+const {
+  toSafeString,
+  escapeHtml,
+  formatDateDMY,
+  formatCurrency,
+  toInlineCode,
+} = require("./formatters");
+const normalizeBankInfo = (bankInfo = {}) => ({
+  accountNumber: String(bankInfo.accountNumber || "").trim(),
+  accountHolder: String(bankInfo.accountHolder || "").trim(),
+  bankCode: String(bankInfo.bankShortCode || bankInfo.bankCode || "").trim(),
+});
+
+function extractOrderData(order) {
+  if (!order) return {};
+  return {
+    orderCode: toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim(),
+    productName: toSafeString(order.id_product || order.idProduct).trim(),
+    info: toSafeString(order.information_order || order.informationOrder).trim(),
+    slot: toSafeString(order.slot).trim(),
+    customer: toSafeString(order.customer || order.customer_name).trim(),
+    supply: toSafeString(order.supply).trim(),
+    contact: toSafeString(order.contact || order.customer_link).trim(),
+    registerDate: toSafeString(order.registration_date_display || order.registration_date_str).trim() || formatDateDMY(order.order_date),
+    expiryDate: toSafeString(order.expiry_date_display || order.expiry_date_str).trim() || formatDateDMY(order.expiry_date),
+    days: Number(order.days || order.total_days || 0) || 0,
+    daysLeft: Number(order.days_left) || 4,
+    cost: Number(order.cost || 0) || 0,
+    price: Number(order.price || 0) || 0,
+  };
+}
+
+function buildOrderCreatedMessage(order, bankInfo) {
+  const bank = normalizeBankInfo(bankInfo);
+  if (!order) return "";
+  const { orderCode, productName, info, slot, customer, registerDate, expiryDate, days, price } = extractOrderData(order);
+  const priceValue = `${formatCurrency(price)} đ`;
+
+  const escOrder = orderCode ? escapeHtml(orderCode) : "...";
+  const escProduct = productName ? escapeHtml(productName) : "N/A";
+  const escInfo = info ? escapeHtml(info) : "N/A";
+  const escSlot = slot ? escapeHtml(slot) : "";
+  const escCustomer = customer ? escapeHtml(customer) : "N/A";
+  const escRegister = registerDate ? escapeHtml(registerDate) : "";
+  const escExpiry = expiryDate ? escapeHtml(expiryDate) : "";
+  const escDays = days > 0 ? escapeHtml(`${days} ngày`) : "";
+  const escPrice = escapeHtml(priceValue);
+  const escStk = bank.accountNumber ? escapeHtml(bank.accountNumber) : "";
+
+  const separator1 = "━━━━━━ 📦 ━━━━━━";
+  const separator2 = "━━━━━━ 👤 ━━━━━━";
+  const separator3 = "━━━━━━ 💳 ━━━━━━";
+
+  const lines = [
+    `✅ Đơn hàng <code>${escOrder}</code> đã được tạo thành công!`,
+    "",
+    separator1,
+    "🔔 <b>THÔNG TIN SẢN PHẨM</b>",
+    `📦 Tên Sản Phẩm: <b>${escProduct}</b>`,
+    `📋 Thông Tin Đơn Hàng: <code>${escInfo}</code>`,
+    escSlot ? `📌 Slot: <code>${escSlot}</code>` : null,
+    escRegister ? `📅 Ngày Bắt đầu: ${escRegister}` : null,
+    escDays ? `⏳ Thời hạn: ${escDays}` : null,
+    escExpiry ? `📅 Ngày Hết hạn: ${escExpiry}` : null,
+    `💰 Giá bán: <b>${escPrice}</b>`,
+    "",
+    separator2,
+    "🔶 <b>THÔNG TIN KHÁCH HÀNG</b>",
+    `👤 Tên Khách Hàng: <code>${escCustomer}</code>`,
+    "",
+    separator3,
+    "💳 <b>HƯỚNG DẪN THANH TOÁN</b>",
+    escStk ? `🏦 STK: <code>${escStk}</code>` : null,
+    "ℹ️ Chuyển khoản <b>đúng số tiền</b> hiển thị trên QR (không cần ghi nội dung).",
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
+/** MAVN import order: text only (no VietQR / no shop payment lines). */
+function buildImportOrderCreatedMessage(order) {
+  if (!order) return "";
+  const { orderCode, productName, info, slot, customer, supply, registerDate, expiryDate, days, cost, price } = extractOrderData(order);
+  const escOrder = orderCode ? escapeHtml(orderCode) : "...";
+  const escProduct = productName ? escapeHtml(productName) : "N/A";
+  const escInfo = info ? escapeHtml(info) : "N/A";
+  const escSlot = slot ? escapeHtml(slot) : "";
+  const escCustomer = customer ? escapeHtml(customer) : "N/A";
+  const escSupply = supply ? escapeHtml(supply) : "";
+  const escRegister = registerDate ? escapeHtml(registerDate) : "";
+  const escExpiry = expiryDate ? escapeHtml(expiryDate) : "";
+  const escDays = days > 0 ? escapeHtml(String(days) + " ng\u00e0y") : "";
+  const escCost = escapeHtml(formatCurrency(cost) + " \u0111");
+  const escPrice = escapeHtml(formatCurrency(price) + " \u0111");
+
+  const sep = "\u2501\u2501\u2501\u2501\u2501\u2501";
+  const separator1 = sep + " \ud83d\udce6 " + sep;
+  const separator2 = sep + " \ud83d\udc64 " + sep;
+
+  const lines = [
+    "\ud83d\uded2 <b>\u0110\u01a1n nh\u1eadp h\xe0ng</b> <code>" +
+      escOrder +
+      "</code> \u0111\xe3 \u0111\u01b0\u1ee3c t\u1ea1o.",
+    "",
+    separator1,
+    "\ud83d\udd14 <b>TH\xd4NG TIN S\u1ea2N PH\u1ea8M</b>",
+    "\ud83d\udce6 T\xean s\u1ea3n ph\u1ea9m: <b>" + escProduct + "</b>",
+    escSupply ? "\ud83c\udfe2 NCC: <b>" + escSupply + "</b>" : null,
+    "\ud83d\udccb Th\xf4ng tin \u0111\u01a1n h\xe0ng: <code>" + escInfo + "</code>",
+    escSlot ? "\ud83d\udccc Slot: <code>" + escSlot + "</code>" : null,
+    escRegister
+      ? "\ud83d\udcc5 Ng\xe0y b\u1eaft \u0111\u1ea7u: " + escRegister
+      : null,
+    escDays ? "\u23f3 Th\u1eddi h\u1ea1n: " + escDays : null,
+    escExpiry ? "\ud83d\udcc5 Ng\xe0y h\u1ebft h\u1ea1n: " + escExpiry : null,
+    cost > 0
+      ? "\ud83d\udcb0 Gi\xe1 nh\u1eadp (cost): <b>" + escCost + "</b>"
+      : null,
+    "\ud83d\udcb0 Gi\xe1 b\xe1n: <b>" + escPrice + "</b>",
+    "",
+    separator2,
+    "\ud83d\udd38 <b>TH\xd4NG TIN KH\xc1CH H\xc0NG</b>",
+    "\ud83d\udc64 T\xean kh\xe1ch h\xe0ng: <code>" + escCustomer + "</code>",
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
+function buildCopyKeyboard(_payload) {
+  // Telegram inline keyboard tạm bỏ — giữ chữ ký để các caller không phải đổi.
+  return null;
+}
+
+/**
+ * Build message thông báo đơn cần gia hạn (còn 4 ngày). Plain text.
+ */
+function buildDueOrderMessage(order, index, total, bankInfo) {
+  const bank = normalizeBankInfo(bankInfo);
+  if (!order) return "";
+  const { orderCode, productName, info, slot, customer, contact, registerDate, expiryDate, days, daysLeft, price } = extractOrderData(order);
+  const priceDisplay =
+    price > 0 ? `${formatCurrency(price)} VND` : "Chưa Xác Định";
+
+  const lines = [
+    `📦 Đơn hàng đến hạn (${index}/${total})`,
+    `🛒 Sản phẩm: ${productName}`,
+    `🆔 Mã đơn: ${orderCode || "..."}`,
+    `⏳ Còn lại: ${daysLeft} ngày`,
+    `——— 🧾 THÔNG TIN SẢN PHẨM ———`,
+    info ? `📝 Mô tả: ${info}` : null,
+    slot ? `📌 Slot: ${slot}` : null,
+    registerDate ? `📅 Ngày đăng ký: ${registerDate}` : null,
+    days > 0 ? `⏱️ Thời hạn: ${days} ngày` : null,
+    expiryDate ? `📆 Ngày hết hạn: ${expiryDate}` : null,
+    `💰 Giá bán: ${priceDisplay}`,
+    `——— 🤝 THÔNG TIN KHÁCH HÀNG ———`,
+    `👤 Tên: ${customer}`,
+    contact ? `📞 Liên hệ: ${contact}` : null,
+    `——— ℹ️ THÔNG TIN THANH TOÁN ———`,
+    bank.bankCode ? `🏦 Ngân hàng: ${bank.bankCode}` : null,
+    bank.accountNumber ? `🏧 STK: ${bank.accountNumber}` : null,
+    bank.accountHolder ? `👤 Tên: ${bank.accountHolder}` : null,
+    `ℹ️ Chuyển khoản đúng số tiền trên QR (không cần ghi nội dung chuyển khoản).`,
+    ``,
+    `🙏 Trân trọng cảm ơn quý khách!`,
+  ].filter((line) => line !== null);
+
+  return lines.join("\n");
+}
+
+/**
+ * Build message thông báo đơn hết hạn ngắn gọn. HTML.
+ */
+function buildExpiredOrderMessage(order, index, total) {
+  if (!order) return "";
+  const { orderCode, productName, info, slot } = extractOrderData(order);
+
+  const escProduct = productName ? escapeHtml(productName) : "N/A";
+  const escInfo = info ? escapeHtml(info) : "N/A";
+  const escSlot = slot ? escapeHtml(slot) : "N/A";
+  const orderCodeDisplay = toInlineCode(orderCode) || "...";
+
+  const lines = [
+    `📦 <b>Đơn hàng hết hạn (${index}/${total})</b>`,
+    `Sản phẩm: <b>${escProduct}</b>`,
+    `🆔 Mã đơn: ${orderCodeDisplay}`,
+    "",
+    `— <b>THÔNG TIN SẢN PHẨM</b> —`,
+    `📝 Mô tả: ${escInfo}`,
+    `📌 Slot: ${escSlot}`,
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
+module.exports = {
+  buildOrderCreatedMessage,
+  buildImportOrderCreatedMessage,
+  buildCopyKeyboard,
+  buildDueOrderMessage,
+  buildExpiredOrderMessage,
+};

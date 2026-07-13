@@ -10,7 +10,11 @@ import type {
 } from "./productDescTypes";
 
 export { auditProductSeo } from "./productDescSeoApi";
-export { deleteProductImage, fetchProductImages, uploadProductImage } from "./productDescImageApi";
+import { fetchImages, uploadImage, deleteImage } from "@/shared/api/coreImageApi";
+
+export const uploadProductImage = (file: File) => uploadImage(file, "/api/product-descriptions/upload-image");
+export const fetchProductImages = () => fetchImages("/api/product-descriptions/images");
+export const deleteProductImage = (fileName: string) => deleteImage("/api/product-descriptions/images", fileName);
 
 export type {
   CreateProductDescriptionPayload,
@@ -128,7 +132,7 @@ export const fetchProductDescriptions = async (
     const message = await response.text().catch(() => "");
     throw new Error(
       normalizeErrorMessage(message, {
-        fallback: "Kh?ng th? t?i th?ng tin s?n ph?m.",
+        fallback: "Không thể tải thông tin sản phẩm.",
       })
     );
   }

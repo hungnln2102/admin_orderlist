@@ -1,5 +1,6 @@
 const logger = require("../../utils/logger");
-const { sendFourDaysRemainingNotification } = require("../../services/telegramOrderNotification");
+// Removed direct telegram require
+
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { fetchVariantDisplayNames } = require("../variantDisplayNames");
@@ -148,9 +149,8 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
           }
           if (pending.length > 0) {
             try {
-              await sendFourDaysRemainingNotification(
-                pending.map((p) => p.order)
-              );
+              const { eventBus, EVENTS } = require("../../../events");
+              eventBus.emit(EVENTS.DAILY_FOUR_DAYS_DUE, pending.map((p) => p.order));
             } catch (sendErr) {
               for (const p of pending) {
                 if (p.perOrderKey) {

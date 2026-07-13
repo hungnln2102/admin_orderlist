@@ -16,8 +16,8 @@ import {
   formatDateLabel,
   formatPromoPercent,
   formatRateDescription,
-  hasValidPromoRatio,
-} from "../utils";
+} from "../priceFormatters";
+import { hasValidPromoRatio } from "../priceCalculations";
 
 interface PriceCardProps {
   item: ProductPricingRow;

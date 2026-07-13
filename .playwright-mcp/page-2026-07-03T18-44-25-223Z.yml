@@ -1,0 +1,14 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e8]: Codebase Memory
+      - navigation [ref=e9]:
+        - button "Graph" [ref=e10]
+        - button "Projects" [ref=e11]
+        - button "Control" [ref=e12]
+  - main [ref=e13]:
+    - generic [ref=e18]:
+      - heading "Indexed Projects" [level=2] [ref=e19]
+      - generic [ref=e20]:
+        - button "+ New Index" [ref=e21]
+        - button "..." [disabled] [ref=e22]

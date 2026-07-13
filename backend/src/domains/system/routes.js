@@ -1,5 +1,5 @@
 const express = require("express");
-const { notifyError } = require("../../utils/telegramErrorNotifier");
+const { notifyError } = require("../../domains/notifications/telegram").systemNotifier;
 const { runFourDaysNotificationNow } = require("../scheduler/controller");
 const { requireCronInvokeSecret } = require("../../middleware/secureCronInvoke");
 

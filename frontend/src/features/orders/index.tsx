@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { type OrderDatasetKey } from "@/constants";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
-import ViewOrderModal from "@/components/modals/ViewOrderModal/ViewOrderModal";
 import { CreatedBatchOrderModal } from "./components/CreatedBatchOrderModal";
-import EditOrderModal from "@/components/modals/EditOrderModal/EditOrderModal";
-import CreateOrderModal from "@/components/modals/CreateOrderModal/CreateOrderModal";
+import { CreateOrderModal, EditOrderModal, ViewOrderModal } from "./modals";
 import { useOrdersData, type EditableOrder } from "./hooks/useOrdersData";
 import { formatCurrency } from "./utils/ordersHelpers";
 import { OrdersPageHeader } from "./components/OrdersPageHeader";
@@ -70,6 +68,7 @@ export default function Orders() {
     handleCreateTopupOrderFromRefund,
     handleMarkPaid,
     handleRenewOrder,
+    handleMockWebhook,
     confirmDelete,
     fetchError,
     reloadOrders,
@@ -172,6 +171,7 @@ export default function Orders() {
         onCreateTopupOrderFromRefund={handleCreateTopupOrderFromRefund}
         onMarkPaid={handleMarkPaid}
         onRenew={handleRenewOrder}
+        onMockWebhook={handleMockWebhook}
         setCurrentPage={setCurrentPage}
         setRowsPerPage={setRowsPerPage}
       />

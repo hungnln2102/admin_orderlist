@@ -80,6 +80,7 @@ const incrementDashboardSummaryByDelta = async (
     context = "webhook.incrementDashboardSummaryByDelta",
   } = {}
 ) => {
+  return; // Bỏ qua cập nhật dashboard
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;

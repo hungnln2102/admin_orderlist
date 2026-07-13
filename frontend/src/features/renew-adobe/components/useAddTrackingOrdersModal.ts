@@ -43,7 +43,7 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
       .catch((err) => {
         if (aborted) return;
         setLoadError(
-          (err as Error)?.message ?? "Kh?ng t?i ???c danh s?ch ??n match."
+          (err as Error)?.message ?? "Không tải được danh sách đơn match."
         );
         setItems([]);
       })
@@ -118,7 +118,7 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
       const refreshed = await fetchMatchableOrders({ q: appliedSearch, excludeTracked });
       setItems(refreshed);
     } catch (err) {
-      setSubmitError((err as Error)?.message ?? "Kh?ng th? l?u.");
+      setSubmitError((err as Error)?.message ?? "Không thể lưu.");
     } finally {
       setSubmitting(false);
     }

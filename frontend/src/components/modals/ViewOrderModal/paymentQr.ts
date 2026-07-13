@@ -118,7 +118,6 @@ export const buildViewOrderPaymentQrPayload = ({
           accountNumber: accountNo,
           bankCode,
           amount: effectiveQrAmount,
-          description: idOrder,
           accountName,
         })
       : "",

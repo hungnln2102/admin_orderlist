@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
-import { ORDER_FIELDS, Order } from "@/constants";
+import { Order } from "@/constants";
 import type { EditableOrder, ViewModalSource } from "../types";
+import { normalizeEditableOrder } from "../utils/editOrderMapper";
 
 export type CreatedOrderBatchView = {
   batchCode: string;
@@ -77,12 +78,7 @@ export function useOrdersModals() {
   }, []);
 
   const handleEditOrder = useCallback((order: Order) => {
-    const converted: EditableOrder = {
-      ...order,
-      cost: Number(order[ORDER_FIELDS.COST] ?? 0) || 0,
-      price: Number(order[ORDER_FIELDS.PRICE] ?? 0) || 0,
-    };
-    setOrderToEdit(converted);
+    setOrderToEdit(normalizeEditableOrder(order));
     setIsEditModalOpen(true);
   }, []);
 

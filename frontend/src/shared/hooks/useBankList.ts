@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 
 export type BankListItem = {
@@ -32,13 +32,7 @@ export function useBankList() {
   useEffect(() => {
     let cancelled = false;
 
-    apiFetch(API_ENDPOINTS.BANK_LIST)
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Không tải được danh sách ngân hàng");
-        }
-        return response.json();
-      })
+    apiGet<unknown[]>(API_ENDPOINTS.BANK_LIST)
       .then((data) => {
         if (cancelled) return;
         const rows = Array.isArray(data) ? data : [];

@@ -1,6 +1,6 @@
 import type React from "react";
 import { showAppNotification } from "@/lib/notifications";
-import { apiFetch } from "@/shared/api/client";
+import { apiPatch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { ProductPricingRow } from "../types";
 
@@ -47,28 +47,14 @@ export function useProductStatusActions({
     }));
 
     try {
-      const response = await apiFetch(
-        `${API_ENDPOINTS.PRODUCT_PRICES}/${item.id}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            is_active: nextStatus,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Lỗi khi cập nhật trạng thái");
-      }
-
-      const payload: {
+      const payload = await apiPatch<{
         id: number;
         is_active: boolean;
         update?: string;
-      } = await response.json();
+      }>(
+        `${API_ENDPOINTS.PRODUCT_PRICES}/${item.id}/status`,
+        { is_active: nextStatus }
+      );
 
       const serverStatus = payload?.is_active ?? nextStatus;
       const serverUpdated =

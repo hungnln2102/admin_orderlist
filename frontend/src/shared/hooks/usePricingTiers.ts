@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ORDER_CODE_PREFIXES } from "@/constants";
-import { apiFetch } from "../api/client";
+import { apiGet } from "../api/client";
 
 export interface PricingTier {
   id: number;
@@ -51,9 +51,7 @@ export function usePricingTiers() {
     }
     setLoading(true);
     try {
-      const res = await apiFetch("/api/pricing-tiers");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: PricingTier[] = await res.json();
+      const data = await apiGet<PricingTier[]>("/api/pricing-tiers");
       _sharedCache = data;
       _sharedTs = Date.now();
       if (mounted.current) {

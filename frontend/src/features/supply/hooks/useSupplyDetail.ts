@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 
 type SupplyOverview = {
   error?: string;
@@ -52,9 +52,7 @@ export const useSupplyDetail = (supplyId: number | null, isOpen: boolean) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/supplies/${supplyId}/overview`);
-      const data = (await res.json()) as SupplyOverview;
-      if (!res.ok) throw new Error(data?.error || "Không tải được chi tiết");
+      const data = await apiGet<SupplyOverview>(`/api/supplies/${supplyId}/overview`);
       setOverview(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra");

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiPost } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { generateUniqueCategoryGradient } from "../utils/categoryColors";
 
@@ -68,21 +68,10 @@ export const useCategoryCreate = ({
     setCreatingCategory(true);
     setCreateCategoryError(null);
     try {
-      const response = await apiFetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmedName,
-          color: (newCategoryColor || "").trim() || null,
-        }),
+      await apiPost("/api/categories", {
+        name: trimmedName,
+        color: (newCategoryColor || "").trim() || null,
       });
-      if (!response.ok) {
-        const message = await response.text().catch(() => "");
-        throw new Error(
-          message || `Failed to create category (${response.status}).`
-        );
-      }
-      await response.json().catch(() => null);
       await reloadCategories();
       setCreateCategoryOpen(false);
       setNewCategoryName("");

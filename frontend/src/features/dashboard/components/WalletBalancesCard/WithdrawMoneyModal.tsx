@@ -1,14 +1,20 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import React, { useEffect, useState } from "react";
+import { formatNumberOnTyping } from "@/shared/money";
 import { fetchShopBankAccounts, recordShopBankAccountWithdrawal } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
-import { formatShopBankMoneyDraft, parseShopBankMoneyInput } from "@/features/shop-bank-accounts/helpers/formatShopBankMoney";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
+import { GenericFormModal, FormField } from "@/shared/components/GenericModal/GenericFormModal";
 
 type WithdrawMoneyModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+};
+
+const formatShopBankAccountOption = (item: ShopBankAccountItem) => {
+  const bankLabel = item.bankShortCode || item.bankBin || item.bankDisplayName;
+  return [item.accountNumber, bankLabel, item.accountHolder]
+    .filter(Boolean)
+    .join(" - ");
 };
 
 const WithdrawMoneyModal: React.FC<WithdrawMoneyModalProps> = ({
@@ -17,147 +23,84 @@ const WithdrawMoneyModal: React.FC<WithdrawMoneyModalProps> = ({
   onSuccess,
 }) => {
   const [accounts, setAccounts] = useState<ShopBankAccountItem[]>([]);
-  const [accountId, setAccountId] = useState(0);
-  const [amountInput, setAmountInput] = useState("");
-  const [reason, setReason] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    setLoadingAccounts(true);
-    void fetchShopBankAccounts()
-      .then((items) => {
-        setAccounts(items);
-        setAccountId(items[0]?.id ?? 0);
+    fetchShopBankAccounts()
+      .then((res) => {
+        setAccounts(res.filter((acc) => acc.isActive));
       })
-      .catch(() => setAccounts([]))
-      .finally(() => setLoadingAccounts(false));
-    setAmountInput("");
-    setReason("");
-    setError(null);
+      .catch(() => {
+        // ignore
+      });
   }, [isOpen]);
 
-  const amountValue = useMemo(() => parseShopBankMoneyInput(amountInput), [amountInput]);
-
-  const closeAndReset = () => {
-    if (loading) return;
-    onClose();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (data: Record<string, any>) => {
     setError(null);
-    if (!accountId) {
-      setError("Vui lòng chọn STK.");
-      return;
+    const amountNum = Number(String(data.amountInput || "").replace(/,/g, ""));
+    if (!amountNum || amountNum <= 0) {
+      setError("Số tiền không hợp lệ");
+      throw new Error("Validation");
     }
-    if (!amountValue || amountValue <= 0) {
-      setError("Số tiền rút phải lớn hơn 0.");
-      return;
-    }
-    setLoading(true);
+
     try {
-      await recordShopBankAccountWithdrawal(accountId, amountValue, reason.trim() || null);
+      await recordShopBankAccountWithdrawal(
+        Number(data.accountId),
+        amountNum,
+        data.reason || ""
+      );
+
       onSuccess();
-      closeAndReset();
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tạo phiếu rút tiền. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
+      setError(err instanceof Error ? err.message : "Lỗi hệ thống");
+      throw err;
     }
   };
 
-  if (!isOpen) return null;
+  const fields: FormField[] = [
+    {
+      name: "accountId",
+      label: "Chọn tài khoản nguồn",
+      type: "select",
+      required: true,
+      colSpan: 2,
+      options: accounts.map((acc) => ({
+        value: acc.id,
+        label: formatShopBankAccountOption(acc),
+      })),
+    },
+    {
+      name: "amountInput",
+      label: "Số tiền cần rút",
+      type: "text",
+      required: true,
+      placeholder: "0",
+      formatOnTyping: formatNumberOnTyping,
+    },
+    {
+      name: "reason",
+      label: "Lý do (Không bắt buộc)",
+      type: "textarea",
+      placeholder: "Nhập lý do rút tiền (chuyển đi đâu, tiêu việc gì)...",
+      colSpan: 2,
+    },
+  ];
 
   return (
-    <ModalPortal>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900 to-slate-950 p-6 shadow-2xl">
-          <button
-            type="button"
-            onClick={closeAndReset}
-            className="absolute right-4 top-4 rounded-full p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-            disabled={loading}
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
-
-          <h2 className="mb-5 text-xl font-bold text-white">Tạo phiếu rút tiền</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/80">STK rút tiền</label>
-              <select
-                value={accountId || ""}
-                onChange={(e) => setAccountId(Number(e.target.value) || 0)}
-                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white"
-                disabled={loading || loadingAccounts}
-              >
-                {accounts.length === 0 ? (
-                  <option value="">Chưa có STK</option>
-                ) : (
-                  accounts.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.accountNumber} · {item.accountHolder}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/80">Số tiền rút</label>
-              <input
-                type="text"
-                value={amountInput}
-                onChange={(e) => setAmountInput(formatShopBankMoneyDraft(e.target.value))}
-                placeholder="0"
-                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                disabled={loading}
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/80">Lý do rút</label>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Nhập lý do rút tiền..."
-                rows={3}
-                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                disabled={loading}
-              />
-            </div>
-
-            {error ? (
-              <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                {error}
-              </div>
-            ) : null}
-
-            <div className="flex gap-3 pt-1">
-              <button
-                type="button"
-                onClick={closeAndReset}
-                className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                disabled={loading}
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white hover:from-indigo-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={loading || loadingAccounts || !accountId}
-              >
-                {loading ? "Đang lưu..." : "Xác nhận rút"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </ModalPortal>
+    <GenericFormModal
+      isOpen={isOpen}
+      onClose={() => {
+        setError(null);
+        onClose();
+      }}
+      title="Rút Tiền Khỏi Quỹ"
+      fields={fields}
+      onSubmit={handleSubmit}
+      submitText="Rút tiền"
+      errorMessage={error}
+    />
   );
 };
 

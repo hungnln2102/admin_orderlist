@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import type React from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiPost } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type {
   CreateProductFormState,
   CreateSupplierEntry,
   ProductPricingRow,
 } from "../types";
-import { createSupplierEntry, formatVndInput } from "../utils";
+import { createSupplierEntry } from "../supplyPriceUtils";
+import { formatVndInput } from "../priceFormatters";
 import {
   applySelectedSupplierToEntry,
   createEmptyCreateForm,
@@ -237,23 +238,9 @@ export const useProductActions = ({
     setCreateError(null);
 
     try {
-      const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(validation.payload),
-      });
-      const rawBody = await response.text();
-      const payload = parseJsonResponseText(rawBody);
+      await apiPost(API_ENDPOINTS.PRODUCT_PRICES, validation.payload);
 
-      if (!response.ok) {
-        const errorMessage =
-          payload?.error || rawBody?.trim() || "Không thể tạo sản phẩm";
-        throw new Error(errorMessage);
-      }
-
-      await fetchProductPrices();
+      await fetchProductPrices();
       handleCloseCreateModal();
     } catch (err) {
       console.error("Lỗi khi tạo sản phẩm:", err);

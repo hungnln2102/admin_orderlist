@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import type { MatchableOrder, PaymentReceipt } from "../helpers";
-import { normalizeReceiptRow } from "../helpers";
+import { normalizeReceiptRow } from "../utils/receiptMapper";
 
 const normalizeMatchableOrders = (ordersRaw: Partial<MatchableOrder>[]): MatchableOrder[] =>
   ordersRaw
@@ -31,7 +31,7 @@ export function useInvoiceReceipts() {
           apiFetch("/api/payment-receipts/matchable-orders?limit=500"),
         ]);
         if (!receiptsResponse.ok) {
-          throw new Error("Kh?ng th? t?i bi?n nh?n.");
+          throw new Error("Không thể tải biên nhận.");
         }
 
         const data = await receiptsResponse.json();
@@ -55,7 +55,7 @@ export function useInvoiceReceipts() {
         }
       } catch (err) {
         console.error(err);
-        setError(err instanceof Error ? err.message : "Kh?ng th? t?i bi?n nh?n.");
+        setError(err instanceof Error ? err.message : "Không thể tải biên nhận.");
       } finally {
         setLoading(false);
       }

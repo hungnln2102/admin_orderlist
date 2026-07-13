@@ -1,5 +1,6 @@
 const logger = require("../../utils/logger");
-const { sendZeroDaysRemainingNotification } = require("../../services/telegramOrderNotification");
+// Removed direct telegram require
+
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { fetchVariantDisplayNames } = require("../variantDisplayNames");
 const { buildRenewalQuery, normalizeNotifyRow } = require("./shared");
@@ -108,7 +109,8 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
 
         if (pending.length > 0) {
           try {
-            await sendZeroDaysRemainingNotification(pending.map((p) => p.order));
+            const { eventBus, EVENTS } = require("../../../events");
+            eventBus.emit(EVENTS.DAILY_ZERO_DAYS_DUE, pending.map((p) => p.order));
           } catch (sendErr) {
             for (const p of pending) {
               if (p.perOrderKey) {

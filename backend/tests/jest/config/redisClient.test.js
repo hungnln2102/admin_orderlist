@@ -7,6 +7,14 @@ describe("redisClient production session store hardening", () => {
     process.env = { ...originalEnv };
   });
 
+  beforeEach(() => {
+    jest.mock("../../../src/utils/logger", () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    }));
+  });
+
   it("does not require persistent session store outside production", () => {
     process.env.NODE_ENV = "test";
     delete process.env.REDIS_URL;

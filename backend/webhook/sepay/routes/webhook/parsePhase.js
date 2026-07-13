@@ -1,8 +1,5 @@
-const { normalizeAmount, extractOrderCodes } = require("../../utils");
-const {
-  normalizeTransactionPayload,
-  deriveOrderCode,
-} = require("../../transactions");
+const { normalizeAmount } = require("../../utils");
+const { normalizeTransactionPayload } = require("../../transactions");
 const { extractPaymentReferenceCandidates } = require("../../paymentReference");
 const { BATCH_CODE_REGEX, isBatchCode } = require("./constants");
 
@@ -34,27 +31,13 @@ function parseWebhookTransaction(payload) {
   const transaction = normalizeTransactionPayload(payload);
   if (!transaction) return null;
 
-  const orderCode = deriveOrderCode(transaction);
   const paymentReferenceCodes = extractPaymentReferenceCandidates(transaction);
-  const extractedOrderCodes = extractOrderCodes(transaction);
   const explicitBatchCodes = extractBatchCodes(transaction);
-  const normalizedPrimary = String(orderCode || "").trim().toUpperCase();
-  const normalizedExtracted = extractedOrderCodes
-    .map((code) => String(code || "").trim().toUpperCase())
-    .filter(Boolean);
-  const orderCodes = [
-    ...new Set(
-      normalizedExtracted.length > 0
-        ? normalizedExtracted
-        : normalizedPrimary
-          ? [normalizedPrimary]
-          : []
-    ),
-  ];
+  
+  const orderCodes = [];
   const batchCodes = [
     ...new Set([
       ...explicitBatchCodes,
-      ...orderCodes.filter((code) => isBatchCode(code)),
     ]),
   ];
 
@@ -72,7 +55,7 @@ function parseWebhookTransaction(payload) {
 
   return {
     transaction,
-    orderCode,
+    orderCode: null,
     paymentReferenceCodes,
     orderCodes,
     batchCodes,

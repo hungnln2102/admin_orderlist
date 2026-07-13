@@ -1,5 +1,4 @@
 import { formatDateToDMY } from "@/shared/date";
-import { PAYMENT_RECEIPT_COLS } from "@/lib/tableSql";
 
 export type { ShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 export { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
@@ -143,34 +142,7 @@ export const toISODate = (value: string): string => {
   return `${y}-${m}-${d}`;
 };
 
-export const normalizeReceiptRow = (
-  row: Partial<PaymentReceipt> & Record<string, unknown>
-): PaymentReceipt => {
-  const toSafeString = (value: unknown) =>
-    typeof value === "string" ? value : "";
-  return {
-    id: Number(row?.id) || 0,
-    orderCode: toSafeString(
-      row?.orderCode ?? row?.[PAYMENT_RECEIPT_COLS.orderCode]
-    ),
-    paidAt: toSafeString(row?.paidAt ?? row?.[PAYMENT_RECEIPT_COLS.paidDate]),
-    amount: Number(row?.amount ?? row?.[PAYMENT_RECEIPT_COLS.amount]) || 0,
-    sender: toSafeString(row?.sender ?? row?.[PAYMENT_RECEIPT_COLS.sender]),
-    receiver: toSafeString(row?.receiver ?? row?.[PAYMENT_RECEIPT_COLS.receiver]),
-    note: toSafeString(row?.note ?? row?.[PAYMENT_RECEIPT_COLS.note]),
-    isFinancialPosted: Boolean(row?.isFinancialPosted),
-    postedRevenue: Number(row?.postedRevenue) || 0,
-    postedProfit: Number(row?.postedProfit) || 0,
-    postedOffFlowBankReceipt: Number(row?.postedOffFlowBankReceipt) || 0,
-    reconciledAt:
-      row?.reconciledAt != null ? String(row.reconciledAt) : null,
-    adjustmentApplied: Boolean(row?.adjustmentApplied),
-    outboundAmount: Number(row?.outboundAmount) || 0,
-    outboundReason: toSafeString(row?.outboundReason),
-    outboundReasonLabel: toSafeString(row?.outboundReasonLabel),
-    outboundContent: toSafeString(row?.outboundContent),
-  };
-};
+export { normalizeReceiptRow } from "./utils/receiptMapper";
 
 export const buildExportWorksheet = (
   rows: PaymentReceipt[],

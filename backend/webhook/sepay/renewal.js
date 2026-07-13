@@ -148,6 +148,7 @@ const createAutoMavrykExternalImportLog = async ({
    *  Caller (webhook) sẽ gửi 1 tin nhắn tổng hợp ở cuối. */
   suppressFinanceNotify = false,
 }) => {
+  return { created: false, reason: "skipped_to_isolate_orders" }; // Bỏ qua NCC
   const normalizedAmount = normalizeMoney(amount);
   if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
     return { created: false, reason: "invalid_amount" };
@@ -853,6 +854,18 @@ const runRenewal = async (
     }
     if (mavrykExternalImportLog) {
       details.MAVRYK_EXTERNAL_IMPORT_LOG = mavrykExternalImportLog;
+    }
+
+    try {
+      const { eventBus, EVENTS } = require("../../../src/events");
+      // Truyền object chứa thông tin cần thiết
+      eventBus.emit(EVENTS.ORDER_RENEWED, {
+        id_order: orderCode,
+        san_pham: details.SAN_PHAM,
+        ngay_het_han_moi: details.HET_HAN
+      });
+    } catch (eventErr) {
+      logger.error("[EventBus] Lỗi phát sự kiện ORDER_RENEWED", { error: eventErr.message });
     }
 
     return { success: true, details, processType: "renewal" };

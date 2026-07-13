@@ -17,6 +17,7 @@ type Props = {
   totalSupplierRefund: number;
   confirmingId: number | null;
   qrImageUrl: string | null;
+  qrTransferAmount: number | null;
   shopBankAccounts: ShopBankAccountItem[];
   selectedShopBankAccount: ShopBankAccountItem | null;
   shopBankAccountsLoading: boolean;
@@ -40,6 +41,7 @@ export function SupplierSettlementPanel({
   totalSupplierRefund,
   confirmingId,
   qrImageUrl,
+  qrTransferAmount,
   shopBankAccounts,
   selectedShopBankAccount,
   shopBankAccountsLoading,
@@ -70,11 +72,10 @@ export function SupplierSettlementPanel({
                 <div
                   key={payment.id}
                   onClick={() => onSelectPayment(payment.id)}
-                  className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border transition cursor-pointer ${
-                    isSelected
+                  className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border transition cursor-pointer ${isSelected
                       ? "border-indigo-500 bg-indigo-500/20"
                       : "border-white/5 bg-white/5 hover:bg-white/10"
-                  }`}
+                    }`}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm truncate">
@@ -144,9 +145,19 @@ export function SupplierSettlementPanel({
                 {qrImageUrl ? (
                   <>
                     <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
-                    <p className="text-[11px] text-white/55 text-center">
-                      Ảnh VietQR đã kèm thông tin tài khoản và số tiền.
-                    </p>
+                    <div className="text-[11px] text-white/55 text-center">
+                      <p>
+                        Ảnh VietQR đã kèm thông tin tài khoản và số tiền
+                        {qrTransferAmount != null ? `: ${formatCurrency(qrTransferAmount)}` : ""}.
+                      </p>
+                      {qrTransferAmount != null &&
+                        qrTransferAmount !== amountDueForPayment(selectedPayment) &&
+                        Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0) > 0 ? (
+                        <p className="mt-0.5 text-amber-300/80">
+                          QR đã trừ mã nhận diện NCC để tự động khớp giao dịch.
+                        </p>
+                      ) : null}
+                    </div>
                   </>
                 ) : (
                   <div className="w-64 h-64 bg-white/10 rounded-lg flex items-center justify-center text-xs text-center p-2">

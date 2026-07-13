@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/shared/api/client";
+import { apiGet } from "@/shared/api/client";
 import {
   fetchProductDescriptions,
   ProductDescription,
@@ -69,13 +69,10 @@ export const useProductInfo = (): UseProductInfoResult => {
     setLoading(true);
     setError(null);
     try {
-      const [descResponse, priceResponse] = await Promise.all([
+      const [descResponse, priceData] = await Promise.all([
         fetchProductDescriptions({ limit: 1000 }),
-        apiFetch("/api/products"),
+        apiGet<ProductPriceItem[]>("/api/products"),
       ]);
-      const priceData = (await priceResponse.json().catch(() => [])) as
-        | ProductPriceItem[]
-        | [];
       setProductDescs(
         Array.isArray(descResponse.items) ? descResponse.items : []
       );

@@ -103,10 +103,8 @@ const normalizeOptionalText = (value) => {
 };
 
 const normalizeSepayTransactionId = (value) => {
-  if (value == null || value === "") return "";
-  const numeric = Number.parseInt(String(value), 10);
-  if (Number.isFinite(numeric) && numeric > 0) return String(numeric);
-  return "";
+  const text = String(value ?? "").trim();
+  return text || "";
 };
 
 const getPaymentReceiptColumns = async () => {
@@ -535,8 +533,8 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       )
       VALUES (
         ${insertValues
-          .map((_, idx) => (idx === 1 ? `$${idx + 1}::date` : `$${idx + 1}`))
-          .join(", ")}
+        .map((_, idx) => (idx === 1 ? `$${idx + 1}::date` : `$${idx + 1}`))
+        .join(", ")}
       )
       RETURNING ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
     `;
@@ -585,11 +583,11 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       amount,
       matchedSlot: resolvedSlot
         ? {
-            id: resolvedSlot.id,
-            cycle_index: resolvedSlot.cycle_index,
-            slot_kind: resolvedSlot.slot_kind,
-            expected_amount: Number(resolvedSlot.expected_amount),
-          }
+          id: resolvedSlot.id,
+          cycle_index: resolvedSlot.cycle_index,
+          slot_kind: resolvedSlot.slot_kind,
+          expected_amount: Number(resolvedSlot.expected_amount),
+        }
         : null,
     };
   } catch (err) {

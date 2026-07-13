@@ -1,5 +1,8 @@
 import type { SupplyPriceState } from "../../types";
-import { computeHighestSupplyPrice, sortSupplyItems } from "../../utils";
+import {
+  computeHighestSupplyPrice,
+  sortSupplyItems,
+} from "../../supplyPriceUtils";
 
 type SupplyStateMutationResult = {
   nextState: SupplyPriceState;

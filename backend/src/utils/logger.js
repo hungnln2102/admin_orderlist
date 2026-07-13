@@ -173,7 +173,7 @@ try {
 
 // Telegram notification transport (error + warn)
 try {
-  const { notifyError, notifyWarn } = require("./telegramErrorNotifier");
+  const { notifyError, notifyWarn } = require("../domains/notifications/telegram").systemNotifier;
   const splatKey = Symbol.for("splat");
 
   /**
@@ -186,6 +186,7 @@ try {
     /\[Order\]\[Telegram\]/i,
     /\[Renewal\]\[Telegram\]/i,
     /\[Telegram\]\[/i,
+    /\[TelegramClient\]/i,
     /sendRenewalNotification/i,
     /TelegramFinanceDeltaNotifier/i,
   ];

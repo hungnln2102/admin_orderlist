@@ -4,7 +4,7 @@ import type {
   ProductPricingRow,
   SupplyPriceState,
 } from "../../types";
-import { normalizeProductKey } from "../../utils";
+import { normalizeProductKey } from "../../priceLabels";
 import { PriceCard } from "../PriceCard";
 import ProductRow from "../ProductRow";
 import type {

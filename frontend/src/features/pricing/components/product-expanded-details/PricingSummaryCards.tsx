@@ -2,7 +2,7 @@ import type { ProductPricingRow } from "../../types";
 import {
   formatCurrencyValue,
   formatPromoPercent,
-} from "../../utils";
+} from "../../priceFormatters";
 
 type PricingSummaryCardsProps = {
   item: ProductPricingRow;
