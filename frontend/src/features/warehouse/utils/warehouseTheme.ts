@@ -40,4 +40,4 @@ export function getWarehouseTheme(status?: string | null): WarehouseTheme {
   return INDIGO;
 }
 
-export const WAREHOUSE_TOTAL_COLUMNS = 6;
+export const WAREHOUSE_TOTAL_COLUMNS = 3;

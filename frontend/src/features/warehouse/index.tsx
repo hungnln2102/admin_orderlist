@@ -147,15 +147,19 @@ export default function Storage() {
   const startCreate = () => {
     setEditingId("new");
     setDraft({
-      category: "",
       account: "",
-      password: "",
-      backup_email: "",
-      two_fa: "",
       note: "",
-      status: "Ton",
-      expires_at: "",
       is_verified: false,
+      services: [
+        {
+          category: "",
+          password: "",
+          backup_email: "",
+          two_fa: "",
+          status: "Tồn",
+          expires_at: "",
+        }
+      ]
     });
   };
 

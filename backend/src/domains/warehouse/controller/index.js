@@ -10,52 +10,87 @@ const {
   syncOrdersForPackagesUsingStock,
 } = require("../../../services/packageOrderAccountSync");
 const logger = require("../../../utils/logger");
+const eventBus = require("../../../events/eventBus");
+const EVENTS = require("../../../events/eventTypes");
 
 const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
 const cols = warehouseDef.columns;
 const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_PRODUCT);
 
+const servicesDef = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
+const srvCols = servicesDef.columns;
+const servicesTable = tableName(servicesDef.tableName, SCHEMA_PRODUCT);
+
 const pkgDef = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const pkgCols = pkgDef.columns;
 const pkgTable = tableName(pkgDef.tableName, SCHEMA_PRODUCT);
 
-const SELECT_MAP = {
-  id: cols.id,
-  category: cols.productType,
-  account: cols.accountUsername,
-  password: cols.passwordEncrypted,
-  backup_email: cols.backupEmail,
-  two_fa: cols.twoFaEncrypted,
-  note: cols.note,
-  status: cols.status,
-  expires_at: cols.expiresAt,
-  is_verified: cols.isVerified,
-  created_at: cols.createdAt,
-  updated_at: cols.updatedAt,
-};
-
 const listWarehouse = async (_req, res) => {
   try {
+    // We group services inside the email account
     const alias = "ps";
-    const rows = await db(`${warehouseTable} as ${alias}`)
+    const sAlias = "ss";
+    const stocks = await db(`${warehouseTable} as ${alias}`)
       .select({
         id: `${alias}.${cols.id}`,
-        category: `${alias}.${cols.productType}`,
         account: `${alias}.${cols.accountUsername}`,
-        password: `${alias}.${cols.passwordEncrypted}`,
-        backup_email: `${alias}.${cols.backupEmail}`,
-        two_fa: `${alias}.${cols.twoFaEncrypted}`,
         note: `${alias}.${cols.note}`,
-        status: db.raw(
-          `CASE WHEN EXISTS (SELECT 1 FROM ${pkgTable} WHERE ${pkgCols.stockId} = ${alias}.${cols.id} OR ${pkgCols.storageId} = ${alias}.${cols.id}) THEN 'Đang Sử Dụng' ELSE 'Tồn' END`
-        ),
-        expires_at: `${alias}.${cols.expiresAt}`,
+        status: `${alias}.${cols.status}`,
         is_verified: `${alias}.${cols.isVerified}`,
         created_at: `${alias}.${cols.createdAt}`,
         updated_at: `${alias}.${cols.updatedAt}`,
       })
-      .orderBy(`${alias}.${cols.id}`, "asc");
-    res.json(rows || []);
+      .orderBy(`${alias}.${cols.id}`, "desc");
+
+    const stockIds = stocks.map(s => s.id);
+    let servicesByStock = {};
+
+    if (stockIds.length > 0) {
+      const services = await db(`${servicesTable} as ${sAlias}`)
+        .select({
+          id: `${sAlias}.${srvCols.id}`,
+          stock_id: `${sAlias}.${srvCols.stockId}`,
+          category: `${sAlias}.${srvCols.productType}`,
+          password: `${sAlias}.${srvCols.passwordEncrypted}`,
+          backup_email: `${sAlias}.${srvCols.backupEmail}`,
+          two_fa: `${sAlias}.${srvCols.twoFaEncrypted}`,
+          expires_at: `${sAlias}.${srvCols.expiresAt}`,
+          status: `${sAlias}.${srvCols.status}`,
+          created_at: `${sAlias}.${srvCols.createdAt}`,
+          updated_at: `${sAlias}.${srvCols.updatedAt}`,
+        })
+        .whereIn(`${sAlias}.${srvCols.stockId}`, stockIds);
+
+      // Check if services are used in packages
+      const srvIds = services.map(s => s.id);
+      let inUseSrvIds = new Set();
+      if (srvIds.length > 0) {
+        const usedPkgs = await db(pkgTable)
+          .select(pkgCols.stockServiceId)
+          .whereIn(pkgCols.stockServiceId, srvIds);
+        inUseSrvIds = new Set(usedPkgs.map(p => p.stock_service_id));
+      }
+
+      for (const srv of services) {
+        if (inUseSrvIds.has(srv.id)) {
+          srv.status = 'Đang Sử Dụng';
+        } else {
+          srv.status = 'Tồn';
+        }
+
+        if (!servicesByStock[srv.stock_id]) {
+          servicesByStock[srv.stock_id] = [];
+        }
+        servicesByStock[srv.stock_id].push(srv);
+      }
+    }
+
+    const result = stocks.map(stock => ({
+      ...stock,
+      services: servicesByStock[stock.id] || []
+    }));
+
+    res.json(result);
   } catch (error) {
     logger.error("[warehouse] Query failed", {
       error: error.message,
@@ -66,35 +101,85 @@ const listWarehouse = async (_req, res) => {
 };
 
 const createWarehouse = async (req, res) => {
+  // Support both legacy single-service creation and new multi-service creation
   const {
-    category,
     account,
-    password,
-    backup_email,
-    two_fa,
     note,
     status,
-    expires_at,
     is_verified,
+    services = []
   } = req.body || {};
 
+  // Handle legacy payload fallback
+  if (services.length === 0 && req.body.category) {
+    services.push({
+      category: req.body.category,
+      password: req.body.password,
+      backup_email: req.body.backup_email,
+      two_fa: req.body.two_fa,
+      expires_at: req.body.expires_at,
+    });
+  }
+
   try {
-    const now = new Date().toISOString();
-    const [row] = await db(warehouseTable)
-      .insert({
-        [cols.productType]: category ?? null,
-        [cols.accountUsername]: account ?? null,
-        [cols.passwordEncrypted]: password ?? null,
-        [cols.backupEmail]: backup_email ?? null,
-        [cols.twoFaEncrypted]: two_fa ?? null,
-        [cols.note]: note ?? null,
-        [cols.status]: status ?? "Tồn",
-        [cols.expiresAt]: normalizeDateInput(expires_at) || null,
-        [cols.isVerified]: is_verified ?? false,
-        [cols.createdAt]: now,
-        [cols.updatedAt]: now,
-      })
-      .returning(SELECT_MAP);
+    const row = await db.transaction(async (trx) => {
+      const now = new Date().toISOString();
+      let stockRow;
+      
+      if (account) {
+        const existingStock = await trx(warehouseTable).where(cols.accountUsername, account).first();
+        if (existingStock) {
+          stockRow = existingStock;
+        }
+      }
+
+      if (!stockRow) {
+        const [stock] = await trx(warehouseTable)
+          .insert({
+            [cols.accountUsername]: account ?? null,
+            [cols.note]: note ?? null,
+            [cols.status]: status ?? "Tồn",
+            [cols.isVerified]: is_verified ?? false,
+            [cols.createdAt]: now,
+            [cols.updatedAt]: now,
+          })
+          .returning("*");
+          
+        stockRow = stock.id !== undefined ? stock : { id: stock, [cols.accountUsername]: account };
+      }
+
+      const insertedServices = [];
+      for (const srv of services) {
+        const [insertedSrv] = await trx(servicesTable)
+          .insert({
+            [srvCols.stockId]: stockRow.id,
+            [srvCols.productType]: srv.category ?? null,
+            [srvCols.passwordEncrypted]: srv.password ?? null,
+            [srvCols.backupEmail]: srv.backup_email ?? null,
+            [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
+            [srvCols.status]: "Tồn",
+            [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
+            [srvCols.createdAt]: now,
+            [srvCols.updatedAt]: now,
+          })
+          .returning("*");
+        
+        insertedServices.push(insertedSrv.id !== undefined ? insertedSrv : { id: insertedSrv });
+      }
+
+      return {
+        id: stockRow.id,
+        account: stockRow[cols.accountUsername],
+        services: insertedServices
+      };
+    });
+
+    // Emit Event cho Subscriber (Auto-Assembly) xu ly tao package_product
+    eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, {
+      stockId: row.id,
+      account: row.account,
+      services: row.services,
+    });
 
     res.status(201).json(row);
   } catch (error) {
@@ -109,15 +194,11 @@ const createWarehouse = async (req, res) => {
 const updateWarehouse = async (req, res) => {
   const { id } = req.params;
   const {
-    category,
     account,
-    password,
-    backup_email,
-    two_fa,
     note,
     status,
-    expires_at,
     is_verified,
+    services = []
   } = req.body || {};
 
   if (!id) return res.status(400).json({ error: "Missing id" });
@@ -125,52 +206,70 @@ const updateWarehouse = async (req, res) => {
   try {
     const row = await db.transaction(async (trx) => {
       const before = await trx(warehouseTable).where(cols.id, id).first();
+      if (!before) return null;
+
       const [updated] = await trx(warehouseTable)
         .where(cols.id, id)
         .update({
-          [cols.productType]: category ?? null,
           [cols.accountUsername]: account ?? null,
-          [cols.passwordEncrypted]: password ?? null,
-          [cols.backupEmail]: backup_email ?? null,
-          [cols.twoFaEncrypted]: two_fa ?? null,
           [cols.note]: note ?? null,
           [cols.status]: status ?? null,
-          [cols.expiresAt]: normalizeDateInput(expires_at) || null,
           [cols.isVerified]: is_verified ?? false,
           [cols.updatedAt]: new Date().toISOString(),
         })
-        .returning(SELECT_MAP);
+        .returning("*");
 
-      if (!updated) return null;
+      const oldAcc = before[cols.accountUsername] ?? null;
+      const newAcc = updated[cols.accountUsername] ?? null;
+      const same = String(oldAcc ?? "").trim() === String(newAcc ?? "").trim();
+      if (!same) {
+        await syncOrdersForPackagesUsingStock(trx, id, oldAcc, newAcc);
+      }
 
-      if (before) {
-        const oldAcc = before[cols.accountUsername] ?? null;
-        const newAcc = updated.account ?? null;
-        const same = String(oldAcc ?? "").trim() === String(newAcc ?? "").trim();
-        if (!same) {
-          await syncOrdersForPackagesUsingStock(trx, id, oldAcc, newAcc);
+      // Sync services (replace or update)
+      // For simplicity in this endpoint, we'll clear and recreate or selectively update.
+      // Assuming 'services' payload contains full list including IDs for existing ones.
+      if (services.length > 0) {
+        const existingSrvs = await trx(servicesTable).where(srvCols.stockId, id).select(srvCols.id);
+        const existingIds = new Set(existingSrvs.map(s => s.id));
+        const keptIds = new Set();
+
+        for (const srv of services) {
+          if (srv.id && existingIds.has(srv.id)) {
+            // Update
+            await trx(servicesTable).where(srvCols.id, srv.id).update({
+              [srvCols.productType]: srv.category ?? null,
+              [srvCols.passwordEncrypted]: srv.password ?? null,
+              [srvCols.backupEmail]: srv.backup_email ?? null,
+              [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
+              [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
+              [srvCols.updatedAt]: new Date().toISOString()
+            });
+            keptIds.add(srv.id);
+          } else {
+            // Insert new
+            const now = new Date().toISOString();
+            await trx(servicesTable).insert({
+              [srvCols.stockId]: id,
+              [srvCols.productType]: srv.category ?? null,
+              [srvCols.passwordEncrypted]: srv.password ?? null,
+              [srvCols.backupEmail]: srv.backup_email ?? null,
+              [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
+              [srvCols.status]: "Tồn",
+              [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
+              [srvCols.createdAt]: now,
+              [srvCols.updatedAt]: now,
+            });
+          }
         }
 
-        // Sync expires_at sang tat ca PACKAGE_PRODUCT lien ket voi stock nay
-        const oldExpires = before[cols.expiresAt] ?? null;
-        const newExpires = updated.expires_at ?? null;
-        const expiresChanged =
-          String(oldExpires ?? "").trim() !== String(newExpires ?? "").trim();
-        if (expiresChanged) {
-          await trx(pkgTable)
-            .where((qb) => {
-              qb.where(pkgCols.stockId, id).orWhere(pkgCols.storageId, id);
-            })
-            .update({ [pkgCols.storageTotal]: trx.raw("storage_total") }); // no-op placeholder to avoid empty update
-
-          // Ghi log sync (package_product khong co expires_at, nen chi log)
-          logger.info("[warehouse] expires_at thay doi, packages lien ket da duoc ghi nhan", {
-            stockId: id,
-            oldExpires,
-            newExpires,
-          });
+        // Delete removed services
+        const toDelete = [...existingIds].filter(eid => !keptIds.has(eid));
+        if (toDelete.length > 0) {
+          await trx(servicesTable).whereIn(srvCols.id, toDelete).del();
         }
       }
+
       return updated;
     });
 
@@ -193,10 +292,10 @@ const deleteWarehouse = async (req, res) => {
   if (!id) return res.status(400).json({ error: "Missing id" });
 
   try {
-    const deleted = await db(warehouseTable).where(cols.id, id).del();
-    if (!deleted) {
-      return res.status(404).json({ error: "Không tìm thấy" });
-    }
+    await db.transaction(async (trx) => {
+      await trx(servicesTable).where(srvCols.stockId, id).del();
+      await trx(warehouseTable).where(cols.id, id).del();
+    });
     res.json({ success: true });
   } catch (error) {
     logger.error("[warehouse] Delete failed", {

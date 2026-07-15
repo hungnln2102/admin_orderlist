@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 const { registerTelegramSubscribers } = require('./subscribers/telegramSubscriber');
 const { registerSepaySubscribers } = require('./subscribers/sepaySubscriber');
 const { registerFinancialMetricsSubscribers } = require('./subscribers/financialMetricsSubscriber');
+const { registerWarehouseSubscribers } = require('./subscribers/warehouseSubscriber');
 
 function registerAllSubscribers() {
   logger.info('[EventBus] Registering all subscribers...');
@@ -13,6 +14,7 @@ function registerAllSubscribers() {
   registerTelegramSubscribers();
   registerSepaySubscribers();
   registerFinancialMetricsSubscribers();
+  registerWarehouseSubscribers();
 
   logger.info('[EventBus] All subscribers registered successfully.');
 }

@@ -39,9 +39,15 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
         return { value: name, label: name };
       });
 
-    const fromStock = items
-      .map((it) => String(it.category || "").trim())
-      .filter(Boolean);
+    const fromStock: string[] = [];
+    items.forEach((it) => {
+      if (Array.isArray(it.services)) {
+        it.services.forEach((srv) => {
+          const cat = String(srv.category || "").trim();
+          if (cat) fromStock.push(cat);
+        });
+      }
+    });
 
     const seen = new Set<string>();
     const merged: ProductOption[] = [];

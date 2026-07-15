@@ -84,20 +84,14 @@ export const StorageTable: React.FC<StorageTableProps> = ({
         <div className="overflow-x-auto">
         <table className="min-w-[920px] w-full table-fixed border-separate border-spacing-y-4 text-white">
           <colgroup>
-            <col className="w-[28%]" />
-            <col className="w-[26%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
-            <col className="w-[4%]" />
+            <col className="w-[40%]" />
+            <col className="w-[40%]" />
             <col className="w-[20%]" />
           </colgroup>
           <thead>
             <tr className="[&>th]:px-1.5 [&>th]:pb-2 [&>th]:text-center [&>th]:text-[9px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-indigo-300/70 sm:[&>th]:px-2 sm:[&>th]:text-[10px]">
               <th className="!px-2 sm:!px-3">Sản phẩm</th>
               <th>Tài khoản</th>
-              <th>Trạng thái</th>
-              <th>Hạn SD</th>
-              <th>V</th>
               <th className="pr-2 text-right sm:pr-3">Thao tác</th>
             </tr>
           </thead>

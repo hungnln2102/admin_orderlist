@@ -1,18 +1,34 @@
 import { normalizeSearchText } from "@/shared/text";
 
-export type WarehouseItem = {
+export type WarehouseService = {
   id?: number;
+  stock_id?: number;
   category?: string | null;
-  account?: string | null;
   password?: string | null;
   backup_email?: string | null;
   two_fa?: string | null;
-  note?: string | null;
   status?: string | null;
   expires_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type WarehouseItem = {
+  id?: number;
+  account?: string | null;
+  note?: string | null;
+  status?: string | null;
   is_verified?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
+  services?: WarehouseService[];
+
+  // Legacy fields for UI compatibility if needed during transition
+  category?: string | null;
+  password?: string | null;
+  backup_email?: string | null;
+  two_fa?: string | null;
+  expires_at?: string | null;
 };
 
 export const inputClass =

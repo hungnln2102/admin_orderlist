@@ -13,17 +13,20 @@ const PACKAGE_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const STOCK_DEF = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
+const SRV_DEF = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
 
 const TABLES = {
   packageProduct: tableName(PACKAGE_DEF.tableName, SCHEMA_PRODUCT),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
   productStock: tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT),
+  stockServices: tableName(SRV_DEF.tableName, SCHEMA_PRODUCT),
 };
 
 const PRODUCT_SCHEMA_COLS = PRODUCT_DEF.columns;
 const VARIANT_COLS = VARIANT_DEF.columns;
 const STOCK_COLS = STOCK_DEF.columns;
+const SRV_COLS = SRV_DEF.columns;
 
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
@@ -32,31 +35,37 @@ const PACKAGE_PRODUCTS_SELECT = `
     p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)} AS package_name,
     p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageRequiresActivation)} AS product_requires_activation,
     stk.${quoteIdent(STOCK_COLS.accountUsername)} AS package_username,
-    stk.${quoteIdent(STOCK_COLS.passwordEncrypted)} AS package_password,
-    stk.${quoteIdent(STOCK_COLS.backupEmail)} AS package_mail_2nd,
+    ss1.${quoteIdent(SRV_COLS.passwordEncrypted)} AS package_password,
+    ss1.${quoteIdent(SRV_COLS.backupEmail)} AS package_mail_2nd,
     stk.${quoteIdent(STOCK_COLS.note)} AS package_note,
-    stk.${quoteIdent(STOCK_COLS.twoFaEncrypted)} AS package_two_fa,
+    ss1.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS package_two_fa,
     pp.${QUOTED_COLS.packageProduct.supplier} AS package_supplier,
     pp.${QUOTED_COLS.packageProduct.cost} AS package_import,
     pp.${QUOTED_COLS.packageProduct.slot} AS package_slot,
-    stk.${quoteIdent(STOCK_COLS.expiresAt)} AS package_expired,
-    stk.${quoteIdent(STOCK_COLS.expiresAt)}::text AS package_expired_raw,
+    ss1.${quoteIdent(SRV_COLS.expiresAt)} AS package_expired,
+    ss1.${quoteIdent(SRV_COLS.expiresAt)}::text AS package_expired_raw,
     pp.${QUOTED_COLS.packageProduct.match} AS package_match,
     pp.${QUOTED_COLS.packageProduct.stockId} AS stock_id,
     pp.${QUOTED_COLS.packageProduct.storageId} AS storage_id,
     pp.${QUOTED_COLS.packageProduct.storageTotal} AS storage_total,
     stk2.${quoteIdent(STOCK_COLS.accountUsername)} AS storage_username,
-    stk2.${quoteIdent(STOCK_COLS.passwordEncrypted)} AS storage_password,
-    stk2.${quoteIdent(STOCK_COLS.backupEmail)} AS storage_mail,
+    ss2.${quoteIdent(SRV_COLS.passwordEncrypted)} AS storage_password,
+    ss2.${quoteIdent(SRV_COLS.backupEmail)} AS storage_mail,
     stk2.${quoteIdent(STOCK_COLS.note)} AS storage_note,
-    stk2.${quoteIdent(STOCK_COLS.twoFaEncrypted)} AS storage_two_fa,
+    ss2.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS storage_two_fa,
     COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
   FROM ${TABLES.packageProduct} pp
   LEFT JOIN ${TABLES.product} p ON p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)} = pp.${QUOTED_COLS.packageProduct.packageId}
   LEFT JOIN ${TABLES.productStock} stk
     ON stk.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.stockId}
+  LEFT JOIN (
+    SELECT DISTINCT ON (stock_id) * FROM ${TABLES.stockServices}
+  ) ss1 ON ss1.id = pp.${quoteIdent(PACKAGE_DEF.columns.stockServiceId)} OR (pp.${quoteIdent(PACKAGE_DEF.columns.stockServiceId)} IS NULL AND ss1.stock_id = stk.id)
   LEFT JOIN ${TABLES.productStock} stk2
     ON stk2.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.storageId}
+  LEFT JOIN (
+    SELECT DISTINCT ON (stock_id) * FROM ${TABLES.stockServices}
+  ) ss2 ON ss2.stock_id = stk2.id
   LEFT JOIN (
     SELECT
       v.${quoteIdent(VARIANT_COLS.productId)} AS product_id,

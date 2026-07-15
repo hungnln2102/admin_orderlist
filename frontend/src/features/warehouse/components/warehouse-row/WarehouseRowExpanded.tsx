@@ -132,20 +132,65 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
             />
           ) : (
             <>
-              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 sm:[&>*]:min-w-0 lg:grid-cols-3 lg:[grid-template-columns:repeat(3,minmax(0,1fr))] xl:grid-cols-4 xl:[grid-template-columns:repeat(4,minmax(0,1fr))]">
-                <DetailCard theme={theme} label="Tài khoản">
-                  <CopyableValue value={item.account} showButtonOnHover={false} />
-                </DetailCard>
-                <DetailCard theme={theme} label="Mật khẩu">
-                  <CopyableValue value={item.password} mono showButtonOnHover={false} />
-                </DetailCard>
-                <DetailCard theme={theme} label="Mail dự phòng">
-                  <CopyableValue value={item.backup_email} showButtonOnHover={false} />
-                </DetailCard>
-                <DetailCard theme={theme} label="2FA">
-                  <CopyableValue value={item.two_fa} mono showButtonOnHover={false} />
-                </DetailCard>
-              </div>
+              {(item.services && item.services.length > 0) ? (
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-sm text-indigo-100">
+                    <thead className="text-[10px] uppercase text-indigo-300 border-b border-indigo-500/20">
+                      <tr>
+                        <th className="px-3 py-2">Dịch vụ</th>
+                        <th className="px-3 py-2">Mật khẩu</th>
+                        <th className="px-3 py-2">Mail Backup</th>
+                        <th className="px-3 py-2">2FA</th>
+                        <th className="px-3 py-2">Hạn sử dụng</th>
+                        <th className="px-3 py-2">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-indigo-500/10">
+                      {item.services.map((srv, idx) => (
+                        <tr key={srv.id || idx}>
+                          <td className="px-3 py-2 font-semibold text-white">{srv.category || "—"}</td>
+                          <td className="px-3 py-2">
+                            <div className="w-fit max-w-full">
+                              <CopyableValue value={srv.password} mono showButtonOnHover={false} />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="w-fit max-w-full">
+                              <CopyableValue value={srv.backup_email} showButtonOnHover={false} />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="w-fit max-w-full">
+                              <CopyableValue value={srv.two_fa} mono showButtonOnHover={false} />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">{srv.expires_at ? new Date(srv.expires_at).toLocaleDateString('vi-VN') : "—"}</td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] ${srv.status === 'Đang Sử Dụng' ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                              {srv.status || "—"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <DetailCard theme={theme} label="Tài khoản">
+                    <CopyableValue value={item.account} showButtonOnHover={false} />
+                  </DetailCard>
+                  <DetailCard theme={theme} label="Mật khẩu">
+                    <CopyableValue value={item.password} mono showButtonOnHover={false} />
+                  </DetailCard>
+                  <DetailCard theme={theme} label="Mail dự phòng">
+                    <CopyableValue value={item.backup_email} showButtonOnHover={false} />
+                  </DetailCard>
+                  <DetailCard theme={theme} label="2FA">
+                    <CopyableValue value={item.two_fa} mono showButtonOnHover={false} />
+                  </DetailCard>
+                </div>
+              )}
               <div
                 className={`mt-4 min-w-0 overflow-hidden rounded-xl border p-4 text-center ${theme.detailItemClass}`}
               >

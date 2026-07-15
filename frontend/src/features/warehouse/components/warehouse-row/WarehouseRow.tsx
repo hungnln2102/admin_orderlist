@@ -70,12 +70,23 @@ export const WarehouseRow = React.memo(function WarehouseRow({
         }`}
       >
         <td className={productCellClass}>
-          <span
-            className="block whitespace-nowrap text-center text-[10px] font-bold uppercase leading-tight tracking-wide text-white sm:text-[11px]"
-            title={item.category || ""}
-          >
-            {item.category || "—"}
-          </span>
+          <div className="flex flex-wrap justify-center gap-1">
+            {(item.services && item.services.length > 0) ? (
+              item.services.map((srv, idx) => (
+                <span
+                  key={srv.id || idx}
+                  className={`inline-block whitespace-nowrap text-center text-[9px] font-bold uppercase tracking-wide text-white px-1.5 py-0.5 rounded ${srv.status === 'Đang Sử Dụng' ? 'bg-white/10 text-white/50 line-through' : 'bg-indigo-500/80'}`}
+                  title={`${srv.category || "—"} - ${srv.status || ""}`}
+                >
+                  {srv.category || "—"} {srv.status === 'Đang Sử Dụng' ? '(Hết)' : ''}
+                </span>
+              ))
+            ) : (
+              <span className="block whitespace-nowrap text-center text-[10px] font-bold uppercase leading-tight tracking-wide text-white sm:text-[11px]">
+                {item.category || "—"}
+              </span>
+            )}
+          </div>
         </td>
 
         <td className={`${cellClass} max-w-0 overflow-hidden`}>
@@ -83,39 +94,8 @@ export const WarehouseRow = React.memo(function WarehouseRow({
             className="block truncate text-center text-[10px] font-medium text-indigo-100/90 sm:text-[11px]"
             title={item.account || ""}
           >
-            {item.account || "—"}
+            {item.account || "?"}
           </span>
-        </td>
-
-        <td className={`${cellClass} text-center`}>
-          <span
-            className={`inline-block max-w-full truncate rounded-full border px-1.5 py-0.5 text-[7px] font-bold uppercase leading-tight sm:text-[8px] ${warehouseStatusClass(
-              item.status
-            )}`}
-            title={item.status || ""}
-          >
-            {item.status || "—"}
-          </span>
-        </td>
-
-        <td className={`${cellClass} text-center`}>
-          <span className="inline-block whitespace-nowrap text-[9px] font-semibold tabular-nums text-indigo-200/90 sm:text-[10px]">
-            {exp}
-          </span>
-        </td>
-
-        <td className={`${cellClass} text-center`}>
-          {item.is_verified ? (
-            <CheckCircleSolid
-              className="mx-auto h-4 w-4 text-emerald-400 sm:h-5 sm:w-5"
-              aria-label="Đã xác minh"
-            />
-          ) : (
-            <XCircleIcon
-              className="mx-auto h-4 w-4 text-white/20 sm:h-5 sm:w-5"
-              aria-label="Chưa xác minh"
-            />
-          )}
         </td>
 
         <td

@@ -1,4 +1,5 @@
 const { db, withTransaction } = require("../../db");
+const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../../config/dbSchema");
 const { normalizeDateInput } = require("../../utils/normalizers");
 const { TABLES, ruleCols, stockCols, pkgCols, productCols } = require("./constants");
 const logger = require("../../utils/logger");
@@ -14,22 +15,12 @@ const findRuleByProductId = async (trxOrDb, productId) => {
   return row || null;
 };
 
+const SRV_DEF = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
+const SRV_COLS = SRV_DEF.columns;
+TABLES.stockServices = tableName(SRV_DEF.tableName, SCHEMA_PRODUCT);
+
 /**
  * Tao luon stock + package trong mot transaction.
- *
- * @param {object} payload
- * @param {number} payload.productId
- * @param {number|null} payload.supplierId
- * @param {number|null} payload.importPrice
- * @param {number|null} payload.slotLimit
- * @param {string|null} payload.matchMode  "information_order" | "slot"
- * @param {string|null} payload.account
- * @param {string|null} payload.password
- * @param {string|null} payload.backup_email
- * @param {string|null} payload.two_fa
- * @param {string|null} payload.expires_at
- * @param {string|null} payload.note
- * @returns {{ stock: object, pkg: object }}
  */
 const createImportPackage = async (payload) => {
   const {
@@ -61,32 +52,32 @@ const createImportPackage = async (payload) => {
     // 2. Insert PRODUCT_STOCK
     const [stock] = await trx(TABLES.stock)
       .insert({
-        [stockCols.productType]: category,
         [stockCols.accountUsername]: account || null,
-        [stockCols.passwordEncrypted]: password || null,
-        [stockCols.backupEmail]: backup_email || null,
-        [stockCols.twoFaEncrypted]: two_fa || null,
         [stockCols.note]: note || null,
-        [stockCols.status]: "Ton",
-        [stockCols.expiresAt]: normalizeDateInput(expires_at) || null,
+        [stockCols.status]: "Tồn",
         [stockCols.isVerified]: false,
         [stockCols.createdAt]: now,
         [stockCols.updatedAt]: now,
       })
-      .returning([
-        stockCols.id,
-        stockCols.productType,
-        stockCols.accountUsername,
-        stockCols.passwordEncrypted,
-        stockCols.backupEmail,
-        stockCols.twoFaEncrypted,
-        stockCols.note,
-        stockCols.status,
-        stockCols.expiresAt,
-        stockCols.isVerified,
-        stockCols.createdAt,
-        stockCols.updatedAt,
-      ]);
+      .returning("*");
+
+    // 2.5 Insert STOCK_SERVICES
+    const [srv] = await trx(TABLES.stockServices)
+      .insert({
+        [SRV_COLS.stockId]: stock.id !== undefined ? stock.id : stock,
+        [SRV_COLS.productType]: category,
+        [SRV_COLS.passwordEncrypted]: password || null,
+        [SRV_COLS.backupEmail]: backup_email || null,
+        [SRV_COLS.twoFaEncrypted]: two_fa || null,
+        [SRV_COLS.expiresAt]: normalizeDateInput(expires_at) || null,
+        [SRV_COLS.status]: "Tồn",
+        [SRV_COLS.createdAt]: now,
+        [SRV_COLS.updatedAt]: now,
+      })
+      .returning("*");
+      
+    const stockRow = stock.id !== undefined ? stock : { id: stock };
+    const srvRow = srv.id !== undefined ? srv : { id: srv };
 
     const normalizedMatchMode =
       matchMode === "slot" ? "slot" : "information_order";
@@ -101,53 +92,46 @@ const createImportPackage = async (payload) => {
         [pkgCols.cost]: importPrice ?? null,
         [pkgCols.slot]: resolvedSlotLimit,
         [pkgCols.match]: normalizedMatchMode,
-        [pkgCols.stockId]: stock[stockCols.id],
+        [pkgCols.stockId]: stockRow.id,
+        [pkgCols.stockServiceId]: srvRow.id,
         [pkgCols.storageId]: null,
         [pkgCols.storageTotal]: null,
       })
-      .returning([
-        pkgCols.id,
-        pkgCols.packageId,
-        pkgCols.supplier,
-        pkgCols.cost,
-        pkgCols.slot,
-        pkgCols.match,
-        pkgCols.stockId,
-        pkgCols.storageId,
-        pkgCols.storageTotal,
-      ]);
+      .returning("*");
+      
+    const pkgRow = pkg.id !== undefined ? pkg : { id: pkg };
 
     logger.info("[import-packages] Tao stock + package thanh cong", {
-      stockId: stock[stockCols.id],
-      packageId: pkg[pkgCols.id],
+      stockId: stockRow.id,
+      packageId: pkgRow.id,
       productId,
     });
 
     return {
       stock: {
-        id: stock[stockCols.id],
-        category: stock[stockCols.productType],
-        account: stock[stockCols.accountUsername],
-        password: stock[stockCols.passwordEncrypted],
-        backup_email: stock[stockCols.backupEmail],
-        two_fa: stock[stockCols.twoFaEncrypted],
-        note: stock[stockCols.note],
-        status: stock[stockCols.status],
-        expires_at: stock[stockCols.expiresAt],
-        is_verified: stock[stockCols.isVerified],
-        created_at: stock[stockCols.createdAt],
-        updated_at: stock[stockCols.updatedAt],
+        id: stockRow.id,
+        category: category,
+        account: stockRow[stockCols.accountUsername],
+        password: password,
+        backup_email: backup_email,
+        two_fa: two_fa,
+        note: stockRow[stockCols.note],
+        status: stockRow[stockCols.status],
+        expires_at: expires_at,
+        is_verified: stockRow[stockCols.isVerified],
+        created_at: stockRow[stockCols.createdAt],
+        updated_at: stockRow[stockCols.updatedAt],
       },
       pkg: {
-        id: pkg[pkgCols.id],
-        package_id: pkg[pkgCols.packageId],
-        supplier: pkg[pkgCols.supplier],
-        import_price: pkg[pkgCols.cost],
-        slot: pkg[pkgCols.slot],
-        match: pkg[pkgCols.match],
-        stock_id: pkg[pkgCols.stockId],
-        storage_id: pkg[pkgCols.storageId],
-        storage_total: pkg[pkgCols.storageTotal],
+        id: pkgRow.id,
+        package_id: pkgRow[pkgCols.packageId],
+        supplier: pkgRow[pkgCols.supplier],
+        import_price: pkgRow[pkgCols.cost],
+        slot: pkgRow[pkgCols.slot],
+        match: pkgRow[pkgCols.match],
+        stock_id: pkgRow[pkgCols.stockId],
+        storage_id: pkgRow[pkgCols.storageId],
+        storage_total: pkgRow[pkgCols.storageTotal],
       },
     };
   });
