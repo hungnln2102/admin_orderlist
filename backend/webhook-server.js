@@ -12,7 +12,7 @@ const { loadBackendEnv } = require("./src/config/loadEnv");
 loadBackendEnv();
 
 const logger = require("./src/utils/logger");
-const { notifyCritical } = require("./src/utils/telegramErrorNotifier");
+const { notifyCritical } = require("./src/domains/notifications/telegram").systemNotifier;
 
 process.on("uncaughtException", (err) => {
   logger.error("[WEBHOOK][FATAL] uncaughtException", {

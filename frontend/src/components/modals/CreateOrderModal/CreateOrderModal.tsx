@@ -124,6 +124,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     isDraftComplete,
     isLoading,
     totalOrdersToCreate,
+    orderCreationKind,
   });
   const unitPrice = Number(formData[ORDER_FIELDS.PRICE]) || 0;
   return (
@@ -140,6 +141,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             onClose={onClose}
           />
           <CreateOrderModalBody
+            orderCreationKind={orderCreationKind}
             onSubmit={handleSubmitWithPackage}
             customer={{
               formData,
@@ -205,6 +207,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             pricing={{
               customMode,
               customerType,
+              orderCreationKind,
               formData,
               registerDateDMY,
               isMavrykSupply,

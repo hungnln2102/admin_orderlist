@@ -44,9 +44,9 @@ export const useCreateOrderImportPackageFlow = ({
     }
   }, [isImportOrder, isOpen, selectedProductId, loadImportRule]);
 
-  const handleSubmitWithPackage = useCallback(
+    const handleSubmitWithPackage = useCallback(
     (event: React.FormEvent) => {
-      if (isImportOrder && importRule?.enabled && selectedProductId) {
+      if (isImportOrder && selectedProductId) {
         pendingImportPackageRef.current = {
           productId: selectedProductId,
           supplierId: selectedSupplyId,

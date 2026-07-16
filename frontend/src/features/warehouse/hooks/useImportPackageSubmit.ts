@@ -72,7 +72,6 @@ export const useImportPackageSubmit = (
       importPrice?: number | null;
       slotLimit?: number | null;
     }) => {
-      if (!rule?.enabled) return null;
       setSubmitting(true);
       setError(null);
       try {
@@ -80,8 +79,8 @@ export const useImportPackageSubmit = (
           productId: params.productId,
           supplierId: params.supplierId,
           importPrice: params.importPrice,
-          slotLimit: params.slotLimit ?? rule.defaultSlotLimit,
-          matchMode: rule.defaultMatchMode,
+          slotLimit: params.slotLimit ?? rule?.defaultSlotLimit ?? 1,
+          matchMode: rule?.defaultMatchMode ?? "information_order",
           account: data.account || null,
           password: data.password || null,
           backup_email: data.backup_email || null,

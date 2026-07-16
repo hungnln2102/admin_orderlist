@@ -10,14 +10,14 @@ import {
   panelTitleClass,
   readOnlyClass,
 } from "../helpers";
-import type { CustomerType, Order } from "../types";
+import type { CreateOrderCreationKind, CustomerType, Order } from "../types";
 
 type CreateOrderPricingSectionProps = {
   customMode: boolean;
   customerType: CustomerType;
+  orderCreationKind?: CreateOrderCreationKind;
   formData: Partial<Order>;
   registerDateDMY: string;
-  /** NCC Mavryk/Shop: không dùng giá nhập; giá bán = lợi nhuận */
   isMavrykSupply?: boolean;
   costValue: string | number | undefined;
   priceValue: string | number | undefined;
@@ -32,6 +32,7 @@ type CreateOrderPricingSectionProps = {
 export const CreateOrderPricingSection = ({
   customMode,
   customerType,
+  orderCreationKind,
   formData,
   registerDateDMY,
   isMavrykSupply = false,
@@ -45,6 +46,7 @@ export const CreateOrderPricingSection = ({
   onPriceChange,
 }: CreateOrderPricingSectionProps) => {
   const isGift = customerType === ORDER_CODE_PREFIXES.GIFT;
+  const isImport = orderCreationKind === "import";
   const costDisplay = isMavrykSupply ? 0 : costValue;
 
   const copy = useMemo(
@@ -53,37 +55,49 @@ export const CreateOrderPricingSection = ({
   );
 
   return (
-    <section className={`${panelClass} lg:col-span-2`}>
-      <div className="mb-4">
-        <h4 className={panelTitleClass}>Chi phí & thời hạn đơn hàng</h4>
+    <section className={`${panelClass} lg:col-span-2 relative overflow-hidden group`}>
+      {/* Decorative premium gradients for taste skill */}
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+      <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+      <div className="mb-4 relative z-10 flex items-center gap-2">
+        <div className="w-1.5 h-4 bg-gradient-to-b from-indigo-400 to-indigo-600 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.5)]" />
+        <h4 className={`${panelTitleClass} !mb-0 text-white/90 font-bold tracking-wide`}>
+          Chi phí & thông tin thời gian
+        </h4>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <div>
-          <label className={labelClass}>Ngày đăng ký</label>
-          <input
-            type="text"
-            name={ORDER_FIELDS.ORDER_DATE}
-            value={registerDateDMY}
-            placeholder="dd/mm/yyyy"
-            autoComplete="off"
-            spellCheck={false}
-            onChange={onRegisterDateChange}
-            onBlur={onRegisterDateBlur}
-            className={inputClass}
-          />
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 relative z-10">
+        <div className="space-y-1.5">
+          <label className={`${labelClass} text-indigo-200/70`}>Ngày đăng ký</label>
+          <div className="relative group/input">
+            <input
+              type="text"
+              name={ORDER_FIELDS.ORDER_DATE}
+              value={registerDateDMY}
+              placeholder="dd/mm/yyyy"
+              autoComplete="off"
+              spellCheck={false}
+              onChange={onRegisterDateChange}
+              onBlur={onRegisterDateBlur}
+              className={`${inputClass} bg-white/[0.03] border-indigo-500/20 focus:border-indigo-400 focus:bg-indigo-500/[0.05] transition-all duration-300 placeholder:text-white/20`}
+            />
+          </div>
         </div>
-        <div>
-          <label className={labelClass}>Số ngày đăng ký</label>
+
+        <div className="space-y-1.5">
+          <label className={`${labelClass} text-indigo-200/70`}>Số ngày đăng ký</label>
           <input
             type="text"
             name={ORDER_FIELDS.DAYS}
             value={(formData[ORDER_FIELDS.DAYS] as string) || ""}
             readOnly
-            className={`${inputClass} ${readOnlyClass}`}
+            className={`${inputClass} ${readOnlyClass} bg-white/[0.01] border-white/5 text-white/40`}
           />
         </div>
-        <div>
-          <label className={labelClass}>Ngày hết hạn</label>
+
+        <div className="space-y-1.5">
+          <label className={`${labelClass} text-indigo-200/70`}>Ngày hết hạn</label>
           <input
             type="text"
             name={ORDER_FIELDS.EXPIRY_DATE}
@@ -93,11 +107,14 @@ export const CreateOrderPricingSection = ({
             spellCheck={false}
             onChange={onExpiryDateChange}
             onBlur={onExpiryDateBlur}
-            className={`${inputClass} font-black text-rose-300`}
+            className={`${inputClass} font-black text-rose-300 bg-white/[0.03] border-rose-500/20 focus:border-rose-400 focus:bg-rose-500/[0.05] transition-all duration-300 placeholder:text-rose-300/20`}
           />
         </div>
-        <div>
-          <label className={labelClass}>{copy.costLabel}</label>
+
+        <div className="space-y-1.5">
+          <label className={`${labelClass} text-indigo-200/70`}>
+            {isImport ? "Giá nhập (Cost)" : copy.costLabel}
+          </label>
           {customMode && !isMavrykSupply ? (
             <input
               type="text"
@@ -105,7 +122,7 @@ export const CreateOrderPricingSection = ({
               name={ORDER_FIELDS.COST}
               value={formatCurrencyPlain(Number(costValue ?? 0))}
               onChange={onCostChange}
-              className={`${inputClass} font-semibold`}
+              className={`${inputClass} font-bold text-amber-300 bg-white/[0.03] border-amber-500/20 focus:border-amber-400 focus:bg-amber-500/[0.05] transition-all duration-300 shadow-[inset_0_1px_4px_rgba(0,0,0,0.1)]`}
             />
           ) : (
             <input
@@ -114,43 +131,44 @@ export const CreateOrderPricingSection = ({
               value={formatCurrency(costDisplay ?? 0)}
               readOnly
               title={copy.costFieldTitle}
-              className={`${inputClass} font-semibold ${readOnlyClass}`}
+              className={`${inputClass} font-bold text-amber-300/70 ${readOnlyClass} bg-white/[0.01] border-white/5`}
             />
           )}
         </div>
-        <div>
-          <label className={labelClass}>{copy.priceLabel}</label>
-          {customMode ? (
-            <input
-              type="text"
-              inputMode="numeric"
-              name={ORDER_FIELDS.PRICE}
-              value={
-                isGift
-                  ? "0"
-                  : formatCurrencyPlain(Number(priceValue ?? 0))
-              }
-              onChange={isGift ? undefined : onPriceChange}
-              readOnly={isGift}
-              title={copy.priceFieldTitle}
-              className={`${inputClass} font-black text-emerald-300 ${
-                isGift ? readOnlyClass : ""
-              }`}
-            />
-          ) : (
-            <input
-              type="text"
-              name={ORDER_FIELDS.PRICE}
-              inputMode={isGift ? "numeric" : undefined}
-              value={
-                isGift ? "0" : formatCurrency(priceValue ?? 0)
-              }
-              readOnly
-              title={copy.priceFieldTitle}
-              className={`${inputClass} font-black text-emerald-300 ${readOnlyClass}`}
-            />
-          )}
-        </div>
+
+        {!isImport && (
+          <div className="space-y-1.5">
+            <label className={`${labelClass} text-indigo-200/70`}>{copy.priceLabel}</label>
+            {customMode ? (
+              <input
+                type="text"
+                inputMode="numeric"
+                name={ORDER_FIELDS.PRICE}
+                value={
+                  isGift
+                    ? "0"
+                    : formatCurrencyPlain(Number(priceValue ?? 0))
+                }
+                onChange={isGift ? undefined : onPriceChange}
+                readOnly={isGift}
+                title={copy.priceFieldTitle}
+                className={`${inputClass} font-black text-emerald-300 bg-white/[0.03] border-emerald-500/30 focus:border-emerald-400 focus:bg-emerald-500/[0.05] transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.1)]`}
+              />
+            ) : (
+              <input
+                type="text"
+                name={ORDER_FIELDS.PRICE}
+                inputMode={isGift ? "numeric" : undefined}
+                value={
+                  isGift ? "0" : formatCurrency(priceValue ?? 0)
+                }
+                readOnly
+                title={copy.priceFieldTitle}
+                className={`${inputClass} font-black text-emerald-300/70 ${readOnlyClass} bg-white/[0.01] border-white/5`}
+              />
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

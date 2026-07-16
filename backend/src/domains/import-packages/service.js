@@ -38,33 +38,59 @@ const createImportPackage = async (payload) => {
   } = payload;
 
   const rule = await findRuleByProductId(db, productId);
+  const eventBus = require("../../events/eventBus");
+  const EVENTS = require("../../events/eventTypes");
 
-  return withTransaction(async (trx) => {
-    // 1. Lay ten san pham de dien vao category cua stock
-    const productRow = await trx(TABLES.product)
-      .select(productCols.packageName)
-      .where(productCols.id, productId)
+  const result = await withTransaction(async (trx) => {
+    // 1. Lấy tên sản phẩm (display_name) từ variant
+    const variantRow = await trx(tableName("variant", SCHEMA_PRODUCT))
+      .select("display_name")
+      .where("id", productId)
       .first();
-    const category = productRow?.[productCols.packageName] || null;
+    const category = variantRow?.display_name || null;
 
     const now = new Date().toISOString();
 
-    // 2. Insert PRODUCT_STOCK
-    const [stock] = await trx(TABLES.stock)
-      .insert({
-        [stockCols.accountUsername]: account || null,
-        [stockCols.note]: note || null,
-        [stockCols.status]: "Tồn",
-        [stockCols.isVerified]: false,
-        [stockCols.createdAt]: now,
-        [stockCols.updatedAt]: now,
-      })
-      .returning("*");
+    // 2. Kiểm tra xem tài khoản đã tồn tại trong product_stocks chưa
+    let stockId = null;
+    let isNewStock = false;
+    
+    if (account) {
+      const existingStock = await trx(TABLES.stock)
+        .select(stockCols.id)
+        .where(stockCols.accountUsername, account)
+        .first();
+        
+      if (existingStock) {
+        stockId = existingStock[stockCols.id];
+      }
+    }
+
+    let stockObj = {};
+    if (!stockId) {
+      // Chưa tồn tại -> tạo mới
+      const [insertedStock] = await trx(TABLES.stock)
+        .insert({
+          [stockCols.accountUsername]: account || null,
+          [stockCols.note]: note || null,
+          [stockCols.status]: "Tồn",
+          [stockCols.isVerified]: false,
+          [stockCols.createdAt]: now,
+          [stockCols.updatedAt]: now,
+        })
+        .returning("*");
+      stockId = insertedStock.id !== undefined ? insertedStock.id : insertedStock;
+      stockObj = insertedStock;
+      isNewStock = true;
+    } else {
+      const existingStock = await trx(TABLES.stock).where(stockCols.id, stockId).first();
+      stockObj = existingStock;
+    }
 
     // 2.5 Insert STOCK_SERVICES
     const [srv] = await trx(TABLES.stockServices)
       .insert({
-        [SRV_COLS.stockId]: stock.id !== undefined ? stock.id : stock,
+        [SRV_COLS.stockId]: stockId,
         [SRV_COLS.productType]: category,
         [SRV_COLS.passwordEncrypted]: password || null,
         [SRV_COLS.backupEmail]: backup_email || null,
@@ -76,7 +102,6 @@ const createImportPackage = async (payload) => {
       })
       .returning("*");
       
-    const stockRow = stock.id !== undefined ? stock : { id: stock };
     const srvRow = srv.id !== undefined ? srv : { id: srv };
 
     const normalizedMatchMode =
@@ -84,7 +109,7 @@ const createImportPackage = async (payload) => {
     const resolvedSlotLimit =
       slotLimit ?? rule?.default_slot_limit ?? 1;
 
-    // 3. Insert PACKAGE_PRODUCT lien ket voi stock vua tao
+    // 3. Insert PACKAGE_PRODUCT liên kết với stock
     const [pkg] = await trx(TABLES.package)
       .insert({
         [pkgCols.packageId]: productId,
@@ -92,7 +117,7 @@ const createImportPackage = async (payload) => {
         [pkgCols.cost]: importPrice ?? null,
         [pkgCols.slot]: resolvedSlotLimit,
         [pkgCols.match]: normalizedMatchMode,
-        [pkgCols.stockId]: stockRow.id,
+        [pkgCols.stockId]: stockId,
         [pkgCols.stockServiceId]: srvRow.id,
         [pkgCols.storageId]: null,
         [pkgCols.storageTotal]: null,
@@ -101,26 +126,27 @@ const createImportPackage = async (payload) => {
       
     const pkgRow = pkg.id !== undefined ? pkg : { id: pkg };
 
-    logger.info("[import-packages] Tao stock + package thanh cong", {
-      stockId: stockRow.id,
+    logger.info("[import-packages] Tao stock/service + package thanh cong", {
+      stockId,
       packageId: pkgRow.id,
       productId,
+      isNewStock,
     });
 
     return {
       stock: {
-        id: stockRow.id,
+        id: stockId,
         category: category,
-        account: stockRow[stockCols.accountUsername],
+        account: stockObj[stockCols.accountUsername],
         password: password,
         backup_email: backup_email,
         two_fa: two_fa,
-        note: stockRow[stockCols.note],
-        status: stockRow[stockCols.status],
+        note: stockObj[stockCols.note],
+        status: stockObj[stockCols.status],
         expires_at: expires_at,
-        is_verified: stockRow[stockCols.isVerified],
-        created_at: stockRow[stockCols.createdAt],
-        updated_at: stockRow[stockCols.updatedAt],
+        is_verified: stockObj[stockCols.isVerified],
+        created_at: stockObj[stockCols.createdAt],
+        updated_at: stockObj[stockCols.updatedAt],
       },
       pkg: {
         id: pkgRow.id,
@@ -133,8 +159,27 @@ const createImportPackage = async (payload) => {
         storage_id: pkgRow[pkgCols.storageId],
         storage_total: pkgRow[pkgCols.storageTotal],
       },
+      payloadForEvent: {
+        stockId,
+        account: stockObj[stockCols.accountUsername],
+        serviceId: srvRow.id,
+        category,
+        password,
+        backup_email,
+        two_fa,
+        expires_at,
+        note,
+        packageId: pkgRow.id,
+        isNewStock
+      }
     };
   });
+
+  // 4. Emit event sau khi transaction thanh cong
+  eventBus.emit(EVENTS.IMPORT_PACKAGE_CREATED, result.payloadForEvent);
+
+  delete result.payloadForEvent;
+  return result;
 };
 
 /**

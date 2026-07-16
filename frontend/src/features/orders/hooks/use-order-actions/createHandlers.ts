@@ -19,20 +19,32 @@ const toOptionalNumber = (value: unknown): number | null => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-const postImportPackage = async (meta: ImportPackageMeta | null | undefined) => {
+const postImportPackage = async (
+  meta: ImportPackageMeta | null | undefined,
+  outgoingOrder: Record<string, unknown>
+) => {
   const productId = toOptionalNumber(meta?.productId);
   if (!productId) return;
 
   const data = meta?.data ?? {};
+  
+  const accountVal = typeof data.account === "string" && data.account 
+    ? data.account 
+    : (outgoingOrder[ORDER_FIELDS.INFORMATION_ORDER] as string | undefined);
+    
+  const expiresAtVal = typeof data.expires_at === "string" && data.expires_at 
+    ? data.expires_at 
+    : (outgoingOrder[ORDER_FIELDS.EXPIRY_DATE] as string | undefined);
+
   await createImportPackage({
     productId,
     supplierId: toOptionalNumber(meta?.supplierId),
     importPrice: toOptionalNumber(meta?.importPrice),
-    account: typeof data.account === "string" ? data.account : null,
+    account: accountVal ?? null,
     password: typeof data.password === "string" ? data.password : null,
     backup_email: typeof data.backup_email === "string" ? data.backup_email : null,
     two_fa: typeof data.two_fa === "string" ? data.two_fa : null,
-    expires_at: typeof data.expires_at === "string" ? data.expires_at : null,
+    expires_at: expiresAtVal ?? null,
     note: typeof data.note === "string" ? data.note : null,
   });
 };
@@ -139,7 +151,7 @@ export const buildSaveNewOrderHandler =
           const importPackageMeta = outgoing.__import_package as ImportPackageMeta | undefined;
           delete outgoing.__import_package;
           const created = await postSingleOrder(outgoing);
-          await postImportPackage(importPackageMeta);
+          await postImportPackage(importPackageMeta, outgoing);
           createdOrders.push(created);
         } catch (error) {
           const label = String(outgoing[ORDER_FIELDS.ID_PRODUCT] || `Đơn #${i + 1}`);
