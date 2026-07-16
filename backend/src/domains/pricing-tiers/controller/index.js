@@ -143,6 +143,12 @@ const upsertVariantMargins = async (req, res) => {
       );
     }
     await trx.commit();
+    try {
+      const { syncRenewalOrdersPriceForVariant } = require("../../../../services/pricing/syncRenewalPricing");
+      await syncRenewalOrdersPriceForVariant(variantId);
+    } catch (syncErr) {
+      logger.error("[PricingTier] Failed to sync renewal prices after upsertVariantMargins", { error: syncErr.message });
+    }
     writeUserEventLog(req, {
       action: "Sua bien loi nhuan bang gia",
       entity: "Bang gia",

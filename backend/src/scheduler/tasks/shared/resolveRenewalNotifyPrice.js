@@ -26,6 +26,24 @@ async function resolveRenewalNotifyPrice(client, row, computed) {
     const slot = await findLatestPendingSlotByOrder(client, orderCode);
     const expected = Number(slot?.expected_amount);
     if (Number.isFinite(expected) && expected > 0) {
+      const suffix = Number(slot?.amount_suffix) || 0;
+      const expectedNew = basePrice + suffix;
+      if (expectedNew !== expected && basePrice > 0) {
+        await client.query(
+          `UPDATE orders.order_payment_slots
+           SET expected_amount = $1, base_amount = $2
+           WHERE id = $3`,
+          [expectedNew, basePrice, slot.id]
+        );
+        await client.query(
+          `UPDATE orders.order_list
+           SET price = $1
+           WHERE id_order = $2`,
+          [expectedNew, orderCode]
+        );
+        logger.info(`[CRON][Renewal] Updated stale renewal slot price for order ${orderCode}: ${expected} -> ${expectedNew} (base ${basePrice} + suffix ${suffix})`);
+        return expectedNew;
+      }
       return expected;
     }
   }

@@ -25,6 +25,10 @@ function resolveAction(row, baseAmount) {
   const slotExpected = Number(row.slot_expected_amount) || 0;
 
   if (row.slot_id && slotExpected > 0) {
+    const suffix = Number(row.slot_amount_suffix) || 0;
+    if (baseAmount > 0 && slotExpected !== baseAmount + suffix) {
+      return "sync";
+    }
     return storedPrice === slotExpected ? null : "sync";
   }
 
@@ -88,7 +92,8 @@ async function reconcileSingleRenewalOrder(client, row, receiverAccount, options
   }
 
   if (action === "sync") {
-    const expectedAmount = Number(row.slot_expected_amount);
+    const suffix = Number(row.slot_amount_suffix) || 0;
+    const expectedAmount = baseAmount > 0 ? (baseAmount + suffix) : Number(row.slot_expected_amount);
     const previousPrice = Number(row.price) || 0;
     if (dryRun) {
       return {
@@ -98,8 +103,17 @@ async function reconcileSingleRenewalOrder(client, row, receiverAccount, options
         baseAmount,
         previousPrice,
         expectedAmount,
-        suffix: Number(row.slot_amount_suffix) || 0,
+        suffix,
       };
+    }
+
+    if (Number(row.slot_expected_amount) !== expectedAmount) {
+      await client.query(
+        `UPDATE orders.order_payment_slots
+         SET expected_amount = $1, base_amount = $2
+         WHERE id = $3`,
+        [expectedAmount, baseAmount, row.slot_id]
+      );
     }
 
     await client.query(
@@ -116,7 +130,7 @@ async function reconcileSingleRenewalOrder(client, row, receiverAccount, options
       baseAmount,
       previousPrice,
       expectedAmount,
-      suffix: Number(row.slot_amount_suffix) || 0,
+      suffix,
     };
   }
 

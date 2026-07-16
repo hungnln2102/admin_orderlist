@@ -169,6 +169,13 @@ const updateProductPrice = async (req, res) => {
           [parsedId, tier.id, ratio]
         );
       }
+
+      try {
+        const { syncRenewalOrdersPriceForVariant } = require("../../../../../services/pricing/syncRenewalPricing");
+        await syncRenewalOrdersPriceForVariant(parsedId);
+      } catch (syncErr) {
+        logger.error("[Pricing][Sync] Failed to sync renewal prices after updateProductPrice", { error: syncErr.message });
+      }
     }
 
     if (targetProductId && imageUrl !== undefined) {
