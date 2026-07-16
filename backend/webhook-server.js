@@ -37,6 +37,10 @@ process.on("unhandledRejection", (reason) => {
 const app = require("./webhook/sepay/app");
 const { HOST, PORT, SEPAY_WEBHOOK_PATH } = require("./webhook/sepay/config");
 
+// Đăng ký toàn bộ event subscribers (cực kỳ quan trọng để bắt sự kiện từ eventBus)
+const { registerAllSubscribers } = require("./src/events");
+registerAllSubscribers();
+
 const server = app.listen(PORT, HOST, () => {
   logger.info(
     `[Webhook] Sepay webhook listening at http://${HOST}:${PORT}${SEPAY_WEBHOOK_PATH}`

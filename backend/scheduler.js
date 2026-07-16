@@ -23,6 +23,10 @@ loadBackendEnv();
 const logger = require("./src/utils/logger");
 const { notifyCritical } = require("./src/domains/notifications/telegram").systemNotifier;
 
+// Đăng ký toàn bộ event subscribers
+const { registerAllSubscribers } = require("./src/events");
+registerAllSubscribers();
+
 process.on("uncaughtException", (err) => {
   logger.error("[SCHEDULER][FATAL] uncaughtException", {
     error: err.message,
