@@ -857,7 +857,7 @@ const runRenewal = async (
     }
 
     try {
-      const { eventBus, EVENTS } = require("../../../src/events");
+      const { eventBus, EVENTS } = require("../../src/events");
       // Truyền object chứa thông tin cần thiết
       eventBus.emit(EVENTS.ORDER_RENEWED, {
         id_order: orderCode,

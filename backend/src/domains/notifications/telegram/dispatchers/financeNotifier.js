@@ -28,7 +28,21 @@ function notifySepayReceived(orderCode, amount) {
   });
 }
 
+/**
+ * Báo webhook Sepay chuyển tiền ra (Money Out)
+ */
+function notifySepaySpent(orderCode, amount) {
+  const text = `💸 <b>Sepay Notification</b>\nĐã chuyển <b>${amount}đ</b> ra ngoài (Đơn <code>${orderCode}</code>)`;
+  enqueueMessage({
+    chat_id: TELEGRAM_CHAT_ID,
+    message_thread_id: TELEGRAM_FINANCE_TOPIC_ID,
+    text,
+    parse_mode: "HTML",
+  });
+}
+
 module.exports = {
   notifyFinanceDelta,
-  notifySepayReceived
+  notifySepayReceived,
+  notifySepaySpent
 };
