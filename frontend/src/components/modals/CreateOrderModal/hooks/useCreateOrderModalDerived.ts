@@ -105,11 +105,8 @@ export const useCreateOrderModalDerived = ({
 
   const canSelectCustomerType = useMemo(() => {
     const hasProduct = Boolean(formData[ORDER_FIELDS.ID_PRODUCT]);
-    const hasSupply = Boolean(
-      selectedSupplyId !== null || ((formData[ORDER_FIELDS.SUPPLY] as string) || "").trim()
-    );
-    return hasProduct && hasSupply;
-  }, [formData, selectedSupplyId]);
+    return hasProduct;
+  }, [formData]);
 
   const currentProductPctPromo = useMemo(() => {
     const productName = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";

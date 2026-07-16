@@ -96,13 +96,13 @@ const prepareCreateOrderPayload = async ({ body = {}, context }) => {
     }
   }
 
-  let isInternalSupplier = false;
+  let isInternalSupplier = true;
   if (payload[supplyIdCol] != null) {
     const supRow = await findSupplierById(payload[supplyIdCol]);
     isInternalSupplier = isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]);
-    if (!ctx.isMavnCreate && isInternalSupplier) {
-      payload[costCol] = 0;
-    }
+  }
+  if (!ctx.isMavnCreate && isInternalSupplier) {
+    payload[costCol] = 0;
   }
 
   if (ctx.isMavnCreate) {

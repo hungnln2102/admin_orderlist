@@ -35,9 +35,8 @@ export const isSharedOrderBaseComplete = (
   formData: Partial<Order> | undefined,
   selectedSupplyId: number | null
 ): boolean => {
-  const supplyFilled = selectedSupplyId != null || Boolean(formData?.[ORDER_FIELDS.SUPPLY]);
   return Boolean(
-    formData && formData[ORDER_FIELDS.ID_PRODUCT] && supplyFilled && formData[ORDER_FIELDS.CUSTOMER]
+    formData && formData[ORDER_FIELDS.ID_PRODUCT] && formData[ORDER_FIELDS.CUSTOMER]
   );
 };
 

@@ -133,13 +133,13 @@ const attachCreateOrderRoute = (router) => {
         // - NCC Mavryk/Shop: log external_import + trừ profit/bank.
         // - NCC khác: log NCC (trigger DB) + trừ profit, không trừ bank.
         // Đơn bán (MAVL/MAVC/MAVT/MAVK/MAVS) với NCC Mavryk/Shop nội bộ → cost = 0.
-        let isInternalSupplier = false;
+        let isInternalSupplier = true;
         if (payload[supplyIdCol] != null) {
             const supRow = await findSupplierById(payload[supplyIdCol]);
             isInternalSupplier = isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]);
-            if (!isMavnCreate && isInternalSupplier) {
-                payload[costCol] = 0;
-            }
+        }
+        if (!isMavnCreate && isInternalSupplier) {
+            payload[costCol] = 0;
         }
         if (isMavnCreate) {
             payload[costCol] = isInternalSupplier

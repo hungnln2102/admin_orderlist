@@ -122,8 +122,7 @@ export const buildCustomerTypeOptions = ({
 
 export const isCreateOrderDraftReady = (formData: Partial<Order>): boolean => {
   const prod = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
-  const src = (formData[ORDER_FIELDS.SUPPLY] as string) || "";
   const info = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
   const customer = (formData[ORDER_FIELDS.CUSTOMER] as string) || "";
-  return !!prod && !!src && !!info && !!customer;
+  return !!prod && !!info && !!customer;
 };

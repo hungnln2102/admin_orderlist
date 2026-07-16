@@ -124,6 +124,8 @@ const calculateOrderPricing = async ({
     isMavrykProfit = isMavrykShopSupplierName(
       String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] ?? "").trim()
     );
+  } else {
+    isMavrykProfit = true;
   }
   if (isMavnImportOrder({ id_order: normalizedOrderId })) {
     isMavrykProfit = false;
@@ -155,13 +157,7 @@ const calculateOrderPricing = async ({
     await findMaxSupplierCostPrice(variantPricing.variantId)
   );
 
-  if (maxSupplyPrice <= 0 && importBySource <= 0) {
-    if (isMavrykProfit) {
-      throw new PricingHttpError(
-        400,
-        "Chưa có giá tham chiếu (max NCC) cho gói. Thêm giá NCC cho variant hoặc nhập thủ công."
-      );
-    }
+  if (!isMavrykProfit && maxSupplyPrice <= 0 && importBySource <= 0) {
     throw new PricingHttpError(400, "Không có giá NCC");
   }
 
