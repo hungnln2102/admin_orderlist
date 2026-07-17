@@ -925,12 +925,8 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
       }
 
       // ===== Combined finance delta notify =====
-      await notifyCombinedMonthlyDelta({
-        client,
-        paidMonthKey,
-        financeSnapshotBefore,
-        alreadyFinancialPosted,
-      });
+      // Removed because financialMetricsSubscriber now handles notifications via EventBus (SEPAY_MONEY_IN)
+      // and calling it here causes race conditions and missed notifications.
     } catch (dbErr) {
       await client.query("ROLLBACK");
       throw dbErr;

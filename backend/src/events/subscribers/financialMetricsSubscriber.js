@@ -3,6 +3,7 @@ const EVENTS = require("@/events/eventTypes");
 const logger = require("@/utils/logger");
 const { pool } = require("@/config/database");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, ADMIN_SCHEMA, SCHEMA_ADMIN, tableName } = require("@/config/dbSchema");
+const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
@@ -71,6 +72,17 @@ async function handleOrderPaymentReceived(payload) {
       await pool.query(updateDefaultBankQuery, [revenue]);
     }
 
+    // 3. Bắn Telegram thông báo biến động tháng & Ghi log audit
+    await notifyFinanceMonthlyDelta({
+      monthKey: finalMonthKey,
+      revenueDelta: revenue,
+      profitDelta: profit,
+      importDelta: importCost,
+      bankBalanceDelta: revenue,
+      context: payload.isRenewal ? `renewal.sepay:${orderCode}` : `webhook.sepay.combined`,
+      executor: pool,
+    });
+
     logger.info(`[FinancialMetrics] Đã ghi nhận SQL thành công cho đơn ${orderCode}`);
   } catch (error) {
     logger.error('[FinancialMetrics] Lỗi SQL khi handleOrderPaymentReceived', { error: error.message });
@@ -111,6 +123,15 @@ async function handleOrderDeleted(payload) {
         ${summaryCols.UPDATED_AT} = NOW();
     `;
     await pool.query(updateSummaryQuery, [finalMonthKey, amountToDeduct]);
+
+    // 3. Bắn Telegram thông báo biến động tháng & Ghi log audit
+    await notifyFinanceMonthlyDelta({
+      monthKey: finalMonthKey,
+      revenueDelta: -amountToDeduct,
+      profitDelta: -amountToDeduct,
+      context: `dashboardSummary.refund.statusChange`,
+      executor: pool,
+    });
   } catch (error) {
     logger.error('[FinancialMetrics] Lỗi handleOrderDeleted', { error: error.message });
   }
@@ -156,6 +177,13 @@ async function handleWithdrawal(payload) {
           ${summaryCols.UPDATED_AT} = NOW();
       `;
       await client.query(updateSummaryQuery, [finalMonthKey, amountToDeduct]);
+
+      await notifyFinanceMonthlyDelta({
+        monthKey: finalMonthKey,
+        bankBalanceDelta: -amountToDeduct,
+        context: `webhook.outbound_transfer`,
+        executor: client,
+      });
 
       await client.query("COMMIT");
     } catch (e) {
@@ -213,6 +241,14 @@ async function handleManualExpense(payload) {
       `;
       await client.query(updateSummaryQuery, [finalMonthKey, amountToDeduct]);
 
+      await notifyFinanceMonthlyDelta({
+        monthKey: finalMonthKey,
+        profitDelta: -amountToDeduct,
+        bankBalanceDelta: -amountToDeduct,
+        context: `manualWebhook.incrementDashboardSummaryByDelta`,
+        executor: client,
+      });
+
       await client.query("COMMIT");
     } catch (e) {
       await client.query("ROLLBACK");
@@ -265,6 +301,13 @@ async function handleSupplierPayment(payload) {
           ${summaryCols.UPDATED_AT} = NOW();
       `;
       await client.query(updateSummaryQuery, [finalMonthKey, amountToDeduct]);
+
+      await notifyFinanceMonthlyDelta({
+        monthKey: finalMonthKey,
+        bankBalanceDelta: -amountToDeduct,
+        context: `payments.confirmPaymentSupply`,
+        executor: client,
+      });
 
       await client.query("COMMIT");
     } catch (e) {
