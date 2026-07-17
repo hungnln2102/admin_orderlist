@@ -57,12 +57,12 @@ const createImportPackage = async (payload) => {
     
     if (account) {
       const existingStock = await trx(TABLES.stock)
-        .select(stockCols.id)
-        .where(stockCols.accountUsername, account)
+        .select(stockCols.ID)
+        .where(stockCols.ACCOUNT_USERNAME, account)
         .first();
         
       if (existingStock) {
-        stockId = existingStock[stockCols.id];
+        stockId = existingStock[stockCols.ID];
       }
     }
 
@@ -71,34 +71,34 @@ const createImportPackage = async (payload) => {
       // Chưa tồn tại -> tạo mới
       const [insertedStock] = await trx(TABLES.stock)
         .insert({
-          [stockCols.accountUsername]: account || null,
-          [stockCols.note]: note || null,
-          [stockCols.status]: "Tồn",
-          [stockCols.isVerified]: false,
-          [stockCols.createdAt]: now,
-          [stockCols.updatedAt]: now,
+          [stockCols.ACCOUNT_USERNAME]: account || null,
+          [stockCols.NOTE]: note || null,
+          [stockCols.STATUS]: "Tồn",
+          [stockCols.IS_VERIFIED]: false,
+          [stockCols.CREATED_AT]: now,
+          [stockCols.UPDATED_AT]: now,
         })
         .returning("*");
       stockId = insertedStock.id !== undefined ? insertedStock.id : insertedStock;
       stockObj = insertedStock;
       isNewStock = true;
     } else {
-      const existingStock = await trx(TABLES.stock).where(stockCols.id, stockId).first();
+      const existingStock = await trx(TABLES.stock).where(stockCols.ID, stockId).first();
       stockObj = existingStock;
     }
 
     // 2.5 Insert STOCK_SERVICES
     const [srv] = await trx(TABLES.stockServices)
       .insert({
-        [SRV_COLS.stockId]: stockId,
+        [SRV_COLS.STOCK_ID]: stockId,
         product_id: productId,
-        [SRV_COLS.passwordEncrypted]: password || null,
-        [SRV_COLS.backupEmail]: backup_email || null,
-        [SRV_COLS.twoFaEncrypted]: two_fa || null,
-        [SRV_COLS.expiresAt]: normalizeDateInput(expires_at) || null,
-        [SRV_COLS.status]: "Tồn",
-        [SRV_COLS.createdAt]: now,
-        [SRV_COLS.updatedAt]: now,
+        [SRV_COLS.PASSWORD_ENCRYPTED]: password || null,
+        [SRV_COLS.BACKUP_EMAIL]: backup_email || null,
+        [SRV_COLS.TWO_FA_ENCRYPTED]: two_fa || null,
+        [SRV_COLS.EXPIRES_AT]: normalizeDateInput(expires_at) || null,
+        [SRV_COLS.STATUS]: "Tồn",
+        [SRV_COLS.CREATED_AT]: now,
+        [SRV_COLS.UPDATED_AT]: now,
       })
       .returning("*");
       
@@ -112,15 +112,15 @@ const createImportPackage = async (payload) => {
     // 3. Insert PACKAGE_PRODUCT liên kết với stock
     const [pkg] = await trx(TABLES.package)
       .insert({
-        [pkgCols.packageId]: productId,
-        [pkgCols.supplier]: supplierId || null,
-        [pkgCols.cost]: importPrice ?? null,
-        [pkgCols.slot]: resolvedSlotLimit,
-        [pkgCols.match]: normalizedMatchMode,
-        [pkgCols.stockId]: stockId,
-        [pkgCols.stockServiceId]: srvRow.id,
-        [pkgCols.storageId]: null,
-        [pkgCols.storageTotal]: null,
+        [pkgCols.PACKAGE_ID]: productId,
+        [pkgCols.SUPPLIER]: supplierId || null,
+        [pkgCols.COST]: importPrice ?? null,
+        [pkgCols.SLOT]: resolvedSlotLimit,
+        [pkgCols.MATCH]: normalizedMatchMode,
+        [pkgCols.STOCK_ID]: stockId,
+        [pkgCols.STOCK_SERVICE_ID]: srvRow.id,
+        [pkgCols.STORAGE_ID]: null,
+        [pkgCols.STORAGE_TOTAL]: null,
       })
       .returning("*");
       
@@ -137,31 +137,31 @@ const createImportPackage = async (payload) => {
       stock: {
         id: stockId,
         category: category,
-        account: stockObj[stockCols.accountUsername],
+        account: stockObj[stockCols.ACCOUNT_USERNAME],
         password: password,
         backup_email: backup_email,
         two_fa: two_fa,
-        note: stockObj[stockCols.note],
-        status: stockObj[stockCols.status],
+        note: stockObj[stockCols.NOTE],
+        status: stockObj[stockCols.STATUS],
         expires_at: expires_at,
-        is_verified: stockObj[stockCols.isVerified],
-        created_at: stockObj[stockCols.createdAt],
-        updated_at: stockObj[stockCols.updatedAt],
+        is_verified: stockObj[stockCols.IS_VERIFIED],
+        created_at: stockObj[stockCols.CREATED_AT],
+        updated_at: stockObj[stockCols.UPDATED_AT],
       },
       pkg: {
         id: pkgRow.id,
-        package_id: pkgRow[pkgCols.packageId],
-        supplier: pkgRow[pkgCols.supplier],
-        import_price: pkgRow[pkgCols.cost],
-        slot: pkgRow[pkgCols.slot],
-        match: pkgRow[pkgCols.match],
-        stock_id: pkgRow[pkgCols.stockId],
-        storage_id: pkgRow[pkgCols.storageId],
-        storage_total: pkgRow[pkgCols.storageTotal],
+        package_id: pkgRow[pkgCols.PACKAGE_ID],
+        supplier: pkgRow[pkgCols.SUPPLIER],
+        import_price: pkgRow[pkgCols.COST],
+        slot: pkgRow[pkgCols.SLOT],
+        match: pkgRow[pkgCols.MATCH],
+        stock_id: pkgRow[pkgCols.STOCK_ID],
+        storage_id: pkgRow[pkgCols.STORAGE_ID],
+        storage_total: pkgRow[pkgCols.STORAGE_TOTAL],
       },
       payloadForEvent: {
         stockId,
-        account: stockObj[stockCols.accountUsername],
+        account: stockObj[stockCols.ACCOUNT_USERNAME],
         serviceId: srvRow.id,
         category,
         password,
