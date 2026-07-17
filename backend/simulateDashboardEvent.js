@@ -1,3 +1,4 @@
+require("module-alias/register");
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 const { registerFinancialMetricsSubscribers } = require("@/events/subscribers/financialMetricsSubscriber");

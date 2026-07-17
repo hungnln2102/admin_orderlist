@@ -1,3 +1,4 @@
+require("module-alias/register");
 const knex = require("@/db/knexClient");
 const axios = require('axios');
 const { SEPAY_API_KEY } = require('./webhook/sepay/config');
