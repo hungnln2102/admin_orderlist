@@ -28,14 +28,14 @@ echo "  Deploying Admin Order List"
 echo "======================================"
 echo ""
 
-echo "[1/3] Pulling latest code from Git..."
+echo "[1/4] Pulling latest code from Git..."
 git pull origin main || git pull origin master
 
 echo ""
 if [ -n "$NO_CACHE" ]; then
-  echo "[2/3] Rebuilding Docker containers (--no-cache)..."
+  echo "[2/4] Rebuilding Docker containers (--no-cache)..."
 else
-  echo "[2/3] Rebuilding Docker containers (BuildKit + layer cache)..."
+  echo "[2/4] Rebuilding Docker containers (BuildKit + layer cache)..."
 fi
 "${DC[@]}" -f docker-compose.yml down
 "${DC[@]}" -f docker-compose.yml build $NO_CACHE
@@ -58,7 +58,11 @@ if command -v nginx >/dev/null 2>&1 || [ -x /usr/sbin/nginx ]; then
 fi
 
 echo ""
-echo "[3/3] Checking container status..."
+echo "[3/4] Running database migrations..."
+"${DC[@]}" -f docker-compose.yml exec -T backend npx knex migrate:latest || echo "Warning: Database migration failed. Please check logs."
+
+echo ""
+echo "[4/4] Checking container status..."
 sleep 3
 "${DC[@]}" ps
 

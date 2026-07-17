@@ -62,6 +62,7 @@ export const useOrderInit = ({
       ...INITIAL_FORM_DATA,
       ...(prefillContext?.initialFormData || {}),
       [ORDER_FIELDS.ID_ORDER]: initialType,
+      [ORDER_FIELDS.CUSTOMER]: orderCreationKind === "import" ? "Mavryk" : (prefillContext?.initialFormData?.[ORDER_FIELDS.CUSTOMER] || ""),
       [ORDER_FIELDS.ORDER_DATE]:
         ((prefillContext?.initialFormData?.[ORDER_FIELDS.ORDER_DATE] as string) || initialDate),
       [ORDER_FIELDS.EXPIRY_DATE]:
