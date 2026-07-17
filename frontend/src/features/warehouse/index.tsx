@@ -183,25 +183,29 @@ export default function Storage() {
     return items
       .filter((item) => {
         if (productFilter.trim()) {
-          const cat = normalizeText(item.category);
           const filter = normalizeText(productFilter);
-          if (cat !== filter) return false;
+          const hasMatchingCat = item.services?.some(s => normalizeText(s.category) === filter);
+          if (!hasMatchingCat && normalizeText(item.category) !== filter) return false;
         }
         if (!search.trim()) return true;
         const q = normalizeText(search);
-        return [
-          item.category,
+        
+        const baseMatch = [
           item.account,
-          item.password,
-          item.backup_email,
-          item.two_fa,
           item.note,
           item.status,
+          item.category, // Legacy fallback
         ].some((field) => normalizeText(field).includes(q));
+
+        if (baseMatch) return true;
+
+        return item.services?.some(s => 
+          [s.category, s.password, s.backup_email, s.two_fa].some(field => normalizeText(field).includes(q))
+        );
       })
       .sort((a, b) => {
-        const nameA = normalizeText(a.category);
-        const nameB = normalizeText(b.category);
+        const nameA = normalizeText(a.services?.[0]?.category || a.category);
+        const nameB = normalizeText(b.services?.[0]?.category || b.category);
         return nameA.localeCompare(nameB, "vi");
       });
   }, [items, search, productFilter]);

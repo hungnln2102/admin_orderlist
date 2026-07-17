@@ -70,12 +70,12 @@ const listWarehouse = async (_req, res) => {
 
     if (stockIds.length > 0) {
       const services = await db(`${servicesTable} as ${sAlias}`)
-        .leftJoin(`${SCHEMA_PRODUCT}.product as p`, `p.id`, `${sAlias}.product_id`)
+        .leftJoin(`${SCHEMA_PRODUCT}.variant as v`, `v.id`, `${sAlias}.product_id`)
         .select({
           id: `${sAlias}.${srvCols.id}`,
           stock_id: `${sAlias}.${srvCols.stockId}`,
           product_id: `${sAlias}.product_id`,
-          category: `p.package_name`,
+          category: `v.display_name`,
           password: `${sAlias}.${srvCols.passwordEncrypted}`,
           backup_email: `${sAlias}.${srvCols.backupEmail}`,
           two_fa: `${sAlias}.${srvCols.twoFaEncrypted}`,

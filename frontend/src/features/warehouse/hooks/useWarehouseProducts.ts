@@ -5,7 +5,7 @@ import type { WarehouseItem } from "../types";
 
 type CatalogProduct = {
   id?: number;
-  package_name?: string;
+  san_pham?: string;
 };
 
 export type ProductOption = { value: string; label: string };
@@ -17,7 +17,7 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      const data = await apiGet<CatalogProduct[]>("/api/products/packages");
+      const data = await apiGet<CatalogProduct[]>("/api/products");
       setProducts(Array.isArray(data) ? data : []);
     } catch {
       setProducts([]);
@@ -32,10 +32,10 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
 
   const productOptions = useMemo((): ProductOption[] => {
     const fromApi = products
-      .filter((p) => p.id && String(p.package_name || "").trim())
+      .filter((p) => p.id && String(p.san_pham || "").trim())
       .map((p) => {
         const value = String(p.id).trim();
-        const label = String(p.package_name).trim();
+        const label = String(p.san_pham).trim();
         return { value, label };
       });
 
