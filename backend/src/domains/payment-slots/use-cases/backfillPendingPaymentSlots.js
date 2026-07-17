@@ -3,18 +3,18 @@
  * Mỗi đơn: mở slot → cập nhật order_list.price = expected_amount (QR/Telegram/webhook khớp suffix).
  */
 
-const { pool } = require("../../../config/database");
-const { STATUS } = require("../../../utils/statuses");
-const { ORDERS_SCHEMA } = require("../../../config/dbSchema");
-const { isMavnImportOrder } = require("../../../utils/orderHelpers");
-const logger = require("../../../utils/logger");
-const { resolveDefaultShopBankAccount } = require("../../../services/shopBankAccountResolver");
+const { pool } = require("@/config/database");
+const { STATUS } = require("@/utils/statuses");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { isMavnImportOrder } = require("@/utils/orderHelpers");
+const logger = require("@/utils/logger");
+const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
 const { computeOrderCurrentPrice } = require("../../../../webhook/sepay/renewalPricing");
-const { openPaymentSlot } = require("./openPaymentSlot");
-const { SLOT_KIND } = require("../constants");
-const { findLatestPendingSlotByOrder } = require("../repositories/paymentSlotRepository");
-const { SLOTS_TABLE, SLOT_COLS, SLOT_STATUS } = require("../constants");
-const { deriveUnpaidBaseAmount } = require("./backfill/deriveUnpaidBaseAmount");
+const { openPaymentSlot } = require("@/domains/payment-slots/use-cases/openPaymentSlot");
+const { SLOT_KIND } = require("@/domains/payment-slots/constants");
+const { findLatestPendingSlotByOrder } = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const { SLOTS_TABLE, SLOT_COLS, SLOT_STATUS } = require("@/domains/payment-slots/constants");
+const { deriveUnpaidBaseAmount } = require("@/domains/payment-slots/use-cases/backfill/deriveUnpaidBaseAmount");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const ORDER_TABLE = `orders.${ORDERS_SCHEMA.ORDER_LIST.TABLE}`;

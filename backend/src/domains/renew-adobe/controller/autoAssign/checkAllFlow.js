@@ -1,13 +1,13 @@
-const { notifyWarn } = require("../../../../domains/notifications/telegram").systemNotifier;
+const { notifyWarn } = require("@/domains/notifications/telegram").systemNotifier;
 const {
   purgeAndDeleteNoLicenseAdobeAdminAccount,
-} = require("../../../../services/renew-adobe/renewAdobePurgeNoLicenseAccount");
-const { shouldPurgeAdobeAccountByLicenseStatus } = require("../statusUtils");
+} = require("@/services/renew-adobe/renewAdobePurgeNoLicenseAccount");
+const { shouldPurgeAdobeAccountByLicenseStatus } = require("@/domains/renew-adobe/controller/statusUtils");
 const {
   getProfileUsageSnapshot,
-} = require("../../../../services/renew-adobe/adobe-renew-v2/shared/profileUsageMetrics");
-const { autoAssignUsers } = require("./autoAssignUsers");
-const { db, logger, TABLE, COLS, MAP_TABLE, MAP_COLS, getOrderUserTrackingCountByOrgName } = require("./shared");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileUsageMetrics");
+const { autoAssignUsers } = require("@/domains/renew-adobe/controller/autoAssign/autoAssignUsers");
+const { db, logger, TABLE, COLS, MAP_TABLE, MAP_COLS, getOrderUserTrackingCountByOrgName } = require("@/domains/renew-adobe/controller/autoAssign/shared");
 
 async function runCheckAllAccountsFlow({
   runCheckForAccountId,

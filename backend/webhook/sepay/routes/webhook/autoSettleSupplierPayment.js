@@ -1,10 +1,10 @@
-const { STATUS } = require("../../../../src/utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 const { decodeSupplierSignature } = require("./supplierPaymentSignature");
 const { insertFinancialAuditLog } = require("../../payments");
-const { debitShopBankSupplierPayment } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
-const { notifyFinanceMonthlyDelta } = require("../../../../src/services/telegramFinanceDeltaNotifier");
-const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../../../src/config/dbSchema");
-const logger = require("../../../../src/utils/logger");
+const { debitShopBankSupplierPayment } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
+const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const SUPPLIER_ORDER_COST_LOG_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER);
 const PAYMENT_SUPPLY_TABLE = tableName(PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE, SCHEMA_PARTNER);

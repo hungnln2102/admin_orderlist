@@ -7,9 +7,9 @@
  * getTierByPrefix("MAVC") → tier object
  * invalidate()     → xóa cache, lần gọi tiếp sẽ reload từ DB
  */
-const { db } = require("../../db");
-const { SCHEMA_PRODUCT, PRICING_TIER_SCHEMA } = require("../../config/dbSchema");
-const logger = require("../../utils/logger");
+const { db } = require("@/db");
+const { SCHEMA_PRODUCT, PRICING_TIER_SCHEMA } = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const TIER_TABLE = `${SCHEMA_PRODUCT}.${PRICING_TIER_SCHEMA.PRICING_TIER.TABLE}`;
 

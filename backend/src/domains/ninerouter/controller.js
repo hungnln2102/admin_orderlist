@@ -1,5 +1,5 @@
-const { isConfigured } = require("./config");
-const { proxyToNinerouter } = require("./gateway");
+const { isConfigured } = require("@/domains/ninerouter/config");
+const { proxyToNinerouter } = require("@/domains/ninerouter/gateway");
 
 /**
  * Proxy mọi request dưới mount `/ninerouter` sang `${NINEROUTER_URL}${req.url}`.

@@ -1,4 +1,4 @@
-const logger = require("../../../../../utils/logger");
+const logger = require("@/utils/logger");
 
 function isRecoverableCheckError(error) {
   const msg = String(error?.message || error || "").toLowerCase();

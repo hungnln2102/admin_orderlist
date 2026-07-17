@@ -2,10 +2,10 @@ const {
   buildWebhookLoopOrderCodes,
   createWebhookAmountForCodeResolver,
   resolveWebhookPostedRevenue,
-} = require("../../../src/domains/payments/use-cases/resolveOrderCode");
+} = require("@/domains/payments/use-cases/resolveOrderCode");
 const {
   computeDashboardPaymentDecision,
-} = require("../../../src/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
+} = require("@/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
 
 describe("webhook orderCodeResolution", () => {
   test("transaction match excludes extra MAV codes from loop", () => {

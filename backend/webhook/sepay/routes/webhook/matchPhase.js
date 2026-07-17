@@ -1,4 +1,4 @@
-const logger = require("../../../../src/utils/logger");
+const logger = require("@/utils/logger");
 const {
   PAYMENT_RECEIPT_BATCH_ITEM_TABLE,
   PAYMENT_RECEIPT_BATCH_TABLE,

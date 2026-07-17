@@ -1,12 +1,12 @@
-const { db } = require("../../../../db");
-const { quoteIdent } = require("../../../../utils/sql");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
 const {
   TABLES,
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("./constants");
-const { normalizeImageUrl } = require("./urlHelpers");
+} = require("@/domains/product-descriptions/controller/shared/constants");
+const { normalizeImageUrl } = require("@/domains/product-descriptions/controller/shared/urlHelpers");
 
 /**
  * Tìm variant theo `productId` (so khớp display_name có/không hậu tố `--Nm`).

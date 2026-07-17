@@ -13,8 +13,8 @@ const {
   SCHEMA_PARTNER,
   SCHEMA_FINANCE,
   tableName,
-} = require("../../config/dbSchema");
-const { findSupplierCostPrice } = require("../supplies/services/supplierCostService");
+} = require("@/config/dbSchema");
+const { findSupplierCostPrice } = require("@/domains/supplies/services/supplierCostService");
 
 const ORDER_LIST_TABLE = tableName(
   ORDERS_SCHEMA.ORDER_LIST.TABLE,

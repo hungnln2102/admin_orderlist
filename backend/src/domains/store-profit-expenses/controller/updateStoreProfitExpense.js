@@ -7,8 +7,8 @@ const {
   normalizeTextInput,
   mapExpenseRow,
   storeProfitExpensesHasMavnColumns,
-} = require("./shared");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+} = require("@/domains/store-profit-expenses/controller/shared");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const updateStoreProfitExpense = async (req, res) => {
   const id = Number(req.params.id);

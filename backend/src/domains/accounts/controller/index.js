@@ -1,11 +1,11 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   IDENTITY_SCHEMA,
   getDefinition,
   tableName,
   SCHEMA_IDENTITY,
-} = require("../../../config/dbSchema");
-const logger = require("../../../utils/logger");
+} = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const ACCOUNTS_DEF = getDefinition("ACCOUNTS", IDENTITY_SCHEMA);
 const ROLES_DEF = getDefinition("ROLES", IDENTITY_SCHEMA);

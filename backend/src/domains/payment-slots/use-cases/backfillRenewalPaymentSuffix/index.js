@@ -4,11 +4,11 @@
  * - Chưa có slot pending → mở slot renewal + cập nhật price
  */
 
-const { pool } = require("../../../../config/database");
-const logger = require("../../../../utils/logger");
-const { resolveDefaultShopBankAccount } = require("../../../../services/shopBankAccountResolver");
-const { fetchRenewalSuffixCandidates } = require("./fetchCandidates");
-const { reconcileSingleRenewalOrder } = require("./reconcileSingle");
+const { pool } = require("@/config/database");
+const logger = require("@/utils/logger");
+const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
+const { fetchRenewalSuffixCandidates } = require("@/domains/payment-slots/use-cases/backfillRenewalPaymentSuffix/fetchCandidates");
+const { reconcileSingleRenewalOrder } = require("@/domains/payment-slots/use-cases/backfillRenewalPaymentSuffix/reconcileSingle");
 
 /**
  * @param {object} [options]

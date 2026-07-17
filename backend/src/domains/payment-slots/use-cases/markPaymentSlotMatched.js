@@ -3,8 +3,8 @@
  * payment_receipt được INSERT (hoặc dedupe) thành công.
  */
 
-const repo = require("../repositories/paymentSlotRepository");
-const logger = require("../../../utils/logger");
+const repo = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const logger = require("@/utils/logger");
 
 /**
  * @param {import('pg').PoolClient | import('knex').Knex.Transaction} executor

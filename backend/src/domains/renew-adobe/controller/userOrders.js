@@ -1,11 +1,11 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
-const { TBL_ORDER, ORD_COLS } = require("./orderAccess");
+} = require("@/config/dbSchema");
+const { TBL_ORDER, ORD_COLS } = require("@/domains/renew-adobe/controller/orderAccess");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

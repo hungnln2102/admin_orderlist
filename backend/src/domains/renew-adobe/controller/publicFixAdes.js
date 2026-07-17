@@ -8,24 +8,24 @@
  * Mount tại `/api/renew-adobe/public/fix-ades/*` (cùng namespace public, đã được Website proxy sẵn).
  */
 
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
-const { normalizeEmail } = require("../helpers/email");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { normalizeEmail } = require("@/domains/renew-adobe/helpers/email");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   checkAdesAccount,
   checkAdesTransferStatus,
   renewAdesAccount,
   syncAdesAccount,
-} = require("../../../services/fix-ades/checkService");
+} = require("@/services/fix-ades/checkService");
 const {
   isLikelyNotActivePayload,
   normalizeCheckResultForRenewFlow,
-} = require("../../fix-ades/helpers/renewFlowResult");
+} = require("@/domains/fix-ades/helpers/renewFlowResult");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

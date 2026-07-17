@@ -19,34 +19,34 @@ const {
   SCHEMA_SUPPLIER_COST,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
-} = require("./dbSchema/env");
+} = require("@/config/dbSchema/env");
 const {
   tableName,
   getTable,
   getColumns,
   getDefinition,
-} = require("./dbSchema/helpers");
-const { ADMIN_SCHEMA, FINANCE_SCHEMA } = require("./dbSchema/schemas/adminFinance");
+} = require("@/config/dbSchema/helpers");
+const { ADMIN_SCHEMA, FINANCE_SCHEMA } = require("@/config/dbSchema/schemas/adminFinance");
 const {
   FORM_DESC_SCHEMA,
   IDENTITY_SCHEMA,
   COMMON_SCHEMA,
-} = require("./dbSchema/schemas/formsIdentity");
+} = require("@/config/dbSchema/schemas/formsIdentity");
 const {
   PROMOTION_SCHEMA,
   WALLET_SCHEMA,
-} = require("./dbSchema/schemas/promotionWallet");
+} = require("@/config/dbSchema/schemas/promotionWallet");
 const {
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   PRICING_TIER_SCHEMA,
-} = require("./dbSchema/schemas/ordersProductPartner");
-const { RECEIPT_SCHEMA } = require("./dbSchema/schemas/receipt");
+} = require("@/config/dbSchema/schemas/ordersProductPartner");
+const { RECEIPT_SCHEMA } = require("@/config/dbSchema/schemas/receipt");
 const {
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
-} = require("./dbSchema/schemas/automation");
+} = require("@/config/dbSchema/schemas/automation");
 
 module.exports = {
   SCHEMA_ORDERS,

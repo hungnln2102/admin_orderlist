@@ -2,13 +2,13 @@
  * Cron / manual: đồng bộ daily_revenue_summary từ mốc thuế đến hôm nay (UPSERT).
  * Đơn mới hoặc chỉnh sửa đơn — query đọc lại order_list nên mỗi lần chạy đều tính đủ.
  */
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   runDailyRevenueSummaryBackfill,
   vnTodayYmd,
   TAX_ORDER_LIST_FROM_DEFAULT,
   IMPORT_SPREAD_FALLBACK_DAYS_DEFAULT,
-} = require("../../services/dashboard/dailyRevenueSummaryBackfill");
+} = require("@/services/dashboard/dailyRevenueSummaryBackfill");
 
 function envTrim(key) {
   const v = process.env[key];

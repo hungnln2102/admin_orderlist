@@ -1,18 +1,18 @@
-const { ORDERS_SCHEMA } = require("../../../../../config/dbSchema");
-const { VALID_PREFIXES } = require("../../../../../services/orderCodeService");
-const { ORDER_PREFIXES } = require("../../../../../utils/orderHelpers");
-const { STATUS, COLS } = require("../../constants");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { VALID_PREFIXES } = require("@/services/orderCodeService");
+const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
+const { STATUS, COLS } = require("@/domains/orders/controller/constants");
 const {
   sanitizeOrderWritePayload,
   normalizeTextInput,
-} = require("../../helpers");
-const { normalizeMoney } = require("../../finance/refundCredits");
-const { ensureSupplierRecord, findSupplierById } = require("../../../../supplies/services/supplierLookupService");
-const { isMavrykShopSupplierName } = require("../../../../../utils/orderHelpers");
+} = require("@/domains/orders/controller/helpers");
+const { normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");
+const { ensureSupplierRecord, findSupplierById } = require("@/domains/supplies/services/supplierLookupService");
+const { isMavrykShopSupplierName } = require("@/utils/orderHelpers");
 const {
   ensureVariantRecord,
   resolveProductToVariantId,
-} = require("../../../../products/services/productVariantService");
+} = require("@/domains/products/services/productVariantService");
 
 const buildCreateOrderRequestContext = (body = {}) => {
   const payload = sanitizeOrderWritePayload(body);

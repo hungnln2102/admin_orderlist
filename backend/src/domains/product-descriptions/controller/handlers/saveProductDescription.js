@@ -1,19 +1,19 @@
-const { db } = require("../../../../db");
-const { quoteIdent } = require("../../../../utils/sql");
-const { normalizeTextInput, trimToLength } = require("../../../../utils/normalizers");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const { normalizeTextInput, trimToLength } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("../shared/constants");
-const { normalizeImageUrl } = require("../shared/urlHelpers");
+} = require("@/domains/product-descriptions/controller/shared/constants");
+const { normalizeImageUrl } = require("@/domains/product-descriptions/controller/shared/urlHelpers");
 const {
   findVariantForProductId,
   mapProductDescRow,
-} = require("../shared/queries");
-const { invalidateWebsiteSeoCache } = require("../shared/cache");
+} = require("@/domains/product-descriptions/controller/shared/queries");
+const { invalidateWebsiteSeoCache } = require("@/domains/product-descriptions/controller/shared/cache");
 
 const saveProductDescription = async (req, res) => {
   const { productId, rules, description, imageUrl, shortDesc, descVariantId } =

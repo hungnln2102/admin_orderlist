@@ -1,7 +1,7 @@
-const { db } = require("../../../db");
-const { normalizeTextInput } = require("../../../utils/normalizers");
-const { categoryCols, TABLES } = require("../../products/controller/constants");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const { normalizeTextInput } = require("@/utils/normalizers");
+const { categoryCols, TABLES } = require("@/domains/products/controller/constants");
+const logger = require("@/utils/logger");
 
 const listCategories = async (_req, res) => {
   try {

@@ -1,8 +1,8 @@
-const { db } = require("../../../db");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
-const { normalizeTextInput } = require("../../../utils/normalizers");
-const logger = require("../../../utils/logger");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+const { db } = require("@/db");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
+const { normalizeTextInput } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const WALLET_TYPES_TABLE = tableName(
   FINANCE_SCHEMA.MASTER_WALLETTYPES.TABLE,

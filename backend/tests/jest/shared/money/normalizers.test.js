@@ -1,7 +1,7 @@
 ﻿const {
   normalizeIntegerVndAmount,
   normalizeNonNegativeIntegerVndAmount,
-} = require("../../../../src/shared/money/normalizers");
+} = require("@/shared/money/normalizers");
 
 describe("shared money normalizers", () => {
   test.each([

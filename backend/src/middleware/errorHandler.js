@@ -4,7 +4,7 @@
  * Lỗi 5xx tự động gửi Telegram qua logger.error() → Winston transport.
  */
 
-const logger = require("../utils/logger");
+const logger = require("@/utils/logger");
 
 class AppError extends Error {
   constructor(message, statusCode = 500, code = "INTERNAL_ERROR", details = null) {

@@ -1,4 +1,4 @@
-const { query, validate } = require("../../../middleware/validateRequest");
+const { query, validate } = require("@/middleware/validateRequest");
 
 const dateRangeRules = [
   query("from")

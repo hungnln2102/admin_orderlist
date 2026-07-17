@@ -2,7 +2,7 @@ const {
   validateWithdrawnPayload,
   validateWithdrawPayload,
   parseWithdrawnAmount,
-} = require("../../../../src/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
+} = require("@/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
 
 describe("shopBankWithdrawnValidator", () => {
   test("parses formatted VND amount", () => {

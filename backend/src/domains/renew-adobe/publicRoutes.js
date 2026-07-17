@@ -2,21 +2,21 @@ const express = require("express");
 const {
   getWebsiteStatus,
   activateWebsiteUser,
-} = require("./controller");
+} = require("@/domains/renew-adobe/controller");
 const {
   resolveSystemByEmail,
-} = require("./controller/publicResolveSystem");
+} = require("@/domains/renew-adobe/controller/publicResolveSystem");
 const {
   publicCheckFixAdes,
   publicRenewFixAdes,
   publicSyncFixAdes,
-} = require("./controller/publicFixAdes");
+} = require("@/domains/renew-adobe/controller/publicFixAdes");
 const {
   publicGetOtp,
-} = require("./controller/publicOtp");
+} = require("@/domains/renew-adobe/controller/publicOtp");
 const {
   requireRenewAdobePublicActivateKey,
-} = require("../../middleware/renewAdobePublicActivateKey");
+} = require("@/middleware/renewAdobePublicActivateKey");
 
 const router = express.Router();
 

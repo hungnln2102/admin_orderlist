@@ -4,14 +4,14 @@ const {
     PARTNER_SCHEMA,
     SCHEMA_SUPPLIER,
     tableName,
-} = require("../../../../config/dbSchema");
-const { TABLES, COLS } = require("../constants");
+} = require("@/config/dbSchema");
+const { TABLES, COLS } = require("@/domains/orders/controller/constants");
 const { normalizeMoney } = require("../../../../../webhook/sepay/utils");
 const {
     mergeSummaryUpdates,
     monthKeyFromPaidDateYmd,
-} = require("./dashboardSummary");
-const { resolveDashboardImportDeltaOnPaid } = require("./dashboardImportDeltaOnPaid");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
+const { resolveDashboardImportDeltaOnPaid } = require("@/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
 
 const fetchSupplierNameBySupplyId = async (trx, supplyIdRaw) => {
     if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";

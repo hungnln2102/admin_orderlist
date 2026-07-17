@@ -7,8 +7,8 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   PRICING_TIER_SCHEMA,
-} = require("../../../config/dbSchema");
-const { QUOTED_COLS } = require("../../../utils/columns");
+} = require("@/config/dbSchema");
+const { QUOTED_COLS } = require("@/utils/columns");
 
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);

@@ -3,9 +3,9 @@
  * Giữ nguyên export contract cho routes + scheduler tasks.
  */
 
-const { autoAssignUsers, runAutoAssign } = require("./autoAssign/autoAssignUsers");
-const { fixSingleUser, fixUsersRound, adobeQueueStatus } = require("./autoAssign/fixHandlers");
-const { runCheckAllAccountsFlow, checkAllAccounts } = require("./autoAssign/checkAllFlow");
+const { autoAssignUsers, runAutoAssign } = require("@/domains/renew-adobe/controller/autoAssign/autoAssignUsers");
+const { fixSingleUser, fixUsersRound, adobeQueueStatus } = require("@/domains/renew-adobe/controller/autoAssign/fixHandlers");
+const { runCheckAllAccountsFlow, checkAllAccounts } = require("@/domains/renew-adobe/controller/autoAssign/checkAllFlow");
 
 module.exports = {
   adobeQueueStatus,

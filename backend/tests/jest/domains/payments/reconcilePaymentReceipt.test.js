@@ -6,11 +6,11 @@ jest.mock("../../../../webhook/sepay/renewalQueue", () => ({
   enqueueRenewal: jest.fn(),
 }));
 
-const { withTransaction } = require("../../../../src/db");
+const { withTransaction } = require("@/db");
 const { enqueueRenewal } = require("../../../../webhook/sepay/renewalQueue");
 const {
   reconcilePaymentReceipt,
-} = require("../../../../src/domains/payments/controller/handlers/reconcilePaymentReceipt");
+} = require("@/domains/payments/controller/handlers/reconcilePaymentReceipt");
 
 const makeRes = () => ({
   status: jest.fn().mockReturnThis(),

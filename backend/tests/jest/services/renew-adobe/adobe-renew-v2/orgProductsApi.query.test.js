@@ -1,7 +1,7 @@
 const {
   extractProductsListQueryFromRequestUrl,
   PRODUCTS_LIST_QUERY_MANAGE_TEAM,
-} = require("../../../../../src/services/renew-adobe/adobe-renew-v2/shared/orgProductsApi");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/orgProductsApi");
 
 describe("orgProductsApi JIL products query", () => {
   it("PRODUCTS_LIST_QUERY_MANAGE_TEAM khớp contract manage-team (includeFulfillableItemCodesOnly + administration)", () => {

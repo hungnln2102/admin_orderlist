@@ -1,4 +1,4 @@
-const { SUPPLIER_COST_DEF } = require("../shared");
+const { SUPPLIER_COST_DEF } = require("@/config/dbSchema/shared");
 
 /** Chỉ bảng thuộc PostgreSQL schema `orders` (xem `000_consolidated_schema.sql`). */
 const ORDERS_SCHEMA = {

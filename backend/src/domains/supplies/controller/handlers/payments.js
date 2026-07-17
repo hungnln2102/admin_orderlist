@@ -1,7 +1,7 @@
-const { db } = require("../../../../db");
-const { QUOTED_COLS, TABLES, paymentSupplyCols } = require("../constants");
-const { parseMoney, parseSupplyId } = require("../helpers");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const { QUOTED_COLS, TABLES, paymentSupplyCols } = require("@/domains/supplies/controller/constants");
+const { parseMoney, parseSupplyId } = require("@/domains/supplies/controller/helpers");
+const logger = require("@/utils/logger");
 
 const createPayment = async (req, res) => {
   const { supplyId } = req.params;

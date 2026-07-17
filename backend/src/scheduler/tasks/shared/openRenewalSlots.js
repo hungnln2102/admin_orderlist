@@ -7,19 +7,19 @@
  * Mỗi đơn chạy trong savepoint riêng — lỗi slot không vỡ cả batch.
  */
 
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   openPaymentSlot,
   SLOT_KIND,
-} = require("../../../domains/payment-slots");
+} = require("@/domains/payment-slots");
 const {
   resolveDefaultShopBankAccount,
-} = require("../../../services/shopBankAccountResolver");
+} = require("@/services/shopBankAccountResolver");
 const {
   computeOrderCurrentPrice,
 } = require("../../../../webhook/sepay/renewalPricing");
-const { ORDERS_SCHEMA } = require("../../../config/dbSchema");
-const { isMavnImportOrder } = require("../../../utils/orderHelpers");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { isMavnImportOrder } = require("@/utils/orderHelpers");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const ORDER_TABLE_NAME = ORDERS_SCHEMA.ORDER_LIST.TABLE;

@@ -5,11 +5,11 @@ const {
   COLS,
   ORDER_COLS,
   ADOBE_SYSTEM_CODE,
-} = require("./shared");
+} = require("@/services/userAccountMappingService/shared");
 const {
   getRenewAdobeVariantIds,
   listActiveRenewAdobeOrdersByVariants,
-} = require("./queryHelpers");
+} = require("@/services/userAccountMappingService/queryHelpers");
 
 /**
  * Đồng bộ đơn hàng từ order_list vào user_account_mapping.

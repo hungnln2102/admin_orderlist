@@ -1,4 +1,4 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   listUsdtWalletItems,
   getDefaultUsdtWallet,
@@ -6,10 +6,10 @@ const {
   updateUsdtWalletItem,
   setDefaultUsdtWalletItem,
   deleteUsdtWalletItem,
-} = require("../use-cases");
-const { listUsdtWalletBalances } = require("../use-cases/listUsdtWalletBalances");
-const { recordUsdtWalletWithdrawal } = require("../use-cases/recordUsdtWalletWithdrawal");
-const { getUsdtVndRate } = require("../services/binanceExchangeRateService");
+} = require("@/domains/usdt-wallets/use-cases");
+const { listUsdtWalletBalances } = require("@/domains/usdt-wallets/use-cases/listUsdtWalletBalances");
+const { recordUsdtWalletWithdrawal } = require("@/domains/usdt-wallets/use-cases/recordUsdtWalletWithdrawal");
+const { getUsdtVndRate } = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
 
 const handleControllerError = (res, error, context) => {
   const status = Number.isInteger(error?.status) ? error.status : 500;

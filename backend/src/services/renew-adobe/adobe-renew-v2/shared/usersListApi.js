@@ -8,9 +8,9 @@ const {
   hasAdobeProAccessFromProducts,
   extractAbpUserProductRefs,
   mapAbpUserToSnapshotUser,
-} = require("./usersListApi/shared");
-const { fetchUsersViaAbpApi } = require("./usersListApi/abp");
-const { fetchUsersViaApi, captureUsersApiHeaders } = require("./usersListApi/jil");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi/shared");
+const { fetchUsersViaAbpApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi/abp");
+const { fetchUsersViaApi, captureUsersApiHeaders } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi/jil");
 
 module.exports = {
   fetchUsersViaApi,

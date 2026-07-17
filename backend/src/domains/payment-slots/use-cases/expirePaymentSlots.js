@@ -3,8 +3,8 @@
  * Chạy hàng giờ; mặc định dọn pending > 30 ngày.
  */
 
-const repo = require("../repositories/paymentSlotRepository");
-const logger = require("../../../utils/logger");
+const repo = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const logger = require("@/utils/logger");
 
 /**
  * @param {import('pg').Pool|import('pg').PoolClient} executor

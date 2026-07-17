@@ -1,13 +1,13 @@
-const { ORDERS_SCHEMA } = require("../../../../../config/dbSchema");
-const { STATUS } = require("../../constants");
-const { SLOT_KIND, openPaymentSlot } = require("../../../../payment-slots");
-const { resolveDefaultShopBankAccount } = require("../../../../../services/shopBankAccountResolver");
-const { resolveDefaultUsdtWallet } = require("../../../../../services/usdtWalletResolver");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { STATUS } = require("@/domains/orders/controller/constants");
+const { SLOT_KIND, openPaymentSlot } = require("@/domains/payment-slots");
+const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
+const { resolveDefaultUsdtWallet } = require("@/services/usdtWalletResolver");
 const {
   getUsdtVndRate,
   convertVndToUsd,
-} = require("../../../../usdt-wallets/services/binanceExchangeRateService");
-const { normalizeMoney } = require("../../finance/refundCredits");
+} = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
+const { normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");
 
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;
 

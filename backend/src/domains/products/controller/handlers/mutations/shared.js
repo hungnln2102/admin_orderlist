@@ -1,5 +1,5 @@
-const { db } = require("../../../../../db");
-const { quoteIdent } = require("../../../../../utils/sql");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
 const {
   productCols,
   variantCols,
@@ -10,7 +10,7 @@ const {
   productCategoryCols,
   TABLES,
   MARGIN_PIVOT_SQL,
-} = require("../../constants");
+} = require("@/domains/products/controller/constants");
 
 const fetchVariantView = async (variantId) => {
   const query = `

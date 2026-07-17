@@ -7,14 +7,14 @@ const {
   ORDERS_SCHEMA,
   SCHEMA_ORDERS,
   tableName,
-} = require("../../../config/dbSchema");
-const { STATUS } = require("../../../utils/statuses");
-const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
+} = require("@/config/dbSchema");
+const { STATUS } = require("@/utils/statuses");
+const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
 const {
   createDateNormalization,
   createNumericExtraction,
   quoteIdent,
-} = require("../../../utils/sql");
+} = require("@/utils/sql");
 
 const salesPrefixEscList = [
   ORDER_PREFIXES.ctv,

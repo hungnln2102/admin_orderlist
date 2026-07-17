@@ -1,10 +1,10 @@
 /**
  * Adobe Renew V2 — B15: Xóa product khỏi admin bằng API assignments.
  */
-const logger = require("../../../utils/logger");
-const { ADMIN_CONSOLE_API_BASE, TIMEOUTS } = require("./shared/constants");
-const { fetchUsersViaApi } = require("./shared/usersListApi");
-const { extractProductId } = require("./shared/accessChecks");
+const logger = require("@/utils/logger");
+const { ADMIN_CONSOLE_API_BASE, TIMEOUTS } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
+const { extractProductId } = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
 
 async function captureAdobeApiHeaders(page, orgToken) {
   const reqPromise = page.waitForRequest(

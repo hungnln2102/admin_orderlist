@@ -2,10 +2,10 @@ const {
     PARTNER_SCHEMA,
     SCHEMA_PARTNER,
     tableName,
-} = require("../../../../config/dbSchema");
-const { mergeSummaryUpdates } = require("./dashboardSummary");
-const { COLS } = require("../constants");
-const { toNullableNumber } = require("../../../../utils/normalizers");
+} = require("@/config/dbSchema");
+const { mergeSummaryUpdates } = require("@/domains/orders/controller/finance/dashboardSummary");
+const { COLS } = require("@/domains/orders/controller/constants");
+const { toNullableNumber } = require("@/utils/normalizers");
 
 const sumNccRefundAmountForOrder = async (trx, orderListId) => {
     const id = Number(orderListId);

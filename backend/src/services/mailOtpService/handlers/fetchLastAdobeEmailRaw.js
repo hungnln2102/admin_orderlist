@@ -3,9 +3,9 @@
  * Chỉ lấy mail từ `message@adobe.com` / `@adobe.com` hoặc From chứa "Adobe".
  */
 
-const logger = require("../../../utils/logger");
-const { toUidList, getImapHostFromProvider, createImapClient } = require("../shared/imapClient");
-const { getMailBackupById } = require("../repository/mailBackupRepo");
+const logger = require("@/utils/logger");
+const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
 
 /**
  * @param {number} mailBackupId - ID bản ghi trong mail_backup (bắt buộc).

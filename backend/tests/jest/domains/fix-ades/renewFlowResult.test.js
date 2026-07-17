@@ -1,7 +1,7 @@
 const {
   isLikelyNotActivePayload,
   normalizeCheckResultForRenewFlow,
-} = require("../../../../src/domains/fix-ades/helpers/renewFlowResult");
+} = require("@/domains/fix-ades/helpers/renewFlowResult");
 
 describe("fix-ades renew flow result helpers", () => {
   test("detects inactive payload hints", () => {

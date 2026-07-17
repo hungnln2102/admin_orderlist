@@ -1,18 +1,18 @@
-const { db } = require("../../../../db");
-const { quoteIdent } = require("../../../../utils/sql");
-const { normalizeTextInput, trimToLength } = require("../../../../utils/normalizers");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const { normalizeTextInput, trimToLength } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("../shared/constants");
+} = require("@/domains/product-descriptions/controller/shared/constants");
 const {
   findVariantForProductId,
   mapProductDescRow,
-} = require("../shared/queries");
-const { invalidateWebsiteSeoCache } = require("../shared/cache");
+} = require("@/domains/product-descriptions/controller/shared/queries");
+const { invalidateWebsiteSeoCache } = require("@/domains/product-descriptions/controller/shared/cache");
 
 /**
  * Tạo bản ghi desc_variant. Có thể gắn variant (productId) nếu truyền mã;

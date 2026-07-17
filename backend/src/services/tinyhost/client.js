@@ -3,7 +3,7 @@
  * Docs: https://tinyhost.shop/api-docs.html
  */
 
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 
 const BASE_URL = process.env.TINYHOST_BASE_URL || "https://tinyhost.shop";
 const TIMEOUT_MS = Number(process.env.TINYHOST_TIMEOUT_MS) || 15_000;

@@ -25,7 +25,7 @@ describe("dashboard routes smoke", () => {
       debug: jest.fn(),
     }));
 
-    const router = require("../../../../src/domains/dashboard/routes");
+    const router = require("@/domains/dashboard/routes");
     const app = express();
     app.use(express.json());
     app.use("/", router);

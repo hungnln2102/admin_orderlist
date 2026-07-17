@@ -4,7 +4,7 @@
  *
  * Khớp tinh thần `sumNccOrderMarginByMonthKeys` (DISTINCT ON order_list_id).
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

@@ -1,5 +1,5 @@
-const { enqueueMessage } = require("../core/telegramClient");
-const { ERROR_TOPIC_ID, SEND_ERROR_NOTIFICATION, TELEGRAM_CHAT_ID } = require("../core/constants");
+const { enqueueMessage } = require("@/domains/notifications/telegram/core/telegramClient");
+const { ERROR_TOPIC_ID, SEND_ERROR_NOTIFICATION, TELEGRAM_CHAT_ID } = require("@/domains/notifications/telegram/core/constants");
 
 /**
  * Gửi cảnh báo hệ thống hoặc lỗi

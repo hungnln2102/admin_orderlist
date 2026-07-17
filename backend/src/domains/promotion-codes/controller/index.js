@@ -1,11 +1,11 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   PROMOTION_SCHEMA,
   getDefinition,
   tableName,
   SCHEMA_PROMOTION,
-} = require("../../../config/dbSchema");
-const logger = require("../../../utils/logger");
+} = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const PROMO_CODES_DEF = getDefinition("PROMOTION_CODES", PROMOTION_SCHEMA);
 

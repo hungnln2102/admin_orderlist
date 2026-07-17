@@ -2,7 +2,7 @@ const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);

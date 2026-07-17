@@ -1,12 +1,12 @@
-const logger = require("../../../../src/utils/logger");
+const logger = require("@/utils/logger");
 const {
   PAYMENT_RECEIPT_BATCH_TABLE,
   isMissingBatchTablesError,
 } = require("./constants");
 const {
   normalizeTransactionCode,
-} = require("../../../../src/services/transactionCodeService");
-const { isLegacyBatchTransferCode } = require("../../../../src/domains/payments/controller/shared/batchTransferCode");
+} = require("@/services/transactionCodeService");
+const { isLegacyBatchTransferCode } = require("@/domains/payments/controller/shared/batchTransferCode");
 
 /**
  * Từ các token 8 ký tự trong nội dung CK, tìm batch pending (mã gộp CK).

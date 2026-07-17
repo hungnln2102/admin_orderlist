@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
-const logger = require("../../../../utils/logger");
+const logger = require("@/utils/logger");
 
 function sanitizeEmailForPath(email) {
   return String(email || "unknown")

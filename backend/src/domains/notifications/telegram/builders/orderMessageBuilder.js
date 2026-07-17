@@ -8,7 +8,7 @@ const {
   formatDateDMY,
   formatCurrency,
   toInlineCode,
-} = require("./formatters");
+} = require("@/domains/notifications/telegram/builders/formatters");
 const normalizeBankInfo = (bankInfo = {}) => ({
   accountNumber: String(bankInfo.accountNumber || "").trim(),
   accountHolder: String(bankInfo.accountHolder || "").trim(),

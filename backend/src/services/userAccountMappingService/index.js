@@ -1,9 +1,9 @@
-const { syncOrdersToMapping } = require("./syncOrders");
+const { syncOrdersToMapping } = require("@/services/userAccountMappingService/syncOrders");
 const {
   lookupAndRecordIfNeeded,
   syncRenewAdobeMappingFromTeamMembers,
   clearRenewAdobeMappingForEmailsNotOnTeam,
-} = require("./teamSync");
+} = require("@/services/userAccountMappingService/teamSync");
 const {
   recordUsersAssigned,
   removeMappingsForAccount,
@@ -14,7 +14,7 @@ const {
   getAssignedAdobeAccountIdForUserEmail,
   getEmailSetAlreadyAssignedToAdobe,
   getMappingCountsByAdobeAccountIds,
-} = require("./mappingCrud");
+} = require("@/services/userAccountMappingService/mappingCrud");
 
 module.exports = {
   syncOrdersToMapping,

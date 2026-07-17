@@ -6,9 +6,9 @@ const {
   bulkDeletePackages,
   updateProductPackageOptions,
   fetchProductRequiresActivationForPackagePayload,
-} = require("./service");
-const { pkgCols } = require("./constants");
-const logger = require("../../../utils/logger");
+} = require("@/domains/package-products/controller/service");
+const { pkgCols } = require("@/domains/package-products/controller/constants");
+const logger = require("@/utils/logger");
 
 const listHandler = async (_req, res) => {
   try {

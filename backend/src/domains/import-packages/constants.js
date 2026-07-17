@@ -13,7 +13,7 @@ const {
   getDefinition,
   PRODUCT_SCHEMA,
   SCHEMA_PRODUCT,
-} = require("../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const RULE_DEF = {
   tableName: "import_package_rules",

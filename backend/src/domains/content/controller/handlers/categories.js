@@ -1,5 +1,5 @@
-const db = require("../../../../config/database");
-const logger = require("../../../../utils/logger");
+const db = require("@/config/database");
+const logger = require("@/utils/logger");
 
 exports.list = async (_req, res) => {
   try {

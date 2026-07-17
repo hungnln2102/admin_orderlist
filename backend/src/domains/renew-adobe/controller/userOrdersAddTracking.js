@@ -6,27 +6,27 @@
  * Tách file riêng để không phình `userOrders.js` (read-only list).
  */
 
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   TBL_ORDER,
   ORD_COLS,
-} = require("./orderAccess");
+} = require("@/domains/renew-adobe/controller/orderAccess");
 const {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
-} = require("../../../services/renew-adobe/orderUserTrackingService");
+} = require("@/services/renew-adobe/orderUserTrackingService");
 const {
   normalizeAdobeSystemCode,
-} = require("../../../services/renew-adobe/adobeSystemConstants");
-const { normalizeOtpSource } = require("../../../services/otpProviderService");
+} = require("@/services/renew-adobe/adobeSystemConstants");
+const { normalizeOtpSource } = require("@/services/otpProviderService");
 const {
   normalizeTrackingOtpSource,
-} = require("../helpers/normalizeTrackingOtpSource");
+} = require("@/domains/renew-adobe/helpers/normalizeTrackingOtpSource");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

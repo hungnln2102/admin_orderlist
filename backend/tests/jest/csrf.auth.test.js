@@ -2,7 +2,7 @@ const request = require("supertest");
 
 process.env.DISABLE_CSRF = "false";
 
-const app = require("../../src/app");
+const app = require("@/app");
 
 describe("auth CSRF protection", () => {
   it("blocks POST /api/auth/logout without CSRF token", async () => {

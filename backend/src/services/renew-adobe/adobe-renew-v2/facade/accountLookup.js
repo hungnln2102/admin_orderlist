@@ -1,12 +1,12 @@
-const logger = require("../../../../utils/logger");
-const { runCheckFlow } = require("../runCheckFlow");
-const { parseCcpProductIdsFromAlertConfig } = require("../shared/accessChecks");
-const { normalizeSavedCookiesFromDb } = require("./cookies");
+const logger = require("@/utils/logger");
+const { runCheckFlow } = require("@/services/renew-adobe/adobe-renew-v2/runCheckFlow");
+const { parseCcpProductIdsFromAlertConfig } = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+const { normalizeSavedCookiesFromDb } = require("@/services/renew-adobe/adobe-renew-v2/facade/cookies");
 const {
   openCheckAccountSession,
   closeCheckAccountSession,
-} = require("./loginSession");
-const { buildCheckAccountResponse } = require("./postCheck");
+} = require("@/services/renew-adobe/adobe-renew-v2/facade/loginSession");
+const { buildCheckAccountResponse } = require("@/services/renew-adobe/adobe-renew-v2/facade/postCheck");
 
 async function checkAccount(email, password, options = {}) {
   const savedCookiesFromDb = normalizeSavedCookiesFromDb(options.savedCookiesFromDb);

@@ -1,4 +1,4 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   USDT_WALLETS_DEF,
   COLS,
@@ -9,14 +9,14 @@ const {
   insertUsdtWallet,
   updateUsdtWallet,
   deleteUsdtWallet,
-} = require("../repositories/usdtWalletRepository");
+} = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
 const {
   createHttpError,
   validateCreatePayload,
   validateUpdatePayload,
   validateDeletePayload,
   validateSetDefaultPayload,
-} = require("../validators/usdtWalletValidator");
+} = require("@/domains/usdt-wallets/validators/usdtWalletValidator");
 
 const ensureDefinition = () => {
   if (!USDT_WALLETS_DEF) {
@@ -54,7 +54,7 @@ const listUsdtWalletItems = async () => {
 
 const getDefaultUsdtWallet = async () => {
   ensureDefinition();
-  const { findDefaultActiveUsdtWallet } = require("../repositories/usdtWalletRepository");
+  const { findDefaultActiveUsdtWallet } = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
   const row = await findDefaultActiveUsdtWallet();
   if (!row) {
     throw createHttpError(404, "Chưa có ví USDT mặc định đang bật.");

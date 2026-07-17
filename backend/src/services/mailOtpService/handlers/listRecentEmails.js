@@ -2,9 +2,9 @@
  * Liệt kê metadata (from, subject, date) của N mail gần nhất — để debug xem IMAP trả về gì.
  */
 
-const logger = require("../../../utils/logger");
-const { toUidList, getImapHostFromProvider, createImapClient } = require("../shared/imapClient");
-const { getMailBackupById } = require("../repository/mailBackupRepo");
+const logger = require("@/utils/logger");
+const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
 
 /**
  * @param {number} mailBackupId

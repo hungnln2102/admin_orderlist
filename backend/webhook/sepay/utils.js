@@ -1,7 +1,7 @@
 /* Utility helpers for Sepay webhook */
 const {
   calculateOrderPricingFromResolvedValues,
-} = require("../../src/services/pricing/core");
+} = require("@/services/pricing/core");
 const {
   pool,
   ORDER_COLS,
@@ -257,7 +257,7 @@ const calcGiaBan = ({
     });
     return result.price;
   } catch (err) {
-    const logger = require("../../src/utils/logger");
+    const logger = require("@/utils/logger");
     logger.error("Error calculating gia_ban", {
       orderId,
       error: err?.message,
@@ -275,7 +275,7 @@ const calcGiaBan = ({
  */
 const resolveOrderByPayment = async (client, { amount, transactionContent }) => {
   if (!amount || amount <= 0) return [];
-  const { STATUS } = require("../../src/utils/statuses");
+  const { STATUS } = require("@/utils/statuses");
   const statusList = [STATUS.RENEWAL, STATUS.UNPAID];
 
   const sql = `

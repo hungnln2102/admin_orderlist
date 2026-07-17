@@ -3,7 +3,7 @@
  * @see database/migrations/099_dashboard_financial_change_log.sql
  */
 
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

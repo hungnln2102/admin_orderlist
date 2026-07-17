@@ -2,7 +2,7 @@ const {
   normalizeMoney,
   normalizeImportValue,
   resolveMoney,
-} = require("../../../src/services/pricing/core");
+} = require("@/services/pricing/core");
 
 describe("pricing core money normalizers", () => {
   test.each([

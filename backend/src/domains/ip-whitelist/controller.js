@@ -1,10 +1,10 @@
-const { db } = require("../../db");
-const logger = require("../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   ADMIN_SCHEMA,
   SCHEMA_ADMIN,
   tableName,
-} = require("../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const TABLE = tableName(ADMIN_SCHEMA.IP_WHITELISTS.TABLE, SCHEMA_ADMIN);
 const C = ADMIN_SCHEMA.IP_WHITELISTS.COLS;

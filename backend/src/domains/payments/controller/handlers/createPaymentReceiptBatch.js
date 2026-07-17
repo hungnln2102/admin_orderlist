@@ -1,22 +1,22 @@
-const { withTransaction } = require("../../../../db");
-const { STATUS } = require("../../../../utils/statuses");
-const logger = require("../../../../utils/logger");
-const { resolveDefaultShopBankAccount } = require("../../../../services/shopBankAccountResolver");
+const { withTransaction } = require("@/db");
+const { STATUS } = require("@/utils/statuses");
+const logger = require("@/utils/logger");
+const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
 const {
   TABLES,
   ORDER_COLS,
   PAYMENT_RECEIPT_BATCH_COLS,
   PAYMENT_RECEIPT_BATCH_ITEM_COLS,
-} = require("../shared/constants");
+} = require("@/domains/payments/controller/shared/constants");
 const {
   parseOrderCodesInput,
   parseTransactionCodesInput,
   isMissingBatchTablesError,
   createHttpError,
   normalizeMoney,
-} = require("../shared/helpers");
-const { generateUniqueMavgBatchCode } = require("../shared/batchTransferCode");
-const { computeBatchPaymentTotal } = require("../batch/computeBatchPaymentTotal");
+} = require("@/domains/payments/controller/shared/helpers");
+const { generateUniqueMavgBatchCode } = require("@/domains/payments/controller/shared/batchTransferCode");
+const { computeBatchPaymentTotal } = require("@/domains/payments/controller/batch/computeBatchPaymentTotal");
 
 const resolveOrdersForBatch = async (trx, { transactionCodes, orderCodes }) => {
   if (orderCodes.length > 0) {

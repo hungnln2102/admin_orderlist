@@ -3,7 +3,7 @@ const {
   getSellerPricingTable,
   postCalculate,
   postVariantsPricing,
-} = require("./controller");
+} = require("@/domains/public-pricing/controller");
 
 const router = express.Router();
 

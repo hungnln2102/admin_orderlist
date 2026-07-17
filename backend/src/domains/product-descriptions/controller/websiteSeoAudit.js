@@ -1,5 +1,5 @@
 require("dotenv").config();
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 
 const WEBSITE_SEO_AUDIT_URL =
   process.env.WEBSITE_SEO_AUDIT_URL || process.env.WEBSITE_API_BASE_URL || "";

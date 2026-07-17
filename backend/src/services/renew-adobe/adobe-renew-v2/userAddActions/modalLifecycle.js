@@ -1,6 +1,6 @@
-const logger = require("../../../../utils/logger");
-const { dismissBlockingOverlays } = require("../dismissBlockingOverlays");
-const { clickBestEffort, getUsersListUrlFromPage } = require("./shared");
+const logger = require("@/utils/logger");
+const { dismissBlockingOverlays } = require("@/services/renew-adobe/adobe-renew-v2/dismissBlockingOverlays");
+const { clickBestEffort, getUsersListUrlFromPage } = require("@/services/renew-adobe/adobe-renew-v2/userAddActions/shared");
 
 async function dismissAddUsersPostSaveErrorToast(page, logPrefix) {
   for (let i = 0; i < 12; i++) {

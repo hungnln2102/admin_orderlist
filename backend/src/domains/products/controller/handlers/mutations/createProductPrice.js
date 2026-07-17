@@ -1,23 +1,23 @@
-const { db } = require("../../../../../db");
-const { quoteIdent } = require("../../../../../utils/sql");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
 const {
   normalizeTextInput,
   toNullableNumber,
-} = require("../../../../../utils/normalizers");
-const logger = require("../../../../../utils/logger");
-const { mapProductPriceRow } = require("../../mappers");
-const { pricingCache, supplierCache } = require("../../../../../utils/cache");
-const { ensureSupplierRecord } = require("../../../../supplies/services/supplierLookupService");
-const { upsertProductSupplierPrice } = require("../../../services/productSupplierMutationService");
+} = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
+const { mapProductPriceRow } = require("@/domains/products/controller/mappers");
+const { pricingCache, supplierCache } = require("@/utils/cache");
+const { ensureSupplierRecord } = require("@/domains/supplies/services/supplierLookupService");
+const { upsertProductSupplierPrice } = require("@/domains/products/services/productSupplierMutationService");
 const {
   productSchemaCols,
   productCategoryCols,
   variantCols,
   productDescCols,
   TABLES,
-} = require("../../constants");
-const { getTiers } = require("../../../../../services/pricing/tierCache");
-const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
+} = require("@/domains/products/controller/constants");
+const { getTiers } = require("@/services/pricing/tierCache");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 const {
   fetchVariantView,
   hasProductCategoryColor,
@@ -26,7 +26,7 @@ const {
   normalizeCategoryIds,
   pickCategoryColor,
   resetVariantSequence,
-} = require("./shared");
+} = require("@/domains/products/controller/handlers/mutations/shared");
 
 const createProductPrice = async (req, res) => {
   const {

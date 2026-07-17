@@ -3,9 +3,9 @@
  * Từ khi dùng payment slot (suffix trên số tiền), không còn tạo / trả mã transaction.
  */
 
-const { db } = require("../../../db");
-const { TABLES, COLS } = require("../controller/constants");
-const { isMavnImportOrder } = require("../../../utils/orderHelpers");
+const { db } = require("@/db");
+const { TABLES, COLS } = require("@/domains/orders/controller/constants");
+const { isMavnImportOrder } = require("@/utils/orderHelpers");
 
 const loadOrderRow = async (executor, { orderListId, idOrder }) => {
   const idCol = COLS.ORDER.ID;

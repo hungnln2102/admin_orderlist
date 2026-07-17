@@ -1,4 +1,4 @@
-const { body, param, validate } = require("../../../middleware/validateRequest");
+const { body, param, validate } = require("@/middleware/validateRequest");
 
 const saveDailyBalanceRules = [
   body("recordDate").trim().notEmpty().withMessage("recordDate không hợp lệ."),

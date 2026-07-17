@@ -1,4 +1,4 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   listShopBankAccountItems,
   getDefaultShopBankAccount,
@@ -6,11 +6,11 @@ const {
   updateShopBankAccountItem,
   setDefaultShopBankAccountItem,
   deleteShopBankAccountItem,
-} = require("../use-cases");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
-const { listShopBankAccountBalances } = require("../use-cases/listShopBankAccountBalances");
-const { updateShopBankAccountWithdrawn } = require("../use-cases/updateShopBankAccountWithdrawn");
-const { recordShopBankAccountWithdrawal } = require("../use-cases/recordShopBankAccountWithdrawal");
+} = require("@/domains/shop-bank-accounts/use-cases");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
+const { listShopBankAccountBalances } = require("@/domains/shop-bank-accounts/use-cases/listShopBankAccountBalances");
+const { updateShopBankAccountWithdrawn } = require("@/domains/shop-bank-accounts/use-cases/updateShopBankAccountWithdrawn");
+const { recordShopBankAccountWithdrawal } = require("@/domains/shop-bank-accounts/use-cases/recordShopBankAccountWithdrawal");
 
 const handleControllerError = (res, error, context) => {
   const status = Number.isInteger(error?.status) ? error.status : 500;

@@ -3,9 +3,9 @@
  * Từ click Sign in đến khi tới trang đích (account/adminconsole).
  */
 
-const logger = require("../../../utils/logger");
-const { LOGIN_PAGE_URL, AUTH_SERVICES_BASE } = require("./shared/constants");
-const { LOGIN_TIMEOUTS, runOtpIfPresent, runCredentialsFixedOnce, handleOtpChallenge } = require("./flows/login");
+const logger = require("@/utils/logger");
+const { LOGIN_PAGE_URL, AUTH_SERVICES_BASE } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
+const { LOGIN_TIMEOUTS, runOtpIfPresent, runCredentialsFixedOnce, handleOtpChallenge } = require("@/services/renew-adobe/adobe-renew-v2/flows/login");
 
 /** True nếu URL là trang đã đăng nhập (account, adminconsole, home...), không phải form login. */
 function isOnAdobeSite(url) {

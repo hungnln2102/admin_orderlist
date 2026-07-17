@@ -1,6 +1,6 @@
 const {
   buildDailyRevenueSummaryBackfillQuery,
-} = require("../../../src/services/dashboard/dailyRevenueSummaryBackfill/queryRepository");
+} = require("@/services/dashboard/dailyRevenueSummaryBackfill/queryRepository");
 
 describe("dailyRevenueSummaryBackfill queryRepository", () => {
   test("builds SQL and bindings for backfill", () => {

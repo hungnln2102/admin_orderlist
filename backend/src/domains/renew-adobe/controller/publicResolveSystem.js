@@ -5,18 +5,18 @@
  * Email không có trong tracking → 200 ok=false để Website hiển thị thông báo gọn, không tạo lỗi đỏ trong DevTools.
  */
 
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
-const { normalizeEmail } = require("../helpers/email");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { normalizeEmail } = require("@/domains/renew-adobe/helpers/email");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   DEFAULT_ADOBE_SYSTEM_CODE,
   ALLOWED_ADOBE_SYSTEM_CODES,
-} = require("../../../services/renew-adobe/adobeSystemConstants");
+} = require("@/services/renew-adobe/adobeSystemConstants");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

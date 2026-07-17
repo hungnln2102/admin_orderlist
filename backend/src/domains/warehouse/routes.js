@@ -4,8 +4,8 @@ const {
   createWarehouse,
   updateWarehouse,
   deleteWarehouse,
-} = require("./controller");
-const { warehouseIdParam } = require("./validators/warehouseValidator");
+} = require("@/domains/warehouse/controller");
+const { warehouseIdParam } = require("@/domains/warehouse/validators/warehouseValidator");
 
 const router = express.Router();
 

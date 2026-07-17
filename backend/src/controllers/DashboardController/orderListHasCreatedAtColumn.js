@@ -1,4 +1,4 @@
-const { db } = require("../../db");
+const { db } = require("@/db");
 
 let cache = { value: null, checkedAt: 0 };
 const CACHE_MS = 5 * 60 * 1000;

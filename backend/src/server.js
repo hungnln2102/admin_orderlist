@@ -1,9 +1,10 @@
-const app = require("./app");
-const { port } = require("./config/appConfig");
-const { ensureDefaultAdmin } = require("./domains/auth/controller");
-const logger = require("./utils/logger");
-const { notifyCritical } = require("./domains/notifications/telegram").systemNotifier;
-const { registerAllSubscribers } = require("./events");
+require("module-alias/register");
+const app = require("@/app");
+const { port } = require("@/config/appConfig");
+const { ensureDefaultAdmin } = require("@/domains/auth/controller");
+const logger = require("@/utils/logger");
+const { notifyCritical } = require("@/domains/notifications/telegram").systemNotifier;
+const { registerAllSubscribers } = require("@/events");
 
 registerAllSubscribers();
 

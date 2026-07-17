@@ -3,7 +3,7 @@ const {
   columns,
   selectColumns,
   COLS,
-} = require("../../../../src/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 
 describe("shopBankAccountRepository column mapping", () => {
   test("getDefinition exposes camelCase columns with DB names", () => {

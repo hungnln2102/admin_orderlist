@@ -1,6 +1,6 @@
-const pricingService = require("../../../src/services/pricing/pricingService");
-const orderPricingService = require("../../../src/services/pricing/orderPricingService");
-const pricingCore = require("../../../src/services/pricing/core");
+const pricingService = require("@/services/pricing/pricingService");
+const orderPricingService = require("@/services/pricing/orderPricingService");
+const pricingCore = require("@/services/pricing/core");
 
 describe("pricingService facade", () => {
   test("exports the stable pricing owner surface", () => {

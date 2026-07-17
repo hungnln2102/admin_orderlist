@@ -1,11 +1,11 @@
-const { STATUS } = require("../../../../../utils/statuses");
-const { TABLES, ORDER_COLS } = require("../../shared/constants");
-const { createHttpError } = require("../../shared/helpers");
+const { STATUS } = require("@/utils/statuses");
+const { TABLES, ORDER_COLS } = require("@/domains/payments/controller/shared/constants");
+const { createHttpError } = require("@/domains/payments/controller/shared/helpers");
 const {
   updateDashboardMonthlySummaryOnStatusChange,
-} = require("../../../../orders/controller/finance/dashboardSummary");
-const { syncMavnStoreProfitExpense } = require("../../../../orders/controller/orderFinanceHelpers");
-const { insertReconcileAuditLog } = require("./auditLog");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
+const { syncMavnStoreProfitExpense } = require("@/domains/orders/controller/orderFinanceHelpers");
+const { insertReconcileAuditLog } = require("@/domains/payments/controller/handlers/reconcile/auditLog");
 
 /**
  * Action `reconcile_and_mark_paid`:

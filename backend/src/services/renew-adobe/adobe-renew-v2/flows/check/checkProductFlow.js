@@ -1,6 +1,6 @@
-const logger = require("../../../../../utils/logger");
-const { withRecoverableRetry } = require("./retry");
-const { checkOrgLicenseCapacity } = require("../../shared/accessChecks");
+const logger = require("@/utils/logger");
+const { withRecoverableRetry } = require("@/services/renew-adobe/adobe-renew-v2/flows/check/retry");
+const { checkOrgLicenseCapacity } = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
 
 const ADMIN_PRODUCTS = "https://adminconsole.adobe.com/products";
 

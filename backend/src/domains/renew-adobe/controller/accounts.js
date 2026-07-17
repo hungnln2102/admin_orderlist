@@ -6,7 +6,7 @@
 const {
   listMailBackupMailboxes,
   createMailBackupMailbox,
-} = require("./accounts/mailBackupHandlers");
+} = require("@/domains/renew-adobe/controller/accounts/mailBackupHandlers");
 const {
   listAccounts,
   lookupAccountByEmail,
@@ -14,7 +14,7 @@ const {
   deleteAccount,
   updateUrlAccess,
   updateAccount,
-} = require("./accounts/accountHandlers");
+} = require("@/domains/renew-adobe/controller/accounts/accountHandlers");
 
 module.exports = {
   listMailBackupMailboxes,

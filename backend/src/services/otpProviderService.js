@@ -1,7 +1,7 @@
-const logger = require("../utils/logger");
-const mailOtpService = require("./mailOtpService");
-const { fetchOtpFromAdesApi } = require("./fix-ades/otpReader");
-const { readOtpFromTinyHost } = require("./tinyhost");
+const logger = require("@/utils/logger");
+const mailOtpService = require("@/services/mailOtpService");
+const { fetchOtpFromAdesApi } = require("@/services/fix-ades/otpReader");
+const { readOtpFromTinyHost } = require("@/services/tinyhost");
 
 const OTP_SOURCES = {
   IMAP: "imap",

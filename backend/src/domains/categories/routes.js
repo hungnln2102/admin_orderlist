@@ -4,8 +4,8 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
-} = require("./controller");
-const { categoryIdParam, createCategoryRules } = require("./validators/categoryValidator");
+} = require("@/domains/categories/controller");
+const { categoryIdParam, createCategoryRules } = require("@/domains/categories/validators/categoryValidator");
 
 const router = express.Router();
 

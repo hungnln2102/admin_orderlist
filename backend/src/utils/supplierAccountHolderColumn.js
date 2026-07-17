@@ -3,7 +3,7 @@
  * If the column is missing, callers must not reference it in SQL.
  * We only cache a positive result so that after migration the next request picks up the column without restart.
  */
-const { supplierCache } = require("./cache");
+const { supplierCache } = require("@/utils/cache");
 
 let accountHolderColumnKnownPresent = false;
 

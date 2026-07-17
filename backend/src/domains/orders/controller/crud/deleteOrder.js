@@ -1,15 +1,15 @@
-const { db } = require("../../../../db");
-const { TABLES, STATUS } = require("../constants");
-const { normalizeOrderRow } = require("../helpers");
-const { ORDERS_SCHEMA } = require("../../../../config/dbSchema");
-const { deleteOrderWithArchive } = require("../orderDeletionService");
-const { todayYMDInVietnam } = require("../../../../utils/normalizers");
-const logger = require("../../../../utils/logger");
-const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
-const eventBus = require("../../../../events/eventBus");
-const EVENTS = require("../../../../events/eventTypes");
+const { db } = require("@/db");
+const { TABLES, STATUS } = require("@/domains/orders/controller/constants");
+const { normalizeOrderRow } = require("@/domains/orders/controller/helpers");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { deleteOrderWithArchive } = require("@/domains/orders/controller/orderDeletionService");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
 
-const { orderIdParam } = require("../../validators/orderValidator");
+const { orderIdParam } = require("@/domains/orders/validators/orderValidator");
 
 const attachDeleteOrderRoute = (router) => {
     router.delete("/:id", ...orderIdParam, async (req, res) => {

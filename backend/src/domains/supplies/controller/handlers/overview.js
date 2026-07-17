@@ -1,22 +1,22 @@
-const { db } = require("../../../../db");
+const { db } = require("@/db");
 const {
   QUOTED_COLS,
   TABLES,
   orderCols,
   STATUS,
-} = require("../constants");
+} = require("@/domains/supplies/controller/constants");
 const {
   quoteIdent,
-} = require("../../../../utils/sql");
-const { normalizeSupplyStatus } = require("../../../../utils/normalizers");
+} = require("@/utils/sql");
+const { normalizeSupplyStatus } = require("@/utils/normalizers");
 const {
   resolveSupplyStatusColumn,
   parseSupplyId,
   resolveSupplierTableName,
   resolveSupplierNameColumn,
-} = require("../helpers");
-const logger = require("../../../../utils/logger");
-const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
+} = require("@/domains/supplies/controller/helpers");
+const logger = require("@/utils/logger");
+const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 
 const getSupplyOverview = async (req, res) => {
   const { supplyId } = req.params;

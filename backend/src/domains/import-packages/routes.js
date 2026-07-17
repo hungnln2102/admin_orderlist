@@ -6,7 +6,7 @@ const {
   handleGetRule,
   handleUpsertRule,
   handleDeleteRule,
-} = require("./controller");
+} = require("@/domains/import-packages/controller");
 
 const router = express.Router();
 

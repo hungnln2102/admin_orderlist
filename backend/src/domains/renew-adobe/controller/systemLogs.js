@@ -1,8 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const logger = require("../../../utils/logger");
-const db = require("../../../config/database");
-const { SCHEMA_ORDERS, SCHEMA_FINANCE, SCHEMA_RENEW_ADOBE, ORDERS_SCHEMA, FINANCE_SCHEMA, RENEW_ADOBE_SCHEMA } = require("../../../config/dbSchema");
+const logger = require("@/utils/logger");
+const db = require("@/config/database");
+const { SCHEMA_ORDERS, SCHEMA_FINANCE, SCHEMA_RENEW_ADOBE, ORDERS_SCHEMA, FINANCE_SCHEMA, RENEW_ADOBE_SCHEMA } = require("@/config/dbSchema");
 
 const logsDir = path.resolve(__dirname, "../../../../logs");
 

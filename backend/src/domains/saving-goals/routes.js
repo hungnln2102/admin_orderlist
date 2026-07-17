@@ -5,12 +5,12 @@ const {
   updateSavingGoal,
   deleteSavingGoal,
   reorderSavingGoal,
-} = require("./controller");
+} = require("@/domains/saving-goals/controller");
 const {
   goalIdParam,
   createGoalRules,
   updatePriorityRules,
-} = require("./validators/savingGoalValidator");
+} = require("@/domains/saving-goals/validators/savingGoalValidator");
 
 const router = express.Router();
 

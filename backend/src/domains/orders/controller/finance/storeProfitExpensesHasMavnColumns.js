@@ -2,8 +2,8 @@
  * Cột linked_order_code + expense_meta (migration Knex 20260629200000).
  * dbSchema luôn khai báo COLS nên không thể dùng COLS.* để biết DB đã migrate hay chưa.
  */
-const { db } = require("../../../../db");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE } = require("../../../../config/dbSchema");
+const { db } = require("@/db");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE } = require("@/config/dbSchema");
 
 let cache = { value: null, checkedAt: 0 };
 const CACHE_MS = 5 * 60 * 1000;

@@ -1,7 +1,7 @@
 const {
   loadPostgresEnvForCli,
   getPostgresCliFallbackPathsForHelp,
-} = require("./src/config/loadPostgresEnvForCli");
+} = require("@/config/loadPostgresEnvForCli");
 
 const DATABASE_URL = loadPostgresEnvForCli().trim();
 if (!DATABASE_URL) {

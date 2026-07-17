@@ -1,8 +1,8 @@
-const eventBus = require('../eventBus');
-const EVENTS = require('../eventTypes');
-const logger = require('../../utils/logger');
-const { pool } = require('../../config/database');
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, ADMIN_SCHEMA, SCHEMA_ADMIN, tableName } = require('../../config/dbSchema');
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
+const logger = require("@/utils/logger");
+const { pool } = require("@/config/database");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, ADMIN_SCHEMA, SCHEMA_ADMIN, tableName } = require("@/config/dbSchema");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;

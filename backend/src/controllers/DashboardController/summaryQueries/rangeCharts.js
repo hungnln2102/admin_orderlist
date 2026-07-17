@@ -15,7 +15,7 @@ const {
   makeEventDateExpr,
   revenueByEventValueExprNo,
   profitByEventValueExprNo,
-} = require("./constants");
+} = require("@/controllers/DashboardController/summaryQueries/constants");
 
 /**
  * Biểu đồ tháng: đếm đơn theo birth; doanh thu / lợi nhuận theo event; hoàn theo cancel.

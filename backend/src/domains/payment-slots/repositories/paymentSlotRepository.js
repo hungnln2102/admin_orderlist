@@ -10,7 +10,7 @@ const {
   SLOT_STATUS,
   SUFFIX_SEQUENCE,
   SUFFIX_MAX,
-} = require("../constants");
+} = require("@/domains/payment-slots/constants");
 
 /** Hỗ trợ cả pg.Client (.query) và knex (.raw); chuẩn hoá về {rows}. */
 const pgPlaceholdersToKnex = (sql, params = []) => {

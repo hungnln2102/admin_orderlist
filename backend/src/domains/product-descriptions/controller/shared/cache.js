@@ -1,5 +1,5 @@
-const logger = require("../../../../utils/logger");
-const { normalizeBaseUrl } = require("./urlHelpers");
+const logger = require("@/utils/logger");
+const { normalizeBaseUrl } = require("@/domains/product-descriptions/controller/shared/urlHelpers");
 
 const WEBSITE_CACHE_INVALIDATE_URL =
   process.env.WEBSITE_CACHE_INVALIDATE_URL ||

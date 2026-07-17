@@ -4,7 +4,7 @@
  */
 
 const { body, param, query, validationResult } = require("express-validator");
-const { AppError } = require("./errorHandler");
+const { AppError } = require("@/middleware/errorHandler");
 
 /**
  * Middleware to check validation results

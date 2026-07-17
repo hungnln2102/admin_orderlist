@@ -2,7 +2,7 @@ const {
   ADMIN_SCHEMA,
   SCHEMA_ADMIN,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const LEDGER_TABLE = tableName(
   ADMIN_SCHEMA.USDT_WALLET_LEDGER.TABLE,

@@ -9,9 +9,9 @@ const {
   SCHEMA_PRODUCT,
   PRODUCT_SCHEMA,
   tableName,
-} = require("../config/dbSchema");
-const { fetchPackageProductById } = require("./packageProductService");
-const logger = require("../utils/logger");
+} = require("@/config/dbSchema");
+const { fetchPackageProductById } = require("@/services/packageProductService");
+const logger = require("@/utils/logger");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const V_COLS = PRODUCT_SCHEMA.VARIANT.COLS;

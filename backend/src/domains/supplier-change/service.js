@@ -5,11 +5,11 @@
  * logic lớn được tách dưới `./service/*` để dễ bảo trì.
  */
 
-const { db } = require("../../db");
-const { todayYMDInVietnam } = require("../../utils/normalizers");
-const { executeChangeSupplier } = require("./service/executor");
-const { ChangeSupplierError } = require("./service/errors");
-const { FLOWS } = require("./service/constants");
+const { db } = require("@/db");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const { executeChangeSupplier } = require("@/domains/supplier-change/service/executor");
+const { ChangeSupplierError } = require("@/domains/supplier-change/service/errors");
+const { FLOWS } = require("@/domains/supplier-change/service/constants");
 
 /**
  * @param {number} orderId

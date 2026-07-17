@@ -3,8 +3,8 @@
  * Runtime: `fetchVerifiedCcpSeatProductIdsFromOrgProductsApi` / users API đọc `productId` từ Adobe theo từng org.
  * Ở đây chỉ mô phỏng shape JSON (id nội bộ vs productId fulfillable) để kiểm tra `extractProductId` / lọc CCP.
  */
-const { extractCcpSeatProductIdsFromOrgProductsList } = require("../../../../../src/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
-const { extractAbpUserProductRefs, mapAbpUserToSnapshotUser } = require("../../../../../src/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
+const { extractCcpSeatProductIdsFromOrgProductsList } = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+const { extractAbpUserProductRefs, mapAbpUserToSnapshotUser } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 
 /** Hex 20 ký tự giả — đại diện mã fulfillable CCP từ API (mỗi org một bộ id thật). */
 const FIXTURE_CCP_PRODUCT_ID = "F00DC0C0C0DE00000001";

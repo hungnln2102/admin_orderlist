@@ -1,7 +1,7 @@
-const { listStoreProfitExpenses } = require("./listStoreProfitExpenses");
-const { createStoreProfitExpense } = require("./createStoreProfitExpense");
-const { updateStoreProfitExpense } = require("./updateStoreProfitExpense");
-const { deleteStoreProfitExpense } = require("./deleteStoreProfitExpense");
+const { listStoreProfitExpenses } = require("@/domains/store-profit-expenses/controller/listStoreProfitExpenses");
+const { createStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/createStoreProfitExpense");
+const { updateStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/updateStoreProfitExpense");
+const { deleteStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/deleteStoreProfitExpense");
 
 module.exports = {
   listStoreProfitExpenses,

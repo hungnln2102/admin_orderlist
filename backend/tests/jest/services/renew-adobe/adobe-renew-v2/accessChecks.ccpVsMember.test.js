@@ -5,7 +5,7 @@ const {
   discoverAdobeProProductIdSet,
   checkUserAssignedProduct,
   resolveAuthoritativeCcpProductIdSet,
-} = require("../../../../../src/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
 
 describe("accessChecks CCP vs Member (free)", () => {
   it("treats Vietnamese free membership product as not CCP", () => {

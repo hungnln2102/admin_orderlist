@@ -3,14 +3,14 @@
  * - Mỗi lần cộng off-flow từ biên lai → tạo phiếu credit OPEN (idempotent theo payment_receipt_id).
  * - Khi hoàn tiền credit (cashout) → trừ lại off-flow tháng gốc.
  */
-const { applyDashboardDelta } = require("../../../payments/controller/shared/dashboardDelta");
+const { applyDashboardDelta } = require("@/domains/payments/controller/shared/dashboardDelta");
 const {
   normalizeMoney,
   CREDIT_STATUS,
   REFUND_CREDIT_NOTES_TABLE,
   REFUND_CREDIT_NOTE_COLS: R,
-} = require("./refundCredits");
-const logger = require("../../../../utils/logger");
+} = require("@/domains/orders/controller/finance/refundCredits");
+const logger = require("@/utils/logger");
 
 const CREDIT_SOURCE_KIND = {
   ORDER_REFUND: "ORDER_REFUND",

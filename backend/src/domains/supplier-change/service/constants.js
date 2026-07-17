@@ -1,4 +1,4 @@
-const { STATUS } = require("../../../utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 
 const FLOWS = Object.freeze({
   A: "A",

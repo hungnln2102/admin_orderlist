@@ -1,11 +1,11 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
-const { TABLE, COLS } = require("./accountTable");
-const { normalizeEmail } = require("../helpers/email");
+} = require("@/config/dbSchema");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/accountTable");
+const { normalizeEmail } = require("@/domains/renew-adobe/helpers/email");
 
 const MAP_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,

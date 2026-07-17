@@ -1,15 +1,15 @@
-const { db, withTransaction } = require("../../../db");
+const { db, withTransaction } = require("@/db");
 const {
   toNullableNumber,
-} = require("../../../utils/normalizers");
+} = require("@/utils/normalizers");
 const {
   PACKAGE_PRODUCTS_SELECT,
   mapPackageProductRow,
   fetchPackageProductById,
-} = require("../../../services/packageProductService");
-const { syncOrdersMatchingPackageAccount } = require("../../../services/packageOrderAccountSync");
-const logger = require("../../../utils/logger");
-const { pkgCols, TABLES, productCols } = require("./constants");
+} = require("@/services/packageProductService");
+const { syncOrdersMatchingPackageAccount } = require("@/services/packageOrderAccountSync");
+const logger = require("@/utils/logger");
+const { pkgCols, TABLES, productCols } = require("@/domains/package-products/controller/constants");
 
 
 const normalizeMatchMode = (matchMode) =>

@@ -3,9 +3,9 @@
  */
 
 const crypto = require("crypto");
-const { db } = require("../db");
-const { ORDERS_SCHEMA, tableName, SCHEMA_ORDERS } = require("../config/dbSchema");
-const logger = require("../utils/logger");
+const { db } = require("@/db");
+const { ORDERS_SCHEMA, tableName, SCHEMA_ORDERS } = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const MAX_RETRIES = 12;
 const TRANSACTION_CODE_LENGTH = 8;

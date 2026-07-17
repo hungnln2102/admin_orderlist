@@ -2,10 +2,10 @@ const {
   findLatestPendingSlotByOrder,
   findPendingSlotByAmount,
   fetchNextSuffix,
-} = require("../../../payment-slots/repositories/paymentSlotRepository");
-const { MAX_SUFFIX_ATTEMPTS, SUFFIX_MAX } = require("../../../payment-slots/constants");
-const { createHttpError, normalizeMoney } = require("../shared/helpers");
-const { TABLES, PAYMENT_RECEIPT_BATCH_COLS } = require("../shared/constants");
+} = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const { MAX_SUFFIX_ATTEMPTS, SUFFIX_MAX } = require("@/domains/payment-slots/constants");
+const { createHttpError, normalizeMoney } = require("@/domains/payments/controller/shared/helpers");
+const { TABLES, PAYMENT_RECEIPT_BATCH_COLS } = require("@/domains/payments/controller/shared/constants");
 
 const resolveOrderBaseAmount = async (trx, orderRow, idOrderCol) => {
   const orderCode = String(orderRow?.[idOrderCol] || "").trim().toUpperCase();

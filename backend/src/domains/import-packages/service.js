@@ -1,8 +1,8 @@
-const { db, withTransaction } = require("../../db");
-const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../../config/dbSchema");
-const { normalizeDateInput } = require("../../utils/normalizers");
-const { TABLES, ruleCols, stockCols, pkgCols, productCols } = require("./constants");
-const logger = require("../../utils/logger");
+const { db, withTransaction } = require("@/db");
+const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("@/config/dbSchema");
+const { normalizeDateInput } = require("@/utils/normalizers");
+const { TABLES, ruleCols, stockCols, pkgCols, productCols } = require("@/domains/import-packages/constants");
+const logger = require("@/utils/logger");
 
 /**
  * Doc rule cau hinh import-package theo productId.
@@ -38,8 +38,8 @@ const createImportPackage = async (payload) => {
   } = payload;
 
   const rule = await findRuleByProductId(db, productId);
-  const eventBus = require("../../events/eventBus");
-  const EVENTS = require("../../events/eventTypes");
+  const eventBus = require("@/events/eventBus");
+  const EVENTS = require("@/events/eventTypes");
 
   const result = await withTransaction(async (trx) => {
     // 1. Lấy tên sản phẩm (display_name) từ variant

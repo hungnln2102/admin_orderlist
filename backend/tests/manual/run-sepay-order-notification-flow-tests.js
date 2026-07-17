@@ -35,12 +35,12 @@ const {
     PAYMENT_RECEIPT_TABLE,
     PAYMENT_RECEIPT_COLS,
 } = require("../../webhook/sepay/config");
-const { STATUS } = require("../../src/utils/statuses");
-const { openPaymentSlot } = require("../../src/domains/payment-slots/use-cases/openPaymentSlot");
+const { STATUS } = require("@/utils/statuses");
+const { openPaymentSlot } = require("@/domains/payment-slots/use-cases/openPaymentSlot");
 const { parseWebhookTransaction } = require("../../webhook/sepay/routes/webhook/parsePhase");
 const { processWebhookTransactionAsync } = require("../../webhook/sepay/routes/webhook/postHandler");
-const eventBus = require("../../src/events/eventBus");
-const EVENTS = require("../../src/events/eventTypes");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
 
 const RUNS_PER_CASE = Number(process.env.SEPAY_FLOW_TEST_RUNS || 5);
 const TEST_PREFIX = "MAVITFLOW";

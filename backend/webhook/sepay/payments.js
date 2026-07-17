@@ -11,7 +11,7 @@ const {
   SUPPLIER_COST_COLS,
   PAYMENT_SUPPLY_COLS,
 } = require("./config");
-const { STATUS } = require("../../src/utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 const {
   normalizeAmount,
   parsePaidDate,
@@ -23,15 +23,15 @@ const {
   normalizeImportValue,
   fetchProductPricing,
 } = require("./utils");
-const logger = require("../../src/utils/logger");
+const logger = require("@/utils/logger");
 const {
   calculateOrderPricingFromResolvedValues,
-} = require("../../src/services/pricing/core");
+} = require("@/services/pricing/core");
 const { withSavepoint } = require("./savepoint");
 const {
   resolveOrderByExpectedAmount,
   markPaymentSlotMatched,
-} = require("../../src/domains/payment-slots");
+} = require("@/domains/payment-slots");
 
 let paymentReceiptOrderColCache = null;
 let paymentReceiptColumnsCache = null;

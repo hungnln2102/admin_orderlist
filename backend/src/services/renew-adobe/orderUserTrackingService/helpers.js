@@ -1,5 +1,5 @@
-const { normalizeEmail } = require("../../../domains/renew-adobe/helpers/email");
-const { MAP_COLS } = require("./tables");
+const { normalizeEmail } = require("@/domains/renew-adobe/helpers/email");
+const { MAP_COLS } = require("@/services/renew-adobe/orderUserTrackingService/tables");
 
 
 function normalizeOrgKeyForTracking(orgName) {

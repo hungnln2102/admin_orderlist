@@ -2,7 +2,7 @@
  * Cột total_import (tổng nhập hàng theo tháng từ partner.supplier_order_cost_log.import_cost).
  * Đồng bộ qua trigger; backfill từ log.
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

@@ -1,9 +1,9 @@
-const adobeRenewV2 = require("../../../../services/renew-adobe/adobe-renew-v2");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
 const {
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
   userCountDbValue,
-} = require("../usersSnapshotUtils");
+} = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 const {
   db,
   logger,
@@ -19,7 +19,7 @@ const {
   getRenewAdobeVariantIds,
   upsertRenewAdobeOrderUserTrackingForAccount,
   logAutoAssign,
-} = require("./shared");
+} = require("@/domains/renew-adobe/controller/autoAssign/shared");
 
 async function autoAssignUsers({ onProgress = null } = {}) {
   const variantIds = await getRenewAdobeVariantIds();

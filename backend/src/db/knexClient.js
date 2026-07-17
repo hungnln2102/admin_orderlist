@@ -1,5 +1,5 @@
 const knex = require("knex");
-const { loadPostgresEnvForCli } = require("../config/loadPostgresEnvForCli");
+const { loadPostgresEnvForCli } = require("@/config/loadPostgresEnvForCli");
 
 const {
   SCHEMA_ADMIN,
@@ -16,14 +16,14 @@ const {
   SCHEMA_FORM_DESC,
   SCHEMA_INPUTS,
   SCHEMA_RENEW_ADOBE,
-} = require("../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const DATABASE_URL = loadPostgresEnvForCli().trim();
 
 if (!DATABASE_URL) {
   // Use require here to avoid circular dependency
   try {
-    const logger = require("../utils/logger");
+    const logger = require("@/utils/logger");
     logger.warn(
       "[db] Thiếu chuỗi kết nối Postgres (DATABASE_URL / POSTGRES_URL / PG_URL hoặc DB_USER+DB_NAME). Knex sẽ được khởi tạo không có connection string."
     );

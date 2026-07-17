@@ -6,9 +6,9 @@
 
 const https = require("https");
 function getLogger() {
-  return require("../../../../utils/logger");
+  return require("@/utils/logger");
 }
-const { HTTP_TIMEOUT_MS, TELEGRAM_BOT_TOKEN } = require("./constants");
+const { HTTP_TIMEOUT_MS, TELEGRAM_BOT_TOKEN } = require("@/domains/notifications/telegram/core/constants");
 
 const RATE_LIMIT_MS = 1500; // Giãn cách 1.5s giữa mỗi tin nhắn
 const MAX_QUEUE = 300; // Ngăn rò rỉ bộ nhớ nếu mạng sập dài hạn

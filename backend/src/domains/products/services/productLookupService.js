@@ -1,7 +1,7 @@
-const { db } = require("../../../db");
-const { quoteIdent } = require("../../../utils/sql");
-const { normalizeTextInput } = require("../../../utils/normalizers");
-const { TABLES, variantCols, productCols } = require("../controller/constants");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const { normalizeTextInput } = require("@/utils/normalizers");
+const { TABLES, variantCols, productCols } = require("@/domains/products/controller/constants");
 
 const findProductIdByName = async (nameRaw) => {
   const normalizedInput = normalizeTextInput(nameRaw);

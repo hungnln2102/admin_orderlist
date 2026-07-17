@@ -23,13 +23,13 @@ const {
   isEligibleForRenewal,
   fetchMonthlySummarySnapshot,
 } = require("../../renewal");
-const { STATUS: ORDER_STATUS } = require("../../../../src/utils/statuses");
+const { STATUS: ORDER_STATUS } = require("@/utils/statuses");
 const {
   isMavnImportOrder,
   isMavrykShopSupplierName,
-} = require("../../../../src/utils/orderHelpers");
+} = require("@/utils/orderHelpers");
 const { getOrderQrPaymentEligibility } = require("../../orderPaymentEligibility");
-const logger = require("../../../../src/utils/logger");
+const logger = require("@/utils/logger");
 const {
   verifyWebhookAuth,
 } = require("./authPhase");
@@ -56,7 +56,7 @@ const {
   resolveOrderPriceForWebhookMatch,
   fetchSupplierNameBySupplyId,
 } = require("./postingPhase");
-const { creditShopBankFromPaymentReceipt } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { creditShopBankFromPaymentReceipt } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
 const {
@@ -66,9 +66,9 @@ const {
 } = require("./orderCodeResolution");
 const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
 const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpectedAmount");
-const { STATUS } = require("../../../../src/utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 const { withSavepoint } = require("../../savepoint");
-const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
+const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 
 async function handleWebhookPost(req, res) {
   logger.debug("Incoming Sepay webhook", {
@@ -100,8 +100,8 @@ async function handleWebhookPost(req, res) {
   }
 
   // Phát sự kiện ra EventBus để tách biệt logic xử lý khỏi HTTP response
-  const eventBus = require("../../../../src/events/eventBus");
-  const EVENTS = require("../../../../src/events/eventTypes");
+  const eventBus = require("@/events/eventBus");
+  const EVENTS = require("@/events/eventTypes");
   eventBus.emit(EVENTS.SEPAY_WEBHOOK_RECEIVED, {
     reqBody: req.body,
     parsed,
@@ -882,8 +882,8 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
 
       // Bắn event tiền vào / ra cho FinancialMetricsSubscriber (và các module khác)
       if (receiptResult?.inserted) {
-        const eventBus = require("../../../../src/events/eventBus");
-        const EVENTS = require("../../../../src/events/eventTypes");
+        const eventBus = require("@/events/eventBus");
+        const EVENTS = require("@/events/eventTypes");
 
         if (transferAmountNormalized > 0) {
           const hasEligibleRenewal = loopOrderCodes.some(code => eligibilityByOrderCode.get(code)?.eligible);

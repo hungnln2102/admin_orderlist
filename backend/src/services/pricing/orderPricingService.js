@@ -1,21 +1,21 @@
-const { db } = require("../../db");
-const { ORDERS_SCHEMA } = require("../../config/dbSchema");
-const { TABLES, COLS } = require("../../domains/orders/controller/constants");
+const { db } = require("@/db");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { TABLES, COLS } = require("@/domains/orders/controller/constants");
 const {
   normalizeMoney,
   roundToThousands,
   resolveOrderKind,
-} = require("./core");
-const { getTiers } = require("./tierCache");
-const { isMavrykShopSupplierName, isMavnImportOrder } = require("../../utils/orderHelpers");
+} = require("@/services/pricing/core");
+const { getTiers } = require("@/services/pricing/tierCache");
+const { isMavrykShopSupplierName, isMavnImportOrder } = require("@/utils/orderHelpers");
 const {
   findSupplierById,
   findSupplierIdByName,
-} = require("../../domains/supplies/services/supplierLookupService");
+} = require("@/domains/supplies/services/supplierLookupService");
 const {
   findMaxSupplierCostPrice,
   findSupplierCostPrice,
-} = require("../../domains/supplies/services/supplierCostService");
+} = require("@/domains/supplies/services/supplierCostService");
 
 class PricingHttpError extends Error {
   constructor(statusCode, message) {

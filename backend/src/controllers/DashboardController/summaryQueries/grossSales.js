@@ -8,7 +8,7 @@ const {
   orderCountedSql,
   idOrderMatchesSalesSql,
   makeBirthDateExpr,
-} = require("./constants");
+} = require("@/controllers/DashboardController/summaryQueries/constants");
 
 /**
  * SUM(giá bán) MAV* theo mốc birth (created_at, fallback order_date) trong khoảng [from, to] (inclusive).

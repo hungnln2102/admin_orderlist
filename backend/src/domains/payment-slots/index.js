@@ -16,21 +16,21 @@
  *  - SLOT_KIND, SLOT_STATUS                    — enum hằng số
  */
 
-const constants = require("./constants");
-const { openPaymentSlot } = require("./use-cases/openPaymentSlot");
+const constants = require("@/domains/payment-slots/constants");
+const { openPaymentSlot } = require("@/domains/payment-slots/use-cases/openPaymentSlot");
 const {
   resolveOrderByExpectedAmount,
-} = require("./use-cases/resolveOrderByExpectedAmount");
-const { markPaymentSlotMatched } = require("./use-cases/markPaymentSlotMatched");
-const { expirePaymentSlots } = require("./use-cases/expirePaymentSlots");
+} = require("@/domains/payment-slots/use-cases/resolveOrderByExpectedAmount");
+const { markPaymentSlotMatched } = require("@/domains/payment-slots/use-cases/markPaymentSlotMatched");
+const { expirePaymentSlots } = require("@/domains/payment-slots/use-cases/expirePaymentSlots");
 const {
   findLatestPendingSlotByOrder,
   findLatestMatchedSlotByOrder,
   findActiveSlotByOrder,
-} = require("./repositories/paymentSlotRepository");
+} = require("@/domains/payment-slots/repositories/paymentSlotRepository");
 const {
   backfillPendingPaymentSlots,
-} = require("./use-cases/backfillPendingPaymentSlots");
+} = require("@/domains/payment-slots/use-cases/backfillPendingPaymentSlots");
 
 module.exports = {
   openPaymentSlot,

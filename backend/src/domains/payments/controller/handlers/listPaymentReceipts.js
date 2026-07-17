@@ -1,11 +1,11 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   PAYMENT_RECEIPT_DEF,
   PAYMENT_RECEIPT_AUDIT_DEF,
   RECEIPT_STATE_COLS,
-} = require("../shared/constants");
+} = require("@/domains/payments/controller/shared/constants");
 
 const OUTBOUND_RULE_BRANCH = "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT";
 

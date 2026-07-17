@@ -1,12 +1,12 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 
 const {
   defaultFrom22nd,
   vnTodayYmd,
   TAX_ORDER_LIST_FROM_DEFAULT,
   IMPORT_SPREAD_FALLBACK_DAYS_DEFAULT,
-} = require("./shared");
-const { executeDailyRevenueSummaryBackfill } = require("./queryRepository");
+} = require("@/services/dashboard/dailyRevenueSummaryBackfill/shared");
+const { executeDailyRevenueSummaryBackfill } = require("@/services/dashboard/dailyRevenueSummaryBackfill/queryRepository");
 
 /**
  * @param {object} [options]

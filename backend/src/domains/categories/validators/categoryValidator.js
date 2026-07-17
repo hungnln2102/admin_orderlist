@@ -1,4 +1,4 @@
-const { body, param, validate } = require("../../../middleware/validateRequest");
+const { body, param, validate } = require("@/middleware/validateRequest");
 
 const categoryIdParam = [
   param("id").isInt({ min: 1 }).withMessage("Invalid category ID."),

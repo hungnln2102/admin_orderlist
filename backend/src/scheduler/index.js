@@ -5,7 +5,7 @@
  * API server dùng SchedulerController → import taskInstances.js trực tiếp.
  */
 const cron = require("node-cron");
-const logger = require("../utils/logger");
+const logger = require("@/utils/logger");
 
 const {
   updateDatabaseTask,
@@ -20,7 +20,7 @@ const {
   schedulerTimezone,
   cronExpression,
   runOnStart,
-} = require("./taskInstances");
+} = require("@/scheduler/taskInstances");
 
 const dailyRevenueSummaryCron =
   process.env.DAILY_REVENUE_SUMMARY_CRON || "15 0 * * *";

@@ -16,15 +16,16 @@
  *   node scheduler.js --run-four-days-once   # một lần: Telegram đơn cần gia hạn (còn 4 ngày), bỏ qua chốt ngày
  *   npm run start:scheduler:four-days-once
  */
+require("module-alias/register");
 // Cùng .env + .env.local với API — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
-const { loadBackendEnv } = require("./src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 loadBackendEnv();
 
-const logger = require("./src/utils/logger");
-const { notifyCritical } = require("./src/domains/notifications/telegram").systemNotifier;
+const logger = require("@/utils/logger");
+const { notifyCritical } = require("@/domains/notifications/telegram").systemNotifier;
 
 // Đăng ký toàn bộ event subscribers
-const { registerAllSubscribers } = require("./src/events");
+const { registerAllSubscribers } = require("@/events");
 registerAllSubscribers();
 
 process.on("uncaughtException", (err) => {
@@ -48,7 +49,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 if (process.argv.includes("--run-cron-once")) {
-  const { updateDatabaseTask } = require("./src/scheduler/taskInstances");
+  const { updateDatabaseTask } = require("@/scheduler/taskInstances");
   logger.info(
     "[Scheduler] CLI --run-cron-once: cùng tác vụ CRON_SCHEDULE (EXPIRED/RENEWAL + backup nếu ENABLE_DB_BACKUP=true)"
   );
@@ -65,7 +66,7 @@ if (process.argv.includes("--run-cron-once")) {
       process.exit(1);
     });
 } else if (process.argv.includes("--run-adobe-once")) {
-  const { renewAdobeCheckAndNotifyTask } = require("./src/scheduler/taskInstances");
+  const { renewAdobeCheckAndNotifyTask } = require("@/scheduler/taskInstances");
   logger.info(
     "[Scheduler] CLI --run-adobe-once: chạy job check tài khoản Adobe (cùng logic trigger=cron, dùng backend/.env hiện tại)"
   );
@@ -82,7 +83,7 @@ if (process.argv.includes("--run-cron-once")) {
       process.exit(1);
     });
 } else if (process.argv.includes("--run-daily-revenue-once")) {
-  const { syncDailyRevenueSummaryTask } = require("./src/scheduler/taskInstances");
+  const { syncDailyRevenueSummaryTask } = require("@/scheduler/taskInstances");
   logger.info(
     "[Scheduler] CLI --run-daily-revenue-once: UPSERT daily_revenue_summary (mốc env hoặc 2026-04-22 → hôm nay VN)"
   );
@@ -99,7 +100,7 @@ if (process.argv.includes("--run-cron-once")) {
       process.exit(1);
     });
 } else if (process.argv.includes("--run-four-days-once")) {
-  const { notifyFourDaysRemainingTask } = require("./src/scheduler/taskInstances");
+  const { notifyFourDaysRemainingTask } = require("@/scheduler/taskInstances");
   logger.info(
     "[Scheduler] CLI --run-four-days-once: gửi Telegram đơn cần gia hạn (còn 4 ngày), trigger=manual"
   );
@@ -116,5 +117,5 @@ if (process.argv.includes("--run-cron-once")) {
       process.exit(1);
     });
 } else {
-  require("./src/scheduler");
+  require("@/scheduler");
 }

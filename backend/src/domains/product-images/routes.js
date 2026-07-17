@@ -2,10 +2,10 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   clearProductImageReferences,
-} = require("../../services/clearProductImageReferences");
+} = require("@/services/clearProductImageReferences");
 
 const router = express.Router();
 

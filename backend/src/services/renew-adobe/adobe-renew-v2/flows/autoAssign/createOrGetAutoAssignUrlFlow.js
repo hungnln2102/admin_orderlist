@@ -1,4 +1,4 @@
-const { getOrCreateAutoAssignUrlWithPage } = require("../../autoAssignFlow");
+const { getOrCreateAutoAssignUrlWithPage } = require("@/services/renew-adobe/adobe-renew-v2/autoAssignFlow");
 
 async function runCreateOrGetAutoAssignUrlFlow(
   page,

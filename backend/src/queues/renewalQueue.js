@@ -1,6 +1,6 @@
 const { Queue } = require("bullmq");
-const { getQueueConnection } = require("./connection");
-const logger = require("../utils/logger");
+const { getQueueConnection } = require("@/queues/connection");
+const logger = require("@/utils/logger");
 
 const QUEUE_NAME = "renewal";
 

@@ -3,9 +3,9 @@
  * Nếu có `mail_backup_id` (`mailBackupIdForFilter`) thì lấy email từ bảng để lọc thư to/from trùng.
  */
 
-const logger = require("../../../utils/logger");
-const { createImapClient } = require("../shared/imapClient");
-const { getMailBackupById } = require("../repository/mailBackupRepo");
+const logger = require("@/utils/logger");
+const { createImapClient } = require("@/services/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
 
 /**
  * @param {Object} [options]

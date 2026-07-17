@@ -2,11 +2,11 @@ const {
   FINANCE_SCHEMA,
   SCHEMA_FINANCE,
   tableName,
-} = require("../../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   normalizeDateInput,
   todayYMDInVietnam,
-} = require("../../../../utils/normalizers");
+} = require("@/utils/normalizers");
 
 const dailySummaryTable = tableName(
   FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.TABLE,

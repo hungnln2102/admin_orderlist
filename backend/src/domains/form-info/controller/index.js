@@ -1,12 +1,12 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   FORM_DESC_SCHEMA,
   getDefinition,
   tableName,
   SCHEMA_FORM_DESC,
   SCHEMA_INPUTS,
-} = require("../../../config/dbSchema");
-const logger = require("../../../utils/logger");
+} = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const FORM_NAME_DEF = getDefinition("FORM_NAME", FORM_DESC_SCHEMA);
 const FORM_INPUT_DEF = getDefinition("FORM_INPUT", FORM_DESC_SCHEMA);

@@ -1,8 +1,8 @@
-const { db } = require("../../../db");
-const { SCHEMA_PRODUCT, PRICING_TIER_SCHEMA } = require("../../../config/dbSchema");
-const logger = require("../../../utils/logger");
-const { invalidate: invalidateTierCache } = require("../../../services/pricing/tierCache");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+const { db } = require("@/db");
+const { SCHEMA_PRODUCT, PRICING_TIER_SCHEMA } = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
+const { invalidate: invalidateTierCache } = require("@/services/pricing/tierCache");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const TIER_TABLE = `${SCHEMA_PRODUCT}.${PRICING_TIER_SCHEMA.PRICING_TIER.TABLE}`;
 const MARGIN_TABLE = `${SCHEMA_PRODUCT}.${PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE}`;
@@ -144,7 +144,7 @@ const upsertVariantMargins = async (req, res) => {
     }
     await trx.commit();
     try {
-      const { syncRenewalOrdersPriceForVariant } = require("../../../../services/pricing/syncRenewalPricing");
+      const { syncRenewalOrdersPriceForVariant } = require("@/services/pricing/syncRenewalPricing");
       await syncRenewalOrdersPriceForVariant(variantId);
     } catch (syncErr) {
       logger.error("[PricingTier] Failed to sync renewal prices after upsertVariantMargins", { error: syncErr.message });

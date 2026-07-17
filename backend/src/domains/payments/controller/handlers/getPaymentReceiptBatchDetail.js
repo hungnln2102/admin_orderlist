@@ -1,13 +1,13 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   PAYMENT_RECEIPT_BATCH_COLS,
   PAYMENT_RECEIPT_BATCH_ITEM_COLS,
   ORDER_COLS,
-} = require("../shared/constants");
-const { isMissingBatchTablesError } = require("../shared/helpers");
-const { isBatchTransferCodeFormat } = require("../shared/batchTransferCode");
+} = require("@/domains/payments/controller/shared/constants");
+const { isMissingBatchTablesError } = require("@/domains/payments/controller/shared/helpers");
+const { isBatchTransferCodeFormat } = require("@/domains/payments/controller/shared/batchTransferCode");
 
 const getPaymentReceiptBatchDetail = async (req, res) => {
   const batchCode = String(req.params.batchCode || "").trim().toUpperCase();

@@ -2,7 +2,7 @@
  * Cột linked_order_code + expense_meta (MAVN) — bản trước trỏ nhầm file SQL / schema `finance`;
  * môi trường thực tế dùng SCHEMA_FINANCE (vd. dashboard.com_profit_expenses).
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

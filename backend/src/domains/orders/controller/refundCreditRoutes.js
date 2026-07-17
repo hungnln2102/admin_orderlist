@@ -1,14 +1,14 @@
-const { db } = require("../../../db");
-const { TABLES, STATUS, COLS } = require("./constants");
-const { orderIdParam } = require("../validators/orderValidator");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const { TABLES, STATUS, COLS } = require("@/domains/orders/controller/constants");
+const { orderIdParam } = require("@/domains/orders/validators/orderValidator");
+const logger = require("@/utils/logger");
 const {
     parseRefundCreditLogsQuery,
     listRefundCreditLogs,
-} = require("./queries/listRefundCreditLogs");
+} = require("@/domains/orders/controller/queries/listRefundCreditLogs");
 const {
     applyOffFlowCreditCashout,
-} = require("./finance/offFlowRefundCredits");
+} = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 const {
     createOrGetRefundCreditNoteForOrder,
     getLatestRefundCreditNoteBySourceOrder,
@@ -16,21 +16,21 @@ const {
     CREDIT_STATUS,
     REFUND_CREDIT_NOTES_TABLE,
     REFUND_CREDIT_NOTE_COLS: RCN,
-} = require("./finance/refundCredits");
-const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../services/orderCodeService");
-const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
+} = require("@/domains/orders/controller/finance/refundCredits");
+const { generateUniqueOrderCode, VALID_PREFIXES } = require("@/services/orderCodeService");
+const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
 const {
     findShopBankAccountById,
-} = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
     debitShopBankRefundCashout,
-} = require("../../shop-bank-accounts/services/shopBankLedgerService");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 const {
     notifyFinanceMonthlyDelta,
-} = require("../../../services/telegramFinanceDeltaNotifier");
-const eventBus = require("../../../events/eventBus");
-const EVENTS = require("../../../events/eventTypes");
+} = require("@/services/telegramFinanceDeltaNotifier");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
 
 const detectPreviewPrefix = (orderCodeRaw) => {
     const normalized = String(orderCodeRaw || "").trim().toUpperCase();

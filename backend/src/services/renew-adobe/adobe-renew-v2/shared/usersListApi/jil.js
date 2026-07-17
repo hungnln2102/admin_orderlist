@@ -1,11 +1,11 @@
-const logger = require("../../../../../utils/logger");
-const { fetchUsersViaAbpApi } = require("./abp");
+const logger = require("@/utils/logger");
+const { fetchUsersViaAbpApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi/abp");
 const {
   normalizeOrgToken,
   extractOrgTokenFromUrl,
   mapApiUserToSnapshotUser,
   applyAdobeProFlags,
-} = require("./shared");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi/shared");
 
 async function captureUsersApiHeaders(page, orgToken) {
   const token = normalizeOrgToken(orgToken);

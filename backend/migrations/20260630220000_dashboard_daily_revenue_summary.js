@@ -5,7 +5,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

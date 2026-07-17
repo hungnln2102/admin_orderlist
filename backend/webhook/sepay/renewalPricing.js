@@ -1,12 +1,12 @@
 const { normalizeMoney } = require("./utils");
 const { ORDER_COLS } = require("./config");
-const { ORDER_PREFIXES } = require("../../src/utils/orderHelpers");
+const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
 const {
   PricingHttpError,
   calculateOrderPricing,
   fetchVariantPricing,
-} = require("../../src/services/pricing/orderPricingService");
-const logger = require("../../src/utils/logger");
+} = require("@/services/pricing/orderPricingService");
+const logger = require("@/utils/logger");
 
 const resolveRenewalOrderPricing = async ({
   sanPham,

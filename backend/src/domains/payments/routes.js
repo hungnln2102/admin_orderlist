@@ -7,7 +7,7 @@ const {
   listMatchableOrders,
   confirmPaymentSupply,
   reconcilePaymentReceipt,
-} = require("./controller");
+} = require("@/domains/payments/controller");
 
 const router = express.Router();
 

@@ -8,7 +8,7 @@
  */
 const fs = require("fs");
 const { execFileSync } = require("child_process");
-const schema = require("../../src/config/dbSchema");
+const schema = require("@/config/dbSchema");
 
 const specs = [
   ["ADMIN_SCHEMA", schema.SCHEMA_ADMIN, schema.ADMIN_SCHEMA],

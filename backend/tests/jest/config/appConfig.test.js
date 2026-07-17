@@ -32,7 +32,7 @@ describe("appConfig CORS origins", () => {
       "https://mavrykpremium.com/path",
     ].join(",");
 
-    const { allowedOrigins, normalizeOrigin } = require("../../../src/config/appConfig");
+    const { allowedOrigins, normalizeOrigin } = require("@/config/appConfig");
 
     expect(allowedOrigins).toEqual([
       "https://admin.mavrykpremium.com",
@@ -49,7 +49,7 @@ describe("appConfig CORS origins", () => {
     process.env.NODE_ENV = "test";
     process.env.FRONTEND_ORIGINS = "https://admin.example.test";
 
-    const { allowedOrigins } = require("../../../src/config/appConfig");
+    const { allowedOrigins } = require("@/config/appConfig");
 
     expect(allowedOrigins).toEqual(
       expect.arrayContaining([

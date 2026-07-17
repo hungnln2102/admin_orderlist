@@ -1,5 +1,5 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TRACK_TABLE,
   TRACK_COLS,
@@ -7,11 +7,11 @@ const {
   MAP_COLS,
   ACC_TABLE,
   ACC_COLS,
-} = require("./tables");
-const { normalizeEmail } = require("./helpers");
+} = require("@/services/renew-adobe/orderUserTrackingService/tables");
+const { normalizeEmail } = require("@/services/renew-adobe/orderUserTrackingService/helpers");
 const {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
-} = require("./upsert");
+} = require("@/services/renew-adobe/orderUserTrackingService/upsert");
 
 async function reconcileOrderUserTrackingWithTeamMembers(
   adobeAccountId,

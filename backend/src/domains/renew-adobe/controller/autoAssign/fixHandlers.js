@@ -1,4 +1,4 @@
-const { logger, assignUserToAvailableAccount, fixUsersAllRoundsTightest, fixUserExpectableErrorMessage } = require("./shared");
+const { logger, assignUserToAvailableAccount, fixUsersAllRoundsTightest, fixUserExpectableErrorMessage } = require("@/domains/renew-adobe/controller/autoAssign/shared");
 
 const fixSingleUser = async (req, res) => {
   const userEmail = (req.body?.email || "").toString().trim().toLowerCase();

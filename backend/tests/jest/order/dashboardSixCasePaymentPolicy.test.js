@@ -12,7 +12,7 @@
  */
 const {
   computeDashboardPaymentDecision,
-} = require("../../../src/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
+} = require("@/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
 
 describe("Dashboard 6-case payment policy (100k order)", () => {
   const PRICE = 100_000;

@@ -1,4 +1,4 @@
-const { loadBackendEnv } = require("../loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

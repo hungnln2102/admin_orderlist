@@ -1,6 +1,6 @@
-const logger = require("../../../../utils/logger");
-const { ensureOrderTransaction } = require("../../use-cases/ensureOrderTransaction");
-const { orderIdParam } = require("../../validators/orderValidator");
+const logger = require("@/utils/logger");
+const { ensureOrderTransaction } = require("@/domains/orders/use-cases/ensureOrderTransaction");
+const { orderIdParam } = require("@/domains/orders/validators/orderValidator");
 
 const attachEnsureOrderTransactionRoute = (router) => {
   router.post("/:id/ensure-transaction", orderIdParam, async (req, res) => {

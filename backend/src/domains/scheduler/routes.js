@@ -8,7 +8,7 @@ const {
   runRenewAdobeCheckNow,
   runSyncMappingNow,
   runDailyRevenueSummaryNow,
-} = require("./controller");
+} = require("@/domains/scheduler/controller");
 
 const router = express.Router();
 

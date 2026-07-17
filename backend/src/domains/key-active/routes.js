@@ -1,8 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { db } = require("../../db");
-const logger = require("../../utils/logger");
-const { TABLES, COLS } = require("./constants");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { TABLES, COLS } = require("@/domains/key-active/constants");
 
 const router = express.Router();
 

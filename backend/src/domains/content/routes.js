@@ -1,6 +1,6 @@
 const express = require("express");
-const contentMediaRoutes = require("./mediaRoutes");
-const contentAdminRoutes = require("./controller");
+const contentMediaRoutes = require("@/domains/content/mediaRoutes");
+const contentAdminRoutes = require("@/domains/content/controller");
 
 const router = express.Router();
 router.use(contentMediaRoutes);

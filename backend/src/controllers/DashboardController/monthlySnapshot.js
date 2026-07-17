@@ -5,11 +5,11 @@
  * total_profit MAVN (âm cost) từ trigger NCC; nhập ngoài luồng điều chỉnh `total_profit` khi ghi `store_profit_expenses.external_import`.
  * Hiển thị API: dùng `total_profit` như trong DB. Thuế trên (doanh thu ròng).
  */
-const { db } = require("../../db");
-const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryQueries");
-const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
-const { quoteIdent } = require("../../utils/sql");
-const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
+const { db } = require("@/db");
+const { buildDashboardSummaryAggregateQuery } = require("@/controllers/DashboardController/dashboardSummaryQueries");
+const { orderListHasCreatedAtColumn } = require("@/controllers/DashboardController/orderListHasCreatedAtColumn");
+const { quoteIdent } = require("@/utils/sql");
+const { dashboardMonthlyTaxRatePercent } = require("@/config/appConfig");
 const {
   tableName,
   FINANCE_SCHEMA,
@@ -20,7 +20,7 @@ const {
   SCHEMA_PARTNER,
   SCHEMA_ORDERS,
   SCHEMA_RECEIPT,
-} = require("../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const importLogTable = tableName(

@@ -51,7 +51,7 @@ describe("saving-goals priority/order sensitive flows", () => {
       () => repository
     );
 
-    const useCases = require("../../../../src/domains/saving-goals/use-cases/savingGoalsUseCases");
+    const useCases = require("@/domains/saving-goals/use-cases/savingGoalsUseCases");
     return { useCases, withTransaction, repository, fakeTrx };
   };
 

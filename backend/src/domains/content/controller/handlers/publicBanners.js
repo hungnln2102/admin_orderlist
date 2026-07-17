@@ -1,5 +1,5 @@
-const db = require("../../../../config/database");
-const logger = require("../../../../utils/logger");
+const db = require("@/config/database");
+const logger = require("@/utils/logger");
 
 /** Banner hero đang bật — storefront, không cần đăng nhập. */
 exports.listActive = async (_req, res) => {

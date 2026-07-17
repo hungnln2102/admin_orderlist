@@ -3,13 +3,13 @@
  * (base + suffix). Không dùng giá recompute tròn nghìn nếu slot đã mở.
  */
 
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   findLatestPendingSlotByOrder,
-} = require("../../../domains/payment-slots/repositories/paymentSlotRepository");
-const { hasPaymentSuffix } = require("../../../domains/payment-slots/helpers/paymentSuffix");
-const { resolveDefaultShopBankAccount } = require("../../../services/shopBankAccountResolver");
-const { openSingleRenewalSlot } = require("./openRenewalSlots");
+} = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const { hasPaymentSuffix } = require("@/domains/payment-slots/helpers/paymentSuffix");
+const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
+const { openSingleRenewalSlot } = require("@/scheduler/tasks/shared/openRenewalSlots");
 
 /**
  * @param {import('pg').PoolClient} client

@@ -1,12 +1,12 @@
-const logger = require("../../../utils/logger");
-const { normalizeOrderRow } = require("../../orders/controller/helpers/normalize");
+const logger = require("@/utils/logger");
+const { normalizeOrderRow } = require("@/domains/orders/controller/helpers/normalize");
 const {
   computeProratedCostForNewSupplier,
   computeRefundFromOldSupplier,
   computeOrderAgeDays,
   classifyFlowByAge,
   isMavrykSupplierName,
-} = require("../priceCalculator");
+} = require("@/domains/supplier-change/priceCalculator");
 const {
   ORDER_COLS,
   SUPPLIER_COLS,
@@ -17,15 +17,15 @@ const {
   findSupplierById,
   findSupplyPriceForVariant,
   findLatestCostLog,
-} = require("../repository");
-const { ChangeSupplierError } = require("./errors");
-const { FLOWS } = require("./constants");
+} = require("@/domains/supplier-change/repository");
+const { ChangeSupplierError } = require("@/domains/supplier-change/service/errors");
+const { FLOWS } = require("@/domains/supplier-change/service/constants");
 const {
   monthKeyFromToday,
   fetchMonthlySnapshotSafe,
   notifyMonthlyDeltaSafe,
-} = require("./summary");
-const { runFlowA, runFlowBUnpaid, runFlowBPaid } = require("./flowHandlers");
+} = require("@/domains/supplier-change/service/summary");
+const { runFlowA, runFlowBUnpaid, runFlowBPaid } = require("@/domains/supplier-change/service/flowHandlers");
 
 async function executeChangeSupplier(trx, { orderId, newSupplyId, today }) {
   await enableAppManagedFlag(trx);

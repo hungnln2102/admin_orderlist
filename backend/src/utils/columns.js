@@ -6,8 +6,8 @@ const {
   ORDERS_SCHEMA,
   RECEIPT_SCHEMA,
   getDefinition,
-} = require("../config/dbSchema");
-const { quoteIdent } = require("./sql");
+} = require("@/config/dbSchema");
+const { quoteIdent } = require("@/utils/sql");
 
 const toCamel = (key = "") =>
   String(key)

@@ -1,4 +1,4 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   NCC_STATUS_UNPAID,
   NCC_STATUS_PAID,
@@ -7,9 +7,9 @@ const {
   deleteCostLogById,
   updateLatestCostLog,
   insertCostLog,
-} = require("../repository");
-const { FLOWS, STATUSES_NEEDING_NCC_LOG } = require("./constants");
-const { applyProfitDeltaOnCostChange } = require("./summary");
+} = require("@/domains/supplier-change/repository");
+const { FLOWS, STATUSES_NEEDING_NCC_LOG } = require("@/domains/supplier-change/service/constants");
+const { applyProfitDeltaOnCostChange } = require("@/domains/supplier-change/service/summary");
 
 async function insertMavrykMarkerLog(trx, { orderId, mavrykSupplyId, idOrderText }) {
   await insertCostLog(trx, {

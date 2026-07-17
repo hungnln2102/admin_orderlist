@@ -1,4 +1,4 @@
-const { db } = require("../../../../db");
+const { db } = require("@/db");
 const {
   variantCols,
   categoryCols,
@@ -8,11 +8,11 @@ const {
   supplyPriceCols,
   TABLES,
   MARGIN_PIVOT_SQL,
-} = require("../constants");
-const { quoteIdent } = require("../../../../utils/sql");
-const { mapProductPriceRow } = require("../mappers");
-const logger = require("../../../../utils/logger");
-const { pricingCache } = require("../../../../utils/cache");
+} = require("@/domains/products/controller/constants");
+const { quoteIdent } = require("@/utils/sql");
+const { mapProductPriceRow } = require("@/domains/products/controller/mappers");
+const logger = require("@/utils/logger");
+const { pricingCache } = require("@/utils/cache");
 
 /**
  * GET /api/products/packages

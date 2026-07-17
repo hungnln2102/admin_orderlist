@@ -1,5 +1,5 @@
 const { createProxyMiddleware } = require("http-proxy-middleware");
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 
 const HEADER = "x-renew-internal-key";
 

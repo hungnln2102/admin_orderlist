@@ -1,6 +1,6 @@
 const {
   normalizeIntegerVndAmount,
-} = require("../../../../shared/money/normalizers");
+} = require("@/shared/money/normalizers");
 
 const UNDERPAY_TOLERANCE_VND = 5000;
 

@@ -3,7 +3,7 @@ const {
   getDefinition,
   SCHEMA_PRODUCT,
   PRODUCT_SCHEMA,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const PACKAGE_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);

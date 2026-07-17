@@ -1,9 +1,9 @@
-const { db } = require("../../../../../db");
-const { quoteIdent } = require("../../../../../utils/sql");
-const logger = require("../../../../../utils/logger");
-const { pricingCache } = require("../../../../../utils/cache");
-const { variantCols, TABLES } = require("../../constants");
-const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const logger = require("@/utils/logger");
+const { pricingCache } = require("@/utils/cache");
+const { variantCols, TABLES } = require("@/domains/products/controller/constants");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const toggleProductPriceStatus = async (req, res) => {
   const { productId } = req.params;

@@ -5,7 +5,7 @@ jest.mock("../../src/routes", () => {
   return express.Router();
 });
 
-const app = require("../../src/app");
+const app = require("@/app");
 
 describe("GET /api", () => {
   it("should return ok: true", async () => {

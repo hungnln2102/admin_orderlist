@@ -2,8 +2,8 @@ const {
     todayYMDInVietnam,
     formatYMDToDMY,
     ymdInVietnamFromInstant,
-} = require("../../../../utils/normalizers");
-const { COLS, STATUS } = require("../constants");
+} = require("@/utils/normalizers");
+const { COLS, STATUS } = require("@/domains/orders/controller/constants");
 
 const wholeDaysBetweenYmd = (startYmd, endYmd) => {
     if (!startYmd || !endYmd) return null;

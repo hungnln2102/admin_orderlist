@@ -1,3 +1,3 @@
-const mapping = require("./userAccountMappingService");
+const mapping = require("@/services/userAccountMappingService");
 
 module.exports = mapping;

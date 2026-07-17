@@ -1,4 +1,4 @@
-const { needsUsersPageRecovery } = require("../../../../../src/services/renew-adobe/adobe-renew-v2/checkInfoFlow");
+const { needsUsersPageRecovery } = require("@/services/renew-adobe/adobe-renew-v2/checkInfoFlow");
 
 describe("checkInfoFlow needsUsersPageRecovery", () => {
   it("returns false for users path (org-scoped)", () => {

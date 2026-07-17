@@ -4,20 +4,20 @@
  */
 
 const { chromium } = require("playwright");
-const logger = require("../../../utils/logger");
-const { runCheckFlow } = require("./runCheckFlow");
-const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
+const logger = require("@/utils/logger");
+const { runCheckFlow } = require("@/services/renew-adobe/adobe-renew-v2/runCheckFlow");
+const { getPlaywrightProxyOptions } = require("@/services/renew-adobe/adobe-renew-v2/shared/proxyConfig");
 const {
   launchSessionFromProfile,
   hasExistingProfileForEmail,
-} = require("./shared/profileSession");
-const { recordProfileUsage } = require("./shared/profileUsageMetrics");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
+const { recordProfileUsage } = require("@/services/renew-adobe/adobe-renew-v2/shared/profileUsageMetrics");
 const {
   runGotoUsersFlow,
   runDeleteUsersFlow,
   runUsersSnapshotFlow,
   runPersistUsersSessionFlow,
-} = require("./flows/users");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/users");
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
 

@@ -1,6 +1,6 @@
-const { STATUS } = require("../../../../utils/statuses");
-const { ORDERS_SCHEMA } = require("../../../../config/dbSchema");
-const { SLOTS_TABLE, SLOT_COLS, SLOT_STATUS } = require("../../constants");
+const { STATUS } = require("@/utils/statuses");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { SLOTS_TABLE, SLOT_COLS, SLOT_STATUS } = require("@/domains/payment-slots/constants");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const ORDER_TABLE = `orders.${ORDERS_SCHEMA.ORDER_LIST.TABLE}`;

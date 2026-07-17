@@ -8,7 +8,7 @@
  * Thứ tự triển khai: chạy migration **trước** khi có bản ghi `external_import` mới
  * được tạo bởi bản build đã gọi `applyExternalImportProfitDelta` (tránh trừ đôi).
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

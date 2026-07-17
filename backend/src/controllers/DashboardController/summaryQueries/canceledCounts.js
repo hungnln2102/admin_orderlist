@@ -5,7 +5,7 @@ const {
   quoteIdent,
   canceledAtExpr,
   refundCountedSql,
-} = require("./constants");
+} = require("@/controllers/DashboardController/summaryQueries/constants");
 
 /** Gom số đơn hủy theo tháng canceled_at YYYY-MM trong [from, to]. */
 const buildCanceledCountsByCanceledYmInRangeQuery = () => {

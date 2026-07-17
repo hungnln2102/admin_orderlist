@@ -1,18 +1,18 @@
-const { db } = require("../../../../db");
+const { db } = require("@/db");
 const {
   ORDERS_SCHEMA,
   RECEIPT_SCHEMA,
   tableName,
   SCHEMA_ORDERS,
   SCHEMA_RECEIPT,
-} = require("../../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   generateTransactionCode,
   normalizeTransactionCode,
   TRANSACTION_CODE_LENGTH,
-} = require("../../../../services/transactionCodeService");
-const { generateCandidateBatchCode } = require("./helpers");
-const logger = require("../../../../utils/logger");
+} = require("@/services/transactionCodeService");
+const { generateCandidateBatchCode } = require("@/domains/payments/controller/shared/helpers");
+const logger = require("@/utils/logger");
 
 const MAX_RETRIES = 12;
 const MAV_ORDER_PREFIX_RE = /^MAV[A-Z0-9]{2,}/i;

@@ -1,4 +1,4 @@
-const { param, validate } = require("../../../middleware/validateRequest");
+const { param, validate } = require("@/middleware/validateRequest");
 
 const warehouseIdParam = [
   param("id").notEmpty().withMessage("Missing id"),

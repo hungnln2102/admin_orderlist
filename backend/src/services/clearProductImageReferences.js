@@ -1,10 +1,10 @@
-const { db } = require("../db");
-const { quoteIdent } = require("../utils/sql");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
 const {
   TABLES,
   productSchemaCols,
   variantCols,
-} = require("../domains/products/controller/constants");
+} = require("@/domains/products/controller/constants");
 
 /**
  * Hai dạng path thường gặp trong DB (host khác nhau nhưng đều chứa đoạn này).

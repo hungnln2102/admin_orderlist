@@ -2,7 +2,7 @@ const {
   dailyRowMapBetween,
   sumDailyByMonthKeyBetween,
   sumDailyByYearKeyBetween,
-} = require("../dailyRevenueSummaryAggregate");
+} = require("@/controllers/DashboardController/dailyRevenueSummaryAggregate");
 const {
   db,
   summaryTableName,
@@ -17,7 +17,7 @@ const {
   formatChartDayLabel,
   monthKeysSpanned,
   yearKeysSpanned,
-} = require("./shared");
+} = require("@/controllers/DashboardController/service/shared");
 
 const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
   const startYear = parseInt(String(from).slice(0, 4), 10);

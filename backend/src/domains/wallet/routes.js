@@ -5,13 +5,13 @@ const {
   createWalletType,
   updateWalletType,
   deleteWalletType,
-} = require("./controller");
+} = require("@/domains/wallet/controller");
 const {
   saveDailyBalanceRules,
   createWalletTypeRules,
   updateWalletTypeRules,
   deleteWalletTypeRules,
-} = require("./validators/walletValidator");
+} = require("@/domains/wallet/validators/walletValidator");
 
 const router = express.Router();
 

@@ -6,7 +6,7 @@ const {
   SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
   tableName,
-} = require("../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const TABLES = {
   orderListKeys: tableName(

@@ -1,5 +1,5 @@
-const { roundGiaBanValue } = require("../../utils/orderHelpers");
-const { getTiers } = require("./tierCache");
+const { roundGiaBanValue } = require("@/utils/orderHelpers");
+const { getTiers } = require("@/services/pricing/tierCache");
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) {

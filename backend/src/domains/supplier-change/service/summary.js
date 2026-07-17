@@ -1,12 +1,12 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   mergeSummaryUpdates,
-} = require("../../orders/controller/finance/dashboardSummary");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../services/telegramFinanceDeltaNotifier");
-const { SUMMARY_COLS, fetchMonthlyTotals } = require("../repository");
-const { FLOWS, STATUSES_NEEDING_NCC_LOG } = require("./constants");
+} = require("@/services/telegramFinanceDeltaNotifier");
+const { SUMMARY_COLS, fetchMonthlyTotals } = require("@/domains/supplier-change/repository");
+const { FLOWS, STATUSES_NEEDING_NCC_LOG } = require("@/domains/supplier-change/service/constants");
 
 const toNum = (value) => {
   const n = Number(value);

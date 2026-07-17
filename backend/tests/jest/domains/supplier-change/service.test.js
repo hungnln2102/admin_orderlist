@@ -47,14 +47,14 @@ jest.mock("../../../../src/services/telegramFinanceDeltaNotifier", () => ({
   notifyFinanceMonthlyDelta: jest.fn(async () => {}),
 }));
 
-const dashboardSummary = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
-const financeNotifier = require("../../../../src/services/telegramFinanceDeltaNotifier");
+const dashboardSummary = require("@/domains/orders/controller/finance/dashboardSummary");
+const financeNotifier = require("@/services/telegramFinanceDeltaNotifier");
 
 const {
   normalizeOrderRow,
-} = require("../../../../src/domains/orders/controller/helpers/normalize");
-const repo = require("../../../../src/domains/supplier-change/repository");
-const { changeOrderSupplier, FLOWS } = require("../../../../src/domains/supplier-change/service");
+} = require("@/domains/orders/controller/helpers/normalize");
+const repo = require("@/domains/supplier-change/repository");
+const { changeOrderSupplier, FLOWS } = require("@/domains/supplier-change/service");
 
 const buildTrxMock = () => {
   const trx = {

@@ -1,6 +1,6 @@
 ﻿const {
   debitShopBankRefundCashout,
-} = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 
 describe("shopBankLedgerService refund cashout idempotency", () => {
   test("skips refund cashout when ledger source already exists", async () => {

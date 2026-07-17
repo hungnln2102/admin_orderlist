@@ -3,10 +3,10 @@
  * Admin Console (Profile/Org switcher) → products → users.
  */
 
-const logger = require("../../../utils/logger");
-const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = require("./flows/check");
-const { fetchUsersViaApi } = require("./shared/usersListApi");
-const { fetchVerifiedCcpSeatProductIdsFromOrgProductsApi } = require("./shared/orgProductsApi");
+const logger = require("@/utils/logger");
+const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = require("@/services/renew-adobe/adobe-renew-v2/flows/check");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
+const { fetchVerifiedCcpSeatProductIdsFromOrgProductsApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/orgProductsApi");
 
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 

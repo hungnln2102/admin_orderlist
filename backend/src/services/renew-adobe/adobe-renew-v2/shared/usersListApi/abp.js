@@ -1,5 +1,5 @@
-const logger = require("../../../../../utils/logger");
-const { resolveAdobeEmbedPageUrl } = require("../constants");
+const logger = require("@/utils/logger");
+const { resolveAdobeEmbedPageUrl } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
 const {
   ABP_API_ORIGIN,
   ABP_USERS_ATTRS_QUERY,
@@ -9,7 +9,7 @@ const {
   buildForwardHeadersFromCapturedRequest,
   mapAbpUserToSnapshotUser,
   isAdobeEmbedHostPageUrl,
-} = require("./shared");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi/shared");
 
 /**
  * Fallback khi APIRequestContext trả 403: fetch trong browser.

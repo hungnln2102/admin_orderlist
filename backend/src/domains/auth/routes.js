@@ -5,9 +5,9 @@ const {
   me,
   getCsrfToken,
   changePassword,
-} = require("./controller");
-const { authLimiter, sensitiveLimiter, apiLimiter } = require("../../middleware/rateLimiter");
-const { loginRules, changePasswordRules } = require("./validators/authValidator");
+} = require("@/domains/auth/controller");
+const { authLimiter, sensitiveLimiter, apiLimiter } = require("@/middleware/rateLimiter");
+const { loginRules, changePasswordRules } = require("@/domains/auth/validators/authValidator");
 
 const router = express.Router();
 

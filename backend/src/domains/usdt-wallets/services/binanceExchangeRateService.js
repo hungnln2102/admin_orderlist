@@ -1,4 +1,4 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;

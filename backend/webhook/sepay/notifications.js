@@ -11,7 +11,7 @@ const {
   parsePaidDate,
   extractSenderFromContent,
 } = require("./utils");
-const logger = require("../../src/utils/logger");
+const logger = require("@/utils/logger");
 
 const HTTP_TIMEOUT_MS = 10_000;
 const TRANSIENT_FETCH_ERROR_CODES = new Set([

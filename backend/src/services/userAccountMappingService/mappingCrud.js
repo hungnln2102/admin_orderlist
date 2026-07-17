@@ -3,7 +3,7 @@ const {
   db,
   TABLE,
   COLS,
-} = require("./shared");
+} = require("@/services/userAccountMappingService/shared");
 
 /**
  * Ghi nhận user được add vào Adobe account từ một đơn hàng.

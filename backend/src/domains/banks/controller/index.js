@@ -1,6 +1,6 @@
 const https = require("https");
-const logger = require("../../../utils/logger");
-const { bankCache } = require("../../../utils/cache");
+const logger = require("@/utils/logger");
+const { bankCache } = require("@/utils/cache");
 
 const BANK_SOURCE_URL =
   process.env.BANK_LIST_SOURCE_URL || "https://api.vietqr.io/v2/banks";

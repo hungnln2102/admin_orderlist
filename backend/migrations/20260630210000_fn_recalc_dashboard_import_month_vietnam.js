@@ -3,7 +3,7 @@
  * (khớp `paidMonthKey` từ `payment_receipt.payment_date` — ngày lịch VN).
  * Tránh lệch với `DATE_TRUNC(..., timestamptz)` theo session UTC gây: ledger một tháng, app += tháng khác → “double” khi gộp KPI / hai lần cùng khoản.
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

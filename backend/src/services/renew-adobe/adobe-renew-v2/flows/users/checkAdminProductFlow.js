@@ -1,4 +1,4 @@
-const { fetchUsersViaApi } = require("../../shared/usersListApi");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 
 async function runCheckAdminProductFlow(page, adminEmail) {
   const adminNorm = String(adminEmail || "").trim().toLowerCase();

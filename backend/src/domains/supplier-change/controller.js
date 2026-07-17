@@ -2,8 +2,8 @@
  * HTTP layer cho domain `supplier-change`. Mỏng — chỉ parse body và gọi service.
  */
 
-const logger = require("../../utils/logger");
-const { changeOrderSupplier, ChangeSupplierError } = require("./service");
+const logger = require("@/utils/logger");
+const { changeOrderSupplier, ChangeSupplierError } = require("@/domains/supplier-change/service");
 
 const parseId = (raw) => {
   const n = Number(raw);

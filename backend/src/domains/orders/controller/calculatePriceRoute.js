@@ -1,8 +1,8 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   PricingHttpError,
   calculateOrderPricing,
-} = require("../../../services/pricing/orderPricingService");
+} = require("@/services/pricing/orderPricingService");
 
 const attachCalculatePriceRoute = (router) => {
   router.post("/calculate-price", async (req, res) => {

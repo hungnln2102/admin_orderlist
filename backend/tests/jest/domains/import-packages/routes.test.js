@@ -34,7 +34,7 @@ const buildApp = () => {
     debug: jest.fn(),
   }));
 
-  const router = require("../../../../src/domains/import-packages/routes");
+  const router = require("@/domains/import-packages/routes");
   const app = express();
   app.use(express.json());
   app.use("/import-packages", router);

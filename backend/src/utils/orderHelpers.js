@@ -3,7 +3,7 @@
  * Used by Order controller, Dashboard, webhook/sepay.
  */
 
-const { getPrefixMap } = require("../services/pricing/tierCache");
+const { getPrefixMap } = require("@/services/pricing/tierCache");
 
 /**
  * Hardcode fallback — dùng khi tierCache chưa load xong (module init time).

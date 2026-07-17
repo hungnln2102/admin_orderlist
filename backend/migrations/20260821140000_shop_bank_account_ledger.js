@@ -2,7 +2,7 @@
  * Ledger STK + balance materialized.
  * SQL: database/migrations/105_shop_bank_account_ledger.sql
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

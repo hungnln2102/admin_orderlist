@@ -1,10 +1,10 @@
-const { ORDERS_SCHEMA } = require("../../../../config/dbSchema");
-const { isMavnImportOrder } = require("../../../../utils/orderHelpers");
-const logger = require("../../../../utils/logger");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { isMavnImportOrder } = require("@/utils/orderHelpers");
+const logger = require("@/utils/logger");
 const { computeOrderCurrentPrice } = require("../../../../../webhook/sepay/renewalPricing");
-const { openPaymentSlot } = require("../openPaymentSlot");
-const { SLOT_KIND } = require("../../constants");
-const { hasPaymentSuffix } = require("../../helpers/paymentSuffix");
+const { openPaymentSlot } = require("@/domains/payment-slots/use-cases/openPaymentSlot");
+const { SLOT_KIND } = require("@/domains/payment-slots/constants");
+const { hasPaymentSuffix } = require("@/domains/payment-slots/helpers/paymentSuffix");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const ORDER_TABLE = `orders.${ORDERS_SCHEMA.ORDER_LIST.TABLE}`;

@@ -1,15 +1,15 @@
 const fs = require("fs");
 const path = require("path");
-const logger = require("../../utils/logger");
-const { db } = require("../../db");
-const { TABLE, COLS } = require("../../domains/renew-adobe/controller/accountTable");
+const logger = require("@/utils/logger");
+const { db } = require("@/db");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/accountTable");
 const {
   getProfilesRootDir,
   sanitizeEmailForPath,
-} = require("../../services/renew-adobe/adobe-renew-v2/shared/profileSession");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
 const {
   ensureAdminAccountsExist,
-} = require("./shared/adminAccountsGuard");
+} = require("@/scheduler/tasks/shared/adminAccountsGuard");
 
 function buildExpectedProfileKeysFromEmails(emails = []) {
   const keys = new Set();

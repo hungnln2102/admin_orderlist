@@ -1,11 +1,11 @@
-const { toNullableNumber } = require("../../../utils/normalizers");
+const { toNullableNumber } = require("@/utils/normalizers");
 const {
   variantCols,
   productSchemaCols,
   supplyPriceCols,
   supplyCols,
   categoryCols,
-} = require("./constants");
+} = require("@/domains/products/controller/constants");
 
 const parseCategories = (value) => {
   if (!value) return [];

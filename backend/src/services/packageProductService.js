@@ -1,13 +1,13 @@
-const { db } = require("../db");
+const { db } = require("@/db");
 const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, getDefinition, tableName } =
-  require("../config/dbSchema");
+  require("@/config/dbSchema");
 const {
   formatDateOutput,
   fromDbNumber,
   getRowId,
-} = require("../utils/normalizers");
-const { quoteIdent } = require("../utils/sql");
-const { QUOTED_COLS } = require("../utils/columns");
+} = require("@/utils/normalizers");
+const { quoteIdent } = require("@/utils/sql");
+const { QUOTED_COLS } = require("@/utils/columns");
 
 const PACKAGE_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);

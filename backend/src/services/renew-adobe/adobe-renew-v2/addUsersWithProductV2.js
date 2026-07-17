@@ -4,22 +4,22 @@
  * Không chạy B15 sau add: gói + slot đã kiểm tra ở tầng gán tài khoản; check định kỳ đã gỡ product admin khi cần.
  */
 
-const logger = require("../../../utils/logger");
-const { runCheckFlow } = require("./runCheckFlow");
-const { parseCcpProductIdsFromAlertConfig } = require("./shared/accessChecks");
-const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
-const { launchSessionFromProfile } = require("./shared/profileSession");
+const logger = require("@/utils/logger");
+const { runCheckFlow } = require("@/services/renew-adobe/adobe-renew-v2/runCheckFlow");
+const { parseCcpProductIdsFromAlertConfig } = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+const { getPlaywrightProxyOptions } = require("@/services/renew-adobe/adobe-renew-v2/shared/proxyConfig");
+const { launchSessionFromProfile } = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
 const {
   checkUserAssignedProduct,
   extractOrgTokenFromUrl,
   captureUsersApiHeaders,
-} = require("./shared/usersListApi");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 const {
   runGotoUsersFlow,
   runAddUsersFlow,
   runUsersSnapshotFlow,
   runPersistUsersSessionFlow,
-} = require("./flows/users");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/users");
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
 const POST_ADD_REFRESH_DELAY_MS = (() => {

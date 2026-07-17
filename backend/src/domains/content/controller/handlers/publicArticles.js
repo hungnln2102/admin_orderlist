@@ -1,5 +1,5 @@
-const db = require("../../../../config/database");
-const logger = require("../../../../utils/logger");
+const db = require("@/config/database");
+const logger = require("@/utils/logger");
 
 /** Danh sách bài đã đăng — dùng cho storefront (không cần session). */
 exports.listPublished = async (req, res) => {

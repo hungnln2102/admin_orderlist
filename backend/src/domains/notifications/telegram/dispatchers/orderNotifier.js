@@ -1,15 +1,15 @@
-const { enqueueMessage } = require("../core/telegramClient");
+const { enqueueMessage } = require("@/domains/notifications/telegram/core/telegramClient");
 const { 
   buildOrderCreatedMessage, 
   buildDueOrderMessage, 
   buildExpiredOrderMessage 
-} = require("../builders/orderMessageBuilder");
+} = require("@/domains/notifications/telegram/builders/orderMessageBuilder");
 const { 
   ORDER_CREATED_TOPIC_ID, 
   ZERO_DAYS_TOPIC_ID, 
   FOUR_DAYS_TOPIC_ID,
   SEND_ORDER_NOTIFICATION 
-} = require("../core/constants");
+} = require("@/domains/notifications/telegram/core/constants");
 
 /**
  * Hàm trừu tượng hóa việc bắn Telegram, giúp dọn dẹp logic trùng lặp (Deduping)
@@ -36,7 +36,7 @@ function sendBulkTelegramOrders(orders = [], config) {
   // 2. Gửi Header nếu có
   if (headerMessage) {
     enqueueMessage({
-      chat_id: require("../core/constants").TELEGRAM_CHAT_ID,
+      chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
       message_thread_id: topicId,
       text: headerMessage,
       parse_mode: "HTML",
@@ -52,7 +52,7 @@ function sendBulkTelegramOrders(orders = [], config) {
     // tạm thời đơn giản hóa dùng sendMessage cho text HTML
     const text = messageBuilder(order, index, total);
     enqueueMessage({
-      chat_id: require("../core/constants").TELEGRAM_CHAT_ID,
+      chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
       message_thread_id: topicId,
       text,
       parse_mode: "HTML",
@@ -64,7 +64,7 @@ function notifyOrderCreated(order) {
   if (!SEND_ORDER_NOTIFICATION) return;
   const text = buildOrderCreatedMessage(order);
   enqueueMessage({
-    chat_id: require("../core/constants").TELEGRAM_CHAT_ID,
+    chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
     message_thread_id: ORDER_CREATED_TOPIC_ID,
     text,
     parse_mode: "HTML",
@@ -98,7 +98,7 @@ function notifyOrderRenewed(order) {
 ⏳ <b>Hết hạn mới:</b> ${order.ngay_het_han_moi || "N/A"}`;
 
   enqueueMessage({
-    chat_id: require("../core/constants").TELEGRAM_CHAT_ID,
+    chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
     message_thread_id: ORDER_CREATED_TOPIC_ID, // Có thể đổi topic nếu cần
     text,
     parse_mode: "HTML",

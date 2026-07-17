@@ -24,7 +24,7 @@ describe("redisClient production session store hardening", () => {
     const {
       assertProductionSessionStoreGuard,
       getSessionStoreGuardState,
-    } = require("../../../src/config/redisClient");
+    } = require("@/config/redisClient");
 
     expect(() => assertProductionSessionStoreGuard()).not.toThrow();
     expect(getSessionStoreGuardState()).toMatchObject({
@@ -40,7 +40,7 @@ describe("redisClient production session store hardening", () => {
     delete process.env.REDIS_URL;
     delete process.env.REDIS_HOST;
 
-    const { assertProductionSessionStoreGuard } = require("../../../src/config/redisClient");
+    const { assertProductionSessionStoreGuard } = require("@/config/redisClient");
 
     expect(() => assertProductionSessionStoreGuard()).toThrow(
       /Production requires persistent Redis session store/
@@ -64,7 +64,7 @@ describe("redisClient production session store hardening", () => {
     const {
       assertProductionSessionStoreGuard,
       getSessionStoreGuardState,
-    } = require("../../../src/config/redisClient");
+    } = require("@/config/redisClient");
 
     const state = assertProductionSessionStoreGuard();
 

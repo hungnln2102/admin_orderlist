@@ -1,6 +1,6 @@
-const logger = require("../../../../utils/logger");
-const { dismissBlockingOverlays } = require("../dismissBlockingOverlays");
-const { clickBestEffort, waitForAssignButtonEnabled } = require("./shared");
+const logger = require("@/utils/logger");
+const { dismissBlockingOverlays } = require("@/services/renew-adobe/adobe-renew-v2/dismissBlockingOverlays");
+const { clickBestEffort, waitForAssignButtonEnabled } = require("@/services/renew-adobe/adobe-renew-v2/userAddActions/shared");
 
 async function fillEmailInSlotV2(page, modal, email, slotIndex) {
   const emailNorm = String(email || "").trim().toLowerCase();

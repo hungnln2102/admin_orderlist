@@ -1,12 +1,12 @@
-const { ensureSupplierRecord } = require("../../supplies/services/supplierLookupService");
+const { ensureSupplierRecord } = require("@/domains/supplies/services/supplierLookupService");
 const {
   deleteSupplierCostPrice,
   upsertSupplierCostPrice,
-} = require("../../supplies/services/supplierCostService");
-const { updateOrderCostsOnSupplyPriceChange } = require("../../../services/updateOrderCostsOnSupplyPriceChange");
-const { pricingCache, supplierCache } = require("../../../utils/cache");
-const logger = require("../../../utils/logger");
-const { toNullableNumber } = require("../../../utils/normalizers");
+} = require("@/domains/supplies/services/supplierCostService");
+const { updateOrderCostsOnSupplyPriceChange } = require("@/services/updateOrderCostsOnSupplyPriceChange");
+const { pricingCache, supplierCache } = require("@/utils/cache");
+const logger = require("@/utils/logger");
+const { toNullableNumber } = require("@/utils/normalizers");
 
 const normalizePositiveId = (value) => {
   const parsed = Number(value);

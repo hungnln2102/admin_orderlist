@@ -1,16 +1,16 @@
-const { STATUS } = require("../../../../../utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 const {
   TABLES,
   ORDER_COLS,
   RECEIPT_STATE_COLS,
   PAYMENT_RECEIPT_DEF,
-} = require("../../shared/constants");
-const { normalizeMoney, toMonthKey } = require("../../shared/helpers");
-const { applyDashboardDelta } = require("../../shared/dashboardDelta");
-const { insertReconcileAuditLog } = require("./auditLog");
-const { ensureOffFlowRefundCreditNote } = require("../../../../orders/controller/finance/offFlowRefundCredits");
-const { resolveDashboardImportDeltaOnPaid } = require("../../../../orders/controller/finance/dashboardImportDeltaOnPaid");
-const { fetchSupplierNameBySupplyId } = require("./fetchSupplierNameBySupplyId");
+} = require("@/domains/payments/controller/shared/constants");
+const { normalizeMoney, toMonthKey } = require("@/domains/payments/controller/shared/helpers");
+const { applyDashboardDelta } = require("@/domains/payments/controller/shared/dashboardDelta");
+const { insertReconcileAuditLog } = require("@/domains/payments/controller/handlers/reconcile/auditLog");
+const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
+const { resolveDashboardImportDeltaOnPaid } = require("@/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
+const { fetchSupplierNameBySupplyId } = require("@/domains/payments/controller/handlers/reconcile/fetchSupplierNameBySupplyId");
 
 /**
  * Áp delta dashboard cho 1 lần reconcile receipt.
@@ -141,7 +141,7 @@ const applyReconcileDashboardAdjustment = async (
       });
     } catch (creditErr) {
       // Không chặn reconcile nếu tạo credit lỗi — dashboard đã cập nhật.
-      const logger = require("../../../../../utils/logger");
+      const logger = require("@/utils/logger");
       logger.warn("[Reconcile] Không tạo credit ngoài luồng", {
         receiptId,
         error: creditErr.message,

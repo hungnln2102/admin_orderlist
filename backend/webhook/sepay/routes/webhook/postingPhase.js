@@ -6,29 +6,29 @@ const {
 } = require("../../config");
 const { parseFlexibleDate, normalizeMoney } = require("../../utils");
 const { insertFinancialAuditLog } = require("../../payments");
-const { STATUS: ORDER_STATUS } = require("../../../../src/utils/statuses");
-const { isMavrykShopSupplierName } = require("../../../../src/utils/orderHelpers");
+const { STATUS: ORDER_STATUS } = require("@/utils/statuses");
+const { isMavrykShopSupplierName } = require("@/utils/orderHelpers");
 const {
   resolveDashboardImportDeltaOnPaid,
-} = require("../../../../src/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../../src/config/dbSchema");
+} = require("@/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
 const {
   qualifiedSummaryCol,
   recomputeSummaryMonthTotalTax,
   monthKeyFromPaidDateYmd,
-} = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../../src/services/telegramFinanceDeltaNotifier");
+} = require("@/services/telegramFinanceDeltaNotifier");
 const {
   UNDERPAY_TOLERANCE_VND,
   computeDashboardPaymentDecision,
   requiredMinForSuccessfulPayment,
-} = require("../../../../src/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
-const logger = require("../../../../src/utils/logger");
+} = require("@/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
+const logger = require("@/utils/logger");
 const { computeOrderCurrentPrice } = require("../../renewalPricing");
 const { withSavepoint } = require("../../savepoint");
-const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
+const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 const {
   PAYMENT_RECEIPT_TABLE_RESOLVED,
   PAYMENT_RECEIPT_COLS,

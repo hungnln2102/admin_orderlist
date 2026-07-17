@@ -2,7 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 
 const router = express.Router();
 

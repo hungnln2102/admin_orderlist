@@ -1,6 +1,6 @@
-const logger = require("../../../../../utils/logger");
-const { ADMIN_CONSOLE_API_BASE, TIMEOUTS } = require("../../shared/constants");
-const { fetchUsersViaApi } = require("../../shared/usersListApi");
+const logger = require("@/utils/logger");
+const { ADMIN_CONSOLE_API_BASE, TIMEOUTS } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 
 async function captureAdobeApiHeaders(page, orgToken) {
   const reqPromise = page.waitForRequest(

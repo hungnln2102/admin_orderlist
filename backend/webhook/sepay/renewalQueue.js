@@ -16,7 +16,7 @@ const pendingRenewalTasks = new Map();
 /** Try BullMQ enqueue; returns true if job was dispatched to Redis queue. */
 const tryBullMQEnqueue = async (orderCode, options = {}) => {
   try {
-    const { addRenewalJob } = require("../../src/queues/renewalQueue");
+    const { addRenewalJob } = require("@/queues/renewalQueue");
     const result = await addRenewalJob(orderCode, options);
     if (!result) return null;
     return {

@@ -2,7 +2,7 @@
  * Link supplier payment cycles to the shop bank account used for settlement.
  * SQL: database/migrations/106_supplier_payments_shop_bank_account.sql
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

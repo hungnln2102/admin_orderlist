@@ -1,12 +1,12 @@
-const logger = require("../../../utils/logger");
-const { ADMIN_CONSOLE_BASE } = require("./shared/constants");
+const logger = require("@/utils/logger");
+const { ADMIN_CONSOLE_BASE } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
 const {
   DEFAULT_COOKIE_EXPIRY_DAYS,
   toPwCookies,
   fromPwCookies,
   exportCookies,
   detectSessionValid,
-} = require("./flows/login/sessionFlow");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/login/sessionFlow");
 
 function resolveAdobeEntryUrl() {
   const raw = String(process.env.ADOBE_ENTRY_URL || "").trim();

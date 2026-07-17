@@ -3,17 +3,17 @@
  * Dùng chung cho job cron và luồng Check All.
  */
 
-const logger = require("../../utils/logger");
-const { db } = require("../../db");
-const adobeRenewV2 = require("./adobe-renew-v2");
-const { removeMappingsForAccount } = require("../userAccountMappingService");
-const { TABLE, COLS } = require("../../domains/renew-adobe/controller/accountTable");
+const logger = require("@/utils/logger");
+const { db } = require("@/db");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
+const { removeMappingsForAccount } = require("@/services/userAccountMappingService");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/accountTable");
 const {
   removeProfileDirForEmail,
-} = require("./adobe-renew-v2/shared/profileSession");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
 const {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
-} = require("./orderUserTrackingService");
+} = require("@/services/renew-adobe/orderUserTrackingService");
 /**
  * @param {object} accountRow — đủ cột: id, email, password_enc, mail_backup_id?, alert_config?
  * @param {{ logPrefix?: string }} [options]

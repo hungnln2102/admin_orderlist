@@ -1,5 +1,5 @@
-const { PAYMENT_RECEIPT_DEF } = require("../shared/constants");
-const { TABLES } = require("../shared/constants");
+const { PAYMENT_RECEIPT_DEF } = require("@/domains/payments/controller/shared/constants");
+const { TABLES } = require("@/domains/payments/controller/shared/constants");
 
 /** Khớp với webhook `SUPPLIER_REFUND_MATCH_TOLERANCE`. */
 const SUPPLIER_REFUND_MATCH_TOLERANCE = 5000;

@@ -1,14 +1,14 @@
 const {
   listProductSupplierPricesByName,
   listProductSuppliersByName,
-} = require("../../services/productSupplierReadService");
+} = require("@/domains/products/services/productSupplierReadService");
 const {
   createProductSupplierPrice,
   deleteProductSupplierPrice,
   updateProductSupplierPrice,
-} = require("../../services/productSupplierMutationService");
-const logger = require("../../../../utils/logger");
-const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
+} = require("@/domains/products/services/productSupplierMutationService");
+const logger = require("@/utils/logger");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const getSuppliesByProductName = async (req, res) => {
   const { productName } = req.params;

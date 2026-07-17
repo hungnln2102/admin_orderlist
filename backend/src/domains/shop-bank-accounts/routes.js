@@ -9,8 +9,8 @@ const {
   listShopBankAccountBalancesHandler,
   patchShopBankAccountWithdrawn,
   postShopBankAccountWithdraw,
-} = require("./controller");
-const { createShopBankAccountRules } = require("./validators/shopBankAccountValidator");
+} = require("@/domains/shop-bank-accounts/controller");
+const { createShopBankAccountRules } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
 
 const router = express.Router();
 

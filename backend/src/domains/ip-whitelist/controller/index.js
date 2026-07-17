@@ -1,10 +1,10 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   listIpWhitelistItems,
   createIpWhitelistItem,
   updateIpWhitelistItem,
   deleteIpWhitelistItem,
-} = require("../use-cases");
+} = require("@/domains/ip-whitelist/use-cases");
 
 const handleControllerError = (res, error, context) => {
   const status = Number.isInteger(error?.status) ? error.status : 500;

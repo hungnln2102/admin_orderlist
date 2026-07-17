@@ -1,6 +1,6 @@
-const { withTransaction } = require("../../../../db");
-const { STATUS } = require("../../../../utils/statuses");
-const logger = require("../../../../utils/logger");
+const { withTransaction } = require("@/db");
+const { STATUS } = require("@/utils/statuses");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   ORDER_COLS,
@@ -8,22 +8,22 @@ const {
   PAYMENT_RECEIPT_DEF,
   RECONCILE_ACTIONS,
   SUPPORTED_RECONCILE_ACTIONS,
-} = require("../shared/constants");
-const { normalizeMoney } = require("../shared/helpers");
+} = require("@/domains/payments/controller/shared/constants");
+const { normalizeMoney } = require("@/domains/payments/controller/shared/helpers");
 const {
   computeDashboardPaymentDecision,
-} = require("../../../orders/controller/finance/dashboardPaymentPostingPolicy");
+} = require("@/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
 const { enqueueRenewal } = require("../../../../../webhook/sepay/renewalQueue");
 const {
   applyReconcileDashboardAdjustment,
-} = require("./reconcile/dashboardAdjustment");
+} = require("@/domains/payments/controller/handlers/reconcile/dashboardAdjustment");
 const {
   applyMarkPaidAction,
   applyRenewAction,
-} = require("./reconcile/actionHandlers");
+} = require("@/domains/payments/controller/handlers/reconcile/actionHandlers");
 const {
   voidOffFlowCreditByReceiptId,
-} = require("../../../orders/controller/finance/offFlowRefundCredits");
+} = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 
 /**
  * Quyết định `effectiveAction` từ `requestedAction` + trạng thái đơn + khả năng cover.

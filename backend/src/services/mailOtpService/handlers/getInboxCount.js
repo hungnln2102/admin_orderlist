@@ -3,9 +3,9 @@
  * Dùng để debug / hiển thị "có bao nhiêu mail" trên UI test IMAP.
  */
 
-const logger = require("../../../utils/logger");
-const { getImapHostFromProvider, createImapClient } = require("../shared/imapClient");
-const { getMailBackupById } = require("../repository/mailBackupRepo");
+const logger = require("@/utils/logger");
+const { getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
 
 /**
  * Đếm số thư trong INBOX (cùng cách với test-imap-login: dùng status("INBOX", { messages: true })).

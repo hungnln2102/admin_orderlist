@@ -6,13 +6,13 @@ const {
   deletePackageProduct,
   bulkDeletePackages,
   patchProductPackageOptions,
-} = require("./controller");
+} = require("@/domains/package-products/controller");
 const {
   packageIdParam,
   createPackageRules,
   bulkDeleteRules,
   patchProductPackageOptionsRules,
-} = require("./validators/packageValidator");
+} = require("@/domains/package-products/validators/packageValidator");
 
 const router = express.Router();
 

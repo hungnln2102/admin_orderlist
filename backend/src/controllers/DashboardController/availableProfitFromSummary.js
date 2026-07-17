@@ -1,4 +1,4 @@
-const { sumActiveShopBankBalances } = require("../../domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
+const { sumActiveShopBankBalances } = require("@/domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
 
 const toNumber = (value) => Number(value || 0);
 

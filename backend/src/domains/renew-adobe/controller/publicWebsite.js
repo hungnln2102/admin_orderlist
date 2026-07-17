@@ -1,19 +1,19 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TBL_ORDER,
   ORD_COLS,
   ALLOWED_ORDER_STATUSES,
   getRenewAdobeVariantIds,
-} = require("./orderAccess");
+} = require("@/domains/renew-adobe/controller/orderAccess");
 const {
   normalizeEmail,
   findAccountMatchByEmail,
-} = require("./accountLookup");
-const { assignUserToAvailableAccount } = require("./assignmentService");
-const { buildWebsiteStatusPayload } = require("./statusUtils");
-const { runCheckForAccountId } = require("./checkAccounts");
-const { runCheckAllAccountsFlow } = require("./autoAssign");
+} = require("@/domains/renew-adobe/controller/accountLookup");
+const { assignUserToAvailableAccount } = require("@/domains/renew-adobe/controller/assignmentService");
+const { buildWebsiteStatusPayload } = require("@/domains/renew-adobe/controller/statusUtils");
+const { runCheckForAccountId } = require("@/domains/renew-adobe/controller/checkAccounts");
+const { runCheckAllAccountsFlow } = require("@/domains/renew-adobe/controller/autoAssign");
 
 function compareOrders(a, b) {
   const expiryA = a.expiry_date ? new Date(a.expiry_date).getTime() : 0;

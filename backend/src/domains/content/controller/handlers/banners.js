@@ -1,5 +1,5 @@
-const db = require("../../../../config/database");
-const logger = require("../../../../utils/logger");
+const db = require("@/config/database");
+const logger = require("@/utils/logger");
 
 function normalizeButtonPair(label, href) {
   const l = label !== undefined && label !== null ? String(label).trim() : "";

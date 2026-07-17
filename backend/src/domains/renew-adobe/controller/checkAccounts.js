@@ -1,26 +1,26 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
-const logger = require("../../../utils/logger");
-const adobeRenewV2 = require("../../../services/renew-adobe/adobe-renew-v2");
-const { TABLE, COLS } = require("./accountTable");
-const { persistCheckResult } = require("./checkSyncService");
+} = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/accountTable");
+const { persistCheckResult } = require("@/domains/renew-adobe/controller/checkSyncService");
 const {
   mergeRenewAdobeAlertConfig,
   resolveAccountSeatLimit,
-} = require("./usersSnapshotUtils");
+} = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
   upsertRenewAdobeOrderUserTrackingForOrderIds,
   reconcileOrderUserTrackingWithTeamMembers,
-} = require("../../../services/renew-adobe/orderUserTrackingService");
+} = require("@/services/renew-adobe/orderUserTrackingService");
 const {
   syncRenewAdobeMappingFromTeamMembers,
   clearRenewAdobeMappingForEmailsNotOnTeam,
-} = require("../../../services/userAccountMappingService");
+} = require("@/services/userAccountMappingService");
 
 const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
 const mappingTable = tableName(mappingSchema.TABLE, SCHEMA_RENEW_ADOBE);

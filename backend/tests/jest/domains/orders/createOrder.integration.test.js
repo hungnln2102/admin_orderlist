@@ -126,7 +126,7 @@ describe("POST /orders createOrder flow", () => {
 
     const {
       attachCreateOrderRoute,
-    } = require("../../../../src/domains/orders/controller/crud/createOrder");
+    } = require("@/domains/orders/controller/crud/createOrder");
     const app = express();
     app.use(express.json());
     const router = express.Router();

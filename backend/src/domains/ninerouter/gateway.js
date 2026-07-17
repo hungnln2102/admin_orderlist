@@ -1,7 +1,7 @@
 const { Readable } = require("stream");
 const { pipeline } = require("stream/promises");
-const logger = require("../../utils/logger");
-const { getBaseUrl, getApiKey, getTimeoutMs } = require("./config");
+const logger = require("@/utils/logger");
+const { getBaseUrl, getApiKey, getTimeoutMs } = require("@/domains/ninerouter/config");
 
 /**
  * @param {import("express").Request} req

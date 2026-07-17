@@ -1,4 +1,4 @@
-const { db } = require("../db");
+const { db } = require("@/db");
 const {
   tableName,
   getDefinition,
@@ -7,7 +7,7 @@ const {
   SCHEMA_PRODUCT,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
-} = require("../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const PRODUCT_DESC_DEF = getDefinition("PRODUCT_DESC", PRODUCT_SCHEMA);
 

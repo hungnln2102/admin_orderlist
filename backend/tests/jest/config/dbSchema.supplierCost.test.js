@@ -1,7 +1,7 @@
 /**
  * Test supplier_cost config: column must be variant_id (not product_id).
  */
-const { getDefinition, PARTNER_SCHEMA } = require("../../../src/config/dbSchema");
+const { getDefinition, PARTNER_SCHEMA } = require("@/config/dbSchema");
 
 describe("dbSchema supplier_cost", () => {
   it("SUPPLIER_COST uses variant_id column", () => {

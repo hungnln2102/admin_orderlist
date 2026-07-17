@@ -3,7 +3,7 @@ const {
   ORDER_TABLE,
   ORDER_COLS,
 } = require("./config");
-const { STATUS: ORDER_STATUS } = require("../../src/domains/orders/controller/constants");
+const { STATUS: ORDER_STATUS } = require("@/domains/orders/controller/constants");
 const { daysUntil } = require("./utils");
 
 const fetchOrderState = async (orderCode) => {

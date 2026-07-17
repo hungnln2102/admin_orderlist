@@ -1,4 +1,4 @@
-const { TABLES } = require("../../shared/constants");
+const { TABLES } = require("@/domains/payments/controller/shared/constants");
 
 /**
  * Helper insert vào `payment_receipt_financial_audit_log` với `source = 'reconcile'`.

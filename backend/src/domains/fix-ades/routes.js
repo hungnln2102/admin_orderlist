@@ -4,15 +4,15 @@
  */
 
 const express = require("express");
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   checkAdesAccount,
   checkAdesTransferStatus,
   renewAdesAccount,
-} = require("../../services/fix-ades/checkService");
+} = require("@/services/fix-ades/checkService");
 const {
   normalizeCheckResultForRenewFlow,
-} = require("./helpers/renewFlowResult");
+} = require("@/domains/fix-ades/helpers/renewFlowResult");
 
 const router = express.Router();
 

@@ -1,5 +1,5 @@
-const logger = require("../../../../../../utils/logger");
-const { TIMEOUTS, ADMIN_CONSOLE_API_BASE } = require("../../../shared/constants");
+const logger = require("@/utils/logger");
+const { TIMEOUTS, ADMIN_CONSOLE_API_BASE } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
 const {
   normalizeBatchResult,
   extractUserIdFromAbpCreateBody,
@@ -7,7 +7,7 @@ const {
   safeBodyPreview,
   extractApiErrorCode,
   isTrialAlreadyConsumedFromPatch,
-} = require("./responseHelpers");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/responseHelpers");
 
 async function captureAdobeApiHeaders(page, orgId) {
   const orgToken = `${orgId}@AdobeOrg`;

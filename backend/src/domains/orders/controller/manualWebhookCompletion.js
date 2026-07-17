@@ -14,35 +14,35 @@ const {
   updatePaymentSupplyBalance,
 } = require("../../../../webhook/sepay/payments");
 const { normalizeMoney, parseFlexibleDate } = require("../../../../webhook/sepay/utils");
-const { STATUS: ORDER_STATUS } = require("../../../utils/statuses");
+const { STATUS: ORDER_STATUS } = require("@/utils/statuses");
 const {
   isDashboardSalesOrder,
   isMavnImportOrder,
   isMavrykShopSupplierName,
-} = require("../../../utils/orderHelpers");
+} = require("@/utils/orderHelpers");
 const {
   resolveDashboardImportDeltaOnPaid,
-} = require("./finance/dashboardImportDeltaOnPaid");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
+} = require("@/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
 const {
   qualifiedSummaryCol,
   recomputeSummaryMonthTotalTax,
   monthKeyFromPaidDateYmd,
-} = require("./finance/dashboardSummary");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../services/telegramFinanceDeltaNotifier");
+} = require("@/services/telegramFinanceDeltaNotifier");
 const {
   completeMavnProcessingOrderPaidWithoutWebhook,
-} = require("./finance/mavnCompleteProcessingPaidWithoutWebhook");
+} = require("@/domains/orders/controller/finance/mavnCompleteProcessingPaidWithoutWebhook");
 const {
   creditShopBankFromPaymentReceipt,
-} = require("../../shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 const {
   findDefaultActiveAccount,
   findShopBankAccountById,
-} = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
-const logger = require("../../../utils/logger");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+const logger = require("@/utils/logger");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;

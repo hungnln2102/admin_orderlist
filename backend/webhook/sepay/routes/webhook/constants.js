@@ -1,5 +1,5 @@
 const { PAYMENT_RECEIPT_TABLE, PAYMENT_RECEIPT_COLS } = require("../../config");
-const { SCHEMA_RECEIPT, RECEIPT_SCHEMA, tableName } = require("../../../../src/config/dbSchema");
+const { SCHEMA_RECEIPT, RECEIPT_SCHEMA, tableName } = require("@/config/dbSchema");
 
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
 const PAYMENT_RECEIPT_TABLE_RESOLVED = tableName(PAYMENT_RECEIPT_BASE_TABLE, SCHEMA_RECEIPT);

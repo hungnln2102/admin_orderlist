@@ -1,15 +1,15 @@
 const crypto = require("crypto");
 const {
   normalizeIntegerVndAmount,
-} = require("../../../../shared/money/normalizers");
+} = require("@/shared/money/normalizers");
 const {
   ORDER_CODE_REGEX_GLOBAL,
   BATCH_CODE_REGEX_STRICT,
   BATCH_CODE_PREFIX,
-} = require("./constants");
+} = require("@/domains/payments/controller/shared/constants");
 const {
   parseTransactionCodesInput,
-} = require("./parseTransactionCodesInput");
+} = require("@/domains/payments/controller/shared/parseTransactionCodesInput");
 
 const normalizeMoney = normalizeIntegerVndAmount;
 

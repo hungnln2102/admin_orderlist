@@ -16,7 +16,7 @@ jest.mock("../../../src/utils/logger", () => ({
   error: jest.fn(),
 }));
 
-const { STATUS } = require("../../../src/utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 const {
   tryAutoSettleSupplierPaymentByOutbound,
 } = require("../../../webhook/sepay/routes/webhook/autoSettleSupplierPayment");
@@ -26,10 +26,10 @@ const {
 const { insertFinancialAuditLog } = require("../../../webhook/sepay/payments");
 const {
   debitShopBankSupplierPayment,
-} = require("../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../src/services/telegramFinanceDeltaNotifier");
+} = require("@/services/telegramFinanceDeltaNotifier");
 
 describe("auto settle supplier payment", () => {
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe("auto settle supplier payment", () => {
   test("parseWebhookTransaction marks outbound transfer as negative", () => {
     const {
       parseWebhookTransaction,
-    } = require("../../../src/domains/payments/use-cases/parseTransaction");
+    } = require("@/domains/payments/use-cases/parseTransaction");
 
     const parsed = parseWebhookTransaction({
       transaction: {

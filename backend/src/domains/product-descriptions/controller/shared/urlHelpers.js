@@ -1,6 +1,6 @@
 const path = require("path");
-const logger = require("../../../../utils/logger");
-const { isImageFile } = require("./constants");
+const logger = require("@/utils/logger");
+const { isImageFile } = require("@/domains/product-descriptions/controller/shared/constants");
 
 const getForwardedHeader = (req, headerName) => {
   const raw = req.get(headerName);

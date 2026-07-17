@@ -1,8 +1,8 @@
-const { db } = require("../../../db");
-const { SUPPLY_STATUS_CANDIDATES } = require("./constants");
-const { SCHEMA_PRODUCT, SCHEMA_SUPPLIER, SCHEMA_PARTNER } = require("../../../config/dbSchema");
-const { normalizeSupplyStatus } = require("../../../utils/normalizers");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const { SUPPLY_STATUS_CANDIDATES } = require("@/domains/supplies/controller/constants");
+const { SCHEMA_PRODUCT, SCHEMA_SUPPLIER, SCHEMA_PARTNER } = require("@/config/dbSchema");
+const { normalizeSupplyStatus } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
 
 const SUPPLIER_TABLE_PRIMARY = `${SCHEMA_SUPPLIER}.supplier`;
 const SUPPLIER_TABLE_FALLBACK = `${SCHEMA_PRODUCT}.supplier`;

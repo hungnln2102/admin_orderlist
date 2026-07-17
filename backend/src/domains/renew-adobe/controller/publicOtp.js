@@ -1,12 +1,12 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
-const { normalizeEmail } = require("../helpers/email");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { normalizeEmail } = require("@/domains/renew-adobe/helpers/email");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
-const { fetchOtpBySource } = require("../../../services/otpProviderService");
+} = require("@/config/dbSchema");
+const { fetchOtpBySource } = require("@/services/otpProviderService");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

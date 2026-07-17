@@ -1,4 +1,4 @@
-const { parseWebhookTransaction } = require("../../../src/domains/payments/use-cases/parseTransaction");
+const { parseWebhookTransaction } = require("@/domains/payments/use-cases/parseTransaction");
 
 describe("sepay webhook parse phase", () => {
   test("extracts multiple order codes and MAVG batch code", () => {

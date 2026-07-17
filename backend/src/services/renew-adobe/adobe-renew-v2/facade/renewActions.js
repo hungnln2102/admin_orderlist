@@ -1,5 +1,5 @@
-const { deleteUsersV2 } = require("../deleteUsersV2");
-const { addUsersWithProductV2 } = require("../addUsersWithProductV2");
+const { deleteUsersV2 } = require("@/services/renew-adobe/adobe-renew-v2/deleteUsersV2");
+const { addUsersWithProductV2 } = require("@/services/renew-adobe/adobe-renew-v2/addUsersWithProductV2");
 
 async function removeUserFromAccount(email, password, userEmail, options = {}) {
   if (!userEmail) throw new Error("Thiếu userEmail");

@@ -15,8 +15,8 @@ const {
   PRODUCT_SCHEMA,
   tableName,
   getDefinition,
-} = require("../config/dbSchema");
-const logger = require("../utils/logger");
+} = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);

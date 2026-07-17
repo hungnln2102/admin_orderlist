@@ -1,5 +1,5 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   FINANCE_SCHEMA,
   SCHEMA_FINANCE,
@@ -8,20 +8,20 @@ const {
   SCHEMA_ORDERS,
   SCHEMA_PARTNER,
   tableName,
-} = require("../../../config/dbSchema");
-const { normalizeTextInput } = require("../../../utils/normalizers");
-const { STATUS } = require("../../../utils/statuses");
+} = require("@/config/dbSchema");
+const { normalizeTextInput } = require("@/utils/normalizers");
+const { STATUS } = require("@/utils/statuses");
 const {
   isMavnImportOrder,
   isMavrykShopSupplierName,
-} = require("../../../utils/orderHelpers");
+} = require("@/utils/orderHelpers");
 const {
   monthKeyVietnamFromDbTimestamp,
   mergeSummaryUpdates,
-} = require("../../orders/controller/finance/dashboardSummary");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   storeProfitExpensesHasMavnColumns,
-} = require("../../orders/controller/finance/storeProfitExpensesHasMavnColumns");
+} = require("@/domains/orders/controller/finance/storeProfitExpensesHasMavnColumns");
 
 const TABLE = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;

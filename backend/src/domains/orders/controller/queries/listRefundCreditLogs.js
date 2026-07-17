@@ -1,5 +1,5 @@
-const { db } = require("../../../../db");
-const { TABLES } = require("../constants");
+const { db } = require("@/db");
+const { TABLES } = require("@/domains/orders/controller/constants");
 
 const STATUS_GROUPS = {
     ALL: "all",

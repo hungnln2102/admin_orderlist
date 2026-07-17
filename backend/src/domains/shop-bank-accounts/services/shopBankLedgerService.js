@@ -2,11 +2,11 @@ const {
   ADMIN_SCHEMA,
   SCHEMA_ADMIN,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   normalizeAccountNumber,
   normalizeRoundedMoney,
-} = require("../helpers/shopBankInputs");
+} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
 
 const LEDGER_TABLE = tableName(
   ADMIN_SCHEMA.SHOP_BANK_ACCOUNT_LEDGER.TABLE,

@@ -1,5 +1,5 @@
-const { normalizeOptionalText } = require("../../../shared/text/normalizeOptionalText");
-const { normalizeBoolean } = require("../../../shared/validation/normalizeBoolean");
+const { normalizeOptionalText } = require("@/shared/text/normalizeOptionalText");
+const { normalizeBoolean } = require("@/shared/validation/normalizeBoolean");
 
 const normalizeAccountNumber = (value) =>
   String(value || "")

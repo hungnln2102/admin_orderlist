@@ -2,8 +2,8 @@ const {
   IDENTITY_SCHEMA,
   SCHEMA_MAIL_BACKUP,
   tableName,
-} = require("../../../../config/dbSchema");
-const { TABLE, COLS } = require("../accountTable");
+} = require("@/config/dbSchema");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/accountTable");
 
 const MAIL_BACKUP_TABLE =
   IDENTITY_SCHEMA?.MAIL_BACKUP

@@ -1,6 +1,6 @@
 const {
   __test__,
-} = require("../../../../src/domains/renew-adobe/controller/publicFixAdes");
+} = require("@/domains/renew-adobe/controller/publicFixAdes");
 
 describe("publicFixAdes status normalization", () => {
   it("maps active statuses to có gói", () => {

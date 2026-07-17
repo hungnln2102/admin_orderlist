@@ -1,9 +1,9 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   ADMIN_SCHEMA,
   SCHEMA_ADMIN,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const ACCOUNT_TABLE = tableName(ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.TABLE, SCHEMA_ADMIN);
 const ACCOUNT_COLS = ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;

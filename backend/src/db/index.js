@@ -1,4 +1,4 @@
-const db = require("./knexClient");
+const db = require("@/db/knexClient");
 
 const withTransaction = async (handler) => {
   const trx = await db.transaction();

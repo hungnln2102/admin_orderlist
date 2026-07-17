@@ -4,7 +4,7 @@
  * - dashboard_financial_change_log.bank_balance_delta
  * - dashboard_financial_change_log.bank_balance_snapshot
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

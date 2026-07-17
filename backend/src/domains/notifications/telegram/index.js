@@ -1,6 +1,6 @@
-const orderNotifier = require("./dispatchers/orderNotifier");
-const financeNotifier = require("./dispatchers/financeNotifier");
-const systemNotifier = require("./dispatchers/systemNotifier");
+const orderNotifier = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
+const financeNotifier = require("@/domains/notifications/telegram/dispatchers/financeNotifier");
+const systemNotifier = require("@/domains/notifications/telegram/dispatchers/systemNotifier");
 
 module.exports = {
   orderNotifier,

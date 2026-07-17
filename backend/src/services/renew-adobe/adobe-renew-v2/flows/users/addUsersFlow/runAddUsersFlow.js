@@ -1,19 +1,19 @@
-const logger = require("../../../../../../utils/logger");
-const { fetchUsersViaApi } = require("../../../shared/usersListApi");
+const logger = require("@/utils/logger");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 const {
   CREATE_USER_CONCURRENCY,
   MAX_PRODUCT_PATCH_PER_REQUEST,
   hasProductId,
   extractOrgIdFromUrl,
-} = require("./config");
-const { normalizeBatchResult } = require("./responseHelpers");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/config");
+const { normalizeBatchResult } = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/responseHelpers");
 const {
   captureAdobeApiHeaders,
   resolveAssignableProductId,
   createUserViaAbpApi,
   assignProductBatchViaPatch,
-} = require("./apiClients");
-const { resolveUserIdOrFail, applyAssignFallback } = require("./fallbacks");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/apiClients");
+const { resolveUserIdOrFail, applyAssignFallback } = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/fallbacks");
 
 async function runAddUsersFlow(page, userEmails = [], options = {}) {
   const list = Array.isArray(userEmails)

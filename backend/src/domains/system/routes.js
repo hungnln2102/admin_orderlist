@@ -1,7 +1,7 @@
 const express = require("express");
-const { notifyError } = require("../../domains/notifications/telegram").systemNotifier;
-const { runFourDaysNotificationNow } = require("../scheduler/controller");
-const { requireCronInvokeSecret } = require("../../middleware/secureCronInvoke");
+const { notifyError } = require("@/domains/notifications/telegram").systemNotifier;
+const { runFourDaysNotificationNow } = require("@/domains/scheduler/controller");
+const { requireCronInvokeSecret } = require("@/middleware/secureCronInvoke");
 
 const router = express.Router();
 let lastFrontendReport = 0;

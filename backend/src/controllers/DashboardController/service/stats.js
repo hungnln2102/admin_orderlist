@@ -1,9 +1,9 @@
-const { fetchEstimatedBankBalancePair } = require("../availableProfitFromSummary");
+const { fetchEstimatedBankBalancePair } = require("@/controllers/DashboardController/availableProfitFromSummary");
 const {
   buildOrderCountBirthInRangeQuery,
-} = require("../dashboardSummaryQueries");
-const { orderListHasCreatedAtColumn } = require("../orderListHasCreatedAtColumn");
-const { sumDailyKpisForRange } = require("../dailyRevenueSummaryAggregate");
+} = require("@/controllers/DashboardController/dashboardSummaryQueries");
+const { orderListHasCreatedAtColumn } = require("@/controllers/DashboardController/orderListHasCreatedAtColumn");
+const { sumDailyKpisForRange } = require("@/controllers/DashboardController/dailyRevenueSummaryAggregate");
 const {
   db,
   summaryTableName,
@@ -13,7 +13,7 @@ const {
   currentCalendarMonthKey,
   computePreviousRange,
   kpiFromSummaryOnly,
-} = require("./shared");
+} = require("@/controllers/DashboardController/service/shared");
 
 const fetchDashboardStats = async () => {
   const now = new Date();

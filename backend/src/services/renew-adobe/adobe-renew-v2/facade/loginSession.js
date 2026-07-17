@@ -1,11 +1,11 @@
 const { chromium } = require("playwright");
-const logger = require("../../../../utils/logger");
-const { getPlaywrightProxyOptions } = require("../shared/proxyConfig");
+const logger = require("@/utils/logger");
+const { getPlaywrightProxyOptions } = require("@/services/renew-adobe/adobe-renew-v2/shared/proxyConfig");
 const {
   launchSessionFromProfile,
   hasExistingProfileForEmail,
-} = require("../shared/profileSession");
-const { recordProfileUsage } = require("../shared/profileUsageMetrics");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
+const { recordProfileUsage } = require("@/services/renew-adobe/adobe-renew-v2/shared/profileUsageMetrics");
 
 const buildLaunchOptions = () => {
   const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";

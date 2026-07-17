@@ -2,7 +2,7 @@
  * Cùng lúc cập nhật total_import (NCC) và total_profit: mỗi tháng, mỗi order_list_id một lần
  * (log mới nhất), cộng GREATEST(0, COALESCE(gross_selling_price, price) - cost) từ orders.order_list.
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

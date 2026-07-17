@@ -1,4 +1,4 @@
-const { ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName } = require("../config/dbSchema");
+const { ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName } = require("@/config/dbSchema");
 
 const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;
 

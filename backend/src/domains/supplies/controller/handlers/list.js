@@ -1,5 +1,5 @@
-const { db } = require("../../../../db");
-const { PARTNER_SCHEMA } = require("../../../../config/dbSchema");
+const { db } = require("@/db");
+const { PARTNER_SCHEMA } = require("@/config/dbSchema");
 const {
   QUOTED_COLS,
   TABLES,
@@ -8,12 +8,12 @@ const {
   orderCols,
   supplyCols,
   STATUS,
-} = require("../constants");
-const { quoteIdent } = require("../../../../utils/sql");
-const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("../helpers");
-const logger = require("../../../../utils/logger");
-const { supplierCache } = require("../../../../utils/cache");
-const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
+} = require("@/domains/supplies/controller/constants");
+const { quoteIdent } = require("@/utils/sql");
+const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("@/domains/supplies/controller/helpers");
+const logger = require("@/utils/logger");
+const { supplierCache } = require("@/utils/cache");
+const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 const logCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
 
 const listSupplies = async (_req, res) => {

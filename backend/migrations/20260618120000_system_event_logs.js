@@ -1,4 +1,4 @@
-const { SCHEMA_RENEW_ADOBE } = require("../src/config/dbSchema");
+const { SCHEMA_RENEW_ADOBE } = require("@/config/dbSchema");
 
 const schema = SCHEMA_RENEW_ADOBE || "system_automation";
 

@@ -1,12 +1,12 @@
-const { db } = require("../../../../db");
-const { quoteIdent } = require("../../../../utils/sql");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   productDescColNames,
   variantColNames,
-} = require("../shared/constants");
-const { invalidateWebsiteSeoCache } = require("../shared/cache");
+} = require("@/domains/product-descriptions/controller/shared/constants");
+const { invalidateWebsiteSeoCache } = require("@/domains/product-descriptions/controller/shared/cache");
 
 /** Xóa bản ghi desc_variant; gỡ liên kết variant (id_desc) trước khi xóa. */
 const deleteProductDescriptionRecord = async (req, res) => {

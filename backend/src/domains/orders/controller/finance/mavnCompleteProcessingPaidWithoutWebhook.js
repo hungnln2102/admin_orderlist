@@ -1,8 +1,8 @@
-const { db } = require("../../../../db");
-const { TABLES } = require("../constants");
-const { ORDERS_SCHEMA } = require("../../../../config/dbSchema");
-const { isMavnImportOrder } = require("../../../../utils/orderHelpers");
-const { syncMavnStoreProfitExpense } = require("./mavnStoreExpenseSync");
+const { db } = require("@/db");
+const { TABLES } = require("@/domains/orders/controller/constants");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { isMavnImportOrder } = require("@/utils/orderHelpers");
+const { syncMavnStoreProfitExpense } = require("@/domains/orders/controller/finance/mavnStoreExpenseSync");
 
 /**
  * Đơn nhập MAVN từng vào Đang xử lý (PROCESSING) do renewal cũ — không có bank/webhook.
@@ -14,7 +14,7 @@ async function completeMavnProcessingOrderPaidWithoutWebhook(orderId) {
     return { status: 400, body: { error: "orderId không hợp lệ." } };
   }
 
-  const { STATUS } = require("../../../../utils/statuses");
+  const { STATUS } = require("@/utils/statuses");
 
   try {
     let updatedRow = null;

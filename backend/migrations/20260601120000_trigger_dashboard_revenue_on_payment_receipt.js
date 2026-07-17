@@ -2,7 +2,7 @@
  * Cộng dồn total_revenue mỗi lần INSERT biên lai (Sepay) vào payment_receipt.
  * (Không backfill dữ liệu tháng cũ — chỉ tăng từ bản ghi mới từ khi bật trigger.)
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

@@ -2,7 +2,7 @@ const express = require("express");
 const {
   getMaintenanceStatus,
   updateMaintenanceStatus,
-} = require("./controller");
+} = require("@/domains/site-maintenance/controller");
 
 const router = express.Router();
 

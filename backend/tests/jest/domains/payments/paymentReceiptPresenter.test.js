@@ -1,7 +1,7 @@
 const {
   buildPaymentReceiptResponse,
   normalizeOutboundAuditDelta,
-} = require("../../../../src/domains/payments/controller/handlers/paymentReceiptPresenter");
+} = require("@/domains/payments/controller/handlers/paymentReceiptPresenter");
 
 describe("paymentReceiptPresenter", () => {
   test("normalizes list response into camelCase receipt contract", () => {

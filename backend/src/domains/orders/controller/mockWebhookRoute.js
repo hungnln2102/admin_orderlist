@@ -1,8 +1,8 @@
 const { ORDER_COLS, ORDER_TABLE, pool } = require("../../../../webhook/sepay/config");
 const { parseWebhookTransaction } = require("../../../../webhook/sepay/routes/webhook/parsePhase");
-const eventBus = require("../../../events/eventBus");
-const EVENTS = require("../../../events/eventTypes");
-const logger = require("../../../utils/logger");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
+const logger = require("@/utils/logger");
 
 const attachMockWebhookRoute = (router) => {
   router.post("/:id/mock-sepay-webhook", async (req, res) => {

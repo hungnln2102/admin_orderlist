@@ -1,17 +1,17 @@
-const { db } = require("../../../db");
-const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("../../../config/dbSchema");
+const { db } = require("@/db");
+const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("@/config/dbSchema");
 const {
   isGiftOrder,
   isMavnImportOrder,
   isMavrykShopSupplierName,
-} = require("../../../utils/orderHelpers");
-const { STATUS, COLS } = require("../controller/constants");
-const { findSupplierById } = require("../../supplies/services/supplierLookupService");
-const { resolveProductToVariantId } = require("../../products/services/productVariantService");
+} = require("@/utils/orderHelpers");
+const { STATUS, COLS } = require("@/domains/orders/controller/constants");
+const { findSupplierById } = require("@/domains/supplies/services/supplierLookupService");
+const { resolveProductToVariantId } = require("@/domains/products/services/productVariantService");
 const {
   changeOrderSupplier,
   ChangeSupplierError,
-} = require("../../supplier-change/service");
+} = require("@/domains/supplier-change/service");
 
 const updateOrderWithFinance = async ({
     trx,
@@ -30,8 +30,8 @@ const updateOrderWithFinance = async ({
     const {
         updateDashboardMonthlySummaryOnStatusChange,
         syncMavnStoreProfitExpense,
-    } = require("../services/orderFinanceSyncService");
-    const logger = require("../../../utils/logger");
+    } = require("@/domains/orders/services/orderFinanceSyncService");
+    const logger = require("@/utils/logger");
 
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
     const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
@@ -171,7 +171,7 @@ const updateOrderWithFinance = async ({
             prevStatus !== STATUS.REFUNDED &&
             (nextStatus === STATUS.PENDING_REFUND || nextStatus === STATUS.REFUNDED);
         if (enteredRefundLifecycle) {
-            const { createOrGetRefundCreditNoteForOrder } = require("../controller/finance/refundCredits");
+            const { createOrGetRefundCreditNoteForOrder } = require("@/domains/orders/controller/finance/refundCredits");
             const refundAmount = Number(updatedOrder?.[COLS.ORDER.REFUND] ?? updatedOrder?.refund) || 0;
             if (refundAmount > 0) {
                 await createOrGetRefundCreditNoteForOrder(trx, {

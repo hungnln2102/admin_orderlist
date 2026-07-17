@@ -1,4 +1,4 @@
-const { body, validate } = require("../../../middleware/validateRequest");
+const { body, validate } = require("@/middleware/validateRequest");
 
 const loginRules = [
   body("username").trim().notEmpty().withMessage("Tên đăng nhập là bắt buộc"),

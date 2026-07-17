@@ -1,5 +1,5 @@
-const logger = require("../../../../../utils/logger");
-const { withRecoverableRetry } = require("./retry");
+const logger = require("@/utils/logger");
+const { withRecoverableRetry } = require("@/services/renew-adobe/adobe-renew-v2/flows/check/retry");
 
 const ADMIN_PRODUCTS = "https://adminconsole.adobe.com/products";
 

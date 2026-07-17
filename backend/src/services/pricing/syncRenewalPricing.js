@@ -1,9 +1,9 @@
-const { db } = require("../../db");
-const logger = require("../../utils/logger");
-const { TABLES } = require("../../domains/orders/controller/constants");
-const { ORDERS_SCHEMA } = require("../../config/dbSchema");
-const { calculateOrderPricing } = require("./orderPricingService");
-const { SLOTS_TABLE, SLOT_COLS, SLOT_STATUS } = require("../../domains/payment-slots/constants");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { TABLES } = require("@/domains/orders/controller/constants");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { calculateOrderPricing } = require("@/services/pricing/orderPricingService");
+const { SLOTS_TABLE, SLOT_COLS, SLOT_STATUS } = require("@/domains/payment-slots/constants");
 
 /**
  * Đồng bộ lại giá của toàn bộ các đơn hàng RENEWAL (Cần Gia Hạn) của variant được chỉ định.

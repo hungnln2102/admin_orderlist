@@ -5,7 +5,7 @@ const {
   classifyFlowByAge,
   isMavrykSupplierName,
   FLOW_A_AGE_THRESHOLD_DAYS,
-} = require("../../../../src/domains/supplier-change/priceCalculator");
+} = require("@/domains/supplier-change/priceCalculator");
 
 describe("supplier-change / priceCalculator", () => {
   describe("computeProratedCostForNewSupplier", () => {

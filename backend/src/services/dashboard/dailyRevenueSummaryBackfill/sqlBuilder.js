@@ -1,4 +1,4 @@
-const { TZ, ident, orderCountedSql, refundCountedSql } = require("./shared");
+const { TZ, ident, orderCountedSql, refundCountedSql } = require("@/services/dashboard/dailyRevenueSummaryBackfill/shared");
 
 function buildBackfillSql({
   summaryTable,

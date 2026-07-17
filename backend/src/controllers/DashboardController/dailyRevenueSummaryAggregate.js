@@ -3,12 +3,12 @@
  * @see database/migrations/093_dashboard_daily_revenue_summary.sql
  * @see ../../services/dashboard/dailyRevenueSummaryBackfill.js (scripts/ops/backfill-daily-revenue-summary.js)
  */
-const { db } = require("../../db");
+const { db } = require("@/db");
 const {
   tableName,
   SCHEMA_FINANCE,
   FINANCE_SCHEMA,
-} = require("../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const dailyTableName = tableName(
   FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.TABLE,

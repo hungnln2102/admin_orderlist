@@ -1,4 +1,4 @@
-const { body, param, validate } = require("../../../middleware/validateRequest");
+const { body, param, validate } = require("@/middleware/validateRequest");
 
 const packageIdParam = [
   param("id").notEmpty().withMessage("ID sản phẩm gói hàng là bắt buộc."),

@@ -14,14 +14,14 @@ const {
   monthKeyVietnamFromDbTimestamp,
   mergeSummaryUpdates,
   MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED,
-} = require("./shared");
+} = require("@/domains/store-profit-expenses/controller/shared");
 
 const {
   debitShopBankExternalOut,
   SOURCE_KINDS,
-} = require("../../shop-bank-accounts/services/shopBankLedgerService");
-const { findShopBankAccountById } = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { findShopBankAccountById } = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const parseShopBankAccountId = (body) => {
   const raw =

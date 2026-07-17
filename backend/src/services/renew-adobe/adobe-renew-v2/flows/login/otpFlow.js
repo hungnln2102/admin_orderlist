@@ -1,6 +1,6 @@
-const logger = require("../../../../../utils/logger");
-const { fetchOtpBySource, normalizeOtpSource } = require("../../../../otpProviderService");
-const { LOGIN_TIMEOUTS } = require("./loginTimeouts");
+const logger = require("@/utils/logger");
+const { fetchOtpBySource, normalizeOtpSource } = require("@/services/otpProviderService");
+const { LOGIN_TIMEOUTS } = require("@/services/renew-adobe/adobe-renew-v2/flows/login/loginTimeouts");
 
 function maskOtp(code) {
   const normalized = String(code || "").replace(/\D/g, "");

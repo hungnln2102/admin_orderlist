@@ -2,10 +2,10 @@ const {
   SITE_SETTINGS_DEF,
   readMaintenanceSetting,
   writeMaintenanceSetting,
-} = require("../repositories/siteMaintenanceRepository");
+} = require("@/domains/site-maintenance/repositories/siteMaintenanceRepository");
 const {
   invalidateWebsiteMaintenanceCache,
-} = require("../helpers/invalidateWebsiteMaintenanceCache");
+} = require("@/domains/site-maintenance/helpers/invalidateWebsiteMaintenanceCache");
 
 const createHttpError = (status, message) => {
   const error = new Error(message);

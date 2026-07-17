@@ -1,6 +1,6 @@
-const { TABLES } = require("../constants");
-const { ORDERS_SCHEMA } = require("../../../../config/dbSchema");
-const { syncMavnStoreProfitExpense } = require("./mavnStoreExpenseSync");
+const { TABLES } = require("@/domains/orders/controller/constants");
+const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { syncMavnStoreProfitExpense } = require("@/domains/orders/controller/finance/mavnStoreExpenseSync");
 
 const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
 
@@ -14,7 +14,7 @@ async function syncMavnFinanceAfterRenewalOrderPaid({ orderCode, beforeRenewalRo
   const code = String(orderCode || "").trim();
   if (!code || !beforeRenewalRow) return;
 
-  const { db } = require("../../../../db");
+  const { db } = require("@/db");
 
   await db.transaction(async (trx) => {
     const afterRow = await trx(TABLES.orderList).where(idOrderCol, code).forUpdate().first();

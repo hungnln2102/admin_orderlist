@@ -24,7 +24,7 @@ describe("app CORS", () => {
       return express.Router();
     });
 
-    const app = require("../../src/app");
+    const app = require("@/app");
     const response = await request(app)
       .get("/api")
       .set("Origin", "https://www.mavrykpremium.com");

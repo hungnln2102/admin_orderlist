@@ -1,6 +1,6 @@
-const { ceilToThousands, calcRemainingRefund, calcRemainingImport } = require("./finance/refunds");
-const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
-const { syncMavnStoreProfitExpense } = require("./finance/mavnStoreExpenseSync");
+const { ceilToThousands, calcRemainingRefund, calcRemainingImport } = require("@/domains/orders/controller/finance/refunds");
+const { updateDashboardMonthlySummaryOnStatusChange } = require("@/domains/orders/controller/finance/dashboardSummary");
+const { syncMavnStoreProfitExpense } = require("@/domains/orders/controller/finance/mavnStoreExpenseSync");
 
 module.exports = {
   ceilToThousands,

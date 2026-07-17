@@ -1,13 +1,13 @@
-const logger = require("../../utils/logger");
-const { db } = require("../../db");
+const logger = require("@/utils/logger");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   SCHEMA_ORDERS,
   ORDERS_SCHEMA,
   tableName,
-} = require("../../config/dbSchema");
-const { STATUS } = require("../../utils/statuses");
+} = require("@/config/dbSchema");
+const { STATUS } = require("@/utils/statuses");
 
 const TABLE = tableName(RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE, SCHEMA_RENEW_ADOBE);
 const COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;

@@ -1,4 +1,4 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   SHOP_BANK_ACCOUNTS_DEF,
   COLS,
@@ -10,14 +10,14 @@ const {
   insertShopBankAccount,
   updateShopBankAccount,
   deleteShopBankAccount,
-} = require("../repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   createHttpError,
   validateCreatePayload,
   validateUpdatePayload,
   validateDeletePayload,
   validateSetDefaultPayload,
-} = require("../validators/shopBankAccountValidator");
+} = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
 
 const ensureDefinition = () => {
   if (!SHOP_BANK_ACCOUNTS_DEF) {

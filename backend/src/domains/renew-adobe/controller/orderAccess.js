@@ -1,11 +1,11 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   SCHEMA_ORDERS,
   ORDERS_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const PS_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.TABLE,

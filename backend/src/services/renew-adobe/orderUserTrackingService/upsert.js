@@ -1,5 +1,5 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TBL_ORDER,
   ORD_COLS,
@@ -10,8 +10,8 @@ const {
   MAP_COLS,
   ACC_TABLE,
   ACC_COLS,
-} = require("./tables");
-const { normalizeEmail, resolveRowStatus } = require("./helpers");
+} = require("@/services/renew-adobe/orderUserTrackingService/tables");
+const { normalizeEmail, resolveRowStatus } = require("@/services/renew-adobe/orderUserTrackingService/helpers");
 
 async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
   if (!orders || orders.length === 0) return 0;

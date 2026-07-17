@@ -1,12 +1,12 @@
-const { db } = require("../../../db");
-const { STATUS, COLS } = require("../controller/constants");
-const { todayYMDInVietnam } = require("../../../utils/normalizers");
-const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA, TABLES } = require("../../../config/dbSchema");
-const { generateUniqueOrderCode } = require("../../../services/orderCodeService");
-const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder } = require("../controller/finance/refundCredits");
-const { allocateCreateOrderPayment, resolveRefundCreditAllocation } = require("../controller/crud/create-order/createOrderPaymentAllocation");
-const { insertOrder, generateNextOrderId } = require("../repositories/orderRepository");
-const { eventBus, EVENTS } = require("../../../events");
+const { db } = require("@/db");
+const { STATUS, COLS } = require("@/domains/orders/controller/constants");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA, TABLES } = require("@/config/dbSchema");
+const { generateUniqueOrderCode } = require("@/services/orderCodeService");
+const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder } = require("@/domains/orders/controller/finance/refundCredits");
+const { allocateCreateOrderPayment, resolveRefundCreditAllocation } = require("@/domains/orders/controller/crud/create-order/createOrderPaymentAllocation");
+const { insertOrder, generateNextOrderId } = require("@/domains/orders/repositories/orderRepository");
+const { eventBus, EVENTS } = require("@/events");
 
 
 const executeCreateOrder = async ({

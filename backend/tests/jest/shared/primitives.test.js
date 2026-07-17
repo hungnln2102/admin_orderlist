@@ -1,5 +1,5 @@
-const { normalizeOptionalText } = require("../../../src/shared/text/normalizeOptionalText");
-const { normalizeBoolean } = require("../../../src/shared/validation/normalizeBoolean");
+const { normalizeOptionalText } = require("@/shared/text/normalizeOptionalText");
+const { normalizeBoolean } = require("@/shared/validation/normalizeBoolean");
 
 describe("shared primitive normalizers", () => {
   test.each([

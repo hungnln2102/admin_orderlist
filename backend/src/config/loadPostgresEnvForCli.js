@@ -6,8 +6,8 @@
 const fs = require("fs");
 const path = require("path");
 const dotenv = require("dotenv");
-const { loadBackendEnv, backendRoot } = require("./loadEnv");
-const { getPostgresConnectionUrl } = require("./postgresConnectionUrl");
+const { loadBackendEnv, backendRoot } = require("@/config/loadEnv");
+const { getPostgresConnectionUrl } = require("@/config/postgresConnectionUrl");
 
 function buildFallbackEntries() {
   const repoRoot = path.resolve(backendRoot, "..");

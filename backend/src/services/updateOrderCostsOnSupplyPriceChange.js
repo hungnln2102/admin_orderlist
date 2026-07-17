@@ -1,7 +1,7 @@
-const { db } = require("../db");
-const { TABLES, STATUS } = require("../domains/orders/controller/constants");
-const { toNullableNumber } = require("../utils/normalizers");
-const logger = require("../utils/logger");
+const { db } = require("@/db");
+const { TABLES, STATUS } = require("@/domains/orders/controller/constants");
+const { toNullableNumber } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
 
 /**
  * Khi đổi giá nhập NCC: cập nhật cost trên đơn UNPAID / Đang Xử Lý.

@@ -1,10 +1,10 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   ADMIN_SCHEMA,
   SCHEMA_ADMIN,
   getDefinition,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const SCHEMA_COLS = ADMIN_SCHEMA.USDT_WALLETS.COLS;
 const USDT_WALLETS_DEF = getDefinition("USDT_WALLETS", ADMIN_SCHEMA);

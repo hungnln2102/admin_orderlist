@@ -1,14 +1,14 @@
-const { db } = require("../../../../db");
-const { quoteIdent } = require("../../../../utils/sql");
-const { normalizeTextInput } = require("../../../../utils/normalizers");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const { normalizeTextInput } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("../shared/constants");
-const { mapProductDescRow } = require("../shared/queries");
+} = require("@/domains/product-descriptions/controller/shared/constants");
+const { mapProductDescRow } = require("@/domains/product-descriptions/controller/shared/queries");
 
 const listProductDescriptions = async (req, res) => {
   const search = normalizeTextInput(req.query.search || "");

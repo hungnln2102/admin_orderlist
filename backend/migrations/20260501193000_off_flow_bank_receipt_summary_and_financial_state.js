@@ -2,7 +2,7 @@
  * Tiền NH nhận **ngoài luồng doanh thu** (biên lai không gắn DT/LN): webhook không mã đơn,
  * và tiền thừa sau khi đơn đã PAID (biên lai bổ sung).
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

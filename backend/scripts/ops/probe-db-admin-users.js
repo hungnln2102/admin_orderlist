@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /** One-off: in app env, show DB name and whether admin.users exists. */
-require("../../src/config/loadEnv").loadBackendEnv();
+require("@/config/loadEnv").loadBackendEnv();
 const knex = require("knex");
-const { getPostgresConnectionUrl } = require("../../src/config/postgresConnectionUrl");
+const { getPostgresConnectionUrl } = require("@/config/postgresConnectionUrl");
 
 const url = getPostgresConnectionUrl();
 const masked = url.replace(/:[^:@/]+@/, ":***@");

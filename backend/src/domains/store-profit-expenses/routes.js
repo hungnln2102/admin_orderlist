@@ -4,13 +4,13 @@ const {
   createStoreProfitExpense,
   updateStoreProfitExpense,
   deleteStoreProfitExpense,
-} = require("./controller");
+} = require("@/domains/store-profit-expenses/controller");
 const {
   listStoreProfitExpensesRules,
   createStoreProfitExpenseRules,
   updateStoreProfitExpenseRules,
   deleteStoreProfitExpenseRules,
-} = require("./validators/storeProfitExpensesValidator");
+} = require("@/domains/store-profit-expenses/validators/storeProfitExpensesValidator");
 
 const router = express.Router();
 

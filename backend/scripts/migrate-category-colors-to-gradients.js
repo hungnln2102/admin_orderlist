@@ -7,11 +7,11 @@
  * Xem trước không ghi DB:
  *   npm run migrate:category-gradients -- --dry-run
  */
-const { db } = require("../src/db");
+const { db } = require("@/db");
 const {
   TABLES,
   categoryCols,
-} = require("../src/domains/products/controller/constants");
+} = require("@/domains/products/controller/constants");
 
 function isGradientCssValue(color) {
   if (!color || typeof color !== "string") return false;

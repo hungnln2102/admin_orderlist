@@ -9,9 +9,9 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
-} = require("../../../config/dbSchema");
-const { STATUS } = require("../../../utils/statuses");
-const { QUOTED_COLS } = require("../../../utils/columns");
+} = require("@/config/dbSchema");
+const { STATUS } = require("@/utils/statuses");
+const { QUOTED_COLS } = require("@/utils/columns");
 
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);

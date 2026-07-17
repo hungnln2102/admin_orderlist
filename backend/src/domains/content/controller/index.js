@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const categories = require("./handlers/categories");
-const articles = require("./handlers/articles");
-const banners = require("./handlers/banners");
+const categories = require("@/domains/content/controller/handlers/categories");
+const articles = require("@/domains/content/controller/handlers/articles");
+const banners = require("@/domains/content/controller/handlers/banners");
 const {
   contentIdParam,
   createArticleRules,
@@ -12,7 +12,7 @@ const {
   reorderBannerRules,
   createContentCategoryRules,
   updateContentCategoryRules,
-} = require("../validators/contentValidator");
+} = require("@/domains/content/validators/contentValidator");
 
 router.get("/categories", categories.list);
 router.post("/categories", ...createContentCategoryRules, categories.create);

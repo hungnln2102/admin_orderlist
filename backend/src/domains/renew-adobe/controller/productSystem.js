@@ -1,12 +1,12 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   SCHEMA_PRODUCT,
   RENEW_ADOBE_SCHEMA,
   PRODUCT_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
-const logger = require("../../../utils/logger");
+} = require("@/config/dbSchema");
+const logger = require("@/utils/logger");
 
 const PS_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.TABLE,

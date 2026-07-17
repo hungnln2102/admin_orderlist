@@ -2,7 +2,7 @@
  * `fn_recalc_dashboard_total_import` chỉ đồng bộ `total_import` từ log NCC.
  * `total_profit` theo đơn do webhook / điều chỉnh khác (tránh ghi đè lẫn lợi nhuận ghi nhận qua Sepay).
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

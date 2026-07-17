@@ -1,8 +1,8 @@
-const { loadBackendEnv } = require("../config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 
-const { pool } = require("../config/database");
+const { pool } = require("@/config/database");
 
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
 const schedulerTimezone =

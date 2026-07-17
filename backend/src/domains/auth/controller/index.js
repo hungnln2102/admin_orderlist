@@ -1,14 +1,14 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   ADMIN_SCHEMA,
   getDefinition,
   tableName,
   SCHEMA_ADMIN,
-} = require("../../../config/dbSchema");
-const { session: sessionConfig } = require("../../../config/appConfig");
-const logger = require("../../../utils/logger");
+} = require("@/config/dbSchema");
+const { session: sessionConfig } = require("@/config/appConfig");
+const logger = require("@/utils/logger");
 
 const USERS_DEF = getDefinition("USERS", ADMIN_SCHEMA);
 const USERS_TABLE = tableName(USERS_DEF.tableName, SCHEMA_ADMIN);

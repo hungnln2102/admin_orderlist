@@ -1,7 +1,7 @@
-const { db } = require("../../../../db");
-const { STATUS } = require("../../../../utils/statuses");
-const logger = require("../../../../utils/logger");
-const { TABLES, ORDER_COLS } = require("../shared/constants");
+const { db } = require("@/db");
+const { STATUS } = require("@/utils/statuses");
+const logger = require("@/utils/logger");
+const { TABLES, ORDER_COLS } = require("@/domains/payments/controller/shared/constants");
 
 const listMatchableOrders = async (req, res) => {
   const limitParam = Number.parseInt(req.query.limit, 10);

@@ -1,5 +1,5 @@
-const { db } = require("../../../db");
-const { quoteIdent } = require("../../../utils/sql");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
 const {
   variantCols,
   categoryCols,
@@ -9,7 +9,7 @@ const {
   supplyPriceCols,
   TABLES,
   MARGIN_PIVOT_SQL,
-} = require("../controller/constants");
+} = require("@/domains/products/controller/constants");
 
 const PRODUCT_PRICE_SELECT_SQL = `
   SELECT

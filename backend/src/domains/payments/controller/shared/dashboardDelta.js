@@ -1,11 +1,11 @@
-const { TABLES, SUMMARY_COLS } = require("./constants");
-const { normalizeMoney } = require("./helpers");
+const { TABLES, SUMMARY_COLS } = require("@/domains/payments/controller/shared/constants");
+const { normalizeMoney } = require("@/domains/payments/controller/shared/helpers");
 const {
   recomputeSummaryMonthTotalTax,
-} = require("../../../orders/controller/finance/dashboardSummary");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../../services/telegramFinanceDeltaNotifier");
+} = require("@/services/telegramFinanceDeltaNotifier");
 
 /**
  * Cập nhật dashboard_monthly_summary cho 1 tháng theo delta tích lũy (revenue/profit/orders/off-flow/bank-balance)

@@ -5,21 +5,21 @@
  */
 const {
   listProductDescriptions,
-} = require("./handlers/listProductDescriptions");
+} = require("@/domains/product-descriptions/controller/handlers/listProductDescriptions");
 const {
   createProductDescription,
-} = require("./handlers/createProductDescription");
+} = require("@/domains/product-descriptions/controller/handlers/createProductDescription");
 const {
   saveProductDescription,
-} = require("./handlers/saveProductDescription");
+} = require("@/domains/product-descriptions/controller/handlers/saveProductDescription");
 const {
   deleteProductDescriptionRecord,
-} = require("./handlers/deleteProductDescriptionRecord");
+} = require("@/domains/product-descriptions/controller/handlers/deleteProductDescriptionRecord");
 const {
   uploadProductImage,
   listProductImages,
   deleteProductImage,
-} = require("./handlers/productImages");
+} = require("@/domains/product-descriptions/controller/handlers/productImages");
 
 module.exports = {
   listProductDescriptions,

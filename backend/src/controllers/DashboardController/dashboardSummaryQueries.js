@@ -13,30 +13,30 @@
  */
 const {
   buildDashboardSummaryAggregateQuery,
-} = require("./summaryQueries/summaryRebuild");
+} = require("@/controllers/DashboardController/summaryQueries/summaryRebuild");
 const {
   buildRangeCompareStatsQuery,
-} = require("./summaryQueries/rangeCompare");
+} = require("@/controllers/DashboardController/summaryQueries/rangeCompare");
 const {
   buildRangeMonthlyChartQuery,
   buildRangeDailyChartQuery,
-} = require("./summaryQueries/rangeCharts");
+} = require("@/controllers/DashboardController/summaryQueries/rangeCharts");
 const {
   buildGrossSalesByBirthDateRangeQuery,
-} = require("./summaryQueries/grossSales");
+} = require("@/controllers/DashboardController/summaryQueries/grossSales");
 const {
   buildOrderCountBirthInRangeQuery,
   buildOrderCountsByBirthYmInRangeQuery,
   buildOrderCountsByBirthYearInRangeQuery,
-} = require("./summaryQueries/orderCounts");
+} = require("@/controllers/DashboardController/summaryQueries/orderCounts");
 const {
   buildCanceledCountsByCanceledYmInRangeQuery,
   buildCanceledCountsByCanceledYearInRangeQuery,
-} = require("./summaryQueries/canceledCounts");
+} = require("@/controllers/DashboardController/summaryQueries/canceledCounts");
 const {
   orderCountedStatuses,
   revenueCountedStatuses,
-} = require("./summaryQueries/constants");
+} = require("@/controllers/DashboardController/summaryQueries/constants");
 
 module.exports = {
   buildDashboardSummaryAggregateQuery,

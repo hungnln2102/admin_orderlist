@@ -3,7 +3,7 @@ const {
   ORDER_PREFIXES,
   isMavnImportOrder,
 } = require("../../helpers");
-const { isMavrykShopSupplierName } = require("../../src/utils/orderHelpers");
+const { isMavrykShopSupplierName } = require("@/utils/orderHelpers");
 const {
   pool,
   ORDER_TABLE,
@@ -15,8 +15,8 @@ const {
   SUPPLIER_TABLE,
   SUPPLIER_COLS,
 } = require("./config");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
-const { STATUS: ORDER_STATUS } = require("../../src/domains/orders/controller/constants");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
+const { STATUS: ORDER_STATUS } = require("@/domains/orders/controller/constants");
 const {
   parseFlexibleDate,
   normalizeProductDuration,
@@ -34,14 +34,14 @@ const {
 } = require("./payments");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../src/services/telegramFinanceDeltaNotifier");
-const logger = require("../../src/utils/logger");
+} = require("@/services/telegramFinanceDeltaNotifier");
+const logger = require("@/utils/logger");
 const {
   storeProfitExpensesHasMavnColumns,
-} = require("../../src/domains/orders/controller/finance/storeProfitExpensesHasMavnColumns");
+} = require("@/domains/orders/controller/finance/storeProfitExpensesHasMavnColumns");
 const {
   WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
-} = require("../../src/domains/orders/controller/queries/webhookReceiptOrderDateWindow");
+} = require("@/domains/orders/controller/queries/webhookReceiptOrderDateWindow");
 
 const { calculateRenewalPricing, computeOrderCurrentPrice } = require("./renewalPricing");
 const {
@@ -59,19 +59,19 @@ const {
   findActiveSlotByOrder,
   openPaymentSlot,
   SLOT_KIND,
-} = require("../../src/domains/payment-slots");
+} = require("@/domains/payment-slots");
 const {
   resolveDefaultShopBankAccount,
-} = require("../../src/services/shopBankAccountResolver");
+} = require("@/services/shopBankAccountResolver");
 
-const { recomputeSummaryMonthTotalTax } = require("../../src/domains/orders/controller/finance/dashboardSummary");
+const { recomputeSummaryMonthTotalTax } = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   resolveMavrykDefaultBankAccount,
-} = require("../../src/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   debitShopBankExternalOut,
   SOURCE_KINDS: LEDGER_SOURCE_KINDS,
-} = require("../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const storeExpenseTable = tableName(
@@ -665,7 +665,7 @@ const runRenewal = async (
       try {
         const {
           syncMavnStockExpiryAfterOrderRenewal,
-        } = require("../../src/services/mavnRenewalStockExpirySync");
+        } = require("@/services/mavnRenewalStockExpirySync");
         mavnStockSync = await syncMavnStockExpiryAfterOrderRenewal(client, {
           orderCode,
           newExpiryDate: ngayHetHanMoi,
@@ -693,7 +693,7 @@ const runRenewal = async (
     if (isMavn && renewalNextStatus === ORDER_STATUS.PAID) {
       const {
         syncMavnFinanceAfterRenewalOrderPaid,
-      } = require("../../src/domains/orders/controller/finance/mavnRenewalPaidSync");
+      } = require("@/domains/orders/controller/finance/mavnRenewalPaidSync");
       await syncMavnFinanceAfterRenewalOrderPaid({
         orderCode,
         beforeRenewalRow: {
@@ -857,7 +857,7 @@ const runRenewal = async (
     }
 
     try {
-      const { eventBus, EVENTS } = require("../../src/events");
+      const { eventBus, EVENTS } = require("@/events");
       // Truyền object chứa thông tin cần thiết
       eventBus.emit(EVENTS.ORDER_RENEWED, {
         id_order: orderCode,

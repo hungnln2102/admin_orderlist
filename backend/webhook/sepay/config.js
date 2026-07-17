@@ -15,7 +15,7 @@ const {
   ORDERS_SCHEMA,
   RECEIPT_SCHEMA,
   PRICING_TIER_SCHEMA,
-} = require("../../src/config/dbSchema");
+} = require("@/config/dbSchema");
 
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
 const SEPAY_WEBHOOK_SECRET =
@@ -40,7 +40,7 @@ const TELEGRAM_TOPIC_ID = Number.parseInt(
 const SEND_RENEWAL_TO_TOPIC =
   String(process.env.SEND_RENEWAL_TO_TOPIC || "true").toLowerCase() !== "false";
 
-const { pool } = require("../../src/config/database");
+const { pool } = require("@/config/database");
 
 // --------------------------------
 // GET table and column definitions

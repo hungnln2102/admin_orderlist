@@ -1,10 +1,10 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   tableName,
   SCHEMA_FINANCE,
   FINANCE_SCHEMA,
-} = require("../../../config/dbSchema");
-const { dashboardMonthlyTaxRatePercent } = require("../../../config/appConfig");
+} = require("@/config/dbSchema");
+const { dashboardMonthlyTaxRatePercent } = require("@/config/appConfig");
 
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,

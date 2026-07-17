@@ -6,13 +6,13 @@
  * danh sách user-orders trong UI Renew Adobe Admin.
  */
 
-const { db } = require("../../db");
-const logger = require("../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

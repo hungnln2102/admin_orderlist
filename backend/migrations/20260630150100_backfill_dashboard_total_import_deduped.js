@@ -2,7 +2,7 @@
  * Backfill `dashboard_monthly_summary.total_import` theo cùng công thức DISTINCT ON
  * như `fn_recalc_dashboard_total_import` (migration 20260630150000).
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

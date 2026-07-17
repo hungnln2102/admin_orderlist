@@ -2,7 +2,7 @@ const {
   calculateOrderPricingFromResolvedValues,
   deriveVariantMarginsFromCostAndSalePrice,
   resolveTierPrice,
-} = require("../../../src/services/pricing/core");
+} = require("@/services/pricing/core");
 
 describe("pricing core baseline calculations", () => {
   const prefixMap = {

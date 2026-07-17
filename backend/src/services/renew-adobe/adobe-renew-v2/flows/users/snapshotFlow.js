@@ -1,5 +1,5 @@
-const { fetchUsersViaApi } = require("../../shared/usersListApi");
-const { exportCookies } = require("../login");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
+const { exportCookies } = require("@/services/renew-adobe/adobe-renew-v2/flows/login");
 
 async function runUsersSnapshotFlow(
   page,

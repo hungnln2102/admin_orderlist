@@ -7,7 +7,7 @@ const {
   PRODUCT_SYSTEM_COLS,
   ADOBE_SYSTEM_CODE,
   ACTIVE_STATUSES,
-} = require("./shared");
+} = require("@/services/userAccountMappingService/shared");
 
 async function getRenewAdobeVariantIds() {
   const variants = await db(PRODUCT_SYSTEM_TABLE)

@@ -1,20 +1,20 @@
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
-const adobeRenewV2 = require("../../../services/renew-adobe/adobe-renew-v2");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
 const {
   lookupAndRecordIfNeeded,
   getMappingCountsByAdobeAccountIds,
-} = require("../../../services/userAccountMappingService");
+} = require("@/services/userAccountMappingService");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
-} = require("../../../services/renew-adobe/orderUserTrackingService");
-const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
+} = require("@/services/renew-adobe/orderUserTrackingService");
+const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("@/domains/renew-adobe/controller/accountTable");
 const {
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
   resolveAccountUserLimit,
   userCountDbValue,
-} = require("./usersSnapshotUtils");
+} = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 const runAddUsersBatch = async (req, res) => {
   const accountIdsRaw = req.body?.accountIds;

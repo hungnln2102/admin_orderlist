@@ -2,7 +2,7 @@ const { safeIdent } = require("./utils");
 const {
   TRANSACTION_CODE_REGEX_GLOBAL,
   normalizeTransactionCode,
-} = require("../../src/services/transactionCodeService");
+} = require("@/services/transactionCodeService");
 const { ORDER_TABLE, ORDER_COLS } = require("./config");
 
 const MAV_ORDER_PREFIX_RE = /^MAV[A-Z0-9]{2,}/i;

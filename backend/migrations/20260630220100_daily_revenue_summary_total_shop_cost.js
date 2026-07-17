@@ -3,7 +3,7 @@
  * @see database/migrations/094_daily_revenue_summary_total_shop_cost.sql
  */
 
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

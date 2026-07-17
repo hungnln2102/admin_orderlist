@@ -1,4 +1,4 @@
-const { STATUS } = require("../../src/utils/statuses");
+const { STATUS } = require("@/utils/statuses");
 
 const PAYABLE_STATUSES = new Set([STATUS.UNPAID, STATUS.RENEWAL]);
 

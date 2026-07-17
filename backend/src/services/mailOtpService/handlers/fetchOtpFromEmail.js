@@ -10,15 +10,15 @@
  * - Khi có nhiều mail: chọn mail gần nhất (UID cao nhất) rồi trả về OTP của mail đó.
  */
 
-const logger = require("../../../utils/logger");
-const { toUidList, getImapHostFromProvider, createImapClient } = require("../shared/imapClient");
+const logger = require("@/utils/logger");
+const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
 const {
   stripHtml,
   extractOtpFromText,
   isAdobeEmail,
   isVerificationEmail,
-} = require("../shared/otpExtractor");
-const { getMailBackupById } = require("../repository/mailBackupRepo");
+} = require("@/services/mailOtpService/shared/otpExtractor");
+const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
 
 /**
  * Lấy mã OTP từ hộp thư qua IMAP.

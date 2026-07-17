@@ -1,10 +1,10 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   PAYMENT_RECEIPT_BATCH_COLS,
-} = require("../shared/constants");
-const { isMissingBatchTablesError } = require("../shared/helpers");
+} = require("@/domains/payments/controller/shared/constants");
+const { isMissingBatchTablesError } = require("@/domains/payments/controller/shared/helpers");
 
 const listPaymentReceiptBatches = async (req, res) => {
   const limitParam = Number.parseInt(req.query.limit, 10);

@@ -6,11 +6,11 @@ const {
   COLS,
   ORDER_TABLE,
   ORDER_COLS,
-} = require("./shared");
+} = require("@/services/userAccountMappingService/shared");
 const {
   getRenewAdobeVariantIds,
   findLatestRenewAdobeOrderByEmail,
-} = require("./queryHelpers");
+} = require("@/services/userAccountMappingService/queryHelpers");
 
 /**
  * Khi add user vào Adobe account:

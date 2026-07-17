@@ -1,4 +1,4 @@
-const { normalizeOtpSource } = require("../../../services/otpProviderService");
+const { normalizeOtpSource } = require("@/services/otpProviderService");
 
 const TRACKING_OTP_NONE = "none";
 

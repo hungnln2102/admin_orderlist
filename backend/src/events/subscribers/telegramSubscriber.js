@@ -1,7 +1,7 @@
-const eventBus = require('../eventBus');
-const EVENTS = require('../eventTypes');
-const logger = require('../../utils/logger');
-const { notifyOrderCreated, notifyFourDaysRemaining, notifyZeroDaysRemaining, notifyOrderRenewed } = require('../../domains/notifications/telegram/dispatchers/orderNotifier');
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
+const logger = require("@/utils/logger");
+const { notifyOrderCreated, notifyFourDaysRemaining, notifyZeroDaysRemaining, notifyOrderRenewed } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
 
 /**
  * Lắng nghe các sự kiện và bắn Telegram

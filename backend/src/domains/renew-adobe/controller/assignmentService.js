@@ -1,14 +1,14 @@
 /**
  * Entry mỏng cho assignment service.
- * Giữ nguyên API cũ để các nơi require("./assignmentService") không cần đổi.
+ * Giữ nguyên API cũ để các nơi require("@/domains/renew-adobe/controller/assignmentService") không cần đổi.
  */
 
-const { buildAvailableAccounts } = require("./assignmentService/availableAccounts");
-const { assignUserToAvailableAccount } = require("./assignmentService/assignSingle");
+const { buildAvailableAccounts } = require("@/domains/renew-adobe/controller/assignmentService/availableAccounts");
+const { assignUserToAvailableAccount } = require("@/domains/renew-adobe/controller/assignmentService/assignSingle");
 const {
   fixUsersOneRoundTightest,
   fixUsersAllRoundsTightest,
-} = require("./assignmentService/fixRounds");
+} = require("@/domains/renew-adobe/controller/assignmentService/fixRounds");
 
 module.exports = {
   buildAvailableAccounts,

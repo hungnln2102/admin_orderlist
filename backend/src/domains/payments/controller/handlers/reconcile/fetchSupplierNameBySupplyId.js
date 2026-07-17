@@ -2,7 +2,7 @@ const {
   PARTNER_SCHEMA,
   SCHEMA_SUPPLIER,
   tableName,
-} = require("../../../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const fetchSupplierNameBySupplyId = async (trx, supplyIdRaw) => {
   if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";

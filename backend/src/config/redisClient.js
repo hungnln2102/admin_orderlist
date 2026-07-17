@@ -1,4 +1,4 @@
-const logger = require("../utils/logger");
+const logger = require("@/utils/logger");
 
 function toBool(value, defaultValue = false) {
   if (value == null || value === "") return defaultValue;

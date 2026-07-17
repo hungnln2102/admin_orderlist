@@ -3,15 +3,15 @@
  * Không join customer_profiles để tránh lỗi khi bảng chưa tồn tại; khi có bảng có thể bật lại.
  */
 
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   IDENTITY_SCHEMA,
   WALLET_SCHEMA,
   tableName,
   SCHEMA_IDENTITY,
   SCHEMA_WALLET,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const ACCOUNTS_TABLE = tableName(IDENTITY_SCHEMA.ACCOUNTS.TABLE, SCHEMA_IDENTITY);
 const WALLETS_TABLE = tableName(WALLET_SCHEMA.WALLETS.TABLE, SCHEMA_WALLET);

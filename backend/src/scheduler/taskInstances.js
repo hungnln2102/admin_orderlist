@@ -3,24 +3,24 @@
  * giữa API (SchedulerController trigger manual) và Scheduler (cron).
  * File này KHÔNG tạo side-effect (không schedule cron).
  */
-const config = require("./config");
+const config = require("@/scheduler/config");
 const {
   createUpdateDatabaseTask,
   getLastRunAt,
-} = require("./tasks/updateDatabaseTask");
-const { createNotifyZeroDaysTask } = require("./tasks/notifyZeroDays");
-const { createNotifyFourDaysTask } = require("./tasks/notifyFourDays");
-const { createRenewAdobeCheckAndNotifyTask } = require("./tasks/renewAdobeCheckAndNotify");
-const { createCleanupExpiredAdobeUsersTask } = require("./tasks/cleanupExpiredAdobeUsers");
+} = require("@/scheduler/tasks/updateDatabaseTask");
+const { createNotifyZeroDaysTask } = require("@/scheduler/tasks/notifyZeroDays");
+const { createNotifyFourDaysTask } = require("@/scheduler/tasks/notifyFourDays");
+const { createRenewAdobeCheckAndNotifyTask } = require("@/scheduler/tasks/renewAdobeCheckAndNotify");
+const { createCleanupExpiredAdobeUsersTask } = require("@/scheduler/tasks/cleanupExpiredAdobeUsers");
 const {
   createCleanupAdobeProfileGarbageTask,
-} = require("./tasks/cleanupAdobeProfileGarbage");
+} = require("@/scheduler/tasks/cleanupAdobeProfileGarbage");
 const {
   createCleanupExpiredTrackingTask,
-} = require("./tasks/cleanupExpiredTracking");
+} = require("@/scheduler/tasks/cleanupExpiredTracking");
 const {
   syncDailyRevenueSummaryTask,
-} = require("./tasks/syncDailyRevenueSummaryTask");
+} = require("@/scheduler/tasks/syncDailyRevenueSummaryTask");
 
 const {
   pool,

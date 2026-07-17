@@ -8,11 +8,12 @@
  *   node webhook-server.js
  *   npm run start:webhook
  */
-const { loadBackendEnv } = require("./src/config/loadEnv");
+require("module-alias/register");
+const { loadBackendEnv } = require("@/config/loadEnv");
 loadBackendEnv();
 
-const logger = require("./src/utils/logger");
-const { notifyCritical } = require("./src/domains/notifications/telegram").systemNotifier;
+const logger = require("@/utils/logger");
+const { notifyCritical } = require("@/domains/notifications/telegram").systemNotifier;
 
 process.on("uncaughtException", (err) => {
   logger.error("[WEBHOOK][FATAL] uncaughtException", {
@@ -38,7 +39,7 @@ const app = require("./webhook/sepay/app");
 const { HOST, PORT, SEPAY_WEBHOOK_PATH } = require("./webhook/sepay/config");
 
 // Đăng ký toàn bộ event subscribers (cực kỳ quan trọng để bắt sự kiện từ eventBus)
-const { registerAllSubscribers } = require("./src/events");
+const { registerAllSubscribers } = require("@/events");
 registerAllSubscribers();
 
 const server = app.listen(PORT, HOST, () => {

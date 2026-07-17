@@ -1,5 +1,5 @@
-const logger = require("../../../src/utils/logger");
-const { errorHandler } = require("../../../src/middleware/errorHandler");
+const logger = require("@/utils/logger");
+const { errorHandler } = require("@/middleware/errorHandler");
 
 describe("errorHandler", () => {
   afterEach(() => {

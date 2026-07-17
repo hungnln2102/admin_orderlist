@@ -1,7 +1,7 @@
 const express = require("express");
 const { isValidApiKey } = require("../auth");
 const { runRenewalBatch } = require("../renewal");
-const logger = require("../../../src/utils/logger");
+const logger = require("@/utils/logger");
 
 const router = express.Router();
 

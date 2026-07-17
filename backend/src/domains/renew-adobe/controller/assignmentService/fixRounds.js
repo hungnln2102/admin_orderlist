@@ -1,24 +1,24 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   getAssignedAdobeAccountIdForUserEmail,
   getEmailSetAlreadyAssignedToAdobe,
-} = require("../../../../services/userAccountMappingService");
+} = require("@/services/userAccountMappingService");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
-} = require("../../../../services/renew-adobe/orderUserTrackingService");
+} = require("@/services/renew-adobe/orderUserTrackingService");
 const {
   TABLE,
   COLS,
   buildAvailableAccounts,
   getAccountsBaseSelectCols,
-} = require("./availableAccounts");
+} = require("@/domains/renew-adobe/controller/assignmentService/availableAccounts");
 const {
   isAdobeSlotFullAddError,
   normalizeDistinctEmails,
   addUsersToAdobe,
   persistAfterAddSuccess,
-} = require("./helpers");
+} = require("@/domains/renew-adobe/controller/assignmentService/helpers");
 
 async function fixUsersOneRoundTightest(userEmailsRaw) {
   const remainingDistinct = normalizeDistinctEmails(userEmailsRaw);

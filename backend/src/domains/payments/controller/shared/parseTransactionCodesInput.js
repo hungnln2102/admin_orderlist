@@ -1,4 +1,4 @@
-const { BATCH_CODE_REGEX_STRICT } = require("./constants");
+const { BATCH_CODE_REGEX_STRICT } = require("@/domains/payments/controller/shared/constants");
 
 const MAV_ORDER_PREFIX_RE = /^MAV[A-Z0-9]{2,}/i;
 const TRANSACTION_CODE_REGEX_GLOBAL = /\b[A-Z0-9]{8}\b/gi;

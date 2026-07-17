@@ -3,7 +3,7 @@ const {
   inferAdobeProProductIdSet,
   hasAdobeProAccessFromProducts,
   resolveAuthoritativeCcpProductIdSet,
-} = require("../accessChecks");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
 
 const ABP_API_ORIGIN = "https://abpapi.adobe.io";
 const ABP_USERS_ATTRS_QUERY =

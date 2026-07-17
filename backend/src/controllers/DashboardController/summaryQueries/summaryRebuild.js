@@ -15,7 +15,7 @@ const {
   makeEventDateExpr,
   revenueByEventValueExpr,
   profitByEventValueExpr,
-} = require("./constants");
+} = require("@/controllers/DashboardController/summaryQueries/constants");
 
 /**
  * Cùng SELECT như rebuild dashboard_monthly_summary; cột tên theo bảng finance.

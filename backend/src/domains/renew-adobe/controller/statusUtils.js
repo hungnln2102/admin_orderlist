@@ -1,5 +1,5 @@
 const ACTIVE_LICENSE_STATUSES = new Set(["paid", "active"]);
-const { resolveAccountSeatLimit } = require("./usersSnapshotUtils");
+const { resolveAccountSeatLimit } = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 function normalizeLicenseStatus(value) {
   return String(value || "unknown").trim().toLowerCase() || "unknown";

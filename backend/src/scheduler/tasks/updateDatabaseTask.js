@@ -1,14 +1,14 @@
-const { STATUS } = require("../../utils/statuses");
-const logger = require("../../utils/logger");
-const { backupDatabaseToDrive } = require("../../utils/backupService");
-const { COL, TABLES, ORDER_COLS, expiryDateSQL } = require("../sqlHelpers");
+const { STATUS } = require("@/utils/statuses");
+const logger = require("@/utils/logger");
+const { backupDatabaseToDrive } = require("@/utils/backupService");
+const { COL, TABLES, ORDER_COLS, expiryDateSQL } = require("@/scheduler/sqlHelpers");
 // Require trực tiếp file con để tránh phụ thuộc thứ tự load `index.js` của service.
 const {
   removeMappingsByOrders,
-} = require("../../services/userAccountMappingService/mappingCrud");
+} = require("@/services/userAccountMappingService/mappingCrud");
 const {
   openRenewalSlotsForFlippedOrders,
-} = require("./shared/openRenewalSlots");
+} = require("@/scheduler/tasks/shared/openRenewalSlots");
 
 let lastRunAt = null;
 

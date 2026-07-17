@@ -10,10 +10,10 @@ const {
   uploadProductImage,
   listProductImages,
   deleteProductImage,
-} = require("./controller");
+} = require("@/domains/product-descriptions/controller");
 const {
   auditProductSeoProxy,
-} = require("./controller/websiteSeoAudit");
+} = require("@/domains/product-descriptions/controller/websiteSeoAudit");
 
 const router = express.Router();
 

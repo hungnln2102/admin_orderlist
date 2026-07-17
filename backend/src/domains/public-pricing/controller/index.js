@@ -1,5 +1,5 @@
-const { db } = require("../../../db");
-const { roundToThousands } = require("../../../services/pricing/core");
+const { db } = require("@/db");
+const { roundToThousands } = require("@/services/pricing/core");
 const {
   TABLES,
   variantCols,
@@ -8,8 +8,8 @@ const {
   categoryCols,
   productDescCols,
   supplyPriceCols,
-} = require("../../products/controller/constants");
-const { quoteIdent } = require("../../../utils/sql");
+} = require("@/domains/products/controller/constants");
+const { quoteIdent } = require("@/utils/sql");
 
 const MAX_BATCH = 200;
 const MAX_IDS = 500;

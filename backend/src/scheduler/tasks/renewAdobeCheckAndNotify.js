@@ -3,13 +3,13 @@
  * Trigger `cron`: sau check có thể chạy flow auto-fix bằng batch add qua env `RENEW_ADOBE_ENABLE_POST_CHECK_FIX`.
  * Trigger `manual` (API /scheduler/run-adobe-check): giữ hành vi cũ (includeAutoAssign=true).
  */
-const logger = require("../../utils/logger");
-const { runCheckForAccountId } = require("../../domains/renew-adobe/controller");
-const { runCheckAllAccountsFlow } = require("../../domains/renew-adobe/controller/autoAssign");
-const { runRenewAdobePostCheckFlow } = require("./renewAdobePostCheckFlow");
+const logger = require("@/utils/logger");
+const { runCheckForAccountId } = require("@/domains/renew-adobe/controller");
+const { runCheckAllAccountsFlow } = require("@/domains/renew-adobe/controller/autoAssign");
+const { runRenewAdobePostCheckFlow } = require("@/scheduler/tasks/renewAdobePostCheckFlow");
 const {
   ensureAdminAccountsExist,
-} = require("./shared/adminAccountsGuard");
+} = require("@/scheduler/tasks/shared/adminAccountsGuard");
 
 const ENABLE_POST_CHECK_FIX = process.env.RENEW_ADOBE_ENABLE_POST_CHECK_FIX === "true";
 

@@ -4,7 +4,7 @@
 
 const {
   findDefaultActiveAccount,
-} = require("../domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 
 const EMPTY_BANK = {
   id: null,

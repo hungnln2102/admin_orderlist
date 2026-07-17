@@ -1,12 +1,12 @@
-const logger = require("../../../utils/logger");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+const logger = require("@/utils/logger");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 const {
   listSavingGoals: listSavingGoalsUseCase,
   createSavingGoal: createSavingGoalUseCase,
   updateSavingGoal: updateSavingGoalUseCase,
   deleteSavingGoal: deleteSavingGoalUseCase,
   reorderSavingGoal: reorderSavingGoalUseCase,
-} = require("../use-cases/savingGoalsUseCases");
+} = require("@/domains/saving-goals/use-cases/savingGoalsUseCases");
 
 const listSavingGoals = async (_req, res) => {
   try {

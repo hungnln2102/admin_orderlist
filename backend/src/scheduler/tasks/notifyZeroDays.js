@@ -1,14 +1,14 @@
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 // Removed direct telegram require
 
-const { todayYMDInVietnam } = require("../../utils/normalizers");
-const { fetchVariantDisplayNames } = require("../variantDisplayNames");
-const { buildRenewalQuery, normalizeNotifyRow } = require("./shared");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const { fetchVariantDisplayNames } = require("@/scheduler/variantDisplayNames");
+const { buildRenewalQuery, normalizeNotifyRow } = require("@/scheduler/tasks/shared");
 const {
   claimDailyNotificationRun,
   releaseDailyNotificationRun,
   claimOrderOnceNotification,
-} = require("./shared/dailyNotificationGuard");
+} = require("@/scheduler/tasks/shared/dailyNotificationGuard");
 
 const ADVISORY_LOCK_KEY_1 = 90101;
 const ADVISORY_LOCK_KEY_2 = 0;
@@ -109,7 +109,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
 
         if (pending.length > 0) {
           try {
-            const { eventBus, EVENTS } = require("../../../events");
+            const { eventBus, EVENTS } = require("@/events");
             eventBus.emit(EVENTS.DAILY_ZERO_DAYS_DUE, pending.map((p) => p.order));
           } catch (sendErr) {
             for (const p of pending) {

@@ -1,26 +1,26 @@
-const logger = require("../../utils/logger");
-const { db } = require("../../db");
+const logger = require("@/utils/logger");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../config/dbSchema");
-const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
-const { runCheckForAccountId } = require("../../domains/renew-adobe/controller");
-const { runCheckAllAccountsFlow } = require("../../domains/renew-adobe/controller/autoAssign");
-const { notifyWarn } = require("../../domains/notifications/telegram").systemNotifier;
+} = require("@/config/dbSchema");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
+const { runCheckForAccountId } = require("@/domains/renew-adobe/controller");
+const { runCheckAllAccountsFlow } = require("@/domains/renew-adobe/controller/autoAssign");
+const { notifyWarn } = require("@/domains/notifications/telegram").systemNotifier;
 const {
   startJobRun,
   setCounter,
   addCounter,
   finishJobRun,
-} = require("./shared/jobRunLogger");
+} = require("@/scheduler/tasks/shared/jobRunLogger");
 const {
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
   userCountDbValue,
-} = require("../../domains/renew-adobe/controller/usersSnapshotUtils");
-const { getMapAccountIdToUserEmailsFor2330Cleanup } = require("../../services/renew-adobe/orderUserTrackingService");
+} = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
+const { getMapAccountIdToUserEmailsFor2330Cleanup } = require("@/services/renew-adobe/orderUserTrackingService");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACCOUNT_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;

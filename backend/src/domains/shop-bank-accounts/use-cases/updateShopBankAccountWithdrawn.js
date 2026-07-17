@@ -1,17 +1,17 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   SHOP_BANK_ACCOUNTS_DEF,
   COLS,
   findShopBankAccountById,
   updateShopBankAccount,
-} = require("../repositories/shopBankAccountRepository");
-const { sumReceivedByReceiver } = require("../repositories/shopBankReceiptTotalsRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+const { sumReceivedByReceiver } = require("@/domains/shop-bank-accounts/repositories/shopBankReceiptTotalsRepository");
 const {
   normalizeAccountNumber,
   normalizeRoundedMoney,
-} = require("../helpers/shopBankInputs");
-const { createHttpError } = require("../validators/shopBankAccountValidator");
-const { validateWithdrawnPayload } = require("../validators/shopBankWithdrawnValidator");
+} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
+const { createHttpError } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
+const { validateWithdrawnPayload } = require("@/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
 
 
 const updateShopBankAccountWithdrawn = async (id, payload) => {

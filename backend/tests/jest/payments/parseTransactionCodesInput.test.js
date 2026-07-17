@@ -1,7 +1,7 @@
 const {
   parseTransactionCodesInput,
   normalizeTransactionToken,
-} = require("../../../src/domains/payments/controller/shared/parseTransactionCodesInput");
+} = require("@/domains/payments/controller/shared/parseTransactionCodesInput");
 
 describe("parseTransactionCodesInput", () => {
   test("parses 8-char codes separated by comma or newline", () => {

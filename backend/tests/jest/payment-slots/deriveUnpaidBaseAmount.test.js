@@ -1,4 +1,4 @@
-const { deriveUnpaidBaseAmount } = require("../../../src/domains/payment-slots/use-cases/backfill/deriveUnpaidBaseAmount");
+const { deriveUnpaidBaseAmount } = require("@/domains/payment-slots/use-cases/backfill/deriveUnpaidBaseAmount");
 
 describe("deriveUnpaidBaseAmount", () => {
   test("keeps round VND price", () => {

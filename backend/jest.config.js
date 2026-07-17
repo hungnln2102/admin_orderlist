@@ -5,6 +5,9 @@
  */
 module.exports = {
   testEnvironment: "node",
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1"
+  },
   roots: ["<rootDir>/tests/jest"],
   testMatch: ["**/*.test.js"],
   collectCoverageFrom: [

@@ -2,12 +2,12 @@ const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
   TBL_ORDER,
   ORD_COLS,
   getRenewAdobeVariantIds,
-} = require("../../../domains/renew-adobe/controller/orderAccess");
+} = require("@/domains/renew-adobe/controller/orderAccess");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

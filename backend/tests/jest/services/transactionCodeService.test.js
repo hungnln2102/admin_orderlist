@@ -2,7 +2,7 @@ const {
   TRANSACTION_CODE_LENGTH,
   generateTransactionCode,
   normalizeTransactionCode,
-} = require("../../../src/services/transactionCodeService");
+} = require("@/services/transactionCodeService");
 
 describe("transactionCodeService", () => {
   test("generates fixed-length alphanumeric codes", () => {

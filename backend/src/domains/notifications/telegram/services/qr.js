@@ -10,7 +10,7 @@
 const https = require("https");
 const { URL } = require("url");
 
-const { preferIpv4Lookup } = require("./dnsHelpers");
+const { preferIpv4Lookup } = require("@/domains/notifications/telegram/services/dnsHelpers");
 
 const VIETQR_IMAGE_TEMPLATE = "compact2";
 

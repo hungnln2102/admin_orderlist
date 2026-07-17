@@ -1,17 +1,17 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   getDefinition,
   PRODUCT_SCHEMA,
   SCHEMA_PRODUCT,
   tableName,
-} = require("../../../config/dbSchema");
-const { normalizeDateInput } = require("../../../utils/normalizers");
+} = require("@/config/dbSchema");
+const { normalizeDateInput } = require("@/utils/normalizers");
 const {
   syncOrdersForPackagesUsingStock,
-} = require("../../../services/packageOrderAccountSync");
-const logger = require("../../../utils/logger");
-const eventBus = require("../../../events/eventBus");
-const EVENTS = require("../../../events/eventTypes");
+} = require("@/services/packageOrderAccountSync");
+const logger = require("@/utils/logger");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
 
 const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
 const cols = warehouseDef.columns;

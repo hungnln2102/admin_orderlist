@@ -1,8 +1,8 @@
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   getSiteMaintenanceStatus,
   updateSiteMaintenanceStatus,
-} = require("../use-cases");
+} = require("@/domains/site-maintenance/use-cases");
 
 const handleControllerError = (res, error, context) => {
   const status = Number.isInteger(error?.status) ? error.status : 500;

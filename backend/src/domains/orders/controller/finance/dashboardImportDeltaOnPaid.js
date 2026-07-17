@@ -3,8 +3,8 @@ const {
   PARTNER_SCHEMA,
   SCHEMA_PARTNER,
   tableName,
-} = require("../../../../config/dbSchema");
-const { isMavrykSupplierStrictForNccLog } = require("../../../../utils/orderHelpers");
+} = require("@/config/dbSchema");
+const { isMavrykSupplierStrictForNccLog } = require("@/utils/orderHelpers");
 const { normalizeMoney } = require("../../../../../webhook/sepay/utils");
 
 const orderCols = ORDERS_SCHEMA.ORDER_LIST.COLS;

@@ -1,6 +1,6 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
-const { TABLE, COLS, MAIL_BACKUP_TABLE, MB_COLS, trimStr } = require("./shared");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { TABLE, COLS, MAIL_BACKUP_TABLE, MB_COLS, trimStr } = require("@/domains/renew-adobe/controller/accounts/shared");
 
 const listMailBackupMailboxes = async (req, res) => {
   if (!MAIL_BACKUP_TABLE || !MB_COLS.ID) {

@@ -1,35 +1,35 @@
-const logger = require("../../utils/logger");
-const { db } = require("../../db");
+const logger = require("@/utils/logger");
+const { db } = require("@/db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   SCHEMA_ORDERS,
   ORDERS_SCHEMA,
   tableName,
-} = require("../../config/dbSchema");
-const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
-const { STATUS } = require("../../utils/statuses");
+} = require("@/config/dbSchema");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
+const { STATUS } = require("@/utils/statuses");
 const {
   recordUsersAssigned,
   syncOrdersToMapping,
   getMappingCountsByAdobeAccountIds,
-} = require("../../services/userAccountMappingService");
+} = require("@/services/userAccountMappingService");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
-} = require("../../services/renew-adobe/orderUserTrackingService");
-const { notifyWarn } = require("../../domains/notifications/telegram").systemNotifier;
+} = require("@/services/renew-adobe/orderUserTrackingService");
+const { notifyWarn } = require("@/domains/notifications/telegram").systemNotifier;
 const {
   startJobRun,
   setCounter,
   addCounter,
   finishJobRun,
-} = require("./shared/jobRunLogger");
+} = require("@/scheduler/tasks/shared/jobRunLogger");
 const {
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
   resolveAccountUserLimit,
   userCountDbValue,
-} = require("../../domains/renew-adobe/controller/usersSnapshotUtils");
+} = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 const ACCOUNT_TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const ACCOUNT_TABLE = tableName(ACCOUNT_TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
@@ -269,7 +269,7 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
 async function runRenewAdobePostCheckFlow({ trigger = "cron" } = {}) {
   const {
     ensureAdminAccountsExist,
-  } = require("./shared/adminAccountsGuard");
+  } = require("@/scheduler/tasks/shared/adminAccountsGuard");
   if (
     !(await ensureAdminAccountsExist({
       taskName: "runRenewAdobePostCheckFlow",

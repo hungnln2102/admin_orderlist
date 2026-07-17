@@ -10,8 +10,8 @@
  * Token short-lived (Ades cấp ~ vài giây/phút) → mặc định không cache.
  */
 
-const logger = require("../../utils/logger");
-const { assertValidEmail } = require("../../domains/renew-adobe/helpers/email");
+const logger = require("@/utils/logger");
+const { assertValidEmail } = require("@/domains/renew-adobe/helpers/email");
 
 const DEFAULT_BASE_URL = "https://api-2026-02.ades.support/ades-support";
 const DEFAULT_ORIGIN = "https://var.ctv.ac";

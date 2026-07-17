@@ -1,4 +1,4 @@
-const { SUFFIX_MAX } = require("../constants");
+const { SUFFIX_MAX } = require("@/domains/payment-slots/constants");
 
 /** Giá đã cộng suffix thanh toán (base + 1..100). */
 function hasPaymentSuffix(price, basePrice) {

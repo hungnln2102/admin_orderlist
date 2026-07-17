@@ -1,10 +1,10 @@
-const { body, validate } = require("../../../middleware/validateRequest");
+const { body, validate } = require("@/middleware/validateRequest");
 const {
   normalizeAccountNumber,
   normalizeBankBin,
   normalizeBoolean,
   normalizeOptionalText,
-} = require("../helpers/shopBankInputs");
+} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
 
 const createShopBankAccountRules = [
   body("accountNumber")

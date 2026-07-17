@@ -1,8 +1,8 @@
-const { STATUS: ORDER_STATUS } = require("../../../../src/utils/statuses");
+const { STATUS: ORDER_STATUS } = require("@/utils/statuses");
 const { getOrderQrPaymentEligibility } = require("../../orderPaymentEligibility");
-const { isMavnImportOrder } = require("../../../../src/utils/orderHelpers");
+const { isMavnImportOrder } = require("@/utils/orderHelpers");
 const { queueRenewalTask, processRenewalTask } = require("../../renewal");
-const logger = require("../../../../src/utils/logger");
+const logger = require("@/utils/logger");
 const {
   getAccumulatedReceiptAmount,
   resolveOrderPriceForWebhookMatch,

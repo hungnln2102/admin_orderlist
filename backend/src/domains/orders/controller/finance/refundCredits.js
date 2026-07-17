@@ -11,10 +11,10 @@ const {
     RECEIPT_SCHEMA,
     SCHEMA_RECEIPT,
     tableName,
-} = require("../../../../config/dbSchema");
+} = require("@/config/dbSchema");
 const {
     normalizeNonNegativeIntegerVndAmount,
-} = require("../../../../shared/money/normalizers");
+} = require("@/shared/money/normalizers");
 
 const R = RECEIPT_SCHEMA.REFUND_CREDIT_NOTES.COLS;
 const A = RECEIPT_SCHEMA.REFUND_CREDIT_APPLICATIONS.COLS;

@@ -1,25 +1,25 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   SHOP_BANK_ACCOUNTS_DEF,
   findShopBankAccountById,
   TABLE,
   selectColumns,
   columns,
-} = require("../repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   debitShopBankWithdraw,
   SOURCE_KINDS,
-} = require("../services/shopBankLedgerService");
-const { createHttpError } = require("../validators/shopBankAccountValidator");
-const { validateWithdrawPayload } = require("../validators/shopBankWithdrawnValidator");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { createHttpError } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
+const { validateWithdrawPayload } = require("@/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
 const {
   normalizeOptionalText,
   normalizeRoundedMoney,
-} = require("../helpers/shopBankInputs");
+} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
 const {
   TABLE: EXPENSE_TABLE,
   COLS: EXPENSE_COLS,
-} = require("../../store-profit-expenses/controller/shared");
+} = require("@/domains/store-profit-expenses/controller/shared");
 
 
 const recordShopBankAccountWithdrawal = async (id, payload) => {

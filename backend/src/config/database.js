@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
-const { loadBackendEnv } = require("./loadEnv");
-const { getPostgresConnectionUrl } = require("./postgresConnectionUrl");
+const { loadBackendEnv } = require("@/config/loadEnv");
+const { getPostgresConnectionUrl } = require("@/config/postgresConnectionUrl");
 
 loadBackendEnv();
 

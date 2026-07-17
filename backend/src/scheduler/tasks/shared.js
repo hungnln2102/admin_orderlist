@@ -1,6 +1,6 @@
-const { normalizeOrderRow } = require("../../domains/orders/controller/helpers");
-const { STATUS } = require("../../utils/statuses");
-const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
+const { normalizeOrderRow } = require("@/domains/orders/controller/helpers");
+const { STATUS } = require("@/utils/statuses");
+const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("@/scheduler/sqlHelpers");
 
 /**
  * SELECT renewal candidates: same columns and filters as notify tasks, parameterized by days left.

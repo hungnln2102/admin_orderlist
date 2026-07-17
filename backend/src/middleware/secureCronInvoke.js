@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const logger = require("../utils/logger");
+const logger = require("@/utils/logger");
 
 /**
  * Bảo vệ gọi job nội bộ (cron) bằng `CRON_INVOKE_SECRET` — thân `GET` công khai

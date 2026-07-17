@@ -1,4 +1,4 @@
-const { redisClient, isRedisAvailable } = require("../config/redisClient");
+const { redisClient, isRedisAvailable } = require("@/config/redisClient");
 
 /**
  * BullMQ requires an ioredis instance with maxRetriesPerRequest: null.

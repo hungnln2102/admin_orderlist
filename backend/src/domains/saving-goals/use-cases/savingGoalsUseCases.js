@@ -1,5 +1,5 @@
-const { db, withTransaction } = require("../../../db");
-const repository = require("../repositories/savingGoalsRepository");
+const { db, withTransaction } = require("@/db");
+const repository = require("@/domains/saving-goals/repositories/savingGoalsRepository");
 
 const toUserError = (statusCode, userMessage) => {
   const error = new Error(userMessage);

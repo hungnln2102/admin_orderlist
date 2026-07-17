@@ -5,7 +5,7 @@ const {
   PRODUCT_SCHEMA,
   SCHEMA_PRODUCT,
   getDefinition,
-} = require("../../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const PRODUCT_DESC_DEF = PRODUCT_SCHEMA.PRODUCT_DESC;
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);

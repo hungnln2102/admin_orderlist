@@ -1,17 +1,17 @@
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 // Removed direct telegram require
 
-const { todayYMDInVietnam } = require("../../utils/normalizers");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
 const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
-const { fetchVariantDisplayNames } = require("../variantDisplayNames");
-const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
-const { buildRenewalQuery, normalizeNotifyRow } = require("./shared");
-const { resolveRenewalNotifyPrice } = require("./shared/resolveRenewalNotifyPrice");
+const { fetchVariantDisplayNames } = require("@/scheduler/variantDisplayNames");
+const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
+const { buildRenewalQuery, normalizeNotifyRow } = require("@/scheduler/tasks/shared");
+const { resolveRenewalNotifyPrice } = require("@/scheduler/tasks/shared/resolveRenewalNotifyPrice");
 const {
   claimDailyNotificationRun,
   releaseDailyNotificationRun,
   claimOrderOnceNotification,
-} = require("./shared/dailyNotificationGuard");
+} = require("@/scheduler/tasks/shared/dailyNotificationGuard");
 
 const ADVISORY_LOCK_KEY_1 = 90101;
 const ADVISORY_LOCK_KEY_2 = 4;
@@ -149,7 +149,7 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
           }
           if (pending.length > 0) {
             try {
-              const { eventBus, EVENTS } = require("../../../events");
+              const { eventBus, EVENTS } = require("@/events");
               eventBus.emit(EVENTS.DAILY_FOUR_DAYS_DUE, pending.map((p) => p.order));
             } catch (sendErr) {
               for (const p of pending) {

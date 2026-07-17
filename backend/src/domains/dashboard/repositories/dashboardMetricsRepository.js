@@ -5,7 +5,7 @@ const {
   fetchDashboardMonthlySummary: fetchDashboardMonthlySummaryLegacy,
   fetchDashboardChartsFromSummary: fetchDashboardChartsFromSummaryLegacy,
   fetchDashboardChartsForDateRange: fetchDashboardChartsForDateRangeLegacy,
-} = require("../../../controllers/DashboardController/service");
+} = require("@/controllers/DashboardController/service");
 
 const fetchDashboardStats = () => fetchDashboardStatsLegacy();
 

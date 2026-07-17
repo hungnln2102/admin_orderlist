@@ -1,15 +1,15 @@
 const {
   createProductPrice,
-} = require("./mutations/createProductPrice");
+} = require("@/domains/products/controller/handlers/mutations/createProductPrice");
 const {
   updateProductPrice,
-} = require("./mutations/updateProductPrice");
+} = require("@/domains/products/controller/handlers/mutations/updateProductPrice");
 const {
   toggleProductPriceStatus,
-} = require("./mutations/toggleProductPriceStatus");
+} = require("@/domains/products/controller/handlers/mutations/toggleProductPriceStatus");
 const {
   deleteProductPrice,
-} = require("./mutations/deleteProductPrice");
+} = require("@/domains/products/controller/handlers/mutations/deleteProductPrice");
 
 module.exports = {
   createProductPrice,

@@ -1,7 +1,7 @@
 const {
   buildOffFlowCreditCode,
   CREDIT_SOURCE_KIND,
-} = require("../../../src/domains/orders/controller/finance/offFlowRefundCredits");
+} = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 
 describe("offFlowRefundCredits", () => {
   test("buildOffFlowCreditCode is stable per receipt", () => {

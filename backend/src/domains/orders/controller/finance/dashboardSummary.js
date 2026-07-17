@@ -2,16 +2,16 @@ const {
     FINANCE_SCHEMA,
     SCHEMA_FINANCE,
     tableName,
-} = require("../../../../config/dbSchema");
-const { STATUS, COLS } = require("../constants");
-const { toNullableNumber, todayYMDInVietnam } = require("../../../../utils/normalizers");
-const { quoteIdent } = require("../../../../utils/sql");
+} = require("@/config/dbSchema");
+const { STATUS, COLS } = require("@/domains/orders/controller/constants");
+const { toNullableNumber, todayYMDInVietnam } = require("@/utils/normalizers");
+const { quoteIdent } = require("@/utils/sql");
 const {
     isDashboardSalesOrder,
-} = require("../../../../utils/orderHelpers");
-const { dashboardMonthlyTaxRatePercent } = require("../../../../config/appConfig");
-const { addDailyRevenueReversed } = require("./dailyRevenueSummaryAdjustments");
-const { notifyFinanceMonthlyDelta } = require("../../../../services/telegramFinanceDeltaNotifier");
+} = require("@/utils/orderHelpers");
+const { dashboardMonthlyTaxRatePercent } = require("@/config/appConfig");
+const { addDailyRevenueReversed } = require("@/domains/orders/controller/finance/dailyRevenueSummaryAdjustments");
+const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
@@ -301,7 +301,7 @@ const updateDashboardMonthlySummaryOnStatusChange = async (
         isRefundCounted(nextStatus) &&
         refundMonthKey
     ) {
-        const { applyPendingRefundProfitMinusCustomerOverNcc } = require("./pendingRefundDashboardProfitFallback");
+        const { applyPendingRefundProfitMinusCustomerOverNcc } = require("@/domains/orders/controller/finance/pendingRefundDashboardProfitFallback");
         refundProfitDelta = await applyPendingRefundProfitMinusCustomerOverNcc(
             trx,
             beforeRow,

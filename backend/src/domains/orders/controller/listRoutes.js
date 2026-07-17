@@ -1,7 +1,7 @@
-const { todayYMDInVietnam } = require("../../../utils/normalizers");
-const { normalizeOrderRow } = require("./helpers");
-const { buildOrdersListQuery } = require("./queries/listOrders");
-const logger = require("../../../utils/logger");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const { normalizeOrderRow } = require("@/domains/orders/controller/helpers");
+const { buildOrdersListQuery } = require("@/domains/orders/controller/queries/listOrders");
+const logger = require("@/utils/logger");
 
 const TAX_ORDER_START_DATE = "2026-04-22";
 

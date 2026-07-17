@@ -1,15 +1,15 @@
 const {
   getMappingCountsByAdobeAccountIds,
-} = require("../../../../services/userAccountMappingService");
-const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("../accountTable");
+} = require("@/services/userAccountMappingService");
+const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("@/domains/renew-adobe/controller/accountTable");
 const {
   ACTIVE_LICENSE_STATUSES,
   normalizeLicenseStatus,
-} = require("../statusUtils");
+} = require("@/domains/renew-adobe/controller/statusUtils");
 const {
   resolveAccountUserLimit,
   resolveAccountSeatLimit,
-} = require("../usersSnapshotUtils");
+} = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 function hasActivePackageByContractCount(account) {
   const n = Number(resolveAccountSeatLimit(account) || 0);

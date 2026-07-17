@@ -6,10 +6,10 @@
  *
  * Hoặc PowerShell: $env:DEV_ADMIN_PASSWORD='matkhau'; node scripts/ops/seed-dev-admin.js
  */
-require("../../src/config/loadEnv").loadBackendEnv();
+require("@/config/loadEnv").loadBackendEnv();
 const bcrypt = require("bcryptjs");
 const knex = require("knex");
-const { getPostgresConnectionUrl } = require("../../src/config/postgresConnectionUrl");
+const { getPostgresConnectionUrl } = require("@/config/postgresConnectionUrl");
 
 const username = (process.env.DEV_ADMIN_USERNAME || "mavryk").trim().toLowerCase();
 const password = process.env.DEV_ADMIN_PASSWORD;

@@ -1,5 +1,5 @@
 const express = require("express");
-const { forward } = require("./controller");
+const { forward } = require("@/domains/ninerouter/controller");
 
 const router = express.Router();
 

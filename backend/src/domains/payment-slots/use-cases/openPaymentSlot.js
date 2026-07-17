@@ -13,13 +13,13 @@
 const {
   SLOT_KIND,
   MAX_SUFFIX_ATTEMPTS,
-} = require("../constants");
-const repo = require("../repositories/paymentSlotRepository");
+} = require("@/domains/payment-slots/constants");
+const repo = require("@/domains/payment-slots/repositories/paymentSlotRepository");
 const {
   normalizeAccount,
   normalizeExactAmount,
-} = require("../helpers/paymentSlotInputs");
-const logger = require("../../../utils/logger");
+} = require("@/domains/payment-slots/helpers/paymentSlotInputs");
+const logger = require("@/utils/logger");
 
 const VALID_KINDS = new Set([SLOT_KIND.NEW, SLOT_KIND.RENEWAL]);
 

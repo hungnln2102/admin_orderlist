@@ -1,11 +1,11 @@
-const { db } = require("../../../db");
-const { PARTNER_SCHEMA } = require("../../../config/dbSchema");
-const { getNextSupplyId } = require("../../../services/idService");
-const { normalizeTextInput } = require("../../../utils/normalizers");
+const { db } = require("@/db");
+const { PARTNER_SCHEMA } = require("@/config/dbSchema");
+const { getNextSupplyId } = require("@/services/idService");
+const { normalizeTextInput } = require("@/utils/normalizers");
 const {
   resolveSupplierNameColumn,
   resolveSupplierTableName,
-} = require("../controller/helpers");
+} = require("@/domains/supplies/controller/helpers");
 
 const getQuery = (trxOrDb) => trxOrDb || db;
 

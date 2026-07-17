@@ -1,6 +1,6 @@
-const { db } = require("../../../db");
-const { TABLE, COLS } = require("./accountTable");
-const { resolveLisenceCount, userCountDbValue } = require("./usersSnapshotUtils");
+const { db } = require("@/db");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/accountTable");
+const { resolveLisenceCount, userCountDbValue } = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 function buildCheckUpdatePayload({ scrapedData = {}, savedCookies = null } = {}) {
   let licenseForUserCount = resolveLisenceCount({

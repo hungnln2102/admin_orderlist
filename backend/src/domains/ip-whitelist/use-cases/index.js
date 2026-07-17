@@ -6,13 +6,13 @@ const {
   createIpWhitelist,
   updateIpWhitelist,
   deleteIpWhitelist,
-} = require("../repositories/ipWhitelistRepository");
+} = require("@/domains/ip-whitelist/repositories/ipWhitelistRepository");
 const {
   createHttpError,
   validateCreatePayload,
   validateUpdatePayload,
   validateDeletePayload,
-} = require("../validators/ipWhitelistValidator");
+} = require("@/domains/ip-whitelist/validators/ipWhitelistValidator");
 
 const ensureDefinition = () => {
   if (!IP_WHITELISTS_DEF) {

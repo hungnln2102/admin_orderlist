@@ -1,27 +1,27 @@
 const express = require("express");
 const router = express.Router();
 
-const { getSupplyInsights } = require("./handlers/insights");
+const { getSupplyInsights } = require("@/domains/supplies/controller/handlers/insights");
 const {
   listSupplies,
   getProductsBySupply,
   listPaymentsBySupply,
   listSupplyOrderCosts,
-} = require("./handlers/list");
-const { createPayment, updatePaymentImport } = require("./handlers/payments");
+} = require("@/domains/supplies/controller/handlers/list");
+const { createPayment, updatePaymentImport } = require("@/domains/supplies/controller/handlers/payments");
 const {
   createSupply,
   updateSupply,
   toggleSupplyActive,
   deleteSupply,
-} = require("./handlers/mutations");
-const { getSupplyOverview } = require("./handlers/overview");
+} = require("@/domains/supplies/controller/handlers/mutations");
+const { getSupplyOverview } = require("@/domains/supplies/controller/handlers/overview");
 const {
   supplyIdParam,
   createSupplyRules,
   createPaymentRules,
   updatePaymentRules,
-} = require("../validators/supplyValidator");
+} = require("@/domains/supplies/validators/supplyValidator");
 
 router.get("/insights", getSupplyInsights);
 

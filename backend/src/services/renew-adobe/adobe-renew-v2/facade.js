@@ -4,28 +4,28 @@
  */
 
 const { chromium } = require("playwright");
-const logger = require("../../../utils/logger");
-const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
-const { runCheckFlow } = require("./runCheckFlow");
+const logger = require("@/utils/logger");
+const { getPlaywrightProxyOptions } = require("@/services/renew-adobe/adobe-renew-v2/shared/proxyConfig");
+const { runCheckFlow } = require("@/services/renew-adobe/adobe-renew-v2/runCheckFlow");
 const {
   launchSessionFromProfile,
   hasExistingProfileForEmail,
-} = require("./shared/profileSession");
-const { recordProfileUsage } = require("./shared/profileUsageMetrics");
-const { getOrCreateAutoAssignUrlWithPage } = require("./autoAssignFlow");
-const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
-const { deleteUsersV2 } = require("./deleteUsersV2");
-const { addUsersWithProductV2 } = require("./addUsersWithProductV2");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
+const { recordProfileUsage } = require("@/services/renew-adobe/adobe-renew-v2/shared/profileUsageMetrics");
+const { getOrCreateAutoAssignUrlWithPage } = require("@/services/renew-adobe/adobe-renew-v2/autoAssignFlow");
+const { runB15RemoveProductFromAdmin } = require("@/services/renew-adobe/adobe-renew-v2/removeProductAdminFlow");
+const { deleteUsersV2 } = require("@/services/renew-adobe/adobe-renew-v2/deleteUsersV2");
+const { addUsersWithProductV2 } = require("@/services/renew-adobe/adobe-renew-v2/addUsersWithProductV2");
 const {
   applyAdobeProFlags,
   checkUserAssignedProduct,
-} = require("./shared/usersListApi");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 const {
   discoverAdobeProProductIdSet,
   computeCcpProductIdsToPersist,
   parseCcpProductIdsFromAlertConfig,
-} = require("./shared/accessChecks");
-const { mergeRenewAdobeAlertConfig } = require("../../../domains/renew-adobe/controller/usersSnapshotUtils");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+const { mergeRenewAdobeAlertConfig } = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 /**
  * Chuẩn hóa savedCookiesFromDb từ DB.

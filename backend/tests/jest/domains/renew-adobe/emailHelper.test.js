@@ -1,7 +1,7 @@
 const {
   assertValidEmail,
   normalizeEmail,
-} = require("../../../../src/domains/renew-adobe/helpers/email");
+} = require("@/domains/renew-adobe/helpers/email");
 
 describe("renew-adobe email helper", () => {
   test("normalizes email by trimming and lowercasing", () => {

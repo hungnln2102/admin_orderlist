@@ -1,12 +1,12 @@
-const eventBus = require('./eventBus');
-const EVENTS = require('./eventTypes');
-const logger = require('../utils/logger');
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
+const logger = require("@/utils/logger");
 
 // Import your subscribers here when they are created
-const { registerTelegramSubscribers } = require('./subscribers/telegramSubscriber');
-const { registerSepaySubscribers } = require('./subscribers/sepaySubscriber');
-const { registerFinancialMetricsSubscribers } = require('./subscribers/financialMetricsSubscriber');
-const { registerWarehouseSubscribers } = require('./subscribers/warehouseSubscriber');
+const { registerTelegramSubscribers } = require("@/events/subscribers/telegramSubscriber");
+const { registerSepaySubscribers } = require("@/events/subscribers/sepaySubscriber");
+const { registerFinancialMetricsSubscribers } = require("@/events/subscribers/financialMetricsSubscriber");
+const { registerWarehouseSubscribers } = require("@/events/subscribers/warehouseSubscriber");
 
 function registerAllSubscribers() {
   logger.info('[EventBus] Registering all subscribers...');

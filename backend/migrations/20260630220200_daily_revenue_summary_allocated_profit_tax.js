@@ -3,7 +3,7 @@
  * @see database/migrations/095_daily_revenue_summary_allocated_profit_tax.sql
  */
 
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

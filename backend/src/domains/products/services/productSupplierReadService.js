@@ -1,13 +1,13 @@
-const { db } = require("../../../db");
-const { quoteIdent } = require("../../../utils/sql");
-const { isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
+const { isMavrykShopSupplierName } = require("@/utils/orderHelpers");
 const {
   resolveSupplierNameColumn,
   resolveSupplierTableName,
-} = require("../../supplies/controller/helpers");
-const { findProductIdByName } = require("./productLookupService");
-const { mapSupplyPriceRow } = require("../controller/mappers");
-const { supplyPriceCols, TABLES } = require("../controller/constants");
+} = require("@/domains/supplies/controller/helpers");
+const { findProductIdByName } = require("@/domains/products/services/productLookupService");
+const { mapSupplyPriceRow } = require("@/domains/products/controller/mappers");
+const { supplyPriceCols, TABLES } = require("@/domains/products/controller/constants");
 
 const resolveCandidateVariantIds = async (productName) => {
   const ids = await findProductIdByName(productName);

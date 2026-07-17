@@ -1,7 +1,7 @@
 /**
  * Cột total_tax: round(total_revenue * DASHBOARD_MONTHLY_TAX_RATE_PERCENT / 100), khớp appConfig.
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

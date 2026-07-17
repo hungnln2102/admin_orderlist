@@ -6,9 +6,9 @@ const {
   renewAdobeCheckAndNotifyTask,
   cleanupAdobeProfileGarbageTask,
   syncDailyRevenueSummaryTask,
-} = require("../../../scheduler/taskInstances");
-const logger = require("../../../utils/logger");
-const { syncOrdersToMapping } = require("../../../services/userAccountMappingService");
+} = require("@/scheduler/taskInstances");
+const logger = require("@/utils/logger");
+const { syncOrdersToMapping } = require("@/services/userAccountMappingService");
 
 const runSchedulerNow = async (_req, res) => {
   try {

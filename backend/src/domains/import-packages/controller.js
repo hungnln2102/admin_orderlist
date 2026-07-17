@@ -5,9 +5,9 @@ const {
   getRuleByProductId,
   upsertRule,
   deleteRule,
-} = require("./service");
-const { toNullableNumber } = require("../../utils/normalizers");
-const logger = require("../../utils/logger");
+} = require("@/domains/import-packages/service");
+const { toNullableNumber } = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
 
 // POST /api/import-packages
 const handleCreate = async (req, res) => {

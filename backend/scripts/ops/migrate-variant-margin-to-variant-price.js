@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
-const { loadBackendEnv } = require("../../src/config/loadEnv");
-const { roundGiaBanValue } = require("../../src/utils/orderHelpers");
+const { loadBackendEnv } = require("@/config/loadEnv");
+const { roundGiaBanValue } = require("@/utils/orderHelpers");
 
 loadBackendEnv();
 

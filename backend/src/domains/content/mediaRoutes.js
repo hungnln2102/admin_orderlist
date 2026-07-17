@@ -3,8 +3,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const logger = require("../../utils/logger");
-const { compressArticleImageToWebp } = require("../../utils/articleImageCompress");
+const logger = require("@/utils/logger");
+const { compressArticleImageToWebp } = require("@/utils/articleImageCompress");
 
 const router = express.Router();
 

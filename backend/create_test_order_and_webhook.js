@@ -1,4 +1,4 @@
-const knex = require('./src/db/knexClient');
+const knex = require("@/db/knexClient");
 const axios = require('axios');
 const { SEPAY_API_KEY } = require('./webhook/sepay/config');
 

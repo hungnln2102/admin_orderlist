@@ -5,8 +5,8 @@ const {
   SCHEMA_ORDERS,
   SCHEMA_RECEIPT,
   getDefinition,
-} = require("../../config/dbSchema");
-const { createYearExtraction } = require("../../utils/sql");
+} = require("@/config/dbSchema");
+const { createYearExtraction } = require("@/utils/sql");
 
 const ORDER_DEF = ORDERS_SCHEMA.ORDER_LIST;
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);

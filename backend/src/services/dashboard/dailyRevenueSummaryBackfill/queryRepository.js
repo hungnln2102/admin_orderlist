@@ -5,9 +5,9 @@ const {
   PARTNER_SCHEMA,
   SCHEMA_SUPPLIER,
   tableName,
-} = require("../../../config/dbSchema");
-const { STATUS } = require("../../../utils/statuses");
-const { buildBackfillSql } = require("./sqlBuilder");
+} = require("@/config/dbSchema");
+const { STATUS } = require("@/utils/statuses");
+const { buildBackfillSql } = require("@/services/dashboard/dailyRevenueSummaryBackfill/sqlBuilder");
 
 function buildDailyRevenueSummaryBackfillQuery({
   from,

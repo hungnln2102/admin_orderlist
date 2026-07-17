@@ -8,10 +8,10 @@
  *   npm run sync:daily-revenue-summary -- --from=2026-04-22 --to=2026-05-02
  */
 
-const { db } = require("../../src/db");
+const { db } = require("@/db");
 const {
   runDailyRevenueSummaryBackfill,
-} = require("../../src/services/dashboard/dailyRevenueSummaryBackfill");
+} = require("@/services/dashboard/dailyRevenueSummaryBackfill");
 
 function parseArgs(argv) {
   let from = null;

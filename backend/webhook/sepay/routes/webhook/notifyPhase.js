@@ -2,8 +2,8 @@ const { normalizeMoney } = require("../../utils");
 const { fetchMonthlySummarySnapshot } = require("../../renewal");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../../src/services/telegramFinanceDeltaNotifier");
-const logger = require("../../../../src/utils/logger");
+} = require("@/services/telegramFinanceDeltaNotifier");
+const logger = require("@/utils/logger");
 
 async function notifyCombinedMonthlyDelta({
   client,

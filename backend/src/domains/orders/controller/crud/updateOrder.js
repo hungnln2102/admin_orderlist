@@ -1,18 +1,18 @@
-const { db } = require("../../../../db");
-const { TABLES, STATUS } = require("../constants");
+const { db } = require("@/db");
+const { TABLES, STATUS } = require("@/domains/orders/controller/constants");
 const {
     normalizeOrderRow,
     sanitizeOrderWritePayload,
     normalizeTextInput,
-} = require("../helpers");
-const { todayYMDInVietnam } = require("../../../../utils/normalizers");
-const { updateOrderWithFinance } = require("../../use-cases/updateOrder");
-const logger = require("../../../../utils/logger");
-const { orderIdParam } = require("../../validators/orderValidator");
-const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
-const { ensureSupplierRecord } = require("../../../supplies/services/supplierLookupService");
-const eventBus = require("../../../../events/eventBus");
-const EVENTS = require("../../../../events/eventTypes");
+} = require("@/domains/orders/controller/helpers");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const { updateOrderWithFinance } = require("@/domains/orders/use-cases/updateOrder");
+const logger = require("@/utils/logger");
+const { orderIdParam } = require("@/domains/orders/validators/orderValidator");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
+const { ensureSupplierRecord } = require("@/domains/supplies/services/supplierLookupService");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
 
 const AUDIT_FIELD_LABELS = {
     customer: "Khách hàng",

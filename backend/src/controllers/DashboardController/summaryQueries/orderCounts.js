@@ -5,7 +5,7 @@ const {
   quoteIdent,
   orderCountedSql,
   makeBirthDateExpr,
-} = require("./constants");
+} = require("@/controllers/DashboardController/summaryQueries/constants");
 
 /** Đếm đơn theo mốc birth trong [from, to] (cùng tập status «đang trong sổ bán»). */
 const buildOrderCountBirthInRangeQuery = (options = {}) => {

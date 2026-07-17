@@ -1,10 +1,10 @@
 const sepayWebhookApp = require("../../../../webhook/sepay_webhook");
-const { db } = require("../../../db");
-const { TABLES, STATUS } = require("./constants");
-const logger = require("../../../utils/logger");
-const { orderCodeParam, orderIdParam } = require("../validators/orderValidator");
-const { voidOpenRefundCreditNotesForSourceOrder } = require("./finance/refundCredits");
-const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+const { db } = require("@/db");
+const { TABLES, STATUS } = require("@/domains/orders/controller/constants");
+const logger = require("@/utils/logger");
+const { orderCodeParam, orderIdParam } = require("@/domains/orders/validators/orderValidator");
+const { voidOpenRefundCreditNotesForSourceOrder } = require("@/domains/orders/controller/finance/refundCredits");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const attachRenewRoutes = (router) => {
     router.post("/:orderCode/renew", ...orderCodeParam, async(req, res) => {
@@ -45,7 +45,7 @@ const attachRenewRoutes = (router) => {
     router.patch("/canceled/:id/refund", ...orderIdParam, async(req, res) => {
         const id = Number(req.params.id);
 
-        const { ORDERS_SCHEMA } = require("../../../config/dbSchema");
+        const { ORDERS_SCHEMA } = require("@/config/dbSchema");
         const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
         const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
         const informationOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.INFORMATION_ORDER;

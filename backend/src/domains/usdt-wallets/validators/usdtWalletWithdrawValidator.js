@@ -1,4 +1,4 @@
-const { createHttpError } = require("./usdtWalletValidator");
+const { createHttpError } = require("@/domains/usdt-wallets/validators/usdtWalletValidator");
 
 const validateWithdrawPayload = (id, payload) => {
   const normalizedId = Number(id);

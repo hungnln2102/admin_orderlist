@@ -1,4 +1,4 @@
-const { db } = require("../../../../db");
+const { db } = require("@/db");
 const {
   TABLES,
   STATUS,
@@ -7,17 +7,17 @@ const {
   variantCols,
   supplyPriceCols,
   supplyCols,
-} = require("../constants");
+} = require("@/domains/supplies/controller/constants");
 const {
   createDateNormalization,
   createSourceKey,
   createNumericExtraction,
   quoteIdent,
-} = require("../../../../utils/sql");
-const { normalizeSupplyStatus, formatDateOutput } = require("../../../../utils/normalizers");
-const { resolveSupplyStatusColumn } = require("../helpers");
-const logger = require("../../../../utils/logger");
-const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
+} = require("@/utils/sql");
+const { normalizeSupplyStatus, formatDateOutput } = require("@/utils/normalizers");
+const { resolveSupplyStatusColumn } = require("@/domains/supplies/controller/helpers");
+const logger = require("@/utils/logger");
+const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 
 const SUPPLIER_COST_TABLE = TABLES.supplyPrice;
 let supplierTableNameCache = null;

@@ -1,16 +1,16 @@
-const { db } = require("../../../../db");
-const { QUOTED_COLS, TABLES } = require("../constants");
-const { normalizeSupplyStatus } = require("../../../../utils/normalizers");
+const { db } = require("@/db");
+const { QUOTED_COLS, TABLES } = require("@/domains/supplies/controller/constants");
+const { normalizeSupplyStatus } = require("@/utils/normalizers");
 const {
   resolveSupplyStatusColumn,
   parseSupplyId,
   resolveSupplierTableName,
   resolveSupplierNameColumn,
-} = require("../helpers");
-const logger = require("../../../../utils/logger");
-const { quoteIdent } = require("../../../../utils/sql");
-const { supplierCache } = require("../../../../utils/cache");
-const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
+} = require("@/domains/supplies/controller/helpers");
+const logger = require("@/utils/logger");
+const { quoteIdent } = require("@/utils/sql");
+const { supplierCache } = require("@/utils/cache");
+const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 
 const ACCOUNT_HOLDER_MIGRATION_HINT =
   "Chua co cot account_holder. Chay migration: database/migrations/035_supplier_account_holder.sql";

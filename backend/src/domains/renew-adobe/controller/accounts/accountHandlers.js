@@ -1,15 +1,15 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
-const { findAccountMatchByEmail, normalizeEmail } = require("../accountLookup");
-const { removeMappingsForAccount } = require("../../../../services/userAccountMappingService");
-const { normalizeOtpSource } = require("../../../../services/otpProviderService");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const { findAccountMatchByEmail, normalizeEmail } = require("@/domains/renew-adobe/controller/accountLookup");
+const { removeMappingsForAccount } = require("@/services/userAccountMappingService");
+const { normalizeOtpSource } = require("@/services/otpProviderService");
 const {
   removeProfileDirForEmail,
-} = require("../../../../services/renew-adobe/adobe-renew-v2/shared/profileSession");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
 const {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
   getOrderUserTrackingCountsForAdminAccounts,
-} = require("../../../../services/renew-adobe/orderUserTrackingService");
+} = require("@/services/renew-adobe/orderUserTrackingService");
 const {
   TABLE,
   COLS,
@@ -18,7 +18,7 @@ const {
   EMAIL_OK,
   getEmptyFields,
   trimStr,
-} = require("./shared");
+} = require("@/domains/renew-adobe/controller/accounts/shared");
 
 const listAccounts = async (_req, res) => {
   try {

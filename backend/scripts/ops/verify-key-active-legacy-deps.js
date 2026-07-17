@@ -6,7 +6,7 @@
  * Exit 0 nếu không có schema hoặc có thể drop (0 bảng, 0 trigger key_active).
  * Exit 1 nếu còn ràng buộc.
  */
-const { loadBackendEnv } = require("../../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 const { Client } = require("pg");

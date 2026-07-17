@@ -1,6 +1,6 @@
-const eventBus = require('../eventBus');
-const EVENTS = require('../eventTypes');
-const logger = require('../../utils/logger');
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
+const logger = require("@/utils/logger");
 
 const handleWarehouseStockCreated = async (payload) => {
   const { stockId, account, services } = payload;

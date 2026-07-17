@@ -4,8 +4,8 @@
  * @param {number} variantId - ID variant (product)
  * @returns {Promise<boolean>} true nếu có ít nhất một đơn tham chiếu
  */
-const { db } = require("../db");
-const { ORDERS_SCHEMA, tableName, SCHEMA_ORDERS } = require("../config/dbSchema");
+const { db } = require("@/db");
+const { ORDERS_SCHEMA, tableName, SCHEMA_ORDERS } = require("@/config/dbSchema");
 
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
 const orderListTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);

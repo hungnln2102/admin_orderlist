@@ -3,7 +3,7 @@
  * Dùng chung cho mọi file con dưới `mailOtpService/`.
  */
 
-const { IDENTITY_SCHEMA, SCHEMA_MAIL_BACKUP, tableName } = require("../../../config/dbSchema");
+const { IDENTITY_SCHEMA, SCHEMA_MAIL_BACKUP, tableName } = require("@/config/dbSchema");
 
 const MAIL_BACKUP_TABLE =
   IDENTITY_SCHEMA?.MAIL_BACKUP

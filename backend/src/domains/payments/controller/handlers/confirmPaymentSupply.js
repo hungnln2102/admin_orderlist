@@ -1,32 +1,32 @@
-const { withTransaction } = require("../../../../db");
-const { STATUS } = require("../../../../utils/statuses");
-const { QUOTED_COLS } = require("../../../../utils/columns");
-const logger = require("../../../../utils/logger");
+const { withTransaction } = require("@/db");
+const { STATUS } = require("@/utils/statuses");
+const { QUOTED_COLS } = require("@/utils/columns");
+const logger = require("@/utils/logger");
 const {
   TABLES,
   PS,
   SCHEMA_PARTNER,
-} = require("../shared/constants");
-const { createHttpError, toMonthKey } = require("../shared/helpers");
+} = require("@/domains/payments/controller/shared/constants");
+const { createHttpError, toMonthKey } = require("@/domains/payments/controller/shared/helpers");
 const {
   findDefaultActiveAccount,
   findShopBankAccountById,
-} = require("../../../shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   creditShopBankFromPaymentReceipt,
   creditShopBankSupplierRefund,
   debitShopBankSupplierPayment,
   SOURCE_KINDS,
-} = require("../../../shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 const {
   findSupplierRefundReceipt,
-} = require("../helpers/matchSupplierRefundReceipt");
+} = require("@/domains/payments/controller/helpers/matchSupplierRefundReceipt");
 const {
   notifyFinanceMonthlyDelta,
-} = require("../../../../domains/notifications/telegram").financeNotifier;
+} = require("@/domains/notifications/telegram").financeNotifier;
 const {
   creditSupplierRefundToDailyWallet,
-} = require("../../../wallet/repositories/dailyBalanceRepository");
+} = require("@/domains/wallet/repositories/dailyBalanceRepository");
 
 const confirmPaymentSupply = async (req, res) => {
   const { paymentId } = req.params;

@@ -9,8 +9,8 @@
  * 4. deleteEmail() — xóa sau khi dùng
  */
 
-const { listEmails, getEmail, deleteEmail, waitForEmail } = require("./client");
-const logger = require("../../utils/logger");
+const { listEmails, getEmail, deleteEmail, waitForEmail } = require("@/services/tinyhost/client");
+const logger = require("@/utils/logger");
 
 function parseAddress(emailAddress) {
   const trimmed = String(emailAddress || "").trim();

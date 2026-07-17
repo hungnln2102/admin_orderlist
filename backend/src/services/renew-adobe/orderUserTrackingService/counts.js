@@ -1,11 +1,11 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   TRACK_TABLE,
   TRACK_COLS,
   MAP_TABLE,
   MAP_COLS,
-} = require("./tables");
-const { normalizeOrgKeyForTracking } = require("./helpers");
+} = require("@/services/renew-adobe/orderUserTrackingService/tables");
+const { normalizeOrgKeyForTracking } = require("@/services/renew-adobe/orderUserTrackingService/helpers");
 
 async function getOrderUserTrackingCountsForAdminAccounts(
   accountRows,

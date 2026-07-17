@@ -1,8 +1,8 @@
-const { db } = require("../../src/db");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
+const { db } = require("@/db");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
 const {
   buildAlignedMonthlyRows,
-} = require("../../src/controllers/DashboardController/monthlySnapshot");
+} = require("@/controllers/DashboardController/monthlySnapshot");
 
 const summaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,

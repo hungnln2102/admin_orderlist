@@ -1,14 +1,14 @@
-const { db } = require("../../../../db");
-const { TABLES, COLS } = require("../constants");
+const { db } = require("@/db");
+const { TABLES, COLS } = require("@/domains/orders/controller/constants");
 const {
     ORDERS_SCHEMA,
     RECEIPT_SCHEMA,
     PARTNER_SCHEMA,
     PRODUCT_SCHEMA,
-} = require("../../../../config/dbSchema");
-const { STATUS } = require("../../../../utils/statuses");
-const { ORDER_PREFIXES } = require("../../../../utils/orderHelpers");
-const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
+} = require("@/config/dbSchema");
+const { STATUS } = require("@/utils/statuses");
+const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
+const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 
 const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
@@ -34,7 +34,7 @@ const RCN = RECEIPT_SCHEMA.REFUND_CREDIT_NOTES.COLS;
 const RCA = RECEIPT_SCHEMA.REFUND_CREDIT_APPLICATIONS.COLS;
 const {
     WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
-} = require("./webhookReceiptOrderDateWindow");
+} = require("@/domains/orders/controller/queries/webhookReceiptOrderDateWindow");
 
 const buildOrdersListQuery = async (scope = "", options = {}) => {
     const normalizedScope = String(scope || "").toLowerCase();

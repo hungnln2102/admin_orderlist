@@ -6,11 +6,11 @@
  * lock được duy trì đến khi markSlotMatched.
  */
 
-const repo = require("../repositories/paymentSlotRepository");
+const repo = require("@/domains/payment-slots/repositories/paymentSlotRepository");
 const {
   normalizeAccount,
   normalizeExactAmount,
-} = require("../helpers/paymentSlotInputs");
+} = require("@/domains/payment-slots/helpers/paymentSlotInputs");
 
 /**
  * @param {import('pg').PoolClient | import('knex').Knex.Transaction} executor

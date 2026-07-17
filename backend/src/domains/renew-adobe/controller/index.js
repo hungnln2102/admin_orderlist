@@ -7,16 +7,16 @@ const {
   deleteAccount,
   updateUrlAccess,
   updateAccount,
-} = require("./accounts");
+} = require("@/domains/renew-adobe/controller/accounts");
 const {
   runCheckForAccountId,
   runCheck,
   runCheckWithCookies,
-} = require("./checkAccounts");
+} = require("@/domains/renew-adobe/controller/checkAccounts");
 const {
   runAddUsersBatch,
   runAutoDeleteUsers: runAutoDeleteUsersHandler,
-} = require("./batchUsers");
+} = require("@/domains/renew-adobe/controller/batchUsers");
 const {
   adobeQueueStatus,
   checkAllAccounts: checkAllAccountsHandler,
@@ -24,25 +24,25 @@ const {
   runAutoAssign,
   fixSingleUser,
   fixUsersRound,
-} = require("./autoAssign");
+} = require("@/domains/renew-adobe/controller/autoAssign");
 const {
   listVariants,
   listProductSystem,
   createProductSystem,
   deleteProductSystem,
-} = require("./productSystem");
-const { listUserOrders } = require("./userOrders");
+} = require("@/domains/renew-adobe/controller/productSystem");
+const { listUserOrders } = require("@/domains/renew-adobe/controller/userOrders");
 const {
   listMatchableOrders,
   addOrdersToTracking,
   updateTrackingOrder,
   deleteTrackingOrder,
-} = require("./userOrdersAddTracking");
+} = require("@/domains/renew-adobe/controller/userOrdersAddTracking");
 const {
   getWebsiteStatus,
   activateWebsiteUser,
-} = require("./publicWebsite");
-const { listSystemLogs } = require("./systemLogs");
+} = require("@/domains/renew-adobe/controller/publicWebsite");
+const { listSystemLogs } = require("@/domains/renew-adobe/controller/systemLogs");
 
 const runAutoDeleteUsers = (req, res) =>
   runAutoDeleteUsersHandler({

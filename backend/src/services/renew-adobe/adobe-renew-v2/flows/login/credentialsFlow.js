@@ -1,5 +1,5 @@
-const { LOGIN_TIMEOUTS } = require("./loginTimeouts");
-const { detectLoginScreen, runOtpIfPresent } = require("./otpFlow");
+const { LOGIN_TIMEOUTS } = require("@/services/renew-adobe/adobe-renew-v2/flows/login/loginTimeouts");
+const { detectLoginScreen, runOtpIfPresent } = require("@/services/renew-adobe/adobe-renew-v2/flows/login/otpFlow");
 
 const PASSWORD_SELECTORS = ['input[name="password"]', 'input[type="password"]', 'input#password'];
 

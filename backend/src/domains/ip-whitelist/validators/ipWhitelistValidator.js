@@ -1,4 +1,4 @@
-const { body, validate } = require("../../../middleware/validateRequest");
+const { body, validate } = require("@/middleware/validateRequest");
 
 const createIpWhitelistRules = [
   body("ipAddress")

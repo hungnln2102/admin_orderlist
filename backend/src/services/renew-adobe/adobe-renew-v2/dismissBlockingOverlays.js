@@ -3,7 +3,7 @@
  * "intercepts pointer events" khi click sidebar (vd. B15 → /users/administrators).
  */
 
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 
 const MAX_ATTEMPTS = 6;
 const SPECTRUM_MAX = 12;

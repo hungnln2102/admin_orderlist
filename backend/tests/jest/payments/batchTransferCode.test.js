@@ -1,7 +1,7 @@
 const {
   isBatchTransferCodeFormat,
   isLegacyBatchTransferCode,
-} = require("../../../src/domains/payments/controller/shared/batchTransferCode");
+} = require("@/domains/payments/controller/shared/batchTransferCode");
 
 describe("batchTransferCode", () => {
   test("accepts 8-char transfer codes", () => {

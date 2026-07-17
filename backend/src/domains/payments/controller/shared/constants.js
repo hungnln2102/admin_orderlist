@@ -10,8 +10,8 @@ const {
   ORDERS_SCHEMA,
   RECEIPT_SCHEMA,
   tableName,
-} = require("../../../../config/dbSchema");
-const { QUOTED_COLS } = require("../../../../utils/columns");
+} = require("@/config/dbSchema");
+const { QUOTED_COLS } = require("@/utils/columns");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);
 const PAYMENT_RECEIPT_STATE_DEF = getDefinition(

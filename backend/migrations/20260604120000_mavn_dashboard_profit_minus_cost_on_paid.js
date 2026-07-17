@@ -7,7 +7,7 @@
  * tránh kéo chỉ số sang tháng sau.
  * @see fn_recalc_dashboard_total_import (partner.supplier_order_cost_log trigger)
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

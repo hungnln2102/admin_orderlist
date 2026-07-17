@@ -4,8 +4,8 @@ const {
   createIpWhitelist,
   updateIpWhitelist,
   removeIpWhitelist,
-} = require("./controller");
-const { createIpWhitelistRules } = require("./validators/ipWhitelistValidator");
+} = require("@/domains/ip-whitelist/controller");
+const { createIpWhitelistRules } = require("@/domains/ip-whitelist/validators/ipWhitelistValidator");
 
 const router = express.Router();
 

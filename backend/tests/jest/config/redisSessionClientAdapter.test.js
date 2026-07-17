@@ -1,6 +1,6 @@
 const {
   createConnectRedisClientAdapter,
-} = require("../../../src/config/redisSessionClientAdapter");
+} = require("@/config/redisSessionClientAdapter");
 
 describe("redisSessionClientAdapter", () => {
   it("maps node-redis set expiration options to ioredis EX syntax", async () => {

@@ -6,15 +6,15 @@
 const {
   fetchDashboardStats,
   fetchDashboardStatsForDateRange,
-} = require("./service/stats");
+} = require("@/controllers/DashboardController/service/stats");
 const {
   fetchDashboardChartsForDateRange,
   fetchDashboardChartsFromSummary,
-} = require("./service/charts");
+} = require("@/controllers/DashboardController/service/charts");
 const {
   fetchDashboardYears,
   fetchDashboardMonthlySummary,
-} = require("./service/summaryReads");
+} = require("@/controllers/DashboardController/service/summaryReads");
 
 module.exports = {
   fetchDashboardStats,

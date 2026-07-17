@@ -1,15 +1,15 @@
-const logger = require("../../../../utils/logger");
-const { getOrCreateAutoAssignUrlWithPage } = require("../autoAssignFlow");
-const { runB15RemoveProductFromAdmin } = require("../removeProductAdminFlow");
+const logger = require("@/utils/logger");
+const { getOrCreateAutoAssignUrlWithPage } = require("@/services/renew-adobe/adobe-renew-v2/autoAssignFlow");
+const { runB15RemoveProductFromAdmin } = require("@/services/renew-adobe/adobe-renew-v2/removeProductAdminFlow");
 const {
   applyAdobeProFlags,
   checkUserAssignedProduct,
-} = require("../shared/usersListApi");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 const {
   discoverAdobeProProductIdSet,
   computeCcpProductIdsToPersist,
-} = require("../shared/accessChecks");
-const { mergeRenewAdobeAlertConfig } = require("../../../../domains/renew-adobe/controller/usersSnapshotUtils");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+const { mergeRenewAdobeAlertConfig } = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
 
 async function buildCheckAccountResponse({
   result,

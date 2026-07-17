@@ -15,7 +15,7 @@ jest.mock("../../../../src/utils/logger", () => ({
 
 describe("wallet daily balance rules", () => {
   it("keeps the latest previous value per wallet for omitted columns", () => {
-    const { __private } = require("../../../../src/domains/wallet/controller");
+    const { __private } = require("@/domains/wallet/controller");
 
     const latestByWallet = __private.buildLatestBalancesByWallet([
       { wallet_id: 1, amount: "1000", record_date: "2026-04-27" },

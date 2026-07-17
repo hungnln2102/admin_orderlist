@@ -1,6 +1,6 @@
 const express = require("express");
-const { sendOrderCreatedNotification, sendZeroDaysRemainingNotification } = require("../../domains/notifications/telegram").orderNotifier;
-const logger = require("../../utils/logger");
+const { sendOrderCreatedNotification, sendZeroDaysRemainingNotification } = require("@/domains/notifications/telegram").orderNotifier;
+const logger = require("@/utils/logger");
 
 const router = express.Router();
 

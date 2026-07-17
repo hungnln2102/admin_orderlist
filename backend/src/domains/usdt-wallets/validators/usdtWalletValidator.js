@@ -1,9 +1,9 @@
-const { body, validate } = require("../../../middleware/validateRequest");
+const { body, validate } = require("@/middleware/validateRequest");
 const {
   normalizeBoolean,
   normalizeOptionalText,
   normalizeWalletAddress,
-} = require("../helpers/usdtWalletInputs");
+} = require("@/domains/usdt-wallets/helpers/usdtWalletInputs");
 
 const SUPPORTED_NETWORKS = ["TRC20", "ERC20", "BEP20", "SOL", "TON"];
 

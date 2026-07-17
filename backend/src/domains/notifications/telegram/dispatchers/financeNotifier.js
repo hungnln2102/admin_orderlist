@@ -1,5 +1,5 @@
-const { enqueueMessage } = require("../core/telegramClient");
-const { TELEGRAM_FINANCE_TOPIC_ID, SEND_FINANCE_DELTA_NOTIFICATION, TELEGRAM_CHAT_ID } = require("../core/constants");
+const { enqueueMessage } = require("@/domains/notifications/telegram/core/telegramClient");
+const { TELEGRAM_FINANCE_TOPIC_ID, SEND_FINANCE_DELTA_NOTIFICATION, TELEGRAM_CHAT_ID } = require("@/domains/notifications/telegram/core/constants");
 
 /**
  * Gửi thông báo biến động số dư nội bộ

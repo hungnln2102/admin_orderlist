@@ -1,5 +1,5 @@
 /**
- * Barrel — giữ contract module cũ `require("./mailOtpService")`.
+ * Barrel — giữ contract module cũ `require("@/services/mailOtpService/mailOtpService")`.
  *
  * Service đọc mail qua IMAP, lấy OTP từ hộp thư.
  * Độc lập với luồng login Adobe; có thể dùng từ bất kỳ module nào (Adobe check, hoặc API khác).
@@ -10,19 +10,19 @@
  * - `handlers/`    → mỗi file = một capability (fetchOtp, getInboxCount, …).
  */
 
-const { getImapHostFromProvider } = require("./shared/imapClient");
-const { extractOtpFromText } = require("./shared/otpExtractor");
-const { getMailBackupById } = require("./repository/mailBackupRepo");
+const { getImapHostFromProvider } = require("@/services/mailOtpService/shared/imapClient");
+const { extractOtpFromText } = require("@/services/mailOtpService/shared/otpExtractor");
+const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
 const {
   fetchOtpFromEmail,
   fetchOtpFromAdobeEmail,
   hasOtpConfig,
-} = require("./handlers/fetchOtpFromEmail");
-const { getInboxCount } = require("./handlers/getInboxCount");
-const { getConnectionDebug } = require("./handlers/getConnectionDebug");
-const { listRecentEmails } = require("./handlers/listRecentEmails");
-const { fetchLastAdobeEmailRaw } = require("./handlers/fetchLastAdobeEmailRaw");
-const { fetchRecentWithEnvLogin } = require("./handlers/fetchRecentWithEnvLogin");
+} = require("@/services/mailOtpService/handlers/fetchOtpFromEmail");
+const { getInboxCount } = require("@/services/mailOtpService/handlers/getInboxCount");
+const { getConnectionDebug } = require("@/services/mailOtpService/handlers/getConnectionDebug");
+const { listRecentEmails } = require("@/services/mailOtpService/handlers/listRecentEmails");
+const { fetchLastAdobeEmailRaw } = require("@/services/mailOtpService/handlers/fetchLastAdobeEmailRaw");
+const { fetchRecentWithEnvLogin } = require("@/services/mailOtpService/handlers/fetchRecentWithEnvLogin");
 
 module.exports = {
   getImapHostFromProvider,

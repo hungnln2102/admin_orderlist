@@ -11,9 +11,9 @@
  */
 
 const crypto = require("crypto");
-const { db } = require("../db");
-const { TABLES, COLS } = require("../domains/orders/controller/constants");
-const logger = require("../utils/logger");
+const { db } = require("@/db");
+const { TABLES, COLS } = require("@/domains/orders/controller/constants");
+const logger = require("@/utils/logger");
 
 const MAX_RETRIES = 10;
 const VALID_PREFIXES = ["MAVC", "MAVL", "MAVK", "MAVT", "MAVN", "MAVS"];

@@ -1,8 +1,8 @@
-const eventBus = require('./src/events/eventBus');
-const EVENTS = require('./src/events/eventTypes');
-const { registerFinancialMetricsSubscribers } = require('./src/events/subscribers/financialMetricsSubscriber');
-const knex = require('./src/db/knexClient');
-const { pool } = require('./src/config/database');
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
+const { registerFinancialMetricsSubscribers } = require("@/events/subscribers/financialMetricsSubscriber");
+const knex = require("@/db/knexClient");
+const { pool } = require("@/config/database");
 
 async function test() {
   registerFinancialMetricsSubscribers();

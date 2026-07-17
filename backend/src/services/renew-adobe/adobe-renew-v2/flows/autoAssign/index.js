@@ -1,8 +1,8 @@
-require("./contracts");
+require("@/services/renew-adobe/adobe-renew-v2/flows/autoAssign/contracts");
 
 const {
   runCreateOrGetAutoAssignUrlFlow,
-} = require("./createOrGetAutoAssignUrlFlow");
+} = require("@/services/renew-adobe/adobe-renew-v2/flows/autoAssign/createOrGetAutoAssignUrlFlow");
 
 module.exports = {
   runCreateOrGetAutoAssignUrlFlow,

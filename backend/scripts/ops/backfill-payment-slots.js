@@ -14,10 +14,10 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
-const { db } = require("../../src/db");
+const { db } = require("@/db");
 const {
   backfillPendingPaymentSlots,
-} = require("../../src/domains/payment-slots/use-cases/backfillPendingPaymentSlots");
+} = require("@/domains/payment-slots/use-cases/backfillPendingPaymentSlots");
 
 function parseArgs(argv) {
   let dryRun = false;

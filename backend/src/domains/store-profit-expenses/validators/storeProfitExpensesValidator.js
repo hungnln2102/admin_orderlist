@@ -1,4 +1,4 @@
-const { body, param, query, validate } = require("../../../middleware/validateRequest");
+const { body, param, query, validate } = require("@/middleware/validateRequest");
 
 const EXPENSE_TYPES = ["withdraw_profit", "external_import", "mavn_import"];
 const EXPENSE_TYPES_CREATABLE = ["withdraw_profit", "external_import"];

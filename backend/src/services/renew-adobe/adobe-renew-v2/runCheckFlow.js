@@ -3,12 +3,12 @@
  * B1 tại đây; B2–B9 giao loginFlow.js; B10–B13 giao checkInfoFlow.js.
  */
 
-const logger = require("../../../utils/logger");
-const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
-const { FLOW_ERROR_CODES } = require("./shared/errorCodes");
-const { runLoginFlow } = require("./loginFlow");
-const { runB10ToB13 } = require("./checkInfoFlow");
-const { launchSessionFromProfile } = require("./shared/profileSession");
+const logger = require("@/utils/logger");
+const { getPlaywrightProxyOptions } = require("@/services/renew-adobe/adobe-renew-v2/shared/proxyConfig");
+const { FLOW_ERROR_CODES } = require("@/services/renew-adobe/adobe-renew-v2/shared/errorCodes");
+const { runLoginFlow } = require("@/services/renew-adobe/adobe-renew-v2/loginFlow");
+const { runB10ToB13 } = require("@/services/renew-adobe/adobe-renew-v2/checkInfoFlow");
+const { launchSessionFromProfile } = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");
 const {
   DEFAULT_COOKIE_EXPIRY_DAYS,
   gotoAdobeAdminConsoleB1,
@@ -16,7 +16,7 @@ const {
   fromPwCookies,
   buildSuccessResult,
   detectSessionValid,
-} = require("./runCheckFlow.helpers");
+} = require("@/services/renew-adobe/adobe-renew-v2/runCheckFlow.helpers");
 
 function mapRunCheckErrorCode(error) {
   const msg = String(error?.message || "").toLowerCase();

@@ -2,13 +2,13 @@ const {
   PricingHttpError,
   calculateOrderPricing,
   fetchVariantPricing,
-} = require("./orderPricingService");
+} = require("@/services/pricing/orderPricingService");
 const {
   calculateOrderPricingFromResolvedValues,
   deriveVariantMarginsFromCostAndSalePrice,
   resolveTierPrice,
   roundToThousands,
-} = require("./core");
+} = require("@/services/pricing/core");
 
 const toPricingNumber = (value) => {
   if (value === null || value === undefined || value === "") return 0;

@@ -1,11 +1,11 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
   tableName,
-} = require("../../../../config/dbSchema");
-const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("../accountTable");
+} = require("@/config/dbSchema");
+const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("@/domains/renew-adobe/controller/accountTable");
 const MAP_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
   SCHEMA_RENEW_ADOBE
@@ -15,17 +15,17 @@ const {
   buildAvailableAccounts,
   assignUserToAvailableAccount,
   fixUsersAllRoundsTightest,
-} = require("../assignmentService");
+} = require("@/domains/renew-adobe/controller/assignmentService");
 const {
   TBL_ORDER,
   ORD_COLS,
   ALLOWED_ORDER_STATUSES,
   getRenewAdobeVariantIds,
-} = require("../orderAccess");
+} = require("@/domains/renew-adobe/controller/orderAccess");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
   getOrderUserTrackingCountByOrgName,
-} = require("../../../../services/renew-adobe/orderUserTrackingService");
+} = require("@/services/renew-adobe/orderUserTrackingService");
 
 function logAutoAssign(onProgress, data) {
   if (onProgress) {

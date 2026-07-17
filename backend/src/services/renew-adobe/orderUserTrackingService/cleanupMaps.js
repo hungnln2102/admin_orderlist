@@ -1,4 +1,4 @@
-const { db } = require("../../../db");
+const { db } = require("@/db");
 const {
   TBL_ORDER,
   ORD_COLS,
@@ -7,8 +7,8 @@ const {
   TRACK_COLS,
   MAP_TABLE,
   MAP_COLS,
-} = require("./tables");
-const { normalizeEmail } = require("./helpers");
+} = require("@/services/renew-adobe/orderUserTrackingService/tables");
+const { normalizeEmail } = require("@/services/renew-adobe/orderUserTrackingService/helpers");
 
 async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
   const rows = await db(TRACK_TABLE)

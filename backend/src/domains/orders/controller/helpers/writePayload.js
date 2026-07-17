@@ -2,8 +2,8 @@ const {
     normalizeDateInput,
     toNullableNumber,
     normalizeTextInput,
-} = require("../../../../utils/normalizers");
-const { COLS } = require("../constants");
+} = require("@/utils/normalizers");
+const { COLS } = require("@/domains/orders/controller/constants");
 
 const ORDER_WRITABLE_COLUMNS = [
     COLS.ORDER.ID_ORDER, COLS.ORDER.ID_PRODUCT, COLS.ORDER.INFORMATION_ORDER,

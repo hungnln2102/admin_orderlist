@@ -12,7 +12,7 @@ const {
 const { sendRenewalNotification } = require("./sepay/notifications");
 
 if (require.main === module) {
-  const logger = require("../src/utils/logger");
+  const logger = require("@/utils/logger");
   app.listen(PORT, HOST, () => {
     logger.info(`Listening on http://${HOST}:${PORT}${SEPAY_WEBHOOK_PATH}`);
   });

@@ -1,10 +1,10 @@
 const crypto = require("crypto");
-const logger = require("../../../utils/logger");
+const logger = require("@/utils/logger");
 const {
   ADMIN_SCHEMA,
   SCHEMA_ADMIN,
   tableName,
-} = require("../../../config/dbSchema");
+} = require("@/config/dbSchema");
 
 const SITE_SETTINGS_TABLE = tableName(
   ADMIN_SCHEMA.SITE_SETTINGS.TABLE,

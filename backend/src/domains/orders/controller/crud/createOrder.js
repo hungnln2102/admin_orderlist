@@ -1,36 +1,36 @@
-const { db } = require("../../../../db");
-const { TABLES, STATUS, COLS } = require("../constants");
+const { db } = require("@/db");
+const { TABLES, STATUS, COLS } = require("@/domains/orders/controller/constants");
 const {
     normalizeOrderRow,
     sanitizeOrderWritePayload,
     normalizeTextInput,
-} = require("../helpers");
-const { todayYMDInVietnam } = require("../../../../utils/normalizers");
-const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../../../config/dbSchema");
-const { nextId } = require("../../../../services/idService");
-const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../../services/orderCodeService");
+} = require("@/domains/orders/controller/helpers");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
+const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("@/config/dbSchema");
+const { nextId } = require("@/services/idService");
+const { generateUniqueOrderCode, VALID_PREFIXES } = require("@/services/orderCodeService");
 const {
     openPaymentSlot,
     SLOT_KIND,
-} = require("../../../payment-slots");
+} = require("@/domains/payment-slots");
 const {
     resolveDefaultShopBankAccount,
-} = require("../../../../services/shopBankAccountResolver");
+} = require("@/services/shopBankAccountResolver");
 const {
     resolveDefaultUsdtWallet,
-} = require("../../../../services/usdtWalletResolver");
+} = require("@/services/usdtWalletResolver");
 const {
     getUsdtVndRate,
     convertVndToUsd,
-} = require("../../../usdt-wallets/services/binanceExchangeRateService");
-const logger = require("../../../../utils/logger");
-const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
-const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder, normalizeMoney } = require("../finance/refundCredits");
-const { ensureSupplierRecord, findSupplierById } = require("../../../supplies/services/supplierLookupService");
+} = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
+const logger = require("@/utils/logger");
+const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("@/utils/orderHelpers");
+const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder, normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");
+const { ensureSupplierRecord, findSupplierById } = require("@/domains/supplies/services/supplierLookupService");
 const {
     ensureVariantRecord,
     resolveProductToVariantId,
-} = require("../../../products/services/productVariantService");
+} = require("@/domains/products/services/productVariantService");
 
 /** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;

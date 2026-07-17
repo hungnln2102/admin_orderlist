@@ -34,7 +34,7 @@ describe("POST /api/auth/change-password CSRF + success flow", () => {
     }));
     jest.doMock("bcryptjs", () => bcryptMock);
 
-    const app = require("../../../../src/app");
+    const app = require("@/app");
     return { app, updateSpy, bcryptMock };
   };
 

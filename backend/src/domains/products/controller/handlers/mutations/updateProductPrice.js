@@ -1,27 +1,27 @@
-const { db } = require("../../../../../db");
-const { quoteIdent } = require("../../../../../utils/sql");
+const { db } = require("@/db");
+const { quoteIdent } = require("@/utils/sql");
 const {
   normalizeTextInput,
   toNullableNumber,
-} = require("../../../../../utils/normalizers");
-const logger = require("../../../../../utils/logger");
-const { mapProductPriceRow } = require("../../mappers");
-const { pricingCache } = require("../../../../../utils/cache");
+} = require("@/utils/normalizers");
+const logger = require("@/utils/logger");
+const { mapProductPriceRow } = require("@/domains/products/controller/mappers");
+const { pricingCache } = require("@/utils/cache");
 const {
   variantCols,
   productSchemaCols,
   productCategoryCols,
   TABLES,
-} = require("../../constants");
-const { getTiers } = require("../../../../../services/pricing/tierCache");
-const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
+} = require("@/domains/products/controller/constants");
+const { getTiers } = require("@/services/pricing/tierCache");
+const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 const {
   fetchVariantView,
   hasProductCategoryColor,
   normalizeCategoryColors,
   normalizeCategoryIds,
   pickCategoryColor,
-} = require("./shared");
+} = require("@/domains/products/controller/handlers/mutations/shared");
 
 const updateProductPrice = async (req, res) => {
   const { productId } = req.params;
@@ -171,7 +171,7 @@ const updateProductPrice = async (req, res) => {
       }
 
       try {
-        const { syncRenewalOrdersPriceForVariant } = require("../../../../../services/pricing/syncRenewalPricing");
+        const { syncRenewalOrdersPriceForVariant } = require("@/services/pricing/syncRenewalPricing");
         await syncRenewalOrdersPriceForVariant(parsedId);
       } catch (syncErr) {
         logger.error("[Pricing][Sync] Failed to sync renewal prices after updateProductPrice", { error: syncErr.message });

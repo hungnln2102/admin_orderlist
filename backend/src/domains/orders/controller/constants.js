@@ -10,8 +10,8 @@ const {
     PRODUCT_SCHEMA,
     PARTNER_SCHEMA,
     PRICING_TIER_SCHEMA,
-} = require("../../../config/dbSchema");
-const { STATUS } = require("../../../utils/statuses");
+} = require("@/config/dbSchema");
+const { STATUS } = require("@/utils/statuses");
 
 const TABLES = {
     orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),

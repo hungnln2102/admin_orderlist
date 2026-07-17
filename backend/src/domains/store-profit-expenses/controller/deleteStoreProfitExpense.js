@@ -6,7 +6,7 @@ const {
   parseAmount,
   monthKeyVietnamFromDbTimestamp,
   mergeSummaryUpdates,
-} = require("./shared");
+} = require("@/domains/store-profit-expenses/controller/shared");
 
 const deleteStoreProfitExpense = async (req, res) => {
   const id = Number(req.params.id);

@@ -3,11 +3,11 @@ jest.mock("../../../../../src/utils/normalizers", () => ({
   toNullableNumber: (v) => v,
 }));
 
-const { todayYMDInVietnam } = require("../../../../../src/utils/normalizers");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
 const {
   monthKeyVietnamNow,
   monthKeyFromVietnamYmd,
-} = require("../../../../../src/domains/orders/controller/finance/dashboardSummary");
+} = require("@/domains/orders/controller/finance/dashboardSummary");
 
 describe("monthKeyVietnam", () => {
   test("monthKeyVietnamNow lấy tháng từ ngày lịch VN, không phụ thuộc order_date tương lai", () => {

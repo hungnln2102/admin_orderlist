@@ -7,19 +7,19 @@ const {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
   upsertRenewAdobeOrderUserTrackingForAccount,
   syncAllRenewAdobeOrderUserTracking,
-} = require("./orderUserTrackingService/upsert");
+} = require("@/services/renew-adobe/orderUserTrackingService/upsert");
 const {
   reconcileOrderUserTrackingWithTeamMembers,
-} = require("./orderUserTrackingService/reconcile");
+} = require("@/services/renew-adobe/orderUserTrackingService/reconcile");
 const {
   getOrderUserTrackingCountsForAdminAccounts,
   getOrderUserTrackingCountByOrgName,
-} = require("./orderUserTrackingService/counts");
-const { normalizeOrgKeyForTracking } = require("./orderUserTrackingService/helpers");
+} = require("@/services/renew-adobe/orderUserTrackingService/counts");
+const { normalizeOrgKeyForTracking } = require("@/services/renew-adobe/orderUserTrackingService/helpers");
 const {
   getMapAccountIdToUserEmailsForTrackingExpiredToday,
   getMapAccountIdToUserEmailsFor2330Cleanup,
-} = require("./orderUserTrackingService/cleanupMaps");
+} = require("@/services/renew-adobe/orderUserTrackingService/cleanupMaps");
 
 module.exports = {
   upsertRenewAdobeOrderUserTrackingForOrderIds,

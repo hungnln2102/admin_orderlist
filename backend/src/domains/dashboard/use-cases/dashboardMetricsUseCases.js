@@ -1,4 +1,4 @@
-const dashboardMetricsRepository = require("../repositories/dashboardMetricsRepository");
+const dashboardMetricsRepository = require("@/domains/dashboard/repositories/dashboardMetricsRepository");
 
 const fetchDashboardStats = () => dashboardMetricsRepository.fetchDashboardStats();
 

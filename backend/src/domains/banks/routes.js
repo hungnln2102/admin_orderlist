@@ -1,5 +1,5 @@
 const express = require("express");
-const { listBanks } = require("./controller");
+const { listBanks } = require("@/domains/banks/controller");
 
 const router = express.Router();
 

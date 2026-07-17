@@ -1,7 +1,7 @@
-const logger = require("../../../../../../utils/logger");
-const { fetchUsersViaApi } = require("../../../shared/usersListApi");
-const { hasProductId } = require("./config");
-const { createUserViaAbpApi, assignProductViaPatch } = require("./apiClients");
+const logger = require("@/utils/logger");
+const { fetchUsersViaApi } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
+const { hasProductId } = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/config");
+const { createUserViaAbpApi, assignProductViaPatch } = require("@/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow/apiClients");
 
 async function resolveUserIdOrFail(page, orgToken, orgId, email, headers, preUser) {
   const userId = String(preUser?.id || "").trim() || null;

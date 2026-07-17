@@ -4,7 +4,7 @@
  * @param {number[]} variantIds - Danh sách variant id (id_product từ order)
  * @returns {Promise<Map<number, string>>} Map variantId -> display_name (hoặc variant_name nếu không có display_name)
  */
-const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, tableName } = require("../config/dbSchema");
+const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, tableName } = require("@/config/dbSchema");
 
 const VARIANT_TABLE = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT);
 const ID_COL = PRODUCT_SCHEMA.VARIANT.COLS.ID;

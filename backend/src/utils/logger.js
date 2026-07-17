@@ -125,8 +125,8 @@ if (process.env.NODE_ENV === "production" || process.env.LOG_FILE) {
 
 // Database transport for system logs (best-effort, skip if migration has not run yet)
 try {
-  const { pool } = require("../config/database");
-  const { SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA } = require("../config/dbSchema");
+  const { pool } = require("@/config/database");
+  const { SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA } = require("@/config/dbSchema");
   const eventLogDef = RENEW_ADOBE_SCHEMA.SYSTEM_EVENT_LOGS;
   const eventLogCols = eventLogDef.COLS;
   const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;
@@ -173,7 +173,7 @@ try {
 
 // Telegram notification transport (error + warn)
 try {
-  const { notifyError, notifyWarn } = require("../domains/notifications/telegram").systemNotifier;
+  const { notifyError, notifyWarn } = require("@/domains/notifications/telegram").systemNotifier;
   const splatKey = Symbol.for("splat");
 
   /**

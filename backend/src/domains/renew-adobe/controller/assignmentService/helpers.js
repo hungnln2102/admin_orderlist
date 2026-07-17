@@ -1,15 +1,15 @@
-const { db } = require("../../../../db");
-const logger = require("../../../../utils/logger");
-const adobeRenewV2 = require("../../../../services/renew-adobe/adobe-renew-v2");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
+const adobeRenewV2 = require("@/services/renew-adobe/adobe-renew-v2");
 const {
   lookupAndRecordIfNeeded,
   markUsersProductFalseByAccount,
-} = require("../../../../services/userAccountMappingService");
+} = require("@/services/userAccountMappingService");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
-} = require("../../../../services/renew-adobe/orderUserTrackingService");
-const { resolveLisenceCount, mergeRenewAdobeAlertConfig, userCountDbValue } = require("../usersSnapshotUtils");
-const { TABLE, COLS } = require("./availableAccounts");
+} = require("@/services/renew-adobe/orderUserTrackingService");
+const { resolveLisenceCount, mergeRenewAdobeAlertConfig, userCountDbValue } = require("@/domains/renew-adobe/controller/usersSnapshotUtils");
+const { TABLE, COLS } = require("@/domains/renew-adobe/controller/assignmentService/availableAccounts");
 
 function isAdobeSlotFullAddError(msg) {
   return String(msg || "").includes("đầy slot");

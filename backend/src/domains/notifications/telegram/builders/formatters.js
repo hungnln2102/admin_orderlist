@@ -2,7 +2,7 @@
  * Format số, tiền, ngày, chuỗi an toàn cho Telegram (HTML escape, inline code).
  */
 
-const { formatYMDToDMY } = require("../../../../utils/normalizers");
+const { formatYMDToDMY } = require("@/utils/normalizers");
 
 const toSafeString = (value) =>
   value === undefined || value === null ? "" : String(value);

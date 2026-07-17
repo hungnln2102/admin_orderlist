@@ -3,8 +3,8 @@ const os = require("os");
 const path = require("path");
 const { execFile, execFileSync } = require("child_process");
 const { google } = require("googleapis");
-const { loadBackendEnv } = require("../config/loadEnv");
-const { getPostgresConnectionUrl } = require("../config/postgresConnectionUrl");
+const { loadBackendEnv } = require("@/config/loadEnv");
+const { getPostgresConnectionUrl } = require("@/config/postgresConnectionUrl");
 
 loadBackendEnv();
 

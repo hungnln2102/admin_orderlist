@@ -1,10 +1,10 @@
-const logger = require("../../../../utils/logger");
-const { ADMIN_CONSOLE_API_BASE, resolveAdobeEmbedPageUrl } = require("./constants");
+const logger = require("@/utils/logger");
+const { ADMIN_CONSOLE_API_BASE, resolveAdobeEmbedPageUrl } = require("@/services/renew-adobe/adobe-renew-v2/shared/constants");
 const {
   normalizeOrgToken,
   buildForwardHeadersFromCapturedRequest,
-} = require("./usersListApi");
-const { extractCcpSeatProductIdsFromOrgProductsList } = require("./accessChecks");
+} = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
+const { extractCcpSeatProductIdsFromOrgProductsList } = require("@/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
 
 /**
  * Query mặc định khi không parse được từ request đã bắt — khớp SPA www.adobe.com/manage-team (JIL products).

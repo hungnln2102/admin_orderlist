@@ -5,7 +5,7 @@
  *
  * An toàn chạy nhiều lần: ghi đè function + tính lại total_import theo đúng công thức hiện tại.
  */
-const { loadBackendEnv } = require("../src/config/loadEnv");
+const { loadBackendEnv } = require("@/config/loadEnv");
 
 loadBackendEnv();
 

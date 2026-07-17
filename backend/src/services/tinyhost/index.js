@@ -1,4 +1,4 @@
 module.exports = {
-  ...require("./client"),
-  ...require("./otpReader"),
+  ...require("@/services/tinyhost/client"),
+  ...require("@/services/tinyhost/otpReader"),
 };

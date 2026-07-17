@@ -1,6 +1,6 @@
-const db = require("../../../config/database");
-const logger = require("../../../utils/logger");
-const { SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA } = require("../../../config/dbSchema");
+const db = require("@/config/database");
+const logger = require("@/utils/logger");
+const { SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA } = require("@/config/dbSchema");
 
 const EVENT_LOG_DEF = RENEW_ADOBE_SCHEMA.SYSTEM_EVENT_LOGS;
 const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;

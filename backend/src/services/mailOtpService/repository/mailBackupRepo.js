@@ -3,9 +3,9 @@
  * Trả về object thuần để các handler dùng (không leak Knex builder ra ngoài).
  */
 
-const logger = require("../../../utils/logger");
-const { db } = require("../../../db");
-const { MAIL_BACKUP_TABLE, MB_COLS } = require("../shared/constants");
+const logger = require("@/utils/logger");
+const { db } = require("@/db");
+const { MAIL_BACKUP_TABLE, MB_COLS } = require("@/services/mailOtpService/shared/constants");
 
 /**
  * Lấy thông tin mailbox từ bảng mail_backup theo id (chỉ dòng is_active).

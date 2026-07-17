@@ -1,10 +1,10 @@
-const db = require("../../../db/knexClient");
+const db = require("@/db/knexClient");
 const {
   RECEIPT_SCHEMA,
   SCHEMA_RECEIPT,
   tableName,
-} = require("../../../config/dbSchema");
-const { normalizeAccountNumber } = require("../helpers/shopBankInputs");
+} = require("@/config/dbSchema");
+const { normalizeAccountNumber } = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
 
 const PAYMENT_RECEIPT_TABLE = tableName(
   RECEIPT_SCHEMA.PAYMENT_RECEIPT.TABLE,

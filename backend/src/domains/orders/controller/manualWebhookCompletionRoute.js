@@ -1,10 +1,10 @@
-const { completeProcessingOrderWithManualWebhook } = require("./manualWebhookCompletion");
+const { completeProcessingOrderWithManualWebhook } = require("@/domains/orders/controller/manualWebhookCompletion");
 
 const attachManualWebhookCompletionRoute = (router) => {
   router.post("/:id/complete-manual-webhook", async (req, res) => {
     const result = await completeProcessingOrderWithManualWebhook(req.params.id, req.body || {});
     if (result.status >= 200 && result.status < 300) {
-      const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+      const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
       writeUserEventLog(req, {
         action: "Hoàn thành webhook thủ công",
         entity: "Đơn hàng",

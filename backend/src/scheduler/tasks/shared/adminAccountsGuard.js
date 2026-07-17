@@ -3,12 +3,12 @@
  * Rỗng → cron skip ngay (tránh đụng dữ liệu khi shop chưa add admin nào).
  */
 
-const { db } = require("../../../db");
-const logger = require("../../../utils/logger");
+const { db } = require("@/db");
+const logger = require("@/utils/logger");
 const {
   TABLE: ACCOUNTS_ADMIN_TABLE,
   COLS: ACCOUNTS_ADMIN_COLS,
-} = require("../../../domains/renew-adobe/controller/accountTable");
+} = require("@/domains/renew-adobe/controller/accountTable");
 
 /**
  * @returns {Promise<boolean>} true khi tồn tại ≥ 1 row trong `accounts_admin`.

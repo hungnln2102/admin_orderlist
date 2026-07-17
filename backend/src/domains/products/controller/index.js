@@ -3,20 +3,20 @@ const {
   listProductPrices,
   getProductPriceById,
   listProductPackages,
-} = require("./handlers/list");
+} = require("@/domains/products/controller/handlers/list");
 const {
   createProductPrice,
   updateProductPrice,
   toggleProductPriceStatus,
   deleteProductPrice,
-} = require("./handlers/mutations");
+} = require("@/domains/products/controller/handlers/mutations");
 const {
   getSuppliesByProductName,
   getSupplyPricesByProductName,
   updateSupplyPriceForProduct,
   createSupplyPriceForProduct,
   deleteSupplyPriceForProduct,
-} = require("./handlers/supplies");
+} = require("@/domains/products/controller/handlers/supplies");
 
 module.exports = {
   listProducts,

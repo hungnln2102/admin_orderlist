@@ -9,23 +9,23 @@ const {
   allowedOriginSet,
   normalizeOrigin,
   session: sessionConfig,
-} = require("./config/appConfig");
+} = require("@/config/appConfig");
 const {
   redisClient,
   isRedisAvailable,
   assertProductionSessionStoreGuard,
-} = require("./config/redisClient");
-const { createConnectRedisClientAdapter } = require("./config/redisSessionClientAdapter");
-const v1Routes = require("./routes/v1");
-const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
-const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
-const { apiLimiter } = require("./middleware/rateLimiter");
+} = require("@/config/redisClient");
+const { createConnectRedisClientAdapter } = require("@/config/redisSessionClientAdapter");
+const v1Routes = require("@/routes/v1");
+const { AUTH_OPEN_PATHS } = require("@/middleware/authGuard");
+const { errorHandler, notFoundHandler } = require("@/middleware/errorHandler");
+const { apiLimiter } = require("@/middleware/rateLimiter");
 const {
   generateToken,
   verifyToken,
   addTokenToResponse,
-} = require("./middleware/csrfProtection");
-const logger = require("./utils/logger");
+} = require("@/middleware/csrfProtection");
+const logger = require("@/utils/logger");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -92,7 +92,7 @@ app.use(
   express.static(path.join(__dirname, "../image_variant"), staticOpts)
 );
 
-const { pool: dbPool } = require("./config/database");
+const { pool: dbPool } = require("@/config/database");
 
 app.get("/api/health", async (_req, res) => {
   const uptime = process.uptime();

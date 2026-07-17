@@ -1,4 +1,4 @@
-const { param, validate } = require("../../../middleware/validateRequest");
+const { param, validate } = require("@/middleware/validateRequest");
 
 const orderIdParam = [
   param("id").isInt({ min: 1 }).withMessage("ID đơn hàng không hợp lệ"),

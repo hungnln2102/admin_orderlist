@@ -1,6 +1,6 @@
 const {
   validateCreatePayload,
-} = require("../../../../src/domains/shop-bank-accounts/validators/shopBankAccountValidator");
+} = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
 
 describe("shopBankAccountValidator", () => {
   test("validateCreatePayload accepts valid row", () => {

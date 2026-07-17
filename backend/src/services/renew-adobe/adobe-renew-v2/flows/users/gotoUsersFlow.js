@@ -1,4 +1,4 @@
-const { extractOrgTokenFromUrl } = require("../../shared/usersListApi");
+const { extractOrgTokenFromUrl } = require("@/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 
 const WAIT_NETWORKIDLE = String(process.env.ADOBE_V2_GOTO_USERS_WAIT_NETWORKIDLE || "1").trim() === "1";
 

@@ -3,7 +3,7 @@
  * Host mặc định: https://api-2026-02.ades.support
  */
 
-const logger = require("../../utils/logger");
+const logger = require("@/utils/logger");
 
 const DEFAULT_BASE_URL = "https://api-2026-02.ades.support";
 const DEFAULT_ENDPOINT = "/mail/read-otp-gpm";

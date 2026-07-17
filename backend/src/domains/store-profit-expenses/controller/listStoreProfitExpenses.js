@@ -1,4 +1,4 @@
-const { normalizeDateInput } = require("../../../utils/normalizers");
+const { normalizeDateInput } = require("@/utils/normalizers");
 const {
   db,
   logger,
@@ -9,7 +9,7 @@ const {
   parseAmount,
   mapExpenseRow,
   storeProfitExpensesHasMavnColumns,
-} = require("./shared");
+} = require("@/domains/store-profit-expenses/controller/shared");
 
 const listStoreProfitExpenses = async (req, res) => {
   const from = normalizeDateInput(req.query?.from);

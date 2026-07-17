@@ -2,9 +2,9 @@
  * Adobe Renew V2 — B14: Lấy/tạo URL auto-assign bằng API (không thao tác UI).
  */
 
-const logger = require("../../../utils/logger");
-const { doFormLoginOnAuthPage } = require("./loginFlow");
-const { fromPwCookies } = require("./runCheckFlow");
+const logger = require("@/utils/logger");
+const { doFormLoginOnAuthPage } = require("@/services/renew-adobe/adobe-renew-v2/loginFlow");
+const { fromPwCookies } = require("@/services/renew-adobe/adobe-renew-v2/runCheckFlow");
 
 function normalizeOrgToken(orgId) {
   const raw = String(orgId || "").trim();

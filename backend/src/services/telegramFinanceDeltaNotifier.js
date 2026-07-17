@@ -1,13 +1,13 @@
-const logger = require("../utils/logger");
+const logger = require("@/utils/logger");
 const {
   FINANCE_SCHEMA,
   SCHEMA_FINANCE,
   tableName,
-} = require("../config/dbSchema");
-const { financeNotifier } = require("../domains/notifications/telegram");
+} = require("@/config/dbSchema");
+const { financeNotifier } = require("@/domains/notifications/telegram");
 const {
   sumActiveShopBankBalances,
-} = require("../domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
+} = require("@/domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
 
 const monthlySummaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,

@@ -1,4 +1,4 @@
-const { db, summaryTableName, summaryCols, toNumber } = require("./shared");
+const { db, summaryTableName, summaryCols, toNumber } = require("@/controllers/DashboardController/service/shared");
 
 const fetchDashboardYears = async () => {
   const mk = summaryCols.MONTH_KEY;
