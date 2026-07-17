@@ -9,7 +9,6 @@ async function run() {
   try {
     logger.info("Bắt đầu sửa foreign key cho stock_services.product_id -> variant.id...");
 
-    // Find the foreign key constraint name
     const query = `
       SELECT conname
       FROM pg_constraint
@@ -24,32 +23,46 @@ async function run() {
         logger.info(`Đang xoá foreign key cũ: ${fkName}`);
         await db.raw(`ALTER TABLE ${SCHEMA_PRODUCT}.${SRV_DEF.tableName} DROP CONSTRAINT "${fkName}"`);
       }
-    } else {
-      logger.info("Không tìm thấy FK cũ trỏ vào product. (Có thể đã bị xoá trước đó).");
     }
 
-    logger.info(`Chuẩn hoá lại dữ liệu product_id để khớp với bảng variant...`);
-    await db.raw(`
-      UPDATE ${SCHEMA_PRODUCT}.${SRV_DEF.tableName} ss
-      SET product_id = (
-        SELECT v.id FROM ${SCHEMA_PRODUCT}.variant v 
-        WHERE v.product_id = ss.product_id 
-        LIMIT 1
-      )
-      WHERE NOT EXISTS (
-        SELECT 1 FROM ${SCHEMA_PRODUCT}.variant v2 WHERE v2.id = ss.product_id
-      ) AND ss.product_id IS NOT NULL
-    `);
+    logger.info(`Khôi phục các dịch vụ bị mất (bằng product_type_old)...`);
+    const nullServices = await db(`${SCHEMA_PRODUCT}.${SRV_DEF.tableName}`)
+      .whereNull("product_id")
+      .whereNotNull("product_type_old");
+      
+    for (const srv of nullServices) {
+      const typeStr = srv.product_type_old.trim();
+      if (!typeStr) continue;
 
-    await db.raw(`
-      UPDATE ${SCHEMA_PRODUCT}.${SRV_DEF.tableName} ss
-      SET product_id = NULL
-      WHERE NOT EXISTS (
-        SELECT 1 FROM ${SCHEMA_PRODUCT}.variant v WHERE v.id = ss.product_id
-      ) AND ss.product_id IS NOT NULL
-    `);
+      let variant = await db(`${SCHEMA_PRODUCT}.variant`).whereRaw("TRIM(LOWER(display_name)) = ?", [typeStr.toLowerCase()]).first();
+      
+      if (!variant) {
+         let prod = await db(`${SCHEMA_PRODUCT}.product`).whereRaw("TRIM(LOWER(package_name)) = ?", [typeStr.toLowerCase()]).first();
+         let prodId;
+         if (!prod) {
+           const [insertedProd] = await db(`${SCHEMA_PRODUCT}.product`).insert({ 
+             package_name: typeStr,
+             created_at: new Date().toISOString(),
+             updated_at: new Date().toISOString()
+           }).returning("id");
+           prodId = insertedProd.id !== undefined ? insertedProd.id : insertedProd;
+         } else {
+           prodId = prod.id;
+         }
+         
+         const [insertedVar] = await db(`${SCHEMA_PRODUCT}.variant`).insert({
+            product_id: prodId,
+            display_name: typeStr,
+            variant_name: typeStr,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+         }).returning("id");
+         variant = { id: insertedVar.id !== undefined ? insertedVar.id : insertedVar };
+      }
 
-    // Check if new FK already exists
+      await db(`${SCHEMA_PRODUCT}.${SRV_DEF.tableName}`).where("id", srv.id).update({ product_id: variant.id });
+    }
+
     const queryNew = `
       SELECT conname
       FROM pg_constraint
