@@ -91,7 +91,7 @@ const createImportPackage = async (payload) => {
     const [srv] = await trx(TABLES.stockServices)
       .insert({
         [SRV_COLS.stockId]: stockId,
-        [SRV_COLS.productType]: category,
+        product_id: productId,
         [SRV_COLS.passwordEncrypted]: password || null,
         [SRV_COLS.backupEmail]: backup_email || null,
         [SRV_COLS.twoFaEncrypted]: two_fa || null,

@@ -5,8 +5,7 @@ import type { WarehouseItem } from "../types";
 
 type CatalogProduct = {
   id?: number;
-  san_pham?: string;
-  is_active?: boolean;
+  package_name?: string;
 };
 
 export type ProductOption = { value: string; label: string };
@@ -18,7 +17,7 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      const data = await apiGet<CatalogProduct[]>(API_ENDPOINTS.PRODUCT_PRICES);
+      const data = await apiGet<CatalogProduct[]>("/api/products/packages");
       setProducts(Array.isArray(data) ? data : []);
     } catch {
       setProducts([]);
@@ -33,10 +32,11 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
 
   const productOptions = useMemo((): ProductOption[] => {
     const fromApi = products
-      .filter((p) => p.is_active !== false && String(p.san_pham || "").trim())
+      .filter((p) => p.id && String(p.package_name || "").trim())
       .map((p) => {
-        const name = String(p.san_pham).trim();
-        return { value: name, label: name };
+        const value = String(p.id).trim();
+        const label = String(p.package_name).trim();
+        return { value, label };
       });
 
     const fromStock: string[] = [];

@@ -55,6 +55,9 @@ const queueRenewalTask = (orderCode, options = {}) => {
     suppressFinanceNotify:
       options.suppressFinanceNotify === true ||
       existing.suppressFinanceNotify === true,
+    suppressTelegramNotify:
+      options.suppressTelegramNotify === true ||
+      existing.suppressTelegramNotify === true,
   };
   task.alreadyQueued = alreadyQueued;
   pendingRenewalTasks.set(key, task);
@@ -138,7 +141,7 @@ const processRenewalTask = async (orderCode) => {
     }
   }
 
-  if (task.renewalDone && !task.telegramDone) {
+  if (task.renewalDone && !task.telegramDone && !task.suppressTelegramNotify) {
     if (!isTelegramEnabled()) {
       task.telegramDone = true;
     } else {
@@ -161,7 +164,7 @@ const processRenewalTask = async (orderCode) => {
     }
   }
 
-  const success = task.renewalDone && task.telegramDone;
+  const success = task.renewalDone && (task.telegramDone || task.suppressTelegramNotify);
   if (success) {
     pendingRenewalTasks.delete(orderCode);
   } else {
@@ -174,6 +177,7 @@ const processRenewalTask = async (orderCode) => {
     renewalDone: task.renewalDone,
     telegramDone: task.telegramDone,
     lastError: task.lastError,
+    lastRenewalResult: task.lastRenewalResult,
   };
 };
 
@@ -191,17 +195,30 @@ const runRenewalBatch = async ({ orderCodes, forceRenewal = false } = {}) => {
   for (const target of targets) {
     queueRenewalTask(target.orderCode, {
       forceRenewal: target.forceRenewal,
+      suppressTelegramNotify: true, // Gom tin nhắn
     });
   }
 
   const results = [];
+  const renewalOutcomes = [];
   for (const target of targets) {
     const code = target.orderCode;
     if (!code) continue;
     const outcome = await processRenewalTask(code);
     if (outcome) {
       results.push(outcome);
+      if (outcome.lastRenewalResult) {
+        renewalOutcomes.push({
+          orderCode: code,
+          result: outcome.lastRenewalResult
+        });
+      }
     }
+  }
+
+  if (renewalOutcomes.length > 0) {
+    const { sendGroupedRenewalNotification } = require("./notifications");
+    await sendGroupedRenewalNotification(renewalOutcomes);
   }
 
   const succeeded = results.filter((r) => r?.success).length;

@@ -102,10 +102,26 @@ async function processQueue() {
         job.resolve(true);
       } catch (fallbackError) {
         getLogger().error("[TelegramClient] Fallback failed", { error: fallbackError.message });
-        job.reject(fallbackError);
+        job.resolve(false); // Resolve false instead of reject to prevent unhandledRejection
       }
+    } else if (error.message.includes("429") || error.message.includes("Too Many Requests")) {
+      let retryAfter = 5; // Default 5s
+      const match = error.message.match(/retry after (\d+)/i) || error.message.match(/"retry_after":\s*(\d+)/i);
+      if (match && match[1]) {
+        retryAfter = parseInt(match[1], 10);
+      }
+      
+      getLogger().warn(`[TelegramClient] Rate limited (429), pausing queue for ${retryAfter}s`);
+      queue.unshift(job); // Trả lại job về đầu hàng chờ
+      
+      setTimeout(() => {
+        isSending = false;
+        processQueue();
+      }, retryAfter * 1000 + 500); // Đợi số giây yêu cầu + 0.5s bù trừ
+      
+      return; // Không gọi set timeout RATE_LIMIT_MS ở dưới nữa
     } else {
-      job.reject(error);
+      job.resolve(false); // Resolve false instead of reject to prevent unhandledRejection
     }
   }
 

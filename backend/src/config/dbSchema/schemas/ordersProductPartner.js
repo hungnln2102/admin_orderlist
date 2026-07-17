@@ -135,7 +135,8 @@ const PRODUCT_SCHEMA = {
     COLS: {
       ID: "id",
       STOCK_ID: "stock_id",
-      PRODUCT_TYPE: "product_type",
+      PRODUCT_ID: "product_id",
+      PRODUCT_TYPE_OLD: "product_type_old",
       PASSWORD_ENCRYPTED: "password_encrypted",
       BACKUP_EMAIL: "backup_email",
       TWO_FA_ENCRYPTED: "two_fa_encrypted",

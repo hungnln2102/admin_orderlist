@@ -129,6 +129,7 @@ export interface SearchableSelectProps {
   options: SSOption[];
   placeholder?: string;
   disabled?: boolean;
+  allowCustom?: boolean;
   onChange: (value: SSOption["value"], option: SSOption) => void;
   onClear?: () => void;
 }

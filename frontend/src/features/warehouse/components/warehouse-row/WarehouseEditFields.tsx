@@ -92,9 +92,12 @@ export const WarehouseEditFields: React.FC<Props> = ({
               <div>
                 <p className={`${labelCls} mb-1`}>Sản phẩm</p>
                 <ProductCategorySelect
-                  value={srv.category || ""}
+                  value={String(srv.product_id || srv.category || "")}
                   options={productOptions}
-                  onChange={(v) => handleServiceChange(idx, "category", v)}
+                  onChange={(v) => {
+                    handleServiceChange(idx, "product_id", v);
+                    handleServiceChange(idx, "category", v);
+                  }}
                 />
               </div>
               <div>

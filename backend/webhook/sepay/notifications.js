@@ -108,8 +108,8 @@ const postJson = async (url, data) => {
   return sendWithHttps(url, payload, headers);
 };
 
-const buildRenewalMessage = (orderCode, result) => {
-  if (!result) return `Don ${orderCode}: Khong co ket qua gia han`;
+const buildOrderDetailsBlock = (orderCode, result, commonOverrides = {}) => {
+  if (!result) return `Đơn ${orderCode}: Không có kết quả gia hạn`;
 
   const status = result.success
     ? "Gia Hạn Thành Công"
@@ -117,24 +117,27 @@ const buildRenewalMessage = (orderCode, result) => {
     ? "Bỏ Qua"
     : "Lỗi Gia Hạn";
 
-  // New rich notification for successful renewals
   if (result.success && result.details && typeof result.details === "object") {
     const d = result.details;
     const lines = [
-      "✅ GIA HẠN TỰ ĐỘNG THÀNH CÔNG",
-      "──── Thông Tin Đơn Hàng ────",
       `🪪 Mã Đơn: ${orderCode}`,
-      `📦 Sản Phẩm: ${d.SAN_PHAM || ""}`,
+      !commonOverrides.hasOwnProperty('SAN_PHAM') && d.SAN_PHAM ? `📦 Sản Phẩm: ${d.SAN_PHAM}` : null,
       `ℹ️ Thông tin: ${d.THONG_TIN_DON || ""}`,
       d.SLOT ? `🎯 Slot: ${d.SLOT}` : null,
-      `📅 Ngày Đăng Ký: ${d.NGAY_DANG_KY || ""}`,
-      `📆 Hết Hạn: ${d.HET_HAN || ""}`,
-      `💵 Giá Bán: ${formatCurrency(d.GIA_BAN)}`,
-      "──── Thông Tin Nhà Cung Cấp ────",
-      d.NGUON ? `🏷 Nhà Cung Cấp: ${d.NGUON}` : null,
-      `💰 Giá Nhập: ${formatCurrency(d.GIA_NHAP)}`,
-    ].filter(Boolean);
-    return lines.join("\n");
+      !commonOverrides.hasOwnProperty('NGAY_DANG_KY') && d.NGAY_DANG_KY ? `📅 Ngày Đăng Ký: ${d.NGAY_DANG_KY}` : null,
+      !commonOverrides.hasOwnProperty('HET_HAN') && d.HET_HAN ? `📆 Hết Hạn: ${d.HET_HAN}` : null,
+      !commonOverrides.hasOwnProperty('GIA_BAN') && d.GIA_BAN !== undefined ? `💵 Giá Bán: ${formatCurrency(d.GIA_BAN)}` : null,
+    ];
+
+    const showSupplierSection = (!commonOverrides.hasOwnProperty('NGUON') && d.NGUON) || (!commonOverrides.hasOwnProperty('GIA_NHAP') && d.GIA_NHAP !== undefined);
+    
+    if (showSupplierSection) {
+      lines.push("──── Thông Tin Nhà Cung Cấp ────");
+      if (!commonOverrides.hasOwnProperty('NGUON') && d.NGUON) lines.push(`🏷 Nhà Cung Cấp: ${d.NGUON}`);
+      if (!commonOverrides.hasOwnProperty('GIA_NHAP') && d.GIA_NHAP !== undefined) lines.push(`💰 Giá Nhập: ${formatCurrency(d.GIA_NHAP)}`);
+    }
+
+    return lines.filter(Boolean).join("\n");
   }
 
   if (!result.details || typeof result.details !== "object") {
@@ -144,15 +147,21 @@ const buildRenewalMessage = (orderCode, result) => {
   const d = result.details;
   const lines = [
     `Đơn ${orderCode}: ${status}`,
-    `- Sản Phẩm: ${d.SAN_PHAM || ""}`,
+    !commonOverrides.hasOwnProperty('SAN_PHAM') && d.SAN_PHAM ? `- Sản Phẩm: ${d.SAN_PHAM}` : null,
     `- Thông Tin: ${d.THONG_TIN_DON || ""}`,
     d.SLOT ? `- Slot: ${d.SLOT}` : null,
-    `- Ngày Đăng Ký: ${d.NGAY_DANG_KY || ""}`,
-    `- Hết Hạn: ${d.HET_HAN || ""}`,
-    `- Giá Bán: ${formatCurrency(d.GIA_BAN)}`,
-    `- Giá Nhập: ${formatCurrency(d.GIA_NHAP)}`,
+    !commonOverrides.hasOwnProperty('NGAY_DANG_KY') && d.NGAY_DANG_KY ? `- Ngày Đăng Ký: ${d.NGAY_DANG_KY}` : null,
+    !commonOverrides.hasOwnProperty('HET_HAN') && d.HET_HAN ? `- Hết Hạn: ${d.HET_HAN}` : null,
+    !commonOverrides.hasOwnProperty('GIA_BAN') && d.GIA_BAN !== undefined ? `- Giá Bán: ${formatCurrency(d.GIA_BAN)}` : null,
+    !commonOverrides.hasOwnProperty('GIA_NHAP') && d.GIA_NHAP !== undefined ? `- Giá Nhập: ${formatCurrency(d.GIA_NHAP)}` : null,
   ].filter(Boolean);
   return lines.join("\n");
+};
+
+const buildRenewalMessage = (orderCode, result) => {
+  const isSuccess = result?.success;
+  const header = isSuccess ? "✅ GIA HẠN TỰ ĐỘNG THÀNH CÔNG\n──── Thông Tin Đơn Hàng ────\n" : "❌ LỖI GIA HẠN TỰ ĐỘNG\n──── Thông Tin Đơn Hàng ────\n";
+  return header + buildOrderDetailsBlock(orderCode, result);
 };
 
 const sendRenewalNotification = async (orderCode, renewalResult) => {
@@ -217,6 +226,97 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
   }
 };
 
+const sendGroupedRenewalNotification = async (items) => {
+  const sendEnabled =
+    SEND_RENEWAL_TO_TOPIC !== false && String(SEND_RENEWAL_TO_TOPIC) !== "false";
+  if (!items || !items.length || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+
+  const isAllSuccess = items.every(i => i.result?.success);
+  const isAllFailed = items.every(i => !i.result?.success);
+  
+  let header = "";
+  if (isAllSuccess) {
+    header = `✅ GIA HẠN TỰ ĐỘNG THÀNH CÔNG${items.length > 1 ? ` (${items.length} ĐƠN)` : ""}`;
+  } else if (isAllFailed) {
+    header = `❌ LỖI GIA HẠN TỰ ĐỘNG${items.length > 1 ? ` (${items.length} ĐƠN)` : ""}`;
+  } else {
+    header = `⚠️ GIA HẠN TỰ ĐỘNG (THÀNH CÔNG & LỖI) (${items.length} ĐƠN)`;
+  }
+
+  // Tối ưu thông tin chung
+  const allMatch = (key) => {
+    if (items.length === 0) return false;
+    const firstVal = items[0].result?.details?.[key];
+    if (firstVal === undefined || firstVal === null) return false;
+    return items.every(i => i.result?.details?.[key] === firstVal);
+  };
+
+  const commonOverrides = {};
+  const checkFields = ['SAN_PHAM', 'NGAY_DANG_KY', 'HET_HAN', 'GIA_BAN', 'NGUON', 'GIA_NHAP'];
+  
+  checkFields.forEach(field => {
+    if (allMatch(field)) {
+      commonOverrides[field] = items[0].result.details[field];
+    }
+  });
+
+  if (Object.keys(commonOverrides).length > 0) {
+    header += `\n──── Thông Tin Chung ────`;
+    if (commonOverrides.hasOwnProperty('SAN_PHAM')) header += `\n📦 Sản Phẩm: ${commonOverrides.SAN_PHAM}`;
+    if (commonOverrides.hasOwnProperty('NGAY_DANG_KY')) header += `\n📅 Ngày Đăng Ký: ${commonOverrides.NGAY_DANG_KY}`;
+    if (commonOverrides.hasOwnProperty('HET_HAN')) header += `\n📆 Hết Hạn: ${commonOverrides.HET_HAN}`;
+    if (commonOverrides.hasOwnProperty('GIA_BAN')) header += `\n💵 Giá Bán: ${formatCurrency(commonOverrides.GIA_BAN)}`;
+    
+    // Nếu có NGUON hoặc GIA_NHAP, nhóm riêng
+    if (commonOverrides.hasOwnProperty('NGUON') || commonOverrides.hasOwnProperty('GIA_NHAP')) {
+      header += `\n──── Chung: Nhà Cung Cấp ────`;
+      if (commonOverrides.hasOwnProperty('NGUON')) header += `\n🏷 Nhà Cung Cấp: ${commonOverrides.NGUON}`;
+      if (commonOverrides.hasOwnProperty('GIA_NHAP')) header += `\n💰 Giá Nhập: ${formatCurrency(commonOverrides.GIA_NHAP)}`;
+    }
+  }
+
+  header += `\n──── Chi Tiết Các Đơn ────`;
+
+  const detailsBlocks = items.map(item => buildOrderDetailsBlock(item.orderCode, item.result, commonOverrides));
+  const text = header + "\n" + detailsBlocks.join("\n━━━━━━━━━━━━━━━━━━━━\n");
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  
+  const buildPayload = (includeTopic = true) => {
+    const payload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+    };
+    if (includeTopic && sendEnabled && Number.isFinite(TELEGRAM_TOPIC_ID)) {
+      payload.message_thread_id = TELEGRAM_TOPIC_ID;
+    }
+    return payload;
+  };
+
+  try {
+    await postJson(url, buildPayload(true));
+  } catch (err) {
+    const bodyText = String(err?.body || err?.message || "");
+    const lowered = bodyText.toLowerCase();
+    const isThreadError =
+      err?.status === 400 &&
+      (lowered.includes("message_thread_id") ||
+        lowered.includes("message thread not found") ||
+        (lowered.includes("thread") && lowered.includes("not found")) ||
+        (lowered.includes("topic") && lowered.includes("not found")));
+
+    if (isThreadError) {
+      try {
+        await postJson(url, buildPayload(false));
+        return;
+      } catch (retryErr) {
+        logger.error("Gửi thông báo gia hạn gộp Telegram thất bại sau khi thử lại", { error: retryErr?.message });
+        return;
+      }
+    }
+    logger.error("Không thể gửi thông báo gia hạn gộp Telegram", { error: err?.message });
+  }
+};
+
 // Stubbed payment notification (disabled)
 const sendPaymentNotification = async () => {
   return;
@@ -227,5 +327,6 @@ module.exports = {
   isTransientFetchError,
   buildRenewalMessage,
   sendRenewalNotification,
+  sendGroupedRenewalNotification,
   sendPaymentNotification,
 };

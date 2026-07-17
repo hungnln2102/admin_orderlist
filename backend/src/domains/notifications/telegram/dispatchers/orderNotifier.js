@@ -90,20 +90,7 @@ function notifyZeroDaysRemaining(orders) {
   });
 }
 
-function notifyOrderRenewed(order) {
-  if (!SEND_ORDER_NOTIFICATION) return;
-  const text = `✅ <b>GIA HẠN THÀNH CÔNG</b>
-📦 <b>Mã Đơn:</b> <code>${order.id_order || order.idOrder || "N/A"}</code>
-🛍️ <b>Sản Phẩm:</b> ${order.san_pham || order.sanPham || "N/A"}
-⏳ <b>Hết hạn mới:</b> ${order.ngay_het_han_moi || "N/A"}`;
 
-  enqueueMessage({
-    chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
-    message_thread_id: ORDER_CREATED_TOPIC_ID, // Có thể đổi topic nếu cần
-    text,
-    parse_mode: "HTML",
-  });
-}
 
 module.exports = {
   sendOrderCreatedNotification: notifyOrderCreated,
@@ -111,6 +98,5 @@ module.exports = {
   sendZeroDaysRemainingNotification: notifyZeroDaysRemaining,
   notifyOrderCreated,
   notifyFourDaysRemaining,
-  notifyZeroDaysRemaining,
-  notifyOrderRenewed
+  notifyZeroDaysRemaining
 };

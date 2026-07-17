@@ -20,6 +20,8 @@ async function dispatchWebhookRenewals({
   receiptId,
   ORDER_COLS,
 }) {
+  const renewalOutcomes = [];
+
   for (const code of loopOrderCodes) {
     const currentAmountForCode = getCurrentAmountForCode(code);
     const state = stateByOrderCode.get(code);
@@ -83,9 +85,22 @@ async function dispatchWebhookRenewals({
         paymentReceiptId: receiptId,
         // Cuối luồng webhook sẽ gửi 1 tin BIẾN ĐỘNG THÁNG tổng hợp.
         suppressFinanceNotify: true,
+        // Gom tin nhắn Telegram gia hạn tự động
+        suppressTelegramNotify: true,
       });
-      await processRenewalTask(code);
+      const outcome = await processRenewalTask(code);
+      if (outcome && outcome.lastRenewalResult) {
+        renewalOutcomes.push({
+          orderCode: code,
+          result: outcome.lastRenewalResult
+        });
+      }
     }
+  }
+
+  if (renewalOutcomes.length > 0) {
+    const { sendGroupedRenewalNotification } = require("../../notifications");
+    await sendGroupedRenewalNotification(renewalOutcomes);
   }
 }
 

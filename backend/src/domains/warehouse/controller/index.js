@@ -25,6 +25,29 @@ const pkgDef = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const pkgCols = pkgDef.columns;
 const pkgTable = tableName(pkgDef.tableName, SCHEMA_PRODUCT);
 
+async function resolveProductId(trx, categoryValue) {
+  if (!categoryValue) return null;
+  const num = Number(categoryValue);
+  if (Number.isFinite(num) && num > 0) {
+    const exists = await trx(`${SCHEMA_PRODUCT}.product`).where("id", num).first();
+    if (exists) return num;
+  }
+  
+  const typeStr = String(categoryValue).trim();
+  if (typeStr === "") return null;
+  
+  const existingProd = await trx(`${SCHEMA_PRODUCT}.product`).whereRaw("TRIM(LOWER(package_name)) = ?", [typeStr.toLowerCase()]).first();
+  if (existingProd) return existingProd.id;
+  
+  const [inserted] = await trx(`${SCHEMA_PRODUCT}.product`).insert({
+    package_name: typeStr,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).returning("id");
+  
+  return inserted.id !== undefined ? inserted.id : inserted;
+}
+
 const listWarehouse = async (_req, res) => {
   try {
     // We group services inside the email account
@@ -47,10 +70,12 @@ const listWarehouse = async (_req, res) => {
 
     if (stockIds.length > 0) {
       const services = await db(`${servicesTable} as ${sAlias}`)
+        .leftJoin(`${SCHEMA_PRODUCT}.product as p`, `p.id`, `${sAlias}.product_id`)
         .select({
           id: `${sAlias}.${srvCols.id}`,
           stock_id: `${sAlias}.${srvCols.stockId}`,
-          category: `${sAlias}.${srvCols.productType}`,
+          product_id: `${sAlias}.product_id`,
+          category: `p.package_name`,
           password: `${sAlias}.${srvCols.passwordEncrypted}`,
           backup_email: `${sAlias}.${srvCols.backupEmail}`,
           two_fa: `${sAlias}.${srvCols.twoFaEncrypted}`,
@@ -150,10 +175,11 @@ const createWarehouse = async (req, res) => {
 
       const insertedServices = [];
       for (const srv of services) {
+        const pId = await resolveProductId(trx, srv.category);
         const [insertedSrv] = await trx(servicesTable)
           .insert({
             [srvCols.stockId]: stockRow.id,
-            [srvCols.productType]: srv.category ?? null,
+            product_id: pId,
             [srvCols.passwordEncrypted]: srv.password ?? null,
             [srvCols.backupEmail]: srv.backup_email ?? null,
             [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
@@ -226,32 +252,35 @@ const updateWarehouse = async (req, res) => {
         await syncOrdersForPackagesUsingStock(trx, id, oldAcc, newAcc);
       }
 
+      let updatedServices = [];
       // Sync services (replace or update)
-      // For simplicity in this endpoint, we'll clear and recreate or selectively update.
-      // Assuming 'services' payload contains full list including IDs for existing ones.
-      if (services.length > 0) {
+      if (services && services.length > 0) {
         const existingSrvs = await trx(servicesTable).where(srvCols.stockId, id).select(srvCols.id);
         const existingIds = new Set(existingSrvs.map(s => s.id));
         const keptIds = new Set();
 
         for (const srv of services) {
+          const pId = await resolveProductId(trx, srv.category);
           if (srv.id && existingIds.has(srv.id)) {
             // Update
-            await trx(servicesTable).where(srvCols.id, srv.id).update({
-              [srvCols.productType]: srv.category ?? null,
+            const [updatedSrv] = await trx(servicesTable).where(srvCols.id, srv.id).update({
+              product_id: pId,
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
               [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
               [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
               [srvCols.updatedAt]: new Date().toISOString()
-            });
+            }).returning("*");
+            
+            const fetchedUpdated = updatedSrv.id !== undefined ? updatedSrv : await trx(servicesTable).where(srvCols.id, srv.id).first();
+            updatedServices.push(fetchedUpdated);
             keptIds.add(srv.id);
           } else {
             // Insert new
             const now = new Date().toISOString();
-            await trx(servicesTable).insert({
+            const [insertedSrv] = await trx(servicesTable).insert({
               [srvCols.stockId]: id,
-              [srvCols.productType]: srv.category ?? null,
+              product_id: pId,
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
               [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
@@ -259,7 +288,10 @@ const updateWarehouse = async (req, res) => {
               [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
               [srvCols.createdAt]: now,
               [srvCols.updatedAt]: now,
-            });
+            }).returning("*");
+            
+            const fetchedInserted = insertedSrv.id !== undefined ? insertedSrv : await trx(servicesTable).where(srvCols.id, insertedSrv).first();
+            updatedServices.push(fetchedInserted);
           }
         }
 
@@ -268,9 +300,35 @@ const updateWarehouse = async (req, res) => {
         if (toDelete.length > 0) {
           await trx(servicesTable).whereIn(srvCols.id, toDelete).del();
         }
+      } else {
+        // If services array is empty, delete all existing services
+        await trx(servicesTable).where(srvCols.stockId, id).del();
       }
+      
+      // Remap services to frontend format
+      const formattedServices = updatedServices.map(srv => ({
+        id: srv[srvCols.id],
+        stock_id: srv[srvCols.stockId],
+        category: srv[srvCols.productType],
+        password: srv[srvCols.passwordEncrypted],
+        backup_email: srv[srvCols.backupEmail],
+        two_fa: srv[srvCols.twoFaEncrypted],
+        expires_at: srv[srvCols.expiresAt],
+        status: srv[srvCols.status],
+        created_at: srv[srvCols.createdAt],
+        updated_at: srv[srvCols.updatedAt]
+      }));
 
-      return updated;
+      return {
+        id: updated[cols.id],
+        account: updated[cols.accountUsername],
+        note: updated[cols.note],
+        status: updated[cols.status],
+        is_verified: updated[cols.isVerified],
+        created_at: updated[cols.createdAt],
+        updated_at: updated[cols.updatedAt],
+        services: formattedServices
+      };
     });
 
     if (!row) {

@@ -23,6 +23,7 @@ export const ProductCategorySelect: React.FC<Props> = ({
     options={options}
     placeholder={placeholder}
     disabled={disabled}
+    allowCustom={true}
     onChange={(v) => onChange(String(v))}
     onClear={() => onChange("")}
   />

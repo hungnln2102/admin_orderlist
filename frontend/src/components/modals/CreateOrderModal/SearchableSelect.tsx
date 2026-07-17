@@ -8,6 +8,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   options,
   placeholder,
   disabled,
+  allowCustom,
   onChange,
   onClear,
 }) => {
@@ -17,8 +18,10 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   const selectedLabel = useMemo(() => {
     const found = options.find((o) => o.value === value);
-    return found ? found.label : "";
-  }, [options, value]);
+    if (found) return found.label;
+    if (allowCustom && value) return String(value);
+    return "";
+  }, [options, value, allowCustom]);
 
   useEffect(() => {
     setQuery(selectedLabel);
@@ -79,28 +82,55 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {open && !disabled && (
         <div className="absolute z-30 mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 shadow-[0_24px_45px_-18px_rgba(2,6,23,0.95)] max-h-64 overflow-auto animate-in fade-in slide-in-from-top-2 duration-150">
           {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-400 italic">
-              Không có kết quả
-            </div>
-          ) : (
-            filtered.map((opt) => (
+            allowCustom && query.trim() !== "" ? (
               <div
-                key={`${String(opt.value)}-${opt.label}`}
-                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
-                  opt.value === value
-                    ? "bg-cyan-500/15 text-cyan-200"
-                    : "text-slate-200 hover:bg-cyan-500/10 active:bg-cyan-500/20"
-                }`}
+                className="px-4 py-2.5 text-sm cursor-pointer text-cyan-300 hover:bg-cyan-500/10 transition-colors"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  setQuery(opt.label);
                   setOpen(false);
-                  onChange(opt.value, opt);
+                  onChange(query, { value: query, label: query });
                 }}
               >
-                {opt.label}
+                + Thêm "{query}"
               </div>
-            ))
+            ) : (
+              <div className="px-4 py-3 text-sm text-slate-400 italic">
+                Không có kết quả
+              </div>
+            )
+          ) : (
+            <>
+              {filtered.map((opt) => (
+                <div
+                  key={`${String(opt.value)}-${opt.label}`}
+                  className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
+                    opt.value === value
+                      ? "bg-cyan-500/15 text-cyan-200"
+                      : "text-slate-200 hover:bg-cyan-500/10 active:bg-cyan-500/20"
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setQuery(opt.label);
+                    setOpen(false);
+                    onChange(opt.value, opt);
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))}
+              {allowCustom && query.trim() !== "" && !filtered.some(o => o.label.toLowerCase() === query.trim().toLowerCase()) && (
+                <div
+                  className="px-4 py-2.5 text-sm cursor-pointer border-t border-slate-700 text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setOpen(false);
+                    onChange(query, { value: query, label: query });
+                  }}
+                >
+                  + Thêm "{query}"
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

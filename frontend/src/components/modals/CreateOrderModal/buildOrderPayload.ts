@@ -35,8 +35,13 @@ export const isSharedOrderBaseComplete = (
   formData: Partial<Order> | undefined,
   selectedSupplyId: number | null
 ): boolean => {
+  if (!formData) return false;
+  const isImport = String(formData[ORDER_FIELDS.ID_ORDER] || "").startsWith("MAVN");
+  if (isImport) {
+    return Boolean(formData[ORDER_FIELDS.ID_PRODUCT]);
+  }
   return Boolean(
-    formData && formData[ORDER_FIELDS.ID_PRODUCT] && formData[ORDER_FIELDS.CUSTOMER]
+    formData[ORDER_FIELDS.ID_PRODUCT] && formData[ORDER_FIELDS.CUSTOMER]
   );
 };
 

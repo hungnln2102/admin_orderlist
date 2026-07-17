@@ -1,7 +1,7 @@
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 const logger = require("@/utils/logger");
-const { notifyOrderCreated, notifyFourDaysRemaining, notifyZeroDaysRemaining, notifyOrderRenewed } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
+const { notifyOrderCreated, notifyFourDaysRemaining, notifyZeroDaysRemaining } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
 
 /**
  * Lắng nghe các sự kiện và bắn Telegram
@@ -33,21 +33,14 @@ function handleZeroDaysDue(orders) {
   }
 }
 
-function handleOrderRenewed(order) {
-  try {
-    logger.info(`[TelegramSubscriber] Nhận sự kiện ORDER_RENEWED cho đơn: ${order?.id_order || 'N/A'}`);
-    notifyOrderRenewed(order);
-  } catch (error) {
-    logger.error('[TelegramSubscriber] Lỗi khi xử lý ORDER_RENEWED', { error: error.message });
-  }
-}
+
 
 // Hàm này sẽ được gọi ở index.js để ghim các listener vào EventBus
 function registerTelegramSubscribers() {
   eventBus.on(EVENTS.ORDER_CREATED, handleOrderCreated);
   eventBus.on(EVENTS.DAILY_FOUR_DAYS_DUE, handleFourDaysDue);
   eventBus.on(EVENTS.DAILY_ZERO_DAYS_DUE, handleZeroDaysDue);
-  eventBus.on(EVENTS.ORDER_RENEWED, handleOrderRenewed);
+
   
   logger.info('[TelegramSubscriber] Đã đăng ký thành công');
 }

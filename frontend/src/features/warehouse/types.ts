@@ -3,6 +3,7 @@ import { normalizeSearchText } from "@/shared/text";
 export type WarehouseService = {
   id?: number;
   stock_id?: number;
+  product_id?: number | string | null;
   category?: string | null;
   password?: string | null;
   backup_email?: string | null;
