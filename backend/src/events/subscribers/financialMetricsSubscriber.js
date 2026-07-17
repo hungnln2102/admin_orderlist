@@ -20,10 +20,10 @@ const bankCols = ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;
  */
 async function handleOrderPaymentReceived(payload) {
   try {
-    const { amount, cost, monthKey, orderCode, bankAccountId } = payload;
+    const { amount, cost, profit: payloadProfit, monthKey, orderCode, bankAccountId } = payload;
     const revenue = Number(amount) || 0;
     const importCost = Number(cost) || 0;
-    const profit = revenue - importCost;
+    const profit = payloadProfit !== undefined ? Number(payloadProfit) : (revenue - importCost);
 
     logger.info(`[FinancialMetrics] Tiền vào đơn ${orderCode}: Doanh thu +${revenue}, Sổ Quỹ +${revenue}, Chi phí +${importCost}, Lợi nhuận +${profit}`);
 

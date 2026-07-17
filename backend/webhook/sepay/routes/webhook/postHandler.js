@@ -891,6 +891,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
             transactionId: transaction.transaction_id || transaction.id || null,
             amount: transferAmountNormalized,
             cost: postedImportDelta, // Cost từ vòng lặp được cộng dồn (importDelta)
+            profit: postedProfitDelta,
             monthKey: paidMonthKey,
             orderCode: loopOrderCodes[0] || null, // Lấy mã đơn đầu tiên
             bankAccountId: transaction.account_number || transaction.accountNumber || null,

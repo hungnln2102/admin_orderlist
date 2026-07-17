@@ -1,4 +1,5 @@
 const { db } = require("@/db");
+const { eventBus, EVENTS } = require("@/events");
 const { TABLES, STATUS, COLS } = require("@/domains/orders/controller/constants");
 const {
     normalizeOrderRow,
@@ -24,7 +25,7 @@ const {
     convertVndToUsd,
 } = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
 const logger = require("@/utils/logger");
-const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("@/utils/orderHelpers");
+const { ORDER_PREFIXES, isMavrykShopSupplierName, isMavnImportOrder } = require("@/utils/orderHelpers");
 const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder, normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");
 const { ensureSupplierRecord, findSupplierById } = require("@/domains/supplies/services/supplierLookupService");
 const {
@@ -335,6 +336,11 @@ const attachCreateOrderRoute = (router) => {
                 }
             }
 
+            if (isMavnImportOrder(newOrder)) {
+                eventBus.emit(EVENTS.IMPORT_ORDER_CREATED, newOrder);
+            } else {
+                eventBus.emit(EVENTS.ORDER_CREATED, newOrder);
+            }
             res.status(201).json(normalized);
         } catch (error) {
             await trx.rollback();

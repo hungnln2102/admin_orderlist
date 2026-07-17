@@ -63,18 +63,7 @@ async function resolveDashboardImportDeltaOnPaid(
     Number(supplyIdRaw) > 0;
   if (!hasSupply) return 0;
 
-  const orderListId = state[orderCols.ID];
-  if (
-    orderListId != null &&
-    Number.isFinite(Number(orderListId)) &&
-    (await hasSupplierOrderCostLogRowInPaidMonth(executor, orderListId, paidMonthKey))
-  ) {
-    return 0;
-  }
-
-  const supplierName = await fetchSupplierNameBySupplyId(executor, supplyIdRaw);
-  if (isMavrykSupplierStrictForNccLog(supplierName)) return c;
-  return 0;
+  return c;
 }
 
 module.exports = {

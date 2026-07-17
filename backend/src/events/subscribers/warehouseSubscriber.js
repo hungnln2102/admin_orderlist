@@ -19,9 +19,27 @@ const handleWarehouseStockCreated = async (payload) => {
   }
 };
 
+const handleImportOrderCreated = async (orderData) => {
+  const orderCode = orderData?.id_order || orderData?.idOrder || 'N/A';
+  logger.info(`[WarehouseSubscriber] Bắt được sự kiện IMPORT_ORDER_CREATED cho đơn nhập: ${orderCode}`);
+
+  try {
+    // TODO: Viết logic đẩy dữ liệu đơn nhập (MAVN) vào Kho hàng tại đây
+    
+    logger.info(`[WarehouseSubscriber] Đã hoàn thành quá trình xử lý đơn nhập kho cho đơn: ${orderCode}`);
+  } catch (error) {
+    logger.error(`[WarehouseSubscriber] Lỗi khi xử lý sự kiện IMPORT_ORDER_CREATED`, {
+      orderCode,
+      error: error.message,
+      stack: error.stack
+    });
+  }
+};
+
 const registerWarehouseSubscribers = () => {
   eventBus.on(EVENTS.WAREHOUSE_STOCK_CREATED, handleWarehouseStockCreated);
-  logger.info('[WarehouseSubscriber] Đã khởi tạo và gắn Event WAREHOUSE_STOCK_CREATED');
+  eventBus.on(EVENTS.IMPORT_ORDER_CREATED, handleImportOrderCreated);
+  logger.info('[WarehouseSubscriber] Đã khởi tạo và gắn Event WAREHOUSE_STOCK_CREATED, IMPORT_ORDER_CREATED');
 };
 
 module.exports = {
