@@ -146,6 +146,7 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
                         <th className="px-3 py-2">2FA</th>
                         <th className="px-3 py-2">Hạn sử dụng</th>
                         <th className="px-3 py-2">Trạng thái</th>
+                        <th className="px-3 py-2">Ghi chú</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-indigo-500/10">
@@ -169,9 +170,12 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
                           </td>
                           <td className="px-3 py-2">{srv.expires_at ? new Date(srv.expires_at).toLocaleDateString('vi-VN') : "—"}</td>
                           <td className="px-3 py-2">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] ${srv.status === 'Đang Sử Dụng' ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                              {srv.status || "—"}
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] ${srv.status === 'UNAVAILABLE' ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                              {srv.status === 'UNAVAILABLE' ? "Đang Sử Dụng" : (srv.status === 'AVAILABLE' ? "Tồn Kho" : srv.status || "--")}
                             </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs opacity-75 max-w-[150px] truncate" title={srv.note || ""}>
+                            {srv.note || "--"}
                           </td>
                         </tr>
                       ))}
@@ -194,21 +198,6 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
                   </DetailCard>
                 </div>
               )}
-              <div
-                className={`mt-4 min-w-0 overflow-hidden rounded-xl border p-4 text-center ${theme.detailItemClass}`}
-              >
-                <p
-                  className={`text-xs font-medium uppercase tracking-wide ${theme.detailLabelClass}`}
-                >
-                  Ghi chú
-                </p>
-                <p
-                  className="mt-2 max-w-full text-sm text-indigo-50 line-clamp-4 break-words"
-                  title={String(item.note || "").trim() || undefined}
-                >
-                  {String(item.note || "").trim() || "Không có ghi chú."}
-                </p>
-              </div>
             </>
           )}
         </div>

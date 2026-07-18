@@ -1,5 +1,5 @@
 const { db, withTransaction } = require("@/db");
-const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("@/config/dbSchema");
+const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, WAREHOUSE_SCHEMA, SCHEMA_WAREHOUSE, tableName } = require("@/config/dbSchema");
 const { normalizeDateInput } = require("@/utils/normalizers");
 const { TABLES, ruleCols, stockCols, pkgCols, productCols } = require("@/domains/import-packages/constants");
 const logger = require("@/utils/logger");
@@ -15,9 +15,9 @@ const findRuleByProductId = async (trxOrDb, productId) => {
   return row || null;
 };
 
-const SRV_DEF = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
+const SRV_DEF = getDefinition("STOCK_SERVICES", WAREHOUSE_SCHEMA);
 const SRV_COLS = SRV_DEF.columns;
-TABLES.stockServices = tableName(SRV_DEF.tableName, SCHEMA_PRODUCT);
+TABLES.stockServices = tableName(SRV_DEF.tableName, SCHEMA_WAREHOUSE);
 
 /**
  * Tao luon stock + package trong mot transaction.

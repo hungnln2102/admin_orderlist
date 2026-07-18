@@ -19,6 +19,7 @@ const {
   SCHEMA_SUPPLIER_COST,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
+  SCHEMA_WAREHOUSE,
 } = require("@/config/dbSchema/env");
 const {
   tableName,
@@ -41,6 +42,7 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   PRICING_TIER_SCHEMA,
+  WAREHOUSE_SCHEMA,
 } = require("@/config/dbSchema/schemas/ordersProductPartner");
 const { RECEIPT_SCHEMA } = require("@/config/dbSchema/schemas/receipt");
 const {
@@ -87,4 +89,6 @@ module.exports = {
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
   PRICING_TIER_SCHEMA,
+  SCHEMA_WAREHOUSE,
+  WAREHOUSE_SCHEMA,
 };

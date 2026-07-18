@@ -29,7 +29,7 @@ export const WarehouseEditFields: React.FC<Props> = ({
   };
 
   const handleAddService = () => {
-    const newServices = [...services, { category: "", password: "", backup_email: "", two_fa: "", expires_at: "", status: "Tồn" }];
+    const newServices = [...services, { category: "", password: "", backup_email: "", two_fa: "", expires_at: "", status: "AVAILABLE" }];
     onChange("services", newServices);
   };
 
@@ -48,15 +48,6 @@ export const WarehouseEditFields: React.FC<Props> = ({
             value={draft.account || ""}
             placeholder="Email / Username"
             onChange={(e) => onChange("account", e.target.value)}
-          />
-        </div>
-        <div>
-          <p className={`${labelCls} mb-1`}>Ghi chú chung</p>
-          <input
-            className={inputCls}
-            value={draft.note || ""}
-            placeholder="Ghi chú..."
-            onChange={(e) => onChange("note", e.target.value)}
           />
         </div>
       </div>
@@ -137,9 +128,18 @@ export const WarehouseEditFields: React.FC<Props> = ({
               <div>
                 <p className={`${labelCls} mb-1`}>Trạng thái</p>
                 <input
+                  className={inputCls + " opacity-50 cursor-not-allowed"}
+                  value={srv.status === 'UNAVAILABLE' ? "Đang Sử Dụng" : (srv.status === 'AVAILABLE' ? "Tồn Kho" : srv.status || "--")}
+                  disabled
+                />
+              </div>
+              <div>
+                <p className={`${labelCls} mb-1`}>Ghi chú</p>
+                <input
                   className={inputCls}
-                  value={srv.status || ""}
-                  onChange={(e) => handleServiceChange(idx, "status", e.target.value)}
+                  value={srv.note || ""}
+                  placeholder="Ghi chú..."
+                  onChange={(e) => handleServiceChange(idx, "note", e.target.value)}
                 />
               </div>
             </div>

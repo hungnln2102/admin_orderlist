@@ -127,3 +127,11 @@ module.exports = {
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
 };
+
+const SCHEMA_WAREHOUSE = pickSchema(
+  process.env.DB_SCHEMA_WAREHOUSE,
+  process.env.SCHEMA_WAREHOUSE,
+  "warehouse"
+);
+module.exports.SCHEMA_WAREHOUSE = SCHEMA_WAREHOUSE;
+

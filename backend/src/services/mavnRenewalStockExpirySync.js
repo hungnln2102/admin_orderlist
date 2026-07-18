@@ -13,6 +13,8 @@ const {
   SCHEMA_PRODUCT,
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
+  SCHEMA_WAREHOUSE,
+  WAREHOUSE_SCHEMA,
   tableName,
   getDefinition,
 } = require("@/config/dbSchema");
@@ -21,12 +23,12 @@ const logger = require("@/utils/logger");
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const PKG_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
-const STOCK_DEF = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
+const STOCK_DEF = getDefinition("PRODUCT_STOCK", WAREHOUSE_SCHEMA);
 
 const ORDER_TABLE = tableName(ORDER_DEF.tableName, SCHEMA_ORDERS);
 const VARIANT_TABLE = tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT);
 const PKG_TABLE = tableName(PKG_DEF.tableName, SCHEMA_PRODUCT);
-const STOCK_TABLE = tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT);
+const STOCK_TABLE = tableName(STOCK_DEF.tableName, SCHEMA_WAREHOUSE);
 
 const O = ORDER_DEF.columns;
 const V = VARIANT_DEF.columns;

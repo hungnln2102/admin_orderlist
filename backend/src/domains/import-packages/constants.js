@@ -13,6 +13,8 @@ const {
   getDefinition,
   PRODUCT_SCHEMA,
   SCHEMA_PRODUCT,
+  WAREHOUSE_SCHEMA,
+  SCHEMA_WAREHOUSE,
 } = require("@/config/dbSchema");
 
 const RULE_DEF = {
@@ -29,13 +31,13 @@ const RULE_DEF = {
   },
 };
 
-const STOCK_DEF = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
+const STOCK_DEF = getDefinition("PRODUCT_STOCK", WAREHOUSE_SCHEMA);
 const PKG_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 
 const TABLES = {
   rule: tableName(RULE_DEF.tableName, SCHEMA_PRODUCT),
-  stock: tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT),
+  stock: tableName(STOCK_DEF.tableName, SCHEMA_WAREHOUSE),
   package: tableName(PKG_DEF.tableName, SCHEMA_PRODUCT),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
 };

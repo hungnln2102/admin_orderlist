@@ -71,7 +71,7 @@ async function notifyOrderCreated(order) {
     let productName = order.id_product;
     if (order.id_product) {
       const prod = await db('product').where('id', order.id_product).first();
-      if (prod && prod.name) productName = prod.name;
+      if (prod && prod.package_name) productName = prod.package_name;
     }
     const enrichedOrder = { ...order, productName };
     
@@ -80,12 +80,12 @@ async function notifyOrderCreated(order) {
     const price = Number(order.price) || 0;
     let qrBuffer = null;
     
-    if (price > 0 && defaultBank?.accountNumber && defaultBank?.bankCode) {
+    if (price > 0 && defaultBank?.accountNumber && (defaultBank?.bankShortCode || defaultBank?.bankBin)) {
       const qrResult = await fetchQrImageBytes({
-        bank: defaultBank.bankCode,
+        bank: defaultBank.bankShortCode || defaultBank.bankBin,
         acc: defaultBank.accountNumber,
         amount: price,
-        desc: String(order.id_order || "").trim(),
+        desc: String(order.id_order || order.idOrder || order.order_code || order.orderCode || "").trim(),
         name: defaultBank.accountHolder || "",
       }).catch(e => null);
       

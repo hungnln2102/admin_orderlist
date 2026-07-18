@@ -1,9 +1,9 @@
 require("module-alias/register");
 const { db } = require("../db");
-const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../config/dbSchema");
+const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, WAREHOUSE_SCHEMA, SCHEMA_WAREHOUSE, tableName } = require("../config/dbSchema");
 const logger = require("../utils/logger");
 
-const SRV_DEF = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
+const SRV_DEF = getDefinition("STOCK_SERVICES", WAREHOUSE_SCHEMA);
 
 async function getOrCreateVariant(typeStr, existingProductId = null) {
   let variant = await db(`${SCHEMA_PRODUCT}.variant`).whereRaw("TRIM(LOWER(display_name)) = ?", [typeStr.toLowerCase()]).first();
@@ -42,7 +42,7 @@ async function run() {
     const query = `
       SELECT conname
       FROM pg_constraint
-      WHERE conrelid = '${SCHEMA_PRODUCT}.${SRV_DEF.tableName}'::regclass
+      WHERE conrelid = '${SCHEMA_WAREHOUSE}.${SRV_DEF.tableName}'::regclass
       AND confrelid = '${SCHEMA_PRODUCT}.product'::regclass;
     `;
     const result = await db.raw(query);
@@ -51,13 +51,13 @@ async function run() {
       for (const row of result.rows) {
         const fkName = row.conname;
         logger.info(`Đang xoá foreign key cũ: ${fkName}`);
-        await db.raw(`ALTER TABLE ${SCHEMA_PRODUCT}.${SRV_DEF.tableName} DROP CONSTRAINT "${fkName}"`);
+        await db.raw(`ALTER TABLE ${SCHEMA_WAREHOUSE}.${SRV_DEF.tableName} DROP CONSTRAINT "${fkName}"`);
       }
     }
 
     // 2. Fetch all stock_services
     logger.info(`Đang đồng bộ lại ID...`);
-    const allServices = await db(`${SCHEMA_PRODUCT}.${SRV_DEF.tableName}`).select("id", "product_id", "product_type_old");
+    const allServices = await db(`${SCHEMA_WAREHOUSE}.${SRV_DEF.tableName}`).select("id", "product_id", "product_type_old");
     
     for (const srv of allServices) {
       let targetVariantId = null;
@@ -86,10 +86,10 @@ async function run() {
       }
 
       if (targetVariantId && targetVariantId !== srv.product_id) {
-        await db(`${SCHEMA_PRODUCT}.${SRV_DEF.tableName}`).where("id", srv.id).update({ product_id: targetVariantId });
+        await db(`${SCHEMA_WAREHOUSE}.${SRV_DEF.tableName}`).where("id", srv.id).update({ product_id: targetVariantId });
       } else if (!targetVariantId && srv.product_id !== null) {
         // If we really can't find a variant, set to NULL to prevent FK violation
-        await db(`${SCHEMA_PRODUCT}.${SRV_DEF.tableName}`).where("id", srv.id).update({ product_id: null });
+        await db(`${SCHEMA_WAREHOUSE}.${SRV_DEF.tableName}`).where("id", srv.id).update({ product_id: null });
       }
     }
 
@@ -97,14 +97,14 @@ async function run() {
     const queryNew = `
       SELECT conname
       FROM pg_constraint
-      WHERE conrelid = '${SCHEMA_PRODUCT}.${SRV_DEF.tableName}'::regclass
+      WHERE conrelid = '${SCHEMA_WAREHOUSE}.${SRV_DEF.tableName}'::regclass
       AND confrelid = '${SCHEMA_PRODUCT}.variant'::regclass;
     `;
     const resultNew = await db.raw(queryNew);
     
     if (resultNew.rows && resultNew.rows.length === 0) {
       logger.info(`Đang thêm foreign key mới trỏ vào variant...`);
-      await db.schema.withSchema(SCHEMA_PRODUCT).alterTable(SRV_DEF.tableName, (t) => {
+      await db.schema.withSchema(SCHEMA_WAREHOUSE).alterTable(SRV_DEF.tableName, (t) => {
         t.foreign("product_id").references("id").inTable(`${SCHEMA_PRODUCT}.variant`).onDelete("SET NULL");
       });
       logger.info("Thêm FK mới thành công!");

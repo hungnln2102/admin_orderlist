@@ -118,34 +118,7 @@ const PRODUCT_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
-  PRODUCT_STOCK: {
-    TABLE: "product_stocks",
-    COLS: {
-      ID: "id",
-      ACCOUNT_USERNAME: "account_username",
-      STATUS: "status",
-      IS_VERIFIED: "is_verified",
-      NOTE: "note",
-      CREATED_AT: "created_at",
-      UPDATED_AT: "updated_at",
-    },
-  },
-  STOCK_SERVICES: {
-    TABLE: "stock_services",
-    COLS: {
-      ID: "id",
-      STOCK_ID: "stock_id",
-      PRODUCT_ID: "product_id",
-      PRODUCT_TYPE_OLD: "product_type_old",
-      PASSWORD_ENCRYPTED: "password_encrypted",
-      BACKUP_EMAIL: "backup_email",
-      TWO_FA_ENCRYPTED: "two_fa_encrypted",
-      EXPIRES_AT: "expires_at",
-      STATUS: "status",
-      CREATED_AT: "created_at",
-      UPDATED_AT: "updated_at",
-    },
-  },
+
   PACKAGE_PRODUCT: {
     TABLE: "package_product",
     COLS: {
@@ -233,9 +206,48 @@ const PRICING_TIER_SCHEMA = {
   },
 };
 
+const WAREHOUSE_SCHEMA = {
+  PRODUCT_STOCK: {
+    TABLE: "product_stocks",
+    COLS: {
+      ID: "id",
+      ACCOUNT_USERNAME: "account_username",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  PRODUCT_NAMES: {
+    TABLE: "product_names",
+    COLS: {
+      ID: "id",
+      NAME: "name",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  STOCK_SERVICES: {
+    TABLE: "stock_services",
+    COLS: {
+      ID: "id",
+      STOCK_ID: "stock_id",
+      PRODUCT_ID: "product_id",
+      NAME_ID: "name_id",
+      PASSWORD_ENCRYPTED: "password_encrypted",
+      BACKUP_EMAIL: "backup_email",
+      TWO_FA_ENCRYPTED: "two_fa_encrypted",
+      NOTE: "note",
+      EXPIRES_AT: "expires_at",
+      STATUS: "status",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+};
+
 module.exports = {
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   PRICING_TIER_SCHEMA,
+  WAREHOUSE_SCHEMA,
 };

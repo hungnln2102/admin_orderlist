@@ -1,5 +1,5 @@
 const { db } = require("@/db");
-const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, getDefinition, tableName } =
+const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, SCHEMA_WAREHOUSE, WAREHOUSE_SCHEMA, getDefinition, tableName } =
   require("@/config/dbSchema");
 const {
   formatDateOutput,
@@ -12,15 +12,15 @@ const { QUOTED_COLS } = require("@/utils/columns");
 const PACKAGE_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
-const STOCK_DEF = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
-const SRV_DEF = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
+const STOCK_DEF = getDefinition("PRODUCT_STOCK", WAREHOUSE_SCHEMA);
+const SRV_DEF = getDefinition("STOCK_SERVICES", WAREHOUSE_SCHEMA);
 
 const TABLES = {
   packageProduct: tableName(PACKAGE_DEF.tableName, SCHEMA_PRODUCT),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
-  productStock: tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT),
-  stockServices: tableName(SRV_DEF.tableName, SCHEMA_PRODUCT),
+  productStock: tableName(STOCK_DEF.tableName, SCHEMA_WAREHOUSE),
+  stockServices: tableName(SRV_DEF.tableName, SCHEMA_WAREHOUSE),
 };
 
 const PRODUCT_SCHEMA_COLS = PRODUCT_DEF.columns;

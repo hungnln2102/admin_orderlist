@@ -2,7 +2,9 @@ const { db } = require("@/db");
 const {
   getDefinition,
   PRODUCT_SCHEMA,
+  WAREHOUSE_SCHEMA,
   SCHEMA_PRODUCT,
+  SCHEMA_WAREHOUSE,
   tableName,
 } = require("@/config/dbSchema");
 const { normalizeDateInput } = require("@/utils/normalizers");
@@ -13,13 +15,13 @@ const logger = require("@/utils/logger");
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 
-const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
+const warehouseDef = getDefinition("PRODUCT_STOCK", WAREHOUSE_SCHEMA);
 const cols = warehouseDef.columns;
-const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_PRODUCT);
+const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_WAREHOUSE);
 
-const servicesDef = getDefinition("STOCK_SERVICES", PRODUCT_SCHEMA);
+const servicesDef = getDefinition("STOCK_SERVICES", WAREHOUSE_SCHEMA);
 const srvCols = servicesDef.columns;
-const servicesTable = tableName(servicesDef.tableName, SCHEMA_PRODUCT);
+const servicesTable = tableName(servicesDef.tableName, SCHEMA_WAREHOUSE);
 
 const pkgDef = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const pkgCols = pkgDef.columns;
@@ -30,18 +32,20 @@ const normalizeProductId = (value) => {
 };
 
 const formatWarehouseService = (srv) => {
-  const displayName = srv.display_name || srv.variant_name || srv.product_type || null;
+  const displayName = srv.product_type || srv.display_name || srv.variant_name || null;
 
   return {
     id: srv.id ?? srv[srvCols.id],
     stock_id: srv.stock_id ?? srv[srvCols.stockId],
     product_id: srv.product_id ?? null,
+    warehouse_product_name_id: srv.warehouse_product_name_id ?? srv.name_id ?? srv[srvCols.nameId] ?? null,
     category: displayName,
     display_name: displayName,
     variant_name: srv.variant_name ?? null,
     password: srv.password ?? srv[srvCols.passwordEncrypted],
     backup_email: srv.backup_email ?? srv[srvCols.backupEmail],
     two_fa: srv.two_fa ?? srv[srvCols.twoFaEncrypted],
+    note: srv.note ?? srv[srvCols.note] ?? null,
     expires_at: srv.expires_at ?? srv[srvCols.expiresAt],
     status: srv.status ?? srv[srvCols.status],
     created_at: srv.created_at ?? srv[srvCols.createdAt],
@@ -58,9 +62,6 @@ const listWarehouse = async (_req, res) => {
       .select({
         id: `${alias}.${cols.id}`,
         account: `${alias}.${cols.accountUsername}`,
-        note: `${alias}.${cols.note}`,
-        status: `${alias}.${cols.status}`,
-        is_verified: `${alias}.${cols.isVerified}`,
         created_at: `${alias}.${cols.createdAt}`,
         updated_at: `${alias}.${cols.updatedAt}`,
       })
@@ -72,16 +73,20 @@ const listWarehouse = async (_req, res) => {
     if (stockIds.length > 0) {
       const services = await db(`${servicesTable} as ${sAlias}`)
         .leftJoin(`${SCHEMA_PRODUCT}.variant as v`, `v.id`, `${sAlias}.product_id`)
+        .leftJoin(`${SCHEMA_WAREHOUSE}.product_names as pn`, `pn.id`, `${sAlias}.${srvCols.nameId}`)
         .select({
           id: `${sAlias}.${srvCols.id}`,
           stock_id: `${sAlias}.${srvCols.stockId}`,
           product_id: `${sAlias}.product_id`,
-          category: db.raw("COALESCE(v.display_name, v.variant_name)"),
+          warehouse_product_name_id: `${sAlias}.${srvCols.nameId}`,
+          category: db.raw("COALESCE(pn.name, v.display_name, v.variant_name)"),
           display_name: `v.display_name`,
           variant_name: `v.variant_name`,
+          product_type: `pn.name`,
           password: `${sAlias}.${srvCols.passwordEncrypted}`,
           backup_email: `${sAlias}.${srvCols.backupEmail}`,
           two_fa: `${sAlias}.${srvCols.twoFaEncrypted}`,
+          note: `${sAlias}.${srvCols.note}`,
           expires_at: `${sAlias}.${srvCols.expiresAt}`,
           status: `${sAlias}.${srvCols.status}`,
           created_at: `${sAlias}.${srvCols.createdAt}`,
@@ -101,9 +106,9 @@ const listWarehouse = async (_req, res) => {
 
       for (const srv of services) {
         if (inUseSrvIds.has(srv.id)) {
-          srv.status = 'Đang Sử Dụng';
+          srv.status = 'UNAVAILABLE';
         } else {
-          srv.status = 'Tồn';
+          srv.status = 'AVAILABLE';
         }
 
         if (!servicesByStock[srv.stock_id]) {
@@ -128,13 +133,20 @@ const listWarehouse = async (_req, res) => {
   }
 };
 
+const ensureProductName = async (trx, nameStr) => {
+  if (!nameStr) return null;
+  const normalized = String(nameStr).trim();
+  if (!normalized) return null;
+  const existing = await trx(`${SCHEMA_WAREHOUSE}.product_names`).where("name", normalized).first();
+  if (existing) return existing.id;
+  const [inserted] = await trx(`${SCHEMA_WAREHOUSE}.product_names`).insert({ name: normalized }).returning("id");
+  return inserted?.id ?? inserted ?? null;
+};
+
 const createWarehouse = async (req, res) => {
   // Support both legacy single-service creation and new multi-service creation
   const {
     account,
-    note,
-    status,
-    is_verified,
     services = []
   } = req.body || {};
 
@@ -145,6 +157,7 @@ const createWarehouse = async (req, res) => {
       password: req.body.password,
       backup_email: req.body.backup_email,
       two_fa: req.body.two_fa,
+      note: req.body.note,
       expires_at: req.body.expires_at,
     });
   }
@@ -165,9 +178,6 @@ const createWarehouse = async (req, res) => {
         const [stock] = await trx(warehouseTable)
           .insert({
             [cols.accountUsername]: account ?? null,
-            [cols.note]: note ?? null,
-            [cols.status]: status ?? "Tồn",
-            [cols.isVerified]: is_verified ?? false,
             [cols.createdAt]: now,
             [cols.updatedAt]: now,
           })
@@ -178,14 +188,25 @@ const createWarehouse = async (req, res) => {
 
       const insertedServices = [];
       for (const srv of services) {
+        let pId = normalizeProductId(srv.product_id);
+        let nameId = normalizeProductId(srv.warehouse_product_name_id);
+        if (!pId && !nameId && (srv.product_id || srv.category)) {
+          const customName = typeof srv.product_id === 'string' && srv.product_id !== '' 
+            ? srv.product_id 
+            : srv.category;
+          nameId = await ensureProductName(trx, customName);
+        }
+
         const [insertedSrv] = await trx(servicesTable)
           .insert({
             [srvCols.stockId]: stockRow.id,
-            product_id: normalizeProductId(srv.product_id),
+            product_id: pId,
+            [srvCols.nameId]: nameId,
             [srvCols.passwordEncrypted]: srv.password ?? null,
             [srvCols.backupEmail]: srv.backup_email ?? null,
             [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
-            [srvCols.status]: "Tồn",
+            [srvCols.note]: srv.note ?? null,
+            [srvCols.status]: "AVAILABLE",
             [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
             [srvCols.createdAt]: now,
             [srvCols.updatedAt]: now,
@@ -195,10 +216,35 @@ const createWarehouse = async (req, res) => {
         insertedServices.push(insertedSrv.id !== undefined ? insertedSrv : { id: insertedSrv });
       }
 
+      const serviceProductIds = insertedServices
+        .map((srv) => srv.product_id)
+        .filter((productId) => productId != null);
+      const variants = serviceProductIds.length
+        ? await trx(`${SCHEMA_PRODUCT}.variant`).select("id", "display_name", "variant_name").whereIn("id", serviceProductIds)
+        : [];
+      const variantById = new Map(variants.map((variant) => [Number(variant.id), variant]));
+
+      const serviceNameIds = insertedServices
+        .map((srv) => srv.name_id)
+        .filter((nameId) => nameId != null);
+      const names = serviceNameIds.length
+        ? await trx(`${SCHEMA_WAREHOUSE}.product_names`).select("id", "name").whereIn("id", serviceNameIds)
+        : [];
+      const nameById = new Map(names.map((n) => [Number(n.id), n.name]));
+
+      const formattedServices = insertedServices.map((srv) =>
+        formatWarehouseService({
+          ...srv,
+          ...variantById.get(Number(srv.product_id)),
+          product_type: nameById.get(Number(srv.name_id)),
+          product_id: srv.product_id,
+        })
+      );
+
       return {
         id: stockRow.id,
         account: stockRow[cols.accountUsername],
-        services: insertedServices
+        services: formattedServices
       };
     });
 
@@ -223,9 +269,6 @@ const updateWarehouse = async (req, res) => {
   const { id } = req.params;
   const {
     account,
-    note,
-    status,
-    is_verified,
     services = []
   } = req.body || {};
 
@@ -240,9 +283,6 @@ const updateWarehouse = async (req, res) => {
         .where(cols.id, id)
         .update({
           [cols.accountUsername]: account ?? null,
-          [cols.note]: note ?? null,
-          [cols.status]: status ?? null,
-          [cols.isVerified]: is_verified ?? false,
           [cols.updatedAt]: new Date().toISOString(),
         })
         .returning("*");
@@ -262,13 +302,24 @@ const updateWarehouse = async (req, res) => {
         const keptIds = new Set();
 
         for (const srv of services) {
+          let pId = normalizeProductId(srv.product_id);
+          let nameId = normalizeProductId(srv.warehouse_product_name_id);
+          if (!pId && !nameId && (srv.product_id || srv.category)) {
+            const customName = typeof srv.product_id === 'string' && srv.product_id !== '' 
+              ? srv.product_id 
+              : srv.category;
+            nameId = await ensureProductName(trx, customName);
+          }
+
           if (srv.id && existingIds.has(srv.id)) {
             // Update
             const [updatedSrv] = await trx(servicesTable).where(srvCols.id, srv.id).update({
-              product_id: normalizeProductId(srv.product_id),
+              product_id: pId,
+              [srvCols.nameId]: nameId,
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
               [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
+              [srvCols.note]: srv.note ?? null,
               [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
               [srvCols.updatedAt]: new Date().toISOString()
             }).returning("*");
@@ -281,11 +332,13 @@ const updateWarehouse = async (req, res) => {
             const now = new Date().toISOString();
             const [insertedSrv] = await trx(servicesTable).insert({
               [srvCols.stockId]: id,
-              product_id: normalizeProductId(srv.product_id),
+              product_id: pId,
+              [srvCols.nameId]: nameId,
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
               [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
-              [srvCols.status]: "Tồn",
+              [srvCols.note]: srv.note ?? null,
+              [srvCols.status]: "AVAILABLE",
               [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
               [srvCols.createdAt]: now,
               [srvCols.updatedAt]: now,
@@ -313,10 +366,19 @@ const updateWarehouse = async (req, res) => {
         : [];
       const variantById = new Map(variants.map((variant) => [Number(variant.id), variant]));
 
+      const serviceNameIds = updatedServices
+        .map((srv) => srv.name_id)
+        .filter((nameId) => nameId != null);
+      const names = serviceNameIds.length
+        ? await trx(`${SCHEMA_WAREHOUSE}.product_names`).select("id", "name").whereIn("id", serviceNameIds)
+        : [];
+      const nameById = new Map(names.map((n) => [Number(n.id), n.name]));
+
       const formattedServices = updatedServices.map((srv) =>
         formatWarehouseService({
           ...srv,
           ...variantById.get(Number(srv.product_id)),
+          product_type: nameById.get(Number(srv.name_id)),
           product_id: srv.product_id,
         })
       );
@@ -324,9 +386,6 @@ const updateWarehouse = async (req, res) => {
       return {
         id: updated[cols.id],
         account: updated[cols.accountUsername],
-        note: updated[cols.note],
-        status: updated[cols.status],
-        is_verified: updated[cols.isVerified],
         created_at: updated[cols.createdAt],
         updated_at: updated[cols.updatedAt],
         services: formattedServices

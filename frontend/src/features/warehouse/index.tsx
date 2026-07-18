@@ -96,9 +96,8 @@ export default function Storage() {
     setExpandedItemId((prev) => (prev === id ? null : id));
   };
 
-  const updateDraft = (key: keyof WarehouseItem, value: string) => {
-    const parsed = key === "is_verified" ? value === "true" : value;
-    setDraft((prev) => ({ ...(prev || {}), [key]: parsed }));
+  const updateDraft = (key: keyof WarehouseItem, value: any) => {
+    setDraft((prev) => ({ ...(prev || {}), [key]: value }));
   };
 
   const saveEdit = async (id?: number) => {
@@ -156,18 +155,17 @@ export default function Storage() {
     setEditingId("new");
     setDraft({
       account: "",
-      note: "",
-      is_verified: false,
       services: [
         {
           category: "",
           password: "",
           backup_email: "",
           two_fa: "",
-          status: "Tồn",
           expires_at: "",
-        }
-      ]
+          note: "",
+          status: "AVAILABLE",
+        },
+      ],
     });
   };
 
@@ -202,9 +200,6 @@ export default function Storage() {
 
         const baseMatch = [
           item.account,
-          item.note,
-          item.status,
-          item.category, // Legacy fallback
         ].some((field) => normalizeText(field).includes(q));
 
         if (baseMatch) return true;
