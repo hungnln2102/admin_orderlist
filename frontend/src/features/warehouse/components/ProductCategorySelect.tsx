@@ -5,7 +5,7 @@ import type { ProductOption } from "../hooks/useWarehouseProducts";
 type Props = {
   value: string;
   options: ProductOption[];
-  onChange: (value: string) => void;
+  onChange: (value: string, label: string) => void;
   disabled?: boolean;
   placeholder?: string;
 };
@@ -23,8 +23,8 @@ export const ProductCategorySelect: React.FC<Props> = ({
     options={options}
     placeholder={placeholder}
     disabled={disabled}
-    allowCustom={true}
-    onChange={(v) => onChange(String(v))}
-    onClear={() => onChange("")}
+    allowCustom
+    onChange={(v, opt) => onChange(String(v), String(opt?.label || v))}
+    onClear={() => onChange("", "")}
   />
 );

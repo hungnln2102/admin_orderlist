@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch, apiPost, apiPut, apiDelete } from "@/shared/api/client";
+import { useEffect, useMemo, useState } from "react";
+import { apiFetch, apiPost, apiPut, apiDelete } from "@/shared/api/client";
+
 import { API_ENDPOINTS } from "@/constants";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import {
@@ -10,7 +11,11 @@ import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
 import { useWarehouseProducts } from "./hooks/useWarehouseProducts";
-import { WarehouseItem, normalizeText } from "./types";
+import {
+  WarehouseItem,
+  getWarehouseServiceDisplayName,
+  normalizeText,
+} from "./types";
 import { useImportPackageSubmit } from "./hooks/useImportPackageSubmit";
 
 export default function Storage() {
@@ -104,13 +109,15 @@ export default function Storage() {
       if (editingId === "new") {
         const res = await apiPost<WarehouseItem>(API_ENDPOINTS.WAREHOUSE, draft);
         setItems((prev) => [...prev, res]);
-        cancelEdit();
+        cancelEdit();
+
       } else {
         const updated = await apiPut<WarehouseItem>(`${API_ENDPOINTS.WAREHOUSE}/${id}`, draft);
         setItems((prev) =>
           prev.map((it) => (it.id === id ? { ...it, ...updated } : it))
         );
-        cancelEdit();
+        cancelEdit();
+
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi khi cập nhật");
@@ -132,7 +139,8 @@ export default function Storage() {
     setError(null);
     try {
       await apiDelete(`${API_ENDPOINTS.WAREHOUSE}/${id}`);
-      setItems((prev) => prev.filter((it) => it.id !== id));
+      setItems((prev) => prev.filter((it) => it.id !== id));
+
       if (editingId === id) cancelEdit();
       if (expandedItemId === id) setExpandedItemId(null);
       setWarehouseIdPendingDelete(null);
@@ -184,12 +192,14 @@ export default function Storage() {
       .filter((item) => {
         if (productFilter.trim()) {
           const filter = normalizeText(productFilter);
-          const hasMatchingCat = item.services?.some(s => normalizeText(s.category) === filter);
+          const hasMatchingCat = item.services?.some(
+            (s) => normalizeText(getWarehouseServiceDisplayName(s)) === filter
+          );
           if (!hasMatchingCat && normalizeText(item.category) !== filter) return false;
         }
         if (!search.trim()) return true;
         const q = normalizeText(search);
-        
+
         const baseMatch = [
           item.account,
           item.note,
@@ -199,13 +209,17 @@ export default function Storage() {
 
         if (baseMatch) return true;
 
-        return item.services?.some(s => 
-          [s.category, s.password, s.backup_email, s.two_fa].some(field => normalizeText(field).includes(q))
+        return item.services?.some(s =>
+          [getWarehouseServiceDisplayName(s), s.password, s.backup_email, s.two_fa].some(field => normalizeText(field).includes(q))
         );
       })
       .sort((a, b) => {
-        const nameA = normalizeText(a.services?.[0]?.category || a.category);
-        const nameB = normalizeText(b.services?.[0]?.category || b.category);
+        const nameA = normalizeText(
+          getWarehouseServiceDisplayName(a.services?.[0]) || a.category
+        );
+        const nameB = normalizeText(
+          getWarehouseServiceDisplayName(b.services?.[0]) || b.category
+        );
         return nameA.localeCompare(nameB, "vi");
       });
   }, [items, search, productFilter]);

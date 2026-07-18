@@ -2,13 +2,10 @@ import React, { useCallback } from "react";
 import {
   PencilSquareIcon,
   TrashIcon,
-  XCircleIcon,
 } from "@heroicons/react/24/outline";
-import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
 import type { ProductOption } from "../../hooks/useWarehouseProducts";
-import { WarehouseItem } from "../../types";
+import { WarehouseItem, getWarehouseServiceDisplayName } from "../../types";
 import { getWarehouseTheme } from "../../utils/warehouseTheme";
-import { warehouseStatusClass } from "../storageItemCardUtils";
 import { WarehouseRowExpanded } from "./WarehouseRowExpanded";
 
 type Props = {
@@ -57,30 +54,29 @@ export const WarehouseRow = React.memo(function WarehouseRow({
       action();
     };
 
-  const exp = item.expires_at
-    ? new Date(item.expires_at).toLocaleDateString("vi-VN")
-    : "—";
-
   return (
     <React.Fragment>
       <tr
         onClick={handleToggle}
-        className={`warehouse-row group/row cursor-pointer transition-all duration-500 ${
-          isExpanded ? "warehouse-row--expanded z-20" : "z-10"
-        }`}
+        className={`warehouse-row group/row cursor-pointer transition-all duration-500 ${isExpanded ? "warehouse-row--expanded z-20" : "z-10"
+          }`}
       >
         <td className={productCellClass}>
           <div className="flex flex-wrap justify-center gap-1">
             {(item.services && item.services.length > 0) ? (
-              item.services.map((srv, idx) => (
-                <span
-                  key={srv.id || idx}
-                  className={`inline-block whitespace-nowrap text-center text-[9px] font-bold uppercase tracking-wide text-white px-1.5 py-0.5 rounded ${srv.status === 'Đang Sử Dụng' ? 'bg-white/10 text-white/50 line-through' : 'bg-indigo-500/80'}`}
-                  title={`${srv.category || "—"} - ${srv.status || ""}`}
-                >
-                  {srv.category || "—"} {srv.status === 'Đang Sử Dụng' ? '(Hết)' : ''}
-                </span>
-              ))
+              item.services.map((srv, idx) => {
+                const productLabel = getWarehouseServiceDisplayName(srv) || "—";
+
+                return (
+                  <span
+                    key={srv.id || idx}
+                    className={`inline-block whitespace-nowrap text-center text-[9px] font-bold uppercase tracking-wide text-white px-1.5 py-0.5 rounded ${srv.status === 'Đang Sử Dụng' ? 'bg-white/10 text-white/50 line-through' : 'bg-indigo-500/80'}`}
+                    title={`${productLabel} - ${srv.status || ""}`}
+                  >
+                    {productLabel} {srv.status === 'Đang Sử Dụng' ? '(Hết)' : ''}
+                  </span>
+                );
+              })
             ) : (
               <span className="block whitespace-nowrap text-center text-[10px] font-bold uppercase leading-tight tracking-wide text-white sm:text-[11px]">
                 {item.category || "—"}

@@ -1,74 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_ENDPOINTS } from "@/constants";
-import { apiGet } from "@/shared/api/client";
-import type { WarehouseItem } from "../types";
-
-type CatalogProduct = {
-  id?: number;
-  san_pham?: string;
-};
+import { useMemo } from "react";
+import { getWarehouseServiceDisplayName, type WarehouseItem } from "../types";
 
 export type ProductOption = { value: string; label: string };
 
 export function useWarehouseProducts(items: WarehouseItem[]) {
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-
-  const loadProducts = useCallback(async () => {
-    setLoadingProducts(true);
-    try {
-      const data = await apiGet<CatalogProduct[]>("/api/products");
-      setProducts(Array.isArray(data) ? data : []);
-    } catch {
-      setProducts([]);
-    } finally {
-      setLoadingProducts(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadProducts();
-  }, [loadProducts]);
-
   const productOptions = useMemo((): ProductOption[] => {
-    const fromApi = products
-      .filter((p) => p.id && String(p.san_pham || "").trim())
-      .map((p) => {
-        const value = String(p.id).trim();
-        const label = String(p.san_pham).trim();
-        return { value, label };
-      });
-
-    const fromStock: string[] = [];
-    items.forEach((it) => {
-      if (Array.isArray(it.services)) {
-        it.services.forEach((srv) => {
-          const cat = String(srv.category || "").trim();
-          if (cat) fromStock.push(cat);
-        });
-      }
-    });
-
     const seen = new Set<string>();
     const merged: ProductOption[] = [];
 
-    for (const opt of fromApi) {
-      const key = opt.value.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(opt);
-    }
+    items.forEach((it) => {
+      if (!Array.isArray(it.services)) return;
 
-    for (const name of fromStock) {
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push({ value: name, label: name });
-    }
+      it.services.forEach((srv) => {
+        const label = getWarehouseServiceDisplayName(srv);
+        const value = String(srv.product_id || srv.category || label || "").trim();
+
+        if (!value || !label) return;
+
+        const key = value.toLowerCase();
+        if (seen.has(key)) return;
+
+        seen.add(key);
+        merged.push({ value, label });
+      });
+    });
 
     merged.sort((a, b) => a.label.localeCompare(b.label, "vi"));
     return merged;
-  }, [products, items]);
+  }, [items]);
 
-  return { productOptions, loadingProducts, reloadProducts: loadProducts };
+  return { productOptions, loadingProducts: false, reloadProducts: () => undefined };
 }

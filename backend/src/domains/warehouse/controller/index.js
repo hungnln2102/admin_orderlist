@@ -24,29 +24,30 @@ const servicesTable = tableName(servicesDef.tableName, SCHEMA_PRODUCT);
 const pkgDef = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const pkgCols = pkgDef.columns;
 const pkgTable = tableName(pkgDef.tableName, SCHEMA_PRODUCT);
+const normalizeProductId = (value) => {
+  const numericId = Number(value);
+  return Number.isFinite(numericId) && numericId > 0 ? numericId : null;
+};
 
-async function resolveProductId(trx, categoryValue) {
-  if (!categoryValue) return null;
-  const num = Number(categoryValue);
-  if (Number.isFinite(num) && num > 0) {
-    const exists = await trx(`${SCHEMA_PRODUCT}.product`).where("id", num).first();
-    if (exists) return num;
-  }
-  
-  const typeStr = String(categoryValue).trim();
-  if (typeStr === "") return null;
-  
-  const existingProd = await trx(`${SCHEMA_PRODUCT}.product`).whereRaw("TRIM(LOWER(package_name)) = ?", [typeStr.toLowerCase()]).first();
-  if (existingProd) return existingProd.id;
-  
-  const [inserted] = await trx(`${SCHEMA_PRODUCT}.product`).insert({
-    package_name: typeStr,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).returning("id");
-  
-  return inserted.id !== undefined ? inserted.id : inserted;
-}
+const formatWarehouseService = (srv) => {
+  const displayName = srv.display_name || srv.variant_name || srv.product_type || null;
+
+  return {
+    id: srv.id ?? srv[srvCols.id],
+    stock_id: srv.stock_id ?? srv[srvCols.stockId],
+    product_id: srv.product_id ?? null,
+    category: displayName,
+    display_name: displayName,
+    variant_name: srv.variant_name ?? null,
+    password: srv.password ?? srv[srvCols.passwordEncrypted],
+    backup_email: srv.backup_email ?? srv[srvCols.backupEmail],
+    two_fa: srv.two_fa ?? srv[srvCols.twoFaEncrypted],
+    expires_at: srv.expires_at ?? srv[srvCols.expiresAt],
+    status: srv.status ?? srv[srvCols.status],
+    created_at: srv.created_at ?? srv[srvCols.createdAt],
+    updated_at: srv.updated_at ?? srv[srvCols.updatedAt],
+  };
+};
 
 const listWarehouse = async (_req, res) => {
   try {
@@ -75,7 +76,9 @@ const listWarehouse = async (_req, res) => {
           id: `${sAlias}.${srvCols.id}`,
           stock_id: `${sAlias}.${srvCols.stockId}`,
           product_id: `${sAlias}.product_id`,
-          category: `v.display_name`,
+          category: db.raw("COALESCE(v.display_name, v.variant_name)"),
+          display_name: `v.display_name`,
+          variant_name: `v.variant_name`,
           password: `${sAlias}.${srvCols.passwordEncrypted}`,
           backup_email: `${sAlias}.${srvCols.backupEmail}`,
           two_fa: `${sAlias}.${srvCols.twoFaEncrypted}`,
@@ -106,7 +109,7 @@ const listWarehouse = async (_req, res) => {
         if (!servicesByStock[srv.stock_id]) {
           servicesByStock[srv.stock_id] = [];
         }
-        servicesByStock[srv.stock_id].push(srv);
+        servicesByStock[srv.stock_id].push(formatWarehouseService(srv));
       }
     }
 
@@ -150,7 +153,7 @@ const createWarehouse = async (req, res) => {
     const row = await db.transaction(async (trx) => {
       const now = new Date().toISOString();
       let stockRow;
-      
+
       if (account) {
         const existingStock = await trx(warehouseTable).where(cols.accountUsername, account).first();
         if (existingStock) {
@@ -169,17 +172,16 @@ const createWarehouse = async (req, res) => {
             [cols.updatedAt]: now,
           })
           .returning("*");
-          
+
         stockRow = stock.id !== undefined ? stock : { id: stock, [cols.accountUsername]: account };
       }
 
       const insertedServices = [];
       for (const srv of services) {
-        const pId = await resolveProductId(trx, srv.category);
         const [insertedSrv] = await trx(servicesTable)
           .insert({
             [srvCols.stockId]: stockRow.id,
-            product_id: pId,
+            product_id: normalizeProductId(srv.product_id),
             [srvCols.passwordEncrypted]: srv.password ?? null,
             [srvCols.backupEmail]: srv.backup_email ?? null,
             [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
@@ -189,7 +191,7 @@ const createWarehouse = async (req, res) => {
             [srvCols.updatedAt]: now,
           })
           .returning("*");
-        
+
         insertedServices.push(insertedSrv.id !== undefined ? insertedSrv : { id: insertedSrv });
       }
 
@@ -260,18 +262,17 @@ const updateWarehouse = async (req, res) => {
         const keptIds = new Set();
 
         for (const srv of services) {
-          const pId = await resolveProductId(trx, srv.category);
           if (srv.id && existingIds.has(srv.id)) {
             // Update
             const [updatedSrv] = await trx(servicesTable).where(srvCols.id, srv.id).update({
-              product_id: pId,
+              product_id: normalizeProductId(srv.product_id),
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
               [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
               [srvCols.expiresAt]: normalizeDateInput(srv.expires_at) || null,
               [srvCols.updatedAt]: new Date().toISOString()
             }).returning("*");
-            
+
             const fetchedUpdated = updatedSrv.id !== undefined ? updatedSrv : await trx(servicesTable).where(srvCols.id, srv.id).first();
             updatedServices.push(fetchedUpdated);
             keptIds.add(srv.id);
@@ -280,7 +281,7 @@ const updateWarehouse = async (req, res) => {
             const now = new Date().toISOString();
             const [insertedSrv] = await trx(servicesTable).insert({
               [srvCols.stockId]: id,
-              product_id: pId,
+              product_id: normalizeProductId(srv.product_id),
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
               [srvCols.twoFaEncrypted]: srv.two_fa ?? null,
@@ -289,7 +290,7 @@ const updateWarehouse = async (req, res) => {
               [srvCols.createdAt]: now,
               [srvCols.updatedAt]: now,
             }).returning("*");
-            
+
             const fetchedInserted = insertedSrv.id !== undefined ? insertedSrv : await trx(servicesTable).where(srvCols.id, insertedSrv).first();
             updatedServices.push(fetchedInserted);
           }
@@ -304,20 +305,21 @@ const updateWarehouse = async (req, res) => {
         // If services array is empty, delete all existing services
         await trx(servicesTable).where(srvCols.stockId, id).del();
       }
-      
-      // Remap services to frontend format
-      const formattedServices = updatedServices.map(srv => ({
-        id: srv[srvCols.id],
-        stock_id: srv[srvCols.stockId],
-        category: srv[srvCols.productType],
-        password: srv[srvCols.passwordEncrypted],
-        backup_email: srv[srvCols.backupEmail],
-        two_fa: srv[srvCols.twoFaEncrypted],
-        expires_at: srv[srvCols.expiresAt],
-        status: srv[srvCols.status],
-        created_at: srv[srvCols.createdAt],
-        updated_at: srv[srvCols.updatedAt]
-      }));
+      const serviceProductIds = updatedServices
+        .map((srv) => srv.product_id)
+        .filter((productId) => productId != null);
+      const variants = serviceProductIds.length
+        ? await trx(`${SCHEMA_PRODUCT}.variant`).select("id", "display_name", "variant_name").whereIn("id", serviceProductIds)
+        : [];
+      const variantById = new Map(variants.map((variant) => [Number(variant.id), variant]));
+
+      const formattedServices = updatedServices.map((srv) =>
+        formatWarehouseService({
+          ...srv,
+          ...variantById.get(Number(srv.product_id)),
+          product_id: srv.product_id,
+        })
+      );
 
       return {
         id: updated[cols.id],
@@ -344,7 +346,6 @@ const updateWarehouse = async (req, res) => {
     res.status(500).json({ error: "Không thể cập nhật kho hàng." });
   }
 };
-
 const deleteWarehouse = async (req, res) => {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: "Missing id" });

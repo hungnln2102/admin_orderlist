@@ -94,9 +94,10 @@ export const WarehouseEditFields: React.FC<Props> = ({
                 <ProductCategorySelect
                   value={String(srv.product_id || srv.category || "")}
                   options={productOptions}
-                  onChange={(v) => {
-                    handleServiceChange(idx, "product_id", v);
-                    handleServiceChange(idx, "category", v);
+                  onChange={(value, label) => {
+                    handleServiceChange(idx, "product_id", value);
+                    handleServiceChange(idx, "category", label);
+                    handleServiceChange(idx, "display_name", label);
                   }}
                 />
               </div>

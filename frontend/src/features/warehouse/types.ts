@@ -1,10 +1,11 @@
-import { normalizeSearchText } from "@/shared/text";
-
 export type WarehouseService = {
   id?: number;
   stock_id?: number;
   product_id?: number | string | null;
+  warehouse_product_name_id?: number | string | null;
   category?: string | null;
+  display_name?: string | null;
+  variant_name?: string | null;
   password?: string | null;
   backup_email?: string | null;
   two_fa?: string | null;
@@ -42,3 +43,6 @@ export const normalizeText = (value: unknown) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+
+export const getWarehouseServiceDisplayName = (service?: WarehouseService | null) =>
+  String(service?.display_name || service?.category || "").trim();

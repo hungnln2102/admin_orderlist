@@ -4,6 +4,10 @@ const {
   buildDueOrderMessage, 
   buildExpiredOrderMessage 
 } = require("@/domains/notifications/telegram/builders/orderMessageBuilder");
+const { db } = require("@/db");
+const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
+const { fetchQrImageBytes } = require("@/domains/notifications/telegram/services/qr");
+const FormData = require("form-data");
 const { 
   ORDER_CREATED_TOPIC_ID, 
   ZERO_DAYS_TOPIC_ID, 
@@ -60,15 +64,56 @@ function sendBulkTelegramOrders(orders = [], config) {
   }
 }
 
-function notifyOrderCreated(order) {
+async function notifyOrderCreated(order) {
   if (!SEND_ORDER_NOTIFICATION) return;
-  const text = buildOrderCreatedMessage(order);
-  enqueueMessage({
-    chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
-    message_thread_id: ORDER_CREATED_TOPIC_ID,
-    text,
-    parse_mode: "HTML",
-  });
+
+  try {
+    let productName = order.id_product;
+    if (order.id_product) {
+      const prod = await db('product').where('id', order.id_product).first();
+      if (prod && prod.name) productName = prod.name;
+    }
+    const enrichedOrder = { ...order, productName };
+    
+    const defaultBank = await resolveDefaultShopBankAccount();
+    const text = buildOrderCreatedMessage(enrichedOrder, defaultBank);
+    const price = Number(order.price) || 0;
+    let qrBuffer = null;
+    
+    if (price > 0 && defaultBank?.accountNumber && defaultBank?.bankCode) {
+      const qrResult = await fetchQrImageBytes({
+        bank: defaultBank.bankCode,
+        acc: defaultBank.accountNumber,
+        amount: price,
+        desc: String(order.id_order || "").trim(),
+        name: defaultBank.accountHolder || "",
+      }).catch(e => null);
+      
+      if (qrResult && qrResult.buffer) {
+        qrBuffer = qrResult.buffer;
+      }
+    }
+    
+    if (qrBuffer) {
+      const form = new FormData();
+      form.append("chat_id", require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID);
+      form.append("message_thread_id", ORDER_CREATED_TOPIC_ID);
+      form.append("photo", qrBuffer, { filename: "qr.png", contentType: "image/png" });
+      form.append("caption", text);
+      form.append("parse_mode", "HTML");
+      enqueueMessage(form);
+    } else {
+      enqueueMessage({
+        chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
+        message_thread_id: ORDER_CREATED_TOPIC_ID,
+        text,
+        parse_mode: "HTML",
+      });
+    }
+  } catch (error) {
+    const logger = require("@/utils/logger");
+    logger.error("[OrderNotifier] Lỗi khi notifyOrderCreated", { error: error.message });
+  }
 }
 
 function notifyFourDaysRemaining(orders) {

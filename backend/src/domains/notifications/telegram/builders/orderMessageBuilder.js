@@ -19,7 +19,7 @@ function extractOrderData(order) {
   if (!order) return {};
   return {
     orderCode: toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim(),
-    productName: toSafeString(order.id_product || order.idProduct).trim(),
+    productName: toSafeString(order.productName || order.product_name || order.id_product || order.idProduct).trim(),
     info: toSafeString(order.information_order || order.informationOrder).trim(),
     slot: toSafeString(order.slot).trim(),
     customer: toSafeString(order.customer || order.customer_name).trim(),

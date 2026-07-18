@@ -10,7 +10,7 @@
 const https = require("https");
 const { URL } = require("url");
 
-const { preferIpv4Lookup } = require("@/domains/notifications/telegram/services/dnsHelpers");
+
 
 const VIETQR_IMAGE_TEMPLATE = "compact2";
 
@@ -169,7 +169,7 @@ function httpsGetBuffer(url, options = {}) {
           "User-Agent": "MavrykStoreBot/1.0",
           Accept: "image/png,image/jpeg,image/*",
         },
-        agent: new https.Agent({ keepAlive: true, lookup: preferIpv4Lookup }),
+        agent: new https.Agent({ keepAlive: true }),
       },
       (res) => {
         const status = res.statusCode || 0;

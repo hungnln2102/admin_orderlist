@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import { CheckIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { ProductOption } from "../../hooks/useWarehouseProducts";
-import { WarehouseItem } from "../../types";
+import { WarehouseItem, getWarehouseServiceDisplayName } from "../../types";
 import type { WarehouseTheme } from "../../utils/warehouseTheme";
 import {
   formatWarehouseRowForCopy,
@@ -58,7 +58,10 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
   if (!isExpanded) return null;
 
   const accountLabel = String(item.account || "").trim() || "—";
-  const categoryLabel = String(item.category || "").trim() || "—";
+  const categoryLabel =
+    item.services?.map((srv) => getWarehouseServiceDisplayName(srv)).filter(Boolean).join(", ") ||
+    String(item.category || "").trim() ||
+    "—";
 
   return (
     <tr className="warehouse-row__expandable animate-in fade-in slide-in-from-top-2 duration-300">
@@ -148,7 +151,7 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
                     <tbody className="divide-y divide-indigo-500/10">
                       {item.services.map((srv, idx) => (
                         <tr key={srv.id || idx}>
-                          <td className="px-3 py-2 font-semibold text-white">{srv.category || "—"}</td>
+                          <td className="px-3 py-2 font-semibold text-white">{getWarehouseServiceDisplayName(srv) || "—"}</td>
                           <td className="px-3 py-2">
                             <div className="w-fit max-w-full">
                               <CopyableValue value={srv.password} mono showButtonOnHover={false} />
