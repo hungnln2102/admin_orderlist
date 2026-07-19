@@ -29,11 +29,11 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   const [selectedCreditId, setSelectedCreditId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: creditsData, loading } = useApiQuery<{ data: RefundCreditLog[] }>(
-    isOpen ? "/api/orders/refund-credits/logs?limit=50&statuses=OPEN,PARTIALLY_APPLIED" : null
+  const { data: creditsData, loading } = useApiQuery<{ items: RefundCreditLog[] }>(
+    isOpen ? "/api/orders/refund-credits/logs?limit=50&status_group=available" : null
   );
 
-  const credits = creditsData?.data || [];
+  const credits = creditsData?.items || [];
 
   if (!isOpen || !order) return null;
 
