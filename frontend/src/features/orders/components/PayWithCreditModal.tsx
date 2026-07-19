@@ -4,14 +4,10 @@ import { formatCurrency } from "../utils/ordersHelpers";
 import { apiPost } from "@/shared/api/client";
 import toast from "react-hot-toast";
 import { useApiQuery } from "@/shared/hooks/useApiQuery";
-
-type RefundCreditLog = {
-  id: number;
-  credit_code: string;
-  source_order_code: string;
-  available_amount: number;
-  status: string;
-};
+import {
+  fetchAvailableRefundCredits,
+  type AvailableRefundCredit,
+} from "@/lib/refundCreditsApi";
 
 type PayWithCreditModalProps = {
   isOpen: boolean;
@@ -29,11 +25,12 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   const [selectedCreditId, setSelectedCreditId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: creditsData, loading } = useApiQuery<{ items: RefundCreditLog[] }>(
-    isOpen ? "/api/orders/refund-credits/logs?limit=50&status_group=available" : null
+  const { data: creditsData, loading } = useApiQuery<AvailableRefundCredit[]>(
+    fetchAvailableRefundCredits,
+    { lazy: !isOpen, initialData: [] }
   );
 
-  const credits = creditsData?.items || [];
+  const credits = creditsData || [];
 
   if (!isOpen || !order) return null;
 
@@ -47,7 +44,7 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
     try {
       await apiPost("/api/orders/refund-credits/apply-to-order", {
         targetOrderId: order[ORDER_FIELDS.ID],
-        creditNoteId: selectedCreditId,
+        creditNoteId: Number(selectedCreditId),
       });
       toast.success("Thanh toán bằng credit thành công!");
       onSuccess();
@@ -95,9 +92,9 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
               {credits.map((credit) => (
                 <div
                   key={credit.id}
-                  onClick={() => setSelectedCreditId(credit.id)}
+                  onClick={() => setSelectedCreditId(Number(credit.id))}
                   className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                    selectedCreditId === credit.id
+                    selectedCreditId === Number(credit.id)
                       ? "bg-cyan-500/20 border-cyan-500 shadow-md shadow-cyan-900/20"
                       : "bg-slate-900/40 border-slate-700 hover:border-slate-500"
                   }`}
