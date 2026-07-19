@@ -63,11 +63,14 @@ const appendNote = (baseNote, suffix) => {
 
 const attachRefundCreditRoutes = (router) => {
     router.post("/refund-credits/apply-to-order", async (req, res) => {
-        const { targetOrderId, creditNoteId, note } = req.body;
+        const { targetOrderId, creditNoteId, note, waiveRemaining } = req.body;
         const requestedAmount = req.body.requestedAmount;
         
-        if (!targetOrderId || !creditNoteId) {
-            return res.status(400).json({ error: "Thiếu targetOrderId hoặc creditNoteId" });
+        if (!targetOrderId) {
+            return res.status(400).json({ error: "Thiếu targetOrderId" });
+        }
+        if (!creditNoteId && !waiveRemaining) {
+            return res.status(400).json({ error: "Vui lòng chọn credit hoặc check Xí xóa" });
         }
 
         try {
@@ -86,21 +89,23 @@ const attachRefundCreditRoutes = (router) => {
                     finalRequestedAmount = normalizeMoney(order[COLS.ORDER.PRICE]) - alreadyApplied;
                 }
 
-                if (finalRequestedAmount <= 0) {
+                if (finalRequestedAmount <= 0 && !waiveRemaining) {
                     throw new Error("Đơn hàng này đã được thanh toán đủ.");
                 }
 
-                const result = await applyRefundCreditToTargetOrder(trx, {
-                    creditNoteId,
-                    targetOrderListId: targetOrderId,
-                    targetOrderCode: order[COLS.ORDER.ID_ORDER],
-                    requestedAmount: finalRequestedAmount,
-                    note: note || `Thanh toán bằng credit`,
-                    appliedBy: req.user?.username || 'System'
-                });
+                if (creditNoteId) {
+                    const result = await applyRefundCreditToTargetOrder(trx, {
+                        creditNoteId,
+                        targetOrderListId: targetOrderId,
+                        targetOrderCode: order[COLS.ORDER.ID_ORDER],
+                        requestedAmount: finalRequestedAmount,
+                        note: note || `Thanh toán bằng credit`,
+                        appliedBy: req.user?.username || 'System'
+                    });
 
-                if (result.appliedAmount <= 0) {
-                    throw new Error("Credit không hợp lệ hoặc đã hết số dư.");
+                    if (result.appliedAmount <= 0) {
+                        throw new Error("Credit không hợp lệ hoặc đã hết số dư.");
+                    }
                 }
 
                 // Check if the order is fully paid now
@@ -110,7 +115,7 @@ const attachRefundCreditRoutes = (router) => {
                 const newRemaining = normalizeMoney(order[COLS.ORDER.PRICE]) - newAlreadyApplied;
 
                 let isFullyPaid = false;
-                if (newRemaining <= 0 && [STATUS.UNPAID, STATUS.RENEWAL].includes(order[COLS.ORDER.STATUS])) {
+                if ((newRemaining <= 0 || waiveRemaining) && [STATUS.UNPAID, STATUS.RENEWAL].includes(order[COLS.ORDER.STATUS])) {
                     await trx(TABLES.orderList)
                         .where(COLS.ORDER.ID, targetOrderId)
                         .update({
@@ -127,11 +132,13 @@ const attachRefundCreditRoutes = (router) => {
                 action: "Apply Credit",
                 entity: "Don hang",
                 entityId: targetOrderId,
-                message: `Đã áp dụng credit ${creditNoteId} cho đơn hàng ${targetOrderId}`,
+                message: creditNoteId ? `Đã áp dụng credit ${creditNoteId} cho đơn hàng ${targetOrderId}` : `Đã xí xóa số dư nợ còn lại cho đơn hàng ${targetOrderId}`,
                 source: "orders.refund_credit_applications",
             });
 
-            eventBus.emit(EVENTS.REFUND_CREDIT_UPDATED, { creditNoteId });
+            if (creditNoteId) {
+                eventBus.emit(EVENTS.REFUND_CREDIT_UPDATED, { creditNoteId });
+            }
             eventBus.emit(EVENTS.ORDER_UPDATED, { orderId: targetOrderId });
             
             if (transactionResult.isFullyPaid) {

@@ -23,6 +23,7 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   onSuccess,
 }) => {
   const [selectedCreditId, setSelectedCreditId] = useState<number | null>(null);
+  const [waiveRemaining, setWaiveRemaining] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: creditsData, loading } = useApiQuery<AvailableRefundCredit[]>(
@@ -40,8 +41,8 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   const remainingAmount = Math.max(0, Number(order[ORDER_FIELDS.PRICE]) - totalCreditApplied);
 
   const handleSubmit = async () => {
-    if (!selectedCreditId) {
-      toast.error("Vui lòng chọn một credit để thanh toán");
+    if (!selectedCreditId && !waiveRemaining) {
+      toast.error("Vui lòng chọn một credit hoặc chọn Xí xóa số tiền còn thiếu.");
       return;
     }
 
@@ -49,9 +50,10 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
     try {
       await apiPost("/api/orders/refund-credits/apply-to-order", {
         targetOrderId: order[ORDER_FIELDS.ID],
-        creditNoteId: Number(selectedCreditId),
+        creditNoteId: selectedCreditId ? Number(selectedCreditId) : null,
+        waiveRemaining,
       });
-      toast.success("Thanh toán bằng credit thành công!");
+      toast.success("Thanh toán thành công!");
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -134,6 +136,19 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
           )}
         </div>
 
+        <div className="mt-4 mb-2 flex items-center gap-2 px-1">
+          <input
+            type="checkbox"
+            id="waiveRemaining"
+            checked={waiveRemaining}
+            onChange={(e) => setWaiveRemaining(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-800/50 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-800"
+          />
+          <label htmlFor="waiveRemaining" className="text-sm font-medium text-amber-200 cursor-pointer select-none">
+            Xí xóa số tiền còn thiếu (đánh dấu Đã Thanh toán)
+          </label>
+        </div>
+
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
@@ -147,9 +162,9 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
             type="button"
             className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-2 text-sm font-medium text-white shadow-md shadow-cyan-900/30 hover:from-cyan-500 hover:to-blue-500 focus:outline-none transition-all disabled:opacity-50"
             onClick={handleSubmit}
-            disabled={isSubmitting || !selectedCreditId}
+            disabled={isSubmitting || (!selectedCreditId && !waiveRemaining)}
           >
-            {isSubmitting ? "Đang xử lý..." : "Thanh Toán"}
+            {isSubmitting ? "Đang xử lý..." : "Xác nhận"}
           </button>
         </div>
       </div>
