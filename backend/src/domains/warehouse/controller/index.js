@@ -72,16 +72,16 @@ const listWarehouse = async (_req, res) => {
 
     if (stockIds.length > 0) {
       const services = await db(`${servicesTable} as ${sAlias}`)
-        .leftJoin(`${SCHEMA_PRODUCT}.variant as v`, `v.id`, `${sAlias}.product_id`)
         .leftJoin(`${SCHEMA_WAREHOUSE}.product_names as pn`, `pn.id`, `${sAlias}.${srvCols.nameId}`)
+        .leftJoin(`${SCHEMA_PRODUCT}.product as p`, `p.id`, `pn.product_id`)
         .select({
           id: `${sAlias}.${srvCols.id}`,
           stock_id: `${sAlias}.${srvCols.stockId}`,
-          product_id: `${sAlias}.product_id`,
+          product_id: `pn.product_id`,
           warehouse_product_name_id: `${sAlias}.${srvCols.nameId}`,
-          category: db.raw("COALESCE(pn.name, v.display_name, v.variant_name)"),
-          display_name: `v.display_name`,
-          variant_name: `v.variant_name`,
+          category: db.raw("COALESCE(pn.name, p.package_name)"),
+          display_name: `p.package_name`,
+          variant_name: db.raw("NULL"),
           product_type: `pn.name`,
           password: `${sAlias}.${srvCols.passwordEncrypted}`,
           backup_email: `${sAlias}.${srvCols.backupEmail}`,
@@ -97,15 +97,27 @@ const listWarehouse = async (_req, res) => {
       // Check if services are used in packages
       const srvIds = services.map(s => s.id);
       let inUseSrvIds = new Set();
-      if (srvIds.length > 0) {
-        const usedPkgs = await db(pkgTable)
-          .select(pkgCols.stockServiceId)
-          .whereIn(pkgCols.stockServiceId, srvIds);
-        inUseSrvIds = new Set(usedPkgs.map(p => p.stock_service_id));
+      let inUseStockIds = new Set();
+      if (stockIds.length > 0) {
+        const query = db(pkgTable).select(pkgCols.stockServiceId, pkgCols.storageId, pkgCols.stockId);
+        query.where(function () {
+          this.whereIn(pkgCols.storageId, stockIds)
+            .orWhereIn(pkgCols.stockId, stockIds);
+          if (srvIds.length > 0) {
+            this.orWhereIn(pkgCols.stockServiceId, srvIds);
+          }
+        });
+
+        const usedPkgs = await query;
+        usedPkgs.forEach(p => {
+          if (p.stock_service_id) inUseSrvIds.add(Number(p.stock_service_id));
+          if (p.storage_id) inUseStockIds.add(Number(p.storage_id));
+          if (p.stock_id && !p.stock_service_id) inUseStockIds.add(Number(p.stock_id));
+        });
       }
 
       for (const srv of services) {
-        if (inUseSrvIds.has(srv.id)) {
+        if (inUseSrvIds.has(Number(srv.id)) || inUseStockIds.has(Number(srv.stock_id))) {
           srv.status = 'UNAVAILABLE';
         } else {
           srv.status = 'AVAILABLE';
@@ -133,22 +145,25 @@ const listWarehouse = async (_req, res) => {
   }
 };
 
-const ensureProductName = async (trx, nameStr) => {
+const ensureProductName = async (trx, nameStr, productId = null) => {
   if (!nameStr) return null;
   const normalized = String(nameStr).trim();
   if (!normalized) return null;
   const existing = await trx(`${SCHEMA_WAREHOUSE}.product_names`).where("name", normalized).first();
-  if (existing) return existing.id;
-  const [inserted] = await trx(`${SCHEMA_WAREHOUSE}.product_names`).insert({ name: normalized }).returning("id");
+  if (existing) {
+    if (productId && existing.product_id !== productId) {
+      await trx(`${SCHEMA_WAREHOUSE}.product_names`).where("id", existing.id).update({ product_id: productId });
+    }
+    return existing.id;
+  }
+  const [inserted] = await trx(`${SCHEMA_WAREHOUSE}.product_names`).insert({ name: normalized, product_id: productId }).returning("id");
   return inserted?.id ?? inserted ?? null;
 };
 
 const createWarehouse = async (req, res) => {
   // Support both legacy single-service creation and new multi-service creation
-  const {
-    account,
-    services = []
-  } = req.body || {};
+  let { account, services = [] } = req.body || {};
+  if (account) account = String(account).trim().toLowerCase();
 
   // Handle legacy payload fallback
   if (services.length === 0 && req.body.category) {
@@ -190,17 +205,23 @@ const createWarehouse = async (req, res) => {
       for (const srv of services) {
         let pId = normalizeProductId(srv.product_id);
         let nameId = normalizeProductId(srv.warehouse_product_name_id);
-        if (!pId && !nameId && (srv.product_id || srv.category)) {
-          const customName = typeof srv.product_id === 'string' && srv.product_id !== '' 
-            ? srv.product_id 
-            : srv.category;
-          nameId = await ensureProductName(trx, customName);
+        
+        // Ensure nameId and update product_id if possible
+        if (!nameId && srv.category) {
+          nameId = await ensureProductName(trx, srv.category, pId);
+        } else if (pId && !nameId) {
+          // If they just selected product_id but no category, fetch parent name
+          const parentProduct = await trx(`${SCHEMA_PRODUCT}.product`).where("id", pId).first();
+          if (parentProduct) {
+            nameId = await ensureProductName(trx, parentProduct.package_name, pId);
+          }
+        } else if (nameId && pId) {
+          await ensureProductName(trx, srv.category || "Unknown", pId); // Just updates the product_id if needed
         }
 
         const [insertedSrv] = await trx(servicesTable)
           .insert({
             [srvCols.stockId]: stockRow.id,
-            product_id: pId,
             [srvCols.nameId]: nameId,
             [srvCols.passwordEncrypted]: srv.password ?? null,
             [srvCols.backupEmail]: srv.backup_email ?? null,
@@ -213,7 +234,7 @@ const createWarehouse = async (req, res) => {
           })
           .returning("*");
 
-        insertedServices.push(insertedSrv.id !== undefined ? insertedSrv : { id: insertedSrv });
+        insertedServices.push(insertedSrv.id !== undefined ? insertedSrv : { id: insertedSrv, product_id: pId });
       }
 
       const serviceProductIds = insertedServices
@@ -267,10 +288,8 @@ const createWarehouse = async (req, res) => {
 
 const updateWarehouse = async (req, res) => {
   const { id } = req.params;
-  const {
-    account,
-    services = []
-  } = req.body || {};
+  let { account, services = [] } = req.body || {};
+  if (account) account = String(account).trim().toLowerCase();
 
   if (!id) return res.status(400).json({ error: "Missing id" });
 
@@ -289,7 +308,7 @@ const updateWarehouse = async (req, res) => {
 
       const oldAcc = before[cols.accountUsername] ?? null;
       const newAcc = updated[cols.accountUsername] ?? null;
-      const same = String(oldAcc ?? "").trim() === String(newAcc ?? "").trim();
+      const same = String(oldAcc ?? "").trim().toLowerCase() === String(newAcc ?? "").trim().toLowerCase();
       if (!same) {
         await syncOrdersForPackagesUsingStock(trx, id, oldAcc, newAcc);
       }
@@ -304,17 +323,21 @@ const updateWarehouse = async (req, res) => {
         for (const srv of services) {
           let pId = normalizeProductId(srv.product_id);
           let nameId = normalizeProductId(srv.warehouse_product_name_id);
-          if (!pId && !nameId && (srv.product_id || srv.category)) {
-            const customName = typeof srv.product_id === 'string' && srv.product_id !== '' 
-              ? srv.product_id 
-              : srv.category;
-            nameId = await ensureProductName(trx, customName);
+          
+          if (!nameId && srv.category) {
+            nameId = await ensureProductName(trx, srv.category, pId);
+          } else if (pId && !nameId) {
+            const parentProduct = await trx(`${SCHEMA_PRODUCT}.product`).where("id", pId).first();
+            if (parentProduct) {
+              nameId = await ensureProductName(trx, parentProduct.package_name, pId);
+            }
+          } else if (nameId && pId) {
+            await ensureProductName(trx, srv.category || "Unknown", pId);
           }
 
           if (srv.id && existingIds.has(srv.id)) {
             // Update
             const [updatedSrv] = await trx(servicesTable).where(srvCols.id, srv.id).update({
-              product_id: pId,
               [srvCols.nameId]: nameId,
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
@@ -325,6 +348,7 @@ const updateWarehouse = async (req, res) => {
             }).returning("*");
 
             const fetchedUpdated = updatedSrv.id !== undefined ? updatedSrv : await trx(servicesTable).where(srvCols.id, srv.id).first();
+            fetchedUpdated.product_id = pId;
             updatedServices.push(fetchedUpdated);
             keptIds.add(srv.id);
           } else {
@@ -332,7 +356,6 @@ const updateWarehouse = async (req, res) => {
             const now = new Date().toISOString();
             const [insertedSrv] = await trx(servicesTable).insert({
               [srvCols.stockId]: id,
-              product_id: pId,
               [srvCols.nameId]: nameId,
               [srvCols.passwordEncrypted]: srv.password ?? null,
               [srvCols.backupEmail]: srv.backup_email ?? null,
@@ -345,6 +368,7 @@ const updateWarehouse = async (req, res) => {
             }).returning("*");
 
             const fetchedInserted = insertedSrv.id !== undefined ? insertedSrv : await trx(servicesTable).where(srvCols.id, insertedSrv).first();
+            fetchedInserted.product_id = pId;
             updatedServices.push(fetchedInserted);
           }
         }
@@ -395,6 +419,13 @@ const updateWarehouse = async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "Không tìm thấy" });
     }
+
+    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
+      stockId: row.id,
+      account: row.account,
+      services: row.services
+    });
+
     res.json(row);
   } catch (error) {
     logger.error("[warehouse] Update failed", {
@@ -414,6 +445,9 @@ const deleteWarehouse = async (req, res) => {
       await trx(servicesTable).where(srvCols.stockId, id).del();
       await trx(warehouseTable).where(cols.id, id).del();
     });
+
+    eventBus.emit(EVENTS.WAREHOUSE_STOCK_DELETED, { stockId: id });
+
     res.json({ success: true });
   } catch (error) {
     logger.error("[warehouse] Delete failed", {
@@ -421,7 +455,81 @@ const deleteWarehouse = async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res.status(500).json({ error: "Không thể xóa kho hàng." });
+
+    if (error.message.includes("violates foreign key constraint")) {
+      return res.status(400).json({ error: "Tài khoản này đang được liên kết với Đơn hàng/Gói sản phẩm. Vui lòng huỷ liên kết trước khi xoá." });
+    }
+
+    res.status(500).json({ error: "Không thể xoá kho hàng." });
+  }
+};
+
+const listProductNames = async (req, res) => {
+  try {
+    const names = await db(`${SCHEMA_WAREHOUSE}.product_names`).select("*").orderBy("id", "desc");
+    res.json(names);
+  } catch (error) {
+    logger.error("[warehouse] listProductNames failed", { error: error.message });
+    res.status(500).json({ error: "Không thể tải danh mục." });
+  }
+};
+
+const createProductName = async (req, res) => {
+  const { name, product_id } = req.body;
+  if (!name || !String(name).trim()) return res.status(400).json({ error: "Tên danh mục không được để trống" });
+  
+  try {
+    const normalized = String(name).trim();
+    const existing = await db(`${SCHEMA_WAREHOUSE}.product_names`).where("name", normalized).first();
+    if (existing) return res.status(400).json({ error: "Tên danh mục đã tồn tại" });
+    
+    const [inserted] = await db(`${SCHEMA_WAREHOUSE}.product_names`)
+      .insert({ name: normalized, product_id: product_id || null })
+      .returning("*");
+      
+    res.json(inserted);
+  } catch (error) {
+    logger.error("[warehouse] createProductName failed", { error: error.message });
+    res.status(500).json({ error: "Không thể tạo danh mục." });
+  }
+};
+
+const updateProductName = async (req, res) => {
+  const { id } = req.params;
+  const { name, product_id } = req.body;
+  if (!id) return res.status(400).json({ error: "Missing id" });
+  if (!name || !String(name).trim()) return res.status(400).json({ error: "Tên danh mục không được để trống" });
+
+  try {
+    const normalized = String(name).trim();
+    const existing = await db(`${SCHEMA_WAREHOUSE}.product_names`).where("name", normalized).whereNot("id", id).first();
+    if (existing) return res.status(400).json({ error: "Tên danh mục đã tồn tại" });
+
+    const [updated] = await db(`${SCHEMA_WAREHOUSE}.product_names`)
+      .where("id", id)
+      .update({ name: normalized, product_id: product_id || null })
+      .returning("*");
+      
+    res.json(updated);
+  } catch (error) {
+    logger.error("[warehouse] updateProductName failed", { error: error.message });
+    res.status(500).json({ error: "Không thể cập nhật danh mục." });
+  }
+};
+
+const deleteProductName = async (req, res) => {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: "Missing id" });
+
+  try {
+    await db(`${SCHEMA_WAREHOUSE}.product_names`).where("id", id).del();
+    res.json({ success: true });
+  } catch (error) {
+    logger.error("[warehouse] deleteProductName failed", { error: error.message });
+    if (error.message.includes("violates foreign key constraint")) {
+      return res.status(400).json({ error: "Danh mục này đang được sử dụng trong các tài khoản kho. Vui lòng gỡ bỏ liên kết trước khi xoá." });
+    }
+    res.status(500).json({ error: "Không thể xoá danh mục." });
   }
 };
 
@@ -430,4 +538,9 @@ module.exports = {
   createWarehouse,
   updateWarehouse,
   deleteWarehouse,
+  ensureProductName,
+  listProductNames,
+  createProductName,
+  updateProductName,
+  deleteProductName,
 };

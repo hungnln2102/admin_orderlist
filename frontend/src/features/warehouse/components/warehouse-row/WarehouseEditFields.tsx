@@ -28,6 +28,12 @@ export const WarehouseEditFields: React.FC<Props> = ({
     onChange("services", newServices);
   };
 
+  const handleServicePatch = (idx: number, patch: Partial<WarehouseService>) => {
+    const newServices = [...services];
+    newServices[idx] = { ...newServices[idx], ...patch };
+    onChange("services", newServices);
+  };
+
   const handleAddService = () => {
     const newServices = [...services, { category: "", password: "", backup_email: "", two_fa: "", expires_at: "", status: "AVAILABLE" }];
     onChange("services", newServices);
@@ -86,9 +92,11 @@ export const WarehouseEditFields: React.FC<Props> = ({
                   value={String(srv.product_id || srv.category || "")}
                   options={productOptions}
                   onChange={(value, label) => {
-                    handleServiceChange(idx, "product_id", value);
-                    handleServiceChange(idx, "category", label);
-                    handleServiceChange(idx, "display_name", label);
+                    handleServicePatch(idx, {
+                      product_id: value,
+                      category: label,
+                      display_name: label,
+                    });
                   }}
                 />
               </div>

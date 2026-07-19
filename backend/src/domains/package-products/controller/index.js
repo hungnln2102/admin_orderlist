@@ -9,6 +9,8 @@ const {
 } = require("@/domains/package-products/controller/service");
 const { pkgCols } = require("@/domains/package-products/controller/constants");
 const logger = require("@/utils/logger");
+const eventBus = require("@/events/eventBus");
+const EVENTS = require("@/events/eventTypes");
 
 const listHandler = async (_req, res) => {
   try {
@@ -94,6 +96,12 @@ const updateHandler = async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm gói hàng." });
     }
+
+    eventBus.emit(EVENTS.PACKAGE_PRODUCT_UPDATED, {
+      packageId: id,
+      updatedData: updated
+    });
+
     res.json(updated);
   } catch (error) {
     logger.error("[packages] Update failed", { id, error: error.message, stack: error.stack });
@@ -113,9 +121,15 @@ const deleteHandler = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm gói hàng." });
     }
 
+    const deletedIds = deletedRows.map((row) => row[pkgCols.id]).filter(Boolean);
+    
+    deletedIds.forEach(deletedId => {
+      eventBus.emit(EVENTS.PACKAGE_PRODUCT_DELETED, { packageId: deletedId });
+    });
+
     res.json({
       deleted: deletedRows.length,
-      deletedIds: deletedRows.map((row) => row[pkgCols.id]).filter(Boolean),
+      deletedIds,
       deletedNames: [],
     });
   } catch (error) {
@@ -138,6 +152,12 @@ const bulkDeleteHandler = async (req, res) => {
 
   try {
     const deleteResult = await bulkDeletePackages(uniqueIds);
+    const deletedIds = deleteResult.map((row) => row[pkgCols.id]).filter(Boolean);
+
+    deletedIds.forEach(deletedId => {
+      eventBus.emit(EVENTS.PACKAGE_PRODUCT_DELETED, { packageId: deletedId });
+    });
+
     res.json({
       deleted: deleteResult.length,
       deletedIds: uniqueIds,

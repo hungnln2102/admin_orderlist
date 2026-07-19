@@ -70,7 +70,7 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
         className="warehouse-row__expandable-cell w-full max-w-0 px-4 pb-6 pt-1 sm:px-6 sm:pb-8"
       >
         <div
-          className={`warehouse-row__expandable-content min-w-0 max-w-full overflow-hidden rounded-[24px] border p-5 glass-panel-light shadow-2xl sm:rounded-[32px] sm:p-6 ${theme.expandablePanelClass}`}
+          className={`warehouse-row__expandable-content min-w-0 max-w-full rounded-[24px] border p-5 glass-panel-light shadow-2xl sm:rounded-[32px] sm:p-6 ${theme.expandablePanelClass}`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">

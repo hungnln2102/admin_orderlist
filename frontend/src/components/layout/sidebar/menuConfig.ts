@@ -107,7 +107,7 @@ export const menuSections: MenuSection[] = [
       { name: "Báo giá", href: "/show-price", icon: DocumentIcon },
       { name: "Hóa đơn", href: "/bill-order", icon: DocumentIcon },
       { name: "Biên lai", href: "/invoices", icon: DocumentIcon },
-      { name: "Lô hàng", href: "/warehouse", icon: ArchiveBoxIcon },
+      { name: "Kho Hàng", href: "/warehouse", icon: ArchiveBoxIcon },
     ],
   },
   {

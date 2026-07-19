@@ -37,7 +37,7 @@ const PACKAGE_PRODUCTS_SELECT = `
     stk.${quoteIdent(STOCK_COLS.accountUsername)} AS package_username,
     ss1.${quoteIdent(SRV_COLS.passwordEncrypted)} AS package_password,
     ss1.${quoteIdent(SRV_COLS.backupEmail)} AS package_mail_2nd,
-    stk.${quoteIdent(STOCK_COLS.note)} AS package_note,
+    ss1.${quoteIdent(SRV_COLS.note)} AS package_note,
     ss1.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS package_two_fa,
     pp.${QUOTED_COLS.packageProduct.supplier} AS package_supplier,
     pp.${QUOTED_COLS.packageProduct.cost} AS package_import,
@@ -51,7 +51,7 @@ const PACKAGE_PRODUCTS_SELECT = `
     stk2.${quoteIdent(STOCK_COLS.accountUsername)} AS storage_username,
     ss2.${quoteIdent(SRV_COLS.passwordEncrypted)} AS storage_password,
     ss2.${quoteIdent(SRV_COLS.backupEmail)} AS storage_mail,
-    stk2.${quoteIdent(STOCK_COLS.note)} AS storage_note,
+    ss2.${quoteIdent(SRV_COLS.note)} AS storage_note,
     ss2.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS storage_two_fa,
     COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
   FROM ${TABLES.packageProduct} pp

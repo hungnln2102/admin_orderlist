@@ -42,27 +42,40 @@ const createImportPackage = async (payload) => {
   const EVENTS = require("@/events/eventTypes");
 
   const result = await withTransaction(async (trx) => {
-    // 1. Lấy tên sản phẩm (display_name) từ variant
+    // 1. Lấy tên sản phẩm (package_name) từ product thay vì variant
     const variantRow = await trx(tableName("variant", SCHEMA_PRODUCT))
-      .select("display_name")
+      .select("product_id")
       .where("id", productId)
       .first();
-    const category = variantRow?.display_name || null;
+      
+    let category = "Import Package";
+    if (variantRow?.product_id) {
+      const parentRow = await trx(tableName("product", SCHEMA_PRODUCT))
+        .select("package_name")
+        .where("id", variantRow.product_id)
+        .first();
+      if (parentRow && parentRow.package_name) {
+        category = parentRow.package_name;
+      }
+    }
 
     const now = new Date().toISOString();
+    
+    // Normalize account to lowercase
+    const accountLower = account ? String(account).trim().toLowerCase() : null;
 
     // 2. Kiểm tra xem tài khoản đã tồn tại trong product_stocks chưa
     let stockId = null;
     let isNewStock = false;
     
-    if (account) {
+    if (accountLower) {
       const existingStock = await trx(TABLES.stock)
-        .select(stockCols.ID)
-        .where(stockCols.ACCOUNT_USERNAME, account)
+        .select(stockCols.id)
+        .where(trx.raw(`LOWER(${stockCols.accountUsername}) = ?`, [accountLower]))
         .first();
         
       if (existingStock) {
-        stockId = existingStock[stockCols.ID];
+        stockId = existingStock[stockCols.id];
       }
     }
 
@@ -71,38 +84,77 @@ const createImportPackage = async (payload) => {
       // Chưa tồn tại -> tạo mới
       const [insertedStock] = await trx(TABLES.stock)
         .insert({
-          [stockCols.ACCOUNT_USERNAME]: account || null,
-          [stockCols.NOTE]: note || null,
-          [stockCols.STATUS]: "Tồn",
-          [stockCols.IS_VERIFIED]: false,
-          [stockCols.CREATED_AT]: now,
-          [stockCols.UPDATED_AT]: now,
+          [stockCols.accountUsername]: accountLower || null,
+          [stockCols.createdAt]: now,
+          [stockCols.updatedAt]: now,
         })
         .returning("*");
       stockId = insertedStock.id !== undefined ? insertedStock.id : insertedStock;
       stockObj = insertedStock;
       isNewStock = true;
     } else {
-      const existingStock = await trx(TABLES.stock).where(stockCols.ID, stockId).first();
+      const existingStock = await trx(TABLES.stock).where(stockCols.id, stockId).first();
       stockObj = existingStock;
     }
 
-    // 2.5 Insert STOCK_SERVICES
-    const [srv] = await trx(TABLES.stockServices)
-      .insert({
-        [SRV_COLS.STOCK_ID]: stockId,
-        product_id: productId,
-        [SRV_COLS.PASSWORD_ENCRYPTED]: password || null,
-        [SRV_COLS.BACKUP_EMAIL]: backup_email || null,
-        [SRV_COLS.TWO_FA_ENCRYPTED]: two_fa || null,
-        [SRV_COLS.EXPIRES_AT]: normalizeDateInput(expires_at) || null,
-        [SRV_COLS.STATUS]: "Tồn",
-        [SRV_COLS.CREATED_AT]: now,
-        [SRV_COLS.UPDATED_AT]: now,
-      })
-      .returning("*");
+    const { ensureProductName } = require("@/domains/warehouse/controller/index");
+    const targetProductId = variantRow?.product_id ?? productId;
+    const nameId = await ensureProductName(trx, category || "Import Package", targetProductId);
+
+    // 2.5 Insert or reuse STOCK_SERVICES
+    let srvRow = null;
+    
+    if (!isNewStock) {
+      let query = trx(TABLES.stockServices)
+        .leftJoin(`${SCHEMA_WAREHOUSE}.product_names as pn`, `pn.id`, `${TABLES.stockServices}.${SRV_COLS.nameId}`)
+        .select(`${TABLES.stockServices}.*`)
+        .where(`${TABLES.stockServices}.${SRV_COLS.stockId}`, stockId);
+
+      if (targetProductId) {
+        query = query.where("pn.product_id", targetProductId);
+      } else {
+        query = query.where(`${TABLES.stockServices}.${SRV_COLS.nameId}`, nameId);
+      }
       
-    const srvRow = srv.id !== undefined ? srv : { id: srv };
+      const existingSrv = await query.first();
+      if (existingSrv) {
+        srvRow = existingSrv;
+        const updates = {};
+        if (password) updates[SRV_COLS.passwordEncrypted] = password;
+        if (backup_email) updates[SRV_COLS.backupEmail] = backup_email;
+        if (two_fa) updates[SRV_COLS.twoFaEncrypted] = two_fa;
+        if (expires_at) updates[SRV_COLS.expiresAt] = normalizeDateInput(expires_at);
+        if (note) updates[SRV_COLS.note] = note;
+        
+        if (Object.keys(updates).length > 0) {
+           updates[SRV_COLS.updatedAt] = now;
+           const [updated] = await trx(TABLES.stockServices)
+             .where("id", existingSrv.id)
+             .update(updates)
+             .returning("*");
+           srvRow = updated.id !== undefined ? updated : { id: updated.id || existingSrv.id };
+        }
+      }
+    }
+    
+    if (!srvRow) {
+      const [srv] = await trx(TABLES.stockServices)
+        .insert({
+          [SRV_COLS.stockId]: stockId,
+          [SRV_COLS.nameId]: nameId,
+          [SRV_COLS.passwordEncrypted]: password || null,
+          [SRV_COLS.backupEmail]: backup_email || null,
+          [SRV_COLS.twoFaEncrypted]: two_fa || null,
+          [SRV_COLS.note]: note || null,
+          [SRV_COLS.expiresAt]: normalizeDateInput(expires_at) || null,
+          [SRV_COLS.status]: "AVAILABLE",
+          [SRV_COLS.createdAt]: now,
+          [SRV_COLS.updatedAt]: now,
+        })
+        .returning("*");
+        
+      srvRow = srv.id !== undefined ? srv : { id: srv };
+    }
 
     const normalizedMatchMode =
       matchMode === "slot" ? "slot" : "information_order";
@@ -112,15 +164,15 @@ const createImportPackage = async (payload) => {
     // 3. Insert PACKAGE_PRODUCT liên kết với stock
     const [pkg] = await trx(TABLES.package)
       .insert({
-        [pkgCols.PACKAGE_ID]: productId,
-        [pkgCols.SUPPLIER]: supplierId || null,
-        [pkgCols.COST]: importPrice ?? null,
-        [pkgCols.SLOT]: resolvedSlotLimit,
-        [pkgCols.MATCH]: normalizedMatchMode,
-        [pkgCols.STOCK_ID]: stockId,
-        [pkgCols.STOCK_SERVICE_ID]: srvRow.id,
-        [pkgCols.STORAGE_ID]: null,
-        [pkgCols.STORAGE_TOTAL]: null,
+        [pkgCols.packageId]: variantRow?.product_id ?? productId,
+        [pkgCols.supplier]: supplierId || null,
+        [pkgCols.cost]: importPrice ?? null,
+        [pkgCols.slot]: resolvedSlotLimit,
+        [pkgCols.match]: normalizedMatchMode,
+        [pkgCols.stockId]: stockId,
+        [pkgCols.stockServiceId]: srvRow.id,
+        [pkgCols.storageId]: null,
+        [pkgCols.storageTotal]: null,
       })
       .returning("*");
       
@@ -137,31 +189,31 @@ const createImportPackage = async (payload) => {
       stock: {
         id: stockId,
         category: category,
-        account: stockObj[stockCols.ACCOUNT_USERNAME],
+        account: stockObj[stockCols.accountUsername],
         password: password,
         backup_email: backup_email,
         two_fa: two_fa,
-        note: stockObj[stockCols.NOTE],
-        status: stockObj[stockCols.STATUS],
+        note: note || null,
+        status: "AVAILABLE",
         expires_at: expires_at,
-        is_verified: stockObj[stockCols.IS_VERIFIED],
-        created_at: stockObj[stockCols.CREATED_AT],
-        updated_at: stockObj[stockCols.UPDATED_AT],
+        is_verified: false,
+        created_at: stockObj[stockCols.createdAt],
+        updated_at: stockObj[stockCols.updatedAt],
       },
       pkg: {
         id: pkgRow.id,
-        package_id: pkgRow[pkgCols.PACKAGE_ID],
-        supplier: pkgRow[pkgCols.SUPPLIER],
-        import_price: pkgRow[pkgCols.COST],
-        slot: pkgRow[pkgCols.SLOT],
-        match: pkgRow[pkgCols.MATCH],
-        stock_id: pkgRow[pkgCols.STOCK_ID],
-        storage_id: pkgRow[pkgCols.STORAGE_ID],
-        storage_total: pkgRow[pkgCols.STORAGE_TOTAL],
+        package_id: pkgRow[pkgCols.packageId],
+        supplier: pkgRow[pkgCols.supplier],
+        import_price: pkgRow[pkgCols.cost],
+        slot: pkgRow[pkgCols.slot],
+        match: pkgRow[pkgCols.match],
+        stock_id: pkgRow[pkgCols.stockId],
+        storage_id: pkgRow[pkgCols.storageId],
+        storage_total: pkgRow[pkgCols.storageTotal],
       },
       payloadForEvent: {
         stockId,
-        account: stockObj[stockCols.ACCOUNT_USERNAME],
+        account: stockObj[stockCols.accountUsername],
         serviceId: srvRow.id,
         category,
         password,

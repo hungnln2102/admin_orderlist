@@ -1,33 +1,46 @@
-import { useMemo } from "react";
-import { getWarehouseServiceDisplayName, type WarehouseItem } from "../types";
+import { useState, useEffect } from "react";
+import { apiFetch } from "@/shared/api/client";
+import { type WarehouseItem } from "../types";
 
-export type ProductOption = { value: string; label: string };
+export type ProductOption = { value: string; label: string; nameId?: number };
 
 export function useWarehouseProducts(items: WarehouseItem[]) {
-  const productOptions = useMemo((): ProductOption[] => {
-    const seen = new Set<string>();
-    const merged: ProductOption[] = [];
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
-    items.forEach((it) => {
-      if (!Array.isArray(it.services)) return;
+  const fetchOptions = async () => {
+    setLoadingProducts(true);
+    try {
+      const res = await apiFetch("/api/warehouse/product-names");
+      if (res.ok) {
+        const data = await res.json();
+        const options = data.map((item: any) => ({
+          value: item.product_id ? String(item.product_id) : item.name,
+          label: item.name,
+          nameId: item.id
+        }));
+        
+        // Remove duplicates by value
+        const seen = new Set<string>();
+        const uniqueOptions = options.filter((opt: ProductOption) => {
+          if (seen.has(opt.value)) return false;
+          seen.add(opt.value);
+          return true;
+        });
 
-      it.services.forEach((srv) => {
-        const label = getWarehouseServiceDisplayName(srv);
-        const value = String(srv.product_id || srv.category || label || "").trim();
+        uniqueOptions.sort((a: ProductOption, b: ProductOption) => a.label.localeCompare(b.label, "vi"));
+        setProductOptions(uniqueOptions);
+      }
+    } catch (error) {
+      console.error("Failed to load product names", error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
 
-        if (!value || !label) return;
+  useEffect(() => {
+    fetchOptions();
+  }, []);
 
-        const key = value.toLowerCase();
-        if (seen.has(key)) return;
-
-        seen.add(key);
-        merged.push({ value, label });
-      });
-    });
-
-    merged.sort((a, b) => a.label.localeCompare(b.label, "vi"));
-    return merged;
-  }, [items]);
-
-  return { productOptions, loadingProducts: false, reloadProducts: () => undefined };
+  return { productOptions, loadingProducts, reloadProducts: fetchOptions };
 }

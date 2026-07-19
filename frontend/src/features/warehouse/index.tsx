@@ -11,13 +11,13 @@ import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
 import { useWarehouseProducts } from "./hooks/useWarehouseProducts";
-import { useSystemProducts } from "./hooks/useSystemProducts";
 import {
   WarehouseItem,
   getWarehouseServiceDisplayName,
   normalizeText,
 } from "./types";
 import { useImportPackageSubmit } from "./hooks/useImportPackageSubmit";
+import WarehouseNamesTab from "./components/WarehouseNamesTab";
 
 export default function Storage() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
@@ -32,9 +32,9 @@ export default function Storage() {
   const [warehouseDeleteSubmitting, setWarehouseDeleteSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [activeTab, setActiveTab] = useState<"accounts" | "names">("accounts");
 
   const { expireStock } = useImportPackageSubmit();
-  const { systemProductOptions } = useSystemProducts();
 
   useEffect(() => {
     let mounted = true;
@@ -185,7 +185,7 @@ export default function Storage() {
     }
   };
 
-  const { productOptions, loadingProducts } = useWarehouseProducts(items);
+      const { productOptions, loadingProducts, reloadProducts } = useWarehouseProducts(items);
 
   const filtered = useMemo(() => {
     return items
@@ -245,42 +245,70 @@ export default function Storage() {
     <div className="w-full min-w-0 max-w-none space-y-5 p-4 lg:p-6">
       <StorageHeader totalItems={items.length} />
 
-      <SearchBar
-        search={search}
-        onSearchChange={setSearch}
-        productFilter={productFilter}
-        onProductFilterChange={setProductFilter}
-        productOptions={productOptions}
-        loadingProducts={loadingProducts}
-        onCreate={startCreate}
-        loading={loading}
-        error={error}
-      />
+      {/* Tabs UI */}
+      <div className="flex space-x-1 bg-white/[0.02] p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab("accounts")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "accounts" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+        >
+          Tài khoản kho
+        </button>
+        <button
+          onClick={() => setActiveTab("names")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "names" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+        >
+          Danh mục Tên dịch vụ
+        </button>
+      </div>
 
-      <StorageTable
-        items={currentItems}
-        filteredCount={filtered.length}
-        productOptions={productOptions}
-        draft={draft}
-        editingId={editingId}
-        expandedItemId={expandedItemId}
-        loading={loading}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        rowsPerPage={rowsPerPage}
-        paginationPages={paginationPages}
-        setCurrentPage={setCurrentPage}
-        setRowsPerPage={setRowsPerPage}
-        onDraftChange={updateDraft}
-        onSave={saveEdit}
-        onDelete={requestDeleteRow}
-        onCancel={cancelEdit}
-        onStartEdit={startEdit}
-        onStartCreate={startCreate}
-        onToggleDetails={toggleDetails}
-        onCreatePackage={handleCreatePackage}
-        onExpireStock={handleExpireStock}
-      />
+      {activeTab === "accounts" ? (
+        <>
+          <SearchBar
+            search={search}
+            onSearchChange={setSearch}
+            productFilter={productFilter}
+            onProductFilterChange={setProductFilter}
+            productOptions={productOptions}
+            loadingProducts={loadingProducts}
+            onCreate={startCreate}
+            loading={loading}
+            error={error}
+          />
+
+          <StorageTable
+            items={currentItems}
+            filteredCount={filtered.length}
+            productOptions={productOptions}
+            draft={draft}
+            editingId={editingId}
+            expandedItemId={expandedItemId}
+            loading={loading}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            rowsPerPage={rowsPerPage}
+            paginationPages={paginationPages}
+            setCurrentPage={setCurrentPage}
+            setRowsPerPage={setRowsPerPage}
+            onDraftChange={updateDraft}
+            onSave={saveEdit}
+            onDelete={requestDeleteRow}
+            onCancel={cancelEdit}
+            onStartEdit={startEdit}
+            onStartCreate={startCreate}
+            onToggleDetails={toggleDetails}
+            onCreatePackage={handleCreatePackage}
+            onExpireStock={handleExpireStock}
+          />
+        </>
+      ) : (
+        <WarehouseNamesTab 
+          productOptions={productOptions} 
+          onUpdate={() => {
+            reloadProducts();
+            fetchItems();
+          }}
+        />
+      )}
 
       <ConfirmModal
         isOpen={warehouseIdPendingDelete !== null}

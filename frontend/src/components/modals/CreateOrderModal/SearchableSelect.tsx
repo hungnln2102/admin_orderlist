@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { SearchableSelectProps } from "./types";
 import { inputClass } from "./helpers";
 
@@ -37,11 +38,30 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     const onClickOutside = (e: MouseEvent) => {
       if (!containerRef.current) return;
       if (containerRef.current.contains(e.target as Node)) return;
+      // also check if click is inside the portal
+      const portalEl = document.getElementById("searchable-select-portal");
+      if (portalEl && portalEl.contains(e.target as Node)) return;
       setOpen(false);
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const updateRect = () => {
+      if (containerRef.current) setRect(containerRef.current.getBoundingClientRect());
+    };
+    updateRect();
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [open]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -54,6 +74,8 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
           setQuery(next);
           if (next === "") {
             onClear?.();
+          } else if (allowCustom) {
+            onChange(next, { value: next, label: next });
           }
           if (!open) setOpen(true);
         }}
@@ -79,9 +101,18 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         </button>
       )}
 
-      {open && !disabled && (
-        <div className="absolute z-30 mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 shadow-[0_24px_45px_-18px_rgba(2,6,23,0.95)] max-h-64 overflow-auto animate-in fade-in slide-in-from-top-2 duration-150">
-          {filtered.length === 0 ? (
+      {open && !disabled && rect && (
+        <ModalPortal>
+          <div 
+            id="searchable-select-portal"
+            className="fixed z-[9999] rounded-xl border border-slate-600 bg-slate-800 shadow-[0_24px_45px_-18px_rgba(2,6,23,0.95)] max-h-64 overflow-auto animate-in fade-in slide-in-from-top-2 duration-150"
+            style={{
+              top: rect.bottom + 8,
+              left: rect.left,
+              width: rect.width,
+            }}
+          >
+            {filtered.length === 0 ? (
             allowCustom && query.trim() !== "" ? (
               <div
                 className="px-4 py-2.5 text-sm cursor-pointer text-cyan-300 hover:bg-cyan-500/10 transition-colors"
@@ -132,7 +163,8 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
               )}
             </>
           )}
-        </div>
+          </div>
+        </ModalPortal>
       )}
     </div>
   );
