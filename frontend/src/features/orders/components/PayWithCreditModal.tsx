@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Order, ORDER_FIELDS } from "@/constants";
+import { Order, ORDER_FIELDS, VIRTUAL_FIELDS } from "@/constants";
 import { formatCurrency } from "../utils/ordersHelpers";
 import { apiPost } from "@/shared/api/client";
 import toast from "react-hot-toast";
@@ -33,6 +33,11 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   const credits = creditsData || [];
 
   if (!isOpen || !order) return null;
+
+  const totalCreditApplied = Number.isFinite(Number(order[VIRTUAL_FIELDS.TOTAL_CREDIT_APPLIED]))
+    ? Number(order[VIRTUAL_FIELDS.TOTAL_CREDIT_APPLIED])
+    : 0;
+  const remainingAmount = Math.max(0, Number(order[ORDER_FIELDS.PRICE]) - totalCreditApplied);
 
   const handleSubmit = async () => {
     if (!selectedCreditId) {
@@ -72,7 +77,15 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
             Đơn hàng: <span className="font-bold text-white">{order[ORDER_FIELDS.ID_ORDER]}</span>
           </p>
           <p className="text-sm text-slate-300 mt-1">
-            Số tiền cần thanh toán: <span className="font-bold text-emerald-400">{formatCurrency(order[ORDER_FIELDS.PRICE])}</span>
+            Tổng giá bán: <span className="font-bold text-emerald-400">{formatCurrency(order[ORDER_FIELDS.PRICE])}</span>
+          </p>
+          {totalCreditApplied > 0 && (
+            <p className="text-sm text-amber-400 mt-1">
+              Đã trả một phần: <span className="font-bold">{formatCurrency(totalCreditApplied)}</span>
+            </p>
+          )}
+          <p className="text-sm text-rose-300 mt-1">
+            Số tiền còn thiếu: <span className="font-bold text-rose-400">{formatCurrency(remainingAmount)}</span>
           </p>
         </div>
 

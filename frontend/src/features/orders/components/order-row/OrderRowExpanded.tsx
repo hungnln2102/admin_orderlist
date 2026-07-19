@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { ORDER_FIELDS, Order } from "@/constants";
+import { ORDER_FIELDS, VIRTUAL_FIELDS, ORDER_STATUSES, Order } from "@/constants";
 
 type OrderThemeClasses = {
   expandablePanelClass: string;
@@ -60,6 +60,15 @@ const OrderRowExpanded: React.FC<OrderRowExpandedProps> = ({
   onRenew,
 }) => {
   if (!isExpanded) return null;
+
+  const totalCreditApplied = Number.isFinite(Number(order[VIRTUAL_FIELDS.TOTAL_CREDIT_APPLIED]))
+    ? Number(order[VIRTUAL_FIELDS.TOTAL_CREDIT_APPLIED])
+    : 0;
+
+  const status = order[ORDER_FIELDS.STATUS];
+  const missingAmount = (totalCreditApplied > 0 && status !== ORDER_STATUSES.DA_THANH_TOAN)
+    ? priceValue - totalCreditApplied
+    : null;
 
   return (
     <tr className="order-row__expandable animate-in fade-in slide-in-from-top-2 duration-300">
@@ -127,9 +136,8 @@ const OrderRowExpanded: React.FC<OrderRowExpandedProps> = ({
             )}
           </div>
           <div
-            className={`order-row__detail-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${
-              showSupplierRefundColumn ? "xl:grid-cols-7" : "xl:grid-cols-6"
-            }`}
+            className={`order-row__detail-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${showSupplierRefundColumn ? "xl:grid-cols-7" : "xl:grid-cols-6"
+              }`}
           >
             <div
               className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}
@@ -185,11 +193,16 @@ const OrderRowExpanded: React.FC<OrderRowExpandedProps> = ({
               <p
                 className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}
               >
-                Chênh lệch webhook
+                Webhook
               </p>
               <p className={`mt-1 text-sm font-semibold ${webhookDeltaClass}`}>
                 {webhookDeltaDisplay}
               </p>
+              {missingAmount !== null && missingAmount > 0 && (
+                <p className="mt-1 text-[11px] font-medium text-amber-400">
+                  (Đã trả {formatCurrency(totalCreditApplied)}, còn thiếu {formatCurrency(missingAmount)})
+                </p>
+              )}
             </div>
             {showSupplierRefundColumn && (
               <div
@@ -218,9 +231,8 @@ const OrderRowExpanded: React.FC<OrderRowExpandedProps> = ({
               </p>
             </div>
             <div
-              className={`order-row__detail-item order-row__detail-item--note rounded-xl border p-3 text-center sm:col-span-2 ${
-                showSupplierRefundColumn ? "xl:col-span-7" : "xl:col-span-6"
-              } flex flex-col items-center justify-center ${orderTheme.detailItemClass}`}
+              className={`order-row__detail-item order-row__detail-item--note rounded-xl border p-3 text-center sm:col-span-2 ${showSupplierRefundColumn ? "xl:col-span-7" : "xl:col-span-6"
+                } flex flex-col items-center justify-center ${orderTheme.detailItemClass}`}
             >
               <p
                 className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}

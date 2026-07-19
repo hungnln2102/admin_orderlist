@@ -114,8 +114,7 @@ const attachRefundCreditRoutes = (router) => {
                     await trx(TABLES.orderList)
                         .where(COLS.ORDER.ID, targetOrderId)
                         .update({
-                            [COLS.ORDER.STATUS]: STATUS.PAID,
-                            [COLS.ORDER.UPDATED_AT]: new Date().toISOString()
+                            [COLS.ORDER.STATUS]: STATUS.PAID
                         });
                     isFullyPaid = true;
                 }

@@ -149,6 +149,7 @@ export const VIRTUAL_FIELDS = {
   TRANG_THAI_TEXT: "trang_thai_text_virtual",
   ORDER_DATE_DISPLAY: "order_date_display_virtual",
   EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
+  TOTAL_CREDIT_APPLIED: "total_credit_applied",
 };
 
 export const CALCULATED_FIELDS = {

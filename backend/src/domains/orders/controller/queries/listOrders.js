@@ -119,6 +119,15 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
                 LIMIT 1
             ) latest_rca ON TRUE
             `
+        )
+        .joinRaw(
+            `
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(SUM(rca_sum.${RCA.APPLIED_AMOUNT})::numeric, 0) AS total_credit_applied
+                FROM ${TABLES.refundCreditApplications} rca_sum
+                WHERE rca_sum.${RCA.TARGET_ORDER_LIST_ID} = ${table}.${idCol}
+            ) rca_sum ON TRUE
+            `
         );
 
     const importPattern = `${ORDER_PREFIXES.import}%`;
@@ -201,8 +210,9 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
         db.raw(`latest_rca.refund_credit_effective_code::text as refund_credit_effective_code`),
         db.raw(`latest_rca.refund_credit_effective_available::numeric as refund_credit_effective_available`),
         db.raw(`latest_rca.refund_credit_effective_status::text as refund_credit_effective_status`),
+        db.raw(`rca_sum.total_credit_applied::numeric as total_credit_applied`),
         db.raw(
-            `(COALESCE(${table}.${ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE}::numeric, ${table}.${COLS.ORDER.PRICE}::numeric + COALESCE(latest_rca.refund_credit_applied_amount, 0)::numeric)) as price_before_credit`
+            `(COALESCE(${table}.${ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE}::numeric, ${table}.${COLS.ORDER.PRICE}::numeric + COALESCE(rca_sum.total_credit_applied, 0)::numeric)) as price_before_credit`
         ),
         includeAccountHolder && COLS.SUPPLIER.ACCOUNT_HOLDER
             ? db.raw(
