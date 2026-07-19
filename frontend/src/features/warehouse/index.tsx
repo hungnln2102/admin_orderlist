@@ -11,6 +11,7 @@ import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
 import { useWarehouseProducts } from "./hooks/useWarehouseProducts";
+import { useSystemProducts } from "./hooks/useSystemProducts";
 import {
   WarehouseItem,
   getWarehouseServiceDisplayName,
@@ -33,6 +34,7 @@ export default function Storage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const { expireStock } = useImportPackageSubmit();
+  const { systemProductOptions } = useSystemProducts();
 
   useEffect(() => {
     let mounted = true;

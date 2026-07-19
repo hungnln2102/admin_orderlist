@@ -78,6 +78,34 @@ function rawPostToTelegram(payload) {
   });
 }
 
+function preparePayload(basePayload) {
+  // If it's already a FormData object, return it as is
+  if (basePayload && typeof basePayload.getHeaders === "function") {
+    return basePayload;
+  }
+
+  // Create FormData if photo is present
+  if (basePayload && basePayload.photo) {
+    const FormData = require("form-data");
+    const form = new FormData();
+    if (basePayload.chat_id) form.append("chat_id", basePayload.chat_id);
+    if (basePayload.message_thread_id && Number.isFinite(basePayload.message_thread_id)) {
+      form.append("message_thread_id", basePayload.message_thread_id);
+    }
+    form.append("photo", basePayload.photo, { filename: "qr.png", contentType: "image/png" });
+    if (basePayload.caption) form.append("caption", basePayload.caption);
+    if (basePayload.parse_mode) form.append("parse_mode", basePayload.parse_mode);
+    return form;
+  }
+
+  // Clean up message_thread_id for JSON payload too
+  const finalPayload = { ...basePayload };
+  if (!Number.isFinite(finalPayload.message_thread_id)) {
+    delete finalPayload.message_thread_id;
+  }
+  return finalPayload;
+}
+
 /**
  * Xử lý hàng đợi
  */
@@ -88,7 +116,8 @@ async function processQueue() {
   const job = queue.shift(); // Lấy job đầu tiên
 
   try {
-    await rawPostToTelegram(job.payload);
+    const payloadToSend = preparePayload(job.payload);
+    await rawPostToTelegram(payloadToSend);
     job.resolve(true);
   } catch (error) {
     getLogger().error("[TelegramClient] Failed to send message", { error: error.message });
@@ -98,7 +127,8 @@ async function processQueue() {
       getLogger().warn("[TelegramClient] Thread not found, falling back to main chat");
       delete job.payload.message_thread_id;
       try {
-        await rawPostToTelegram(job.payload);
+        const retryPayload = preparePayload(job.payload);
+        await rawPostToTelegram(retryPayload);
         job.resolve(true);
       } catch (fallbackError) {
         getLogger().error("[TelegramClient] Fallback failed", { error: fallbackError.message });

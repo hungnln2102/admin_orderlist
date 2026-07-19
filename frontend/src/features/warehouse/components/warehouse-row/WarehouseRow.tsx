@@ -39,7 +39,8 @@ export const WarehouseRow = React.memo(function WarehouseRow({
   onSave,
   onCancel,
 }: Props) {
-  const theme = getWarehouseTheme(item.status);
+  const isAvailable = item.services?.some(srv => srv.status !== 'UNAVAILABLE');
+  const theme = getWarehouseTheme(isAvailable ? 'tồn' : 'dùng');
   const cellClass = `warehouse-row__cell px-1.5 sm:px-2 py-3 sm:py-4 glass-panel border-y transition-all duration-500 ${theme.rowSurfaceClass}`;
   const productCellClass = `${cellClass} first:rounded-l-[16px] sm:first:rounded-l-[24px] !px-2 sm:!px-3`;
 
@@ -70,10 +71,10 @@ export const WarehouseRow = React.memo(function WarehouseRow({
                 return (
                   <span
                     key={srv.id || idx}
-                    className={`inline-block whitespace-nowrap text-center text-[9px] font-bold uppercase tracking-wide text-white px-1.5 py-0.5 rounded ${srv.status === 'Đang Sử Dụng' ? 'bg-white/10 text-white/50 line-through' : 'bg-indigo-500/80'}`}
-                    title={`${productLabel} - ${srv.status || ""}`}
+                    className={`inline-block whitespace-nowrap text-center text-[9px] font-bold uppercase tracking-wide text-white px-1.5 py-0.5 rounded ${srv.status === 'UNAVAILABLE' ? 'bg-white/10 text-white/50 line-through' : 'bg-indigo-500/80'}`}
+                    title={`${productLabel} - ${srv.status === 'UNAVAILABLE' ? 'Đang Sử Dụng' : 'Tồn Kho'}`}
                   >
-                    {productLabel} {srv.status === 'Đang Sử Dụng' ? '(Hết)' : ''}
+                    {productLabel} {srv.status === 'UNAVAILABLE' ? '(Hết)' : ''}
                   </span>
                 );
               })

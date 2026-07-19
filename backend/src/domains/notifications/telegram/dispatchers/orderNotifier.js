@@ -7,7 +7,6 @@ const {
 const { db } = require("@/db");
 const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
 const { fetchQrImageBytes } = require("@/domains/notifications/telegram/services/qr");
-const FormData = require("form-data");
 const { 
   ORDER_CREATED_TOPIC_ID, 
   ZERO_DAYS_TOPIC_ID, 
@@ -18,49 +17,85 @@ const {
 /**
  * Hàm trừu tượng hóa việc bắn Telegram, giúp dọn dẹp logic trùng lặp (Deduping)
  */
-function sendBulkTelegramOrders(orders = [], config) {
+async function sendBulkTelegramOrders(orders = [], config) {
   if (!SEND_ORDER_NOTIFICATION) return;
 
-  const { topicId, headerMessage, messageBuilder, includeQR } = config;
-  
-  // 1. Deduping logic
-  const deduped = [];
-  const seenCodes = new Set();
-  for (const o of orders) {
-    const code = String(o?.id_order ?? o?.idOrder ?? "").trim();
-    if (code && seenCodes.has(code)) continue;
-    if (code) seenCodes.add(code);
-    deduped.push(o);
-  }
-
-  if (deduped.length === 0) return;
-
-  const total = deduped.length;
-
-  // 2. Gửi Header nếu có
-  if (headerMessage) {
-    enqueueMessage({
-      chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
-      message_thread_id: topicId,
-      text: headerMessage,
-      parse_mode: "HTML",
-    });
-  }
-
-  // 3. Đẩy vào hàng đợi
-  for (let i = 0; i < deduped.length; i++) {
-    const order = deduped[i];
-    const index = i + 1;
+  try {
+    const { topicId, headerMessage, messageBuilder, includeQR } = config;
     
-    // Giả sử có logic QR ở đây nếu includeQR, 
-    // tạm thời đơn giản hóa dùng sendMessage cho text HTML
-    const text = messageBuilder(order, index, total);
-    enqueueMessage({
-      chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
-      message_thread_id: topicId,
-      text,
-      parse_mode: "HTML",
-    });
+    // 1. Deduping logic
+    const deduped = [];
+    const seenCodes = new Set();
+    for (const o of orders) {
+      const code = String(o?.id_order ?? o?.idOrder ?? "").trim();
+      if (code && seenCodes.has(code)) continue;
+      if (code) seenCodes.add(code);
+      deduped.push(o);
+    }
+
+    if (deduped.length === 0) return;
+
+    const total = deduped.length;
+
+    // 2. Gửi Header nếu có
+    if (headerMessage) {
+      enqueueMessage({
+        chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
+        message_thread_id: topicId,
+        text: headerMessage,
+        parse_mode: "HTML",
+      });
+    }
+
+    let defaultBank = null;
+    if (includeQR) {
+      defaultBank = await resolveDefaultShopBankAccount();
+    }
+
+    // 3. Đẩy vào hàng đợi
+    for (let i = 0; i < deduped.length; i++) {
+      const order = deduped[i];
+      const index = i + 1;
+      
+      const text = messageBuilder(order, index, total);
+      
+      let qrBuffer = null;
+      const price = Number(order.price) || 0;
+      
+      if (includeQR && defaultBank && price > 0 && defaultBank.accountNumber && (defaultBank.bankShortCode || defaultBank.bankBin)) {
+        const qrResult = await fetchQrImageBytes({
+          bankCode: defaultBank.bankShortCode || defaultBank.bankBin,
+          accountNumber: defaultBank.accountNumber,
+          amount: price,
+          addInfo: String(order.id_order || order.idOrder || order.order_code || order.orderCode || "").trim(),
+          accountName: defaultBank.accountHolder || "",
+        }).catch(e => null);
+        
+        if (qrResult && qrResult.buffer) {
+          qrBuffer = qrResult.buffer;
+        }
+      }
+
+      if (qrBuffer) {
+        enqueueMessage({
+          chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
+          message_thread_id: topicId,
+          photo: qrBuffer,
+          caption: text,
+          parse_mode: "HTML"
+        });
+      } else {
+        enqueueMessage({
+          chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
+          message_thread_id: topicId,
+          text,
+          parse_mode: "HTML",
+        });
+      }
+    }
+  } catch (error) {
+    const logger = require("@/utils/logger");
+    logger.error("[OrderNotifier] Lỗi khi sendBulkTelegramOrders", { error: error.message });
   }
 }
 
@@ -82,11 +117,11 @@ async function notifyOrderCreated(order) {
     
     if (price > 0 && defaultBank?.accountNumber && (defaultBank?.bankShortCode || defaultBank?.bankBin)) {
       const qrResult = await fetchQrImageBytes({
-        bank: defaultBank.bankShortCode || defaultBank.bankBin,
-        acc: defaultBank.accountNumber,
+        bankCode: defaultBank.bankShortCode || defaultBank.bankBin,
+        accountNumber: defaultBank.accountNumber,
         amount: price,
-        desc: String(order.id_order || order.idOrder || order.order_code || order.orderCode || "").trim(),
-        name: defaultBank.accountHolder || "",
+        addInfo: String(order.id_order || order.idOrder || order.order_code || order.orderCode || "").trim(),
+        accountName: defaultBank.accountHolder || "",
       }).catch(e => null);
       
       if (qrResult && qrResult.buffer) {
@@ -95,13 +130,13 @@ async function notifyOrderCreated(order) {
     }
     
     if (qrBuffer) {
-      const form = new FormData();
-      form.append("chat_id", require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID);
-      form.append("message_thread_id", ORDER_CREATED_TOPIC_ID);
-      form.append("photo", qrBuffer, { filename: "qr.png", contentType: "image/png" });
-      form.append("caption", text);
-      form.append("parse_mode", "HTML");
-      enqueueMessage(form);
+      enqueueMessage({
+        chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,
+        message_thread_id: ORDER_CREATED_TOPIC_ID,
+        photo: qrBuffer,
+        caption: text,
+        parse_mode: "HTML"
+      });
     } else {
       enqueueMessage({
         chat_id: require("@/domains/notifications/telegram/core/constants").TELEGRAM_CHAT_ID,

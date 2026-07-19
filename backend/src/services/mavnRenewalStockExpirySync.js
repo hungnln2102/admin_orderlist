@@ -147,40 +147,33 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
     return { updated: 0, reason: "no_package_id" };
   }
 
-  const ppRes = await client.query(
+  const stockRes = await client.query(
     `
       SELECT
-        pp.${PP.stockId} AS stock_id,
-        pp.${PP.storageId} AS storage_id,
-        s.${S.accountUsername} AS stock_username,
-        st.${S.accountUsername} AS storage_username
-      FROM ${PKG_TABLE} pp
-      LEFT JOIN ${STOCK_TABLE} s ON s.${S.id} = pp.${PP.stockId}
-      LEFT JOIN ${STOCK_TABLE} st ON st.${S.id} = pp.${PP.storageId}
-      WHERE pp.${PP.packageId} = $1
+        ss.id AS service_id,
+        s.id AS stock_id,
+        s.account_username AS stock_username
+      FROM warehouse.stock_services ss
+      INNER JOIN warehouse.product_stocks s ON s.id = ss.stock_id
+      WHERE ss.product_id = $1
     `,
     [packageId]
   );
 
-  const stockIds = new Set();
-  for (const row of ppRes.rows) {
+  const serviceIdsToUpdate = new Set();
+  const stockIdsMatched = new Set();
+
+  for (const row of stockRes.rows) {
     if (
-      row.stock_id &&
       row.stock_username &&
       informationOrderMatchesAccountUsername(informationOrder, row.stock_username)
     ) {
-      stockIds.add(Number(row.stock_id));
-    }
-    if (
-      row.storage_id &&
-      row.storage_username &&
-      informationOrderMatchesAccountUsername(informationOrder, row.storage_username)
-    ) {
-      stockIds.add(Number(row.storage_id));
+      serviceIdsToUpdate.add(Number(row.service_id));
+      stockIdsMatched.add(Number(row.stock_id));
     }
   }
 
-  if (!stockIds.size) {
+  if (!serviceIdsToUpdate.size) {
     logger.warn("[MAVN renewal stock sync] Không có dòng kho khớp information_order = account_username", {
       orderCode: normalizedCode,
       packageId,
@@ -190,25 +183,25 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
     return { updated: 0, packageId, reason: "no_matching_stock" };
   }
 
-  const ids = Array.from(stockIds).filter((id) => Number.isFinite(id));
+  const ids = Array.from(serviceIdsToUpdate).filter((id) => Number.isFinite(id));
   await client.query(
     `
-      UPDATE ${STOCK_TABLE}
-      SET ${S.expiresAt} = $1::date,
-          ${S.updatedAt} = NOW()
-      WHERE ${S.id} = ANY($2::bigint[])
+      UPDATE warehouse.stock_services
+      SET expires_at = $1::date,
+          updated_at = NOW()
+      WHERE id = ANY($2::bigint[])
     `,
     [iso, ids]
   );
 
-  logger.info("[MAVN renewal stock sync] Đã cập nhật expires_at kho", {
+  logger.info("[MAVN renewal stock sync] Đã cập nhật expires_at trong stock_services", {
     orderCode: normalizedCode,
     packageId,
-    stockIds: ids,
+    serviceIds: ids,
     expiresAt: iso,
   });
 
-  return { updated: ids.length, packageId, stockIds: ids, expiresAt: iso };
+  return { updated: ids.length, packageId, stockIds: Array.from(stockIdsMatched), serviceIds: ids, expiresAt: iso };
 }
 
 module.exports = {
