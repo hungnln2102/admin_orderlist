@@ -16,6 +16,7 @@ const {
     CREDIT_STATUS,
     REFUND_CREDIT_NOTES_TABLE,
     REFUND_CREDIT_NOTE_COLS: RCN,
+    applyRefundCreditToTargetOrder,
 } = require("@/domains/orders/controller/finance/refundCredits");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("@/services/orderCodeService");
 const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
@@ -61,6 +62,90 @@ const appendNote = (baseNote, suffix) => {
 };
 
 const attachRefundCreditRoutes = (router) => {
+    router.post("/refund-credits/apply-to-order", async (req, res) => {
+        const { targetOrderId, creditNoteId, note } = req.body;
+        const requestedAmount = req.body.requestedAmount;
+        
+        if (!targetOrderId || !creditNoteId) {
+            return res.status(400).json({ error: "Thiếu targetOrderId hoặc creditNoteId" });
+        }
+
+        try {
+            const transactionResult = await db.transaction(async (trx) => {
+                const order = await trx(TABLES.orderList).where(COLS.ORDER.ID, targetOrderId).first();
+                if (!order) {
+                    throw new Error("Không tìm thấy đơn hàng cần thanh toán.");
+                }
+
+                // If user didn't specify requestedAmount, calculate remaining debt
+                let finalRequestedAmount = normalizeMoney(requestedAmount);
+                if (finalRequestedAmount <= 0) {
+                    const applications = await trx(TABLES.refundCreditApplications)
+                        .where("target_order_list_id", targetOrderId);
+                    const alreadyApplied = applications.reduce((sum, app) => sum + Number(app.applied_amount), 0);
+                    finalRequestedAmount = normalizeMoney(order[COLS.ORDER.PRICE]) - alreadyApplied;
+                }
+
+                if (finalRequestedAmount <= 0) {
+                    throw new Error("Đơn hàng này đã được thanh toán đủ.");
+                }
+
+                const result = await applyRefundCreditToTargetOrder(trx, {
+                    creditNoteId,
+                    targetOrderListId: targetOrderId,
+                    targetOrderCode: order[COLS.ORDER.ID_ORDER],
+                    requestedAmount: finalRequestedAmount,
+                    note: note || `Thanh toán bằng credit`,
+                    appliedBy: req.user?.username || 'System'
+                });
+
+                if (result.appliedAmount <= 0) {
+                    throw new Error("Credit không hợp lệ hoặc đã hết số dư.");
+                }
+
+                // Check if the order is fully paid now
+                const newApplications = await trx(TABLES.refundCreditApplications)
+                    .where("target_order_list_id", targetOrderId);
+                const newAlreadyApplied = newApplications.reduce((sum, app) => sum + Number(app.applied_amount), 0);
+                const newRemaining = normalizeMoney(order[COLS.ORDER.PRICE]) - newAlreadyApplied;
+
+                let isFullyPaid = false;
+                if (newRemaining <= 0 && [STATUS.UNPAID, STATUS.RENEWAL].includes(order[COLS.ORDER.STATUS])) {
+                    await trx(TABLES.orderList)
+                        .where(COLS.ORDER.ID, targetOrderId)
+                        .update({
+                            [COLS.ORDER.STATUS]: STATUS.PAID,
+                            [COLS.ORDER.UPDATED_AT]: new Date().toISOString()
+                        });
+                    isFullyPaid = true;
+                }
+
+                // Pass info to outer scope to emit events
+                return { isFullyPaid };
+            });
+
+            writeUserEventLog(req, {
+                action: "Apply Credit",
+                entity: "Don hang",
+                entityId: targetOrderId,
+                message: `Đã áp dụng credit ${creditNoteId} cho đơn hàng ${targetOrderId}`,
+                source: "orders.refund_credit_applications",
+            });
+
+            eventBus.emit(EVENTS.REFUND_CREDIT_UPDATED, { creditNoteId });
+            eventBus.emit(EVENTS.ORDER_UPDATED, { orderId: targetOrderId });
+            
+            if (transactionResult.isFullyPaid) {
+                eventBus.emit(EVENTS.ORDER_PAID, { orderId: targetOrderId });
+            }
+
+            return res.json({ success: true });
+        } catch (error) {
+            logger.error("Apply credit failed", { error: error.message, stack: error.stack });
+            return res.status(500).json({ error: error.message || "Không thể áp dụng credit." });
+        }
+    });
+
     router.get("/refund-credits/logs", async (req, res) => {
         try {
             const params = parseRefundCreditLogsQuery(req.query || {});

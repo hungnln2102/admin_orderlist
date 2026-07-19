@@ -34,6 +34,7 @@ type OrderRowProps = {
   onConfirmRefund: (order: Order) => void;
   onCreateTopupOrderFromRefund: (order: Order) => void;
   onMarkPaid: (order: Order) => void;
+  onPayWithCredit?: (order: Order) => void;
   onRenew: (order: Order) => void;
   onMockWebhook: (order: Order) => void;
 };
@@ -57,6 +58,7 @@ export const OrderRow = React.memo(function OrderRow({
   onConfirmRefund,
   onCreateTopupOrderFromRefund,
   onMarkPaid,
+  onPayWithCredit,
   onRenew,
   onMockWebhook,
 }: OrderRowProps) {
@@ -287,6 +289,7 @@ export const OrderRow = React.memo(function OrderRow({
         formatCurrency={formatCurrency}
         stopPropagation={stopPropagation}
         onMarkPaid={onMarkPaid}
+        onPayWithCredit={onPayWithCredit}
         onRenew={onRenew}
       />
     </React.Fragment>

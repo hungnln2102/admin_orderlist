@@ -30,6 +30,7 @@ type OrdersTableSectionProps = {
   onConfirmRefund: (order: Order) => void;
   onCreateTopupOrderFromRefund: (order: Order) => void;
   onMarkPaid: (order: Order) => void;
+  onPayWithCredit?: (order: Order) => void;
   onRenew: (order: Order) => void;
   onMockWebhook: (order: Order) => void;
   setCurrentPage: (value: number | ((prev: number) => number)) => void;
@@ -70,6 +71,7 @@ export function OrdersTableSection({
   onConfirmRefund,
   onCreateTopupOrderFromRefund,
   onMarkPaid,
+  onPayWithCredit,
   onRenew,
   onMockWebhook,
   setCurrentPage,
@@ -102,6 +104,7 @@ export function OrdersTableSection({
                   onConfirmRefund={onConfirmRefund}
                   onCreateTopupOrderFromRefund={onCreateTopupOrderFromRefund}
                   onMarkPaid={onMarkPaid}
+                  onPayWithCredit={onPayWithCredit}
                   onRenew={onRenew}
                 />
               )}
@@ -157,6 +160,7 @@ export function OrdersTableSection({
                   onConfirmRefund={onConfirmRefund}
                   onCreateTopupOrderFromRefund={onCreateTopupOrderFromRefund}
                   onMarkPaid={onMarkPaid}
+                  onPayWithCredit={onPayWithCredit}
                   onRenew={onRenew}
                   onMockWebhook={onMockWebhook}
                 />

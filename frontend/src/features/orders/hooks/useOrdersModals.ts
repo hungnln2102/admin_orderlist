@@ -30,11 +30,13 @@ export function useOrdersModals() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreatedBatchModalOpen, setIsCreatedBatchModalOpen] = useState(false);
+  const [isPayWithCreditModalOpen, setIsPayWithCreditModalOpen] = useState(false);
   const [createdBatchToView, setCreatedBatchToView] = useState<CreatedOrderBatchView | null>(null);
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [viewModalSource, setViewModalSource] = useState<ViewModalSource>("view");
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<EditableOrder | null>(null);
+  const [orderToPayWithCredit, setOrderToPayWithCredit] = useState<Order | null>(null);
   const [createPrefill, setCreatePrefill] = useState<RefundCreatePrefill | null>(null);
 
   const openCreateModal = useCallback((prefill: RefundCreatePrefill | null = null) => {
@@ -62,6 +64,10 @@ export function useOrdersModals() {
     setIsModalOpen(false);
     setOrderToDelete(null);
   }, []);
+  const closePayWithCreditModal = useCallback(() => {
+    setIsPayWithCreditModalOpen(false);
+    setOrderToPayWithCredit(null);
+  }, []);
 
   const handleViewOrder = useCallback((order: Order, source: ViewModalSource = "view") => {
     setOrderToView(order);
@@ -87,17 +93,24 @@ export function useOrdersModals() {
     setIsModalOpen(true);
   }, []);
 
+  const handlePayWithCredit = useCallback((order: Order) => {
+    setOrderToPayWithCredit(order);
+    setIsPayWithCreditModalOpen(true);
+  }, []);
+
   const resetModals = useCallback(() => {
     setIsModalOpen(false);
     setIsViewModalOpen(false);
     setIsEditModalOpen(false);
     setIsCreateModalOpen(false);
     setIsCreatedBatchModalOpen(false);
+    setIsPayWithCreditModalOpen(false);
     setCreatedBatchToView(null);
     setOrderToView(null);
     setViewModalSource("view");
     setOrderToDelete(null);
     setOrderToEdit(null);
+    setOrderToPayWithCredit(null);
     setCreatePrefill(null);
   }, []);
 
@@ -108,10 +121,12 @@ export function useOrdersModals() {
     isEditModalOpen,
     isCreateModalOpen,
     isCreatedBatchModalOpen,
+    isPayWithCreditModalOpen,
     createdBatchToView,
     orderToView,
     orderToDelete,
     orderToEdit,
+    orderToPayWithCredit,
     createPrefill,
     openCreateModal,
     closeCreateModal,
@@ -119,10 +134,12 @@ export function useOrdersModals() {
     closeCreatedBatchModal,
     closeEditModal,
     closeModal,
+    closePayWithCreditModal,
     handleViewOrder,
     handleViewCreatedBatch,
     handleEditOrder,
     handleDeleteOrder,
+    handlePayWithCredit,
     resetModals,
     setOrderToDelete,
   };

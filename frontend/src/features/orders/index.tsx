@@ -10,6 +10,7 @@ import { OrdersDatasetTabs } from "./components/OrdersDatasetTabs";
 import { OrdersStatsSection } from "./components/OrdersStatsSection";
 import { OrdersFiltersBar } from "./components/OrdersFiltersBar";
 import { OrdersTableSection } from "./components/OrdersTableSection";
+import { PayWithCreditModal } from "./components/PayWithCreditModal";
 import { exportFilteredOrdersToExcel } from "./utils/exportFilteredOrders";
 import type { DashboardDateRangeValue } from "@/features/dashboard/components/DashboardDateRangeFilter";
 
@@ -67,6 +68,7 @@ export default function Orders() {
     handleConfirmRefund,
     handleCreateTopupOrderFromRefund,
     handleMarkPaid,
+    handlePayWithCredit,
     handleRenewOrder,
     handleMockWebhook,
     confirmDelete,
@@ -74,6 +76,9 @@ export default function Orders() {
     reloadOrders,
     totalRecords,
     renewingOrderCode,
+    isPayWithCreditModalOpen,
+    closePayWithCreditModal,
+    orderToPayWithCredit,
   } = useOrdersData(datasetKey, { durationRange: orderDurationRange });
 
   useEffect(() => {
@@ -170,6 +175,7 @@ export default function Orders() {
         onConfirmRefund={handleConfirmRefund}
         onCreateTopupOrderFromRefund={handleCreateTopupOrderFromRefund}
         onMarkPaid={handleMarkPaid}
+        onPayWithCredit={handlePayWithCredit}
         onRenew={handleRenewOrder}
         onMockWebhook={handleMockWebhook}
         setCurrentPage={setCurrentPage}
@@ -194,6 +200,14 @@ export default function Orders() {
         isOpen={isCreatedBatchModalOpen}
         onClose={closeCreatedBatchModal}
         batch={createdBatchToView}
+        onViewOrder={handleViewOrder}
+        formatCurrency={formatCurrency}
+      />
+      <PayWithCreditModal
+        isOpen={isPayWithCreditModalOpen}
+        onClose={closePayWithCreditModal}
+        order={orderToPayWithCredit}
+        onSuccess={reloadOrders}
       />
       <EditOrderModal
         isOpen={isEditModalOpen}

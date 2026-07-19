@@ -35,6 +35,7 @@ type OrderCardProps = {
   onConfirmRefund?: (order: Order) => void;
   onCreateTopupOrderFromRefund?: (order: Order) => void;
   onMarkPaid?: (order: Order) => void;
+  onPayWithCredit?: (order: Order) => void;
   onRenew?: (order: Order) => void;
 };
 
@@ -54,6 +55,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   onConfirmRefund,
   onCreateTopupOrderFromRefund,
   onMarkPaid,
+  onPayWithCredit,
   onRenew,
 }) => {
   const orderCode = order[ORDER_FIELDS.ID_ORDER] || "--";
@@ -129,7 +131,15 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               {status}
             </span>
             {showActionButtons && (canStartProcessing || canMarkPaid || canRenew) && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50 justify-end">
+                {canStartProcessing && onPayWithCredit && (
+                  <button
+                    className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-[10px] font-bold text-cyan-300 uppercase tracking-wide transition-all hover:bg-cyan-500/30 active:scale-95 shadow-lg"
+                    onClick={(e) => { e.stopPropagation(); onPayWithCredit(order); }}
+                  >
+                    Thanh Toán bằng Credit
+                  </button>
+                )}
                 {canStartProcessing && onMarkPaid && (
                   <button
                     className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 uppercase tracking-wide transition-all hover:bg-emerald-500/30 active:scale-95 shadow-lg"

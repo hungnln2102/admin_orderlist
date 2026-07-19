@@ -31,6 +31,7 @@ type OrderRowExpandedProps = {
     action: (targetOrder: Order) => void
   ) => (event: React.MouseEvent) => void;
   onMarkPaid: (order: Order) => void;
+  onPayWithCredit?: (order: Order) => void;
   onRenew: (order: Order) => void;
 };
 
@@ -55,6 +56,7 @@ const OrderRowExpanded: React.FC<OrderRowExpandedProps> = ({
   formatCurrency,
   stopPropagation,
   onMarkPaid,
+  onPayWithCredit,
   onRenew,
 }) => {
   if (!isExpanded) return null;
@@ -74,6 +76,17 @@ const OrderRowExpanded: React.FC<OrderRowExpandedProps> = ({
             </div>
             {showActionButtons && (
               <div className="ml-4 flex items-center gap-2">
+                {canStartProcessing && onPayWithCredit && (
+                  <button
+                    className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 shadow-md shadow-cyan-900/40"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPayWithCredit(order);
+                    }}
+                  >
+                    Thanh Toán bằng Credit
+                  </button>
+                )}
                 {canStartProcessing && (
                   <button
                     className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
