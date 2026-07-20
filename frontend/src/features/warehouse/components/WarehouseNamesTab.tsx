@@ -149,7 +149,7 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
                       ))}
                     </select>
                   </td>
-                  <td className="p-4 text-right space-x-2 flex justify-end items-center h-full pt-4">
+                  <td className="p-4 text-right space-x-2">
                     <button onClick={saveEdit} className="text-green-400 hover:text-green-300 font-medium px-2">Lưu</button>
                     <button onClick={cancelEdit} className="text-white/40 hover:text-white/70 px-2">Hủy</button>
                   </td>
@@ -203,16 +203,16 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-right space-x-2 flex justify-end items-center h-full">
+                      <td className="p-4 text-right space-x-2">
                         {isEditing ? (
                           <>
-                            <button onClick={saveEdit} className="text-green-400 hover:text-green-300 font-medium px-2">Lưu</button>
-                            <button onClick={cancelEdit} className="text-white/40 hover:text-white/70 px-2">Hủy</button>
+                            <button onClick={saveEdit} disabled={loading} className="text-green-400 hover:text-green-300 font-medium px-2">Lưu</button>
+                            <button onClick={cancelEdit} disabled={loading} className="text-white/40 hover:text-white/70 px-2">Hủy</button>
                           </>
                         ) : (
                           <>
-                            <button onClick={() => startEdit(item)} className="text-blue-400 hover:text-blue-300 p-1">Sửa</button>
-                            <button onClick={() => setDeleteId(item.id)} className="text-red-400 hover:text-red-300 p-1">Xóa</button>
+                            <button onClick={() => startEdit(item)} disabled={loading} className="text-blue-400 hover:text-blue-300 p-1">Sửa</button>
+                            <button onClick={() => setDeleteId(item.id)} disabled={loading} className="text-red-400 hover:text-red-300 p-1">Xóa</button>
                           </>
                         )}
                       </td>

@@ -11,13 +11,12 @@ export function useWarehouseProducts(items: WarehouseItem[]) {
   const fetchOptions = async () => {
     setLoadingProducts(true);
     try {
-      const res = await apiFetch("/api/warehouse/product-names");
+      const res = await apiFetch("/api/products/packages");
       if (res.ok) {
         const data = await res.json();
         const options = data.map((item: any) => ({
-          value: item.product_id ? String(item.product_id) : item.name,
-          label: item.name,
-          nameId: item.id
+          value: String(item.id),
+          label: item.package_name,
         }));
         
         // Remove duplicates by value
