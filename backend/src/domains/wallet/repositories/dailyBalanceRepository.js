@@ -68,6 +68,43 @@ const incrementDailyWalletBalance = async (
     throw new Error(`Không tìm thấy cột ví nhận hoàn NCC: ${walletName}`);
   }
 
+  // 1. Find existing rows for the target date
+  const existingRows = await executor(DAILY_BALANCES_TABLE)
+    .select(BALANCE_COLS.WALLET_ID)
+    .where(BALANCE_COLS.RECORD_DATE, dateStr);
+  const existingWids = new Set(existingRows.map(r => Number(r[BALANCE_COLS.WALLET_ID] ?? r.wallet_id)));
+
+  // 2. Find previous latest balances
+  const previousRows = await executor(DAILY_BALANCES_TABLE)
+    .select(BALANCE_COLS.WALLET_ID, BALANCE_COLS.AMOUNT)
+    .where(BALANCE_COLS.RECORD_DATE, "<", dateStr)
+    .orderBy(BALANCE_COLS.RECORD_DATE, "desc");
+
+  const latestByWallet = new Map();
+  for (const row of previousRows || []) {
+    const wid = Number(row[BALANCE_COLS.WALLET_ID] ?? row.wallet_id);
+    if (!latestByWallet.has(wid)) {
+      const amt = Number(row[BALANCE_COLS.AMOUNT] ?? row.amount);
+      latestByWallet.set(wid, Number.isFinite(amt) ? amt : 0);
+    }
+  }
+
+  // 3. Insert carry-over balances for missing wallets on this date
+  const carryOverInserts = [];
+  for (const [wid, prevAmount] of latestByWallet.entries()) {
+    if (!existingWids.has(wid)) {
+      carryOverInserts.push({
+        [BALANCE_COLS.RECORD_DATE]: dateStr,
+        [BALANCE_COLS.WALLET_ID]: wid,
+        [BALANCE_COLS.AMOUNT]: prevAmount
+      });
+    }
+  }
+  if (carryOverInserts.length > 0) {
+    await executor(DAILY_BALANCES_TABLE).insert(carryOverInserts);
+  }
+
+  // 4. Finally, apply the increment to the target wallet
   await executor.raw(
     `
       INSERT INTO ${DAILY_BALANCES_TABLE}

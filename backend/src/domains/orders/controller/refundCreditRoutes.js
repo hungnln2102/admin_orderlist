@@ -315,9 +315,17 @@ const attachRefundCreditRoutes = (router) => {
             Number.isFinite(shopBankAccountId) &&
             shopBankAccountId > 0;
 
-        if (action === CREDIT_ACTIONS.COMPLETE && !hasShopBankAccountId) {
+        const addToAssetWallet = Boolean(req.body?.addToAssetWallet);
+        const assetRecordDate = String(req.body?.assetRecordDate || "").trim();
+
+        if (action === CREDIT_ACTIONS.COMPLETE && !addToAssetWallet && !hasShopBankAccountId) {
             return res.status(400).json({
-                error: "Vui lòng chọn STK để trừ tiền hoàn trước khi xác nhận.",
+                error: "Vui lòng chọn STK hoặc Tùy chọn cộng ví tài sản trước khi xác nhận.",
+            });
+        }
+        if (action === CREDIT_ACTIONS.COMPLETE && addToAssetWallet && !assetRecordDate) {
+            return res.status(400).json({
+                error: "Vui lòng chọn ngày ghi nhận dòng tiền.",
             });
         }
 
@@ -362,43 +370,57 @@ const attachRefundCreditRoutes = (router) => {
                     });
                 }
 
-                cashoutAccount = await findShopBankAccountById(shopBankAccountId);
-                if (!cashoutAccount || cashoutAccount.isActive === false) {
-                    await trx.rollback();
-                    return res.status(400).json({
-                        error: "STK không hợp lệ hoặc đang bị tắt.",
-                    });
-                }
-
-                const accountLabel =
-                    String(cashoutAccount.label || "").trim() ||
-                    String(cashoutAccount.accountNumber || "").trim() ||
-                    `STK ${cashoutAccount.id}`;
-                nextNote = appendNote(
-                    nextNote,
-                    `Đã hoàn tiền theo credit (thao tác Đã Hoàn) — trừ ${accountLabel}.`
-                );
-
                 const creditCode = String(current?.[RCN.CREDIT_CODE] || "").trim();
-                const ledgerResult = await debitShopBankRefundCashout(trx, {
-                    accountId: Number(cashoutAccount.id),
-                    amount: cashoutAmount,
-                    sourceId: id,
-                    note: `Hoàn tiền credit ${creditCode || `#${id}`} — ${accountLabel}`,
-                });
-                if (!ledgerResult || ledgerResult.skipped) {
-                    logger.warn("Refund cashout ledger skipped", {
-                        creditId: id,
-                        reason: ledgerResult?.reason || "unknown",
+
+                if (addToAssetWallet) {
+                    const { creditSupplierRefundToDailyWallet } = require("@/domains/wallet/repositories/dailyBalanceRepository");
+                    await creditSupplierRefundToDailyWallet(trx, {
+                        recordDate: assetRecordDate,
+                        amount: cashoutAmount,
                     });
+                    
+                    nextNote = appendNote(
+                        nextNote,
+                        `Đã hoàn tiền (Đã Hoàn) cộng vào ví tài sản ngày ${assetRecordDate}.`
+                    );
                 } else {
-                    const cashoutMonthKey = new Date().toISOString().slice(0, 7);
-                    await notifyFinanceMonthlyDelta({
-                        monthKey: cashoutMonthKey,
-                        bankBalanceDelta: -cashoutAmount,
-                        context: `orders.refundCreditCashout credit=${creditCode || `#${id}`}`,
-                        executor: trx,
+                    cashoutAccount = await findShopBankAccountById(shopBankAccountId);
+                    if (!cashoutAccount || cashoutAccount.isActive === false) {
+                        await trx.rollback();
+                        return res.status(400).json({
+                            error: "STK không hợp lệ hoặc đang bị tắt.",
+                        });
+                    }
+
+                    const accountLabel =
+                        String(cashoutAccount.label || "").trim() ||
+                        String(cashoutAccount.accountNumber || "").trim() ||
+                        `STK ${cashoutAccount.id}`;
+                    nextNote = appendNote(
+                        nextNote,
+                        `Đã hoàn tiền theo credit (thao tác Đã Hoàn) để trừ ${accountLabel}.`
+                    );
+
+                    const ledgerResult = await debitShopBankRefundCashout(trx, {
+                        accountId: Number(cashoutAccount.id),
+                        amount: cashoutAmount,
+                        sourceId: id,
+                        note: `Hoàn tiền credit ${creditCode || `#${id}`} để trả ${accountLabel}`,
                     });
+                    if (!ledgerResult || ledgerResult.skipped) {
+                        logger.warn("Refund cashout ledger skipped", {
+                            creditId: id,
+                            reason: ledgerResult?.reason || "unknown",
+                        });
+                    } else {
+                        const cashoutMonthKey = new Date().toISOString().slice(0, 7);
+                        await notifyFinanceMonthlyDelta({
+                            monthKey: cashoutMonthKey,
+                            bankBalanceDelta: -cashoutAmount,
+                            context: `orders.refundCreditCashout credit=${creditCode || `#${id}`}`,
+                            executor: trx,
+                        });
+                    }
                 }
 
                 const offFlowResult = await applyOffFlowCreditCashout(trx, current, cashoutAmount);

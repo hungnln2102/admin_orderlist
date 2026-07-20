@@ -49,6 +49,7 @@ export const PriceCard: React.FC<PriceCardProps> = ({
 }) => {
   const resolvedIsActive = statusOverride ?? item.isActive ?? false;
   const displayUpdated = updatedTimestamp ?? item.lastUpdated ?? "";
+  const formattedUpdated = formatDateLabel(displayUpdated);
   const hasPromo = typeof item.pctPromo === "number" && Number.isFinite(item.pctPromo) && item.pctPromo > 0;
 
   return (

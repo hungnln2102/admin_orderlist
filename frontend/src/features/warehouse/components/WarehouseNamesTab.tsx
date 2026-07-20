@@ -144,6 +144,9 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
                       className="w-full bg-[#0f1219] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                     >
                       <option value="">-- Không liên kết --</option>
+                      {draft?.product_id && !productOptions.some(o => Number(o.value) === draft.product_id) && (
+                        <option value={draft.product_id} className="hidden">ID: {draft.product_id} (Dữ liệu cũ)</option>
+                      )}
                       {productOptions.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
@@ -191,6 +194,9 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
                             className="w-full bg-[#0f1219] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                           >
                             <option value="">-- Không liên kết --</option>
+                            {draft?.product_id && !productOptions.some(o => Number(o.value) === draft.product_id) && (
+                              <option value={draft.product_id} className="hidden">ID: {draft.product_id} (Dữ liệu cũ)</option>
+                            )}
                             {productOptions.map(o => (
                               <option key={o.value} value={o.value}>{o.label}</option>
                             ))}

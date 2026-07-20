@@ -16,6 +16,8 @@ type CreditActionResponse = {
 
 type SubmitCreditLogActionOptions = {
   shopBankAccountId?: number | null;
+  addToAssetWallet?: boolean;
+  assetRecordDate?: string;
 };
 
 export async function submitCreditLogAction(
@@ -26,6 +28,10 @@ export async function submitCreditLogAction(
   const payload: Record<string, unknown> = { action };
   if (action === "complete" && options.shopBankAccountId != null) {
     payload.shopBankAccountId = options.shopBankAccountId;
+  }
+  if (action === "complete" && options.addToAssetWallet) {
+    payload.addToAssetWallet = options.addToAssetWallet;
+    payload.assetRecordDate = options.assetRecordDate;
   }
   const body = await apiPost<CreditActionResponse>(API_ENDPOINTS.CREDIT_LOG_ACTION(id), payload);
   if (!body?.success) {
