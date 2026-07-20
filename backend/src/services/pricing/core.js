@@ -41,13 +41,6 @@ const normalizeImportValue = (value, ...referenceValues) => {
   return { value: numeric, scaled: false, reference: null };
 };
 
-const roundToThousands = (value) => {
-  const numeric = Number.parseInt(value, 10);
-  if (!Number.isFinite(numeric) || numeric === 0) return 0;
-  const remainder = numeric % 1000;
-  if (remainder === 0) return numeric;
-  return remainder >= 500 ? numeric + (1000 - remainder) : numeric - remainder;
-};
 
 const resolveMoney = (computedValue, ...fallbackValues) => {
   if (Number.isFinite(computedValue) && computedValue > 0) {
@@ -98,7 +91,7 @@ const normalizePromoRatio = (value) => {
 };
 
 const roundPricingValue = (value) =>
-  Math.max(0, roundToThousands(roundGiaBanValue(value)));
+  Math.max(0, roundGiaBanValue(value));
 
 const calculateMarginBasedPrice = (basePrice, marginRatio) => {
   const numericBase = Number(basePrice);
@@ -224,219 +217,16 @@ const resolveTierPrice = (tier, tiersByKey, marginsByKey, pricingBase, priceCach
   return basePrice;
 };
 
-/* ------------------------------------------------------------------ */
-/*  calculateOrderPricingFromResolvedValues — backward compat          */
-/* ------------------------------------------------------------------ */
 
-const calculateOrderPricingFromResolvedValues = ({
-  orderId = "",
-  customerType = "",
-  pricingBase,
-  importPrice,
-  fallbackPrice = 0,
-  fallbackCost = 0,
-  pctCtv,
-  pctKhach,
-  pctPromo,
-  pctStu,
-  forceKhachLe = false,
-  roundCostToThousands = false,
-  days = 30,
-  expiryDate = "",
-  /** Nếu caller đã await getPrefixMap() sẵn, truyền vào để tránh gọi lại. */
-  _prefixMap = null,
-  /** Nếu caller đã await getTiers() sẵn, truyền vào. */
-  _tiers = null,
-} = {}) => {
-  const normalizedPricingBase = resolveMoney(
-    pricingBase,
-    importPrice,
-    fallbackPrice,
-    fallbackCost
-  );
-  const normalizedImportPrice = resolveMoney(
-    importPrice,
-    fallbackCost,
-    normalizedPricingBase
-  );
-
-  const pctCtvNormalized = normalizeMarginRatio(pctCtv, 0);
-  const pctKhachNormalized = normalizeMarginRatio(pctKhach, 0);
-  const pctPromoNormalized = normalizePromoRatio(pctPromo);
-
-  const resellRaw = calculateMarginBasedPrice(
-    normalizedPricingBase,
-    pctCtvNormalized
-  );
-  const customerRaw = calculateMarginBasedPrice(resellRaw, pctKhachNormalized);
-  const pctStuProvided =
-    pctStu !== null &&
-    pctStu !== undefined &&
-    !(typeof pctStu === "string" && String(pctStu).trim() === "");
-  const pctStuNormalized = pctStuProvided
-    ? normalizeMarginRatio(pctStu, 0)
-    : pctKhachNormalized;
-  const studentRaw = calculateMarginBasedPrice(resellRaw, pctStuNormalized);
-  const resellPrice = roundPricingValue(resellRaw);
-  const customerPrice = roundPricingValue(customerRaw);
-  const baseCost = roundCostToThousands
-    ? roundPricingValue(normalizedImportPrice)
-    : resolveMoney(normalizedImportPrice, fallbackCost, normalizedPricingBase);
-
-  const promoAmount =
-    pctPromoNormalized > 0
-      ? roundPricingValue(customerPrice * pctPromoNormalized)
-      : 0;
-  const promoPrice = Math.max(0, customerPrice - promoAmount);
-
-  const studentPrice = roundPricingValue(studentRaw);
-
-  /* --- Generic tier-based price resolution --- */
-  let price = customerPrice;
-
-  if (_tiers && _tiers.length > 0) {
-    const tiersByKey = {};
-    for (const t of _tiers) tiersByKey[t.key] = t;
-
-    const marginsByKey = {
-      ctv: pctCtvNormalized,
-      customer: pctKhachNormalized,
-      promo: pctPromoNormalized,
-      student: pctStuNormalized,
-    };
-
-    if (forceKhachLe) {
-      price = customerPrice;
-    } else {
-      const matchedTier = _tiers.find((t) => {
-        const upper = t.prefix.toUpperCase();
-        const oid = String(orderId || "").trim().toUpperCase();
-        const ct = String(customerType || "").trim().toUpperCase();
-        return oid.startsWith(upper) || ct === upper;
-      });
-
-      if (matchedTier) {
-        const priceCache = {};
-        const rawPrice = resolveTierPrice(
-          matchedTier,
-          tiersByKey,
-          marginsByKey,
-          normalizedPricingBase,
-          priceCache,
-          baseCost
-        );
-        price = roundPricingValue(rawPrice);
-      }
-    }
-  } else {
-    const prefixMap = _prefixMap || {
-      ctv: "MAVC", customer: "MAVL", promo: "MAVK",
-      gift: "MAVT", import: "MAVN", student: "MAVS",
-    };
-    const orderKind = resolveOrderKindSync(prefixMap, { orderId, customerType });
-
-    if (forceKhachLe) {
-      price = customerPrice;
-    } else if (orderKind.isStudent) {
-      price = studentPrice;
-    } else if (orderKind.isCtv) {
-      price = resellPrice;
-    } else if (orderKind.isCustomer) {
-      price = customerPrice;
-    } else if (orderKind.isPromo) {
-      const factor = Math.max(0, 1 - pctPromoNormalized);
-      price = roundPricingValue(customerRaw * factor);
-    } else if (orderKind.isGift) {
-      price = 0;
-    } else if (orderKind.isImport) {
-      price = baseCost;
-    }
-  }
-
-  return {
-    cost: baseCost,
-    price,
-    promoPrice,
-    pricePromo: promoPrice,
-    promo: promoAmount,
-    resellPrice,
-    customerPrice,
-    totalPrice: price,
-    days,
-    expiry_date: expiryDate,
-    meta: {
-      pricingBase: normalizedPricingBase,
-      importPrice: normalizedImportPrice,
-      pctCtv: pctCtvNormalized,
-      pctKhach: pctKhachNormalized,
-      pctStu: pctStuNormalized,
-      pctPromo: pctPromoNormalized,
-      studentPrice,
-      forceKhachLe,
-    },
-  };
-};
-
-const deriveVariantMarginsFromCostAndSalePrice = ({
-  cost,
-  salePrice,
-  orderPrefix,
-  customerType,
-  _prefixMap = null,
-} = {}) => {
-  const B = normalizeMoney(cost);
-  const P = normalizeMoney(salePrice);
-  const head = String(orderPrefix || customerType || "")
-    .trim()
-    .toUpperCase()
-    .slice(0, 4);
-
-  const prefixMap = _prefixMap || {
-    ctv: "MAVC", customer: "MAVL",
-  };
-  const isMavl = head === (prefixMap.customer || "MAVL");
-  const isMavc = head === (prefixMap.ctv || "MAVC");
-
-  if (!Number.isFinite(B) || B <= 0 || !Number.isFinite(P) || P <= 0) {
-    return { pctCtv: 0, pctKhach: 0 };
-  }
-
-  const defaultCtvFromEnv = Number(process.env.NEW_VARIANT_DEFAULT_PCT_CTV);
-  const defaultCtv = normalizeMarginRatio(
-    Number.isFinite(defaultCtvFromEnv) ? defaultCtvFromEnv : 0.04,
-    0.04
-  );
-
-  if (isMavl) {
-    const resellRaw = calculateMarginBasedPrice(B, defaultCtv);
-    if (P > resellRaw * 0.999) {
-      const pctKhach = normalizeMarginRatio(1 - resellRaw / P, 0);
-      return { pctCtv: defaultCtv, pctKhach };
-    }
-    const pctCtv = normalizeMarginRatio(1 - B / P, 0);
-    return { pctCtv, pctKhach: 0 };
-  }
-
-  if (isMavc) {
-    const pctCtv = normalizeMarginRatio(1 - B / P, 0);
-    return { pctCtv, pctKhach: 0 };
-  }
-
-  const pctCtv = normalizeMarginRatio(1 - B / P, 0);
-  return { pctCtv, pctKhach: 0 };
-};
 
 module.exports = {
   normalizeMoney,
   normalizeImportValue,
-  roundToThousands,
   resolveMoney,
   normalizeRatio: normalizeMarginRatio,
   normalizeMarginRatio,
   normalizePromoRatio,
   calculateMarginBasedPrice,
-  calculateOrderPricingFromResolvedValues,
-  deriveVariantMarginsFromCostAndSalePrice,
   resolveOrderKind,
   resolveOrderKindSync,
   resolveTierPrice,

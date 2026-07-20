@@ -32,7 +32,7 @@ export const formatVndDisplay = (value: string | number): string => {
   return new Intl.NumberFormat("vi-VN").format(num);
 };
 
-export const parseRatioInput = (value: string): number | null => {
+export const parseCurrencyInput = (value: string): number | null => {
   if (value === undefined || value === null) return null;
   const digits = String(value).replace(/\D+/g, "");
   if (!digits) return null;

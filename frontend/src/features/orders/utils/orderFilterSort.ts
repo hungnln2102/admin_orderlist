@@ -2,12 +2,11 @@ import { isRegisteredToday } from "@/shared/date";
 import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS, Order, OrderDatasetKey } from "@/constants";
 import { getStatusPriority } from "../status";
 import {
-  normalizeOrderCode,
-  normalizeSearchText,
   parseCanceledAtToMs,
   parseExpiryTime,
   sanitizeDateLike,
 } from "./ordersHelpers";
+import { normalizeSearchText, normalizeCompactCode as normalizeOrderCode } from "@/shared/text";
 
 export type FilterSortParams = {
   searchTerm: string;

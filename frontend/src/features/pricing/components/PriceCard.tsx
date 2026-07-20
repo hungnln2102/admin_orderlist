@@ -17,7 +17,6 @@ import {
   formatPromoPercent,
   formatRateDescription,
 } from "../priceFormatters";
-import { hasValidPromoRatio } from "../priceCalculations";
 
 interface PriceCardProps {
   item: ProductPricingRow;
@@ -50,8 +49,7 @@ export const PriceCard: React.FC<PriceCardProps> = ({
 }) => {
   const resolvedIsActive = statusOverride ?? item.isActive ?? false;
   const displayUpdated = updatedTimestamp ?? item.lastUpdated ?? "";
-  const formattedUpdated = displayUpdated ? formatDateLabel(displayUpdated) : "-";
-  const hasPromo = hasValidPromoRatio(item.pctPromo, item.pctKhach, item.pctCtv);
+  const hasPromo = typeof item.pctPromo === "number" && Number.isFinite(item.pctPromo) && item.pctPromo > 0;
 
   return (
     <div

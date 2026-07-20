@@ -7,7 +7,7 @@ import {
   formatCurrencyValue,
   formatDateLabel,
   formatProfitPercentBySale,
-  parseRatioInput,
+  parseCurrencyInput,
 } from "../priceFormatters";
 import type { ProductRowEditControls, ProductRowSupplyState } from "./productRowContracts";
 
@@ -43,10 +43,10 @@ export const buildProductRowViewModel = ({
   const currentEditForm = isEditingProduct ? editControls.productEditForm : null;
   const previewPrices = currentEditForm
     ? {
-        ctv: parseRatioInput(currentEditForm.pctCtv),
-        customer: parseRatioInput(currentEditForm.pctKhach),
-        promo: parseRatioInput(currentEditForm.pctPromo),
-        student: parseRatioInput(currentEditForm.pctStu),
+        ctv: parseCurrencyInput(currentEditForm.pctCtv),
+        customer: parseCurrencyInput(currentEditForm.pctKhach),
+        promo: parseCurrencyInput(currentEditForm.pctPromo),
+        student: parseCurrencyInput(currentEditForm.pctStu),
       }
     : null;
   const previewWholesalePrice = previewPrices?.ctv ?? null;

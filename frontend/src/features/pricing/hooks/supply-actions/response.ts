@@ -1,8 +1,5 @@
 import type { ProductPricingRow, SupplyPriceItem } from "../../types";
-import {
-  applyBasePriceToProduct,
-  hasValidPromoRatio,
-} from "../../priceCalculations";
+import { applyBasePriceToProduct } from "../product-action-helpers";
 import {
   computeHighestSupplyPrice,
   dedupeSupplyItems,
@@ -74,11 +71,7 @@ export function reconcileFetchedProductPrices(
       typeof row.studentPrice === "number" &&
       Number.isFinite(row.studentPrice) &&
       row.studentPrice > 0;
-    const promoNeeded = hasValidPromoRatio(
-      row.pctPromo,
-      row.pctKhach,
-      row.pctCtv
-    );
+    const promoNeeded = typeof row.pctPromo === "number" && Number.isFinite(row.pctPromo) && row.pctPromo > 0;
     const hasPromo =
       typeof row.promoPrice === "number" &&
       Number.isFinite(row.promoPrice) &&

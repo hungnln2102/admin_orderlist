@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type React from "react";
 import type { ProductPricingRow } from "../types";
-import { applyBasePriceToProduct } from "../priceCalculations";
+import { applyBasePriceToProduct } from "./product-action-helpers";
 import { useExistingSupplyRowActions } from "./useExistingSupplyRowActions";
 import { useNewSupplyRowActions } from "./useNewSupplyRowActions";
 import { useSupplyPriceMap } from "./useSupplyPriceMap";

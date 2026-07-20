@@ -7,10 +7,10 @@ import type {
 } from "../../../types";
 import {
   formatVndDisplay,
-  parseRatioInput,
+  parseCurrencyInput,
   roundPrice,
 } from "../../../priceFormatters";
-import { multiplyValue } from "../../../priceCalculations";
+import { multiplyValue } from "@/shared/pricing";
 import { inputBase, labelBase } from "./shared";
 
 type CreateSupplierCardProps = {
@@ -51,11 +51,11 @@ export function CreateSupplierCard({
     : null;
   const hasPrice = priceNum != null && Number.isFinite(priceNum) && priceNum > 0;
   const ctvPriceRaw = hasPrice
-    ? multiplyValue(priceNum, parseRatioInput(createForm.pctCtv))
+    ? multiplyValue(priceNum, parseCurrencyInput(createForm.pctCtv))
     : null;
   const retailPriceRaw =
     ctvPriceRaw != null
-      ? multiplyValue(ctvPriceRaw, parseRatioInput(createForm.pctKhach))
+      ? multiplyValue(ctvPriceRaw, parseCurrencyInput(createForm.pctKhach))
       : null;
   const ctvPrice = roundPrice(ctvPriceRaw);
   const retailPrice = roundPrice(retailPriceRaw);

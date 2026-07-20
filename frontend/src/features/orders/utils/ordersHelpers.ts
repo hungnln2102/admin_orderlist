@@ -6,7 +6,6 @@ import {
   VIRTUAL_FIELDS,
   Order,
 } from "@/constants";
-import { normalizeCompactCode, normalizeSearchText as normalizeSharedSearchText } from "@/shared/text";
 
 
 export const formatCurrency = (value: number | string) => {
@@ -34,18 +33,6 @@ export const parseErrorResponse = async (
     return null;
   }
 };
-
-export const normalizeSearchText = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
-  return String(value)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-};
-
-export const normalizeOrderCode = (value: unknown): string =>
-  normalizeSearchText(value).replace(/[^a-z0-9]/g, "");
 
 /** Đơn quà tặng: mã bắt đầu bằng MAVT (ORDER_CODE_PREFIXES.GIFT). */
 export const isGiftOrderCode = (orderCode: unknown): boolean => {
@@ -163,10 +150,10 @@ const AVG_DAYS_PER_MONTH = 30;
 export const resolveTotalOrderDaysForProration = (
   order: Pick<Order, "days" | "slot">
 ): number => {
-  const fromDays = Number(order[ORDER_FIELDS.DAYS]);
+  const fromDays = Number(order.days);
   if (Number.isFinite(fromDays) && fromDays > 0) return Math.round(fromDays);
 
-  const months = parseDurationMonthsFromSlot(String(order[ORDER_FIELDS.SLOT] || ""));
+  const months = parseDurationMonthsFromSlot(String(order.slot || ""));
   if (months !== null && months > 0) return Math.round(months * AVG_DAYS_PER_MONTH);
 
   return 0;

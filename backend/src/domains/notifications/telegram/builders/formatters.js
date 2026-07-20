@@ -3,6 +3,7 @@
  */
 
 const { formatYMDToDMY } = require("@/utils/normalizers");
+const { roundGiaBanValue } = require("@/utils/orderHelpers");
 
 const toSafeString = (value) =>
   value === undefined || value === null ? "" : String(value);
@@ -30,14 +31,7 @@ const toPlainText = (value) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const roundGiaBanValue = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  if (num >= 0) {
-    return Math.floor(num + 0.5);
-  }
-  return -Math.floor(Math.abs(num) + 0.5);
-};
+
 
 /** Số tiền CK chính xác từng đồng — giữ payment slot suffix, không làm tròn nghìn. */
 const normalizeExactVnd = (value) => {

@@ -1,5 +1,5 @@
 const { db } = require("@/db");
-const { roundToThousands } = require("@/services/pricing/core");
+
 const {
   TABLES,
   variantCols,
@@ -252,7 +252,7 @@ async function postVariantsPricing(req, res, next) {
       const studentPrice = toNum(row.student_price);
       const importPrice = toNum(row.import_price);
 
-      const costRounded = Math.max(0, roundToThousands(Math.round(pricingBase)));
+      const costRounded = Math.max(0, Math.round(pricingBase));
       const cost = importPrice > 0 ? importPrice : pricingBase;
 
       return {

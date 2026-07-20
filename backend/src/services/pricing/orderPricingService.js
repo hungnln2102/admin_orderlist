@@ -3,7 +3,6 @@ const { ORDERS_SCHEMA } = require("@/config/dbSchema");
 const { TABLES, COLS } = require("@/domains/orders/controller/constants");
 const {
   normalizeMoney,
-  roundToThousands,
   resolveOrderKind,
 } = require("@/services/pricing/core");
 const { getTiers } = require("@/services/pricing/tierCache");
@@ -118,18 +117,7 @@ const calculateOrderPricing = async ({
     customerType,
   });
 
-  let isMavrykProfit = false;
-  if (effectiveSupplyId) {
-    const supRow = await findSupplierById(effectiveSupplyId);
-    isMavrykProfit = isMavrykShopSupplierName(
-      String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] ?? "").trim()
-    );
-  } else {
-    isMavrykProfit = true;
-  }
-  if (isMavnImportOrder({ id_order: normalizedOrderId })) {
-    isMavrykProfit = false;
-  }
+
 
   const variantPricing = await fetchVariantPricing(normalizedProductKey);
   if (!variantPricing?.variantId) {
@@ -137,7 +125,7 @@ const calculateOrderPricing = async ({
   }
 
   let importBySource = 0;
-  if (effectiveSupplyId && !isMavrykProfit) {
+  if (effectiveSupplyId) {
     const latestPriceBySource = await findSupplierCostPrice({
       supplierId: effectiveSupplyId,
       variantId: variantPricing.variantId,
@@ -149,7 +137,7 @@ const calculateOrderPricing = async ({
     }
   }
 
-  if (!isMavrykProfit && importBySource <= 0 && orderRow?.cost) {
+  if (importBySource <= 0 && orderRow?.cost) {
     importBySource = normalizeMoney(orderRow.cost);
   }
 
@@ -157,7 +145,7 @@ const calculateOrderPricing = async ({
     await findMaxSupplierCostPrice(variantPricing.variantId)
   );
 
-  if (!isMavrykProfit && maxSupplyPrice <= 0 && importBySource <= 0) {
+  if (maxSupplyPrice <= 0 && importBySource <= 0) {
     throw new PricingHttpError(400, "Không có giá NCC");
   }
 
@@ -206,16 +194,12 @@ const calculateOrderPricing = async ({
     );
   }
 
-  const resolvedCostRaw = isMavrykProfit
-    ? 0
-    : importBySource > 0
-      ? importBySource
-      : importTierPrice > 0
-        ? importTierPrice
-        : maxSupplyPrice;
-  const resolvedCost = isMavrykProfit
-    ? 0
-    : Math.max(0, roundToThousands(Math.round(resolvedCostRaw)));
+  const resolvedCostRaw = importBySource > 0
+    ? importBySource
+    : importTierPrice > 0
+      ? importTierPrice
+      : maxSupplyPrice;
+  const resolvedCost = Math.max(0, Math.round(resolvedCostRaw));
 
   const retailPrice = customerPrice > 0 ? customerPrice : resolvedPrice;
   const promoPrice = promoPriceRaw > 0 ? promoPriceRaw : retailPrice;

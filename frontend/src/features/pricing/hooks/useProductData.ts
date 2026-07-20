@@ -2,19 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGet } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import { ProductPricingRow, StatusFilter } from "../types";
-import { applyBasePriceToProduct } from "../priceCalculations";
+import { applyBasePriceToProduct } from "./product-action-helpers";
 import { mapProductPriceRow } from "../productPriceMapper";
 import { toTimestamp } from "../supplyPriceUtils";
 
 
-const normalizeSearchText = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
-  return String(value)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-};
+import { normalizeSearchText } from "@/shared/text";
 
 interface UseProductDataResult {
   currentPage: number;

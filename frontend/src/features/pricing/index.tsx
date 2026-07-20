@@ -6,7 +6,7 @@ import ProductTable from "./components/ProductTable";
 import CreateProductModal from "./components/Modals/CreateProductModal";
 import DeleteProductModal from "./components/Modals/DeleteProductModal";
 import { usePricingData } from "./hooks/usePricingData";
-import { parseRatioInput } from "./priceFormatters";
+import { parseCurrencyInput } from "./priceFormatters";
 
 function Pricing() {
   const {
@@ -112,7 +112,7 @@ function Pricing() {
         onAddSupplier={handleAddSupplierRow}
         onRemoveSupplier={handleRemoveSupplierRow}
         onSubmit={handleSubmitCreateProduct}
-        parseRatioInput={parseRatioInput}
+        parseCurrencyInput={parseCurrencyInput}
       />
       <div className="space-y-6">
         <PricingStats

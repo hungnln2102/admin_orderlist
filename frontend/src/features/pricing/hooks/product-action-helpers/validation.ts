@@ -5,13 +5,23 @@ import type {
   ProductPricingRow,
 } from "../../types";
 import { normalizeProductKey } from "../../priceLabels";
-import { parseRatioInput } from "../../priceFormatters";
 import { parseBasePriceInput, parseCurrencyInput } from "./parsers";
 import type {
   CreateProductValidationResult,
   ProductEditValidationResult,
   SupplierPayload,
 } from "./types";
+
+export const applyBasePriceToProduct = (product: ProductPricingRow, basePrice: number | null): ProductPricingRow => {
+  if (typeof basePrice !== "number" || !Number.isFinite(basePrice) || basePrice <= 0) {
+    return product;
+  }
+
+  return {
+    ...product,
+    baseSupplyPrice: basePrice,
+  };
+};
 
 export function isExistingSanPhamCode(
   existingRows: ProductPricingRow[],
@@ -47,10 +57,10 @@ export function validateProductEditForm(
     };
   }
 
-  const nextPctCtv = parseRatioInput(form.pctCtv);
-  const nextPctKhach = parseRatioInput(form.pctKhach);
-  const nextPctPromo = parseRatioInput(form.pctPromo);
-  const nextPctStuRaw = parseRatioInput(form.pctStu);
+  const nextPctCtv = parseCurrencyInput(form.pctCtv);
+  const nextPctKhach = parseCurrencyInput(form.pctKhach);
+  const nextPctPromo = parseCurrencyInput(form.pctPromo);
+  const nextPctStuRaw = parseCurrencyInput(form.pctStu);
   let nextPctStu: number | null = null;
   const pctStuTrimmed = (form.pctStu ?? "").trim();
   if (pctStuTrimmed) {
@@ -147,10 +157,10 @@ export function validateCreateProductForm(
   const trimmedSanPham = form.sanPham.trim();
   const trimmedBasePrice = form.basePrice.trim();
   const parsedBasePrice = parseCurrencyInput(trimmedBasePrice);
-  const pctCtvValue = parseRatioInput(form.pctCtv);
-  const pctKhachValue = parseRatioInput(form.pctKhach);
-  const pctPromoValue = parseRatioInput(form.pctPromo);
-  const pctStuRaw = parseRatioInput(form.pctStu);
+  const pctCtvValue = parseCurrencyInput(form.pctCtv);
+  const pctKhachValue = parseCurrencyInput(form.pctKhach);
+  const pctPromoValue = parseCurrencyInput(form.pctPromo);
+  const pctStuRaw = parseCurrencyInput(form.pctStu);
   let pctStuValue: number | null = null;
   const pctStuTrimmedCreate = form.pctStu.trim();
   if (pctStuTrimmedCreate) {
