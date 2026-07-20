@@ -11,7 +11,6 @@ import {
   buildConfirmRefundHandler,
   buildMarkPaidHandler,
   buildRenewOrderHandler,
-  buildMockWebhookHandler,
 } from "./use-order-actions/paymentHandlers";
 import type { OrderActionsDeps } from "./use-order-actions/types";
 
@@ -62,15 +61,6 @@ export function useOrderActions(deps: OrderActionsDeps) {
     [fetchOrders]
   );
 
-  const handleMockWebhook = useMemo(
-    () =>
-      buildMockWebhookHandler({
-        fetchOrders,
-        setCompletingOrderCode,
-      }),
-    [fetchOrders]
-  );
-
   const handleRenewOrder = useMemo(
     () => buildRenewOrderHandler({ fetchOrders, setRenewingOrderCode }),
     [fetchOrders]
@@ -103,7 +93,6 @@ export function useOrderActions(deps: OrderActionsDeps) {
     handleRenewOrder,
     handleCreateTopupOrderFromRefund,
     handleConfirmRefund,
-    handleMockWebhook,
     handleSaveEdit,
     confirmDelete,
     renewingOrderCode,

@@ -70,7 +70,6 @@ export default function Orders() {
     handleMarkPaid,
     handlePayWithCredit,
     handleRenewOrder,
-    handleMockWebhook,
     confirmDelete,
     fetchError,
     reloadOrders,
@@ -177,7 +176,6 @@ export default function Orders() {
         onMarkPaid={handleMarkPaid}
         onPayWithCredit={handlePayWithCredit}
         onRenew={handleRenewOrder}
-        onMockWebhook={handleMockWebhook}
         setCurrentPage={setCurrentPage}
         setRowsPerPage={setRowsPerPage}
       />

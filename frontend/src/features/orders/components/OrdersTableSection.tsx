@@ -32,7 +32,6 @@ type OrdersTableSectionProps = {
   onMarkPaid: (order: Order) => void;
   onPayWithCredit?: (order: Order) => void;
   onRenew: (order: Order) => void;
-  onMockWebhook: (order: Order) => void;
   setCurrentPage: (value: number | ((prev: number) => number)) => void;
   setRowsPerPage: (value: number) => void;
 };
@@ -73,7 +72,6 @@ export function OrdersTableSection({
   onMarkPaid,
   onPayWithCredit,
   onRenew,
-  onMockWebhook,
   setCurrentPage,
   setRowsPerPage,
 }: OrdersTableSectionProps) {
@@ -162,7 +160,6 @@ export function OrdersTableSection({
                   onMarkPaid={onMarkPaid}
                   onPayWithCredit={onPayWithCredit}
                   onRenew={onRenew}
-                  onMockWebhook={onMockWebhook}
                 />
               ))
             )}

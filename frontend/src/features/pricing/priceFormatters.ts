@@ -6,10 +6,9 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-export const roundToNearestThousand = (value?: number | null): number | null => {
+export const roundPrice = (value?: number | null): number | null => {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  const rounded = Math.round(Math.abs(value) / 1000) * 1000;
-  return value < 0 ? -rounded : rounded;
+  return Math.round(value);
 };
 
 export const formatVndInput = (raw: string): string => {
@@ -93,7 +92,7 @@ export const formatRateDescription = ({ multiplier, price, basePrice }: RateDesc
 };
 
 export const formatCurrencyValue = (value?: number | null): string => {
-  const rounded = roundToNearestThousand(value);
+  const rounded = roundPrice(value);
   if (rounded === null || rounded <= 0) {
     return "-";
   }
@@ -116,7 +115,7 @@ export const formatDateLabel = (value?: string | null): string => {
 
 export const formatProfitValue = (value: number | null): string => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
-  const rounded = roundToNearestThousand(value) ?? 0;
+  const rounded = roundPrice(value) ?? 0;
   if (rounded === 0) return currencyFormatter.format(0);
   return currencyFormatter.format(rounded);
 };

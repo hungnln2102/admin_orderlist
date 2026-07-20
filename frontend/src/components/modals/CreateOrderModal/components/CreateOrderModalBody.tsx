@@ -199,7 +199,7 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
 
                 <div className="group md:col-span-2">
                   <label className={`${labelPremiumClass} !text-emerald-300/80`}>Giá Nhập (Cost)</label>
-                  {pricing.customMode && !pricing.isMavrykSupply ? (
+                  {pricing.customMode ? (
                     <div className="relative">
                       <input
                         type="text"
@@ -216,7 +216,7 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
                       <input
                         type="text"
                         name={ORDER_FIELDS.COST}
-                        value={formatCurrencyPlain(Number(pricing.isMavrykSupply ? 0 : pricing.costValue))}
+                        value={formatCurrencyPlain(Number(pricing.costValue))}
                         readOnly
                         className={`${inputPremiumClass} font-bold text-emerald-400/70 text-lg py-2.5 bg-black/20 border-white/5 cursor-not-allowed`}
                       />

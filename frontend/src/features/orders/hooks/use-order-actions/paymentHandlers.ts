@@ -212,34 +212,4 @@ export const buildConfirmRefundHandler =
     }
   };
 
-export const buildMockWebhookHandler =
-  ({ fetchOrders, setCompletingOrderCode }: Pick<PaymentHandlerArgs, "fetchOrders" | "setCompletingOrderCode">) =>
-  async (order: Order) => {
-    if (!order || !order.id) return;
-    const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
-    setCompletingOrderCode(orderCode || String(order.id));
-    try {
-      const response = await apiFetch(API_ENDPOINTS.ORDER_MOCK_SEPAY_WEBHOOK(order.id), {
-        method: "POST",
-      });
-      if (!response.ok) {
-        const errorMessage = await parseErrorResponse(response);
-        throw new Error(errorMessage || "Lỗi giả lập webhook");
-      }
-      await fetchOrders();
-      emitRefresh(["orders", "dashboard", "payments"]);
-      showAppNotification({
-        type: "success",
-        title: "Giả lập Webhook",
-        message: "Đã giả lập webhook Sepay thành công.",
-      });
-    } catch (error) {
-      showAppNotification({
-        type: "error",
-        title: "Lỗi giả lập webhook",
-        message: `Không thể giả lập webhook: ${error instanceof Error ? error.message : String(error)}`,
-      });
-    } finally {
-      setCompletingOrderCode(null);
-    }
-  };
+

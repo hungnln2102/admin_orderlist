@@ -36,7 +36,6 @@ type OrderRowProps = {
   onMarkPaid: (order: Order) => void;
   onPayWithCredit?: (order: Order) => void;
   onRenew: (order: Order) => void;
-  onMockWebhook: (order: Order) => void;
 };
 
 export const OrderRow = React.memo(function OrderRow({
@@ -60,7 +59,6 @@ export const OrderRow = React.memo(function OrderRow({
   onMarkPaid,
   onPayWithCredit,
   onRenew,
-  onMockWebhook,
 }: OrderRowProps) {
   const {
     [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
@@ -265,7 +263,6 @@ export const OrderRow = React.memo(function OrderRow({
           onDelete={onDelete}
           onConfirmRefund={onConfirmRefund}
           onCreateTopupOrderFromRefund={onCreateTopupOrderFromRefund}
-          onMockWebhook={onMockWebhook}
         />
       </tr>
       <OrderRowExpanded

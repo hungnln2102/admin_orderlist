@@ -8,7 +8,7 @@ import type {
 import {
   formatVndDisplay,
   parseRatioInput,
-  roundToNearestThousand,
+  roundPrice,
 } from "../../../priceFormatters";
 import { multiplyValue } from "../../../priceCalculations";
 import { inputBase, labelBase } from "./shared";
@@ -57,8 +57,8 @@ export function CreateSupplierCard({
     ctvPriceRaw != null
       ? multiplyValue(ctvPriceRaw, parseRatioInput(createForm.pctKhach))
       : null;
-  const ctvPrice = roundToNearestThousand(ctvPriceRaw);
-  const retailPrice = roundToNearestThousand(retailPriceRaw);
+  const ctvPrice = roundPrice(ctvPriceRaw);
+  const retailPrice = roundPrice(retailPriceRaw);
 
   return (
     <div className="rounded-xl border border-white/10 bg-slate-900/40 p-4">

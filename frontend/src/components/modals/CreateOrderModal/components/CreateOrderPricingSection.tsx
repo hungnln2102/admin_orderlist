@@ -47,7 +47,7 @@ export const CreateOrderPricingSection = ({
 }: CreateOrderPricingSectionProps) => {
   const isGift = customerType === ORDER_CODE_PREFIXES.GIFT;
   const isImport = orderCreationKind === "import";
-  const costDisplay = isMavrykSupply ? 0 : costValue;
+  const costDisplay = costValue;
 
   const copy = useMemo(
     () => getCreateOrderPricingCopy(customerType, isMavrykSupply),
@@ -115,7 +115,7 @@ export const CreateOrderPricingSection = ({
           <label className={`${labelClass} text-indigo-200/70`}>
             {isImport ? "Giá nhập (Cost)" : copy.costLabel}
           </label>
-          {customMode && !isMavrykSupply ? (
+          {customMode ? (
             <input
               type="text"
               inputMode="numeric"

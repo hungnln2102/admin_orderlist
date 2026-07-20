@@ -1,9 +1,5 @@
 import { roundGiaBanValue } from "@/shared/money";
 import { VARIANT_PRICING_COLS } from "@/lib/tableSql";
-import {
-  calculateSellingPriceFromMarginInput,
-  getDiscountRatioInput,
-} from "@/shared/pricing";
 import type { ApiPriceEntry } from "../types";
 import { parseDurationFromSku } from "./quoteApiParsing";
 import {
@@ -37,19 +33,17 @@ export const computeLinePricing = (
   const wholesalePrice =
     selected?.wholesalePrice && selected.wholesalePrice > 0
       ? selected.wholesalePrice
-      : basePrice > 0 && basePrice < fallbackRetailPrice
-        ? calculateSellingPriceFromMarginInput(basePrice, selected?.pctCtv) ??
-          fallbackRetailPrice
+      : selected?.pctCtv && selected.pctCtv > 0
+        ? selected.pctCtv
         : fallbackRetailPrice;
   const retailPrice = roundGiaBanValue(
-    calculateSellingPriceFromMarginInput(wholesalePrice, selected?.pctKhach) ??
-      fallbackRetailPrice
+    selected?.pctKhach && selected.pctKhach > 0
+      ? selected.pctKhach
+      : fallbackRetailPrice
   );
-  const pctPromoDecimal = getDiscountRatioInput(selected?.pctPromo) ?? 0;
-  const discount =
-    pctPromoDecimal > 0
-      ? roundGiaBanValue(retailPrice * pctPromoDecimal)
-      : 0;
+  
+  const promoPriceValue = selected?.pctPromo && selected.pctPromo > 0 ? selected.pctPromo : retailPrice;
+  const discount = promoPriceValue < retailPrice ? roundGiaBanValue(retailPrice - promoPriceValue) : 0;
   return { unitPrice: retailPrice, discount };
 };
 
@@ -99,10 +93,8 @@ export const buildProductOptions = (
     const pctPromoRaw = toNumber(
       row?.pct_promo ?? row?.[VARIANT_PRICING_COLS.pctPromo]
     );
-    const pctPromo = getDiscountRatioInput(pctPromoRaw) ?? 0;
     const baseSupply = toNumber(row?.max_supply_price);
-    const wholesaleRaw =
-      calculateSellingPriceFromMarginInput(baseSupply, pctCtvRaw) ?? baseSupply;
+    const wholesaleRaw = pctCtvRaw > 0 ? pctCtvRaw : baseSupply;
     const wholesaleRounded =
       wholesaleRaw > 0 ? roundGiaBanValue(wholesaleRaw) : 0;
 
@@ -122,12 +114,12 @@ export const buildProductOptions = (
       ) || 0;
 
     const retailPriceRaw =
-      calculateSellingPriceFromMarginInput(wholesaleRounded, pctKhachRaw) ??
-      retailBase ??
-      promoBase ??
-      wholesaleRounded;
+      pctKhachRaw > 0
+        ? pctKhachRaw
+        : retailBase ?? promoBase ?? wholesaleRounded;
     const retailPrice = roundGiaBanValue(retailPriceRaw);
-    const promoPriceRaw = retailPrice * (1 - pctPromo);
+    
+    const promoPriceRaw = pctPromoRaw > 0 ? pctPromoRaw : retailPrice;
     const promoRounded = roundGiaBanValue(promoPriceRaw);
     const promoClamped = Math.min(
       retailPrice,

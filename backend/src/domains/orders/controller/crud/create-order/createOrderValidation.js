@@ -96,17 +96,14 @@ const prepareCreateOrderPayload = async ({ body = {}, context }) => {
     }
   }
 
-  let isInternalSupplier = true;
+  let isInternalSupplier = false;
   if (payload[supplyIdCol] != null) {
     const supRow = await findSupplierById(payload[supplyIdCol]);
     isInternalSupplier = isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]);
   }
-  if (!ctx.isMavnCreate && isInternalSupplier) {
-    payload[costCol] = 0;
-  }
 
   if (ctx.isMavnCreate) {
-    payload[costCol] = isInternalSupplier ? 0 : normalizeMoney(payload[priceCol]);
+    payload[priceCol] = 0;
   }
   if (ctx.isGiftOrderCreate) {
     payload[priceCol] = 0;

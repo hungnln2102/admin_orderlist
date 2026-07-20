@@ -4,7 +4,6 @@ import {
   PlusCircleIcon,
   PencilIcon,
   TrashIcon,
-  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, ORDER_STATUSES, Order } from "@/constants";
 import {
@@ -27,7 +26,6 @@ type OrderRowActionsCellProps = {
   onDelete: (order: Order) => void;
   onConfirmRefund: (order: Order) => void;
   onCreateTopupOrderFromRefund: (order: Order) => void;
-  onMockWebhook: (order: Order) => void;
 };
 
 export function OrderRowActionsCell({
@@ -43,9 +41,7 @@ export function OrderRowActionsCell({
   onDelete,
   onConfirmRefund,
   onCreateTopupOrderFromRefund,
-  onMockWebhook,
 }: OrderRowActionsCellProps) {
-  const canMockWebhook = !isCanceled && (statusText === ORDER_STATUSES.CHUA_THANH_TOAN || statusText === ORDER_STATUSES.CAN_GIA_HAN);
   
   return (
         <td className={`order-row__actions px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y transition-all duration-500 last:rounded-r-[16px] sm:last:rounded-r-[24px] ${orderTheme.rowSurfaceClass}`}>
@@ -72,15 +68,6 @@ export function OrderRowActionsCell({
             >
               <EyeIcon className="h-4 w-4" />
             </button>
-            {canMockWebhook && (
-              <button
-                onClick={stopPropagation(onMockWebhook)}
-                className="w-8 h-8 flex items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-all flex-shrink-0"
-                title="Giả lập nhận Webhook Sepay"
-              >
-                <BanknotesIcon className="h-4 w-4" />
-              </button>
-            )}
             {canConfirmRefund && (
               <button
                 onClick={stopPropagation(onCreateTopupOrderFromRefund)}
