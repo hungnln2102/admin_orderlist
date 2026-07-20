@@ -6,9 +6,7 @@ const {
   resolveOrderKind,
 } = require("@/services/pricing/core");
 const { getTiers } = require("@/services/pricing/tierCache");
-const { isMavrykShopSupplierName, isMavnImportOrder } = require("@/utils/orderHelpers");
 const {
-  findSupplierById,
   findSupplierIdByName,
 } = require("@/domains/supplies/services/supplierLookupService");
 const {
@@ -224,16 +222,6 @@ const calculateOrderPricing = async ({
       studentPrice: studentPrice > 0 ? studentPrice : retailPrice,
     },
   };
-
-  if (isMavrykProfit) {
-    return {
-      ...pricingResult,
-      cost: 0,
-      totalPrice: pricingResult.price,
-      gia_nhap: 0,
-      mavryk_profit_mode: true,
-    };
-  }
 
   return {
     ...pricingResult,
