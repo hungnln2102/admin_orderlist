@@ -3,8 +3,21 @@ const path = require('path');
 
 const propertyId = '540562174';
 
+const getCredentials = () => {
+  if (process.env.GOOGLE_ANALYTICS_CREDENTIALS_BASE64) {
+    try {
+      const decoded = Buffer.from(process.env.GOOGLE_ANALYTICS_CREDENTIALS_BASE64, 'base64').toString('utf8');
+      return JSON.parse(decoded);
+    } catch (e) {
+      console.error('Failed to parse GOOGLE_ANALYTICS_CREDENTIALS_BASE64 from env:', e);
+    }
+  }
+  // Fallback to local file for dev if needed
+  return require(path.join(__dirname, '../config/ga4-credentials.json'));
+};
+
 const analyticsDataClient = new BetaAnalyticsDataClient({
-  keyFilename: path.join(__dirname, '../config/ga4-credentials.json'),
+  credentials: getCredentials(),
 });
 
 // Cache in memory for 15 minutes to prevent slow loading and quota limits
