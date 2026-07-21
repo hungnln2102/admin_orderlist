@@ -169,20 +169,43 @@ const voidOffFlowCreditByReceiptId = async (executor, paymentReceiptId, reason) 
   const existing = await getOffFlowCreditByReceiptId(executor, rid);
   if (!existing) return { voided: false };
 
-  const currentStatus = String(existing[R.STATUS] || "").trim().toUpperCase();
+  // Follow succeeded_by_note_id chain to find the latest active note
+  // since the parent might have been split.
+  let current = existing;
+  while (current[R.SUCCEEDED_BY_NOTE_ID]) {
+    const nextId = Number(current[R.SUCCEEDED_BY_NOTE_ID]);
+    if (!Number.isFinite(nextId) || nextId <= 0) break;
+
+    let nextNote = null;
+    if (typeof executor === "function") {
+      nextNote = await executor(REFUND_CREDIT_NOTES_TABLE)
+        .where({ [R.ID]: nextId })
+        .first();
+    } else {
+      const { rows } = await executor.query(
+        `SELECT * FROM ${REFUND_CREDIT_NOTES_TABLE} WHERE ${R.ID} = $1 LIMIT 1`,
+        [nextId]
+      );
+      nextNote = rows[0] || null;
+    }
+    if (!nextNote) break;
+    current = nextNote;
+  }
+
+  const currentStatus = String(current[R.STATUS] || "").trim().toUpperCase();
   if (currentStatus === CREDIT_STATUS.VOID || currentStatus === CREDIT_STATUS.FULLY_APPLIED) {
-    return { voided: false, creditNote: existing };
+    return { voided: false, creditNote: current };
   }
 
   const suffix = reason
     ? String(reason).trim()
     : "Biên lai đã match mã đơn — credit ngoài luồng không còn khả dụng.";
-  const prevNote = existing[R.NOTE] ? String(existing[R.NOTE]).trim() : "";
+  const prevNote = current[R.NOTE] ? String(current[R.NOTE]).trim() : "";
   const newNote = prevNote ? `${prevNote} — ${suffix}` : suffix;
 
   if (typeof executor === "function") {
     await executor(REFUND_CREDIT_NOTES_TABLE)
-      .where({ [R.ID]: existing[R.ID] })
+      .where({ [R.ID]: current[R.ID] })
       .update({
         [R.STATUS]: CREDIT_STATUS.VOID,
         [R.AVAILABLE_AMOUNT]: 0,
@@ -193,19 +216,19 @@ const voidOffFlowCreditByReceiptId = async (executor, paymentReceiptId, reason) 
       `UPDATE ${REFUND_CREDIT_NOTES_TABLE}
        SET ${R.STATUS} = $1, ${R.AVAILABLE_AMOUNT} = 0, ${R.NOTE} = $2
        WHERE ${R.ID} = $3`,
-      [CREDIT_STATUS.VOID, newNote, existing[R.ID]]
+      [CREDIT_STATUS.VOID, newNote, current[R.ID]]
     );
   }
 
   logger.info("[OffFlowCredit] Void credit off-flow do reconcile", {
-    creditNoteId: existing[R.ID],
-    creditCode: existing[R.CREDIT_CODE],
+    creditNoteId: current[R.ID],
+    creditCode: current[R.CREDIT_CODE],
     paymentReceiptId: rid,
     previousStatus: currentStatus,
-    availableAmount: existing[R.AVAILABLE_AMOUNT],
+    availableAmount: current[R.AVAILABLE_AMOUNT],
   });
 
-  return { voided: true, creditNote: { ...existing, [R.STATUS]: CREDIT_STATUS.VOID, [R.AVAILABLE_AMOUNT]: 0 } };
+  return { voided: true, creditNote: { ...current, [R.STATUS]: CREDIT_STATUS.VOID, [R.AVAILABLE_AMOUNT]: 0 } };
 };
 
 module.exports = {

@@ -41,7 +41,7 @@ describe("POST /orders createOrder flow", () => {
       status: row.status,
       price: row.price,
     }));
-    const sendOrderCreatedNotification = jest.fn().mockResolvedValue();
+    const eventBusEmitSpy = jest.fn();
 
     jest.doMock("../../../../src/db", () => ({
       db: dbMock,
@@ -66,9 +66,13 @@ describe("POST /orders createOrder flow", () => {
       VALID_PREFIXES: ["MAVC", "MAVL", "MAVN", "MAVT", "MAVK", "MAVS"],
       generateUniqueOrderCode: jest.fn().mockResolvedValue("MAVC0001"),
     }));
-    jest.doMock("../../../../src/domains/notifications/telegram", () => ({
-      orderNotifier: {
-        sendOrderCreatedNotification,
+    jest.doMock("../../../../src/events", () => ({
+      eventBus: {
+        emit: eventBusEmitSpy,
+      },
+      EVENTS: {
+        ORDER_CREATED: "ORDER_CREATED",
+        IMPORT_ORDER_CREATED: "IMPORT_ORDER_CREATED",
       },
     }));
     jest.doMock("../../../../src/domains/payment-slots", () => ({
@@ -93,6 +97,7 @@ describe("POST /orders createOrder flow", () => {
     jest.doMock("../../../../src/utils/orderHelpers", () => ({
       ORDER_PREFIXES: { gift: "MAVT", import: "MAVN" },
       isMavrykShopSupplierName: jest.fn(() => false),
+      isMavnImportOrder: jest.fn(() => false),
     }));
     jest.doMock("../../../../src/utils/supplierAccountHolderColumn", () => ({
       supplierHasAccountHolderColumn: jest.fn().mockResolvedValue(false),
@@ -120,7 +125,7 @@ describe("POST /orders createOrder flow", () => {
     jest.doMock("../../../../src/utils/logger", () => ({
       info: jest.fn(),
       warn: jest.fn(),
-      error: jest.fn(),
+      error: jest.fn((msg, meta) => console.error("LOGGER ERROR:", msg, meta)),
       debug: jest.fn(),
     }));
 
@@ -137,7 +142,7 @@ describe("POST /orders createOrder flow", () => {
       app,
       commitSpy,
       rollbackSpy,
-      sendOrderCreatedNotification,
+      eventBusEmitSpy,
       insertReturningSpy,
     };
   };
@@ -147,10 +152,9 @@ describe("POST /orders createOrder flow", () => {
   });
 
   it("creates order successfully without breaking core flow", async () => {
-    const { app, commitSpy, sendOrderCreatedNotification } = buildHarness();
+    const { app, commitSpy, eventBusEmitSpy } = buildHarness();
 
     const response = await request(app).post("/").send({ price: 100000 });
-
     expect(response.statusCode).toBe(201);
     expect(response.body).toEqual(
       expect.objectContaining({
@@ -159,7 +163,8 @@ describe("POST /orders createOrder flow", () => {
       })
     );
     expect(commitSpy).toHaveBeenCalledTimes(1);
-    expect(sendOrderCreatedNotification).toHaveBeenCalledWith(
+    expect(eventBusEmitSpy).toHaveBeenCalledWith(
+      "ORDER_CREATED",
       expect.objectContaining({ id_order: "MAVC0001" })
     );
   });

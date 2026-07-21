@@ -202,7 +202,7 @@ const applyRefundCreditToTargetOrder = async (
                 [R.SPLIT_FROM_NOTE_ID]: parentId,
                 [R.NOTE]: splitNote,
                 [R.SOURCE_KIND]: creditNote[R.SOURCE_KIND] || "ORDER_REFUND",
-                [R.PAYMENT_RECEIPT_ID]: creditNote[R.PAYMENT_RECEIPT_ID] ?? null,
+                [R.PAYMENT_RECEIPT_ID]: null,
                 [R.OFF_FLOW_MONTH_KEY]: creditNote[R.OFF_FLOW_MONTH_KEY] ?? null,
             })
             .returning("*");
