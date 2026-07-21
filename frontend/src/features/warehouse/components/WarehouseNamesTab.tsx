@@ -7,6 +7,8 @@ interface ProductName {
   id: number;
   name: string;
   product_id: number | null;
+  slot?: number | null;
+  match?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -117,70 +119,90 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white/[0.02] border-b border-white/5 text-xs uppercase tracking-wider text-white/40">
-                <th className="p-4 font-semibold w-16">ID</th>
-                <th className="p-4 font-semibold">Tên Dịch Vụ Kho</th>
-                <th className="p-4 font-semibold">Sản Phẩm Liên Kết (Product)</th>
-                <th className="p-4 font-semibold w-32 text-right">Thao Tác</th>
+                <th className="p-4 font-semibold w-12 text-center">ID</th>
+                <th className="p-4 font-semibold min-w-[200px]">Tên Dịch Vụ Kho</th>
+                <th className="p-4 font-semibold min-w-[200px]">Sản Phẩm Liên Kết</th>
+                <th className="p-4 font-semibold w-24 text-center">Slot</th>
+                <th className="p-4 font-semibold w-40">Match (Loại)</th>
+                <th className="p-4 font-semibold w-28 text-right">Thao Tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-sm">
               {editingId === "new" && draft && (
                 <tr className="bg-blue-900/10">
-                  <td className="p-4 text-white/50">Mới</td>
+                  <td className="p-4 text-center text-white/50 font-medium">Mới</td>
                   <td className="p-4">
                     <input
                       type="text"
                       value={draft.name || ""}
                       onChange={e => setDraft({ ...draft, name: e.target.value })}
-                      className="w-full bg-[#0f1219] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 h-9 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
                       placeholder="Nhập tên..."
                       autoFocus
                     />
                   </td>
                   <td className="p-4">
+                    <div className="relative">
+                      <select
+                        value={draft.product_id || ""}
+                        onChange={e => setDraft({ ...draft, product_id: e.target.value ? Number(e.target.value) : null })}
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 h-9 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner appearance-none cursor-pointer"
+                      >
+                        <option value="" className="bg-[#0f1219]">-- Không liên kết --</option>
+                        {productOptions.map(o => (
+                          <option key={o.value} value={o.value} className="bg-[#0f1219]">{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <input
+                      type="number"
+                      min="1"
+                      value={draft.slot || ""}
+                      onChange={e => setDraft({ ...draft, slot: e.target.value ? Number(e.target.value) : null })}
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-2 h-9 text-sm font-semibold text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner text-center"
+                    />
+                  </td>
+                  <td className="p-4">
                     <select
-                      value={draft.product_id || ""}
-                      onChange={e => setDraft({ ...draft, product_id: e.target.value ? Number(e.target.value) : null })}
-                      className="w-full bg-[#0f1219] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      value={draft.match || "information_order"}
+                      onChange={e => setDraft({ ...draft, match: e.target.value })}
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 h-9 text-sm font-medium text-indigo-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner appearance-none cursor-pointer"
                     >
-                      <option value="">-- Không liên kết --</option>
-                      {draft?.product_id && !productOptions.some(o => Number(o.value) === draft.product_id) && (
-                        <option value={draft.product_id} className="hidden">ID: {draft.product_id} (Dữ liệu cũ)</option>
-                      )}
-                      {productOptions.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
+                      <option value="information_order" className="bg-[#0f1219]">Info Order</option>
+                      <option value="slot" className="bg-[#0f1219]">Slot</option>
                     </select>
                   </td>
-                  <td className="p-4 text-right space-x-2">
-                    <button onClick={saveEdit} className="text-green-400 hover:text-green-300 font-medium px-2">Lưu</button>
-                    <button onClick={cancelEdit} className="text-white/40 hover:text-white/70 px-2">Hủy</button>
+                  <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                    <button onClick={saveEdit} className="inline-flex items-center justify-center rounded bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/30 transition-all">Lưu</button>
+                    <button onClick={cancelEdit} className="inline-flex items-center justify-center rounded bg-white/10 px-2.5 py-1 text-xs font-semibold text-white/70 hover:bg-white/20 transition-all">Hủy</button>
                   </td>
                 </tr>
               )}
 
               {loading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-white/40">Đang tải...</td>
+                  <td colSpan={6} className="p-8 text-center text-white/40">Đang tải...</td>
                 </tr>
               ) : items.length === 0 && editingId !== "new" ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-white/40">Chưa có danh mục nào</td>
+                  <td colSpan={6} className="p-8 text-center text-white/40">Chưa có danh mục nào</td>
                 </tr>
               ) : (
                 items.map(item => {
                   const isEditing = editingId === item.id;
                   
                   return (
-                    <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
-                      <td className="p-4 text-white/50">{item.id}</td>
+                    <tr key={item.id} className="hover:bg-white/[0.01] transition-colors group">
+                      <td className="p-4 text-center text-white/30 font-mono text-xs">{item.id}</td>
                       <td className="p-4">
                         {isEditing && draft ? (
                           <input
                             type="text"
                             value={draft.name || ""}
                             onChange={e => setDraft({ ...draft, name: e.target.value })}
-                            className="w-full bg-[#0f1219] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 h-9 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
                           />
                         ) : (
                           <span className="text-white/90 font-medium">{item.name}</span>
@@ -188,38 +210,68 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
                       </td>
                       <td className="p-4">
                         {isEditing && draft ? (
-                          <select
-                            value={draft.product_id || ""}
-                            onChange={e => setDraft({ ...draft, product_id: e.target.value ? Number(e.target.value) : null })}
-                            className="w-full bg-[#0f1219] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                          >
-                            <option value="">-- Không liên kết --</option>
-                            {draft?.product_id && !productOptions.some(o => Number(o.value) === draft.product_id) && (
-                              <option value={draft.product_id} className="hidden">ID: {draft.product_id} (Dữ liệu cũ)</option>
-                            )}
-                            {productOptions.map(o => (
-                              <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <select
+                              value={draft.product_id || ""}
+                              onChange={e => setDraft({ ...draft, product_id: e.target.value ? Number(e.target.value) : null })}
+                              className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 h-9 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner appearance-none cursor-pointer"
+                            >
+                              <option value="" className="bg-[#0f1219]">-- Không liên kết --</option>
+                              {productOptions.map(o => (
+                                <option key={o.value} value={o.value} className="bg-[#0f1219]">{o.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         ) : (
-                          <span className={item.product_id ? "text-blue-400" : "text-white/30"}>
+                          <span className={item.product_id ? "text-indigo-300 font-medium" : "text-white/20 italic"}>
                             {item.product_id 
                               ? productOptions.find(o => Number(o.value) === item.product_id)?.label || `ID: ${item.product_id}`
                               : "Không liên kết"}
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-right space-x-2">
-                        {isEditing ? (
-                          <>
-                            <button onClick={saveEdit} disabled={loading} className="text-green-400 hover:text-green-300 font-medium px-2">Lưu</button>
-                            <button onClick={cancelEdit} disabled={loading} className="text-white/40 hover:text-white/70 px-2">Hủy</button>
-                          </>
+                      <td className="p-4">
+                        {isEditing && draft ? (
+                          <input
+                            type="number"
+                            min="1"
+                            value={draft.slot || ""}
+                            onChange={e => setDraft({ ...draft, slot: e.target.value ? Number(e.target.value) : null })}
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-2 h-9 text-sm font-semibold text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner text-center"
+                          />
                         ) : (
-                          <>
-                            <button onClick={() => startEdit(item)} disabled={loading} className="text-blue-400 hover:text-blue-300 p-1">Sửa</button>
-                            <button onClick={() => setDeleteId(item.id)} disabled={loading} className="text-red-400 hover:text-red-300 p-1">Xóa</button>
-                          </>
+                          <div className="flex justify-center">
+                            <span className="text-emerald-400 font-mono font-medium">{item.slot ?? 1}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {isEditing && draft ? (
+                          <select
+                            value={draft.match || "information_order"}
+                            onChange={e => setDraft({ ...draft, match: e.target.value })}
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 h-9 text-sm font-medium text-indigo-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner appearance-none cursor-pointer"
+                          >
+                            <option value="information_order" className="bg-[#0f1219]">Info Order</option>
+                            <option value="slot" className="bg-[#0f1219]">Slot</option>
+                          </select>
+                        ) : (
+                          <span className="text-purple-300 font-medium text-sm">
+                            {item.match === "slot" ? "Slot" : "Information Order"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                        {isEditing ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={saveEdit} disabled={loading} className="inline-flex items-center justify-center rounded bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/30 transition-all">Lưu</button>
+                            <button onClick={cancelEdit} disabled={loading} className="inline-flex items-center justify-center rounded bg-white/10 px-2.5 py-1 text-xs font-semibold text-white/70 hover:bg-white/20 transition-all">Hủy</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => startEdit(item)} disabled={loading} className="inline-flex items-center justify-center rounded bg-indigo-500/20 px-2.5 py-1 text-xs font-semibold text-indigo-400 hover:bg-indigo-500/30 transition-all">Sửa</button>
+                            <button onClick={() => setDeleteId(item.id)} disabled={loading} className="inline-flex items-center justify-center rounded bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-all">Xóa</button>
+                          </div>
                         )}
                       </td>
                     </tr>

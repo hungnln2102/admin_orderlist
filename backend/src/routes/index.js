@@ -49,6 +49,7 @@ const ipWhitelistRoutes = require("@/domains/ip-whitelist/routes");
 const shopBankAccountsRoutes = require("@/domains/shop-bank-accounts/routes");
 const usdtWalletsRoutes = require("@/domains/usdt-wallets/routes");
 const siteMaintenanceRoutes = require("@/domains/site-maintenance/routes");
+const trafficRoutes = require("@/domains/traffic/routes");
 const ninerouterRoutes = require("@/domains/ninerouter/routes");
 const fixAdesRoutes = require("@/domains/fix-ades/routes");
 const longTimeout = (ms) => (req, res, next) => {
@@ -85,6 +86,7 @@ router.use(authGuard);
 /** Proxy OpenAI-compatible tới 9Router — cần NINEROUTER_URL (+ NINEROUTER_KEY nếu bật API key). */
 router.use("/ninerouter", longTimeout(600_000), ninerouterRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/traffic", trafficRoutes);
 router.use("/form-info", formInfoRoutes);
 router.use("/renew-adobe", longTimeout(900_000), renewAdobeMount);
 router.use("/fix-ades", fixAdesRoutes);

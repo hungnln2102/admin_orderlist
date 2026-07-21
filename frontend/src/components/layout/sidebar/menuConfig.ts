@@ -57,6 +57,7 @@ export const menuSections: MenuSection[] = [
     defaultOpen: true,
     items: [
       { name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon },
+      { name: "Traffic", href: "/traffic", icon: ChartBarIcon },
       { name: "Thuế", href: "/tax", icon: ReceiptPercentIcon },
       { name: "Chi phí", href: "/expenses", icon: CalculatorIcon },
     ],

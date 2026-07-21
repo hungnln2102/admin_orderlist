@@ -101,6 +101,16 @@ const createImportPackage = async (payload) => {
     const targetProductId = variantRow?.product_id ?? productId;
     const nameId = await ensureProductName(trx, category || "Import Package", targetProductId);
 
+    let nameSlot = null;
+    let nameMatch = null;
+    if (nameId) {
+      const nameRow = await trx(tableName("product_names", SCHEMA_WAREHOUSE)).where("id", nameId).first();
+      if (nameRow) {
+        nameSlot = nameRow.slot;
+        nameMatch = nameRow.match;
+      }
+    }
+
     // 2.5 Insert or reuse STOCK_SERVICES
     let srvRow = null;
     
@@ -156,10 +166,11 @@ const createImportPackage = async (payload) => {
       srvRow = srv.id !== undefined ? srv : { id: srv };
     }
 
+    const resolvedMatchMode = matchMode ?? nameMatch ?? "information_order";
     const normalizedMatchMode =
-      matchMode === "slot" ? "slot" : "information_order";
+      resolvedMatchMode === "slot" ? "slot" : "information_order";
     const resolvedSlotLimit =
-      slotLimit ?? rule?.default_slot_limit ?? 1;
+      slotLimit ?? nameSlot ?? rule?.default_slot_limit ?? 1;
 
     // 3. Insert PACKAGE_PRODUCT liên kết với stock
     const [pkg] = await trx(TABLES.package)

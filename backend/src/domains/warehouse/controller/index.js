@@ -475,18 +475,23 @@ const listProductNames = async (req, res) => {
 };
 
 const createProductName = async (req, res) => {
-  const { name, product_id } = req.body;
-  if (!name || !String(name).trim()) return res.status(400).json({ error: "Tên danh mục không được để trống" });
-  
   try {
+    const { name, product_id, slot, match } = req.body || {};
+    if (!name) return res.status(400).json({ error: "Tên danh mục là bắt buộc" });
     const normalized = String(name).trim();
     const existing = await db(`${SCHEMA_WAREHOUSE}.product_names`).where("name", normalized).first();
     if (existing) return res.status(400).json({ error: "Tên danh mục đã tồn tại" });
     
     const [inserted] = await db(`${SCHEMA_WAREHOUSE}.product_names`)
-      .insert({ name: normalized, product_id: product_id || null })
+      .insert({
+        name: normalized,
+        product_id: product_id || null,
+        slot: slot || 1,
+        match: match || "information_order"
+      })
       .returning("*");
-      
+
+    eventBus.emit(EVENTS.PRODUCT_NAME_CREATED, inserted);
     res.json(inserted);
   } catch (error) {
     logger.error("[warehouse] createProductName failed", { error: error.message });
@@ -495,21 +500,26 @@ const createProductName = async (req, res) => {
 };
 
 const updateProductName = async (req, res) => {
-  const { id } = req.params;
-  const { name, product_id } = req.body;
-  if (!id) return res.status(400).json({ error: "Missing id" });
-  if (!name || !String(name).trim()) return res.status(400).json({ error: "Tên danh mục không được để trống" });
-
   try {
+    const { id } = req.params;
+    const { name, product_id, slot, match } = req.body || {};
+    if (!name) return res.status(400).json({ error: "Tên danh mục là bắt buộc" });
     const normalized = String(name).trim();
+    
     const existing = await db(`${SCHEMA_WAREHOUSE}.product_names`).where("name", normalized).whereNot("id", id).first();
     if (existing) return res.status(400).json({ error: "Tên danh mục đã tồn tại" });
 
     const [updated] = await db(`${SCHEMA_WAREHOUSE}.product_names`)
       .where("id", id)
-      .update({ name: normalized, product_id: product_id || null })
+      .update({
+        name: normalized,
+        product_id: product_id || null,
+        slot: slot || 1,
+        match: match || "information_order"
+      })
       .returning("*");
       
+    eventBus.emit(EVENTS.PRODUCT_NAME_UPDATED, updated);
     res.json(updated);
   } catch (error) {
     logger.error("[warehouse] updateProductName failed", { error: error.message });
@@ -523,6 +533,8 @@ const deleteProductName = async (req, res) => {
 
   try {
     await db(`${SCHEMA_WAREHOUSE}.product_names`).where("id", id).del();
+    
+    eventBus.emit(EVENTS.PRODUCT_NAME_DELETED, { id });
     res.json({ success: true });
   } catch (error) {
     logger.error("[warehouse] deleteProductName failed", { error: error.message });

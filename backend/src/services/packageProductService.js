@@ -1,5 +1,5 @@
 const { db } = require("@/db");
-const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, SCHEMA_WAREHOUSE, WAREHOUSE_SCHEMA, getDefinition, tableName } =
+const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, SCHEMA_WAREHOUSE, WAREHOUSE_SCHEMA, SCHEMA_PARTNER, PARTNER_SCHEMA, getDefinition, tableName } =
   require("@/config/dbSchema");
 const {
   formatDateOutput,
@@ -21,6 +21,7 @@ const TABLES = {
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
   productStock: tableName(STOCK_DEF.tableName, SCHEMA_WAREHOUSE),
   stockServices: tableName(SRV_DEF.tableName, SCHEMA_WAREHOUSE),
+  supplier: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER),
 };
 
 const PRODUCT_SCHEMA_COLS = PRODUCT_DEF.columns;
@@ -39,7 +40,7 @@ const PACKAGE_PRODUCTS_SELECT = `
     ss1.${quoteIdent(SRV_COLS.backupEmail)} AS package_mail_2nd,
     ss1.${quoteIdent(SRV_COLS.note)} AS package_note,
     ss1.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS package_two_fa,
-    pp.${QUOTED_COLS.packageProduct.supplier} AS package_supplier,
+    COALESCE(s_supp.${quoteIdent(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)}, pp.${QUOTED_COLS.packageProduct.supplier}) AS package_supplier,
     pp.${QUOTED_COLS.packageProduct.cost} AS package_import,
     pp.${QUOTED_COLS.packageProduct.slot} AS package_slot,
     ss1.${quoteIdent(SRV_COLS.expiresAt)} AS package_expired,
@@ -76,6 +77,7 @@ const PACKAGE_PRODUCTS_SELECT = `
     FROM ${TABLES.variant} v
     GROUP BY v.${quoteIdent(VARIANT_COLS.productId)}
   ) product_codes ON product_codes.product_id = pp.${QUOTED_COLS.packageProduct.packageId}
+  LEFT JOIN ${TABLES.supplier} s_supp ON s_supp.id::text = pp.${QUOTED_COLS.packageProduct.supplier}
 `;
 
 const summarizePackageInformation = (user, pass, mail) =>

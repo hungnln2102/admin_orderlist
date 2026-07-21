@@ -61,6 +61,7 @@ const createHandler = async (req, res) => {
 
   try {
     const newRow = await createPackageProduct(req.body || {});
+    eventBus.emit(EVENTS.PACKAGE_PRODUCT_CREATED, newRow);
     res.status(201).json(newRow);
   } catch (error) {
     logger.error("[packages] Insert failed", { error: error.message, stack: error.stack });

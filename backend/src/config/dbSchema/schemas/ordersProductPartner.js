@@ -221,6 +221,8 @@ const WAREHOUSE_SCHEMA = {
     COLS: {
       ID: "id",
       NAME: "name",
+      SLOT: "slot",
+      MATCH: "match",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
     },
