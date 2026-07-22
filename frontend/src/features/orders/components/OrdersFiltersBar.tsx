@@ -1,7 +1,9 @@
 import {
   ArrowDownTrayIcon,
+  FunnelIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import GradientButton from "@/components/ui/GradientButton";
 import {
@@ -36,77 +38,95 @@ export function OrdersFiltersBar({
   onDurationRangeChange,
 }: OrdersFiltersBarProps) {
   return (
-    <div className="min-w-0 rounded-[24px] border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-3 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm sm:rounded-[32px] sm:p-4 lg:p-5">
-      <div className="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-3">
-        <div className="relative w-full min-w-0 lg:min-w-[11rem] lg:flex-1 lg:basis-0 xl:min-w-[14rem]">
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-indigo-300 opacity-70" />
-          <input
-            type="text"
-            placeholder="Tìm kiếm đơn hàng, khách hàng..."
-            className="w-full min-w-0 rounded-2xl border border-white/10 bg-slate-950/40 py-2.5 pr-4 text-sm text-white outline-none transition-all placeholder:text-slate-400/70 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50"
-            style={{ paddingLeft: "3.25rem" }}
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+    <div className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-3.5 shadow-2xl backdrop-blur-md sm:rounded-3xl sm:p-4.5 lg:p-5">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4">
+        {/* Unified Search & Scope Box */}
+        <div className="group relative flex min-w-0 flex-1 items-center rounded-2xl border border-white/10 bg-slate-950/60 transition-all duration-200 focus-within:border-indigo-500/80 focus-within:ring-2 focus-within:ring-indigo-500/30 hover:border-white/20 xl:max-w-2xl">
+          {/* Scope Select Dropdown (Left side of Search Bar) */}
+          <div className="relative shrink-0 border-r border-white/10">
+            <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/80">
+              <FunnelIcon className="h-4 w-4" />
+            </div>
+            <select
+              value={searchField}
+              onChange={(e) => setSearchField(e.target.value)}
+              aria-label="Chọn trường tìm kiếm"
+              className="h-11 cursor-pointer appearance-none bg-transparent py-2.5 pl-9 pr-7 text-xs font-semibold text-indigo-200 outline-none transition-colors hover:text-white sm:text-sm"
+              style={{
+                backgroundImage:
+                  'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")',
+                backgroundPosition: "right 0.5rem center",
+                backgroundRepeat: "no-repeat",
+                backgroundSize: "0.9rem",
+              }}
+            >
+              {SEARCH_FIELD_OPTIONS.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  className="bg-slate-900 font-medium text-white"
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Search Input Field */}
+          <div className="relative flex min-w-0 flex-1 items-center">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-indigo-400 sm:h-5 sm:w-5" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm đơn hàng, khách hàng..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="h-11 w-full min-w-0 border-none bg-transparent py-2.5 pl-10 pr-9 text-xs text-white placeholder-slate-400/70 outline-none sm:text-sm"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                title="Xóa tìm kiếm"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-center sm:gap-3 lg:ml-auto lg:w-auto lg:max-w-full lg:flex-1 lg:basis-0 lg:grid-cols-[minmax(12rem,18rem)_auto] lg:justify-end">
-          <DashboardDateRangeFilter
-            value={durationRange}
-            onChange={onDurationRangeChange}
-            className="w-full min-w-0 max-w-full"
-          />
+        {/* Right Section: Date Range & Action Buttons */}
+        <div className="flex flex-col gap-3 min-[540px]:flex-row min-[540px]:items-center min-[540px]:justify-between xl:shrink-0 xl:justify-end">
+          {/* Date Range Picker */}
+          <div className="w-full min-w-0 min-[540px]:w-[260px] sm:w-[280px]">
+            <DashboardDateRangeFilter
+              value={durationRange}
+              onChange={onDurationRangeChange}
+              className="w-full min-w-0"
+            />
+          </div>
 
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:w-auto sm:min-w-0 sm:justify-end">
-            <div className="relative min-w-0 sm:w-[11rem]">
-              <select
-                className="h-11 w-full min-w-0 cursor-pointer appearance-none rounded-2xl border border-white/10 bg-slate-950/40 px-3.5 text-sm text-white outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50"
-                style={{
-                  backgroundImage:
-                    'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")',
-                  backgroundPosition: "right 0.65rem center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "1.1rem",
-                  paddingRight: "2.25rem",
-                }}
-                value={searchField}
-                onChange={(event) => setSearchField(event.target.value)}
-              >
-                {SEARCH_FIELD_OPTIONS.map((option) => (
-                  <option
-                    key={option.value}
-                    value={option.value}
-                    className="bg-slate-900 text-white"
-                  >
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+          {/* Buttons: Export & Create Order */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={onExportExcel}
               disabled={exportDisabled}
-              className="inline-flex h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-3 text-xs font-bold text-emerald-100 shadow-[0_12px_26px_-18px_rgba(16,185,129,0.85)] transition-all hover:border-emerald-300/60 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-200 shadow-lg shadow-emerald-950/20 transition-all hover:border-emerald-400/50 hover:bg-emerald-500/20 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 min-[540px]:flex-initial sm:text-sm"
               title="Xuất Excel các đơn đang được lọc"
             >
               <ArrowDownTrayIcon className="h-4 w-4 shrink-0" />
-              <span className="hidden whitespace-nowrap min-[390px]:inline sm:inline">
-                Xuất Excel
-              </span>
+              <span>Xuất Excel</span>
             </button>
 
             {isActiveDataset && (
-              <div className="col-span-2 mt-1 min-w-0 shrink-0 justify-self-start sm:col-span-1 sm:mt-0 sm:self-center">
-                <GradientButton
-                  icon={PlusIcon}
-                  onClick={openCreateModal}
-                  className="whitespace-nowrap !px-4 !py-2 text-xs sm:!px-5 sm:!py-2.5 sm:text-sm"
-                >
-                  Tạo Đơn
-                </GradientButton>
-              </div>
+              <GradientButton
+                icon={PlusIcon}
+                onClick={openCreateModal}
+                className="h-11 flex-1 !rounded-2xl whitespace-nowrap !px-4 !py-0 text-xs shadow-lg transition-all active:scale-95 min-[540px]:flex-initial sm:!px-5 sm:text-sm"
+              >
+                Tạo Đơn
+              </GradientButton>
             )}
           </div>
         </div>
@@ -114,5 +134,6 @@ export function OrdersFiltersBar({
     </div>
   );
 }
+
 
 
