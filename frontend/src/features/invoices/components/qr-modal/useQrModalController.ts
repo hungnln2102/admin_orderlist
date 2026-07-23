@@ -5,6 +5,8 @@ import type { ShopBankDisplay } from "../../helpers";
 import { digitsOnly, formatVndThousands } from "./helpers";
 import { parseBatchOrderCodes } from "./parseBatchOrderCodes";
 import type { BatchItem, BatchSummary } from "./types";
+import { emitRefresh } from "@/lib/refreshBus";
+import { showAppNotification } from "@/lib/notifications";
 
 type Params = {
   open: boolean;
@@ -41,6 +43,8 @@ export const useQrModalController = ({
   const [selectedBatchItems, setSelectedBatchItems] = useState<BatchItem[]>([]);
   const [selectedBatchLoading, setSelectedBatchLoading] = useState(false);
   const [selectedBatchError, setSelectedBatchError] = useState<string | null>(null);
+  const [selectedBatchStatus, setSelectedBatchStatus] = useState<string>("");
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -51,6 +55,7 @@ export const useQrModalController = ({
       setBatchInfo(null);
       setBatchLoading(false);
       setSelectedBatchCode("");
+      setSelectedBatchStatus("");
       setSelectedBatchItems([]);
       setSelectedBatchError(null);
       onNoteChange("");
@@ -194,6 +199,7 @@ export const useQrModalController = ({
         totalAmount: nextAmount,
       });
       setSelectedBatchCode(nextBatchCode);
+      setSelectedBatchStatus("pending");
       setSelectedBatchItems([]);
       setSelectedBatchError(null);
     } catch (error) {
@@ -225,6 +231,9 @@ export const useQrModalController = ({
         ? ((body as { items: BatchItem[] }).items)
         : [];
       setSelectedBatchItems(items);
+      setSelectedBatchStatus(
+        String((body as { batch?: { status?: string } })?.batch?.status || "pending")
+      );
       setBatchCodesDraft(
         items
           .map((item) => String(item.orderCode || "").trim().toUpperCase())
@@ -240,11 +249,66 @@ export const useQrModalController = ({
       }
     } catch (error) {
       setSelectedBatchItems([]);
+      setSelectedBatchStatus("");
       setSelectedBatchError(
         error instanceof Error ? error.message : "Không thể tải chi tiết batch."
       );
     } finally {
       setSelectedBatchLoading(false);
+    }
+  };
+
+  const completeBatchManual = async (batchCode: string) => {
+    const normalized = String(batchCode || "").trim().toUpperCase();
+    if (!normalized) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn xác nhận thanh toán Tiền mặt cho Batch ${normalized}?\nTất cả các đơn trong batch sẽ chuyển trạng thái Đã thanh toán.`
+      )
+    ) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const response = await apiFetch(
+        `/api/payment-receipts/batches/${encodeURIComponent(normalized)}/complete-manual`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          String((body as { error?: string })?.error || "Không thể thanh toán batch.")
+        );
+      }
+      showAppNotification({
+        type: "success",
+        title: "Thanh toán batch thành công",
+        message: `Batch ${normalized} đã được xác nhận thanh toán tiền mặt thành công.`,
+      });
+      await openBatchDetail(normalized);
+      const listResponse = await apiFetch("/api/payment-receipts/batches?limit=15");
+      const listBody = await listResponse.json().catch(() => ({}));
+      if (listResponse.ok) {
+        const rows = Array.isArray((listBody as { batches?: unknown[] })?.batches)
+          ? ((listBody as { batches: BatchSummary[] }).batches)
+          : [];
+        setBatchList(rows);
+      }
+      emitRefresh(["orders", "dashboard"]);
+    } catch (error) {
+      showAppNotification({
+        type: "error",
+        title: "Lỗi thanh toán batch",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Đã xảy ra lỗi khi thanh toán batch.",
+      });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -261,6 +325,8 @@ export const useQrModalController = ({
     selectedBatchItems,
     selectedBatchLoading,
     selectedBatchError,
+    selectedBatchStatus,
+    actionLoading,
     orderCodeHint,
     formattedAmountDisplay,
     qrImageUrl,
@@ -270,5 +336,6 @@ export const useQrModalController = ({
     applyAmount,
     createBatchFromOrders,
     openBatchDetail,
+    completeBatchManual,
   };
 };

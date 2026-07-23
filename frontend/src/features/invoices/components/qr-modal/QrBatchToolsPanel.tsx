@@ -22,6 +22,8 @@ type Props = {
   selectedBatchItems: BatchItem[];
   selectedBatchLoading: boolean;
   selectedBatchError: string | null;
+  selectedBatchStatus: string;
+  actionLoading: boolean;
   onAmountDraftChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onAmountDraftBlur: () => void;
   onAmountDraftEnter: () => void;
@@ -29,6 +31,7 @@ type Props = {
   onBatchCodesDraftChange: (value: string) => void;
   onCreateBatchFromOrders: () => void;
   onOpenBatchDetail: (batchCode: string) => void;
+  onCompleteBatchManual: (batchCode: string) => void;
 };
 
 export const QrBatchToolsPanel: React.FC<Props> = ({
@@ -45,6 +48,8 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
   selectedBatchItems,
   selectedBatchLoading,
   selectedBatchError,
+  selectedBatchStatus,
+  actionLoading,
   onAmountDraftChange,
   onAmountDraftBlur,
   onAmountDraftEnter,
@@ -52,6 +57,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
   onBatchCodesDraftChange,
   onCreateBatchFromOrders,
   onOpenBatchDetail,
+  onCompleteBatchManual,
 }) => (
   <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
     <div className={`${panelSurface} p-4 sm:p-6 space-y-5 flex flex-col`}>
@@ -181,9 +187,19 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
                 className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-emerald-500/35 hover:bg-emerald-500/5"
                 onClick={() => onOpenBatchDetail(batch.batchCode)}
               >
-                <span className="text-xs font-semibold text-emerald-300">
-                  {batch.batchCode}
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-emerald-300">
+                    {batch.batchCode}
+                  </span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium tracking-wide ${batch.status === "paid"
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/10"
+                        : "bg-amber-500/10 text-amber-400 border border-amber-500/10"
+                      }`}
+                  >
+                    {batch.status === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
+                  </span>
+                </div>
                 <span className="block text-[11px] text-slate-400 mt-0.5">
                   {batch.orderCount} đơn ·{" "}
                   {(Number(batch.totalAmount) || 0).toLocaleString("vi-VN")} VND
@@ -194,9 +210,33 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         ) : null}
         {selectedBatchCode ? (
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-3 space-y-2 mt-1">
-            <p className="text-xs font-semibold text-emerald-200">
-              Chi tiết · {selectedBatchCode}
-            </p>
+            <div className="flex items-center justify-between gap-2 border-b border-emerald-500/10 pb-1.5">
+              <p className="text-xs font-semibold text-emerald-200">
+                Chi tiết · {selectedBatchCode}
+              </p>
+              {selectedBatchStatus && (
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium ${selectedBatchStatus === "paid"
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "bg-amber-500/20 text-amber-300"
+                    }`}
+                >
+                  {selectedBatchStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
+                </span>
+              )}
+            </div>
+            {selectedBatchStatus && selectedBatchStatus !== "paid" && (
+              <div className="flex justify-end pt-0.5 pb-1">
+                <button
+                  type="button"
+                  className="rounded-lg bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-[10px] font-semibold px-2.5 py-1.5 shadow transition disabled:opacity-50"
+                  onClick={() => onCompleteBatchManual(selectedBatchCode)}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? "Đang xử lý…" : "Xác nhận Thanh toán"}
+                </button>
+              </div>
+            )}
             {selectedBatchLoading ? (
               <p className="text-xs text-slate-400">Đang tải đơn trong batch…</p>
             ) : null}
@@ -204,8 +244,8 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
               <p className="text-xs text-rose-300">{selectedBatchError}</p>
             ) : null}
             {!selectedBatchLoading &&
-            !selectedBatchError &&
-            selectedBatchItems.length === 0 ? (
+              !selectedBatchError &&
+              selectedBatchItems.length === 0 ? (
               <p className="text-xs text-slate-500">Batch chưa có đơn.</p>
             ) : null}
             {selectedBatchItems.length > 0 ? (

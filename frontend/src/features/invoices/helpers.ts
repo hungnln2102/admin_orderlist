@@ -84,11 +84,11 @@ export const determineReceiptCategory = (
   const receipt: ReceiptCategoryInput =
     typeof receiptOrCode === "string" || receiptOrCode == null
       ? {
-          orderCode: receiptOrCode ?? "",
-          postedRevenue: 0,
-          postedProfit: 0,
-          postedOffFlowBankReceipt: 0,
-        }
+        orderCode: receiptOrCode ?? "",
+        postedRevenue: 0,
+        postedProfit: 0,
+        postedOffFlowBankReceipt: 0,
+      }
       : receiptOrCode;
 
   const off = Number(receipt.postedOffFlowBankReceipt) || 0;
@@ -107,19 +107,19 @@ export const determineReceiptCategory = (
 export const CATEGORY_OPTIONS: {
   value: ReceiptCategory;
   label: string;
-  description: string;
+
 }[] = [
-  {
-    value: "receipt",
-    label: "Biên Nhận",
-    description: "MAV đúng luồng thanh toán đơn (không chỉ tiền thừa NH)",
-  },
-  {
-    value: "out-of-flow",
-    label: "Ngoài Luồng",
-    description: "Tiền thừa sau Đã TT, không mã đơn, hoặc không MAV",
-  },
-];
+    {
+      value: "receipt",
+      label: "Biên Nhận",
+
+    },
+    {
+      value: "out-of-flow",
+      label: "Ngoài Luồng",
+
+    },
+  ];
 
 export const parseDMYDate = (value: string): number | null => {
   const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);

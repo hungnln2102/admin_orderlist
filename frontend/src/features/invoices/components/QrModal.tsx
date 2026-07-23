@@ -91,6 +91,8 @@ export const QrModal: React.FC<QrModalProps> = ({
               selectedBatchItems={controller.selectedBatchItems}
               selectedBatchLoading={controller.selectedBatchLoading}
               selectedBatchError={controller.selectedBatchError}
+              selectedBatchStatus={controller.selectedBatchStatus}
+              actionLoading={controller.actionLoading}
               onAmountDraftChange={controller.handleAmountInputChange}
               onAmountDraftBlur={controller.commitAmount}
               onAmountDraftEnter={controller.commitAmount}
@@ -98,6 +100,7 @@ export const QrModal: React.FC<QrModalProps> = ({
               onBatchCodesDraftChange={controller.setBatchCodesDraft}
               onCreateBatchFromOrders={controller.createBatchFromOrders}
               onOpenBatchDetail={controller.openBatchDetail}
+              onCompleteBatchManual={controller.completeBatchManual}
             />
 
             <QrPreviewPanel

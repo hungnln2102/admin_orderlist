@@ -13,7 +13,7 @@ export const CategoryToggle: React.FC<CategoryToggleProps> = ({
   onChange,
 }) => {
   return (
-    <div className="rounded-[32px] glass-panel-light p-2 border border-white/5 shadow-2xl flex flex-col sm:flex-row gap-2 relative z-10 transition-all duration-500">
+    <div className="bg-slate-900/50 backdrop-blur-md border border-white/[0.06] rounded-2xl p-1.5 flex gap-2 relative z-10 transition-all">
       {CATEGORY_OPTIONS.map((option) => {
         const isActive = activeCategory === option.value;
         const count = counts[option.value];
@@ -22,30 +22,22 @@ export const CategoryToggle: React.FC<CategoryToggleProps> = ({
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`group relative flex-1 min-w-[200px] text-left rounded-[26px] px-6 py-5 transition-all duration-500 overflow-hidden ${
+            className={`group relative flex-1 flex items-center justify-center gap-2.5 rounded-xl py-3 px-4 text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
               isActive
-                ? "bg-indigo-600/40 text-white shadow-[0_0_40px_rgba(99,102,241,0.25)] border border-indigo-400/30"
-                : "text-indigo-100/60 hover:text-white border border-transparent"
+                ? "bg-gradient-to-r from-indigo-500/80 to-purple-600/80 text-white shadow-md shadow-indigo-950/50 border border-indigo-400/20"
+                : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03] border border-transparent"
             }`}
           >
-            {/* Active Aura */}
-            {isActive && (
-              <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/20 rounded-full blur-3xl animate-pulse"></div>
-            )}
-            
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] leading-none opacity-80">
-                  {option.label}
-                </p>
-                <p className={`text-sm font-bold tracking-tight transition-colors ${isActive ? 'text-white' : 'text-indigo-100/70 group-hover:text-white'}`}>
-                  {option.description}
-                </p>
-              </div>
-              <div className={`text-2xl font-black tracking-tighter ${isActive ? 'text-indigo-300' : 'text-indigo-200/20 group-hover:text-indigo-200/40'}`}>
-                {count.toLocaleString()}
-              </div>
-            </div>
+            <span>{option.label}</span>
+            <span
+              className={`font-mono text-[10px] px-2 py-0.5 rounded-full border transition-all ${
+                isActive
+                  ? "bg-indigo-950/80 text-indigo-300 border-indigo-400/30"
+                  : "bg-slate-950/40 text-slate-500 border-white/[0.04] group-hover:border-white/[0.08] group-hover:text-slate-400"
+              }`}
+            >
+              {count.toLocaleString()}
+            </span>
           </button>
         );
       })}

@@ -42,76 +42,78 @@ export const FiltersBar: React.FC<FiltersBarProps> = ({
   onAddReceipt,
 }) => {
   return (
-    <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.25)] backdrop-blur-sm relative z-10">
-      <div className="flex flex-col lg:flex-row gap-4 items-center">
+    <div className="rounded-3xl bg-slate-900/40 border border-white/[0.06] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-md relative z-10">
+      <div className="flex flex-col xl:flex-row gap-4 items-stretch xl:items-center">
         {/* Search Group */}
-        <div className="relative w-full lg:flex-1">
-          <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opaciy-70" />
+        <div className="relative flex-1 min-w-[260px]">
+          <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-400 pointer-events-none z-10 opacity-70" />
           <input
             type="text"
             placeholder="Tìm mã đơn, người gửi hoặc ghi chú..."
-            className="w-full pr-4 py-3 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
-            style={{ paddingLeft: '3.25rem' }}
+            className="w-full h-12 pr-4 pl-12 border border-white/[0.06] rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-500/70"
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
           />
         </div>
 
-        {/* Action & Filter Group */}
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
-          <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+        {/* Separator on Desktop */}
+        <div className="hidden xl:block w-px h-8 bg-white/[0.06] mx-1"></div>
 
+        {/* Action & Filter Group */}
+        <div className="w-full xl:w-auto grid grid-cols-1 sm:grid-cols-3 xl:flex xl:flex-row xl:items-center gap-3">
           {/* Date Picker Button */}
-          <div className="relative" ref={dateRangeRef}>
+          <div className="relative w-full" ref={dateRangeRef}>
             <button
               type="button"
               onClick={() => setRangePickerOpen(!rangePickerOpen)}
-              className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl border transition-all text-sm min-w-[200px] ${
+              className={`w-full h-12 flex items-center justify-between gap-3 px-4 rounded-2xl border transition-all text-sm xl:min-w-[220px] ${
                 rangePickerOpen
-                  ? "border-indigo-400/50 bg-indigo-500/20 text-indigo-200"
-                  : "border-white/10 bg-slate-950/40 text-white hover:bg-white/5"
+                  ? "border-indigo-400/50 bg-indigo-500/10 text-indigo-200"
+                  : "border-white/[0.06] bg-slate-950/40 text-white hover:bg-white/[0.03]"
               }`}
             >
               <span className="font-medium truncate">{dateRangeDisplay}</span>
-              <CalendarDaysIcon className="w-5 h-5 opacity-70" />
+              <CalendarDaysIcon className="w-5 h-5 opacity-70 shrink-0" />
             </button>
 
             {rangePickerOpen && (
-              <div className="absolute right-0 top-[calc(100%+12px)] w-80 bg-slate-900 border border-white/15 rounded-2xl shadow-2xl z-50 p-5 space-y-4 backdrop-blur-xl">
+              <div className="absolute right-0 xl:right-0 top-[calc(100%+12px)] w-full sm:w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 p-5 space-y-4 backdrop-blur-xl">
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-indigo-300/80 uppercase tracking-widest px-1">Từ Ngày</label>
+                    <label className="text-[10px] font-bold text-indigo-300/80 uppercase tracking-widest px-1">Từ Ngày</label>
                     <input
                       type="date"
-                      className="w-full bg-slate-950/50 border border-white/10 text-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all"
+                      className="w-full bg-slate-950/50 border border-white/[0.06] text-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all"
                       value={toISODate(dateStart)}
                       onChange={(event) => onDateStartChange(event.target.value ? toDisplayDate(event.target.value) : "")}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-indigo-300/80 uppercase tracking-widest px-1">Đến Ngày</label>
+                    <label className="text-[10px] font-bold text-indigo-300/80 uppercase tracking-widest px-1">Đến Ngày</label>
                     <input
                       type="date"
-                      className="w-full bg-slate-950/50 border border-white/10 text-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all"
+                      className="w-full bg-slate-950/50 border border-white/[0.06] text-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all"
                       value={toISODate(dateEnd)}
                       onChange={(event) => onDateEndChange(event.target.value ? toDisplayDate(event.target.value) : "")}
                     />
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                  <button className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors" onClick={() => { onDateStartChange(""); onDateEndChange(""); }}>Xóa</button>
+                <div className="flex justify-between items-center pt-3 border-t border-white/[0.06]">
+                  <button className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors" onClick={() => { onDateStartChange(""); onDateEndChange(""); }}>Xóa</button>
                   <div className="flex gap-2">
-                    <button className="px-4 py-2 text-xs font-semibold text-white/70 hover:text-white transition-colors" onClick={() => setRangePickerOpen(false)}>Đóng</button>
-                    <button className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-all shadow-lg" onClick={() => setRangePickerOpen(false)}>Áp Dụng</button>
+                    <button className="px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors" onClick={() => setRangePickerOpen(false)}>Đóng</button>
+                    <button className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-950/50" onClick={() => setRangePickerOpen(false)}>Áp Dụng</button>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
-
-          <GradientButton icon={PlusIcon} onClick={onAddReceipt} className="!py-2.5 !px-5 text-sm">
+          <GradientButton
+            icon={PlusIcon}
+            onClick={onAddReceipt}
+            className="w-full xl:w-auto h-12 justify-center whitespace-nowrap !rounded-2xl"
+          >
             Thêm biên nhận
           </GradientButton>
 
@@ -119,10 +121,10 @@ export const FiltersBar: React.FC<FiltersBarProps> = ({
             type="button"
             onClick={onExport}
             disabled={exportDisabled}
-            className={`px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all border ${
+            className={`w-full xl:w-auto h-12 flex items-center justify-center px-5 rounded-2xl text-sm font-semibold transition-all border whitespace-nowrap ${
               exportDisabled
                 ? "bg-white/5 text-white/30 border-white/5 cursor-not-allowed"
-                : "bg-white/5 text-white border-white/10 hover:bg-white/10"
+                : "bg-white/5 text-white border-white/[0.06] hover:bg-white/[0.03] hover:border-white/10"
             }`}
           >
             Tải Về

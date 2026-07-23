@@ -13,6 +13,9 @@ const {
 const {
   getPaymentReceiptBatchDetail,
 } = require("@/domains/payments/controller/handlers/getPaymentReceiptBatchDetail");
+const {
+  completePaymentReceiptBatchManual,
+} = require("@/domains/payments/controller/handlers/completePaymentReceiptBatchManual");
 const { listMatchableOrders } = require("@/domains/payments/controller/handlers/listMatchableOrders");
 const {
   reconcilePaymentReceipt,
@@ -24,6 +27,7 @@ module.exports = {
   createPaymentReceiptBatch,
   listPaymentReceiptBatches,
   getPaymentReceiptBatchDetail,
+  completePaymentReceiptBatchManual,
   listMatchableOrders,
   confirmPaymentSupply,
   reconcilePaymentReceipt,
