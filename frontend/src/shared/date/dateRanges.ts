@@ -81,8 +81,12 @@ export const buildMonthColumns = (startDate: Date = SYSTEM_START_DATE): PeriodCo
   return columns;
 };
 
+const addDaysUtcCache = new Map<string, string>();
 export const addDaysUtc = (ymd: string, days: number): string | null => {
   if (!ymd) return null;
+  const cacheKey = `${ymd}-${days}`;
+  if (addDaysUtcCache.has(cacheKey)) return addDaysUtcCache.get(cacheKey)!;
+  
   const [year, month, day] = ymd.split("-").map(Number);
   if (![year, month, day].every(Number.isFinite)) return null;
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -90,10 +94,18 @@ export const addDaysUtc = (ymd: string, days: number): string | null => {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const result = `${y}-${m}-${d}`;
+  
+  if (addDaysUtcCache.size > 5000) addDaysUtcCache.clear(); // prevent memory leak
+  addDaysUtcCache.set(cacheKey, result);
+  return result;
 };
 
+const countDaysInclusiveCache = new Map<string, number>();
 export const countDaysInclusive = (from: string, to: string): number => {
+  const cacheKey = `${from}-${to}`;
+  if (countDaysInclusiveCache.has(cacheKey)) return countDaysInclusiveCache.get(cacheKey)!;
+  
   const [fy, fm, fd] = from.split("-").map(Number);
   const [ty, tm, td] = to.split("-").map(Number);
   if (![fy, fm, fd, ty, tm, td].every(Number.isFinite)) return 0;
@@ -101,8 +113,10 @@ export const countDaysInclusive = (from: string, to: string): number => {
   const start = Date.UTC(fy, fm - 1, fd);
   const end = Date.UTC(ty, tm - 1, td);
   
-  if (end < start) return 0;
-  return Math.floor((end - start) / (24 * 60 * 60 * 1000)) + 1;
+  const result = end < start ? 0 : Math.floor((end - start) / (24 * 60 * 60 * 1000)) + 1;
+  if (countDaysInclusiveCache.size > 5000) countDaysInclusiveCache.clear();
+  countDaysInclusiveCache.set(cacheKey, result);
+  return result;
 };
 
 export const isDateInColumns = (dateKey: string, columns: PeriodColumn[]) => {

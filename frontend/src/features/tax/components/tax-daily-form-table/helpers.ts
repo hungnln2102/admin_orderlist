@@ -33,7 +33,7 @@ export const FIXED_COLUMNS_WIDTH = FIXED_COLUMNS.reduce(
 
 const moneyFormatter = new Intl.NumberFormat("vi-VN");
 export const formatMoney = (value: number) =>
-  `${moneyFormatter.format(Math.round(value))} đ`;
+  `${moneyFormatter.format(Math.round(value))}\xA0đ`;
 
 export { buildDateColumns, buildMonthColumns };
 

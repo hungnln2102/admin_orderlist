@@ -125,13 +125,13 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       ? order.subRows.some(sub => hasSlotInPeriod(sub, column))
                       : hasSlotInPeriod(order, column);
                     return (
-                      <td
-                        key={column.key}
-                        className={`relative z-0 border-b border-r border-white/[0.04] px-4 py-3 text-[13px] font-semibold transition-colors ${
-                          slotInPeriod
-                            ? "bg-emerald-500/[0.08] text-center text-emerald-300 group-hover:bg-emerald-500/[0.12]"
-                            : "bg-[#060B1C] text-right text-cyan-200/80 group-hover:bg-[#0A1024]"
-                        }`}
+                        <td
+                          key={column.key}
+                          className={`relative z-0 border-b border-r border-white/[0.04] px-4 py-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                            slotInPeriod
+                              ? "bg-emerald-500/[0.08] text-center text-emerald-300 group-hover:bg-emerald-500/[0.12]"
+                              : "bg-[#060B1C] text-right text-cyan-200/80 group-hover:bg-[#0A1024]"
+                          }`}
                         style={{
                           width: periodColumnWidth,
                           minWidth: periodColumnWidth,

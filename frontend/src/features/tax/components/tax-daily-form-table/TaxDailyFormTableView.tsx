@@ -208,7 +208,7 @@ export const TaxDailyFormTableView: React.FC<Props> = ({
                     return (
                       <td
                         key={column.key}
-                        className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-cyan-100 transition-colors group-hover:bg-slate-900"
+                        className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-cyan-100 whitespace-nowrap transition-colors group-hover:bg-slate-900"
                         style={{
                           width: periodColumnWidth,
                           minWidth: periodColumnWidth,
