@@ -182,6 +182,7 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
         db.raw(`${table}.${createdAtCol}::text as created_at_raw`),
         db.raw(`${table}.${expiryCol}::text as expiry_date_raw`),
         db.raw(`${table}.${idProductCol}::text as variant_id`),
+        db.raw(`${TABLES.variant}.variant_name::text as variant_name`),
         db.raw(
             `COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as product_display_name`
         ),

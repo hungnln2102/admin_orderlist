@@ -12,7 +12,7 @@ export type FixedColumn = {
 import { PeriodColumn } from "../../../../shared/date/dateRanges";
 
 export type TaxViewMode = "day" | "month";
-export type TaxMetric = "revenue" | "profit" | "refund";
+export type TaxMetric = "revenue" | "profit" | "refund" | "expense";
 
 export type { PeriodColumn };
 
@@ -28,6 +28,7 @@ export type TaxFormRow = {
   price: number;
   cost: number;
   refund: number;
+  subRows?: TaxFormRow[];
 };
 
 export type TaxDailyFormTableProps = {

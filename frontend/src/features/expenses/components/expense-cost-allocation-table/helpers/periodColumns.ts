@@ -19,6 +19,7 @@ const doesRangeOverlapColumn = (
 };
 
 export const hasSlotInPeriod = (row: ExpenseFormRow, column: PeriodColumn) =>
+  !row.isUnmatched &&
   Boolean(row.slotLabel) &&
   doesRangeOverlapColumn(
     row.slotStartYmd || row.startDateYmd,

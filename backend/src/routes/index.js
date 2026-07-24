@@ -52,6 +52,8 @@ const siteMaintenanceRoutes = require("@/domains/site-maintenance/routes");
 const trafficRoutes = require("@/domains/traffic/routes");
 const ninerouterRoutes = require("@/domains/ninerouter/routes");
 const fixAdesRoutes = require("@/domains/fix-ades/routes");
+const financeRoutes = require("@/domains/finance/routes");
+
 const longTimeout = (ms) => (req, res, next) => {
   req.setTimeout(ms);
   res.setTimeout(ms);
@@ -116,6 +118,7 @@ router.use("/warehouse", warehouseRoutes);
 router.use("/warehouses", warehouseRoutes);
 router.use("/import-packages", importPackagesRoutes);
 router.use("/scheduler", longTimeout(900_000), schedulerRoutes);
+router.use("/finance", financeRoutes);
 router.get("/run-scheduler", runSchedulerNow);
 router.get("/supply-insights", suppliesRoutes.getSupplyInsights);
 router.use("/saving-goals", savingGoalsRoutes);

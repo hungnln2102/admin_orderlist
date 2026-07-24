@@ -83,16 +83,16 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       <td
                         key={column.key}
                         rowSpan={fixedPrefixMergeRowSpans[rowIndex]}
-                        className="sticky z-[60] border-b border-r border-indigo-300/15 bg-[#020617] px-2 py-2 align-top transition-colors group-hover:bg-slate-900 focus-within:z-[75]"
+                        className="sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 align-top transition-colors group-hover:bg-[#0E1531] focus-within:z-[75]"
                         style={{
                           left: column.left,
                           width: column.width,
                           minWidth: column.width,
                         }}
                       >
-                        <span className="block min-h-5 px-1 text-sm font-semibold text-white">
-                          {column.key === "orderCode" && order.orderCode}
+                        <span className={`block min-h-5 text-[13px] font-semibold break-words ${column.key === "informationOrder" ? "text-cyan-200/90 max-w-[130px]" : "text-slate-200"}`}>
                           {column.key === "productCode" && order.productCode}
+                          {column.key === "informationOrder" && order.informationOrder}
                           {column.key === "term" && order.term}
                           {column.key === "startDate" && order.startDate}
                           {column.key === "amount" && formatMoney(order.totalCost)}
@@ -101,9 +101,9 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                     ))}
                   <td
                     key={SLOT_COLUMN.key}
-                    className={`sticky z-[60] border-b border-r border-indigo-300/15 bg-[#020617] px-2 py-2 transition-colors group-hover:bg-slate-900 focus-within:z-[75] ${
+                    className={`sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 transition-colors group-hover:bg-[#0E1531] focus-within:z-[75] ${
                       SLOT_COLUMN.key === LAST_FIXED_COLUMN_KEY
-                        ? "shadow-[18px_0_30px_-24px_rgba(148,163,184,0.8)]"
+                        ? "shadow-[20px_0_35px_-20px_rgba(0,0,0,0.8)]"
                         : ""
                     }`}
                     style={{
@@ -112,21 +112,25 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       minWidth: SLOT_COLUMN.width,
                     }}
                   >
-                    <span className="block h-5 truncate px-1 text-sm font-semibold text-white">
+                    <span className={`block h-5 truncate text-[13px] font-semibold ${order.isUnmatched ? 'text-amber-400/90 italic' : 'text-slate-200'}`}>
                       {order.slotLabel}
                     </span>
                   </td>
 
                   {periodColumns.map((column) => {
-                    const value = getCostPeriodAmount(order, column);
-                    const slotInPeriod = hasSlotInPeriod(order, column);
+                    const value = order.subRows
+                      ? order.subRows.reduce((sum, sub) => sum + (getCostPeriodAmount(sub, column) ?? 0), 0)
+                      : getCostPeriodAmount(order, column);
+                    const slotInPeriod = order.subRows
+                      ? order.subRows.some(sub => hasSlotInPeriod(sub, column))
+                      : hasSlotInPeriod(order, column);
                     return (
                       <td
                         key={column.key}
-                        className={`relative z-0 border-b border-r border-indigo-300/15 px-3 py-2 text-sm font-semibold transition-colors ${
+                        className={`relative z-0 border-b border-r border-white/[0.04] px-4 py-3 text-[13px] font-semibold transition-colors ${
                           slotInPeriod
-                            ? "bg-emerald-500/12 text-center text-emerald-100 group-hover:bg-emerald-500/18"
-                            : "bg-slate-950 text-right text-cyan-100 group-hover:bg-slate-900"
+                            ? "bg-emerald-500/[0.08] text-center text-emerald-300 group-hover:bg-emerald-500/[0.12]"
+                            : "bg-[#060B1C] text-right text-cyan-200/80 group-hover:bg-[#0A1024]"
                         }`}
                         style={{
                           width: periodColumnWidth,
@@ -135,22 +139,22 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       >
                         {slotInPeriod ? (
                           <span
-                            className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-400/20 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.35)]"
+                            className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400/40 bg-emerald-500/20 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.25)] ring-1 ring-emerald-500/30 transition-all hover:scale-110"
                             title="Đã có slot"
                           >
-                            <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                            <CheckIcon className="h-4 w-4 drop-shadow-sm" aria-hidden="true" />
                             <span className="sr-only">Đã có slot</span>
                           </span>
                         ) : value != null ? (
-                          formatMoney(value)
+                          <span className="drop-shadow-sm">{formatMoney(value)}</span>
                         ) : (
-                          ""
+                          <span className="text-slate-600/30">-</span>
                         )}
                       </td>
                     );
                   })}
                   <td
-                    className={`${totalColCell} border-b border-indigo-300/15 px-3 py-2 text-right text-sm font-bold tabular-nums text-sky-100`}
+                    className={`${totalColCell} border-b border-white/[0.04] px-4 py-3 text-right text-[13px] font-bold tabular-nums text-sky-200 drop-shadow-sm`}
                     style={{
                       width: TOTAL_COLUMN_WIDTH,
                       minWidth: TOTAL_COLUMN_WIDTH,
@@ -164,11 +168,15 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
               {!fixedDisplayRows.length && !loading && (
                 <tr>
                   <td
-                    className="border-b border-indigo-300/15 bg-[#020617] px-3 py-4 text-sm text-slate-400"
+                    className="border-b border-white/[0.04] bg-[#0A1024] px-8 py-10 text-center text-[13px] font-medium text-slate-400"
                     colSpan={FIXED_COLUMNS.length + periodColumns.length + 1}
                   >
-                    Chưa có đơn MAVN trạng thái Đã Thanh Toán trong order_list.
-                    Thêm đơn nhập hoặc kiểm tra trạng thái đơn.
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-400/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                      </svg>
+                      <span>Chưa có đơn MAVN trạng thái Đã Thanh Toán trong order_list. <br className="sm:hidden" /> Thêm đơn nhập hoặc kiểm tra trạng thái đơn.</span>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -187,7 +195,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       {FIXED_COLUMNS.map((column) => (
                         <td
                           key={column.key}
-                          className="sticky z-[60] border-b border-r border-indigo-300/15 bg-[#020617] px-2 py-2 transition-colors group-hover:bg-slate-900"
+                          className="sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 transition-colors group-hover:bg-[#0E1531]"
                           style={{
                             left: column.left,
                             width: column.width,
@@ -198,7 +206,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       {periodColumns.map((column) => (
                         <td
                           key={column.key}
-                          className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2"
+                          className="relative z-0 border-b border-r border-white/[0.04] bg-[#060B1C] px-4 py-3 group-hover:bg-[#0A1024]"
                           style={{
                             width: periodColumnWidth,
                             minWidth: periodColumnWidth,
@@ -206,7 +214,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                         />
                       ))}
                       <td
-                        className={`${totalColCell} border-b border-indigo-300/15 px-3 py-2`}
+                        className={`${totalColCell} border-b border-white/[0.04] px-4 py-3`}
                         style={{
                           width: TOTAL_COLUMN_WIDTH,
                           minWidth: TOTAL_COLUMN_WIDTH,

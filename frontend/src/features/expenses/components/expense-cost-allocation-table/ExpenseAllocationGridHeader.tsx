@@ -18,16 +18,16 @@ export const ExpenseAllocationGridHeader: React.FC<ExpenseAllocationGridHeaderPr
   periodColumnWidth,
   yearLabel,
 }) => (
-            <thead className="text-slate-100">
+            <thead className="text-slate-100 shadow-xl">
               <tr>
                 {FIXED_COLUMNS.map((column) => (
                   <th
                     key={column.key}
                     rowSpan={2}
                     scope="col"
-                    className={`sticky top-0 z-[80] border-b border-r border-indigo-300/25 bg-[#020617] px-3 py-4 text-left align-middle text-xs font-bold uppercase tracking-[0.08em] ${
+                    className={`sticky top-0 z-[80] border-b border-r border-indigo-400/20 bg-[#0A1024] px-4 py-4 text-left align-middle text-[11px] font-black uppercase tracking-[0.12em] text-slate-300 ${
                       column.key === LAST_FIXED_COLUMN_KEY
-                        ? "shadow-[18px_0_30px_-24px_rgba(148,163,184,0.95)]"
+                        ? "shadow-[20px_0_35px_-20px_rgba(0,0,0,0.8)]"
                         : ""
                     }`}
                     style={{
@@ -42,23 +42,29 @@ export const ExpenseAllocationGridHeader: React.FC<ExpenseAllocationGridHeaderPr
                 <th
                   scope="col"
                   colSpan={periodColumns.length}
-                  className="sticky top-0 z-[10] border-b border-r border-indigo-300/25 bg-slate-950 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.1em]"
+                  className="sticky top-0 z-[10] border-b border-r border-indigo-400/20 bg-[#080E21] px-4 py-3 text-center text-[11px] font-black uppercase tracking-[0.15em] text-indigo-200"
                 >
-                  {yearLabel}
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="h-px flex-1 bg-indigo-500/20" />
+                    <span>{yearLabel}</span>
+                    <span className="h-px flex-1 bg-indigo-500/20" />
+                  </div>
                 </th>
                 <th
                   rowSpan={2}
                   scope="col"
-                  className={`${totalColHead} sticky top-0 z-[100] border-b border-indigo-300/25 px-3 py-4 text-center align-middle text-xs font-bold uppercase tracking-[0.12em] text-sky-200`}
+                  className={`${totalColHead} sticky top-0 z-[100] border-b border-indigo-400/20 px-4 py-4 text-center align-middle text-[11px] font-black uppercase tracking-[0.15em] text-cyan-300`}
                   style={{
                     width: TOTAL_COLUMN_WIDTH,
                     minWidth: TOTAL_COLUMN_WIDTH,
                   }}
                 >
-                  <span className="block leading-tight">Tổng</span>
-                  <span className="mt-1 block text-[10px] font-semibold normal-case tracking-normal text-sky-300/75">
-                    (Trong kỳ hiển thị)
-                  </span>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="leading-tight drop-shadow-md">Tổng</span>
+                    <span className="text-[9px] font-semibold tracking-normal text-cyan-400/60 lowercase">
+                      (Trong kỳ)
+                    </span>
+                  </div>
                 </th>
               </tr>
               <tr>
@@ -66,7 +72,7 @@ export const ExpenseAllocationGridHeader: React.FC<ExpenseAllocationGridHeaderPr
                   <th
                     key={column.key}
                     scope="col"
-                    className="sticky top-[45px] z-[10] border-b border-r border-indigo-300/25 bg-slate-950 px-3 py-3 text-center text-xs font-semibold"
+                    className="sticky top-[45px] z-[10] border-b border-r border-indigo-400/20 bg-[#0A1024] px-4 py-3 text-center text-xs font-bold text-slate-300"
                     style={{
                       width: periodColumnWidth,
                       minWidth: periodColumnWidth,

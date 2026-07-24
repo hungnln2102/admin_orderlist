@@ -27,9 +27,9 @@ export const ExpenseAllocationGridFooter: React.FC<ExpenseAllocationGridFooterPr
                 {FIXED_COLUMNS.map((column, index) => (
                   <td
                     key={column.key}
-                    className={`sticky bottom-0 z-[70] border-t border-r border-indigo-300/25 bg-[#020617] px-3 py-4 text-sm font-black text-white ${
+                    className={`sticky bottom-0 z-[70] border-t border-r border-indigo-400/20 bg-[#0A1024] px-4 py-5 text-sm font-black text-white ${
                       column.key === LAST_FIXED_COLUMN_KEY
-                        ? "shadow-[18px_0_30px_-24px_rgba(148,163,184,0.95)]"
+                        ? "shadow-[20px_0_35px_-20px_rgba(0,0,0,0.9)]"
                         : ""
                     }`}
                     style={{
@@ -38,11 +38,18 @@ export const ExpenseAllocationGridFooter: React.FC<ExpenseAllocationGridFooterPr
                       minWidth: column.width,
                     }}
                   >
-                    {index === 0 ? "Tổng cộng" : ""}
-                    {column.key === "amount" &&
-                      formatMoney(
-                        fixedDisplayRows.reduce((sum, row) => sum + row.totalCost, 0),
-                      )}
+                    {index === 0 && (
+                      <span className="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        Tổng cộng
+                      </span>
+                    )}
+                    {column.key === "amount" && (
+                      <span className="text-white drop-shadow-md">
+                        {formatMoney(
+                          fixedDisplayRows.reduce((sum, row) => sum + row.totalCost, 0),
+                        )}
+                      </span>
+                    )}
                   </td>
                 ))}
 
@@ -55,18 +62,24 @@ export const ExpenseAllocationGridFooter: React.FC<ExpenseAllocationGridFooterPr
                   return (
                     <td
                       key={column.key}
-                      className="sticky bottom-0 z-[20] border-t border-r border-indigo-300/25 bg-slate-950 px-3 py-4 text-right text-sm font-black text-cyan-100"
+                      className="sticky bottom-0 z-[20] border-t border-r border-indigo-400/20 bg-[#080E21] px-4 py-5 text-right text-[13px] font-black tracking-wide text-cyan-200"
                       style={{
                         width: periodColumnWidth,
                         minWidth: periodColumnWidth,
                       }}
                     >
-                      {sumCol > 0 ? formatMoney(sumCol) : ""}
+                      {sumCol > 0 ? (
+                        <span className="drop-shadow-[0_0_10px_rgba(34,211,238,0.2)]">
+                          {formatMoney(sumCol)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600/50 font-medium">-</span>
+                      )}
                     </td>
                   );
                 })}
                 <td
-                  className={`${totalColFoot} sticky bottom-0 border-t border-indigo-300/25 px-3 py-4 text-right text-sm font-black tabular-nums text-cyan-100`}
+                  className={`${totalColFoot} sticky bottom-0 border-t border-indigo-400/20 px-4 py-5 text-right text-[14px] font-black tabular-nums tracking-wide text-cyan-300 drop-shadow-md`}
                   style={{
                     width: TOTAL_COLUMN_WIDTH,
                     minWidth: TOTAL_COLUMN_WIDTH,

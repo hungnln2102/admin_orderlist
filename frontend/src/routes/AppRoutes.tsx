@@ -10,7 +10,6 @@ const PageLoader = () => (
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
 const TaxPage = lazy(() => import("@/features/tax/pages/TaxPage"));
 const TrafficPage = lazy(() => import("@/features/traffic/pages/TrafficPage"));
-const ExpensesPage = lazy(() => import("@/features/expenses/pages/ExpensesPage"));
 const Orders = lazy(() => import("@/features/orders/index.tsx"));
 const CreditLogsPage = lazy(() => import("@/features/credit/index.tsx"));
 const PackageProduct = lazy(() => import("@/features/package-product/index.tsx"));
@@ -61,7 +60,6 @@ export function AppRoutes() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/traffic" element={<TrafficPage />} />
         <Route path="/tax" element={<TaxPage />} />
-        <Route path="/expenses" element={<ExpensesPage />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/credit" element={<CreditLogsPage />} />
         <Route path="/package-products" element={<PackageProduct />} />

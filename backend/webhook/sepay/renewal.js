@@ -858,12 +858,16 @@ const runRenewal = async (
 
     try {
       const { eventBus, EVENTS } = require("@/events");
-      // Truyền object chứa thông tin cần thiết
-      eventBus.emit(EVENTS.ORDER_RENEWED, {
-        id_order: orderCode,
-        san_pham: details.SAN_PHAM,
-        ngay_het_han_moi: details.HET_HAN
-      });
+        // Truyền object chứa thông tin cần thiết
+        eventBus.emit(EVENTS.ORDER_RENEWED, {
+          id_order: orderCode,
+          san_pham: details.SAN_PHAM,
+          ngay_het_han_moi: details.HET_HAN,
+          registration_date: newRegistrationDateDb,
+          days: finalDays,
+          cost: finalGiaNhap,
+          price: finalGiaBan,
+        });
     } catch (eventErr) {
       logger.error("[EventBus] Lỗi phát sự kiện ORDER_RENEWED", { error: eventErr.message });
     }

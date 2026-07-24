@@ -148,8 +148,7 @@ const buildSlotRowsForImportOrder = (
 
   const regYmd = normalizeYmd(order.registration_date ?? undefined);
   const paidFallback = normalizeYmd(order.created_at_raw ?? order.created_at ?? "");
-  const product =
-    String(order.product_display_name ?? order.id_product ?? "").trim();
+  const product = String(order.variant_name ?? order.variant_id ?? order.id_product ?? "").trim();
   const costNum = Number(order.cost);
   const totalCost = Number.isFinite(costNum) && costNum >= 0 ? costNum : 0;
   const displayStart =
@@ -167,6 +166,7 @@ const buildSlotRowsForImportOrder = (
   const baseRow = {
     orderCode,
     productCode: product,
+    informationOrder: String(order.information_order || "").trim(),
     term: termDays > 0 ? `${termDays} ngày` : "—",
     startDate: displayStart,
     termDays,
@@ -174,7 +174,18 @@ const buildSlotRowsForImportOrder = (
   };
 
   if (!matchedPackage) {
-    return [];
+    return [
+      {
+        key: `ol-${order.id ?? 0}-${orderCode}-unmatched`,
+        ...baseRow,
+        slotLabel: "Chưa nối gói",
+        slotStartYmd: null,
+        slotEndYmd: null,
+        totalCost: totalCost,
+        endDateYmd: null,
+        isUnmatched: true,
+      },
+    ];
   }
 
   return Array.from({ length: slotLimit }, (_, index) => {
@@ -218,5 +229,25 @@ export const computeExpenseRows = (
   packageOrders: OrderListItem[],
 ) => {
   const computedPackages = buildComputedPackages(packageRows, packageOrders);
-  return ordersFromOrderList(importRows, computedPackages);
+  const rows = ordersFromOrderList(importRows, computedPackages);
+  return groupExpenseRows(rows);
+};
+
+export const groupExpenseRows = (rows: ExpenseFormRow[]): ExpenseFormRow[] => {
+  const grouped = new Map<string, ExpenseFormRow>();
+  for (const row of rows) {
+    const groupKey = `${row.orderCode}-${row.slotLabel}`; // group by order code and slot
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, { ...row, subRows: [row] });
+    } else {
+      const existing = grouped.get(groupKey)!;
+      existing.subRows!.push(row);
+      existing.totalCost += row.totalCost;
+      existing.termDays += row.termDays;
+      if (row.endDateYmd && existing.endDateYmd) {
+        existing.endDateYmd = row.endDateYmd > existing.endDateYmd ? row.endDateYmd : existing.endDateYmd;
+      }
+    }
+  }
+  return Array.from(grouped.values());
 };

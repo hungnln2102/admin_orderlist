@@ -2,8 +2,8 @@ import { PeriodColumn } from "@/shared/date/dateRanges";
 
 export type ViewMode = "day" | "month";
 export type FixedColumnKey =
-  | "orderCode"
   | "productCode"
+  | "informationOrder"
   | "term"
   | "startDate"
   | "amount"
@@ -23,6 +23,8 @@ export type OrderListRow = {
   id_order?: string;
   id_product?: string | number | null;
   product_display_name?: string;
+  variant_id?: string | null;
+  variant_name?: string | null;
   information_order?: string | null;
   customer?: string | null;
   line_product_id?: number | string | null;
@@ -41,6 +43,7 @@ export type ExpenseFormRow = {
   key: string;
   orderCode: string;
   productCode: string;
+  informationOrder: string;
   term: string;
   startDate: string;
   slotLabel: string;
@@ -50,4 +53,6 @@ export type ExpenseFormRow = {
   termDays: number;
   startDateYmd: string;
   endDateYmd?: string | null;
+  isUnmatched?: boolean;
+  subRows?: ExpenseFormRow[];
 };

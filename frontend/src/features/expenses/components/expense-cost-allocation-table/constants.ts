@@ -8,12 +8,12 @@ export const DATA_ROW_HEIGHT = 37;
 export const DATA_VISIBLE_ROWS = 10;
 
 export const FIXED_COLUMNS: FixedColumn[] = [
-  { key: "orderCode", label: "M? ??n h?ng", width: 154, left: 0 },
-  { key: "productCode", label: "M? s?n ph?m", width: 154, left: 154 },
-  { key: "term", label: "Th?i h?n", width: 116, left: 308 },
-  { key: "startDate", label: "Ng?y b?t ??u", width: 136, left: 424 },
-  { key: "amount", label: "S? ti?n", width: 142, left: 560 },
-  { key: "slot", label: "Slot", width: 96, left: 702 },
+  { key: "productCode", label: "TÊN SẢN PHẨM", width: 140, left: 0 },
+  { key: "informationOrder", label: "THÔNG TIN", width: 150, left: 140 },
+  { key: "term", label: "THỜI HẠN", width: 100, left: 290 },
+  { key: "startDate", label: "NGÀY BẮT ĐẦU", width: 100, left: 390 },
+  { key: "amount", label: "SỐ TIỀN", width: 120, left: 490 },
+  { key: "slot", label: "SLOT", width: 100, left: 610 },
 ];
 
 export const LAST_FIXED_COLUMN_KEY: FixedColumnKey = "slot";
@@ -26,8 +26,8 @@ export const SLOT_COLUMN = FIXED_COLUMNS.find((c) => c.key === "slot")!;
 export const FIXED_MERGE_COLUMNS = FIXED_COLUMNS.filter((c) => c.key !== "slot");
 
 export const totalColCell =
-  "sticky right-0 z-[45] border-l-2 border-sky-500/35 bg-[#020617] text-sky-100 shadow-[-12px_0_24px_-12px_rgba(56,189,248,0.12)] transition-colors group-hover:bg-slate-900";
+  "sticky right-0 z-[45] border-l border-sky-400/20 bg-[#080E21] text-sky-100 shadow-[-15px_0_25px_-12px_rgba(0,0,0,0.8)] transition-colors group-hover:bg-[#0A1024]";
 export const totalColHead =
-  "sticky right-0 z-[100] border-l-2 border-sky-400/40 bg-[#020617] text-sky-100 shadow-[-12px_0_28px_-12px_rgba(56,189,248,0.18)]";
+  "sticky right-0 z-[100] border-l border-sky-400/20 bg-[#060B1C] text-sky-100 shadow-[-15px_0_25px_-12px_rgba(0,0,0,0.9)]";
 export const totalColFoot =
-  "sticky right-0 z-[78] border-l-2 border-sky-400/40 bg-[#020617] text-sky-50 shadow-[-12px_0_28px_-12px_rgba(56,189,248,0.15)]";
+  "sticky right-0 z-[78] border-l border-sky-400/20 bg-[#0A1024] text-sky-50 shadow-[-15px_0_25px_-12px_rgba(0,0,0,0.9)]";

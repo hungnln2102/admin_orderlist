@@ -132,7 +132,7 @@ const Dashboard: React.FC = () => {
   const tab = new URLSearchParams(location.search).get("tab");
 
   if (tab === "tax" || tab === "expenses") {
-    return <Navigate to={tab === "tax" ? "/tax" : "/expenses"} replace />;
+    return <Navigate to="/tax" replace />;
   }
 
   return <DashboardContent />;

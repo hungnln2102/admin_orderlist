@@ -28,7 +28,7 @@ export type TaxOrder = Pick<
 export const fetchTaxOrders = (
   from: string = TAX_ORDER_START_DATE
 ): Promise<TaxOrder[]> =>
-  apiGet<TaxOrder[]>(`/api/orders/tax?from=${encodeURIComponent(from)}`);
+  apiGet<TaxOrder[]>(`/api/finance/allocations?scope=tax&from=${encodeURIComponent(from)}`).then((res: any) => res.data || res);
 
 const normalizeYmd = (value: unknown) => {
   if (value == null) return "";

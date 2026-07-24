@@ -6,6 +6,7 @@ import {
 } from "../components/TaxDailyFormTable";
 import { TaxOverviewStats } from "../components/TaxOverviewStats";
 import { useTaxOrders } from "../hooks/useTaxOrders";
+import { ExpenseCostAllocationTable } from "../../expenses/components/ExpenseCostAllocationTable";
 
 const TaxPage: React.FC = () => {
   const { orders, loading, error } = useTaxOrders();
@@ -16,6 +17,7 @@ const TaxPage: React.FC = () => {
     { key: "revenue", label: "Doanh thu" },
     { key: "profit", label: "Lợi nhuận" },
     { key: "refund", label: "Hoàn tiền" },
+    { key: "expense", label: "Chi phí" },
   ];
 
   return (
@@ -32,7 +34,7 @@ const TaxPage: React.FC = () => {
       <TaxOverviewStats orders={orders} loading={loading} viewMode={viewMode} />
 
       <div className="rounded-2xl border border-indigo-400/20 bg-slate-950/55 p-1 shadow-[0_18px_50px_-30px_rgba(79,70,229,0.6)]">
-        <div className="grid gap-1 sm:grid-cols-3">
+        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4">
           {metricTabs.map((tab) => {
             const active = activeMetric === tab.key;
 
@@ -54,14 +56,18 @@ const TaxPage: React.FC = () => {
         </div>
       </div>
 
-      <TaxDailyFormTable
-        orders={orders}
-        loading={loading}
-        error={error}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        metric={activeMetric}
-      />
+      {activeMetric === "expense" ? (
+        <ExpenseCostAllocationTable />
+      ) : (
+        <TaxDailyFormTable
+          orders={orders}
+          loading={loading}
+          error={error}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          metric={activeMetric}
+        />
+      )}
     </div>
   );
 };

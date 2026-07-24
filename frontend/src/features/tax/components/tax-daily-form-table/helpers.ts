@@ -73,6 +73,9 @@ export const getMetricAmount = (row: TaxFormRow, metric: TaxMetric) => {
   if (metric === "refund") {
     return row.refund;
   }
+  if (metric === "expense") {
+    return row.cost;
+  }
   return row.price;
 };
 
@@ -83,7 +86,20 @@ export const getPeriodAmount = (
   row: TaxFormRow,
   column: PeriodColumn,
   metric: TaxMetric
-) => {
+): number | null => {
+  if (row.subRows && row.subRows.length > 0) {
+    let sum = 0;
+    let hasValue = false;
+    for (const sub of row.subRows) {
+      const val = getPeriodAmount({ ...sub, subRows: [] }, column, metric);
+      if (val != null) {
+        sum += val;
+        hasValue = true;
+      }
+    }
+    return hasValue ? sum : null;
+  }
+
   const amount = getMetricAmount(row, metric);
 
   if (metric === "refund") {
@@ -144,8 +160,8 @@ export const formatRemaining = (
   return formatMoney(getRemainingAmount(row, columns, metric));
 };
 
-export const toTaxFormRows = (orders: TaxOrder[]): TaxFormRow[] =>
-  orders.map((order) => {
+export const toTaxFormRows = (orders: TaxOrder[]): TaxFormRow[] => {
+  const rows = orders.map((order) => {
     const rowId = String(order.id);
     const termDays = toTermDays(order.days);
     return {
@@ -162,3 +178,19 @@ export const toTaxFormRows = (orders: TaxOrder[]): TaxFormRow[] =>
       refund: toMoneyNumber(order.refund),
     };
   });
+
+  const grouped = new Map<string, TaxFormRow>();
+  for (const row of rows) {
+    if (!grouped.has(row.orderCode)) {
+      grouped.set(row.orderCode, { ...row, subRows: [row] });
+    } else {
+      const existing = grouped.get(row.orderCode)!;
+      existing.subRows!.push(row);
+      existing.price += row.price;
+      existing.cost += row.cost;
+      existing.refund += row.refund;
+      existing.termDays += row.termDays;
+    }
+  }
+  return Array.from(grouped.values());
+};
