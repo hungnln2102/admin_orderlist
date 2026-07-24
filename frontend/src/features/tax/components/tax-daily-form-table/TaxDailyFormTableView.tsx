@@ -184,7 +184,7 @@ export const TaxDailyFormTableView: React.FC<Props> = ({
                   {FIXED_COLUMNS.map((column) => (
                     <td
                       key={column.key}
-                      className={`sticky z-[60] border-b border-r border-indigo-300/15 bg-[#020617] px-2 py-2 transition-colors group-hover:bg-slate-900 focus-within:z-[75] ${
+                      className={`sticky z-[60] border-b border-r border-indigo-300/15 bg-[#020617] px-2 py-2  group-hover:bg-slate-900 focus-within:z-[75] ${
                         column.key === "amount"
                           ? "shadow-[18px_0_30px_-24px_rgba(148,163,184,0.8)]"
                           : ""
@@ -208,7 +208,7 @@ export const TaxDailyFormTableView: React.FC<Props> = ({
                     return (
                       <td
                         key={column.key}
-                        className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-cyan-100 whitespace-nowrap transition-colors group-hover:bg-slate-900"
+                        className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-cyan-100 whitespace-nowrap group-hover:bg-slate-900"
                         style={{
                           width: periodColumnWidth,
                           minWidth: periodColumnWidth,
@@ -221,7 +221,7 @@ export const TaxDailyFormTableView: React.FC<Props> = ({
 
                   {showRemainingColumn && (
                     <td
-                      className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-emerald-200 transition-colors group-hover:bg-slate-900"
+                      className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-emerald-200  group-hover:bg-slate-900"
                       style={{
                         width: REMAINING_COLUMN_WIDTH,
                         minWidth: REMAINING_COLUMN_WIDTH,

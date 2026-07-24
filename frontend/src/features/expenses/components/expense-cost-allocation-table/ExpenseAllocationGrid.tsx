@@ -83,7 +83,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       <td
                         key={column.key}
                         rowSpan={fixedPrefixMergeRowSpans[rowIndex]}
-                        className="sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 align-top transition-colors group-hover:bg-[#0E1531] focus-within:z-[75]"
+                        className="sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 align-top group-hover:bg-[#0E1531] focus-within:z-[75]"
                         style={{
                           left: column.left,
                           width: column.width,
@@ -101,7 +101,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                     ))}
                   <td
                     key={SLOT_COLUMN.key}
-                    className={`sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 transition-colors group-hover:bg-[#0E1531] focus-within:z-[75] ${
+                    className={`sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 group-hover:bg-[#0E1531] focus-within:z-[75] ${
                       SLOT_COLUMN.key === LAST_FIXED_COLUMN_KEY
                         ? "shadow-[20px_0_35px_-20px_rgba(0,0,0,0.8)]"
                         : ""
@@ -127,7 +127,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                     return (
                         <td
                           key={column.key}
-                          className={`relative z-0 border-b border-r border-white/[0.04] px-4 py-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                          className={`relative z-0 border-b border-r border-white/[0.04] px-4 py-3 text-[13px] font-semibold whitespace-nowrap ${
                             slotInPeriod
                               ? "bg-emerald-500/[0.08] text-center text-emerald-300 group-hover:bg-emerald-500/[0.12]"
                               : "bg-[#060B1C] text-right text-cyan-200/80 group-hover:bg-[#0A1024]"
@@ -195,7 +195,7 @@ export const ExpenseAllocationGrid: React.FC<ExpenseAllocationGridProps> = ({
                       {FIXED_COLUMNS.map((column) => (
                         <td
                           key={column.key}
-                          className="sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 transition-colors group-hover:bg-[#0E1531]"
+                          className="sticky z-[60] border-b border-r border-white/[0.04] bg-[#0A1024] px-4 py-3 group-hover:bg-[#0E1531]"
                           style={{
                             left: column.left,
                             width: column.width,
