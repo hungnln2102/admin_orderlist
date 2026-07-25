@@ -30,7 +30,7 @@ export const OutboundAllocationModal: React.FC<OutboundAllocationModalProps> = (
     e.preventDefault();
     if (!receiptId) return;
 
-    let payload: any = { type, reason };
+    const payload: any = { type, reason };
 
     if (type === "external_import") {
       payload.supplierName = supplierName;

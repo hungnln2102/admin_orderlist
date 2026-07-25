@@ -3,13 +3,14 @@ import { showAppNotification } from "@/lib/notifications";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 import {
-  MatchableOrder,
   PaymentReceipt,
   ReceiptCategory,
   buildExportWorksheet,
   toDisplayDate,
   toISODate,
+  formatCurrencyVndFull,
 } from "./helpers";
+import { apiFetch } from "@/shared/api/client";
 import { StatsGrid } from "./components/StatsGrid";
 import { FiltersBar } from "./components/FiltersBar";
 import { CategoryToggle } from "./components/CategoryToggle";
@@ -157,7 +158,7 @@ export default function Invoices() {
         try {
           const body = await response.json();
           message = body?.error || message;
-        } catch {}
+        } catch { }
         throw new Error(message);
       }
 
