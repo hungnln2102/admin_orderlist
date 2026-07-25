@@ -52,10 +52,14 @@ const createSupply = async (req, res) => {
 
   if (statusColumn) {
     fields.push(`"${statusColumn}"`);
-    values.push(status ?? active_supply ?? "active");
+    if (statusColumn === "status" || statusColumn === "trang_thai") {
+      values.push(status ?? (active_supply !== undefined ? (active_supply ? "active" : "inactive") : "active"));
+    } else {
+      values.push(active_supply !== undefined ? !!active_supply : (status ? status === "active" : true));
+    }
   } else {
     fields.push(QUOTED_COLS.supplier.activeSupply);
-    values.push(active_supply !== undefined ? !!active_supply : true);
+    values.push(active_supply !== undefined ? !!active_supply : (status ? status === "active" : true));
   }
 
   const placeholders = values.map(() => "?");
@@ -149,7 +153,11 @@ const updateSupply = async (req, res) => {
   }
   if (status !== undefined || active_supply !== undefined) {
     if (statusColumn) {
-      addField(`"${statusColumn}"`, status ?? active_supply ?? null);
+      if (statusColumn === "status" || statusColumn === "trang_thai") {
+        addField(`"${statusColumn}"`, status ?? (active_supply !== undefined ? (active_supply ? "active" : "inactive") : null));
+      } else {
+        addField(`"${statusColumn}"`, active_supply !== undefined ? !!active_supply : status === "active");
+      }
     } else {
       addField(
         QUOTED_COLS.supplier.activeSupply,
