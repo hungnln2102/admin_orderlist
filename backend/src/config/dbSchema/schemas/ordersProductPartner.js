@@ -160,6 +160,7 @@ const PARTNER_SCHEMA = {
       STATUS: "payment_status",
       CONTENT: "payment_status",
       PAID: "amount_paid",
+      TOTAL_IMPORT: "total_import",
       SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
     },
   },

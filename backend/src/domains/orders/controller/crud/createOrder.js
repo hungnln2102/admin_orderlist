@@ -33,8 +33,6 @@ const {
     resolveProductToVariantId,
 } = require("@/domains/products/services/productVariantService");
 
-/** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
-const CREDIT_BALANCE_TOLERANCE_VND = 5000;
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -127,10 +125,8 @@ const attachCreateOrderRoute = (router) => {
         const isMavnCreate = effectivePrefix === importPrefix;
 
         // Nhập hàng MAVN:
-        // - NCC Mavryk/Shop: cost luôn = 0.
-        // - NCC khác: cost = giá bán.
-        // Tài chính MAVN được
-        // tách theo NCC trong syncMavnStoreProfitExpense:
+        // - Cost luôn = Giá bán (price) cho mọi NCC (kể cả Mavryk/Shop).
+        // Tài chính MAVN được tách theo NCC trong syncMavnStoreProfitExpense:
         // - NCC Mavryk/Shop: log external_import + trừ profit/bank.
         // - NCC khác: log NCC (trigger DB) + trừ profit, không trừ bank.
         // Đơn bán (MAVL/MAVC/MAVT/MAVK/MAVS) với NCC Mavryk/Shop nội bộ → cost = 0.
@@ -143,9 +139,7 @@ const attachCreateOrderRoute = (router) => {
             payload[costCol] = 0;
         }
         if (isMavnCreate) {
-            payload[costCol] = isInternalSupplier
-                ? 0
-                : normalizeMoney(payload[priceCol]);
+            payload[costCol] = normalizeMoney(payload[priceCol]);
         }
 
         if (isGiftOrderCreate) {
@@ -163,7 +157,7 @@ const attachCreateOrderRoute = (router) => {
 
             let creditNoteForOrder = null;
             let appliedCreditAmount = 0;
-            if (Number.isFinite(requestedCreditNoteId) && requestedCreditNoteId > 0) {
+            if (!isMavnCreate && Number.isFinite(requestedCreditNoteId) && requestedCreditNoteId > 0) {
                 creditNoteForOrder = await lockRefundCreditNoteById(trx, requestedCreditNoteId);
                 if (creditNoteForOrder) {
                     const noteAvailable = normalizeMoney(creditNoteForOrder.available_amount);
@@ -190,7 +184,7 @@ const attachCreateOrderRoute = (router) => {
             }
 
             if (!isGiftOrderCreate && !isMavnCreate) {
-                if (appliedCreditAmount > 0 && remainingToPay <= CREDIT_BALANCE_TOLERANCE_VND) {
+                if (remainingToPay <= 0) {
                     payload.status = STATUS.PAID;
                     payload[priceCol] = 0;
                 } else {

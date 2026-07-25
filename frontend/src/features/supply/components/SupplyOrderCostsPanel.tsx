@@ -180,7 +180,7 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
         }}
       />
 
-      <div className="glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
+      <div className="rounded-3xl bg-slate-950/40 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] backdrop-blur-2xl overflow-hidden">
         <SupplyCostTable
           activeTab={activeTab}
           loading={loading}
@@ -194,39 +194,39 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
           onEditTrace={setEditTraceTarget}
         />
         {activeTab === "nccCosts" ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 px-4 py-3 text-xs text-white/50">
-            <span>
-              {total > 0 ? (
-                <>
-                  Hiển thị {offset + 1}–{offset + rows.length} / {total}
-                </>
-              ) : (
-                <>Không có bản ghi</>
-              )}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={!canPrev || loading}
-                onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-white/80 enabled:hover:bg-white/5 disabled:opacity-40"
-              >
-                Trước
-              </button>
-              <button
-                type="button"
-                disabled={!canNext || loading}
-                onClick={() => setOffset((o) => o + PAGE_SIZE)}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-white/80 enabled:hover:bg-white/5 disabled:opacity-40"
-              >
-                Sau
-              </button>
+          total > PAGE_SIZE && (
+            <div className="px-6 py-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-indigo-200/60 bg-indigo-950/20">
+              <span className="font-medium tracking-wide">
+                Hiển thị {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} trên tổng số <span className="text-white font-bold">{total}</span> đơn
+              </span>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, i) => i + 1).map((p) => {
+                  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setOffset((p - 1) * PAGE_SIZE)}
+                      disabled={loading}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                        p === currentPage
+                          ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.5)] border border-indigo-400/30"
+                          : "bg-white/5 hover:bg-indigo-500/20 hover:text-indigo-200 text-white/60 border border-white/5 hover:border-indigo-500/30 active:scale-95"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )
         ) : (
-          <div className="border-t border-white/5 px-4 py-3 text-xs text-white/50">
-            Tổng log ngoài luồng: {externalLogs.length}
-          </div>
+          externalLogs.length > 0 && (
+            <div className="px-6 py-4 border-t border-white/5 text-xs text-indigo-200/60 bg-indigo-950/20 flex justify-between">
+              <span className="font-medium tracking-wide">Tổng log ngoài luồng: <span className="text-white font-bold">{externalLogs.length}</span></span>
+            </div>
+          )
         )}
       </div>
     </div>

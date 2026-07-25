@@ -16,6 +16,8 @@ type ReceiptsTableProps = {
   showOrderCode?: boolean;
   enableOrderCodeEdit?: boolean;
   shopBank: ShopBankDisplay;
+  enableAllocation?: boolean;
+  onAllocate?: (receipt: PaymentReceipt) => void;
 };
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
@@ -30,6 +32,8 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
   showOrderCode = true,
   enableOrderCodeEdit = false,
   shopBank,
+  enableAllocation = false,
+  onAllocate,
 }) => {
   const {
     manualCodeByReceiptId,
@@ -64,7 +68,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
         <table className="min-w-full border-separate border-spacing-y-4 text-white">
           <thead>
             <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
-              {enableMatching ? <th className="w-[320px]">GHÉP MÃ ĐƠN</th> : null}
+              {enableAllocation && enableMatching ? <th className="w-[320px]">THAO TÁC / GHÉP MÃ</th> : enableAllocation ? <th className="w-[180px]">PHÂN BỔ</th> : enableMatching ? <th className="w-[320px]">GHÉP MÃ ĐƠN</th> : null}
               {showOrderCode ? <th className="w-[120px]">MÃ ĐƠN</th> : null}
               <th className="w-[180px]">NGƯỜI GỬI</th>
               <th className="w-[180px]">NGƯỜI NHẬN</th>
@@ -88,6 +92,8 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                 isEditingOrderCode={enableOrderCodeEdit && editingReceiptId === receipt.id}
                 isExpanded={expandedReceiptId === receipt.id}
                 enableMatching={enableMatching}
+                enableAllocation={enableAllocation}
+                onAllocate={onAllocate}
                 showOrderCode={showOrderCode}
                 enableOrderCodeEdit={enableOrderCodeEdit}
                 editingOrderCode={editingOrderCode}

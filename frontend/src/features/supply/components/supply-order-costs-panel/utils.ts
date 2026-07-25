@@ -4,7 +4,7 @@ import type { SupplyOrderCostAggregates, SupplyOrderCostRow } from "@/lib/suppli
 
 import type { ActiveSupplyTab } from "./types";
 
-export const PAGE_SIZE = 80;
+export const PAGE_SIZE = 15;
 
 export const EMPTY_AGG: SupplyOrderCostAggregates = {
   orderCount: 0,

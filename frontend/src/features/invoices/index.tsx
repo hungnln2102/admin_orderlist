@@ -15,6 +15,8 @@ import { FiltersBar } from "./components/FiltersBar";
 import { CategoryToggle } from "./components/CategoryToggle";
 import { ReceiptsTable } from "./components/ReceiptsTable";
 import { OffFlowReceiptsPanel } from "./components/OffFlowReceiptsPanel";
+import { OutboundUnallocatedPanel } from "./components/OutboundUnallocatedPanel";
+import { OutboundAllocationModal } from "./components/OutboundAllocationModal";
 import { QrModal } from "./components/QrModal";
 import { ReceiptDetailModal } from "./components/ReceiptDetailModal";
 import { InvoicesPagination } from "./components/InvoicesPagination";
@@ -39,6 +41,8 @@ export default function Invoices() {
     null
   );
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [allocationModalOpen, setAllocationModalOpen] = useState(false);
+  const [allocationReceipt, setAllocationReceipt] = useState<PaymentReceipt | null>(null);
   const [qrAmount, setQrAmount] = useState("");
   const [qrNote, setQrNote] = useState("");
   const [selectedReceipt, setSelectedReceipt] =
@@ -46,6 +50,7 @@ export default function Invoices() {
   const dateRangeRef = useRef<HTMLDivElement | null>(null);
   const [receiptPage, setReceiptPage] = useState(1);
   const [outOfFlowPage, setOutOfFlowPage] = useState(1);
+  const [outboundUnallocatedPage, setOutboundUnallocatedPage] = useState(1);
   const PAGE_SIZE = 10;
 
   const { filteredReceipts, stats, categoryCounts } = useInvoiceDerivations({
@@ -67,14 +72,17 @@ export default function Invoices() {
     pageSize: PAGE_SIZE,
     receiptPage,
     outOfFlowPage,
+    outboundUnallocatedPage,
     activeCategory: categoryFilter,
     setReceiptPage,
     setOutOfFlowPage,
+    setOutboundUnallocatedPage,
   });
 
   useEffect(() => {
     setReceiptPage(1);
     setOutOfFlowPage(1);
+    setOutboundUnallocatedPage(1);
   }, [searchTerm, dateStart, dateEnd]);
 
   const handleExportToExcel = async () => {
@@ -115,6 +123,17 @@ export default function Invoices() {
 
   const handleSelectReceipt = (receipt: PaymentReceipt) => {
     setSelectedReceipt(receipt);
+  };
+
+  const handleAllocateReceipt = (receipt: PaymentReceipt) => {
+    setAllocationReceipt(receipt);
+    setAllocationModalOpen(true);
+  };
+
+  const onAllocationSuccess = () => {
+    // Reload receipts
+    setReceipts([...receipts]); // Actually this won't trigger fetch unless we refetch. Let's just mutate the receipt or trigger a reload. We don't have a fetch fn exposed. Let's do a hard reload or manipulate array.
+    window.location.reload();
   };
 
   const handleMatchReceipt = async (receiptId: number, orderCode: string) => {
@@ -238,13 +257,27 @@ export default function Invoices() {
             setCategoryFilter(category);
             if (category === "receipt") {
               setReceiptPage(1);
-            } else {
+            } else if (category === "out-of-flow") {
               setOutOfFlowPage(1);
+            } else {
+              setOutboundUnallocatedPage(1);
             }
           }}
         />
 
-        {categoryFilter === "out-of-flow" ? (
+        {categoryFilter === "outbound-unallocated" ? (
+          <OutboundUnallocatedPanel
+            receipts={pagedReceipts}
+            shopBank={shopBank}
+            onSelectReceipt={handleSelectReceipt}
+            expandedReceiptId={expandedReceiptId}
+            onToggle={toggleRowDetails}
+            onAllocate={handleAllocateReceipt}
+            matchableOrders={matchableOrders}
+            matchingReceiptId={matchingReceiptId}
+            onMatchReceipt={handleMatchReceipt}
+          />
+        ) : categoryFilter === "out-of-flow" ? (
           <OffFlowReceiptsPanel
             receipts={pagedReceipts}
             matchableOrders={matchableOrders}
@@ -277,6 +310,14 @@ export default function Invoices() {
           totalItems={filteredReceipts.length}
           paginationItems={paginationItems}
           onSetPage={setActivePage}
+        />
+
+        <OutboundAllocationModal
+          isOpen={allocationModalOpen}
+          receiptId={allocationReceipt?.id || null}
+          amount={allocationReceipt?.outboundAmount || allocationReceipt?.amount || 0}
+          onClose={() => setAllocationModalOpen(false)}
+          onSuccess={onAllocationSuccess}
         />
 
         {!loading && filteredReceipts.length === 0 && (

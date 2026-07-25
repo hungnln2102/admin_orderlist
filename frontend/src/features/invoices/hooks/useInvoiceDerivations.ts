@@ -93,7 +93,7 @@ export function useInvoiceDerivations({
         acc[category] += 1;
         return acc;
       },
-      { receipt: 0, "out-of-flow": 0 } as Record<ReceiptCategory, number>
+      { receipt: 0, "outbound-unallocated": 0, "out-of-flow": 0 } as Record<ReceiptCategory, number>
     );
   }, [receipts]);
 

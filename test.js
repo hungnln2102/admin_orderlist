@@ -1,0 +1,1 @@
+require('module-alias')({ base: __dirname + '/backend' }); const { db } = require('./backend/src/db'); db.raw('SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = ''admin_partner'' AND table_name = ''supplier_payments''').then(res => { console.log(res.rows); process.exit(0); });

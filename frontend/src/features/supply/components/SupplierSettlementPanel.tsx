@@ -51,19 +51,21 @@ export function SupplierSettlementPanel({
   onShopBankAccountChange,
 }: Props) {
   return (
-    <div className="bg-white/5 rounded-xl border border-white/10 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
-        <span className="text-xs text-white/60">
-          Cần chi {formatCurrency(totalUnpaid)} | Hoàn về shop{" "}
-          {formatCurrency(totalSupplierRefund)}
+    <div className="rounded-2xl bg-slate-900/60 border border-white/10 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.3)] h-full flex flex-col">
+      <div className="flex flex-col mb-4 border-b border-white/5 pb-3">
+        <h3 className="text-[13px] font-bold uppercase tracking-widest text-indigo-200 mb-1">Chu kỳ chưa thanh toán</h3>
+        <span className="text-xs font-medium text-white/50">
+          Cần chi <span className="text-amber-400 font-bold">{formatCurrency(totalUnpaid)}</span> | Hoàn về shop{" "}
+          <span className="text-emerald-400 font-bold">{formatCurrency(totalSupplierRefund)}</span>
         </span>
       </div>
       {unpaidPayments.length === 0 ? (
-        <p className="text-white/50 text-sm">Không có chu kỳ nợ.</p>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-slate-500 text-xs font-medium tracking-wide">Không có chu kỳ nợ.</p>
+        </div>
       ) : (
         <>
-          <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scroll scroll-overlay mb-3">
+          <div className="space-y-2 max-h-36 overflow-y-auto custom-scroll pr-1 mb-4">
             {unpaidPayments.map((payment) => {
               const raw = Number(payment.totalImport ?? payment.import_value ?? 0);
               const display = amountDueForPayment(payment);
@@ -72,30 +74,30 @@ export function SupplierSettlementPanel({
                 <div
                   key={payment.id}
                   onClick={() => onSelectPayment(payment.id)}
-                  className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border transition cursor-pointer ${isSelected
-                      ? "border-indigo-500 bg-indigo-500/20"
-                      : "border-white/5 bg-white/5 hover:bg-white/10"
+                  className={`w-full flex items-center justify-between rounded-xl px-4 py-3 border transition-all duration-300 cursor-pointer ${isSelected
+                      ? "border-indigo-500/50 bg-indigo-500/15 shadow-[inset_0_0_15px_rgba(99,102,241,0.15)]"
+                      : "border-white/5 bg-white/5 hover:bg-white/10 hover:border-white/10"
                     }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate">
+                    <p className={`font-bold text-[13px] truncate ${isSelected ? "text-indigo-100" : "text-white/90"}`}>
                       {payment.round || "Chu kỳ"}
                     </p>
-                    <p className="text-xs text-white/60">{payment.status}</p>
+                    <p className={`text-[10px] mt-0.5 uppercase tracking-wider font-bold ${isSelected ? "text-indigo-300/80" : "text-white/40"}`}>{payment.status}</p>
                   </div>
-                  <div className="text-right text-sm mr-2">
+                  <div className="text-right text-sm">
                     <p
                       className={
                         raw < 0
-                          ? "text-emerald-400 font-semibold"
-                          : "text-rose-400 font-semibold"
+                          ? "text-emerald-400 font-bold text-sm tracking-wide"
+                          : "text-amber-400 font-bold text-sm tracking-wide"
                       }
                     >
                       {formatCurrency(display)}
                       {raw < 0 ? " (Hoàn về bạn)" : ""}
                     </p>
-                    <p className="text-white/40 text-xs">
-                      Đã trả: {formatCurrency(payment.paid || 0)}
+                    <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mt-0.5">
+                      Đã trả: <span className="text-white/70">{formatCurrency(payment.paid || 0)}</span>
                     </p>
                   </div>
                   <button

@@ -21,6 +21,7 @@ const {
   reconcilePaymentReceipt,
 } = require("@/domains/payments/controller/handlers/reconcilePaymentReceipt");
 const { confirmPaymentSupply } = require("@/domains/payments/controller/handlers/confirmPaymentSupply");
+const { allocateOutboundPaymentReceipt } = require("@/domains/payments/controller/handlers/allocateOutboundPaymentReceipt");
 
 module.exports = {
   listPaymentReceipts,
@@ -31,4 +32,5 @@ module.exports = {
   listMatchableOrders,
   confirmPaymentSupply,
   reconcilePaymentReceipt,
+  allocateOutboundPaymentReceipt,
 };

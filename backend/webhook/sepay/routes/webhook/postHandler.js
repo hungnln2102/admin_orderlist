@@ -69,6 +69,7 @@ const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpe
 const { STATUS } = require("@/utils/statuses");
 const { withSavepoint } = require("../../savepoint");
 const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
+const { tryAutoSettleSupplierPaymentByOutbound } = require("./autoSettleSupplierPayment");
 
 async function handleWebhookPost(req, res) {
   logger.debug("Incoming Sepay webhook", {
@@ -734,6 +735,24 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
           monthKey: paidMonthKey,
           content: contentRaw.slice(0, 120),
         });
+
+        if (isSupplierPayment) {
+          try {
+            await tryAutoSettleSupplierPaymentByOutbound({
+              client,
+              receiptId,
+              transferAmountNormalized,
+              paidMonthKey,
+              shopBankAccountId: bankAccountId,
+            });
+          } catch (autoSettleErr) {
+            logger.error("[Webhook] AutoSettle supplier failed", {
+              receiptId,
+              error: autoSettleErr.message,
+              stack: autoSettleErr.stack,
+            });
+          }
+        }
       }
 
       if (receiptResult?.inserted) {

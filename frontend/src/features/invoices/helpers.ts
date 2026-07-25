@@ -33,7 +33,7 @@ export interface MatchableOrder {
   informationOrder: string;
 }
 
-export type ReceiptCategory = "receipt" | "out-of-flow";
+export type ReceiptCategory = "receipt" | "outbound-unallocated" | "out-of-flow";
 
 export const formatCurrencyVnd = (value: number): string => {
   if (!Number.isFinite(value)) return "VND 0";
@@ -66,13 +66,19 @@ export const extractTransactionCodeFromNote = (
 
 export type ReceiptCategoryInput = Pick<
   PaymentReceipt,
-  "orderCode" | "postedRevenue" | "postedProfit" | "postedOffFlowBankReceipt"
+  | "orderCode"
+  | "postedRevenue"
+  | "postedProfit"
+  | "postedOffFlowBankReceipt"
+  | "amount"
+  | "outboundAmount"
+  | "outboundReasonLabel"
+  | "isFinancialPosted"
+  | "reconciledAt"
 >;
 
 /**
- * Phân tab Biên nhận vs Ngoài luồng:
- * - Webhook «tiền thừa» (Đã TT + chỉ cộng `posted_off_flow_bank_receipt`, không DT/LN): luôn Ngoài luồng.
- * - Chỉ khi ghép mã + reconcile đưa vào đơn khả dụng → financial_state đổi → hiển thị lại tab Biên nhận.
+ * Phân tab Biên nhận vs Chi phí chưa liệt kê vs Chi phí & Ngoài luồng:
  */
 export const determineReceiptCategory = (
   receiptOrCode:
@@ -88,8 +94,29 @@ export const determineReceiptCategory = (
         postedRevenue: 0,
         postedProfit: 0,
         postedOffFlowBankReceipt: 0,
+        amount: 0,
+        outboundAmount: 0,
+        isFinancialPosted: false,
       }
       : receiptOrCode;
+
+  const isOutbound = Boolean(
+    ("outboundAmount" in receipt && (receipt as any).outboundAmount) ||
+    ("amount" in receipt && Number((receipt as any).amount) < 0) ||
+    ("outboundReasonLabel" in receipt && (receipt as any).outboundReasonLabel)
+  );
+
+  const isPosted = Boolean(
+    ("isFinancialPosted" in receipt && (receipt as any).isFinancialPosted) ||
+    ("reconciledAt" in receipt && (receipt as any).reconciledAt)
+  );
+
+  if (isOutbound) {
+    if (!isPosted) {
+      return "outbound-unallocated";
+    }
+    return "out-of-flow";
+  }
 
   const off = Number(receipt.postedOffFlowBankReceipt) || 0;
   const rev = Number(receipt.postedRevenue) || 0;
@@ -100,24 +127,30 @@ export const determineReceiptCategory = (
   }
 
   const normalized = (receipt.orderCode || "").toUpperCase().trim();
-  if (!normalized) return "out-of-flow";
-  return normalized.startsWith("MAV") ? "receipt" : "out-of-flow";
+  if (!normalized || !normalized.startsWith("MAV")) {
+    if (!isPosted) {
+      return "outbound-unallocated";
+    }
+    return "out-of-flow";
+  }
+  return "receipt";
 };
 
 export const CATEGORY_OPTIONS: {
   value: ReceiptCategory;
   label: string;
-
 }[] = [
     {
       value: "receipt",
       label: "Biên Nhận",
-
+    },
+    {
+      value: "outbound-unallocated",
+      label: "Chi phí chưa liệt kê",
     },
     {
       value: "out-of-flow",
-      label: "Ngoài Luồng",
-
+      label: "Chi phí & Ngoài Luồng",
     },
   ];
 

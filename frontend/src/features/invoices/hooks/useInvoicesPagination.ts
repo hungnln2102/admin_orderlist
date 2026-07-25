@@ -1,15 +1,18 @@
 import { useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { PaginationItem } from "../components/InvoicesPagination";
+import type { ReceiptCategory } from "../helpers";
 
 type UseInvoicesPaginationParams<T> = {
   items: T[];
   pageSize: number;
   receiptPage: number;
   outOfFlowPage: number;
-  activeCategory: "receipt" | "out-of-flow";
+  outboundUnallocatedPage: number;
+  activeCategory: ReceiptCategory;
   setReceiptPage: Dispatch<SetStateAction<number>>;
   setOutOfFlowPage: Dispatch<SetStateAction<number>>;
+  setOutboundUnallocatedPage: Dispatch<SetStateAction<number>>;
 };
 
 const buildPaginationItems = (
@@ -41,23 +44,27 @@ export function useInvoicesPagination<T>({
   pageSize,
   receiptPage,
   outOfFlowPage,
+  outboundUnallocatedPage,
   activeCategory,
   setReceiptPage,
   setOutOfFlowPage,
+  setOutboundUnallocatedPage,
 }: UseInvoicesPaginationParams<T>) {
-  const activePage = activeCategory === "receipt" ? receiptPage : outOfFlowPage;
+  let activePage = receiptPage;
+  if (activeCategory === "out-of-flow") activePage = outOfFlowPage;
+  else if (activeCategory === "outbound-unallocated") activePage = outboundUnallocatedPage;
+
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const paginationItems = useMemo(
     () => buildPaginationItems(activePage, totalPages),
     [activePage, totalPages]
   );
   const pagedItems = items.slice((activePage - 1) * pageSize, activePage * pageSize);
+  
   const setActivePage = (updater: (current: number) => number) => {
-    if (activeCategory === "receipt") {
-      setReceiptPage(updater);
-      return;
-    }
-    setOutOfFlowPage(updater);
+    if (activeCategory === "receipt") setReceiptPage(updater);
+    else if (activeCategory === "out-of-flow") setOutOfFlowPage(updater);
+    else if (activeCategory === "outbound-unallocated") setOutboundUnallocatedPage(updater);
   };
 
   return { activePage, totalPages, paginationItems, pagedItems, setActivePage };

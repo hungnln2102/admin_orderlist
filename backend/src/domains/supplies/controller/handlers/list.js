@@ -84,18 +84,32 @@ const listPaymentsBySupply = async (req, res) => {
   const lc = QUOTED_COLS.supplierOrderCostLog;
   const paidNccLabel = STATUS.PAID;
 
-  const q = `
-    WITH latest AS (
-      SELECT DISTINCT ON (l.${lc.orderListId})
-        l.${lc.loggedAt} AS logged_at,
-        l.${lc.importCost} AS import_cost,
-        l.${lc.refundAmount} AS refund_amount,
-        l.${lc.nccPaymentStatus} AS ncc_payment_status
-      FROM ${TABLES.supplyOrderCostLog} l
-      WHERE l.${lc.supplyId} = ?
-      ORDER BY l.${lc.orderListId}, l.${lc.id} DESC
-    ),
-    agg AS (
+  try {
+    const historyRes = await db.raw(`
+      SELECT 
+        p.${ps.id} AS id,
+        p.${ps.sourceId} AS source_id,
+        COALESCE(p.total_import, 0)::numeric AS import_value,
+        COALESCE(p.${ps.paid}, 0)::numeric AS paid_value,
+        COALESCE(p.${ps.round}, '') AS round_label,
+        COALESCE(s.${supplierNameIdent}, '') AS source_name
+      FROM ${TABLES.paymentSupply} p
+      LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = p.${ps.sourceId}
+      WHERE p.${ps.sourceId} = ?
+      ORDER BY p.${ps.id} DESC
+    `, [parsedSupplyId]);
+
+    const aggRes = await db.raw(`
+      WITH latest AS (
+        SELECT DISTINCT ON (l.${lc.orderListId})
+          l.${lc.loggedAt} AS logged_at,
+          l.${lc.importCost} AS import_cost,
+          l.${lc.refundAmount} AS refund_amount,
+          l.${lc.nccPaymentStatus} AS ncc_payment_status
+        FROM ${TABLES.supplyOrderCostLog} l
+        WHERE l.${lc.supplyId} = ?
+        ORDER BY l.${lc.orderListId}, l.${lc.id} DESC
+      )
       SELECT
         MIN(latest.logged_at::date) AS oldest_date,
         COALESCE(SUM(
@@ -106,50 +120,49 @@ const listPaymentsBySupply = async (req, res) => {
           END
         ), 0)::numeric AS total_unpaid
       FROM latest
-    ),
-    pay AS (
-      SELECT
-        COALESCE(SUM(COALESCE(pl.${ps.paid}, 0)), 0)::numeric AS total_paid,
-        MAX(pl.${ps.id}) AS payment_id
-      FROM ${TABLES.paymentSupply} pl
-      WHERE pl.${ps.sourceId} = ?
-    )
-    SELECT
-      COALESCE(pay.payment_id, 0)::bigint AS id,
-      ?::int AS source_id,
-      COALESCE(s.${supplierNameIdent}, '') AS source_name,
-      COALESCE(agg.total_unpaid, 0)::numeric AS import_value,
-      COALESCE(pay.total_paid, 0)::numeric AS paid_value,
-      CASE
-        WHEN agg.oldest_date IS NULL THEN ''
-        ELSE TO_CHAR(agg.oldest_date, 'DD/MM/YYYY')
-      END AS round_label
-    FROM agg
-    CROSS JOIN pay
-    LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = ?
-    LIMIT 1;
-  `;
+    `, [parsedSupplyId, paidNccLabel]);
 
-  try {
-    const result = await db.raw(q, [parsedSupplyId, paidNccLabel, parsedSupplyId, parsedSupplyId, parsedSupplyId]);
-    const row = result.rows?.[0];
-    const payments = row
-      ? [
-          {
-            id: Number(row.id) || 0,
-            sourceId: Number(row.source_id) || parsedSupplyId,
-            sourceName: row.source_name || "",
-            totalImport: Number(row.import_value) || 0,
-            paid: Number(row.paid_value) || 0,
-            round: row.round_label || "",
-          },
-        ]
-      : [];
+    const payments = [];
+    const aggRow = aggRes.rows?.[0];
+    const currentUnpaid = Number(aggRow?.total_unpaid) || 0;
+    
+    if (currentUnpaid > 0) {
+      let oldestDateStr = 'Công nợ chưa TT';
+      if (aggRow?.oldest_date) {
+         oldestDateStr = new Date(aggRow.oldest_date).toLocaleDateString('vi-VN');
+      }
+      payments.push({
+        id: -1, 
+        sourceId: parsedSupplyId,
+        sourceName: historyRes.rows?.[0]?.source_name || "",
+        totalImport: currentUnpaid,
+        paid: 0,
+        round: oldestDateStr,
+      });
+    }
+
+    historyRes.rows?.forEach(r => {
+      payments.push({
+        id: Number(r.id),
+        sourceId: Number(r.source_id),
+        sourceName: r.source_name || "",
+        totalImport: Number(r.import_value),
+        paid: Number(r.paid_value),
+        round: r.round_label,
+      });
+    });
+
+    const limit = Number.parseInt(String(req.query.limit ?? "5"), 10) || 5;
+    const offset = Number.parseInt(String(req.query.offset ?? "0"), 10) || 0;
+    
+    const total = payments.length;
+    const paginatedPayments = payments.slice(offset, offset + limit);
 
     res.json({
-      payments,
-      hasMore: false,
-      nextOffset: payments.length,
+      payments: paginatedPayments,
+      total,
+      hasMore: offset + limit < total,
+      nextOffset: offset + limit,
     });
   } catch (error) {
     logger.error("Query failed (GET /api/supplies/:id/payments)", { supplyId, error: error.message, stack: error.stack });

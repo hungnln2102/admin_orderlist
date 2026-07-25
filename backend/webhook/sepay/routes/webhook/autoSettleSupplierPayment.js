@@ -21,7 +21,6 @@ async function tryAutoSettleSupplierPaymentByOutbound({
   paidMonthKey,
   shopBankAccountId,
 }) {
-  return null; // Bỏ qua móc nối NCC
   const outboundAmount = Math.abs(transferAmountNormalized);
   const { supplierId, baseAmount } = decodeSupplierSignature(outboundAmount);
   
@@ -148,14 +147,16 @@ async function tryAutoSettleSupplierPaymentByOutbound({
       source: "webhook",
     });
   }
-
-  return {
+  
+  const eventBus = require("@/events/eventBus");
+  const EVENTS = require("@/events/eventTypes");
+  eventBus.emit(EVENTS.SUPPLY_PAYMENT_AUTO_MATCHED, {
+    receiptId,
     supplierId,
-    supplierName,
-    netUnpaidAmount,
-    baseAmount,
-    bankLedgerDelta,
-  };
+    amount: baseAmount,
+  });
+
+  return { supplierId, baseAmount, gap };
 }
 
 module.exports = {

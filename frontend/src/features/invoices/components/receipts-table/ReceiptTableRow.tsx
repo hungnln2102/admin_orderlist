@@ -30,6 +30,8 @@ type ReceiptTableRowProps = {
   onCancelEditOrderCode: () => void;
   onSaveEditedOrderCode: (receipt: PaymentReceipt) => Promise<void>;
   onEditingOrderCodeChange: (nextCode: string) => void;
+  enableAllocation?: boolean;
+  onAllocate?: (receipt: PaymentReceipt) => void;
 };
 
 const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
@@ -58,6 +60,8 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
   onCancelEditOrderCode,
   onSaveEditedOrderCode,
   onEditingOrderCodeChange,
+  enableAllocation,
+  onAllocate,
 }) => {
   const rowView = buildReceiptRowView(receipt, shopBank);
 
@@ -68,7 +72,20 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
         onClick={() => onToggle(receipt.id)}
         onDoubleClick={() => (onSelectReceipt ? onSelectReceipt(receipt) : undefined)}
       >
-        {enableMatching ? (
+        {enableAllocation && ((receipt as any).outboundAmount > 0 || Number(receipt.amount) < 0) ? (
+          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAllocate?.(receipt);
+              }}
+              className="w-full rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors"
+            >
+              Phân bổ chi phí
+            </button>
+          </td>
+        ) : enableMatching ? (
           <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
             <div
               className="space-y-2"

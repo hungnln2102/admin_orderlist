@@ -17,7 +17,7 @@ export function SupplyFiltersBar({
   onAddSupplier,
 }: SupplyFiltersBarProps) {
   return (
-    <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+    <div className="rounded-3xl bg-slate-950/40 border border-white/5 p-4 lg:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] backdrop-blur-2xl">
       <div className="flex flex-col lg:flex-row gap-4 items-center">
         <div className="relative w-full lg:flex-1">
           <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opacity-70" />

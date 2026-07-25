@@ -240,7 +240,7 @@ const confirmPaymentSupply = async (req, res) => {
         });
       }
 
-      return {
+      const responsePayload = {
         paymentRow: insertResult.rows?.[0] || null,
         verification: {
           supplyId: resolvedSupplyId,
@@ -248,6 +248,7 @@ const confirmPaymentSupply = async (req, res) => {
           netUnpaidAmount,
           expectedPaidAmount,
           direction: isSupplierRefundToShop ? "supplier_refund_to_shop" : "shop_pay_to_supplier",
+          isSupplierRefundToShop,
           paymentContent: paymentContent || null,
           paymentPeriod: periodLabel,
           matchedReceiptId: matchedReceipt?.id || null,
@@ -256,6 +257,17 @@ const confirmPaymentSupply = async (req, res) => {
           monthKey: paidMonthKey,
         },
       };
+
+      const eventBus = require("@/events/eventBus");
+      const EVENTS = require("@/events/eventTypes");
+      eventBus.emit(EVENTS.SUPPLY_PAYMENT_CONFIRMED, {
+        supplyId: resolvedSupplyId,
+        paymentId: paymentSupplyId,
+        amount: expectedPaidAmount,
+        direction: isSupplierRefundToShop ? "supplier_refund_to_shop" : "shop_pay_to_supplier",
+      });
+
+      return responsePayload;
     });
 
     if (!result?.paymentRow) {

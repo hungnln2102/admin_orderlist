@@ -75,7 +75,7 @@ const createSupply = async (req, res) => {
     );
     supplierCache.clear();
     const newId = result.rows?.[0]?.id;
-    res.status(201).json({
+    const responseData = {
       id: newId,
       supplier_name: source_name,
       source_name,
@@ -83,7 +83,13 @@ const createSupply = async (req, res) => {
       bin_bank: bin_bank ?? null,
       account_holder: includeAccountHolder ? (account_holder ?? null) : null,
       status: status ?? active_supply ?? "active",
-    });
+    };
+    
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.SUPPLY_CREATED, { supplyId: newId, payload: responseData });
+    
+    res.status(201).json(responseData);
   } catch (error) {
     logger.error("Mutation failed (POST /api/supplies)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tạo nhà cung cấp." });
@@ -203,7 +209,7 @@ const updateSupply = async (req, res) => {
     supplierCache.clear();
     const row = result.rows[0];
     const normalizedStatus = normalizeSupplyStatus(row.raw_status);
-    res.json({
+    const responseData = {
       id: row.id,
       supplier_name: row.source_name,
       source_name: row.source_name,
@@ -212,7 +218,13 @@ const updateSupply = async (req, res) => {
       account_holder: includeAccountHolder ? row.account_holder : null,
       status: normalizedStatus,
       bank_name: bank_name ?? null,
-    });
+    };
+    
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.SUPPLY_UPDATED, { supplyId: parsedSupplyId, payload: responseData });
+    
+    res.json(responseData);
   } catch (error) {
     logger.error("Mutation failed (PATCH /api/supplies/:id)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật nhà cung cấp." });
@@ -261,12 +273,18 @@ const toggleSupplyActive = async (req, res) => {
     supplierCache.clear();
     const normalizedStatus = normalizeSupplyStatus(result.rows[0].raw_status);
     const isActive = normalizedStatus !== "tam dung";
-    res.json({
+    const responseData = {
       id: parsedSupplyId,
       status: isActive ? "active" : "inactive",
       rawStatus: result.rows[0].raw_status,
       isActive,
-    });
+    };
+    
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.SUPPLY_STATUS_TOGGLED, { supplyId: parsedSupplyId, isActive });
+    
+    res.json(responseData);
   } catch (error) {
     logger.error("Mutation failed (PATCH /api/supplies/:id/active)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({
@@ -290,6 +308,11 @@ const deleteSupply = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy nguồn cung cấp." });
     }
     supplierCache.clear();
+    
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.SUPPLY_DELETED, { supplyId: parsedSupplyId });
+    
     res.json({ success: true });
   } catch (error) {
     logger.error("Mutation failed (DELETE /api/supplies/:id)", { supplyId: parsedSupplyId, error: error.message, stack: error.stack });

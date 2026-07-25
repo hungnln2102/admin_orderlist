@@ -35,46 +35,13 @@ const createPayment = async (req, res) => {
   }
 
   try {
-    const existing = await db(TABLES.paymentSupply)
-      .select(paymentSupplyCols.ID)
-      .where(paymentSupplyCols.SOURCE_ID, parsedSupplyId)
-      .first();
-
-    if (existing) {
-      const updated = await db(TABLES.paymentSupply)
-        .where(paymentSupplyCols.ID, existing[paymentSupplyCols.ID])
-        .update({
-          [paymentSupplyCols.PAID]: paidRaw,
-          [paymentSupplyCols.ROUND]: roundLabel,
-          [paymentSupplyCols.STATUS]: statusLabel,
-        })
-        .returning([
-          paymentSupplyCols.ID,
-          paymentSupplyCols.SOURCE_ID,
-          paymentSupplyCols.PAID,
-          paymentSupplyCols.ROUND,
-          paymentSupplyCols.STATUS,
-        ]);
-      const row = updated?.[0];
-      if (!row) {
-        return res.status(500).json({ error: "Không thể cập nhật chu kỳ thanh toán." });
-      }
-      return res.status(200).json({
-        id: row[paymentSupplyCols.ID],
-        sourceId: row[paymentSupplyCols.SOURCE_ID],
-        totalImport: totalImportEffective,
-        paid: Number(row[paymentSupplyCols.PAID]) || 0,
-        round: row[paymentSupplyCols.ROUND] || "",
-        status: row[paymentSupplyCols.STATUS] || "",
-      });
-    }
-
     const result = await db(TABLES.paymentSupply)
       .insert({
         [paymentSupplyCols.SOURCE_ID]: parsedSupplyId,
         [paymentSupplyCols.PAID]: paidRaw,
         [paymentSupplyCols.ROUND]: roundLabel,
         [paymentSupplyCols.STATUS]: statusLabel,
+        [paymentSupplyCols.TOTAL_IMPORT]: totalImportEffective,
       })
       .returning([
         paymentSupplyCols.ID,
@@ -82,7 +49,9 @@ const createPayment = async (req, res) => {
         paymentSupplyCols.PAID,
         paymentSupplyCols.ROUND,
         paymentSupplyCols.STATUS,
+        paymentSupplyCols.TOTAL_IMPORT,
       ]);
+      
     if (!result?.length) {
       return res.status(500).json({
         error: "Không thể thêm chu kỳ thanh toán.",
@@ -92,7 +61,7 @@ const createPayment = async (req, res) => {
     res.status(201).json({
       id: row[paymentSupplyCols.ID],
       sourceId: row[paymentSupplyCols.SOURCE_ID],
-      totalImport: totalImportEffective,
+      totalImport: Number(row[paymentSupplyCols.TOTAL_IMPORT]) || 0,
       paid: Number(row[paymentSupplyCols.PAID]) || 0,
       round: row[paymentSupplyCols.ROUND] || "",
       status: row[paymentSupplyCols.STATUS] || "",

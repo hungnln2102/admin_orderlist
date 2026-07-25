@@ -18,6 +18,9 @@ function registerAllSubscribers() {
   
   const { subscribeToEvents: registerLedger } = require("@/events/subscribers/financialAllocationLedgerSubscriber");
   registerLedger(eventBus, EVENTS);
+  
+  const { registerSupplierCostSubscribers } = require("@/events/subscribers/supplierCostSubscriber");
+  registerSupplierCostSubscribers();
 
   logger.info('[EventBus] All subscribers registered successfully.');
 }

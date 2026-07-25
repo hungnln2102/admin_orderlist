@@ -9,7 +9,6 @@ const {
 } = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
 const { normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");
 
-const CREDIT_BALANCE_TOLERANCE_VND = 5000;
 
 const resolveRefundCreditAllocation = async ({
   trx,
@@ -26,7 +25,7 @@ const resolveRefundCreditAllocation = async ({
   payload[priceCol] = rawPriceBeforeCredit;
 
   let appliedCreditAmount = 0;
-  if (creditNoteForOrder) {
+  if (!isMavnCreate && creditNoteForOrder) {
     const noteAvailable = normalizeMoney(creditNoteForOrder.available_amount);
     let effectiveApplyRequest = requestedCreditApplyAmount;
     if (!Number.isFinite(effectiveApplyRequest) || effectiveApplyRequest <= 0) {
@@ -42,7 +41,7 @@ const resolveRefundCreditAllocation = async ({
   }
 
   if (!isGiftOrderCreate && !isMavnCreate) {
-    if (appliedCreditAmount > 0 && remainingToPay <= CREDIT_BALANCE_TOLERANCE_VND) {
+    if (remainingToPay <= 0) {
       payload.status = STATUS.PAID;
       payload[priceCol] = 0;
     } else {
@@ -112,7 +111,6 @@ const allocateCreateOrderPayment = async ({
 };
 
 module.exports = {
-  CREDIT_BALANCE_TOLERANCE_VND,
   resolveRefundCreditAllocation,
   allocateCreateOrderPayment,
 };

@@ -29,29 +29,39 @@ const SupplyCostFilters: React.FC<SupplyCostFiltersProps> = ({
   const isNccCostsTab = activeTab === "nccCosts";
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+    <div className="rounded-3xl bg-slate-950/40 border border-white/5 p-4 lg:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] backdrop-blur-2xl flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end w-full">
       {isNccCostsTab ? (
         <>
-          <label className="flex min-w-[200px] flex-col gap-1 text-xs text-white/50">
-            Nhà cung cấp
-            <select
-              value={supplyId === "" ? "all" : supplyId}
-              onChange={(event) => {
-                const value = event.target.value;
-                onSupplyIdChange(value === "all" ? "" : value);
-              }}
-              className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white focus:border-indigo-400/60 focus:outline-none"
-            >
-              <option value="all">Tất cả NCC</option>
-              {supplies.map((supply) => (
-                <option key={supply.id} value={String(supply.id)}>
-                  {supply.sourceName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs text-white/50">
-            Mã đơn
+          <div className="relative flex flex-col gap-1.5 w-full sm:w-[220px]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-200/50 pl-2">Nhà cung cấp</span>
+            <div className="relative">
+              <select
+                value={supplyId === "" ? "all" : supplyId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  onSupplyIdChange(value === "all" ? "" : value);
+                }}
+                className="w-full px-4 py-3 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
+                style={{
+                  backgroundImage:
+                    'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")',
+                  backgroundPosition: "right 1rem center",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "1.1rem",
+                  paddingRight: "2.5rem",
+                }}
+              >
+                <option value="all" className="bg-slate-900 text-white">Tất cả NCC</option>
+                {supplies.map((supply) => (
+                  <option key={supply.id} value={String(supply.id)} className="bg-slate-900 text-white">
+                    {supply.sourceName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="relative flex flex-col gap-1.5 flex-1 w-full">
+            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-200/50 pl-2">Mã đơn</span>
             <input
               type="text"
               value={q}
@@ -60,21 +70,21 @@ const SupplyCostFilters: React.FC<SupplyCostFiltersProps> = ({
                 if (event.key === "Enter") onSearch();
               }}
               placeholder="Tìm theo mã đơn..."
-              className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/60 focus:outline-none"
+              className="w-full px-4 py-3 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
             />
-          </label>
+          </div>
         </>
       ) : (
-        <div className="min-w-[280px] flex-1 rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-white/70">
+        <div className="min-w-[280px] flex-1 rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm text-white/70">
           Danh sách log nhập hàng ngoài luồng
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 w-full sm:w-auto mt-1 sm:mt-0">
         <button
           type="button"
           onClick={onOpenCreateLog}
-          className="rounded-xl border border-emerald-400/40 bg-emerald-600/25 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500/40"
+          className="flex-1 sm:flex-none rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-sm font-bold tracking-wide text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all active:scale-95"
         >
           Tạo log nhập hàng
         </button>
@@ -83,14 +93,14 @@ const SupplyCostFilters: React.FC<SupplyCostFiltersProps> = ({
             <button
               type="button"
               onClick={onSearch}
-              className="rounded-xl border border-indigo-400/40 bg-indigo-600/40 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500/50"
+              className="flex-1 sm:flex-none rounded-2xl border border-indigo-500/30 bg-indigo-500/20 px-6 py-3 text-sm font-bold tracking-wide text-indigo-300 hover:bg-indigo-500/30 hover:border-indigo-500/50 hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all active:scale-95"
             >
               Tìm
             </button>
             <button
               type="button"
               onClick={onReset}
-              className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
+              className="flex-1 sm:flex-none rounded-2xl border border-transparent bg-white/5 px-4 py-3 text-sm font-bold tracking-wide text-slate-300 hover:bg-white/10 hover:text-white transition-all active:scale-95"
             >
               Xóa lọc
             </button>

@@ -202,20 +202,27 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     "--";
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-2" onClick={handleClose}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6" onClick={handleClose}>
+        {/* Backdrop blur effect */}
+        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity" />
+        
         <div
-          className="glass-panel-dark border border-white/5 p-5 md:p-6 rounded-[32px] text-white w-full max-w-4xl max-h-[95vh] shadow-2xl overflow-y-auto custom-scroll"
+          className="relative w-full max-w-4xl max-h-[95vh] flex flex-col rounded-3xl bg-slate-900/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5),0_0_40px_-10px_rgba(99,102,241,0.15)] text-white overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex-1" />
-            <h2 className="text-xl font-bold text-center">Chi tiết Nhà Cung Cấp</h2>
-            <div className="flex-1 flex justify-end">
-              <button onClick={handleClose} className="p-2 rounded-full hover:bg-white/10 transition text-white/70" aria-label="Đóng">
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            </div>
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/5">
+            <h2 className="text-lg sm:text-xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">Chi tiết Nhà Cung Cấp</h2>
+            <button 
+              onClick={handleClose} 
+              className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-white/50 hover:text-rose-400 border border-transparent hover:border-rose-500/30 transition-all active:scale-95" 
+              aria-label="Đóng"
+            >
+              <XMarkIcon className="h-5 w-5 stroke-2" />
+            </button>
           </div>
+          
+          <div className="p-6 overflow-y-auto custom-scroll flex-1">
 
           {loading ? (
             <div className="mt-6 text-center text-white/70">Đang tải chi tiết...</div>
@@ -273,6 +280,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
               </div>
             </>
           )}
+          </div>
         </div>
       </div>
     </ModalPortal>

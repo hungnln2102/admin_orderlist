@@ -31,7 +31,7 @@ export const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
         
         {/* Table view for desktop */}
         <div className={`hidden md:block ${className}`}>
-          <div className="overflow-x-visible">
+          <div className="overflow-x-auto custom-scroll w-full">
             <div className="inline-block min-w-full align-middle">
               {children}
             </div>
@@ -42,7 +42,7 @@ export const ResponsiveTable: React.FC<ResponsiveTableProps> = ({
   }
 
   return (
-    <div className={`overflow-x-auto ${className}`}>
+    <div className={`overflow-x-auto custom-scroll w-full ${className}`}>
       {children}
     </div>
   );
