@@ -130,7 +130,7 @@ export const determineReceiptCategory = (
 
   // Nếu là giao dịch chi (outbound)
   if (isOutbound) {
-    if (!isPosted && !hasOutboundReason) {
+    if (!isPosted) {
       return "outbound-unallocated";
     }
     return "out-of-flow";
