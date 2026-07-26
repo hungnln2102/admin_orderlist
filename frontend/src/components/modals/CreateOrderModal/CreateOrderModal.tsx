@@ -18,6 +18,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onSave,
   orderCreationKind = "sales",
 }) => {
+  const isImport = orderCreationKind === "import";
+  const [saveToWarehouse, setSaveToWarehouse] = useState(isImport);
   const [customMode, setCustomMode] = useState(false);
   const { pendingImportPackageRef, handleSaveWithImportPackage } =
     useCreateOrderImportPackageSave(onSave);
@@ -76,6 +78,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     selectedSupplyId,
     pendingImportPackageRef,
     handleSubmit,
+    saveToWarehouse,
   });
   const {
     prefillCreditNoteRemaining,
@@ -143,6 +146,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           <CreateOrderModalBody
             orderCreationKind={orderCreationKind}
             onSubmit={handleSubmitWithPackage}
+            saveToWarehouse={saveToWarehouse}
+            setSaveToWarehouse={setSaveToWarehouse}
             customer={{
               formData,
               onFieldChange: handleChange,

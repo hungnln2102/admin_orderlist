@@ -37,6 +37,8 @@ type CreateOrderModalBodyProps = {
     data: ImportPackageProps["data"];
     onChange: ImportPackageProps["onChange"];
   };
+  saveToWarehouse?: boolean;
+  setSaveToWarehouse?: (value: boolean) => void;
 };
 
 export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
@@ -49,6 +51,8 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
   paymentMethod,
   creditPanels,
   importPackage,
+  saveToWarehouse = true,
+  setSaveToWarehouse,
 }) => {
   const isImport = orderCreationKind === "import";
 
@@ -232,21 +236,42 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
             <div className="md:col-span-2 relative overflow-hidden rounded-[28px] border border-cyan-500/10 bg-gradient-to-b from-cyan-950/20 to-transparent p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent opacity-50" />
               
-              <div className="flex items-center gap-3 mb-6">
-                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 shadow-[0_0_15px_rgba(6,182,214,0.2)]">
-                  <ArchiveBoxArrowDownIcon className="w-5 h-5" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 shadow-[0_0_15px_rgba(6,182,214,0.2)]">
+                    <ArchiveBoxArrowDownIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-wide">
+                      Chi tiết Tài khoản & Lưu trữ
+                    </h3>
+                    <p className="text-xs text-cyan-200/50 font-medium mt-0.5">
+                      {saveToWarehouse
+                        ? "Cấu hình Slot, Thông tin tài khoản nhập và các thông tin dịch vụ bảo mật đi kèm."
+                        : "Chỉ tạo đơn nhập hàng bình thường (Không lưu tài khoản vào kho hàng)."}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-wide">
-                    Chi tiết Tài khoản & Lưu trữ
-                  </h3>
-                  <p className="text-xs text-cyan-200/50 font-medium mt-0.5">
-                    Cấu hình Slot, Thông tin tài khoản nhập và các thông tin dịch vụ bảo mật đi kèm.
-                  </p>
+
+                <div className="flex items-center gap-3 bg-cyan-950/40 border border-cyan-500/20 rounded-xl px-4 py-2 self-start sm:self-auto">
+                  <span className="text-xs font-semibold text-cyan-200/80">Lưu vào Kho Hàng:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSaveToWarehouse?.(!saveToWarehouse)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      saveToWarehouse ? "bg-cyan-500 shadow-[0_0_12px_rgba(6,182,214,0.5)]" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        saveToWarehouse ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 lg:gap-12 items-stretch">
+              <div className={`grid grid-cols-1 ${saveToWarehouse && importPackage.visible ? "xl:grid-cols-2" : ""} gap-8 lg:gap-12 items-stretch`}>
                 {/* Cột trái: Cấu hình Nhập Hàng (Details) */}
                 <div className="flex-1 flex flex-col">
                   {!detailLines.multiOrderEnabled && detailLines.singleMode ? (
@@ -284,7 +309,7 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
                 </div>
 
                 {/* Cột phải: Import Package Service Block */}
-                {importPackage.visible ? (
+                {saveToWarehouse && importPackage.visible ? (
                   <div className="flex-1 w-full relative z-10 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 [&>div]:h-full">
                     <ImportPackageBlock
                       forceShow={true}
@@ -295,7 +320,7 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
                     />
                   </div>
                 ) : (
-                  <div className="hidden xl:block"></div>
+                  <div className="hidden"></div>
                 )}
               </div>
             </div>

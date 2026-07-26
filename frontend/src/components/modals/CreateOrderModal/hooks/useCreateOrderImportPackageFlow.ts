@@ -11,6 +11,7 @@ type UseCreateOrderImportPackageFlowParams = {
   selectedSupplyId: number | null;
   pendingImportPackageRef: React.MutableRefObject<Record<string, unknown> | null>;
   handleSubmit: (event: React.FormEvent) => boolean;
+  saveToWarehouse?: boolean;
 };
 
 export const useCreateOrderImportPackageFlow = ({
@@ -21,6 +22,7 @@ export const useCreateOrderImportPackageFlow = ({
   selectedSupplyId,
   pendingImportPackageRef,
   handleSubmit,
+  saveToWarehouse = true,
 }: UseCreateOrderImportPackageFlowParams) => {
   const isImportOrder = orderCreationKind === "import";
   const {
@@ -46,7 +48,7 @@ export const useCreateOrderImportPackageFlow = ({
 
     const handleSubmitWithPackage = useCallback(
     (event: React.FormEvent) => {
-      if (isImportOrder && selectedProductId) {
+      if (isImportOrder && saveToWarehouse && selectedProductId) {
         pendingImportPackageRef.current = {
           productId: selectedProductId,
           supplierId: selectedSupplyId,
@@ -67,6 +69,7 @@ export const useCreateOrderImportPackageFlow = ({
       pendingImportPackageRef,
       selectedProductId,
       selectedSupplyId,
+      saveToWarehouse,
     ]
   );
 
