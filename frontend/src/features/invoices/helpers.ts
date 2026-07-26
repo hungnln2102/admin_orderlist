@@ -100,6 +100,13 @@ export const determineReceiptCategory = (
       }
       : receiptOrCode;
 
+  const normalized = (receipt.orderCode || "").toUpperCase().trim();
+  const isOrderMatched = normalized.startsWith("MAV");
+
+  if (isOrderMatched) {
+    return "receipt";
+  }
+
   const isOutbound = Boolean(
     ("outboundAmount" in receipt && (receipt as any).outboundAmount) ||
     ("amount" in receipt && Number((receipt as any).amount) < 0) ||
@@ -111,29 +118,30 @@ export const determineReceiptCategory = (
     ("reconciledAt" in receipt && (receipt as any).reconciledAt)
   );
 
+  const hasOffFlowValues = Boolean(
+    Number(receipt.postedOffFlowBankReceipt) !== 0 ||
+    Number(receipt.postedRevenue) !== 0 ||
+    Number(receipt.postedProfit) !== 0
+  );
+
+  const hasOutboundReason = Boolean(
+    (receipt as any).outboundReasonLabel || (receipt as any).outboundReason || ("outboundAmount" in receipt && (receipt as any).outboundAmount)
+  );
+
+  // Nếu là giao dịch chi (outbound)
   if (isOutbound) {
-    if (!isPosted) {
+    if (!isPosted && !hasOutboundReason) {
       return "outbound-unallocated";
     }
     return "out-of-flow";
   }
 
-  const off = Number(receipt.postedOffFlowBankReceipt) || 0;
-  const rev = Number(receipt.postedRevenue) || 0;
-  const prof = Number(receipt.postedProfit) || 0;
-
-  if (off > 0 && rev === 0 && prof === 0) {
+  // Nếu là giao dịch thu (incoming) chưa ghép đơn
+  if (hasOffFlowValues) {
     return "out-of-flow";
   }
 
-  const normalized = (receipt.orderCode || "").toUpperCase().trim();
-  if (!normalized || !normalized.startsWith("MAV")) {
-    if (!isPosted) {
-      return "outbound-unallocated";
-    }
-    return "out-of-flow";
-  }
-  return "receipt";
+  return "outbound-unallocated";
 };
 
 export const CATEGORY_OPTIONS: {
@@ -146,11 +154,11 @@ export const CATEGORY_OPTIONS: {
     },
     {
       value: "outbound-unallocated",
-      label: "Chi phí chưa liệt kê",
+      label: "Chưa liệt kê",
     },
     {
       value: "out-of-flow",
-      label: "Chi phí & Ngoài Luồng",
+      label: "Ngoài luồng",
     },
   ];
 

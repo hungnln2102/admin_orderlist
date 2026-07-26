@@ -32,6 +32,7 @@ type ReceiptTableRowProps = {
   onEditingOrderCodeChange: (nextCode: string) => void;
   enableAllocation?: boolean;
   onAllocate?: (receipt: PaymentReceipt) => void;
+  showCategoryReason?: boolean;
 };
 
 const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
@@ -62,6 +63,7 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
   onEditingOrderCodeChange,
   enableAllocation,
   onAllocate,
+  showCategoryReason = false,
 }) => {
   const rowView = buildReceiptRowView(receipt, shopBank);
 
@@ -72,7 +74,30 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
         onClick={() => onToggle(receipt.id)}
         onDoubleClick={() => (onSelectReceipt ? onSelectReceipt(receipt) : undefined)}
       >
-        {enableAllocation && ((receipt as any).outboundAmount > 0 || Number(receipt.amount) < 0) ? (
+        {showCategoryReason ? (
+          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold shadow-sm ${
+                  Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
+                    ? "bg-rose-500/15 border-rose-400/30 text-rose-300 shadow-rose-950/40"
+                    : "bg-emerald-500/15 border-emerald-400/30 text-emerald-300 shadow-emerald-950/40"
+                }`}
+              >
+                <span>
+                  {Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0 ? "💸" : "💰"}
+                </span>
+                <span>
+                  {receipt.outboundReasonLabel ||
+                    receipt.outboundReason ||
+                    (Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
+                      ? "Chi phí ngoài luồng"
+                      : "Doanh thu ngoài luồng")}
+                </span>
+              </span>
+            </div>
+          </td>
+        ) : enableAllocation && ((receipt as any).outboundAmount > 0 || Number(receipt.amount) < 0) ? (
           <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
             <button
               type="button"

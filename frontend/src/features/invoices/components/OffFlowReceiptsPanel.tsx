@@ -28,7 +28,8 @@ export function OffFlowReceiptsPanel({
       matchableOrders={matchableOrders}
       matchingReceiptId={matchingReceiptId}
       onMatchReceipt={onMatchReceipt}
-      enableMatching={true}
+      enableMatching={false}
+      showCategoryReason={true}
       enableOrderCodeEdit={false}
       expandedReceiptId={expandedReceiptId}
       onToggle={onToggle}

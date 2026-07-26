@@ -5,8 +5,19 @@
  */
 
 const https = require("https");
+let cachedLogger = null;
 function getLogger() {
-  return require("@/utils/logger");
+  if (cachedLogger) return cachedLogger;
+  try {
+    const logger = require("@/utils/logger");
+    if (logger && typeof logger.info === 'function') {
+      cachedLogger = logger;
+      return cachedLogger;
+    }
+  } catch (e) {
+    // Ignore teardown errors in Jest
+  }
+  return { info: () => {}, error: () => {}, warn: () => {} };
 }
 const { HTTP_TIMEOUT_MS, TELEGRAM_BOT_TOKEN } = require("@/domains/notifications/telegram/core/constants");
 
