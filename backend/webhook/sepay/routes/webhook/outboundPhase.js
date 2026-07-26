@@ -2,6 +2,7 @@ const logger = require("@/utils/logger");
 const { insertFinancialAuditLog } = require("../../payments");
 const { tryAutoSettleSupplierPaymentByOutbound } = require("./autoSettleSupplierPayment");
 const { findAccountIdByReceiver } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { hasSupplierSignature } = require("./supplierPaymentSignature");
 
 async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
   const transaction = parsed.transaction;
@@ -18,9 +19,15 @@ async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
   }
 
   const contentLower = contentRaw.toLowerCase();
-  const isSupplierPayment =
+  const isSupplierPaymentByContent =
     /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||
     /nhap\s*hang|nhap\s*kho|thanh\s*toan\s*ncc|chuyen\s*tien\s*ncc|tt\s*ncc/i.test(contentLower);
+
+  // Nhận diện qua chữ ký số tiền: nếu phần dư % 1000 nằm trong vùng 900..999
+  // thì khả năng cao đây là thanh toán NCC dùng suffix trừ (amount = nợ - NCC_ID)
+  const isSupplierPaymentBySignature = hasSupplierSignature(outboundAmount);
+
+  const isSupplierPayment = isSupplierPaymentByContent || isSupplierPaymentBySignature;
   const outboundReason = isSupplierPayment ? "supplier_payment" : "withdrawal";
   const outboundReasonLabel = isSupplierPayment ? "Nhập hàng / Thanh toán NCC" : "Rút tiền / Chuyển ra";
 
@@ -36,6 +43,7 @@ async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
         outbound_reason_label: outboundReasonLabel,
         month_key: paidMonthKey,
         content: contentRaw,
+        detected_by_signature: isSupplierPaymentBySignature && !isSupplierPaymentByContent,
       },
       source: "webhook",
     });
@@ -47,6 +55,8 @@ async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
     outboundAmount,
     outboundReason,
     outboundReasonLabel,
+    isSupplierPaymentByContent,
+    isSupplierPaymentBySignature,
     monthKey: paidMonthKey,
     content: contentRaw.slice(0, 120),
   });

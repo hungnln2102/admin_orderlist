@@ -21,10 +21,13 @@ async function tryAutoSettleSupplierPaymentByOutbound({
   paidMonthKey,
   shopBankAccountId,
 }) {
+  // Số tiền THỰC bank đã trừ (ví dụ: 349.908đ)
   const outboundAmount = Math.abs(transferAmountNormalized);
+
+  // Decode chữ ký: outboundAmount = baseAmount - NCC_ID
+  // Ví dụ: 349.908 → supplierId=92, baseAmount=350.000
   const { supplierId, baseAmount } = decodeSupplierSignature(outboundAmount);
-  
-  // Basic validation
+
   if (supplierId <= 0 || baseAmount <= 0) return null;
 
   // 1. Check if supplier exists
@@ -66,10 +69,10 @@ async function tryAutoSettleSupplierPaymentByOutbound({
   const summary = unpaidLogSummary.rows[0] || {};
   const unpaidCount = Number(summary.unpaid_count) || 0;
   const netUnpaidAmount = Number(summary.net_unpaid_amount) || 0;
-  
+
   if (unpaidCount <= 0 || netUnpaidAmount <= 0) return null;
 
-  // 3. Verify amount match with tolerance
+  // 3. Verify amount match with tolerance (so sánh baseAmount decoded với nợ thực tế)
   const gap = Math.abs(netUnpaidAmount - baseAmount);
   if (gap > SUPPLIER_REFUND_MATCH_TOLERANCE) {
     logger.warn("[Webhook][AutoSettle] Amount mismatch", { supplierId, baseAmount, netUnpaidAmount, gap });
@@ -105,22 +108,23 @@ async function tryAutoSettleSupplierPaymentByOutbound({
     [STATUS.PAID, supplierId]
   );
 
-  // 6. Debit bank ledger
+  // 6. Debit bank ledger — dùng số tiền THỰC chuyển (outboundAmount = 349.908đ)
+  //    KHÔNG dùng baseAmount (350.000đ) vì bank đã trừ đúng số tiền thực
   let bankLedgerDelta = 0;
   if (shopBankAccountId) {
     const ledgerResult = await debitShopBankSupplierPayment(client, {
       accountId: shopBankAccountId,
-      amount: baseAmount,
+      amount: outboundAmount,
       sourceKind: "payment_supply",
       sourceId: paymentSupplyId,
       note: `Auto TT NCC supply ${supplierId} - via Webhook`,
     });
     if (ledgerResult && !ledgerResult.skipped) {
-      bankLedgerDelta = -baseAmount;
+      bankLedgerDelta = -outboundAmount;
     }
   }
 
-  // 7. Notify & Audit
+  // 7. Notify biến động tháng với số tiền thực (outboundAmount)
   if (bankLedgerDelta !== 0 && paidMonthKey) {
     await notifyFinanceMonthlyDelta({
       monthKey: paidMonthKey,
@@ -130,6 +134,7 @@ async function tryAutoSettleSupplierPaymentByOutbound({
     });
   }
 
+  // 8. Audit log
   if (receiptId) {
     await insertFinancialAuditLog(client, {
       payment_receipt_id: receiptId,
@@ -140,6 +145,7 @@ async function tryAutoSettleSupplierPaymentByOutbound({
         supplier_name: supplierName,
         expected_unpaid_amount: netUnpaidAmount,
         base_amount_decoded: baseAmount,
+        actual_outbound_amount: outboundAmount,
         match_gap: gap,
         month_key: paidMonthKey,
         bank_ledger_delta: bankLedgerDelta,
@@ -147,16 +153,17 @@ async function tryAutoSettleSupplierPaymentByOutbound({
       source: "webhook",
     });
   }
-  
+
   const eventBus = require("@/events/eventBus");
   const EVENTS = require("@/events/eventTypes");
   eventBus.emit(EVENTS.SUPPLY_PAYMENT_AUTO_MATCHED, {
     receiptId,
     supplierId,
-    amount: baseAmount,
+    amount: outboundAmount,  // số tiền thực chuyển (349.908đ)
+    baseAmount,              // số nợ gốc decoded (350.000đ) — chỉ để tham chiếu
   });
 
-  return { supplierId, baseAmount, gap };
+  return { supplierId, baseAmount, outboundAmount, gap };
 }
 
 module.exports = {
