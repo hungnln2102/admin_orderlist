@@ -278,7 +278,9 @@ const listSupplyOrderCosts = async (req, res) => {
       INNER JOIN ${TABLES.orderList} ${o} ON ${o}.${orderIdCol} = ${lt}.${orderListIdCol}
       INNER JOIN ${supplierTable} ${sj} ON ${sj}.${supIdCol} = ${lt}.${supplyIdCol}
       ${whereSql}
-      ORDER BY ${lt}.${logIdCol} DESC
+      ORDER BY 
+        CASE WHEN TRIM(COALESCE(${lt}.${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán' THEN 0 ELSE 1 END ASC,
+        ${lt}.${logIdCol} DESC
       OFFSET ?
       LIMIT ?
     `;
