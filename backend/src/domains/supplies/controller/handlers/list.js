@@ -89,7 +89,7 @@ const listPaymentsBySupply = async (req, res) => {
       SELECT 
         p.${ps.id} AS id,
         p.${ps.sourceId} AS source_id,
-        COALESCE(p.total_import, 0)::numeric AS import_value,
+        COALESCE(p.${ps.totalImport}, 0)::numeric AS import_value,
         COALESCE(p.${ps.paid}, 0)::numeric AS paid_value,
         COALESCE(p.${ps.round}, '') AS round_label,
         COALESCE(s.${supplierNameIdent}, '') AS source_name
