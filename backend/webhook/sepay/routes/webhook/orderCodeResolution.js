@@ -6,31 +6,9 @@ const { isBatchCode } = require("./constants");
  * trong nội dung CK (tránh một biên lai 65k ghi DT/LN hai lần cho hai đơn).
  */
 const buildWebhookLoopOrderCodes = ({
-  orderCodesFromTransaction = [],
-  orderCodes = [],
   batchOrderMap = new Map(),
-  orderCode = "",
-  batchCodes = [],
 }) => {
-  const batchOrderCodes = [...batchOrderMap.values()].flat();
-  const mavCodesFromContent = orderCodes.filter((code) => !isBatchCode(code));
-
-  if (orderCodesFromTransaction.length > 0) {
-    return [
-      ...new Set([
-        ...orderCodesFromTransaction,
-        ...batchOrderCodes,
-      ]),
-    ];
-  }
-
-  const fromContent = mavCodesFromContent.length
-    ? mavCodesFromContent
-    : orderCode && !isBatchCode(orderCode)
-      ? [orderCode]
-      : [];
-
-  return [...new Set([...fromContent, ...batchOrderCodes])];
+  return [...new Set([...batchOrderMap.values()].flat())];
 };
 
 /**
@@ -41,12 +19,8 @@ const createWebhookAmountForCodeResolver = ({
   batchCodes = [],
   batchOrderAmountMap = new Map(),
   loopOrderCodes = [],
-  orderCodesFromTransaction = [],
   transferAmountNormalized = 0,
 }) => {
-  const txnResolved = new Set(
-    orderCodesFromTransaction.map((c) => String(c || "").trim().toUpperCase()).filter(Boolean)
-  );
   const multiOrder = loopOrderCodes.length > 1 && batchCodes.length === 0;
   const perOrderShare = multiOrder
     ? Math.round(normalizeMoney(transferAmountNormalized) / loopOrderCodes.length)
@@ -58,10 +32,6 @@ const createWebhookAmountForCodeResolver = ({
     }
     if (!multiOrder) {
       return normalizeMoney(transferAmountNormalized);
-    }
-    if (txnResolved.size > 0) {
-      const key = String(code || "").trim().toUpperCase();
-      return txnResolved.has(key) ? normalizeMoney(transferAmountNormalized) : 0;
     }
     return Math.max(0, perOrderShare);
   };

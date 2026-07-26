@@ -34,7 +34,6 @@ function parseWebhookTransaction(payload) {
   const paymentReferenceCodes = extractPaymentReferenceCandidates(transaction);
   const explicitBatchCodes = extractBatchCodes(transaction);
   
-  const orderCodes = [];
   const batchCodes = [
     ...new Set([
       ...explicitBatchCodes,
@@ -55,9 +54,7 @@ function parseWebhookTransaction(payload) {
 
   return {
     transaction,
-    orderCode: null,
     paymentReferenceCodes,
-    orderCodes,
     batchCodes,
     transferAmountNormalized,
     supplierSettlementTransfer,

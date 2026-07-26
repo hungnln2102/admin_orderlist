@@ -41,7 +41,8 @@ const nextIdInTransaction = async (trx, tableName, columnName = "id") => {
  *   valid transaction block (required by PostgreSQL).
  */
 const nextId = async (tableName, columnName = "id", trx = null) => {
-  if (trx) {
+  // Check if trx is an actual transaction (has commit method)
+  if (trx && typeof trx.commit === 'function') {
     return nextIdInTransaction(trx, tableName, columnName);
   }
 

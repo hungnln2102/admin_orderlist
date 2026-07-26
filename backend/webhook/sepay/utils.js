@@ -267,60 +267,7 @@ const calcGiaBan = ({
   }
 };
 
-/**
- * Fallback: khi không extract được mã đơn MAV từ nội dung chuyển khoản,
- * thử match theo số tiền + trạng thái (RENEWAL hoặc UNPAID).
- * Loại MAVN: nhập hàng không match / không xử lý qua Sepay webhook.
- * Chỉ trả kết quả nếu tìm được đúng 1 đơn duy nhất (tránh nhầm lẫn).
- */
-const resolveOrderByPayment = async (client, { amount, transactionContent }) => {
-  if (!amount || amount <= 0) return [];
-  const { STATUS } = require("@/utils/statuses");
-  const statusList = [STATUS.RENEWAL, STATUS.UNPAID];
 
-  const sql = `
-    SELECT
-      ${safeIdent(ORDER_COLS.idOrder)} AS id_order,
-      ${safeIdent(ORDER_COLS.status)} AS status,
-      ${safeIdent(ORDER_COLS.price)} AS price,
-      ${safeIdent(ORDER_COLS.expiryDate)} AS expired_at,
-      ${safeIdent(ORDER_COLS.customer)} AS customer
-    FROM ${ORDER_TABLE}
-    WHERE ${safeIdent(ORDER_COLS.status)} = ANY($1)
-      AND ${safeIdent(ORDER_COLS.price)} = $2
-      AND UPPER(${safeIdent(ORDER_COLS.idOrder)}::text) NOT LIKE 'MAVN%'
-    ORDER BY ${safeIdent(ORDER_COLS.expiryDate)} ASC
-    LIMIT 10
-  `;
-
-  const res = await client.query(sql, [statusList, amount]);
-  if (!res.rows.length) return [];
-
-  // Ưu tiên đơn RENEWAL sắp hết hạn (daysLeft <= 4)
-  const renewalCandidates = res.rows.filter((r) => {
-    if (r.status !== STATUS.RENEWAL) return false;
-    const dl = daysUntil(r.expired_at);
-    return dl <= 4;
-  });
-
-  if (renewalCandidates.length === 1) return [renewalCandidates[0].id_order];
-
-  // Nếu có nhiều ứng viên, thử match thêm theo tên khách hàng trong nội dung giao dịch
-  if (res.rows.length > 1 && transactionContent) {
-    const contentNorm = stripAccents(String(transactionContent).toLowerCase());
-    const nameMatched = res.rows.filter((r) => {
-      if (!r.customer) return false;
-      const custNorm = stripAccents(String(r.customer).toLowerCase()).replace(/\s+/g, "");
-      return contentNorm.includes(custNorm);
-    });
-    if (nameMatched.length === 1) return [nameMatched[0].id_order];
-  }
-
-  // Đúng 1 đơn duy nhất → dùng luôn
-  if (res.rows.length === 1) return [res.rows[0].id_order];
-
-  return [];
-};
 
 const fetchProductPricing = async (client, productNameOrVariantId) => {
   if (productNameOrVariantId == null || productNameOrVariantId === "") {
@@ -455,7 +402,7 @@ module.exports = {
   roundToThousands,
   formatCurrency,
   calcGiaBan,
-  resolveOrderByPayment,
+
   fetchProductPricing,
   findSupplyId,
   fetchSupplyPrice,
