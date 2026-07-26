@@ -7,8 +7,14 @@ const { isBatchCode } = require("./constants");
  */
 const buildWebhookLoopOrderCodes = ({
   batchOrderMap = new Map(),
+  transactionOrderCodes = [],
+  singleOrderCode = "",
 }) => {
-  return [...new Set([...batchOrderMap.values()].flat())];
+  const batchOrders = [...new Set([...batchOrderMap.values()].flat())];
+  if (batchOrders.length > 0) return batchOrders;
+  if (transactionOrderCodes && transactionOrderCodes.length > 0) return [...new Set(transactionOrderCodes)];
+  if (singleOrderCode) return [singleOrderCode];
+  return [];
 };
 
 /**

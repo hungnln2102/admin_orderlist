@@ -21,6 +21,7 @@ const {
 } = require("./orderCodeResolution");
 const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
 const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpectedAmount");
+const { resolveOrderCodesByTransaction } = require("../../paymentReference");
 
 // Import newly extracted phases
 const { processReceiptPhase } = require("./receiptPhase");
@@ -75,6 +76,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
     batchCodes,
     transferAmountNormalized,
     supplierSettlementTransfer,
+    singleOrderCode,
   } = parsed;
   const potentialSupplierRefundTransfer = Boolean(parsed?.potentialSupplierRefundTransfer);
   const autoSupplierSettlement = parsed?.autoSupplierSettlement || null;
@@ -114,9 +116,15 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         normalizeMoney
       );
       
-      loopOrderCodes = buildWebhookLoopOrderCodes({ batchOrderMap });
+      const transactionOrderCodes = await resolveOrderCodesByTransaction(client, paymentReferenceCodes);
 
-      const getCurrentAmountForCode = createWebhookAmountForCodeResolver({
+      loopOrderCodes = buildWebhookLoopOrderCodes({
+        batchOrderMap,
+        transactionOrderCodes,
+        singleOrderCode,
+      });
+
+      let getCurrentAmountForCode = createWebhookAmountForCodeResolver({
         batchCodes: resolvedBatchCodes,
         batchOrderAmountMap,
         loopOrderCodes,
@@ -157,7 +165,6 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         );
       }
 
-      // 2. Receipt Phase
       const {
         receiptResult,
         receiptId,
@@ -165,6 +172,51 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         paidMonthKey,
         resolvedOrderCode,
       } = await processReceiptPhase(client, parsed, loopOrderCodes, resolvedBatchCodes);
+
+      // Nếu receipt insert thành công và tìm được mã đơn bằng suffix (expected_amount),
+      // nhưng mã đơn đó chưa có trong loopOrderCodes, ta thêm vào để tiếp tục xử lý Order Phase.
+      if (receiptResult?.orderCode && !loopOrderCodes.includes(receiptResult.orderCode)) {
+        const matchedCode = receiptResult.orderCode;
+        loopOrderCodes.push(matchedCode);
+
+        getCurrentAmountForCode = createWebhookAmountForCodeResolver({
+          batchCodes: resolvedBatchCodes,
+          batchOrderAmountMap,
+          loopOrderCodes,
+          transferAmountNormalized,
+        });
+
+        const stateRes = await client.query(
+          `SELECT
+            ${ORDER_COLS.id},
+            ${ORDER_COLS.idOrder},
+            ${ORDER_COLS.idProduct},
+            ${ORDER_COLS.status},
+            ${ORDER_COLS.expiryDate},
+            ${ORDER_COLS.orderDate},
+            ${ORDER_COLS.price},
+            ${ORDER_COLS.grossSellingPrice},
+            ${ORDER_COLS.cost},
+            ${ORDER_COLS.idSupply},
+            ${ORDER_COLS.customer},
+            ${ORDER_COLS.contact},
+            (
+              SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
+              FROM ${PAYMENT_RECEIPT_BATCH_ITEM_TABLE} rca
+              WHERE rca.target_order_list_id = ${ORDER_TABLE}.${ORDER_COLS.id}
+            ) AS credit_applied_amount
+          FROM ${ORDER_TABLE}
+          WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
+          LIMIT 1`,
+          [matchedCode]
+        );
+        const state = stateRes.rows[0] || null;
+        stateByOrderCode.set(matchedCode, state);
+        eligibilityByOrderCode.set(
+          matchedCode,
+          state ? isEligibleForRenewal(state[ORDER_COLS.status], state[ORDER_COLS.expiryDate]) : null
+        );
+      }
 
       // 3. Outbound Phase
       if (

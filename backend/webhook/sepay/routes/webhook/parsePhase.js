@@ -1,4 +1,4 @@
-const { normalizeAmount } = require("../../utils");
+const { normalizeAmount, extractOrderCodeFromText } = require("../../utils");
 const { normalizeTransactionPayload } = require("../../transactions");
 const { extractPaymentReferenceCandidates } = require("../../paymentReference");
 const { BATCH_CODE_REGEX, isBatchCode } = require("./constants");
@@ -52,12 +52,20 @@ function parseWebhookTransaction(payload) {
   const transferAmountNormalized = isOutbound ? -Math.abs(rawAmount) : rawAmount;
   const supplierSettlementTransfer = isSupplierSettlementTransfer(transaction);
 
+  const singleOrderCode = extractOrderCodeFromText(
+    transaction.code,
+    transaction.transaction_content,
+    transaction.note,
+    transaction.description
+  );
+
   return {
     transaction,
     paymentReferenceCodes,
     batchCodes,
     transferAmountNormalized,
     supplierSettlementTransfer,
+    singleOrderCode,
   };
 }
 

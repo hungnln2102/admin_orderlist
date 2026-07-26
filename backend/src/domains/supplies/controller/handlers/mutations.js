@@ -11,6 +11,7 @@ const logger = require("@/utils/logger");
 const { quoteIdent } = require("@/utils/sql");
 const { supplierCache } = require("@/utils/cache");
 const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
+const { getNextSupplyId } = require("@/services/idService");
 
 const ACCOUNT_HOLDER_MIGRATION_HINT =
   "Chua co cot account_holder. Chay migration: database/migrations/035_supplier_account_holder.sql";
@@ -62,17 +63,23 @@ const createSupply = async (req, res) => {
     values.push(active_supply !== undefined ? !!active_supply : (status ? status === "active" : true));
   }
 
-  const placeholders = values.map(() => "?");
-
   try {
-    const result = await db.raw(
-      `
-      INSERT INTO ${supplierTable} (${fields.join(", ")})
-      VALUES (${placeholders.join(", ")})
-      RETURNING ${QUOTED_COLS.supplier.id} AS id;
-    `,
-      values
-    );
+    const result = await db.transaction(async (trx) => {
+      const nextId = await getNextSupplyId(trx);
+      
+      const insertFields = [...fields, QUOTED_COLS.supplier.id];
+      const insertValues = [...values, nextId];
+      const placeholders = insertValues.map(() => "?");
+      
+      return trx.raw(
+        `
+        INSERT INTO ${supplierTable} (${insertFields.join(", ")})
+        VALUES (${placeholders.join(", ")})
+        RETURNING ${QUOTED_COLS.supplier.id} AS id;
+      `,
+        insertValues
+      );
+    });
     supplierCache.clear();
     const newId = result.rows?.[0]?.id;
     const responseData = {
