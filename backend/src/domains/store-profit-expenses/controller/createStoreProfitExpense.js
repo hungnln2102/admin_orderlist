@@ -69,6 +69,8 @@ const createStoreProfitExpense = async (req, res) => {
 
   try {
     const hasMavnCols = await storeProfitExpensesHasMavnColumns();
+    const status = req.body?.status === "pending" ? "pending" : "completed";
+
     const row = await db.transaction(async (trx) => {
       if (expenseType === "external_import" && linkedOrderCode) {
         await ensureNotDuplicateMavnInternalExternalImport(trx, linkedOrderCode);
@@ -79,6 +81,7 @@ const createStoreProfitExpense = async (req, res) => {
         [COLS.REASON]: reason || null,
         [COLS.EXPENSE_TYPE]: expenseType,
         [COLS.SHOP_BANK_ACCOUNT_ID]: shopBankAccountId,
+        [COLS.STATUS]: status,
       };
 
       if (hasMavnCols && linkedOrderCode) {
@@ -100,7 +103,7 @@ const createStoreProfitExpense = async (req, res) => {
       const [created] = await trx(TABLE).insert(insertPayload).returning([COLS.ID]);
       const createdId = Number(created?.id ?? created?.[COLS.ID] ?? 0);
 
-      if (expenseType === "external_import" && amount > 0) {
+      if (expenseType === "external_import" && amount > 0 && status === "completed") {
         await debitShopBankExternalOut(trx, {
           accountId: shopBankAccountId,
           amount,
@@ -116,6 +119,7 @@ const createStoreProfitExpense = async (req, res) => {
           COLS.AMOUNT,
           COLS.REASON,
           COLS.EXPENSE_TYPE,
+          COLS.STATUS,
           ...(hasMavnCols ? [COLS.LINKED_ORDER_CODE, COLS.EXPENSE_META] : []),
           COLS.CREATED_AT,
           trx.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
@@ -123,7 +127,7 @@ const createStoreProfitExpense = async (req, res) => {
         .where(COLS.ID, createdId)
         .first();
 
-      if (expenseType === "external_import" && amount > 0 && inserted?.[COLS.CREATED_AT]) {
+      if (expenseType === "external_import" && amount > 0 && status === "completed" && inserted?.[COLS.CREATED_AT]) {
         const mk = await monthKeyVietnamFromDbTimestamp(trx, inserted[COLS.CREATED_AT]);
         if (mk) {
           const updates = {

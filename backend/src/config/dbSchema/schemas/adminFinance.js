@@ -209,6 +209,7 @@ const FINANCE_SCHEMA = {
       LINKED_ORDER_CODE: "linked_order_code",
       EXPENSE_META: "expense_meta",
       SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
+      STATUS: "status",
     },
   },
 };

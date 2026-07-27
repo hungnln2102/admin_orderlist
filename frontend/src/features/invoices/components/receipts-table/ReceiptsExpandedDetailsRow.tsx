@@ -80,6 +80,29 @@ const ReceiptsExpandedDetailsRow: React.FC<ReceiptsExpandedDetailsRowProps> = ({
             </div>
           </div>
         </div>
+
+        {receipt.flowTypeId ? (
+          <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">
+                Loại phân loại
+              </p>
+              <p className="text-xs font-bold text-emerald-300">
+                {receipt.flowTypeLabel || "Hệ thống tự động"}
+              </p>
+            </div>
+            {receipt.flowNote ? (
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">
+                  Ghi chú phân loại
+                </p>
+                <p className="text-xs text-white/70 italic">
+                  "{receipt.flowNote}"
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </td>
   </tr>

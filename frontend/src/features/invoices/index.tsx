@@ -24,6 +24,7 @@ import { InvoicesPagination } from "./components/InvoicesPagination";
 import { useInvoicesPagination } from "./hooks/useInvoicesPagination";
 import { useInvoiceReceipts } from "./hooks/useInvoiceReceipts";
 import { useInvoiceDerivations } from "./hooks/useInvoiceDerivations";
+import { useReceiptFlowTypes } from "./hooks/useReceiptFlowTypes";
 
 export default function Invoices() {
   const { config: shopBankConfig } = useDefaultShopBankAccount();
@@ -36,6 +37,7 @@ export default function Invoices() {
     useState<ReceiptCategory>("receipt");
   const { receipts, setReceipts, matchableOrders, loading, error, setError } =
     useInvoiceReceipts();
+  const { flowTypes } = useReceiptFlowTypes();
   const [matchingReceiptId, setMatchingReceiptId] = useState<number | null>(null);
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const [expandedReceiptId, setExpandedReceiptId] = useState<number | null>(
@@ -196,6 +198,31 @@ export default function Invoices() {
     }
   };
 
+  const handleClassifyReceipt = async (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => {
+    setError(null);
+    try {
+      const response = await apiFetch(`/api/payment-receipts/${receiptId}/classify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flowTypeId, note, linkedExpenseId }),
+      });
+      if (!response.ok) {
+        let message = "Không thể phân loại biên lai.";
+        try {
+          const body = await response.json();
+          message = body?.error || message;
+        } catch { }
+        throw new Error(message);
+      }
+      // Tải lại trang để cập nhật tab mới và số liệu thống kê
+      window.location.reload();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Không thể phân loại biên lai.";
+      setError(message);
+      throw err;
+    }
+  };
+
   const closeDetailModal = () => {
     setSelectedReceipt(null);
   };
@@ -277,6 +304,8 @@ export default function Invoices() {
             matchableOrders={matchableOrders}
             matchingReceiptId={matchingReceiptId}
             onMatchReceipt={handleMatchReceipt}
+            flowTypes={flowTypes}
+            onClassifyReceipt={handleClassifyReceipt}
           />
         ) : categoryFilter === "out-of-flow" ? (
           <OffFlowReceiptsPanel

@@ -1,6 +1,7 @@
-import type React from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { apiFetch } from "@/shared/api/client";
 
-import { MatchableOrder, PaymentReceipt, type ShopBankDisplay } from "../../helpers";
+import { MatchableOrder, PaymentReceipt, ReceiptFlowType, type ShopBankDisplay } from "../../helpers";
 import ReceiptsExpandedDetailsRow from "./ReceiptsExpandedDetailsRow";
 import { buildReceiptRowView } from "./receiptRowView";
 
@@ -33,6 +34,8 @@ type ReceiptTableRowProps = {
   enableAllocation?: boolean;
   onAllocate?: (receipt: PaymentReceipt) => void;
   showCategoryReason?: boolean;
+  flowTypes?: ReceiptFlowType[];
+  onClassifyReceipt?: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => Promise<void>;
 };
 
 const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
@@ -64,8 +67,76 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
   enableAllocation,
   onAllocate,
   showCategoryReason = false,
+  flowTypes = [],
+  onClassifyReceipt,
 }) => {
   const rowView = buildReceiptRowView(receipt, shopBank);
+
+  const [selectedFlowTypeId, setSelectedFlowTypeId] = useState<number | null>(null);
+  const [classificationNote, setClassificationNote] = useState("");
+  const [classifying, setClassifying] = useState(false);
+  const [classificationError, setClassificationError] = useState<string | null>(null);
+
+  const [linkMode, setLinkMode] = useState<"create" | "link">("create");
+  const [unlinkedExpenses, setUnlinkedExpenses] = useState<any[]>([]);
+  const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null);
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
+
+  // Lọc flow types theo chiều tiền (Thu vs Chi)
+  const filteredFlowTypes = useMemo(() => {
+    return flowTypes.filter(
+      (ft) =>
+        ft.direction === "neutral" ||
+        (receipt.amount > 0 ? ft.direction === "in" : ft.direction === "out")
+    );
+  }, [flowTypes, receipt.amount]);
+
+  const selectedFlowType = useMemo(() => {
+    return flowTypes.find((ft) => ft.id === selectedFlowTypeId) || null;
+  }, [flowTypes, selectedFlowTypeId]);
+
+  const selectedFlowTypeEffect = selectedFlowType?.effect || null;
+
+  const fetchUnlinkedExpenses = async () => {
+    try {
+      setLoadingExpenses(true);
+      const res = await apiFetch(`/api/payment-receipts/unlinked-expenses?receiptId=${receipt.id}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.list)) {
+        setUnlinkedExpenses(data.list);
+        if (data.list.length > 0) {
+          setSelectedExpenseId(data.list[0].id);
+        } else {
+          setSelectedExpenseId(null);
+        }
+      }
+    } catch {
+      setClassificationError("Không thể tải danh sách chi phí chưa ghép.");
+    } finally {
+      setLoadingExpenses(false);
+    }
+  };
+
+  useEffect(() => {
+    if (linkMode === "link" && selectedFlowTypeId) {
+      void fetchUnlinkedExpenses();
+    }
+  }, [linkMode, selectedFlowTypeId]);
+
+  const handleClassifyClick = async () => {
+    if (!selectedFlowTypeId || !onClassifyReceipt) return;
+    try {
+      setClassifying(true);
+      setClassificationError(null);
+      const expenseId = linkMode === "link" && selectedExpenseId ? selectedExpenseId : undefined;
+      await onClassifyReceipt(receipt.id, selectedFlowTypeId, classificationNote, expenseId);
+    } catch (err) {
+      setClassificationError(err instanceof Error ? err.message : "Không thể phân loại biên lai.");
+    } finally {
+      setClassifying(false);
+    }
+  };
 
   return (
     <>
@@ -79,22 +150,181 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
             <div className="flex items-center gap-2">
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold shadow-sm ${
-                  Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
+                  !receipt.isFinancialPosted
+                    ? "bg-slate-500/15 border-slate-400/30 text-slate-300 shadow-slate-950/40"
+                    : Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
                     ? "bg-rose-500/15 border-rose-400/30 text-rose-300 shadow-rose-950/40"
                     : "bg-emerald-500/15 border-emerald-400/30 text-emerald-300 shadow-emerald-950/40"
                 }`}
               >
                 <span>
-                  {Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0 ? "💸" : "💰"}
+                  {!receipt.isFinancialPosted
+                    ? "⏳"
+                    : Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
+                    ? "💸"
+                    : "💰"}
                 </span>
                 <span>
-                  {receipt.outboundReasonLabel ||
-                    receipt.outboundReason ||
-                    (Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
-                      ? "Chi phí ngoài luồng"
-                      : "Doanh thu ngoài luồng")}
+                  {!receipt.isFinancialPosted
+                    ? "Chưa phân loại"
+                    : receipt.flowTypeLabel ||
+                      receipt.outboundReasonLabel ||
+                      receipt.outboundReason ||
+                      (Number(receipt.amount) < 0 || (receipt as any).outboundAmount > 0
+                        ? "Chi phí ngoài luồng"
+                        : "Doanh thu ngoài luồng")}
                 </span>
               </span>
+            </div>
+          </td>
+        ) : onClassifyReceipt && flowTypes.length > 0 ? (
+          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+            <div
+              className="space-y-2"
+              onClick={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+            >
+              <select
+                value={selectedFlowTypeId || ""}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setSelectedFlowTypeId(val ? Number(val) : null);
+                  setClassificationError(null);
+                  setLinkMode("create");
+                  setUnlinkedExpenses([]);
+                  setSelectedExpenseId(null);
+                }}
+                disabled={classifying}
+                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+              >
+                <option value="">Chọn loại phân loại...</option>
+                {filteredFlowTypes.map((ft) => (
+                  <option key={ft.id} value={ft.id}>
+                    {ft.label}
+                  </option>
+                ))}
+              </select>
+
+              {selectedFlowTypeEffect === "order_match" ? (
+                <div className="space-y-2">
+                  <select
+                    value={selectedValue}
+                    onChange={(event) => void onSelectMatch(receipt, event.target.value)}
+                    disabled={isMatching}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                  >
+                    <option value="">Chọn đơn cần ghép...</option>
+                    <option value="__manual__">Tự điền mã đơn hàng</option>
+                    {orderOptions.map((order) => (
+                      <option key={order.orderCode} value={order.orderCode}>
+                        {order.orderCode} - {order.status}
+                      </option>
+                    ))}
+                  </select>
+                  {isManualInput && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={manualCode}
+                        onChange={(event) => onManualCodeChange(event.target.value)}
+                        disabled={isMatching}
+                        placeholder="Nhập mã đơn (VD: MAVC...)"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void onSubmitManualMatch(receipt)}
+                        disabled={isMatching}
+                        className="shrink-0 rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
+                      >
+                        Ghép
+                      </button>
+                    </div>
+                  )}
+                  {isMatching && (
+                    <p className="text-[10px] font-semibold text-indigo-200/70 animate-pulse">
+                      Đang ghép đơn...
+                    </p>
+                  )}
+                  {rowError && (
+                    <p className="text-[10px] font-semibold text-rose-300">{rowError}</p>
+                  )}
+                </div>
+              ) : selectedFlowTypeId ? (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  {/* Tabs/Toggles for Linking Options */}
+                  {(selectedFlowTypeEffect === "withdrawal" || selectedFlowTypeEffect === "import_order") && (
+                    <div className="flex gap-2 p-1 bg-slate-950/40 rounded-xl border border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setLinkMode("create")}
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                          linkMode === "create"
+                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                            : "text-slate-400 border border-transparent hover:text-white"
+                        }`}
+                      >
+                        Tạo log mới
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLinkMode("link")}
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                          linkMode === "link"
+                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                            : "text-slate-400 border border-transparent hover:text-white"
+                        }`}
+                      >
+                        Ghép log có sẵn
+                      </button>
+                    </div>
+                  )}
+
+                  {linkMode === "link" && (selectedFlowTypeEffect === "withdrawal" || selectedFlowTypeEffect === "import_order") ? (
+                    <div className="space-y-2">
+                      {loadingExpenses ? (
+                        <p className="text-[10px] font-semibold text-slate-400 animate-pulse py-1">Đang tải danh sách log...</p>
+                      ) : unlinkedExpenses.length === 0 ? (
+                        <p className="text-[10px] font-semibold text-rose-300 py-1">Không tìm thấy log chi phí phù hợp gần đây.</p>
+                      ) : (
+                        <select
+                          value={selectedExpenseId || ""}
+                          onChange={(e) => setSelectedExpenseId(Number(e.target.value))}
+                          disabled={classifying}
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                        >
+                          {unlinkedExpenses.map((exp) => (
+                            <option key={exp.id} value={exp.id}>
+                              {new Date(exp.created_at).toLocaleDateString("vi-VN")} - {exp.reason || "Không lý do"} ({Number(exp.amount).toLocaleString("vi-VN")}đ)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={classificationNote}
+                      onChange={(event) => setClassificationNote(event.target.value)}
+                      disabled={classifying}
+                      placeholder="Ghi chú phân loại (tùy chọn)..."
+                      className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                    />
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleClassifyClick}
+                    disabled={classifying || (linkMode === "link" && !selectedExpenseId)}
+                    className="w-full rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-xs font-bold uppercase tracking-wider text-indigo-200 hover:bg-indigo-500/30 transition-colors disabled:opacity-60"
+                  >
+                    {classifying ? "Đang xử lý..." : linkMode === "link" ? "Xác nhận ghép log" : "Xác nhận phân loại"}
+                  </button>
+                  {classificationError && (
+                    <p className="text-[10px] font-semibold text-rose-300">{classificationError}</p>
+                  )}
+                </div>
+              ) : null}
             </div>
           </td>
         ) : enableAllocation && ((receipt as any).outboundAmount > 0 || Number(receipt.amount) < 0) ? (

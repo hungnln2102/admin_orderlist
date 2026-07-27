@@ -140,6 +140,18 @@ const reconcilePaymentReceipt = async (req, res) => {
         effectiveAction,
       });
 
+      const matchFlowType = await trx(TABLES.receiptFlowTypes)
+        .where("code", "order_match")
+        .first();
+      if (matchFlowType) {
+        await trx(TABLES.paymentReceiptState)
+          .where(RECEIPT_STATE_COLS.paymentReceiptId, receiptId)
+          .update({
+            flow_type_id: matchFlowType.id,
+            flow_classified_at: trx.fn.now(),
+          });
+      }
+
       const actionResult = {
         actionApplied: effectiveAction,
         actionRequested: requestedAction,

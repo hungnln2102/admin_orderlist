@@ -22,6 +22,22 @@ export interface PaymentReceipt {
   outboundReason?: string;
   outboundReasonLabel?: string;
   outboundContent?: string;
+  flowTypeId?: number | null;
+  flowClassifiedAt?: string | null;
+  flowNote?: string;
+  flowTypeLabel?: string | null;
+  flowTypeCode?: string | null;
+}
+
+export interface ReceiptFlowType {
+  id: number;
+  code: string;
+  label: string;
+  direction: "in" | "out" | "neutral";
+  effect: "order_match" | "off_flow_revenue" | "withdrawal" | "import_order" | "ignore";
+  isSystem: boolean;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export interface MatchableOrder {
@@ -107,46 +123,15 @@ export const determineReceiptCategory = (
     return "receipt";
   }
 
-  const isOutbound = Boolean(
-    ("outboundAmount" in receipt && (receipt as any).outboundAmount) ||
-    ("amount" in receipt && Number((receipt as any).amount) < 0) ||
-    ("outboundReasonLabel" in receipt && (receipt as any).outboundReasonLabel)
-  );
-
   const isPosted = Boolean(
     ("isFinancialPosted" in receipt && (receipt as any).isFinancialPosted) ||
     ("reconciledAt" in receipt && (receipt as any).reconciledAt)
   );
 
-  const hasOffFlowValues = Boolean(
-    Number(receipt.postedOffFlowBankReceipt) !== 0 ||
-    Number(receipt.postedRevenue) !== 0 ||
-    Number(receipt.postedProfit) !== 0
-  );
-
-  const hasOutboundReason = Boolean(
-    (receipt as any).outboundReasonLabel || (receipt as any).outboundReason || ("outboundAmount" in receipt && (receipt as any).outboundAmount)
-  );
-
-  // Nếu là giao dịch chi (outbound)
-  if (isOutbound) {
-    if (!isPosted) {
-      return "outbound-unallocated";
-    }
+  if (isPosted) {
     return "out-of-flow";
   }
 
-  // Nếu là giao dịch thu (incoming) chưa ghép đơn:
-  // Chỉ xếp "ngoài luồng" khi admin đã CHỦ ĐỘNG phân loại
-  // (postedOffFlowBankReceipt > 0). Không tự suy từ postedRevenue
-  // vì đó là doanh thu đơn hàng bình thường, đã xử lý ở nhánh "receipt".
-  const isExplicitlyOffFlow = Number(receipt.postedOffFlowBankReceipt) !== 0;
-
-  if (isExplicitlyOffFlow) {
-    return "out-of-flow";
-  }
-
-  // Mọi biên lai thu chưa được phân loại rõ ràng → "Chưa liệt kê"
   return "outbound-unallocated";
 };
 

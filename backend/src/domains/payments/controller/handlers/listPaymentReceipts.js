@@ -5,6 +5,7 @@ const {
   PAYMENT_RECEIPT_DEF,
   PAYMENT_RECEIPT_AUDIT_DEF,
   RECEIPT_STATE_COLS,
+  FLOW_TYPE_COLS,
 } = require("@/domains/payments/controller/shared/constants");
 
 const OUTBOUND_RULE_BRANCH = "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT";
@@ -43,7 +44,7 @@ const loadOutboundAuditMap = async (receiptIds = []) => {
     });
   }
   return auditMap;
-};
+ };
 
 const listPaymentReceipts = async (req, res) => {
   const limitParam = Number.parseInt(req.query.limit, 10);
@@ -61,6 +62,11 @@ const listPaymentReceipts = async (req, res) => {
         { fs: TABLES.paymentReceiptState },
         `fs.${RECEIPT_STATE_COLS.paymentReceiptId}`,
         `pr.${PAYMENT_RECEIPT_DEF.columns.id}`
+      )
+      .leftJoin(
+        { ft: TABLES.receiptFlowTypes },
+        `ft.${FLOW_TYPE_COLS.ID}`,
+        `fs.${RECEIPT_STATE_COLS.FLOW_TYPE_ID}`
       );
     if (missingOrderOnly) {
       const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
@@ -81,6 +87,11 @@ const listPaymentReceipts = async (req, res) => {
         postedOffFlowBankReceipt: `fs.${RECEIPT_STATE_COLS.postedOffFlowBankReceipt}`,
         reconciledAt: `fs.${RECEIPT_STATE_COLS.reconciledAt}`,
         adjustmentApplied: `fs.${RECEIPT_STATE_COLS.adjustmentApplied}`,
+        flowTypeId: `fs.${RECEIPT_STATE_COLS.FLOW_TYPE_ID}`,
+        flowClassifiedAt: `fs.${RECEIPT_STATE_COLS.FLOW_CLASSIFIED_AT}`,
+        flowNote: `fs.${RECEIPT_STATE_COLS.FLOW_NOTE}`,
+        flowTypeLabel: `ft.${FLOW_TYPE_COLS.LABEL}`,
+        flowTypeCode: `ft.${FLOW_TYPE_COLS.CODE}`,
       })
       .orderBy([
         { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
@@ -105,6 +116,11 @@ const listPaymentReceipts = async (req, res) => {
       postedOffFlowBankReceipt: Number(row.postedOffFlowBankReceipt) || 0,
       reconciledAt: row.reconciledAt || null,
       adjustmentApplied: !!row.adjustmentApplied,
+      flowTypeId: row.flowTypeId ? Number(row.flowTypeId) : null,
+      flowClassifiedAt: row.flowClassifiedAt || null,
+      flowNote: row.flowNote || "",
+      flowTypeLabel: row.flowTypeLabel || null,
+      flowTypeCode: row.flowTypeCode || null,
       ...(outboundAuditMap.get(Number(row.id)) || {}),
     }));
 

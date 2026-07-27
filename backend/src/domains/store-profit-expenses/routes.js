@@ -4,6 +4,7 @@ const {
   createStoreProfitExpense,
   updateStoreProfitExpense,
   deleteStoreProfitExpense,
+  completeStoreProfitExpense,
 } = require("@/domains/store-profit-expenses/controller");
 const {
   listStoreProfitExpensesRules,
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.get("/", ...listStoreProfitExpensesRules, listStoreProfitExpenses);
 router.post("/", ...createStoreProfitExpenseRules, createStoreProfitExpense);
+router.post("/:id/complete", completeStoreProfitExpense);
 router.patch("/:id", ...updateStoreProfitExpenseRules, updateStoreProfitExpense);
 router.delete("/:id", ...deleteStoreProfitExpenseRules, deleteStoreProfitExpense);
 

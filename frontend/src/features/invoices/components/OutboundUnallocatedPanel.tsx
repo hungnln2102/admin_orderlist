@@ -1,5 +1,5 @@
 import { ReceiptsTable } from "./ReceiptsTable";
-import { PaymentReceipt } from "../helpers";
+import { PaymentReceipt, ReceiptFlowType } from "../helpers";
 
 type OutboundUnallocatedPanelProps = {
   receipts: PaymentReceipt[];
@@ -11,6 +11,8 @@ type OutboundUnallocatedPanelProps = {
   matchableOrders: any[];
   matchingReceiptId: number | null;
   onMatchReceipt: (receiptId: number, orderCode: string) => Promise<void>;
+  flowTypes: ReceiptFlowType[];
+  onClassifyReceipt: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => Promise<void>;
 };
 
 export function OutboundUnallocatedPanel({
@@ -23,6 +25,8 @@ export function OutboundUnallocatedPanel({
   matchableOrders,
   matchingReceiptId,
   onMatchReceipt,
+  flowTypes,
+  onClassifyReceipt,
 }: OutboundUnallocatedPanelProps) {
   return (
     <ReceiptsTable
@@ -39,6 +43,8 @@ export function OutboundUnallocatedPanel({
       onSelectReceipt={onSelectReceipt}
       showOrderCode={false}
       shopBank={shopBank}
+      flowTypes={flowTypes}
+      onClassifyReceipt={onClassifyReceipt}
     />
   );
 }

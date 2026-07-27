@@ -37,24 +37,29 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
     throw createHttpError(404, "Không tìm thấy tài khoản.");
   }
 
+  const status = payload?.status === "pending" ? "pending" : "completed";
+
   const result = await db.transaction(async (trx) => {
     const expensePayload = {
       [EXPENSE_COLS.AMOUNT]: amount,
       [EXPENSE_COLS.REASON]: reason,
       [EXPENSE_COLS.EXPENSE_TYPE]: "withdraw_profit",
       [EXPENSE_COLS.SHOP_BANK_ACCOUNT_ID]: normalizedId,
+      [EXPENSE_COLS.STATUS]: status,
     };
 
     const [created] = await trx(EXPENSE_TABLE).insert(expensePayload).returning([EXPENSE_COLS.ID]);
     const expenseId = Number(created?.id ?? created?.[EXPENSE_COLS.ID] ?? 0);
 
-    await debitShopBankWithdraw(trx, {
-      accountId: normalizedId,
-      amount,
-      sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
-      sourceId: expenseId,
-      note: reason,
-    });
+    if (status === "completed") {
+      await debitShopBankWithdraw(trx, {
+        accountId: normalizedId,
+        amount,
+        sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+        sourceId: expenseId,
+        note: reason,
+      });
+    }
 
     const updated = await trx(TABLE).select(selectColumns).where(columns.id, normalizedId).first();
     return { account: updated };

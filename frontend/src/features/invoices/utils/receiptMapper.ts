@@ -23,5 +23,10 @@ export const normalizeReceiptRow = (
     outboundReason: toSafeString(row?.outboundReason),
     outboundReasonLabel: toSafeString(row?.outboundReasonLabel),
     outboundContent: toSafeString(row?.outboundContent),
+    flowTypeId: row?.flowTypeId != null ? Number(row.flowTypeId) : null,
+    flowClassifiedAt: row?.flowClassifiedAt != null ? String(row.flowClassifiedAt) : null,
+    flowNote: toSafeString(row?.flowNote),
+    flowTypeLabel: row?.flowTypeLabel != null ? String(row.flowTypeLabel) : null,
+    flowTypeCode: row?.flowTypeCode != null ? String(row.flowTypeCode) : null,
   };
 };

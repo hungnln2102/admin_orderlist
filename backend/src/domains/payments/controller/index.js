@@ -22,6 +22,14 @@ const {
 } = require("@/domains/payments/controller/handlers/reconcilePaymentReceipt");
 const { confirmPaymentSupply } = require("@/domains/payments/controller/handlers/confirmPaymentSupply");
 const { allocateOutboundPaymentReceipt } = require("@/domains/payments/controller/handlers/allocateOutboundPaymentReceipt");
+const { classifyReceipt } = require("@/domains/payments/controller/handlers/classifyReceipt");
+const {
+  listReceiptFlowTypes,
+  createReceiptFlowType,
+  updateReceiptFlowType,
+  deleteReceiptFlowType,
+} = require("@/domains/payments/controller/handlers/receiptFlowTypes");
+const { listUnlinkedExpenses } = require("@/domains/payments/controller/handlers/listUnlinkedExpenses");
 
 module.exports = {
   listPaymentReceipts,
@@ -33,4 +41,10 @@ module.exports = {
   confirmPaymentSupply,
   reconcilePaymentReceipt,
   allocateOutboundPaymentReceipt,
+  classifyReceipt,
+  listReceiptFlowTypes,
+  createReceiptFlowType,
+  updateReceiptFlowType,
+  deleteReceiptFlowType,
+  listUnlinkedExpenses,
 };

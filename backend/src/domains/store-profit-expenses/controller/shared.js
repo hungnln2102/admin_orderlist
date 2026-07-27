@@ -120,6 +120,7 @@ const mapExpenseRow = (row) => {
     expenseMeta: meta,
     traceCode: traceCode || null,
     createdAt: row.created_at || null,
+    status: row.status || "completed",
   };
 };
 

@@ -2,10 +2,12 @@ const { listStoreProfitExpenses } = require("@/domains/store-profit-expenses/con
 const { createStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/createStoreProfitExpense");
 const { updateStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/updateStoreProfitExpense");
 const { deleteStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/deleteStoreProfitExpense");
+const { completeStoreProfitExpense } = require("@/domains/store-profit-expenses/controller/completeStoreProfitExpense");
 
 module.exports = {
   listStoreProfitExpenses,
   createStoreProfitExpense,
   updateStoreProfitExpense,
   deleteStoreProfitExpense,
+  completeStoreProfitExpense,
 };

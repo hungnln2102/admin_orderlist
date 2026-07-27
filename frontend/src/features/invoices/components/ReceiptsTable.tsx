@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { MatchableOrder, PaymentReceipt, type ShopBankDisplay } from "../helpers";
+import { MatchableOrder, PaymentReceipt, ReceiptFlowType, type ShopBankDisplay } from "../helpers";
 import ReceiptsMatchConfirmModal from "./receipts-table/ReceiptsMatchConfirmModal";
 import { useReceiptMatchState } from "./receipts-table/useReceiptMatchState";
 import ReceiptTableRow from "./receipts-table/ReceiptTableRow";
@@ -19,6 +19,8 @@ type ReceiptsTableProps = {
   enableAllocation?: boolean;
   onAllocate?: (receipt: PaymentReceipt) => void;
   showCategoryReason?: boolean;
+  flowTypes?: ReceiptFlowType[];
+  onClassifyReceipt?: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => Promise<void>;
 };
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
@@ -36,6 +38,8 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
   enableAllocation = false,
   onAllocate,
   showCategoryReason = false,
+  flowTypes = [],
+  onClassifyReceipt,
 }) => {
   const {
     manualCodeByReceiptId,
@@ -70,7 +74,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
         <table className="min-w-full border-separate border-spacing-y-4 text-white">
           <thead>
             <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
-              {showCategoryReason ? <th className="w-[260px]">LOẠI CHI PHÍ / DOANH THU</th> : enableAllocation && enableMatching ? <th className="w-[320px]">THAO TÁC / GHÉP MÃ</th> : enableAllocation ? <th className="w-[180px]">PHÂN BỔ</th> : enableMatching ? <th className="w-[320px]">GHÉP MÃ ĐƠN</th> : null}
+              {showCategoryReason ? <th className="w-[260px]">LOẠI CHI PHÍ / DOANH THU</th> : enableAllocation && enableMatching ? <th className="w-[320px]">THAO TÁC / PHÂN LOẠI</th> : enableAllocation ? <th className="w-[180px]">PHÂN BỔ</th> : enableMatching ? <th className="w-[320px]">GHÉP MÃ ĐƠN</th> : null}
               {showOrderCode ? <th className="w-[120px]">MÃ ĐƠN</th> : null}
               <th className="w-[180px]">NGƯỜI GỬI</th>
               <th className="w-[180px]">NGƯỜI NHẬN</th>
@@ -117,6 +121,8 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                 onSaveEditedOrderCode={saveEditedOrderCode}
                 onEditingOrderCodeChange={(nextCode) => setEditingOrderCode(nextCode.toUpperCase())}
                 showCategoryReason={showCategoryReason}
+                flowTypes={flowTypes}
+                onClassifyReceipt={onClassifyReceipt}
               />
             ))}
           </tbody>
