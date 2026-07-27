@@ -136,13 +136,20 @@ export const determineReceiptCategory = (
     return "out-of-flow";
   }
 
-  // Nếu là giao dịch thu (incoming) chưa ghép đơn
-  if (hasOffFlowValues) {
+  // Nếu là giao dịch thu (incoming) chưa ghép đơn:
+  // Chỉ xếp "ngoài luồng" khi admin đã CHỦ ĐỘNG phân loại
+  // (postedOffFlowBankReceipt > 0). Không tự suy từ postedRevenue
+  // vì đó là doanh thu đơn hàng bình thường, đã xử lý ở nhánh "receipt".
+  const isExplicitlyOffFlow = Number(receipt.postedOffFlowBankReceipt) !== 0;
+
+  if (isExplicitlyOffFlow) {
     return "out-of-flow";
   }
 
+  // Mọi biên lai thu chưa được phân loại rõ ràng → "Chưa liệt kê"
   return "outbound-unallocated";
 };
+
 
 export const CATEGORY_OPTIONS: {
   value: ReceiptCategory;
