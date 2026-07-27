@@ -12,6 +12,7 @@ const {
 const {
   PAYMENT_RECEIPT_BATCH_TABLE,
   PAYMENT_RECEIPT_BATCH_ITEM_TABLE,
+  REFUND_CREDIT_APPLICATIONS_TABLE,
   isMissingBatchTablesError,
 } = require("./constants");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
@@ -149,7 +150,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
             ${ORDER_COLS.contact},
             (
               SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
-              FROM ${PAYMENT_RECEIPT_BATCH_ITEM_TABLE} rca
+              FROM ${REFUND_CREDIT_APPLICATIONS_TABLE} rca
               WHERE rca.target_order_list_id = ${ORDER_TABLE}.${ORDER_COLS.id}
             ) AS credit_applied_amount
           FROM ${ORDER_TABLE}
@@ -202,7 +203,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
             ${ORDER_COLS.contact},
             (
               SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
-              FROM ${PAYMENT_RECEIPT_BATCH_ITEM_TABLE} rca
+              FROM ${REFUND_CREDIT_APPLICATIONS_TABLE} rca
               WHERE rca.target_order_list_id = ${ORDER_TABLE}.${ORDER_COLS.id}
             ) AS credit_applied_amount
           FROM ${ORDER_TABLE}

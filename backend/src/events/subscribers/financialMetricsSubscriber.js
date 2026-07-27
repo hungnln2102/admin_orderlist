@@ -57,7 +57,7 @@ async function handleOrderPaymentReceived(payload) {
         SET ${bankCols.BALANCE} = COALESCE(${bankCols.BALANCE}, 0) + $1,
             ${bankCols.TOTAL_RECEIVED} = COALESCE(${bankCols.TOTAL_RECEIVED}, 0) + $1,
             ${bankCols.UPDATED_AT} = NOW()
-        WHERE ${bankCols.ID} = $2;
+        WHERE ${bankCols.ACCOUNT_NUMBER} = $2;
       `;
       await pool.query(updateBankQuery, [revenue, bankAccountId]);
     } else {
