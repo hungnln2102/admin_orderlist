@@ -77,6 +77,7 @@ const applyReconcileDashboardAdjustment = async (
   let profitDelta = 0;
   let offFlowDelta = 0;
   let importDelta = 0;
+  let bankBalanceDelta = 0;
 
   if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
     // Đơn đã được xử lý trước đó: hoàn tác DT/LN và/hoặc bucket ngoài luồng từ receipt không mã / biên thêm.
@@ -85,10 +86,13 @@ const applyReconcileDashboardAdjustment = async (
     offFlowDelta = -postedOffFlowBankReceipt;
   } else if (statusValue === STATUS.UNPAID || statusValue === STATUS.RENEWAL) {
     const cost = normalizeMoney(orderRow[ORDER_COLS.cost]);
-    if (postedOffFlowBankReceipt > 0) {
+    if (postedOffFlowBankReceipt > 0 || postedRevenue === 0) {
       revenueDelta = recognizedRevenue;
       profitDelta = recognizedRevenue - cost;
       offFlowDelta = offFlowForReceipt - postedOffFlowBankReceipt;
+      if (postedOffFlowBankReceipt === 0 && postedRevenue === 0) {
+        bankBalanceDelta = receiptAmt;
+      }
       if (revenueDelta > 0 && cost > 0) {
         importDelta = await resolveDashboardImportDeltaOnPaid(
           trx,
@@ -124,6 +128,7 @@ const applyReconcileDashboardAdjustment = async (
     ordersDelta: 0,
     importDelta,
     offFlowDelta,
+    bankBalanceDelta,
   });
 
   if (offFlowDelta > 0) {

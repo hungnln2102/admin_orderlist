@@ -7,6 +7,8 @@ const {
   PAYMENT_RECEIPT_DEF,
   RECEIPT_STATE_COLS,
 } = require("@/domains/payments/controller/shared/constants");
+const { applyDashboardDelta } = require("@/domains/payments/controller/shared/dashboardDelta");
+const { toMonthKey } = require("@/domains/payments/controller/shared/helpers");
 
 /**
  * POST /api/payments/payment-receipts/:receiptId/classify
@@ -94,7 +96,50 @@ const classifyReceipt = async (req, res) => {
 
         if (expense.status === "pending") {
           updateData.status = "completed";
-          isLinked = false; // Khi log đang pending, ta KHÔNG set isLinked = true để event subscriber thực hiện ghi sổ quỹ và delta.
+          isLinked = false;
+
+          const amountVal = Number(expense.amount) || 0;
+          const shopBankAccountId = expense.shop_bank_account_id;
+          const expenseType = expense.expense_type;
+          const reason = expense.reason;
+
+          if (amountVal > 0 && shopBankAccountId) {
+            const { debitShopBankExternalOut, debitShopBankWithdraw } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+            if (expenseType === "external_import") {
+              await debitShopBankExternalOut(trx, {
+                accountId: shopBankAccountId,
+                amount: amountVal,
+                sourceKind: "store_profit_expense",
+                sourceId: linkedExpenseId,
+                note: reason || null,
+              });
+            } else if (expenseType === "withdraw_profit") {
+              await debitShopBankWithdraw(trx, {
+                accountId: shopBankAccountId,
+                amount: amountVal,
+                sourceKind: "store_profit_expense",
+                sourceId: linkedExpenseId,
+                note: reason || null,
+              });
+            }
+          }
+
+          if (amountVal > 0 && (expenseType === "external_import" || expenseType === "withdraw_profit")) {
+            const { mergeSummaryUpdates, monthKeyVietnamFromDbTimestamp } = require("@/domains/orders/controller/finance/dashboardSummary");
+            const mk = await monthKeyVietnamFromDbTimestamp(trx, expense.created_at);
+            if (mk) {
+              const updates = {};
+              if (expenseType === "external_import") {
+                updates.total_profit = -amountVal;
+                updates.estimated_bank_balance = -amountVal;
+              } else if (expenseType === "withdraw_profit") {
+                updates.estimated_bank_balance = -amountVal;
+              }
+              await mergeSummaryUpdates(trx, mk, updates, {
+                context: `classifyReceipt.linkedExpense.${expenseType}`,
+              });
+            }
+          }
         } else {
           isLinked = true;  // Khi log đã completed, ta set isLinked = true để BỎ QUA ghi sổ quỹ lặp.
         }
@@ -114,6 +159,12 @@ const classifyReceipt = async (req, res) => {
 
       if (flowType.effect === "off_flow_revenue") {
         updatedState.posted_off_flow_bank_receipt = amount;
+
+        const receiptMonthKey = toMonthKey(receiptRow[PAYMENT_RECEIPT_DEF.columns.paidDate]);
+        await applyDashboardDelta(trx, receiptMonthKey, {
+          offFlowDelta: amount,
+          bankBalanceDelta: amount,
+        });
       }
 
       await trx(TABLES.paymentReceiptState)
