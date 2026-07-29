@@ -255,8 +255,10 @@ try {
     }
   };
 
-  transports.push(new TelegramErrorTransport({ level: "error" }));
-  transports.push(new TelegramWarnTransport({ level: "warn" }));
+  if (process.env.NODE_ENV !== "test") {
+    transports.push(new TelegramErrorTransport({ level: "error" }));
+    transports.push(new TelegramWarnTransport({ level: "warn" }));
+  }
 } catch (err) {
   console.warn("[Logger] Could not load Telegram error notifier:", err.message);
 }

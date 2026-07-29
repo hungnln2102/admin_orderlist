@@ -864,7 +864,7 @@ const runRenewal = async (
           san_pham: details.SAN_PHAM,
           ngay_het_han_moi: details.HET_HAN,
           registration_date: formatDateDB(ngayBatDauMoi),
-          days: finalDays,
+          days: soNgayGiaHan,
           cost: finalGiaNhap,
           price: finalGiaBan,
         });

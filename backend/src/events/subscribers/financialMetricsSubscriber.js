@@ -2,83 +2,62 @@ const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 const logger = require("@/utils/logger");
 const { pool } = require("@/config/database");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, ADMIN_SCHEMA, SCHEMA_ADMIN, tableName } = require("@/config/dbSchema");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
 const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
-const bankTable = tableName(ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.TABLE, SCHEMA_ADMIN);
-const bankCols = ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;
-
 /**
  * 1 & 2. Nhận Webhook Sepay (Thanh toán đơn & Gia hạn)
  * Công thức: Doanh thu += Số tiền nhận
- *            Tiền trong Bank += Số tiền nhận
  *            Chi phí += Cost NCC
  *            Lợi nhuận = Số tiền nhận - Cost NCC
+ * LƯU Ý: Bank balance KHÔNG cộng ở đây — receiptPhase.js đã ghi ledger chính xác
+ *         qua creditShopBankFromPaymentReceipt(). Xem analysis bug gấp 3x bank balance.
  */
 async function handleOrderPaymentReceived(payload) {
   try {
-    const { amount, cost, profit: payloadProfit, monthKey, orderCode, bankAccountId } = payload;
+    const { amount, cost, profit: payloadProfit, monthKey, orderCode } = payload;
     const revenue = Number(amount) || 0;
     const importCost = Number(cost) || 0;
     const profit = payloadProfit !== undefined ? Number(payloadProfit) : (revenue - importCost);
 
-    logger.info(`[FinancialMetrics] Tiền vào đơn ${orderCode}: Doanh thu +${revenue}, Sổ Quỹ +${revenue}, Chi phí +${importCost}, Lợi nhuận +${profit}`);
+    logger.info(`[FinancialMetrics] Tiền vào đơn ${orderCode}: Doanh thu +${revenue}, Chi phí +${importCost}, Lợi nhuận +${profit}`);
 
     // Nếu thiếu monthKey, fallback về tháng hiện tại
     const finalMonthKey = monthKey || new Date().toISOString().slice(0, 7);
 
-    // 1. Cập nhật bảng dashboard_monthly_summary (Upsert)
+    // 1. Cập nhật bảng dashboard_monthly_summary (Upsert) — CHỈ revenue/profit/import
+    //    Bank balance (estimated_bank_balance) KHÔNG cộng ở đây vì
+    //    receiptPhase.js → creditShopBankFromPaymentReceipt() đã ghi ledger chính xác.
+    //    shop_bank_accounts.balance cũng KHÔNG cộng ở đây vì cùng lý do trên.
     const updateSummaryQuery = `
       INSERT INTO ${summaryTable} (
         ${summaryCols.MONTH_KEY}, 
         ${summaryCols.TOTAL_REVENUE}, 
         ${summaryCols.TOTAL_PROFIT}, 
-        ${summaryCols.TOTAL_IMPORT},
-        ${summaryCols.ESTIMATED_BANK_BALANCE}
+        ${summaryCols.TOTAL_IMPORT}
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4)
       ON CONFLICT (${summaryCols.MONTH_KEY}) 
       DO UPDATE SET 
         ${summaryCols.TOTAL_REVENUE} = ${summaryTable}.${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT} = ${summaryTable}.${summaryCols.TOTAL_IMPORT} + EXCLUDED.${summaryCols.TOTAL_IMPORT},
-        ${summaryCols.ESTIMATED_BANK_BALANCE} = ${summaryTable}.${summaryCols.ESTIMATED_BANK_BALANCE} + EXCLUDED.${summaryCols.ESTIMATED_BANK_BALANCE},
         ${summaryCols.UPDATED_AT} = NOW();
     `;
-    await pool.query(updateSummaryQuery, [finalMonthKey, revenue, profit, importCost, revenue]);
+    await pool.query(updateSummaryQuery, [finalMonthKey, revenue, profit, importCost]);
 
-    // 2. Cập nhật bảng shop_bank_accounts
-    if (bankAccountId) {
-      const updateBankQuery = `
-        UPDATE ${bankTable}
-        SET ${bankCols.BALANCE} = COALESCE(${bankCols.BALANCE}, 0) + $1,
-            ${bankCols.TOTAL_RECEIVED} = COALESCE(${bankCols.TOTAL_RECEIVED}, 0) + $1,
-            ${bankCols.UPDATED_AT} = NOW()
-        WHERE ${bankCols.ACCOUNT_NUMBER} = $2;
-      `;
-      await pool.query(updateBankQuery, [revenue, bankAccountId]);
-    } else {
-      // Cộng vào tài khoản mặc định (hoặc tài khoản có is_default = true)
-      const updateDefaultBankQuery = `
-        UPDATE ${bankTable}
-        SET ${bankCols.BALANCE} = COALESCE(${bankCols.BALANCE}, 0) + $1,
-            ${bankCols.TOTAL_RECEIVED} = COALESCE(${bankCols.TOTAL_RECEIVED}, 0) + $1,
-            ${bankCols.UPDATED_AT} = NOW()
-        WHERE ${bankCols.IS_DEFAULT} = true;
-      `;
-      await pool.query(updateDefaultBankQuery, [revenue]);
-    }
-
-    // 3. Bắn Telegram thông báo biến động tháng & Ghi log audit
+    // 2. Bắn Telegram thông báo biến động tháng & Ghi log audit
+    //    bankBalanceDelta = 0 vì bank đã được receiptPhase cập nhật,
+    //    notify sẽ tự đọc bank balance thật từ shop_bank_accounts qua sumActiveShopBankBalances().
     await notifyFinanceMonthlyDelta({
       monthKey: finalMonthKey,
       revenueDelta: revenue,
       profitDelta: profit,
       importDelta: importCost,
-      bankBalanceDelta: revenue,
+      bankBalanceDelta: 0,
       context: payload.isRenewal ? `renewal.sepay:${orderCode}` : `webhook.sepay.combined`,
       executor: pool,
     });

@@ -151,7 +151,7 @@ export const menuSections: MenuSection[] = [
     tone: "amber",
     items: [
       {
-        name: "Danh sách Admin Adobe",
+        name: "Quản lý Adobe",
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
       },

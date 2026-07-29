@@ -48,6 +48,19 @@ function isRenewAdobePublicPost(req) {
   );
 }
 
+function isNetflixPublicPost(req) {
+  const stripped = String(req.path || "");
+  const orig = String(req.originalUrl || "").split("?")[0];
+  const url = String(req.url || "").split("?")[0];
+  const needle = "/netflix/public/";
+  return (
+    stripped.startsWith(needle) ||
+    url.startsWith(needle) ||
+    /^\/api\/netflix\/public(\/|$)/.test(orig) ||
+    /^\/api\/netflix\/public(\/|$)/.test(url)
+  );
+}
+
 /**
  * Generate CSRF token for the session
  * Call this on GET requests to provide token to frontend
@@ -114,7 +127,7 @@ const verifyToken = (req, res, next) => {
     return next();
   }
 
-  if (isPublicPricingPost(req) || isRenewAdobePublicPost(req)) {
+  if (isPublicPricingPost(req) || isRenewAdobePublicPost(req) || isNetflixPublicPost(req)) {
     return next();
   }
 

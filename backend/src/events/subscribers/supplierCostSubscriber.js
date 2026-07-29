@@ -14,9 +14,11 @@ async function handleOrderPaidOrRenewed(payload) {
 
   const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     // 1. Ensure price sync from supplier_cost table
     const ensured = await ensureSupplyAndPriceFromOrder(orderCode, { client });
     if (!ensured || !ensured.supplierId) {
+      await client.query("COMMIT");
       return;
     }
 
@@ -50,7 +52,9 @@ async function handleOrderPaidOrRenewed(payload) {
         importCost,
       });
     }
+    await client.query("COMMIT");
   } catch (err) {
+    await client.query("ROLLBACK");
     logger.error("[SupplierCostSubscriber] Error handling order event", {
       orderCode,
       error: err.message,

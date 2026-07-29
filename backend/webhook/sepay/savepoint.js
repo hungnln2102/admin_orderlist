@@ -5,7 +5,16 @@
  */
 async function withSavepoint(client, savepointId, fn) {
   const sp = `sp_${String(savepointId).replace(/[^a-zA-Z0-9_]/g, "_")}`;
-  await client.query(`SAVEPOINT ${sp}`);
+  try {
+    await client.query(`SAVEPOINT ${sp}`);
+  } catch (err) {
+    if (err.message && err.message.includes("transaction blocks")) {
+      // Not in transaction block, just execute fn directly
+      return await fn();
+    }
+    throw err;
+  }
+
   try {
     const out = await fn();
     await client.query(`RELEASE SAVEPOINT ${sp}`);
