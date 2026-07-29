@@ -51,3 +51,54 @@ export async function fetchNetflixSixDigitCode(
     email,
   });
 }
+
+export interface SubAccessCodeItem {
+  subCode: string;
+  permissions: string;
+  status: "Active" | "Inactive";
+  created: string;
+  permSignin: boolean;
+  permReset: boolean;
+  permCountry: boolean;
+}
+
+export interface SubAccessCodeListResponse {
+  ok: boolean;
+  data?: SubAccessCodeItem[];
+  message?: string;
+  error?: string;
+}
+
+export async function fetchSubAccessCodes(): Promise<SubAccessCodeListResponse> {
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/list", {});
+}
+
+export async function generateSubAccessCode(params: {
+  subCode?: string;
+  permSignin?: boolean;
+  permReset?: boolean;
+  permCountry?: boolean;
+}): Promise<SubAccessCodeListResponse> {
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/generate", params);
+}
+
+export async function toggleSubAccessCode(subCode: string): Promise<SubAccessCodeListResponse> {
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/toggle", { subCode });
+}
+
+export async function deleteSubAccessCode(subCode: string): Promise<SubAccessCodeListResponse> {
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/delete", { subCode });
+}
+
+export async function renameSubAccessCode(oldSub: string, newSub: string): Promise<SubAccessCodeListResponse> {
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/rename", { oldSub, newSub });
+}
+
+export async function updateSubAccessCodePerms(params: {
+  subCode: string;
+  permSignin: boolean;
+  permReset: boolean;
+  permCountry: boolean;
+}): Promise<SubAccessCodeListResponse> {
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/update-perms", params);
+}

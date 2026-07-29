@@ -1,4 +1,4 @@
-import { FilmIcon, ClipboardDocumentIcon, DevicePhoneMobileIcon, CommandLineIcon } from "@heroicons/react/24/outline";
+import { FilmIcon, ClipboardDocumentIcon, DevicePhoneMobileIcon, CommandLineIcon, KeyIcon } from "@heroicons/react/24/outline";
 
 interface TabConfig {
   id: string;
@@ -33,6 +33,14 @@ export const NETFLIX_TABS: TabConfig[] = [
     icon: DevicePhoneMobileIcon,
     color: "text-emerald-300",
     activeColor: "bg-emerald-500/20 border-emerald-400/50 text-emerald-200",
+  },
+  {
+    id: "sub-access",
+    label: "Mã phụ (Sub-Code)",
+    description: "Quản lý Sub-Access Codes VIVA",
+    icon: KeyIcon,
+    color: "text-purple-300",
+    activeColor: "bg-purple-500/20 border-purple-400/50 text-purple-200",
   },
   {
     id: "outlook-fix",

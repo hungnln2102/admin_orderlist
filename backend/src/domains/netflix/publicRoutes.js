@@ -324,4 +324,187 @@ router.post("/six-digit-login", async (req, res) => {
   }
 });
 
+// --- CUSTOMER PANEL (cust.php) PROXY ENDPOINTS ---
+
+async function getCustSession() {
+  const res = await fetch("https://vivarocky.in/cust.php", {
+    method: "POST",
+    headers: UPSTREAM_HEADERS,
+    body: "main_code=mvrk56&login_main=1",
+  });
+  const setCookie = res.headers.get("set-cookie") || "";
+  const match = setCookie.match(/PHPSESSID=([^;]+)/);
+  const sessionId = match ? match[1] : "";
+  const html = await res.text();
+  return { sessionId, html, cookieHeader: `PHPSESSID=${sessionId}` };
+}
+
+function parseSubCodesHtml(html) {
+  const list = [];
+  const rowRegex = /<tr>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<\/tr>/gi;
+  let match;
+
+  while ((match = rowRegex.exec(html)) !== null) {
+    const subCode = stripHtml(match[1]);
+    const permText = stripHtml(match[2]);
+    const statusText = stripHtml(match[3]);
+    const createdText = stripHtml(match[4]);
+
+    if (!subCode || subCode.toLowerCase() === "sub code") continue;
+
+    const isActive = /active/i.test(statusText);
+    const permSignin = /signin/i.test(permText);
+    const permReset = /reset/i.test(permText);
+    const permCountry = /country/i.test(permText);
+
+    list.push({
+      subCode,
+      permissions: permText,
+      status: isActive ? "Active" : "Inactive",
+      created: createdText,
+      permSignin,
+      permReset,
+      permCountry,
+    });
+  }
+
+  return list;
+}
+
+// 1. LIST Sub-Access Codes
+router.post("/customer-panel/list", async (req, res) => {
+  try {
+    const { html } = await getCustSession();
+    const list = parseSubCodesHtml(html);
+    return res.json({ ok: true, data: list });
+  } catch (err) {
+    console.error("[netflix] cust list error:", err);
+    return res.status(500).json({ ok: false, error: "Lỗi kết nối Customer Panel." });
+  }
+});
+
+// 2. Generate New Sub-Code
+router.post("/customer-panel/generate", async (req, res) => {
+  const { subCode = "", permSignin = false, permReset = false, permCountry = false } = req.body || {};
+  try {
+    const { cookieHeader } = await getCustSession();
+    const body = new URLSearchParams();
+    body.append("sub_code", subCode.trim());
+    if (permSignin) body.append("perm_signin", "1");
+    if (permReset) body.append("perm_reset", "1");
+    if (permCountry) body.append("perm_country", "1");
+    body.append("generate_sub", "1");
+
+    const upstreamRes = await fetch("https://vivarocky.in/cust.php", {
+      method: "POST",
+      headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
+      body: body.toString(),
+    });
+
+    const html = await upstreamRes.text();
+    const list = parseSubCodesHtml(html);
+
+    const errorMatch = html.match(/<div[^>]*class=["'][^"']*error[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    const msg = errorMatch ? stripHtml(errorMatch[1]) : "Đã tạo mã phụ thành công.";
+
+    return res.json({ ok: !errorMatch, message: msg, data: list });
+  } catch (err) {
+    console.error("[netflix] cust generate error:", err);
+    return res.status(500).json({ ok: false, error: "Không thể tạo mã phụ." });
+  }
+});
+
+// 3. Toggle Status (Activate / Deactivate)
+router.post("/customer-panel/toggle", async (req, res) => {
+  const { subCode } = req.body || {};
+  if (!subCode) return res.status(400).json({ ok: false, error: "Missing subCode" });
+  try {
+    const { cookieHeader } = await getCustSession();
+    const upstreamRes = await fetch(`https://vivarocky.in/cust.php?toggle=1&sub=${encodeURIComponent(subCode)}`, {
+      method: "GET",
+      headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
+    });
+    const html = await upstreamRes.text();
+    const list = parseSubCodesHtml(html);
+    return res.json({ ok: true, data: list });
+  } catch (err) {
+    console.error("[netflix] cust toggle error:", err);
+    return res.status(500).json({ ok: false, error: "Không thể thay đổi trạng thái mã phụ." });
+  }
+});
+
+// 4. Delete Sub-Code
+router.post("/customer-panel/delete", async (req, res) => {
+  const { subCode } = req.body || {};
+  if (!subCode) return res.status(400).json({ ok: false, error: "Missing subCode" });
+  try {
+    const { cookieHeader } = await getCustSession();
+    const upstreamRes = await fetch(`https://vivarocky.in/cust.php?delete=1&sub=${encodeURIComponent(subCode)}`, {
+      method: "GET",
+      headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
+    });
+    const html = await upstreamRes.text();
+    const list = parseSubCodesHtml(html);
+    return res.json({ ok: true, data: list });
+  } catch (err) {
+    console.error("[netflix] cust delete error:", err);
+    return res.status(500).json({ ok: false, error: "Không thể xóa mã phụ." });
+  }
+});
+
+// 5. Rename Sub-Code
+router.post("/customer-panel/rename", async (req, res) => {
+  const { oldSub, newSub } = req.body || {};
+  if (!oldSub || !newSub) return res.status(400).json({ ok: false, error: "Missing parameters" });
+  try {
+    const { cookieHeader } = await getCustSession();
+    const body = new URLSearchParams({
+      old_sub: oldSub,
+      new_sub: newSub.trim(),
+      edit_sub_code: "1",
+    });
+
+    const upstreamRes = await fetch("https://vivarocky.in/cust.php", {
+      method: "POST",
+      headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
+      body: body.toString(),
+    });
+
+    const html = await upstreamRes.text();
+    const list = parseSubCodesHtml(html);
+    return res.json({ ok: true, data: list });
+  } catch (err) {
+    console.error("[netflix] cust rename error:", err);
+    return res.status(500).json({ ok: false, error: "Không thể đổi tên mã phụ." });
+  }
+});
+
+// 6. Update Permissions
+router.post("/customer-panel/update-perms", async (req, res) => {
+  const { subCode, permSignin, permReset, permCountry } = req.body || {};
+  if (!subCode) return res.status(400).json({ ok: false, error: "Missing subCode" });
+  try {
+    const { cookieHeader } = await getCustSession();
+    const body = new URLSearchParams();
+    body.append("sub_code", subCode);
+    if (permSignin) body.append("perm_signin", "1");
+    if (permReset) body.append("perm_reset", "1");
+    if (permCountry) body.append("perm_country", "1");
+    body.append("edit_perms", "1");
+
+    const upstreamRes = await fetch("https://vivarocky.in/cust.php", {
+      method: "POST",
+      headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
+      body: body.toString(),
+    });
+
+    const html = await upstreamRes.text();
+    const list = parseSubCodesHtml(html);
+    return res.json({ ok: true, data: list });
+  } catch (err) {
+    console.error("[netflix] cust update-perms error:", err);
+    return res.status(500).json({ ok: false, error: "Không thể cập nhật quyền mã phụ." });
+  }
+});
+
 module.exports = router;
