@@ -70,7 +70,7 @@ export interface SubAccessCodeListResponse {
 }
 
 export async function fetchSubAccessCodes(): Promise<SubAccessCodeListResponse> {
-  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/list", {});
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/public/customer-panel/list", {});
 }
 
 export async function generateSubAccessCode(params: {
@@ -79,19 +79,19 @@ export async function generateSubAccessCode(params: {
   permReset?: boolean;
   permCountry?: boolean;
 }): Promise<SubAccessCodeListResponse> {
-  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/generate", params);
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/public/customer-panel/generate", params);
 }
 
 export async function toggleSubAccessCode(subCode: string): Promise<SubAccessCodeListResponse> {
-  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/toggle", { subCode });
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/public/customer-panel/toggle", { subCode });
 }
 
 export async function deleteSubAccessCode(subCode: string): Promise<SubAccessCodeListResponse> {
-  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/delete", { subCode });
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/public/customer-panel/delete", { subCode });
 }
 
 export async function renameSubAccessCode(oldSub: string, newSub: string): Promise<SubAccessCodeListResponse> {
-  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/rename", { oldSub, newSub });
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/public/customer-panel/rename", { oldSub, newSub });
 }
 
 export async function updateSubAccessCodePerms(params: {
@@ -100,5 +100,5 @@ export async function updateSubAccessCodePerms(params: {
   permReset: boolean;
   permCountry: boolean;
 }): Promise<SubAccessCodeListResponse> {
-  return apiPost<SubAccessCodeListResponse>("/api/netflix/customer-panel/update-perms", params);
+  return apiPost<SubAccessCodeListResponse>("/api/netflix/public/customer-panel/update-perms", params);
 }
