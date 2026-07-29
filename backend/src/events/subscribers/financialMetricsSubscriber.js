@@ -2,12 +2,17 @@ const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 const logger = require("@/utils/logger");
 const { pool } = require("@/config/database");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, ADMIN_SCHEMA, SCHEMA_ADMIN, tableName } = require("@/config/dbSchema");
 const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
+const bankTable = tableName(ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.TABLE, SCHEMA_ADMIN);
+const bankCols = ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;
+// Chú ý: bankTable / bankCols không dùng trong handleOrderPaymentReceived (Sepay Webhook)
+// vì shop_bank_accounts đã được cập nhật nguyên tử qua shopBankLedgerService trong receiptPhase.js.
+// Tuy nhiên, chúng vẫn được sử dụng ở dưới trong handleWithdrawal, handleManualExpense, handleSupplierPayment.
 /**
  * 1 & 2. Nhận Webhook Sepay (Thanh toán đơn & Gia hạn)
  * Công thức: Doanh thu += Số tiền nhận
@@ -49,7 +54,10 @@ async function handleOrderPaymentReceived(payload) {
     `;
     await pool.query(updateSummaryQuery, [finalMonthKey, revenue, profit, importCost]);
 
-    // 2. Bắn Telegram thông báo biến động tháng & Ghi log audit
+    // 2. shop_bank_accounts đã được cập nhật nguyên tử qua Ledger Service
+    //    (creditShopBankFromPaymentReceipt trong receiptPhase.js) — không cập nhật lại ở đây.
+
+    // 3. Bắn Telegram thông báo biến động tháng & Ghi log audit
     //    bankBalanceDelta = 0 vì bank đã được receiptPhase cập nhật,
     //    notify sẽ tự đọc bank balance thật từ shop_bank_accounts qua sumActiveShopBankBalances().
     await notifyFinanceMonthlyDelta({

@@ -59,6 +59,19 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
         sourceId: expenseId,
         note: reason,
       });
+
+      const {
+        mergeSummaryUpdates,
+        monthKeyVietnamFromDbTimestamp,
+      } = require("@/domains/orders/controller/finance/dashboardSummary");
+      const mk = await monthKeyVietnamFromDbTimestamp(trx, trx.fn.now());
+      if (mk) {
+        await mergeSummaryUpdates(trx, mk, {
+          estimated_bank_balance: -amount,
+        }, {
+          context: `recordShopBankAccountWithdrawal.withdrawal`,
+        });
+      }
     }
 
     const updated = await trx(TABLE).select(selectColumns).where(columns.id, normalizedId).first();

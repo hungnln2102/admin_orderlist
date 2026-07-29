@@ -3,7 +3,6 @@ const logger = require("@/utils/logger");
 const {
   TABLE,
   COLS,
-  SOURCE_KINDS,
   mapExpenseRow,
   monthKeyVietnamFromDbTimestamp,
   mergeSummaryUpdates,
@@ -11,6 +10,7 @@ const {
 const {
   debitShopBankExternalOut,
   debitShopBankWithdraw,
+  SOURCE_KINDS,
 } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
 const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 const {
@@ -62,7 +62,6 @@ const completeStoreProfitExpense = async (req, res) => {
       // 2. Tạo bản ghi biên lai ảo trong payment_receipt
       const prTable = tableName(RECEIPT_SCHEMA.PAYMENT_RECEIPT.TABLE, SCHEMA_RECEIPT);
       const prCols = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS;
-      const sepayTransactionId = `MANUAL_EXP_${id}_${Date.now()}`;
       const referenceCode = `MANUAL_EXP_${id}`;
 
       const [newReceipt] = await trx(prTable).insert({
@@ -71,7 +70,6 @@ const completeStoreProfitExpense = async (req, res) => {
         [prCols.PAID_DATE]: trx.fn.now(),
         [prCols.RECEIVER]: receiverAccount,
         [prCols.NOTE]: reason || "",
-        [prCols.SEPAY_TRANSACTION_ID]: sepayTransactionId,
         [prCols.REFERENCE_CODE]: referenceCode,
         [prCols.TRANSFER_TYPE]: "out",
       }).returning([prCols.ID]);
@@ -128,16 +126,21 @@ const completeStoreProfitExpense = async (req, res) => {
       }
 
       // 7. Cập nhật số liệu báo cáo dashboard
-      if (amount > 0 && expenseType === "external_import" && expense[COLS.CREATED_AT]) {
+      if (amount > 0 && expense[COLS.CREATED_AT]) {
         const mk = await monthKeyVietnamFromDbTimestamp(trx, expense[COLS.CREATED_AT]);
         if (mk) {
-          const updates = {
-            total_profit: -amount,
-            estimated_bank_balance: -amount,
-          };
-          await mergeSummaryUpdates(trx, mk, updates, {
-            context: `completeStoreProfitExpense.${expenseType}`,
-          });
+          const updates = {};
+          if (expenseType === "external_import") {
+            updates.total_profit = -amount;
+            updates.estimated_bank_balance = -amount;
+          } else if (expenseType === "withdraw_profit") {
+            updates.estimated_bank_balance = -amount;
+          }
+          if (Object.keys(updates).length > 0) {
+            await mergeSummaryUpdates(trx, mk, updates, {
+              context: `completeStoreProfitExpense.${expenseType}`,
+            });
+          }
         }
       }
 

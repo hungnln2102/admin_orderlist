@@ -43,7 +43,7 @@ const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 
 const RUNS_PER_CASE = Number(process.env.SEPAY_FLOW_TEST_RUNS || 5);
-const TEST_PREFIX = "MAVITFLOW";
+const TEST_PREFIX = "MAVIT";
 const RECEIVER_ACCOUNT = String(process.env.SEPAY_FLOW_TEST_RECEIVER || "970422TESTFLOW").trim();
 const SLOTS_TABLE = "orders.order_payment_slots";
 
@@ -422,9 +422,9 @@ async function caseSlotPaymentSuccess(client, run, collector) {
     await processWebhook(
         makeSepayPayload({
             transactionId,
-            referenceCode: `${TEST_PREFIX}-REF-SUCCESS-${run}`,
+            referenceCode: `REF-SUCCESS-${run}`,
             amount: Number(slot.expected_amount),
-            content: `${TEST_PREFIX} thanh toan slot ${orderCode}`,
+            content: `thanh toan slot ${orderCode}`,
         })
     );
 
@@ -464,9 +464,9 @@ async function caseDuplicateWebhookIsIdempotent(client, run, collector) {
     const transactionId = `${Date.now()}${run}2`;
     const payload = makeSepayPayload({
         transactionId,
-        referenceCode: `${TEST_PREFIX}-REF-DUP-${run}`,
+        referenceCode: `REF-DUP-${run}`,
         amount: Number(slot.expected_amount),
-        content: `${TEST_PREFIX} duplicate check ${orderCode}`,
+        content: `duplicate check ${orderCode}`,
     });
 
     collector.drain();
@@ -506,9 +506,9 @@ async function caseWrongAmountDoesNotMatchSlot(client, run, collector) {
     await processWebhook(
         makeSepayPayload({
             transactionId,
-            referenceCode: `${TEST_PREFIX}-REF-WRONG-${run}`,
+            referenceCode: `REF-WRONG-${run}`,
             amount: wrongAmount,
-            content: `${TEST_PREFIX} wrong amount ${orderCode}`,
+            content: `wrong amount transaction`,
         })
     );
 
@@ -549,9 +549,9 @@ async function caseSupersededSlot(client, run, collector) {
     await processWebhook(
         makeSepayPayload({
             transactionId: `${Date.now()}${run}4`,
-            referenceCode: `${TEST_PREFIX}-REF-OLD-SLOT-${run}`,
+            referenceCode: `REF-OLD-SLOT-${run}`,
             amount: Number(firstSlot.expected_amount),
-            content: `${TEST_PREFIX} old superseded slot ${orderCode}`,
+            content: `old superseded slot ${orderCode}`,
         })
     );
 
@@ -566,9 +566,9 @@ async function caseSupersededSlot(client, run, collector) {
     await processWebhook(
         makeSepayPayload({
             transactionId: newTransactionId,
-            referenceCode: `${TEST_PREFIX}-REF-NEW-SLOT-${run}`,
+            referenceCode: `REF-NEW-SLOT-${run}`,
             amount: Number(secondSlot.expected_amount),
-            content: `${TEST_PREFIX} latest slot ${orderCode}`,
+            content: `latest slot ${orderCode}`,
         })
     );
 
