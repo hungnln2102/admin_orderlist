@@ -23,7 +23,6 @@ import {
   TicketIcon,
   UserGroupIcon,
   FilmIcon,
-  CommandLineIcon,
 } from "@heroicons/react/24/outline";
 
 export type MenuItem = {
@@ -176,11 +175,6 @@ export const menuSections: MenuSection[] = [
         name: "Quản lý Netflix",
         href: "/netflix",
         icon: FilmIcon,
-      },
-      {
-        name: "Sửa lỗi Outlook",
-        href: "/outlook-fix",
-        icon: CommandLineIcon,
       },
     ],
   },

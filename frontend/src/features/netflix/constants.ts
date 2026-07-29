@@ -1,8 +1,7 @@
-import { FilmIcon, ClipboardDocumentIcon, DevicePhoneMobileIcon } from "@heroicons/react/24/outline";
-import type { ActiveTab } from "../hooks/useNetflixAdmin";
+import { FilmIcon, ClipboardDocumentIcon, DevicePhoneMobileIcon, CommandLineIcon } from "@heroicons/react/24/outline";
 
 interface TabConfig {
-  id: ActiveTab;
+  id: string;
   label: string;
   description: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -34,5 +33,13 @@ export const NETFLIX_TABS: TabConfig[] = [
     icon: DevicePhoneMobileIcon,
     color: "text-emerald-300",
     activeColor: "bg-emerald-500/20 border-emerald-400/50 text-emerald-200",
+  },
+  {
+    id: "outlook-fix",
+    label: "Sửa lỗi Outlook",
+    description: "Sửa lỗi quy tắc chuyển tiếp thư Outlook",
+    icon: CommandLineIcon,
+    color: "text-blue-300",
+    activeColor: "bg-blue-500/20 border-blue-400/50 text-blue-200",
   },
 ];

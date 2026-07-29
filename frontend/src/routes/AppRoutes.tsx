@@ -52,7 +52,6 @@ const CreateArticlePage = lazy(() => import("@/features/content/pages/CreateArti
 const ArticleCategoriesPage = lazy(() => import("@/features/content/pages/ArticleCategoriesPage"));
 const BannersPage = lazy(() => import("@/features/content/pages/BannersPage"));
 const NetflixAdminPage = lazy(() => import("@/features/netflix/pages/NetflixAdminPage"));
-const OutlookFixPage = lazy(() => import("@/features/netflix/pages/OutlookFixPage"));
 
 export function AppRoutes() {
   return (
@@ -86,7 +85,6 @@ export function AppRoutes() {
         <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
         <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />
         <Route path="/netflix" element={<NetflixAdminPage />} />
-        <Route path="/outlook-fix" element={<OutlookFixPage />} />
         <Route path="/content/articles" element={<ArticlesPage />} />
         <Route path="/content/create" element={<CreateArticlePage />} />
         <Route path="/content/edit/:id" element={<CreateArticlePage />} />
