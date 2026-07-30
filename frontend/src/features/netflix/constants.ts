@@ -44,7 +44,7 @@ export const NETFLIX_TABS: TabConfig[] = [
   },
   {
     id: "outlook-fix",
-    label: "Sửa lỗi Outlook",
+    label: "Fix lỗi OTP Netflix",
     description: "Sửa lỗi quy tắc chuyển tiếp thư Outlook",
     icon: CommandLineIcon,
     color: "text-blue-300",

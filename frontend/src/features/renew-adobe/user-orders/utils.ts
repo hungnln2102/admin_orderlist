@@ -79,10 +79,7 @@ function displayStatusFromOrder(order: OrderInfo): DisplayStatus {
   }
   // Fix Ades / hệ thống dùng tracking_status="có gói" trực tiếp (không cần adobe_account_id).
   if (ts.includes("có gói")) {
-    if (
-      order.system_note === "fix_ades" ||
-      order.system_note === "fix_adobe_edu"
-    ) {
+    if (order.system_note === "fix_ades") {
       return "active";
     }
     return normalizeIncomingLicenseStatus(order.admin_license_status);

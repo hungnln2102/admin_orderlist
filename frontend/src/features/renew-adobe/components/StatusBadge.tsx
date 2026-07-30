@@ -21,15 +21,26 @@ export function StatusBadge({ status, account }: StatusBadgeProps) {
 
   const colorClasses =
     status === "paid" || status === "active"
-      ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/40"
+      ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
       : status === "expired"
-        ? "bg-rose-500/15 text-rose-300 border-rose-400/40"
-        : "bg-amber-500/15 text-amber-300 border-amber-400/40";
+        ? "bg-rose-500/10 text-rose-300 border-rose-500/30"
+        : "bg-amber-500/10 text-amber-300 border-amber-500/30";
+
+  const dotClasses =
+    status === "paid" || status === "active"
+      ? "bg-emerald-400"
+      : status === "expired"
+        ? "bg-rose-400"
+        : "bg-amber-400";
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${colorClasses}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${colorClasses}`}
     >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClasses}`}></span>
+        <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotClasses}`}></span>
+      </span>
       {label}
     </span>
   );

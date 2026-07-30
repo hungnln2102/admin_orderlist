@@ -39,7 +39,7 @@ export function RenewAdobeAccountActions({
       className={
         compact
           ? "mt-2 flex flex-nowrap items-center gap-2"
-          : "inline-flex flex-nowrap items-center justify-center gap-1.5"
+          : "inline-flex flex-nowrap items-center justify-center gap-2"
       }
     >
       <button
@@ -48,16 +48,16 @@ export function RenewAdobeAccountActions({
         disabled={disabled}
         title={
           checkingId === account.id
-            ? "??ang check..."
+            ? "Đang check..."
             : isBeingChecked
               ? "Checking..."
-              : "Check"
+              : "Check trạng thái"
         }
         aria-label="Check account"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/50 hover:bg-indigo-500/20 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(99,102,241,0.02)]"
       >
         {checkIsLoading ? (
-          <ArrowPathIcon className="h-4 w-4 animate-spin" />
+          <ArrowPathIcon className="h-4 w-4 animate-spin text-indigo-400" />
         ) : (
           <EyeIcon className="h-4 w-4" />
         )}
@@ -65,9 +65,9 @@ export function RenewAdobeAccountActions({
       <button
         type="button"
         onClick={() => onEditAccount(account)}
-        title="Sửa"
-        aria-label="Sửa account"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-400/35 hover:bg-amber-500/25"
+        title="Sửa thông tin"
+        aria-label="Sửa account"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/20 hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(245,158,11,0.02)]"
       >
         <PencilSquareIcon className="h-4 w-4" />
       </button>
@@ -75,12 +75,12 @@ export function RenewAdobeAccountActions({
         type="button"
         onClick={() => onDeleteAdmin(account)}
         disabled={disabled}
-        title={deleteIsLoading ? "??ang x??a..." : "X??a"}
-        aria-label="X??a account"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 hover:bg-rose-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+        title={deleteIsLoading ? "Đang xóa..." : "Xóa tài khoản"}
+        aria-label="Xóa account"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/20 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(244,63,94,0.02)]"
       >
         {deleteIsLoading ? (
-          <ArrowPathIcon className="h-4 w-4 animate-spin" />
+          <ArrowPathIcon className="h-4 w-4 animate-spin text-rose-400" />
         ) : (
           <TrashIcon className="h-4 w-4" />
         )}

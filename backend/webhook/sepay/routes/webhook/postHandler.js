@@ -256,7 +256,13 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         });
       }
 
-      if (!alreadyFinancialPosted && receiptResult?.inserted && transferAmountNormalized < 0 && paidMonthKey) {
+      if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate) && transferAmountNormalized < 0 && paidMonthKey) {
+        if (receiptResult?.duplicate) {
+          logger.info("[Webhook] Outbound receipt duplicate → retry processOutboundPhase (idempotent)", {
+            receiptId,
+            amount: transferAmountNormalized,
+          });
+        }
         await processOutboundPhase(client, parsed, receiptId, paidMonthKey);
       }
 

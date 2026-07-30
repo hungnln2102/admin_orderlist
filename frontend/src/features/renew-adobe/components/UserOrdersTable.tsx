@@ -168,11 +168,11 @@ export function UserOrdersTable({
   };
 
   return (
-    <div className="rounded-[18px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm">
-      <h3 className="text-sm font-semibold text-white/90 mb-1">
+    <div className="rounded-2xl bg-gradient-to-br from-slate-900/40 via-slate-850/40 to-slate-950/40 border border-white/5 p-4 lg:p-6 shadow-2xl backdrop-blur-md">
+      <h3 className="text-sm font-semibold text-white/95 mb-1">
         Danh sách user & đơn hàng
       </h3>
-      <p className="text-xs text-white/50 mb-4">
+      <p className="text-xs text-white/40 mb-4">
         Mã đơn hàng, Tên Khách Hàng, Email, Profile, Hệ thống, OTP, Tình trạng Gói, Hạn Sử Dụng
       </p>
 
@@ -248,14 +248,14 @@ export function UserOrdersTable({
         isSubmitting={adesRenewingId !== null}
       />
 
-      <div className="rounded-xl border border-white/10 overflow-hidden">
+      <div className="rounded-xl border border-white/5 overflow-hidden bg-slate-950/20">
         <ResponsiveTable
           showCardOnMobile
           cardView={<UserOrdersTableCard rows={currentRows} {...actionProps} />}
         >
           <table className="min-w-full divide-y divide-white/5 text-white">
             <thead>
-              <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:py-3 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 [&>th]:text-left [&>th]:bg-white/[0.03] [&>th]:whitespace-nowrap">
+              <tr className="[&>th]:px-4 [&>th]:py-3.5 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-extrabold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-indigo-300/60 [&>th]:text-left [&>th]:bg-white/[0.02] [&>th]:whitespace-nowrap border-b border-white/5">
                 <th className="min-w-[120px]">MÃ ĐƠN HÀNG</th>
                 <th className="min-w-[160px]">TÊN KHÁCH HÀNG</th>
                 <th className="min-w-[200px]">EMAIL</th>

@@ -41,23 +41,38 @@ export function UrlAccessCell({ value, onSave }: UrlAccessCellProps) {
 
   if (!editing) {
     return value ? (
-      <div className="flex items-center justify-center gap-1">
+      <div className="flex items-center justify-center gap-1.5">
         <button
           type="button"
           onClick={copyUrl}
           title={value}
-          className="inline-flex items-center gap-1 rounded-lg bg-violet-500/20 text-violet-300 border border-violet-400/40 px-2 py-0.5 text-[11px] font-semibold hover:bg-violet-500/30 transition-colors"
+          className="inline-flex items-center gap-1 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-500/30 hover:border-violet-500/50 hover:bg-violet-500/20 px-2.5 py-1 text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(139,92,246,0.02)] cursor-pointer"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="w-3 h-3"
-          >
-            <path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3Z" />
-            <path d="M11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z" />
-          </svg>
-          {copyError ? "Lỗi copy" : copied ? "Đã copy" : "Link"}
+          {copied ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-3.5 h-3.5 text-emerald-400 animate-bounce"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-3.5 h-3.5"
+            >
+              <path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3Z" />
+              <path d="M11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z" />
+            </svg>
+          )}
+          <span>{copyError ? "Lỗi copy" : copied ? "Đã copy" : "Link"}</span>
         </button>
         <button
           type="button"
@@ -65,14 +80,14 @@ export function UrlAccessCell({ value, onSave }: UrlAccessCellProps) {
             setDraft(value);
             setEditing(true);
           }}
-          className="text-white/30 hover:text-white/60 transition-colors"
+          className="text-white/30 hover:text-white/60 p-1 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
           title="Sửa URL"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            className="w-3 h-3"
+            className="w-3.5 h-3.5"
           >
             <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.262a1.75 1.75 0 0 0 0-2.474Z" />
             <path d="M4.75 3.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h6.5c.69 0 1.25-.56 1.25-1.25V9A.75.75 0 0 1 14 9v2.25A2.75 2.75 0 0 1 11.25 14h-6.5A2.75 2.75 0 0 1 2 11.25v-6.5A2.75 2.75 0 0 1 4.75 2H7a.75.75 0 0 1 0 1.5H4.75Z" />
@@ -86,7 +101,7 @@ export function UrlAccessCell({ value, onSave }: UrlAccessCellProps) {
           setDraft("");
           setEditing(true);
         }}
-        className="text-white/30 hover:text-violet-300 text-[11px] transition-colors"
+        className="inline-flex items-center gap-1 rounded-xl bg-white/[0.04] text-white/40 border border-white/5 hover:border-white/10 hover:bg-white/[0.08] hover:text-white/60 px-2.5 py-1 text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
         title="Thêm URL product"
       >
         + URL
@@ -95,13 +110,13 @@ export function UrlAccessCell({ value, onSave }: UrlAccessCellProps) {
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center justify-center gap-1.5">
       <input
         type="text"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder="https://acrs.adobe.com/go/..."
-        className="w-28 px-1.5 py-0.5 text-[11px] border border-violet-400/40 rounded bg-slate-950/60 text-white placeholder:text-white/20 outline-none focus:ring-1 focus:ring-violet-500/50"
+        className="w-36 px-2.5 py-1 text-xs border border-violet-500/30 rounded-xl bg-slate-950/65 text-white placeholder:text-white/20 outline-none focus:ring-1 focus:ring-violet-500/50 shadow-inner"
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -119,14 +134,14 @@ export function UrlAccessCell({ value, onSave }: UrlAccessCellProps) {
           onSave(draft.trim());
           setEditing(false);
         }}
-        className="text-emerald-400 hover:text-emerald-300 transition-colors"
+        className="text-emerald-400 hover:text-emerald-300 p-1 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
         title="Lưu"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 16 16"
           fill="currentColor"
-          className="w-3.5 h-3.5"
+          className="w-4 h-4"
         >
           <path
             fillRule="evenodd"
@@ -138,14 +153,14 @@ export function UrlAccessCell({ value, onSave }: UrlAccessCellProps) {
       <button
         type="button"
         onClick={() => setEditing(false)}
-        className="text-white/30 hover:text-rose-400 transition-colors"
+        className="text-white/30 hover:text-rose-400 p-1 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
         title="Hủy"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 16 16"
           fill="currentColor"
-          className="w-3.5 h-3.5"
+          className="w-4 h-4"
         >
           <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
         </svg>

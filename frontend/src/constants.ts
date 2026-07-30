@@ -95,6 +95,7 @@ export const API_ENDPOINTS = {
   FIX_ADES_CHECK_TRANSFER_STATUS: "/api/fix-ades/check-transfer-status",
   FIX_ADES_RENEW: "/api/fix-ades/renew",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
+  RENEW_ADOBE_TEST_OTP: "/api/renew-adobe/test-otp",
   RENEW_ADOBE_SYSTEM_LOGS: "/api/renew-adobe/system-logs",
   /** Fix All: backend chạy hết vòng (slot + add batch) trong một lần gọi. */
   RENEW_ADOBE_FIX_USERS_ROUND: "/api/renew-adobe/fix-users-round",

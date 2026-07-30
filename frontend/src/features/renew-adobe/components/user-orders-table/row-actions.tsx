@@ -30,14 +30,14 @@ export function RowActionButtons({
 
   const deleteDisabled = !!deletingId || !!fixingId || !!fixAllProgress;
   const actionBtnCls = compact
-    ? "rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-2.5 py-1 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-    : "rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-3 py-1.5 text-xs font-semibold";
+    ? "rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/20 px-2.5 py-1 text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(244,63,94,0.02)] cursor-pointer disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed"
+    : "rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/20 px-3 py-1.5 text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(244,63,94,0.02)] cursor-pointer";
   const fixBtnCls = compact
-    ? "rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-2.5 py-1 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-    : "rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold";
+    ? "rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/20 px-2.5 py-1 text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(245,158,11,0.02)] cursor-pointer disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed"
+    : "rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/20 px-3 py-1.5 text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(245,158,11,0.02)] cursor-pointer";
   const disabledFixBtnCls = compact
-    ? "rounded-lg bg-slate-500/20 text-slate-300 border border-slate-400/35 px-2.5 py-1 text-xs font-semibold cursor-not-allowed"
-    : "rounded-lg bg-slate-500/20 text-slate-300 border border-slate-400/35 px-3 py-1.5 text-xs font-semibold cursor-not-allowed";
+    ? "rounded-xl bg-slate-500/5 text-slate-400/40 border border-white/5 px-2.5 py-1 text-xs font-semibold cursor-not-allowed opacity-50"
+    : "rounded-xl bg-slate-500/5 text-slate-400/40 border border-white/5 px-3 py-1.5 text-xs font-semibold cursor-not-allowed opacity-50";
   const isFixLoading = fixingId === row.email || adesRenewingId === row.email;
   const canClickFix = canFixViaAdes || canFixViaAdobe;
   const disableFix = isFixLoading || deleteDisabled || !canClickFix || isActive;
@@ -80,26 +80,26 @@ export function RowActionButtons({
         type="button"
         onClick={() => onOpenEdit(row)}
         disabled={deletingTrackingId === row.order_code}
-        className={`inline-flex items-center justify-center rounded-lg border border-indigo-400/40 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40 ${
-          compact ? "h-7 w-7" : "px-2 py-1.5"
+        className={`inline-flex items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:border-indigo-500/50 hover:bg-indigo-500/20 disabled:opacity-40 hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(99,102,241,0.02)] cursor-pointer ${
+          compact ? "h-8 w-8 shrink-0" : "px-3 py-1.5"
         }`}
         title="Sửa hệ thống fix"
         aria-label="Sửa"
       >
-        <PencilSquareIcon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        <PencilSquareIcon className={compact ? "h-4 w-4" : "h-4.5 w-4.5"} />
       </button>
 
       <button
         type="button"
         onClick={() => onOpenDeleteTracking(row)}
         disabled={deletingTrackingId === row.order_code}
-        className={`inline-flex items-center justify-center rounded-lg border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-40 ${
-          compact ? "h-7 w-7" : "px-2 py-1.5"
+        className={`inline-flex items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:border-rose-500/50 hover:bg-rose-500/20 disabled:opacity-40 hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_10px_rgba(244,63,94,0.02)] cursor-pointer ${
+          compact ? "h-8 w-8 shrink-0" : "px-3 py-1.5"
         }`}
         title="Xoá đơn khỏi tracking"
         aria-label="Xoá khỏi tracking"
       >
-        <TrashIcon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        <TrashIcon className={compact ? "h-4 w-4" : "h-4.5 w-4.5"} />
       </button>
     </>
   );

@@ -1,5 +1,5 @@
 const express = require("express");
-const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem, listSystemLogs } = require("@/domains/renew-adobe/controller");
+const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem, listSystemLogs, testOtpBySource } = require("@/domains/renew-adobe/controller");
 
 const router = express.Router();
 
@@ -23,6 +23,7 @@ router.post("/accounts/:id/auto-delete-users", runAutoDeleteUsers);
 router.post("/auto-assign", runAutoAssign);
 router.post("/fix-user", fixSingleUser);
 router.post("/fix-users-round", fixUsersRound);
+router.post("/test-otp", testOtpBySource);
 router.patch("/accounts/:id/url-access", updateUrlAccess);
 router.patch("/accounts/:id", updateAccount);
 

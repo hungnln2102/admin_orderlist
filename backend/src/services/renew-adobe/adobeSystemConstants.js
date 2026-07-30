@@ -7,7 +7,6 @@
 
 const ADOBE_SYSTEM_CODES = [
   "renew_adobe",
-  "fix_adobe_edu",
   "fix_ades",
 ];
 

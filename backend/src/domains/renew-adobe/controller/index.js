@@ -43,6 +43,7 @@ const {
   activateWebsiteUser,
 } = require("@/domains/renew-adobe/controller/publicWebsite");
 const { listSystemLogs } = require("@/domains/renew-adobe/controller/systemLogs");
+const { testOtpBySource } = require("@/domains/renew-adobe/controller/testOtp");
 
 const runAutoDeleteUsers = (req, res) =>
   runAutoDeleteUsersHandler({
@@ -89,4 +90,5 @@ module.exports = {
   getWebsiteStatus,
   activateWebsiteUser,
   listSystemLogs,
+  testOtpBySource,
 };

@@ -30,6 +30,7 @@ const normalizeTransactionLikePayload = (raw = {}) => {
   const amount_in = pickFirst(raw, [
     "amount_in",
     "transferAmount",
+    "transfer_amount",
     "amountIn",
     "amount",
   ]) || 0;
@@ -53,7 +54,7 @@ const normalizeTransactionLikePayload = (raw = {}) => {
     description: pickFirst(raw, ["description"]) || "",
     account_number: pickFirst(raw, ["accountNumber", "account_number"]) || "",
     transfer_amount:
-      pickFirst(raw, ["transferAmount", "amount", "amount_in", "amountIn"]) || 0,
+      pickFirst(raw, ["transferAmount", "transfer_amount", "amount", "amount_in", "amountIn"]) || 0,
     transaction_date_raw: pickFirst(raw, [
       "transactionDate",
       "transaction_date",
