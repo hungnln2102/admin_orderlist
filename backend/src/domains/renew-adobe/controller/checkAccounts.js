@@ -108,7 +108,23 @@ async function markMappingProductFalse(accountId, userEmails) {
 }
 
 async function runCheckForAccountId(id) {
-  const account = await db(TABLE).where(COLS.ID, id).first();
+  const OTP_CFG_TABLE = tableName(
+    RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+    SCHEMA_RENEW_ADOBE
+  );
+  const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
+
+  const account = await db(TABLE)
+    .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${TABLE}.${COLS.OTP_CONFIG_ID}`)
+    .select(
+      `${TABLE}.*`,
+      `cfg.${OTP_CFG_COLS.OTP_SOURCE} as otp_source`,
+      `cfg.${OTP_CFG_COLS.MAIL_BACKUP_ID} as mail_backup_id`,
+      `cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`
+    )
+    .where(`${TABLE}.${COLS.ID}`, id)
+    .first();
+
   if (!account) {
     throw new Error("Không tìm thấy tài khoản.");
   }
@@ -120,16 +136,16 @@ async function runCheckForAccountId(id) {
   }
 
   const mailBackupId =
-    account[COLS.MAIL_BACKUP_ID] != null
-      ? Number(account[COLS.MAIL_BACKUP_ID])
+    account.mail_backup_id != null
+      ? Number(account.mail_backup_id)
       : null;
   const otpSource =
-    COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
-      ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+    account.otp_source
+      ? String(account.otp_source).trim().toLowerCase()
       : "imap";
   const yunaOrderCode =
-    COLS.YUNA_ORDER_CODE && account[COLS.YUNA_ORDER_CODE]
-      ? String(account[COLS.YUNA_ORDER_CODE]).trim()
+    account.yuna_order_code
+      ? String(account.yuna_order_code).trim()
       : null;
   logger.info("[renew-adobe] Check account", { id, email });
 

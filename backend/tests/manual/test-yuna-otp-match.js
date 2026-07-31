@@ -8,7 +8,7 @@ async function main() {
   try {
     const otp = await fetchOtpBySource({
       otpSource: "yuna",
-      accountEmail: "adobevipmavrik20@adoobee.biz.idpxcT",
+      accountEmail: "adobevipmavrik20@adoobee.biz.id",
       yunaOrderCode: "adobe1mMavryk2107",
     });
     console.log("Match OTP Result:", otp);

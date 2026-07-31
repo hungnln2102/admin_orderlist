@@ -2,6 +2,9 @@ const express = require("express");
 const {
   getWebsiteStatus,
   activateWebsiteUser,
+  getYunaOrderData,
+  getSingleAccountOtp,
+  postYunaReportError,
 } = require("@/domains/renew-adobe/controller");
 const {
   resolveSystemByEmail,
@@ -24,6 +27,10 @@ router.get("/status", getWebsiteStatus);
 router.get("/resolve-system", resolveSystemByEmail);
 router.post("/get-otp", publicGetOtp);
 router.post("/activate", requireRenewAdobePublicActivateKey, activateWebsiteUser);
+
+router.get("/order-key/lookup/:orderCode", getYunaOrderData);
+router.post("/order-key/get-otp", getSingleAccountOtp);
+router.post("/order-key/report-error", postYunaReportError);
 
 /**
  * Fix Ades public — verify email thuộc tracking system_note='fix_ades' rồi mới

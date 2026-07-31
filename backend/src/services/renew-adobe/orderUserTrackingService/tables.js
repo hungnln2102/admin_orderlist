@@ -27,6 +27,12 @@ const ACC_TABLE = tableName(
 );
 const ACC_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
+const OTP_CFG_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
+
 module.exports = {
   TBL_ORDER,
   ORD_COLS,
@@ -37,4 +43,6 @@ module.exports = {
   MAP_COLS,
   ACC_TABLE,
   ACC_COLS,
+  OTP_CFG_TABLE,
+  OTP_CFG_COLS,
 };

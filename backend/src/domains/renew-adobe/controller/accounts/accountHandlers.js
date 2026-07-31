@@ -19,6 +19,17 @@ const {
   getEmptyFields,
   trimStr,
 } = require("@/domains/renew-adobe/controller/accounts/shared");
+const {
+  SCHEMA_RENEW_ADOBE,
+  RENEW_ADOBE_SCHEMA,
+  tableName,
+} = require("@/config/dbSchema");
+
+const OTP_CFG_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
 
 const listAccounts = async (_req, res) => {
   try {
@@ -32,19 +43,22 @@ const listAccounts = async (_req, res) => {
       `${TABLE}.${COLS.LAST_CHECKED}`,
       `${TABLE}.${COLS.IS_ACTIVE}`,
       `${TABLE}.${COLS.CREATED_AT}`,
-      ...(COLS.MAIL_BACKUP_ID ? [`${TABLE}.${COLS.MAIL_BACKUP_ID}`] : []),
-      ...(COLS.OTP_SOURCE ? [`${TABLE}.${COLS.OTP_SOURCE}`] : []),
-      ...(COLS.YUNA_ORDER_CODE ? [`${TABLE}.${COLS.YUNA_ORDER_CODE}`] : []),
+      `${TABLE}.${COLS.OTP_CONFIG_ID}`,
+      `cfg.${OTP_CFG_COLS.MAIL_BACKUP_ID} as mail_backup_id`,
+      `cfg.${OTP_CFG_COLS.OTP_SOURCE} as otp_source`,
+      `cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`,
       ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
       ...(COLS.ID_PRODUCT ? [`${TABLE}.${COLS.ID_PRODUCT}`] : []),
     ];
 
-    let qb = db(TABLE);
+    let qb = db(TABLE)
+      .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${TABLE}.${COLS.OTP_CONFIG_ID}`);
+
     if (MAIL_BACKUP_TABLE && MB_COLS.ALIAS_PREFIX) {
       qb = qb
         .leftJoin(
           MAIL_BACKUP_TABLE,
-          `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
+          `cfg.${OTP_CFG_COLS.MAIL_BACKUP_ID}`,
           `${MAIL_BACKUP_TABLE}.${MB_COLS.ID}`
         )
         .select(
@@ -168,28 +182,37 @@ const createAccount = async (req, res) => {
       });
     }
 
-    const [inserted] = await db(TABLE)
-      .insert({
-        [COLS.EMAIL]: email,
-        [COLS.PASSWORD_ENC]: password,
-        [COLS.ORG_NAME]: null,
-        [COLS.LICENSE_STATUS]: null,
-        [COLS.USER_COUNT]: 0,
-        [COLS.ALERT_CONFIG]: null,
-        [COLS.LAST_CHECKED]: null,
-        [COLS.IS_ACTIVE]: true,
-        [COLS.CREATED_AT]: db.fn.now(),
-        [COLS.MAIL_BACKUP_ID]: resolvedMailBackupId,
-        ...(COLS.OTP_SOURCE ? { [COLS.OTP_SOURCE]: otpSource } : {}),
-        ...(COLS.YUNA_ORDER_CODE ? { [COLS.YUNA_ORDER_CODE]: req.body?.yuna_order_code ? String(req.body.yuna_order_code).trim() : null } : {}),
-        ...(COLS.URL_ACCESS ? { [COLS.URL_ACCESS]: null } : {}),
-      })
-      .returning(COLS.ID);
+    const id = await db.transaction(async (trx) => {
+      let otpConfigId = null;
+      if (otpSource && otpSource !== "none") {
+        const [insertedCfg] = await trx(OTP_CFG_TABLE)
+          .insert({
+            [OTP_CFG_COLS.OTP_SOURCE]: otpSource,
+            [OTP_CFG_COLS.MAIL_BACKUP_ID]: resolvedMailBackupId,
+            [OTP_CFG_COLS.YUNA_ORDER_CODE]: req.body?.yuna_order_code ? String(req.body.yuna_order_code).trim() : null,
+          })
+          .returning(OTP_CFG_COLS.ID);
+        otpConfigId = insertedCfg && typeof insertedCfg === "object" ? insertedCfg[OTP_CFG_COLS.ID] : insertedCfg;
+      }
 
-    const id =
-      inserted && typeof inserted === "object"
-        ? inserted[COLS.ID]
-        : inserted;
+      const [inserted] = await trx(TABLE)
+        .insert({
+          [COLS.EMAIL]: email,
+          [COLS.PASSWORD_ENC]: password,
+          [COLS.ORG_NAME]: null,
+          [COLS.LICENSE_STATUS]: null,
+          [COLS.USER_COUNT]: 0,
+          [COLS.ALERT_CONFIG]: null,
+          [COLS.LAST_CHECKED]: null,
+          [COLS.IS_ACTIVE]: true,
+          [COLS.CREATED_AT]: trx.fn.now(),
+          [COLS.OTP_CONFIG_ID]: otpConfigId,
+          ...(COLS.URL_ACCESS ? { [COLS.URL_ACCESS]: null } : {}),
+        })
+        .returning(COLS.ID);
+
+      return inserted && typeof inserted === "object" ? inserted[COLS.ID] : inserted;
+    });
 
     logger.info("[renew-adobe] Created admin account", { id, email });
     return res.status(201).json({ success: true, id });
@@ -231,7 +254,14 @@ const deleteAccount = async (req, res) => {
       ),
     ];
 
-    const deleted = await db(TABLE).where(COLS.ID, id).del();
+    const otpConfigId = row[COLS.OTP_CONFIG_ID];
+    const deleted = await db.transaction(async (trx) => {
+      const delCount = await trx(TABLE).where(COLS.ID, id).del();
+      if (delCount && otpConfigId) {
+        await trx(OTP_CFG_TABLE).where(OTP_CFG_COLS.ID, otpConfigId).del();
+      }
+      return delCount;
+    });
     if (!deleted) {
       return res.status(404).json({ error: "Không tìm thấy tài khoản." });
     }
@@ -305,16 +335,14 @@ const updateAccount = async (req, res) => {
     return res.status(400).json({ error: "ID không hợp lệ." });
   }
 
-  const allowedFields = {
+  const accountFields = {
     email: COLS.EMAIL,
     password_encrypted: COLS.PASSWORD_ENC,
     org_name: COLS.ORG_NAME,
-    otp_source: COLS.OTP_SOURCE,
-    yuna_order_code: COLS.YUNA_ORDER_CODE,
   };
 
   const updates = {};
-  for (const [key, col] of Object.entries(allowedFields)) {
+  for (const [key, col] of Object.entries(accountFields)) {
     if (req.body?.[key] !== undefined) {
       const val = String(req.body[key] ?? "").trim();
       if (key === "email") {
@@ -322,23 +350,61 @@ const updateAccount = async (req, res) => {
           return res.status(400).json({ error: "Email không hợp lệ." });
         }
       }
-      if (key === "otp_source") {
-        updates[col] = normalizeOtpSource(val);
-        continue;
-      }
       updates[col] = val || null;
     }
   }
 
-  if (Object.keys(updates).length === 0) {
+  const otpCfgUpdates = {};
+  if (req.body?.otp_source !== undefined) {
+    otpCfgUpdates[OTP_CFG_COLS.OTP_SOURCE] = normalizeOtpSource(req.body.otp_source);
+  }
+  if (req.body?.mail_backup_id !== undefined) {
+    const mbRaw = req.body.mail_backup_id;
+    otpCfgUpdates[OTP_CFG_COLS.MAIL_BACKUP_ID] = mbRaw ? parseInt(String(mbRaw), 10) : null;
+  }
+  if (req.body?.yuna_order_code !== undefined) {
+    otpCfgUpdates[OTP_CFG_COLS.YUNA_ORDER_CODE] = req.body.yuna_order_code ? String(req.body.yuna_order_code).trim() : null;
+  }
+
+  if (Object.keys(updates).length === 0 && Object.keys(otpCfgUpdates).length === 0) {
     return res.status(400).json({ error: "Không có trường nào để cập nhật." });
   }
 
   try {
-    const [updated] = await db(TABLE)
-      .where(COLS.ID, id)
-      .update(updates)
-      .returning("*");
+    const updated = await db.transaction(async (trx) => {
+      const accountRow = await trx(TABLE).where(COLS.ID, id).select(COLS.OTP_CONFIG_ID).first();
+      if (!accountRow) return null;
+
+      let currentOtpConfigId = accountRow[COLS.OTP_CONFIG_ID];
+
+      if (Object.keys(otpCfgUpdates).length > 0) {
+        if (currentOtpConfigId) {
+          await trx(OTP_CFG_TABLE).where(OTP_CFG_COLS.ID, currentOtpConfigId).update(otpCfgUpdates);
+        } else {
+          const [insertedCfg] = await trx(OTP_CFG_TABLE).insert(otpCfgUpdates).returning(OTP_CFG_COLS.ID);
+          currentOtpConfigId = insertedCfg && typeof insertedCfg === "object" ? insertedCfg[OTP_CFG_COLS.ID] : insertedCfg;
+          updates[COLS.OTP_CONFIG_ID] = currentOtpConfigId;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await trx(TABLE).where(COLS.ID, id).update(updates);
+      }
+
+      // Return refreshed account joined with otp_configs
+      const refreshed = await trx(TABLE)
+        .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${TABLE}.${COLS.OTP_CONFIG_ID}`)
+        .where(`${TABLE}.${COLS.ID}`, id)
+        .select(
+          `${TABLE}.*`,
+          `cfg.${OTP_CFG_COLS.OTP_SOURCE} as otp_source`,
+          `cfg.${OTP_CFG_COLS.MAIL_BACKUP_ID} as mail_backup_id`,
+          `cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`
+        )
+        .first();
+
+      return refreshed;
+    });
 
     if (!updated) {
       return res.status(404).json({ error: "Không tìm thấy tài khoản." });

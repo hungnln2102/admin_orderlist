@@ -23,21 +23,31 @@ const testOtpBySource = async (req, res) => {
       const { db } = require("@/db");
       const { RENEW_ADOBE_SCHEMA, SCHEMA_RENEW_ADOBE, tableName } = require("@/config/dbSchema");
       
-      const trackRow = await db(tableName(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE, SCHEMA_RENEW_ADOBE))
-        .select(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.YUNA_ORDER_CODE)
-        .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.ACCOUNT, accountEmail])
-        .orderBy(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.UPDATED_AT, "desc")
+      const OTP_CFG_TABLE = tableName(
+        RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+        SCHEMA_RENEW_ADOBE
+      );
+      const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
+
+      const trackTable = tableName(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE, SCHEMA_RENEW_ADOBE);
+      const trackRow = await db(trackTable)
+        .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${trackTable}.${RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.OTP_CONFIG_ID}`)
+        .select(`cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`)
+        .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [`${trackTable}.${RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.ACCOUNT}`, accountEmail])
+        .orderBy(`${trackTable}.${RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.UPDATED_AT}`, "desc")
         .first()
         .catch(() => null);
 
-      const accountRow = await db(tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE))
-        .select(RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.YUNA_ORDER_CODE)
-        .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.EMAIL, accountEmail])
+      const accTable = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
+      const accountRow = await db(accTable)
+        .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${accTable}.${RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.OTP_CONFIG_ID}`)
+        .select(`cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`)
+        .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [`${accTable}.${RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.EMAIL}`, accountEmail])
         .first()
         .catch(() => null);
 
-      yunaOrderCode = (trackRow?.[RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.YUNA_ORDER_CODE] || 
-                       accountRow?.[RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.YUNA_ORDER_CODE] || 
+      yunaOrderCode = (trackRow?.yuna_order_code || 
+                       accountRow?.yuna_order_code || 
                        "").trim();
     }
 

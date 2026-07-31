@@ -47,6 +47,12 @@ async function trackingHasOtpSourceColumn() {
   return otpSourceColumnExistsCache;
 }
 
+const OTP_CFG_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
+
 /**
  * Nguồn dữ liệu là `order_user_tracking` (bảng tracking) — không lọc renew_adobe variant
  * để đơn admin tự thêm tay (không thuộc nhóm renew_adobe) vẫn hiển thị.
@@ -55,11 +61,10 @@ async function trackingHasOtpSourceColumn() {
  * - order_list (o): lấy customer/contact/status/expiry hiện tại (fallback về tracking nếu thiếu).
  * - user_account_mapping (m): map email ↔ adobe_account_id theo cặp (order_id, email).
  * - accounts_admin (acc): tên org & license_status của admin Adobe.
+ * - otp_configs (cfg): nguồn cấu hình OTP.
  */
 const listUserOrders = async (_req, res) => {
   try {
-    const hasOtpSource = await trackingHasOtpSourceColumn();
-
     const rows = await db({ t: TRACK_TABLE })
       .leftJoin({ o: TBL_ORDER }, function joinOrder() {
         this.on(
@@ -80,6 +85,7 @@ const listUserOrders = async (_req, res) => {
         );
       })
       .leftJoin({ acc: ACC_TABLE }, `acc.${ACC_COLS.ID}`, `m.${MAP_COLS.ADOBE_ACCOUNT_ID}`)
+      .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `t.${TRACK_COLS.OTP_CONFIG_ID}`)
       .select(
         `t.${TRACK_COLS.ORDER_ID} as order_code`,
         db.raw(
@@ -97,10 +103,8 @@ const listUserOrders = async (_req, res) => {
         `t.${TRACK_COLS.STATUS} as tracking_status`,
         `t.${TRACK_COLS.ID_PRODUCT} as tracking_id_product`,
         `t.${TRACK_COLS.SYSTEM_NOTE} as system_note`,
-        `t.${TRACK_COLS.YUNA_ORDER_CODE} as yuna_order_code`,
-        ...(hasOtpSource
-          ? [`t.${TRACK_COLS.OTP_SOURCE} as otp_source`]
-          : [db.raw(`'imap' as otp_source`)]),
+        `cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`,
+        db.raw(`COALESCE(cfg.${OTP_CFG_COLS.OTP_SOURCE}, 'none') as otp_source`),
         `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_account_id`,
         `acc.${ACC_COLS.LICENSE_STATUS} as admin_license_status`,
         `acc.${ACC_COLS.ORG_NAME} as admin_org_name`

@@ -23,34 +23,9 @@ const getYunaOrderData = async (req, res) => {
       });
     }
 
-    const { isSlueOrKaine, isRilzz, isHotmailOrOutlook, scrapeYunaOtp } = require("@/services/yunaOtpMailScraper");
-
-    const enrichedItems = await Promise.all(
-      (result.items || []).map(async (item) => {
-        const [emailPart] = String(item.name || "").trim().split(/[#|]/);
-        const email = emailPart.trim();
-
-        const hasCode = item.code && /\b\d{6}\b/.test(String(item.code));
-        if (!hasCode && (isSlueOrKaine(email) || isRilzz(email) || isHotmailOrOutlook(email))) {
-          try {
-            const scraped = await scrapeYunaOtp(email);
-            if (scraped) {
-              return {
-                ...item,
-                code: scraped,
-              };
-            }
-          } catch (err) {
-            logger.warn(`[yuna-handler] Lỗi khi cào OTP tự động cho ${email}: ${err.message}`);
-          }
-        }
-        return item;
-      })
-    );
-
     return res.json({
       success: true,
-      items: enrichedItems,
+      items: result.items || [],
       time_left: result.time_left,
     });
   } catch (error) {
@@ -58,6 +33,65 @@ const getYunaOrderData = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || "Lỗi hệ thống khi tra cứu mã đơn hàng.",
+    });
+  }
+};
+
+/**
+ * Endpoint lấy OTP cho một tài khoản cụ thể trong đơn hàng.
+ * POST /api/renew-adobe/yuna/order/get-otp
+ */
+const getSingleAccountOtp = async (req, res) => {
+  const { orderCode, email } = req.body;
+  if (!orderCode || !email) {
+    return res.status(400).json({
+      success: false,
+      error: "Thiếu thông tin tra cứu (orderCode, email).",
+    });
+  }
+
+  try {
+    const result = await yunaOtpService.fetchYunaOrder(orderCode);
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        error: result.error || "Không lấy được thông tin đơn hàng.",
+      });
+    }
+
+    const items = result.items || [];
+    const matchedItem = items.find(item => {
+      const [emailPart] = String(item.name || "").trim().split(/[#|]/);
+      return emailPart.trim().toLowerCase() === email.trim().toLowerCase();
+    });
+
+    if (!matchedItem) {
+      return res.status(400).json({
+        success: false,
+        error: "Tài khoản không thuộc đơn hàng này.",
+      });
+    }
+
+    const { isSupportedYunaDomain, scrapeYunaOtp } = require("@/services/yunaOtpMailScraper");
+    const isSupported = await isSupportedYunaDomain(email);
+    if (!isSupported) {
+      return res.json({
+        success: true,
+        code: null,
+        message: "Tên miền email không được hỗ trợ cào tự động.",
+      });
+    }
+
+    const scraped = await scrapeYunaOtp(email);
+    return res.json({
+      success: true,
+      code: scraped || null,
+    });
+  } catch (error) {
+    logger.error("[renew-adobe/yuna] Lỗi lấy OTP đơn lẻ: %s", error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Lỗi hệ thống khi lấy OTP tài khoản.",
     });
   }
 };
@@ -100,5 +134,6 @@ const postYunaReportError = async (req, res) => {
 
 module.exports = {
   getYunaOrderData,
+  getSingleAccountOtp,
   postYunaReportError,
 };

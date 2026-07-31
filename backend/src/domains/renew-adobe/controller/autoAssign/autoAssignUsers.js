@@ -20,6 +20,16 @@ const {
   upsertRenewAdobeOrderUserTrackingForAccount,
   logAutoAssign,
 } = require("@/domains/renew-adobe/controller/autoAssign/shared");
+const {
+  SCHEMA_RENEW_ADOBE,
+  RENEW_ADOBE_SCHEMA,
+  tableName,
+} = require("@/config/dbSchema");
+const OTP_CFG_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
 
 async function autoAssignUsers({ onProgress = null } = {}) {
   const variantIds = await getRenewAdobeVariantIds();
@@ -52,21 +62,22 @@ async function autoAssignUsers({ onProgress = null } = {}) {
   logAutoAssign(onProgress, { step: "active_orders", count: activeEmails.size });
 
   const accounts = await db(TABLE)
+    .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${TABLE}.${COLS.OTP_CONFIG_ID}`)
     .select(
-      COLS.ID,
-      COLS.EMAIL,
-      COLS.PASSWORD_ENC,
-      COLS.ORG_NAME,
-      COLS.LICENSE_STATUS,
-      COLS.USER_COUNT,
-      COLS.ALERT_CONFIG,
-      ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
-      COLS.MAIL_BACKUP_ID,
-      ...(COLS.YUNA_ORDER_CODE ? [COLS.YUNA_ORDER_CODE] : []),
-      ...(COLS.ID_PRODUCT ? [COLS.ID_PRODUCT] : [])
+      `${TABLE}.${COLS.ID}`,
+      `${TABLE}.${COLS.EMAIL}`,
+      `${TABLE}.${COLS.PASSWORD_ENC}`,
+      `${TABLE}.${COLS.ORG_NAME}`,
+      `${TABLE}.${COLS.LICENSE_STATUS}`,
+      `${TABLE}.${COLS.USER_COUNT}`,
+      `${TABLE}.${COLS.ALERT_CONFIG}`,
+      `cfg.${OTP_CFG_COLS.OTP_SOURCE} as otp_source`,
+      `cfg.${OTP_CFG_COLS.MAIL_BACKUP_ID} as mail_backup_id`,
+      `cfg.${OTP_CFG_COLS.YUNA_ORDER_CODE} as yuna_order_code`,
+      ...(COLS.ID_PRODUCT ? [`${TABLE}.${COLS.ID_PRODUCT}`] : [])
     )
-    .where(COLS.IS_ACTIVE, true)
-    .orderBy(COLS.ID, "asc");
+    .where(`${TABLE}.${COLS.IS_ACTIVE}`, true)
+    .orderBy(`${TABLE}.${COLS.ID}`, "asc");
 
   const existingEmails = new Set();
   const mappedRows = await db(MAP_TABLE)
@@ -141,13 +152,13 @@ async function autoAssignUsers({ onProgress = null } = {}) {
 
     try {
       const mailBackupId =
-        account[COLS.MAIL_BACKUP_ID] != null
-          ? Number(account[COLS.MAIL_BACKUP_ID])
+        account.mail_backup_id != null
+          ? Number(account.mail_backup_id)
           : null;
       const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
       const otpSource =
-        COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
-          ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+        account.otp_source
+          ? String(account.otp_source).trim().toLowerCase()
           : "imap";
       const v2 = await adobeRenewV2.addUsersWithProductV2(
         accountEmail,
@@ -158,7 +169,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
           savedCookiesFromDb: account[COLS.ALERT_CONFIG] ?? null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
-          yunaOrderCode: COLS.YUNA_ORDER_CODE ? account[COLS.YUNA_ORDER_CODE] : null,
+          yunaOrderCode: account.yuna_order_code || null,
           orgId: account[COLS.ORG_ID] || null,
           maxUsers: account.userLimit || MAX_USERS_PER_ACCOUNT,
         }

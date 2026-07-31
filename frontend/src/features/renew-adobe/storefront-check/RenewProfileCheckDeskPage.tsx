@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, ChevronRight, ShieldCheck, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, ShieldCheck, X, Search } from "lucide-react";
 import { useStorefrontRenewCheck } from "./hooks/useStorefrontRenewCheck";
 import { RenewStatusPanel } from "./components/RenewStatusPanel";
 import { STOREFRONT_RENEW_CHECK_STYLES } from "./styles/storefrontRenewCheck.styles";

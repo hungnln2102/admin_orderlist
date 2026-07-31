@@ -241,11 +241,19 @@ async function checkAdesAccount(email) {
   const result = await callWithToken((token) => postAccountCheck(e, token), e);
 
   if (!result.ok) {
-    logger.warn("[fix-ades] check failed", {
-      email: e,
-      status: result.status,
-      body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
-    });
+    if (result.status === 400 || result.status === 403 || result.status === 404) {
+      logger.info("[fix-ades] check validation status (not found or expired)", {
+        email: e,
+        status: result.status,
+        body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    } else {
+      logger.warn("[fix-ades] check failed", {
+        email: e,
+        status: result.status,
+        body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    }
   }
 
   return {
@@ -270,12 +278,21 @@ async function checkAdesTransferStatus(email) {
   const result = await callWithToken((token) => postAccountCheck(e, token), e);
 
   if (!isUsableAdesCheckResult(result)) {
-    logger.warn("[fix-ades] check transfer status failed or unusable", {
-      email: e,
-      status: result?.status,
-      ok: result?.ok,
-      body: typeof result?.raw === "string" ? result.raw.slice(0, 320) : null,
-    });
+    if (result?.status === 400 || result?.status === 403 || result?.status === 404) {
+      logger.info("[fix-ades] check transfer status validation (not found or expired)", {
+        email: e,
+        status: result?.status,
+        ok: result?.ok,
+        body: typeof result?.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    } else {
+      logger.warn("[fix-ades] check transfer status failed or unusable", {
+        email: e,
+        status: result?.status,
+        ok: result?.ok,
+        body: typeof result?.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    }
   }
 
   return {
@@ -306,11 +323,19 @@ async function renewAdesAccount(email) {
   }, e);
 
   if (!result.ok) {
-    logger.warn("[fix-ades] renew failed", {
-      email: e,
-      status: result.status,
-      body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
-    });
+    if (result.status === 400 || result.status === 403 || result.status === 404) {
+      logger.info("[fix-ades] renew validation status", {
+        email: e,
+        status: result.status,
+        body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    } else {
+      logger.warn("[fix-ades] renew failed", {
+        email: e,
+        status: result.status,
+        body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    }
   } else {
     logger.info("[fix-ades] renew success", {
       email: e,
@@ -352,11 +377,19 @@ async function syncAdesAccount(email) {
   }, e);
 
   if (!result.ok) {
-    logger.warn("[fix-ades] sync ADO failed", {
-      email: e,
-      status: result.status,
-      body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
-    });
+    if (result.status === 400 || result.status === 403 || result.status === 404) {
+      logger.info("[fix-ades] sync ADO validation status (feature disabled or invalid)", {
+        email: e,
+        status: result.status,
+        body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    } else {
+      logger.warn("[fix-ades] sync ADO failed", {
+        email: e,
+        status: result.status,
+        body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      });
+    }
   } else {
     logger.info("[fix-ades] sync ADO success", {
       email: e,

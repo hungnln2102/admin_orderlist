@@ -34,6 +34,12 @@ const TRACK_TABLE = tableName(
 );
 const TRACK_COLS = RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS;
 
+const OTP_CFG_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
+
 const MAX_RESULT_ROWS = 200;
 const MAX_TRACK_BATCH = 100;
 
@@ -235,9 +241,19 @@ const updateTrackingOrder = async (req, res) => {
       return res.status(400).json({ error: "Thiếu orderCode." });
     }
 
+    const trackRow = await db(TRACK_TABLE).where(TRACK_COLS.ORDER_ID, orderCode).first();
+    if (!trackRow) {
+      return res
+        .status(404)
+        .json({ error: `Không tìm thấy đơn ${orderCode} trong tracking.` });
+    }
+    let currentOtpConfigId = trackRow[TRACK_COLS.OTP_CONFIG_ID];
+
     const updates = {};
+    const otpCfgUpdates = {};
     /** Chỉ chứa giá trị primitive — dùng cho logger (tránh JSON.stringify trên Knex Raw). */
     const loggableUpdates = {};
+
     if (
       req.body?.system_note !== undefined ||
       req.body?.systemNote !== undefined
@@ -248,6 +264,7 @@ const updateTrackingOrder = async (req, res) => {
       updates[TRACK_COLS.SYSTEM_NOTE] = systemNote;
       loggableUpdates.system_note = systemNote;
     }
+
     if (
       req.body?.otp_source !== undefined ||
       req.body?.otpSource !== undefined
@@ -255,33 +272,42 @@ const updateTrackingOrder = async (req, res) => {
       const otpSource = normalizeTrackingOtpSource(
         req.body?.otp_source ?? req.body?.otpSource
       );
-      updates[TRACK_COLS.OTP_SOURCE] = otpSource;
+      otpCfgUpdates[OTP_CFG_COLS.OTP_SOURCE] = otpSource;
       loggableUpdates.otp_source = otpSource;
     }
+
     if (
       req.body?.yuna_order_code !== undefined ||
       req.body?.yunaOrderCode !== undefined
     ) {
       const yunaOrderCode = String(req.body?.yuna_order_code ?? req.body?.yunaOrderCode ?? "").trim();
-      updates[TRACK_COLS.YUNA_ORDER_CODE] = yunaOrderCode || null;
+      otpCfgUpdates[OTP_CFG_COLS.YUNA_ORDER_CODE] = yunaOrderCode || null;
       loggableUpdates.yuna_order_code = yunaOrderCode || null;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && Object.keys(otpCfgUpdates).length === 0) {
       return res.status(400).json({ error: "Không có trường nào để cập nhật." });
     }
 
     updates[TRACK_COLS.UPDATED_AT] = db.fn.now();
 
-    const updated = await db(TRACK_TABLE)
-      .where(TRACK_COLS.ORDER_ID, orderCode)
-      .update(updates);
+    await db.transaction(async (trx) => {
+      if (Object.keys(otpCfgUpdates).length > 0) {
+        if (currentOtpConfigId) {
+          await trx(OTP_CFG_TABLE).where(OTP_CFG_COLS.ID, currentOtpConfigId).update(otpCfgUpdates);
+        } else {
+          const [insertedCfg] = await trx(OTP_CFG_TABLE).insert(otpCfgUpdates).returning(OTP_CFG_COLS.ID);
+          currentOtpConfigId = insertedCfg && typeof insertedCfg === "object" ? insertedCfg[OTP_CFG_COLS.ID] : insertedCfg;
+          updates[TRACK_COLS.OTP_CONFIG_ID] = currentOtpConfigId;
+        }
+      }
 
-    if (!updated) {
-      return res
-        .status(404)
-        .json({ error: `Không tìm thấy đơn ${orderCode} trong tracking.` });
-    }
+      if (Object.keys(updates).length > 0) {
+        await trx(TRACK_TABLE)
+          .where(TRACK_COLS.ORDER_ID, orderCode)
+          .update(updates);
+      }
+    });
 
     logger.info("[renew-adobe] updateTrackingOrder", {
       orderCode,
@@ -290,7 +316,7 @@ const updateTrackingOrder = async (req, res) => {
     return res.json({
       ok: true,
       orderCode,
-      updated_count: Number(updated),
+      updated_count: 1,
     });
   } catch (error) {
     logger.error("[renew-adobe] updateTrackingOrder failed", {
@@ -315,19 +341,25 @@ const deleteTrackingOrder = async (req, res) => {
       return res.status(400).json({ error: "Thiếu orderCode." });
     }
 
-    const removed = await db(TRACK_TABLE)
-      .where(TRACK_COLS.ORDER_ID, orderCode)
-      .del();
-
-    if (!removed) {
+    const trackRow = await db(TRACK_TABLE).where(TRACK_COLS.ORDER_ID, orderCode).first();
+    if (!trackRow) {
       return res
         .status(404)
         .json({ error: `Không tìm thấy đơn ${orderCode} trong tracking.` });
     }
 
+    const otpConfigId = trackRow[TRACK_COLS.OTP_CONFIG_ID];
+    const removed = await db.transaction(async (trx) => {
+      const delCount = await trx(TRACK_TABLE).where(TRACK_COLS.ORDER_ID, orderCode).del();
+      if (delCount && otpConfigId) {
+        await trx(OTP_CFG_TABLE).where(OTP_CFG_COLS.ID, otpConfigId).del();
+      }
+      return delCount;
+    });
+
     logger.info("[renew-adobe] deleteTrackingOrder", {
       orderCode,
-      removed,
+      removed: Number(removed),
     });
     return res.json({ ok: true, orderCode, removed: Number(removed) });
   } catch (error) {

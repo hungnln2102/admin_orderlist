@@ -10,6 +10,8 @@ const {
   MAP_COLS,
   ACC_TABLE,
   ACC_COLS,
+  OTP_CFG_TABLE,
+  OTP_CFG_COLS,
 } = require("@/services/renew-adobe/orderUserTrackingService/tables");
 const { normalizeEmail, resolveRowStatus } = require("@/services/renew-adobe/orderUserTrackingService/helpers");
 
@@ -81,6 +83,17 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
     }
   }
 
+  const existingTracks = orderCodes.length > 0
+    ? await db(TRACK_TABLE)
+        .select(TRACK_COLS.ORDER_ID, TRACK_COLS.OTP_CONFIG_ID)
+        .whereIn(TRACK_COLS.ORDER_ID, orderCodes)
+    : [];
+  const mapTrackToOtpConfigId = new Map();
+  for (const t of existingTracks) {
+    const oc = String(t[TRACK_COLS.ORDER_ID] || "").trim();
+    if (oc) mapTrackToOtpConfigId.set(oc, t[TRACK_COLS.OTP_CONFIG_ID]);
+  }
+
   let upserted = 0;
   const trx = await db.transaction();
   try {
@@ -111,6 +124,28 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
       const customer = o[ORD_COLS.CUSTOMER] ?? null;
       const account = emailKey || null;
 
+      let currentOtpConfigId = mapTrackToOtpConfigId.get(orderId) || null;
+
+      if (currentOtpConfigId) {
+        const otpCfgUpdates = {};
+        if (explicitOtpSource) otpCfgUpdates[OTP_CFG_COLS.OTP_SOURCE] = explicitOtpSource;
+        if (explicitYunaOrderCode) otpCfgUpdates[OTP_CFG_COLS.YUNA_ORDER_CODE] = explicitYunaOrderCode;
+        if (Object.keys(otpCfgUpdates).length > 0) {
+          await trx(OTP_CFG_TABLE).where(OTP_CFG_COLS.ID, currentOtpConfigId).update(otpCfgUpdates);
+        }
+      } else {
+        const hasConfigInfo = (explicitOtpSource && explicitOtpSource !== 'none') || explicitYunaOrderCode;
+        if (hasConfigInfo) {
+          const [insertedCfg] = await trx(OTP_CFG_TABLE)
+            .insert({
+              [OTP_CFG_COLS.OTP_SOURCE]: explicitOtpSource || 'none',
+              [OTP_CFG_COLS.YUNA_ORDER_CODE]: explicitYunaOrderCode || null,
+            })
+            .returning(OTP_CFG_COLS.ID);
+          currentOtpConfigId = insertedCfg && typeof insertedCfg === "object" ? insertedCfg[OTP_CFG_COLS.ID] : insertedCfg;
+        }
+      }
+
       const insertRow = {
         [TRACK_COLS.ORDER_ID]: orderId,
         [TRACK_COLS.CUSTOMER]: customer,
@@ -119,6 +154,7 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
         [TRACK_COLS.EXPIRED]: expired,
         [TRACK_COLS.STATUS]: status,
         [TRACK_COLS.UPDATED_AT]: trx.fn.now(),
+        [TRACK_COLS.OTP_CONFIG_ID]: currentOtpConfigId,
       };
       const mergeRow = {
         [TRACK_COLS.CUSTOMER]: customer,
@@ -127,6 +163,7 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
         [TRACK_COLS.EXPIRED]: expired,
         [TRACK_COLS.STATUS]: status,
         [TRACK_COLS.UPDATED_AT]: trx.fn.now(),
+        [TRACK_COLS.OTP_CONFIG_ID]: currentOtpConfigId,
       };
       if (idProductStr) {
         insertRow[TRACK_COLS.ID_PRODUCT] = idProductStr;
@@ -136,14 +173,6 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
       if (TRACK_COLS.SYSTEM_NOTE && explicitSystemNote) {
         insertRow[TRACK_COLS.SYSTEM_NOTE] = explicitSystemNote;
         mergeRow[TRACK_COLS.SYSTEM_NOTE] = explicitSystemNote;
-      }
-      if (TRACK_COLS.OTP_SOURCE && explicitOtpSource) {
-        insertRow[TRACK_COLS.OTP_SOURCE] = explicitOtpSource;
-        mergeRow[TRACK_COLS.OTP_SOURCE] = explicitOtpSource;
-      }
-      if (TRACK_COLS.YUNA_ORDER_CODE && explicitYunaOrderCode) {
-        insertRow[TRACK_COLS.YUNA_ORDER_CODE] = explicitYunaOrderCode;
-        mergeRow[TRACK_COLS.YUNA_ORDER_CODE] = explicitYunaOrderCode;
       }
 
       await trx(TRACK_TABLE).insert(insertRow).onConflict(TRACK_COLS.ORDER_ID).merge(mergeRow);
