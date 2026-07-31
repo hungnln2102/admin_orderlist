@@ -16,3 +16,7 @@
 ## Authority & Execution Control
 - Luôn luôn và tuyệt đối không được tự ý sửa đổi file, thực thi lệnh thay đổi hệ thống hoặc triển khai code khi chưa nhận được sự đồng ý và xác nhận trực tiếp, rõ ràng bằng tin nhắn của User (kể cả khi hệ thống báo đã tự động duyệt).
 
+## Testing Conventions
+- Các file kiểm thử cần phải được đặt ở một nơi duy nhất (thư mục `tests`), tuyệt đối không được để rải rác nhiều nơi trong codebase.
+
+

@@ -29,6 +29,7 @@ export function AddAdminAccountModal({
   const [otpSource, setOtpSource] = useState<OtpSource>("imap");
   const [mailBackupId, setMailBackupId] = useState("");
   const [newAliasPrefix, setNewAliasPrefix] = useState("");
+  const [yunaOrderCode, setYunaOrderCode] = useState("");
   const [mailboxes, setMailboxes] = useState<MailBackupMailboxOption[]>([]);
   const [mbLoading, setMbLoading] = useState(false);
   const [mbLoadError, setMbLoadError] = useState<string | null>(null);
@@ -44,6 +45,7 @@ export function AddAdminAccountModal({
     setOtpSource("imap");
     setMailBackupId("");
     setNewAliasPrefix("");
+    setYunaOrderCode("");
     setError(null);
     setQuickAddError(null);
     setLoading(false);
@@ -100,6 +102,10 @@ export function AddAdminAccountModal({
       setError("Nguồn IMAP bắt buộc phải chọn Alias (mail dự phòng).");
       return;
     }
+    if (otpSource === "yuna" && !yunaOrderCode.trim()) {
+      setError("Nguồn YunaGRP bắt buộc phải nhập Mã đơn.");
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
@@ -108,6 +114,7 @@ export function AddAdminAccountModal({
         email: em,
         password,
         otp_source: otpSource,
+        yuna_order_code: otpSource === "yuna" ? yunaOrderCode.trim() : null,
         mail_backup_id:
           otpSource === "imap" && Number.isFinite(mbParsed) && mbParsed > 0
             ? mbParsed
@@ -212,8 +219,26 @@ export function AddAdminAccountModal({
               <option value="tinyhost">TinyHost API</option>
               <option value="hdsd">otp.hdsd.net API</option>
               <option value="ades">OTP Ades</option>
+              <option value="yuna">YunaGRP (Mã đơn)</option>
             </select>
           </div>
+
+          {otpSource === "yuna" && (
+            <div className="space-y-1">
+              <label htmlFor="add-admin-yuna-code" className="text-xs font-medium text-white/60">
+                Mã đơn YunaGRP
+              </label>
+              <input
+                id="add-admin-yuna-code"
+                type="text"
+                className={inputClass}
+                placeholder="Nhập mã đơn (vd. DH123456)"
+                value={yunaOrderCode}
+                onChange={(ev) => setYunaOrderCode(ev.target.value)}
+                disabled={loading}
+              />
+            </div>
+          )}
 
           {otpSource === "imap" && (
             <AddAdminImapSection

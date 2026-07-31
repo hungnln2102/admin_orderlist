@@ -18,6 +18,7 @@ const RENEW_ADOBE_SCHEMA = {
       URL_ACCESS: "access_url",
       /** Adobe product id (CCP) lấy sau check; có thể nhiều id cách nhau bởi dấu phẩy */
       ID_PRODUCT: "id_product",
+      YUNA_ORDER_CODE: "yuna_order_code",
     },
   },
   PRODUCT_SYSTEM: {
@@ -79,6 +80,7 @@ const RENEW_ADOBE_SCHEMA = {
       SYSTEM_NOTE: "system_note",
       /** Nguồn OTP cho email user của đơn (imap, tinyhost, hdsd, ades). */
       OTP_SOURCE: "otp_source",
+      YUNA_ORDER_CODE: "yuna_order_code",
     },
   },
 };

@@ -32,8 +32,9 @@ const listAccounts = async (_req, res) => {
       `${TABLE}.${COLS.LAST_CHECKED}`,
       `${TABLE}.${COLS.IS_ACTIVE}`,
       `${TABLE}.${COLS.CREATED_AT}`,
-      `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
+      ...(COLS.MAIL_BACKUP_ID ? [`${TABLE}.${COLS.MAIL_BACKUP_ID}`] : []),
       ...(COLS.OTP_SOURCE ? [`${TABLE}.${COLS.OTP_SOURCE}`] : []),
+      ...(COLS.YUNA_ORDER_CODE ? [`${TABLE}.${COLS.YUNA_ORDER_CODE}`] : []),
       ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
       ...(COLS.ID_PRODUCT ? [`${TABLE}.${COLS.ID_PRODUCT}`] : []),
     ];
@@ -161,6 +162,11 @@ const createAccount = async (req, res) => {
           "Nguồn OTP là IMAP thì bắt buộc phải chọn Alias (mail dự phòng).",
       });
     }
+    if (otpSource === "yuna" && (!req.body?.yuna_order_code || !String(req.body.yuna_order_code).trim())) {
+      return res.status(400).json({
+        error: "Nguồn OTP là YunaGRP thì bắt buộc phải nhập Mã đơn.",
+      });
+    }
 
     const [inserted] = await db(TABLE)
       .insert({
@@ -175,6 +181,7 @@ const createAccount = async (req, res) => {
         [COLS.CREATED_AT]: db.fn.now(),
         [COLS.MAIL_BACKUP_ID]: resolvedMailBackupId,
         ...(COLS.OTP_SOURCE ? { [COLS.OTP_SOURCE]: otpSource } : {}),
+        ...(COLS.YUNA_ORDER_CODE ? { [COLS.YUNA_ORDER_CODE]: req.body?.yuna_order_code ? String(req.body.yuna_order_code).trim() : null } : {}),
         ...(COLS.URL_ACCESS ? { [COLS.URL_ACCESS]: null } : {}),
       })
       .returning(COLS.ID);
@@ -303,6 +310,7 @@ const updateAccount = async (req, res) => {
     password_encrypted: COLS.PASSWORD_ENC,
     org_name: COLS.ORG_NAME,
     otp_source: COLS.OTP_SOURCE,
+    yuna_order_code: COLS.YUNA_ORDER_CODE,
   };
 
   const updates = {};

@@ -26,6 +26,7 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [systemNote, setSystemNote] = useState<AdobeSystemCode>(DEFAULT_ADOBE_SYSTEM_CODE);
   const [otpSource, setOtpSource] = useState<TrackingOtpSource>(DEFAULT_TRACKING_OTP_SOURCE);
+  const [yunaOrderCode, setYunaOrderCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitInfo, setSubmitInfo] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
     setSelected(new Set());
     setSystemNote(DEFAULT_ADOBE_SYSTEM_CODE);
     setOtpSource(DEFAULT_TRACKING_OTP_SOURCE);
+    setYunaOrderCode("");
     setLoadError(null);
     setSubmitError(null);
     setSubmitInfo(null);
@@ -107,7 +109,12 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
     }
     setSubmitting(true);
     try {
-      const result = await addOrdersToTracking(ids, systemNote, otpSource);
+      const result = await addOrdersToTracking(
+        ids,
+        systemNote,
+        otpSource,
+        otpSource === "yuna" ? yunaOrderCode : undefined
+      );
       onSaved?.({ upserted: result.upserted, accepted: result.accepted });
       const skippedNote =
         result.skipped && result.skipped.length > 0
@@ -137,6 +144,8 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
     setSystemNote,
     otpSource,
     setOtpSource,
+    yunaOrderCode,
+    setYunaOrderCode,
     submitting,
     submitError,
     submitInfo,

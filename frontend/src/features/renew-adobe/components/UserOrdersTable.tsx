@@ -200,6 +200,7 @@ export function UserOrdersTable({
         orderCode={editTarget?.order_code ?? ""}
         initialSystemNote={editTarget?.systemNote}
         initialOtpSource={editTarget?.otpSource}
+        initialYunaOrderCode={editTarget?.yunaOrderCode}
         onClose={() => setEditTarget(null)}
         onSaved={() => {
           setEditTarget(null);

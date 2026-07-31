@@ -61,7 +61,8 @@ export type AddOrdersToTrackingResult = {
 export async function addOrdersToTracking(
   orderIds: string[],
   systemNote?: AdobeSystemCode,
-  otpSource?: TrackingOtpSource
+  otpSource?: TrackingOtpSource,
+  yunaOrderCode?: string
 ): Promise<AddOrdersToTrackingResult> {
   const res = await apiFetch(API_ENDPOINTS.RENEW_ADOBE_USER_ORDERS_TRACK, {
     method: "POST",
@@ -70,6 +71,7 @@ export async function addOrdersToTracking(
       order_ids: orderIds,
       ...(systemNote ? { system_note: systemNote } : {}),
       ...(otpSource ? { otp_source: otpSource } : {}),
+      ...(yunaOrderCode ? { yuna_order_code: yunaOrderCode.trim() } : {}),
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -84,11 +86,16 @@ export async function addOrdersToTracking(
 
 export async function updateTrackingOrder(
   orderCode: string,
-  payload: { systemNote?: AdobeSystemCode; otpSource?: TrackingOtpSource }
+  payload: {
+    systemNote?: AdobeSystemCode;
+    otpSource?: TrackingOtpSource;
+    yunaOrderCode?: string | null;
+  }
 ): Promise<{ ok: boolean; orderCode: string; updated_count: number }> {
   const body: Record<string, unknown> = {};
   if (payload.systemNote) body.system_note = payload.systemNote;
   if (payload.otpSource !== undefined) body.otp_source = payload.otpSource;
+  if (payload.yunaOrderCode !== undefined) body.yuna_order_code = payload.yunaOrderCode;
   const res = await apiFetch(
     API_ENDPOINTS.RENEW_ADOBE_USER_ORDERS_BY_CODE(orderCode),
     {

@@ -60,6 +60,7 @@ async function checkAccount(email, password, options = {}) {
   const cookiesToUse = savedCookiesFromDb?.cookies || [];
   const mailBackupId = options.mailBackupId || null;
   const otpSource = options.otpSource || "imap";
+  const yunaOrderCode = options.yunaOrderCode || null;
   const existingOrgName =
     options.existingOrgName && String(options.existingOrgName).trim()
       ? String(options.existingOrgName).trim()
@@ -130,6 +131,7 @@ async function checkAccount(email, password, options = {}) {
       savedCookies: cookiesToUse,
       mailBackupId,
       otpSource,
+      yunaOrderCode,
       sharedSession,
       existingOrgName,
       cachedContractActiveLicenseCount,
@@ -202,6 +204,7 @@ async function checkAccount(email, password, options = {}) {
           {
             mailBackupId,
             otpSource,
+            yunaOrderCode,
           }
         );
         urlAccess = autoAssign.url;
@@ -306,6 +309,7 @@ async function removeUserFromAccount(email, password, userEmail, options = {}) {
     savedCookies,
     mailBackupId: options.mailBackupId || null,
     otpSource: options.otpSource || "imap",
+    yunaOrderCode: options.yunaOrderCode || null,
   });
   return {
     success: (v2.deleted || []).includes(userEmail),
@@ -335,6 +339,7 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
     savedCookies,
     mailBackupId: options.mailBackupId || null,
     otpSource: options.otpSource || "imap",
+    yunaOrderCode: options.yunaOrderCode || null,
   });
   return {
     deleted: v2.deleted || [],
@@ -360,6 +365,7 @@ async function addUsersWithProduct(email, password, userEmails, options = {}) {
     savedCookiesFromDb: options.savedCookiesFromDb ?? null,
     mailBackupId: options.mailBackupId || null,
     otpSource: options.otpSource || "imap",
+    yunaOrderCode: options.yunaOrderCode || null,
     orgId: options.orgId || null,
   });
   if (!v2.success) throw new Error(v2.error || "V2 addUsersWithProduct fail");

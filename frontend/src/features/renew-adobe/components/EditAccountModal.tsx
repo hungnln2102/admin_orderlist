@@ -15,6 +15,9 @@ export function EditAccountModal({ account, onClose, onSaved }: EditAccountModal
   const [otpSource, setOtpSource] = useState<OtpSource>(
     account.otp_source ?? "imap"
   );
+  const [yunaOrderCode, setYunaOrderCode] = useState(
+    account.yuna_order_code ?? ""
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +31,14 @@ export function EditAccountModal({ account, onClose, onSaved }: EditAccountModal
       if (password !== account.password_encrypted) payload.password_encrypted = password;
       if (orgName.trim() !== (account.org_name ?? "")) payload.org_name = orgName.trim();
       if ((account.otp_source ?? "imap") !== otpSource) payload.otp_source = otpSource;
+      if ((account.yuna_order_code ?? "") !== yunaOrderCode.trim()) {
+        payload.yuna_order_code = yunaOrderCode.trim() || null;
+      }
+
+      if (otpSource === "yuna" && !yunaOrderCode.trim()) {
+        setError("Nguồn YunaGRP bắt buộc phải nhập Mã đơn.");
+        return;
+      }
 
       if (Object.keys(payload).length === 0) {
         onClose();
@@ -91,8 +102,23 @@ export function EditAccountModal({ account, onClose, onSaved }: EditAccountModal
               <option value="tinyhost">TinyHost API</option>
               <option value="hdsd">otp.hdsd.net API</option>
               <option value="ades">OTP Ades</option>
+              <option value="yuna">YunaGRP (Mã đơn)</option>
             </select>
           </div>
+          {otpSource === "yuna" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                Mã đơn YunaGRP
+              </label>
+              <input
+                type="text"
+                value={yunaOrderCode}
+                onChange={(e) => setYunaOrderCode(e.target.value)}
+                placeholder="Nhập mã đơn (vd. DH123456)"
+                className="w-full rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1">Org Name</label>
             <input

@@ -24,6 +24,7 @@ export type EditTrackingOrderModalProps = {
   orderCode: string;
   initialSystemNote?: string | null;
   initialOtpSource?: string | null;
+  initialYunaOrderCode?: string | null;
   onClose: () => void;
   onSaved?: () => void;
 };
@@ -33,6 +34,7 @@ export function EditTrackingOrderModal({
   orderCode,
   initialSystemNote,
   initialOtpSource,
+  initialYunaOrderCode,
   onClose,
   onSaved,
 }: EditTrackingOrderModalProps) {
@@ -44,6 +46,7 @@ export function EditTrackingOrderModal({
     : DEFAULT_TRACKING_OTP_SOURCE;
   const [systemNote, setSystemNote] = useState<AdobeSystemCode>(initialCode);
   const [otpSource, setOtpSource] = useState<TrackingOtpSource>(initialOtp);
+  const [yunaOrderCode, setYunaOrderCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,15 +54,30 @@ export function EditTrackingOrderModal({
     if (!open) return;
     setSystemNote(initialCode);
     setOtpSource(initialOtp);
+    setYunaOrderCode(initialYunaOrderCode ?? "");
     setError(null);
     setSubmitting(false);
-  }, [open, initialCode, initialOtp]);
+  }, [open, initialCode, initialOtp, initialYunaOrderCode]);
 
   const handleSubmit = async () => {
     setError(null);
+    const payload: {
+      systemNote: AdobeSystemCode;
+      otpSource: TrackingOtpSource;
+      yunaOrderCode?: string | null;
+    } = { systemNote, otpSource };
+    if (otpSource === "yuna") {
+      if (!yunaOrderCode.trim()) {
+        setError("Nguồn YunaGRP bắt buộc phải nhập Mã đơn.");
+        return;
+      }
+      payload.yunaOrderCode = yunaOrderCode.trim();
+    } else {
+      payload.yunaOrderCode = null;
+    }
     setSubmitting(true);
     try {
-      await updateTrackingOrder(orderCode, { systemNote, otpSource });
+      await updateTrackingOrder(orderCode, payload);
       onSaved?.();
       onClose();
     } catch (err) {
@@ -135,6 +153,22 @@ export function EditTrackingOrderModal({
                 ))}
               </select>
             </div>
+
+            {otpSource === "yuna" && (
+              <div>
+                <label className="text-xs font-medium text-white/60">
+                  Mã đơn YunaGRP
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nhập mã đơn (vd. DH123456)"
+                  value={yunaOrderCode}
+                  onChange={(e) => setYunaOrderCode(e.target.value)}
+                  disabled={submitting}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500/40 outline-none"
+                />
+              </div>
+            )}
 
             {error && (
               <p className="text-sm text-amber-400/90" role="alert">

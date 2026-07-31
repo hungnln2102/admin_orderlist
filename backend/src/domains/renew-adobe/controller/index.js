@@ -44,6 +44,7 @@ const {
 } = require("@/domains/renew-adobe/controller/publicWebsite");
 const { listSystemLogs } = require("@/domains/renew-adobe/controller/systemLogs");
 const { testOtpBySource } = require("@/domains/renew-adobe/controller/testOtp");
+const { getYunaOrderData, postYunaReportError } = require("@/domains/renew-adobe/controller/yunaHandlers");
 
 const runAutoDeleteUsers = (req, res) =>
   runAutoDeleteUsersHandler({
@@ -91,4 +92,6 @@ module.exports = {
   activateWebsiteUser,
   listSystemLogs,
   testOtpBySource,
+  getYunaOrderData,
+  postYunaReportError,
 };

@@ -36,6 +36,11 @@ export const TRACKING_OTP_SOURCE_OPTIONS: ReadonlyArray<TrackingOtpSourceOption>
     label: "OTP Ades",
     badge: "bg-violet-500/15 text-violet-300 border-violet-400/40",
   },
+  {
+    code: "yuna",
+    label: "YunaGRP (Mã đơn)",
+    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-400/40",
+  },
 ];
 
 export const DEFAULT_TRACKING_OTP_SOURCE: TrackingOtpSource = "imap";

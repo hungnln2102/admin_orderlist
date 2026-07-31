@@ -44,6 +44,7 @@ async function runCheckFlow(email, password, options = {}) {
     savedCookies = [],
     mailBackupId = null,
     otpSource = "imap",
+    yunaOrderCode = null,
     sharedSession = null,
     existingOrgName = null,
     cachedContractActiveLicenseCount = null,
@@ -161,6 +162,7 @@ async function runCheckFlow(email, password, options = {}) {
         password,
         mailBackupId,
         otpSource,
+        yunaOrderCode,
       });
       const resolvedOrgName =
         existingOrgName || loginMeta?.selectedOrgName || null;
@@ -220,6 +222,7 @@ async function runCheckFlow(email, password, options = {}) {
       password,
       mailBackupId,
       otpSource,
+      yunaOrderCode,
     });
     const resolvedOrgName =
       existingOrgName || loginMeta?.selectedOrgName || null;

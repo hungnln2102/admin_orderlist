@@ -18,6 +18,7 @@ export type UserOrderRow = {
   accountId: number;
   systemNote: AdobeSystemCode;
   otpSource: TrackingOtpSource;
+  yunaOrderCode?: string | null;
 };
 
 export type OrderInfo = {
@@ -32,6 +33,7 @@ export type OrderInfo = {
   tracking_id_product?: string | null;
   system_note?: AdobeSystemCode | string | null;
   otp_source?: TrackingOtpSource | string | null;
+  yuna_order_code?: string | null;
   adobe_account_id?: number | null;
   admin_license_status?: string | null;
   admin_org_name?: string | null;

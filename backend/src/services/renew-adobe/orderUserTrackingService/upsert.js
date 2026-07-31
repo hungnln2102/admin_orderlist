@@ -23,6 +23,10 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
     options && typeof options.otpSource === "string"
       ? options.otpSource.trim()
       : "";
+  const explicitYunaOrderCode =
+    options && typeof options.yunaOrderCode === "string"
+      ? options.yunaOrderCode.trim()
+      : "";
 
   const orderCodes = orders
     .map((o) => String(o[ORD_COLS.ID_ORDER] || "").trim())
@@ -137,6 +141,10 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
         insertRow[TRACK_COLS.OTP_SOURCE] = explicitOtpSource;
         mergeRow[TRACK_COLS.OTP_SOURCE] = explicitOtpSource;
       }
+      if (TRACK_COLS.YUNA_ORDER_CODE && explicitYunaOrderCode) {
+        insertRow[TRACK_COLS.YUNA_ORDER_CODE] = explicitYunaOrderCode;
+        mergeRow[TRACK_COLS.YUNA_ORDER_CODE] = explicitYunaOrderCode;
+      }
 
       await trx(TRACK_TABLE).insert(insertRow).onConflict(TRACK_COLS.ORDER_ID).merge(mergeRow);
       upserted += 1;
@@ -156,6 +164,8 @@ async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds, options) {
     typeof options?.systemNote === "string" ? options.systemNote.trim() : "";
   const otpSource =
     typeof options?.otpSource === "string" ? options.otpSource.trim() : "";
+  const yunaOrderCode =
+    typeof options?.yunaOrderCode === "string" ? options.yunaOrderCode.trim() : "";
 
   const ids = [
     ...new Set(
@@ -190,7 +200,7 @@ async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds, options) {
   const orders = await query.orderBy(ORD_COLS.ID_ORDER, "asc");
   const n = await upsertTrackingRowsFromOrderRows(
     orders,
-    systemNote || otpSource ? { systemNote, otpSource } : undefined
+    systemNote || otpSource || yunaOrderCode ? { systemNote, otpSource, yunaOrderCode } : undefined
   );
   if (n > 0) {
     logger.info(

@@ -140,6 +140,18 @@ export default function RenewProfileCheckDeskPage() {
                 ))}
               </div>
 
+              <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-4 text-sm leading-6 text-blue-50/90 space-y-2">
+                <div className="font-semibold text-cyan-300">📬 Hướng dẫn nhận OTP Email:</div>
+                <div className="text-xs space-y-1.5 text-white/70">
+                  <p>Để nhận mã đăng nhập Adobe, bạn hãy kiểm tra đuôi email được cấp:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Nếu mail đuôi <code className="text-cyan-300 font-mono">@sluemone.xyz</code> &amp; <code className="text-cyan-300 font-mono">@kaineapp.top</code>: Vào <a href="https://tmail.wibucrypto.pro" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300 font-medium">tmail.wibucrypto.pro/mailbox/&lt;mail_adobe&gt;</a></li>
+                    <li>Nếu mail đuôi <code className="text-cyan-300 font-mono">@rilzz.store</code>: Vào <a href="https://generator.email" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300 font-medium">generator.email/&lt;mail_adobe&gt;</a></li>
+                    <li>Nếu mail hotmail/outlook/live/msn: Vào <a href="https://generator.email/adobeyunacode@fatub.org" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300 font-medium">generator.email/adobeyunacode@fatub.org</a> (tìm đúng thư gửi tới địa chỉ của bạn)</li>
+                  </ul>
+                </div>
+              </div>
+
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4 text-sm leading-6 text-amber-50/90">
                 Nếu vẫn không xử lý được sau khi kiểm tra profile và jointeam, vui lòng liên hệ Quản Trị Viên để
                 kiểm tra trạng thái tài khoản.

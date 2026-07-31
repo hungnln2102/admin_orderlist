@@ -62,6 +62,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
       COLS.ALERT_CONFIG,
       ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       COLS.MAIL_BACKUP_ID,
+      ...(COLS.YUNA_ORDER_CODE ? [COLS.YUNA_ORDER_CODE] : []),
       ...(COLS.ID_PRODUCT ? [COLS.ID_PRODUCT] : [])
     )
     .where(COLS.IS_ACTIVE, true)
@@ -157,6 +158,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
           savedCookiesFromDb: account[COLS.ALERT_CONFIG] ?? null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
+          yunaOrderCode: COLS.YUNA_ORDER_CODE ? account[COLS.YUNA_ORDER_CODE] : null,
           orgId: account[COLS.ORG_ID] || null,
           maxUsers: account.userLimit || MAX_USERS_PER_ACCOUNT,
         }

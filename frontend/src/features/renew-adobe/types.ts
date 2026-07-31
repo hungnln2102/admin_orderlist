@@ -1,12 +1,13 @@
 export type LicenseStatus = "paid" | "active" | "expired" | "unknown";
 
-export type OtpSource = "imap" | "tinyhost" | "hdsd" | "ades";
+export type OtpSource = "imap" | "tinyhost" | "hdsd" | "ades" | "yuna";
 
 export type AdobeAdminAccount = {
   id: number;
   email: string;
   password_encrypted: string;
   otp_source?: OtpSource;
+  yuna_order_code?: string | null;
   /** mail_backup.alias_prefix (OTP / Gmail +alias) */
   alias?: string | null;
   org_name: string | null;

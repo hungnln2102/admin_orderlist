@@ -39,6 +39,8 @@ export function AddTrackingOrdersModal({
     setSystemNote,
     otpSource,
     setOtpSource,
+    yunaOrderCode,
+    setYunaOrderCode,
     submitting,
     submitError,
     submitInfo,
@@ -161,6 +163,22 @@ export function AddTrackingOrdersModal({
                 <span className="text-white/70">otp_source</span>).
               </p>
             </div>
+
+            {otpSource === "yuna" && (
+              <div className="mt-3 flex flex-col gap-1">
+                <label className="text-xs font-medium text-white/60">
+                  Mã đơn YunaGRP
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nhập mã đơn (vd. DH123456)"
+                  value={yunaOrderCode}
+                  onChange={(e) => setYunaOrderCode(e.target.value)}
+                  disabled={submitting}
+                  className="w-full sm:w-72 px-3 py-2 rounded-xl border border-white/10 bg-slate-950/50 text-sm text-white placeholder:text-slate-500/70 focus:ring-2 focus:ring-emerald-500/40 outline-none"
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">

@@ -91,6 +91,7 @@ async function handleOtpChallenge(page, otpOptions = {}, { stage = "unknown" } =
       accountEmail: otpOptions.accountEmail,
       senderFilter: "adobe",
       minTimestampMs: challengeStartedAt - 15000,
+      yunaOrderCode: otpOptions.yunaOrderCode,
     });
 
     if (!code) continue;

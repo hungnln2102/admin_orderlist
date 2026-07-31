@@ -101,6 +101,9 @@ export const API_ENDPOINTS = {
   RENEW_ADOBE_FIX_USERS_ROUND: "/api/renew-adobe/fix-users-round",
   RENEW_ADOBE_URL_ACCESS: (id: number) =>
     `/api/renew-adobe/accounts/${id}/url-access`,
+  RENEW_ADOBE_YUNA_ORDER: (orderCode: string) =>
+    `/api/renew-adobe/yuna/order/${encodeURIComponent(orderCode)}`,
+  RENEW_ADOBE_YUNA_REPORT_ERROR: "/api/renew-adobe/yuna/report-error",
 
   CUSTOMER_STATUS: "/api/customer-status",
   IP_WHITELISTS: "/api/ip-whitelists",

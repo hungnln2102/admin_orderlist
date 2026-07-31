@@ -1,5 +1,5 @@
 const express = require("express");
-const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem, listSystemLogs, testOtpBySource } = require("@/domains/renew-adobe/controller");
+const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem, listSystemLogs, testOtpBySource, getYunaOrderData, postYunaReportError } = require("@/domains/renew-adobe/controller");
 
 const router = express.Router();
 
@@ -32,5 +32,7 @@ router.get("/product-system", listProductSystem);
 router.post("/product-system", createProductSystem);
 router.delete("/product-system/:id", deleteProductSystem);
 router.get("/system-logs", listSystemLogs);
+router.get("/yuna/order/:orderCode", getYunaOrderData);
+router.post("/yuna/report-error", postYunaReportError);
 
 module.exports = router;

@@ -97,6 +97,7 @@ const listUserOrders = async (_req, res) => {
         `t.${TRACK_COLS.STATUS} as tracking_status`,
         `t.${TRACK_COLS.ID_PRODUCT} as tracking_id_product`,
         `t.${TRACK_COLS.SYSTEM_NOTE} as system_note`,
+        `t.${TRACK_COLS.YUNA_ORDER_CODE} as yuna_order_code`,
         ...(hasOtpSource
           ? [`t.${TRACK_COLS.OTP_SOURCE} as otp_source`]
           : [db.raw(`'imap' as otp_source`)]),

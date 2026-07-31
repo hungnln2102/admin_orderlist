@@ -8,6 +8,7 @@ const OTP_SOURCES = {
   TINYHOST: "tinyhost",
   HDSD: "hdsd",
   ADES: "ades",
+  YUNA: "yuna",
 };
 
 function normalizeOtpSource(rawValue, { hasMailBackupId = false } = {}) {
@@ -19,7 +20,8 @@ function normalizeOtpSource(rawValue, { hasMailBackupId = false } = {}) {
     normalized === OTP_SOURCES.IMAP ||
     normalized === OTP_SOURCES.TINYHOST ||
     normalized === OTP_SOURCES.HDSD ||
-    normalized === OTP_SOURCES.ADES
+    normalized === OTP_SOURCES.ADES ||
+    normalized === OTP_SOURCES.YUNA
   ) {
     return normalized;
   }
@@ -166,6 +168,7 @@ async function fetchOtpBySource({
   accountEmail = "",
   senderFilter = "adobe",
   minTimestampMs = null,
+  yunaOrderCode = null,
 }) {
   const normalizedSource = normalizeOtpSource(otpSource, {
     hasMailBackupId: Number.isFinite(Number(mailBackupId)),
@@ -196,6 +199,40 @@ async function fetchOtpBySource({
       accountEmail,
       timeoutMs: 10000,
     });
+  }
+
+  if (normalizedSource === OTP_SOURCES.YUNA) {
+    if (!yunaOrderCode) {
+      logger.warn("[otp-provider] Nguồn yuna yêu cầu yunaOrderCode nhưng không được cung cấp.");
+      return null;
+    }
+    try {
+      const { fetchYunaOrder } = require("@/services/yunaOtpService");
+      const result = await fetchYunaOrder(yunaOrderCode);
+      if (result.success && result.items) {
+        const emailLower = String(accountEmail || "").trim().toLowerCase();
+        const match = result.items.find((item) => {
+          const rawName = String(item.name || "").trim().toLowerCase();
+          const [emailPart] = rawName.split(/[#|]/);
+          return emailPart.trim() === emailLower;
+        });
+        if (match) {
+          const directCode = extractOtpCode(match.code);
+          if (directCode) return directCode;
+
+          // Nếu YunaGRP chưa có mã, thử tự động cào từ hòm thư tạm
+          const { scrapeYunaOtp } = require("@/services/yunaOtpMailScraper");
+          const scrapedOtp = await scrapeYunaOtp(accountEmail);
+          if (scrapedOtp) {
+            logger.info("[otp-provider] Tự động cào được OTP cho Yuna từ email: %s", scrapedOtp);
+            return scrapedOtp;
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn("[otp-provider] Lỗi khi lấy OTP từ YunaGRP hoặc cào email: %s", err.message);
+    }
+    return null;
   }
 
   if (mailBackupId) {

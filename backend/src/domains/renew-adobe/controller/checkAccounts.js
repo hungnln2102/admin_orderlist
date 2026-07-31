@@ -127,6 +127,10 @@ async function runCheckForAccountId(id) {
     COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
       ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
       : "imap";
+  const yunaOrderCode =
+    COLS.YUNA_ORDER_CODE && account[COLS.YUNA_ORDER_CODE]
+      ? String(account[COLS.YUNA_ORDER_CODE]).trim()
+      : null;
   logger.info("[renew-adobe] Check account", { id, email });
 
   const existingUrlAccess =
@@ -151,6 +155,7 @@ async function runCheckForAccountId(id) {
     savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
     mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
     otpSource,
+    yunaOrderCode,
     existingUrlAccess,
     existingOrgName,
     cachedContractActiveLicenseCount,
@@ -197,6 +202,7 @@ async function runCheckForAccountId(id) {
           savedCookiesFromDb: result.savedCookies || null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
+          yunaOrderCode,
           existingUrlAccess,
           existingOrgName,
           forceProductCheck: true,
@@ -243,6 +249,7 @@ async function runCheckForAccountId(id) {
           savedCookiesFromDb: result.savedCookies || null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
+          yunaOrderCode,
         });
         await db(TABLE).where(COLS.ID, id).update({
           [COLS.USER_COUNT]: 0,
@@ -298,6 +305,7 @@ async function runCheckForAccountId(id) {
             savedCookiesFromDb: result.savedCookies || null,
             mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
             otpSource,
+            yunaOrderCode,
           }
         );
 

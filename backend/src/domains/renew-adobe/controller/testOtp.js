@@ -9,6 +9,7 @@ const testOtpBySource = async (req, res) => {
   const otpSource = String(req.body?.otpSource || "").trim().toLowerCase();
   const accountEmail = String(req.body?.accountEmail || "").trim().toLowerCase();
   const mailBackupId = req.body?.mailBackupId ? Number(req.body.mailBackupId) : null;
+  let yunaOrderCode = String(req.body?.yunaOrderCode || "").trim();
 
   if (!otpSource) {
     return res.status(400).json({
@@ -18,16 +19,40 @@ const testOtpBySource = async (req, res) => {
   }
 
   try {
+    if (!yunaOrderCode && otpSource === "yuna") {
+      const { db } = require("@/db");
+      const { RENEW_ADOBE_SCHEMA, SCHEMA_RENEW_ADOBE, tableName } = require("@/config/dbSchema");
+      
+      const trackRow = await db(tableName(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE, SCHEMA_RENEW_ADOBE))
+        .select(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.YUNA_ORDER_CODE)
+        .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.ACCOUNT, accountEmail])
+        .orderBy(RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.UPDATED_AT, "desc")
+        .first()
+        .catch(() => null);
+
+      const accountRow = await db(tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE))
+        .select(RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.YUNA_ORDER_CODE)
+        .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.EMAIL, accountEmail])
+        .first()
+        .catch(() => null);
+
+      yunaOrderCode = (trackRow?.[RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS.YUNA_ORDER_CODE] || 
+                       accountRow?.[RENEW_ADOBE_SCHEMA.ACCOUNT.COLS.YUNA_ORDER_CODE] || 
+                       "").trim();
+    }
+
     logger.info("[renew-adobe/admin] Gọi thử nghiệm lấy OTP", {
       otpSource,
       accountEmail,
       mailBackupId,
+      yunaOrderCode,
     });
 
     const code = await fetchOtpBySource({
       otpSource,
       accountEmail,
       mailBackupId,
+      yunaOrderCode,
     });
 
     if (!code) {

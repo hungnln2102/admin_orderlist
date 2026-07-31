@@ -134,6 +134,7 @@ export function createAdobeAdminAccount(payload: {
   email: string;
   password: string;
   otp_source?: OtpSource;
+  yuna_order_code?: string | null;
   mail_backup_id?: number | null;
 }) {
   return apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS, {
@@ -143,6 +144,7 @@ export function createAdobeAdminAccount(payload: {
       email: payload.email.trim(),
       password: payload.password,
       ...(payload.otp_source ? { otp_source: payload.otp_source } : {}),
+      ...(payload.yuna_order_code ? { yuna_order_code: payload.yuna_order_code.trim() } : {}),
       ...(payload.mail_backup_id != null && payload.mail_backup_id > 0
         ? { mail_backup_id: payload.mail_backup_id }
         : {}),
@@ -167,6 +169,7 @@ export function updateAdobeAccount(
     password_encrypted?: string;
     org_name?: string;
     otp_source?: OtpSource;
+    yuna_order_code?: string | null;
   }
 ): Promise<{ success: boolean; account?: Record<string, unknown>; error?: string }> {
   return apiFetch(`${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}/${id}`, {

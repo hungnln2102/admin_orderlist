@@ -173,6 +173,13 @@ const addOrdersToTracking = async (req, res) => {
       otpSourceRaw !== undefined && otpSourceRaw !== null
         ? normalizeTrackingOtpSource(otpSourceRaw)
         : null;
+    const yunaOrderCode = req.body?.yuna_order_code ?? req.body?.yunaOrderCode;
+
+    if (otpSource === "yuna" && (!yunaOrderCode || !String(yunaOrderCode).trim())) {
+      return res.status(400).json({
+        error: "Nguồn OTP là YunaGRP thì bắt buộc phải nhập Mã đơn.",
+      });
+    }
 
     const upserted = await upsertRenewAdobeOrderUserTrackingForOrderIds(
       acceptedIds,
@@ -180,6 +187,7 @@ const addOrdersToTracking = async (req, res) => {
         enforceRenewAdobeVariant: false,
         systemNote,
         ...(otpSource ? { otpSource } : {}),
+        yunaOrderCode: yunaOrderCode ? String(yunaOrderCode).trim() : undefined,
       }
     );
 
@@ -249,6 +257,14 @@ const updateTrackingOrder = async (req, res) => {
       );
       updates[TRACK_COLS.OTP_SOURCE] = otpSource;
       loggableUpdates.otp_source = otpSource;
+    }
+    if (
+      req.body?.yuna_order_code !== undefined ||
+      req.body?.yunaOrderCode !== undefined
+    ) {
+      const yunaOrderCode = String(req.body?.yuna_order_code ?? req.body?.yunaOrderCode ?? "").trim();
+      updates[TRACK_COLS.YUNA_ORDER_CODE] = yunaOrderCode || null;
+      loggableUpdates.yuna_order_code = yunaOrderCode || null;
     }
 
     if (Object.keys(updates).length === 0) {

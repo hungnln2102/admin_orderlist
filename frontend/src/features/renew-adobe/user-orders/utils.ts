@@ -135,6 +135,7 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
       accountId: aid,
       systemNote,
       otpSource,
+      yunaOrderCode: order.yuna_order_code ?? null,
     });
   }
   return rows;
