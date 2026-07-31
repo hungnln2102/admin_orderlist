@@ -155,7 +155,8 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
         s.account_username AS stock_username
       FROM warehouse.stock_services ss
       INNER JOIN warehouse.product_stocks s ON s.id = ss.stock_id
-      WHERE ss.product_id = $1
+      INNER JOIN warehouse.product_names pn ON ss.name_id = pn.id
+      WHERE pn.product_id = $1
     `,
     [packageId]
   );

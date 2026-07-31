@@ -288,7 +288,7 @@ const createWarehouse = async (req, res) => {
 
 const updateWarehouse = async (req, res) => {
   const { id } = req.params;
-  let { account, services = [] } = req.body || {};
+  let { account, services } = req.body || {};
   if (account) account = String(account).trim().toLowerCase();
 
   if (!id) return res.status(400).json({ error: "Missing id" });
@@ -315,7 +315,108 @@ const updateWarehouse = async (req, res) => {
 
       let updatedServices = [];
       // Sync services (replace or update)
-      if (services && services.length > 0) {
+      if (services === undefined) {
+        // Fetch all existing services for this stock, joining product_names to get product_id
+        const existingSrvs = await trx(`${servicesTable} as ss`)
+          .leftJoin(`${SCHEMA_WAREHOUSE}.product_names as pn`, `pn.id`, `ss.${srvCols.nameId}`)
+          .select({
+            id: `ss.${srvCols.id}`,
+            stock_id: `ss.${srvCols.stockId}`,
+            name_id: `ss.${srvCols.nameId}`,
+            password: `ss.${srvCols.passwordEncrypted}`,
+            backup_email: `ss.${srvCols.backupEmail}`,
+            two_fa: `ss.${srvCols.twoFaEncrypted}`,
+            note: `ss.${srvCols.note}`,
+            expires_at: `ss.${srvCols.expiresAt}`,
+            status: `ss.${srvCols.status}`,
+            created_at: `ss.${srvCols.createdAt}`,
+            updated_at: `ss.${srvCols.updatedAt}`,
+            product_id: `pn.product_id`
+          })
+          .where(`ss.${srvCols.stockId}`, id);
+
+        const hasFlatFields = req.body.category !== undefined ||
+          req.body.password !== undefined ||
+          req.body.backup_email !== undefined ||
+          req.body.two_fa !== undefined ||
+          req.body.note !== undefined ||
+          req.body.expires_at !== undefined ||
+          req.body.product_id !== undefined ||
+          req.body.warehouse_product_name_id !== undefined;
+
+        if (hasFlatFields) {
+          if (existingSrvs.length > 0) {
+            // Update the first service of the stock
+            const srv = existingSrvs[0];
+            let pId = req.body.product_id !== undefined ? normalizeProductId(req.body.product_id) : srv.product_id;
+            let nameId = req.body.warehouse_product_name_id !== undefined ? normalizeProductId(req.body.warehouse_product_name_id) : srv.name_id;
+            
+            if (req.body.category && req.body.warehouse_product_name_id === undefined) {
+              nameId = await ensureProductName(trx, req.body.category, pId);
+            } else if (pId && !nameId) {
+              const parentProduct = await trx(`${SCHEMA_PRODUCT}.product`).where("id", pId).first();
+              if (parentProduct) {
+                nameId = await ensureProductName(trx, parentProduct.package_name, pId);
+              }
+            }
+
+            const [updatedSrv] = await trx(servicesTable).where(srvCols.id, srv.id).update({
+              [srvCols.nameId]: nameId || srv.name_id,
+              [srvCols.passwordEncrypted]: req.body.password !== undefined ? req.body.password : srv.password,
+              [srvCols.backupEmail]: req.body.backup_email !== undefined ? req.body.backup_email : srv.backup_email,
+              [srvCols.twoFaEncrypted]: req.body.two_fa !== undefined ? req.body.two_fa : srv.two_fa,
+              [srvCols.note]: req.body.note !== undefined ? req.body.note : srv.note,
+              [srvCols.expiresAt]: req.body.expires_at !== undefined ? (normalizeDateInput(req.body.expires_at) || null) : srv.expires_at,
+              [srvCols.updatedAt]: new Date().toISOString()
+            }).returning("*");
+
+            const fetchedUpdated = updatedSrv.id !== undefined ? updatedSrv : await trx(servicesTable).where(srvCols.id, srv.id).first();
+            fetchedUpdated.product_id = pId;
+            fetchedUpdated.name_id = nameId || srv.name_id;
+            updatedServices.push(fetchedUpdated);
+
+            // Keep the rest of the existing services untouched
+            for (let i = 1; i < existingSrvs.length; i++) {
+              updatedServices.push(existingSrvs[i]);
+            }
+          } else {
+            // Insert a new service if none exists
+            let pId = normalizeProductId(req.body.product_id);
+            let nameId = normalizeProductId(req.body.warehouse_product_name_id);
+            
+            if (!nameId && req.body.category) {
+              nameId = await ensureProductName(trx, req.body.category, pId);
+            } else if (pId && !nameId) {
+              const parentProduct = await trx(`${SCHEMA_PRODUCT}.product`).where("id", pId).first();
+              if (parentProduct) {
+                nameId = await ensureProductName(trx, parentProduct.package_name, pId);
+              }
+            }
+
+            const now = new Date().toISOString();
+            const [insertedSrv] = await trx(servicesTable).insert({
+              [srvCols.stockId]: id,
+              [srvCols.nameId]: nameId,
+              [srvCols.passwordEncrypted]: req.body.password ?? null,
+              [srvCols.backupEmail]: req.body.backup_email ?? null,
+              [srvCols.twoFaEncrypted]: req.body.two_fa ?? null,
+              [srvCols.note]: req.body.note ?? null,
+              [srvCols.status]: "AVAILABLE",
+              [srvCols.expiresAt]: normalizeDateInput(req.body.expires_at) || null,
+              [srvCols.createdAt]: now,
+              [srvCols.updatedAt]: now,
+            }).returning("*");
+
+            const fetchedInserted = insertedSrv.id !== undefined ? insertedSrv : await trx(servicesTable).where(srvCols.id, insertedSrv).first();
+            fetchedInserted.product_id = pId;
+            fetchedInserted.name_id = nameId;
+            updatedServices.push(fetchedInserted);
+          }
+        } else {
+          // No flat fields and services is undefined: keep all existing services unchanged
+          updatedServices = existingSrvs;
+        }
+      } else if (services.length > 0) {
         const existingSrvs = await trx(servicesTable).where(srvCols.stockId, id).select(srvCols.id);
         const existingIds = new Set(existingSrvs.map(s => s.id));
         const keptIds = new Set();
@@ -379,7 +480,7 @@ const updateWarehouse = async (req, res) => {
           await trx(servicesTable).whereIn(srvCols.id, toDelete).del();
         }
       } else {
-        // If services array is empty, delete all existing services
+        // If services array is explicitly empty, delete all existing services
         await trx(servicesTable).where(srvCols.stockId, id).del();
       }
       const serviceProductIds = updatedServices
