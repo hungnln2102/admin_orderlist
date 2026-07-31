@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
-import type { WarehouseItem } from "../../../../../Personal/Storage/types";
+import type { WarehouseItem } from "@/features/warehouse/types";
 import { normalizeWarehouseId, type EditableWarehouseFields } from "./shared";
 
 export function usePackageWarehouseItems(open: boolean) {
@@ -34,9 +34,16 @@ export function usePackageWarehouseItems(open: boolean) {
 
   const inStockItems = useMemo(
     () =>
-      warehouseItems.filter((item) =>
-        (item.status || "").toLowerCase().includes("tồn")
-      ),
+      warehouseItems.filter((item) => {
+        if (item.services && item.services.length > 0) {
+          return item.services.some(
+            (srv) =>
+              srv.status === "AVAILABLE" ||
+              (srv.status || "").toLowerCase().includes("tồn")
+          );
+        }
+        return (item.status || "").toLowerCase().includes("tồn");
+      }),
     [warehouseItems]
   );
 
@@ -48,7 +55,10 @@ export function usePackageWarehouseItems(open: boolean) {
         (item) =>
           (item.account || "").toLowerCase().includes(query) ||
           (item.category || "").toLowerCase().includes(query) ||
-          (item.note || "").toLowerCase().includes(query)
+          (item.services?.[0]?.category || "").toLowerCase().includes(query) ||
+          (item.services?.[0]?.display_name || "").toLowerCase().includes(query) ||
+          (item.note || "").toLowerCase().includes(query) ||
+          (item.services?.[0]?.note || "").toLowerCase().includes(query)
       );
     },
     [inStockItems]

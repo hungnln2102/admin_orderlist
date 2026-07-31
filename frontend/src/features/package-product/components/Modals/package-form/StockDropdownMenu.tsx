@@ -1,5 +1,5 @@
 import { CheckIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import type { WarehouseItem } from "../../../../../Personal/Storage/types";
+import type { WarehouseItem } from "@/features/warehouse/types";
 
 type StockDropdownMenuProps = {
   filteredItems: WarehouseItem[];

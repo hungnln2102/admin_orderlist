@@ -8,7 +8,7 @@ import type {
   AccountInfo,
   ManualWarehouseEntry,
 } from "../../../utils/packageHelpers";
-import type { WarehouseItem } from "../../../../../Personal/Storage/types";
+import type { WarehouseItem } from "@/features/warehouse/types";
 import { ItemDetailCard } from "./ItemDetailCard";
 import {
   inputCls,
@@ -35,7 +35,7 @@ export type StockDropdownProps = {
   onToggle: () => void;
   onSelect: (item: WarehouseItem) => void;
   onClear: () => void;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  dropdownRef: React.RefObject<HTMLDivElement>;
   manualMode: boolean;
   onToggleManual: () => void;
   manualEntry: ManualWarehouseEntry;

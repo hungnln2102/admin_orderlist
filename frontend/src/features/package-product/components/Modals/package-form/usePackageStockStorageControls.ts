@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { WarehouseItem } from "../../../../../Personal/Storage/types";
+import type { WarehouseItem } from "@/features/warehouse/types";
 import type { PackageFormValues } from "../../../utils/packageHelpers";
 import { EMPTY_MANUAL_ENTRY } from "../../../utils/packageHelpers";
 

@@ -3,7 +3,7 @@ import type {
   ManualWarehouseEntry,
 } from "../../../utils/packageHelpers";
 import { formatDisplayDate } from "../../../utils/packageHelpers";
-import type { WarehouseItem } from "../../../../../Personal/Storage/types";
+import type { WarehouseItem } from "@/features/warehouse/types";
 
 export const labelCls =
   "block text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5";
@@ -120,10 +120,12 @@ export const normalizeWarehouseId = (value: unknown): number | null => {
 export const buildInfoEntries = (
   item: WarehouseItem | AccountDisplayInfo
 ): InfoEntry[] => {
+  const firstSrv = (item as WarehouseItem).services?.[0];
   return INLINE_EDIT_FIELDS.map((field) => {
     if (field.key === "expires_at") {
       const expiryValue =
         (item as WarehouseItem).expires_at ??
+        firstSrv?.expires_at ??
         (item as AccountDisplayInfo).expires_at ??
         null;
       return {
@@ -139,6 +141,7 @@ export const buildInfoEntries = (
       placeholder: field.placeholder,
       value:
         ((item as WarehouseItem)[field.key] as string | null | undefined) ??
+        (firstSrv?.[field.key as keyof typeof firstSrv] as string | null | undefined) ??
         ((item as AccountDisplayInfo)[field.key] as string | null | undefined) ??
         "",
     };
@@ -147,16 +150,37 @@ export const buildInfoEntries = (
 
 export const toEditableWarehouseFields = (
   item: WarehouseItem | AccountInfo | null | undefined
-): EditableWarehouseFields => ({
-  account: item?.account ? String(item.account) : "",
-  password: item?.password ? String(item.password) : "",
-  backup_email: item?.backup_email ? String(item.backup_email) : "",
-  two_fa: item?.two_fa ? String(item.two_fa) : "",
-  note: item?.note ? String(item.note) : "",
-  expires_at: formatDisplayDate(
-    (item as WarehouseItem | null | undefined)?.expires_at ?? null
-  ),
-});
+): EditableWarehouseFields => {
+  const firstSrv = (item as WarehouseItem | null | undefined)?.services?.[0];
+  return {
+    account: item?.account ? String(item.account) : "",
+    password: item?.password
+      ? String(item.password)
+      : firstSrv?.password
+      ? String(firstSrv.password)
+      : "",
+    backup_email: item?.backup_email
+      ? String(item.backup_email)
+      : firstSrv?.backup_email
+      ? String(firstSrv.backup_email)
+      : "",
+    two_fa: item?.two_fa
+      ? String(item.two_fa)
+      : firstSrv?.two_fa
+      ? String(firstSrv.two_fa)
+      : "",
+    note: item?.note
+      ? String(item.note)
+      : firstSrv?.note
+      ? String(firstSrv.note)
+      : "",
+    expires_at: formatDisplayDate(
+      (item as WarehouseItem | null | undefined)?.expires_at ??
+        firstSrv?.expires_at ??
+        null
+    ),
+  };
+};
 
 export const mergeDisplayInfo = (
   selectedItem: WarehouseItem | null,
@@ -166,14 +190,17 @@ export const mergeDisplayInfo = (
   if (!selectedItem) return fallbackInfo ?? null;
   if (!fallbackInfo) return selectedItem;
 
+  const firstSrv = selectedItem.services?.[0];
+
   return {
     ...fallbackInfo,
     ...selectedItem,
     account: selectedItem.account ?? fallbackInfo.account ?? null,
-    password: selectedItem.password ?? fallbackInfo.password ?? null,
-    backup_email: selectedItem.backup_email ?? fallbackInfo.backup_email ?? null,
-    two_fa: selectedItem.two_fa ?? fallbackInfo.two_fa ?? null,
-    note: selectedItem.note ?? fallbackInfo.note ?? null,
-    expires_at: selectedItem.expires_at ?? fallbackInfo.expires_at ?? null,
+    password: selectedItem.password ?? firstSrv?.password ?? fallbackInfo.password ?? null,
+    backup_email: selectedItem.backup_email ?? firstSrv?.backup_email ?? fallbackInfo.backup_email ?? null,
+    two_fa: selectedItem.two_fa ?? firstSrv?.two_fa ?? fallbackInfo.two_fa ?? null,
+    note: selectedItem.note ?? firstSrv?.note ?? fallbackInfo.note ?? null,
+    expires_at: selectedItem.expires_at ?? firstSrv?.expires_at ?? fallbackInfo.expires_at ?? null,
   };
 };
+

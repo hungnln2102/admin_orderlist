@@ -29,6 +29,9 @@ export type WarehouseItem = {
   backup_email?: string | null;
   two_fa?: string | null;
   expires_at?: string | null;
+  note?: string | null;
+  status?: string | null;
+  is_verified?: boolean | null;
 };
 
 export const inputClass =
