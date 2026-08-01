@@ -1,5 +1,6 @@
 import React from "react";
 import type { ProductOption } from "../hooks/useWarehouseProducts";
+import type { ServiceNameOption } from "../hooks/useWarehouseServiceNames";
 import { WarehouseItem } from "../types";
 import { getWarehouseTheme } from "../utils/warehouseTheme";
 import { WarehouseEditFields } from "./warehouse-row/WarehouseEditFields";
@@ -10,6 +11,7 @@ type MobileProps = {
   items: WarehouseItem[];
   filteredCount: number;
   productOptions: ProductOption[];
+  serviceNameOptions: ServiceNameOption[];
   draft: WarehouseItem | null;
   editingId: number | "new" | null;
   expandedItemId: number | null;
@@ -28,6 +30,7 @@ export const StorageMobileList: React.FC<MobileProps> = ({
   items,
   filteredCount,
   productOptions,
+  serviceNameOptions,
   draft,
   editingId,
   expandedItemId,
@@ -58,6 +61,7 @@ export const StorageMobileList: React.FC<MobileProps> = ({
           <WarehouseEditFields
             draft={draft}
             productOptions={productOptions}
+            serviceNameOptions={serviceNameOptions}
             onChange={onDraftChange}
           />
           <FormActions
@@ -91,10 +95,11 @@ export const StorageMobileList: React.FC<MobileProps> = ({
                   Chỉnh sửa tài khoản
                 </p>
                 <WarehouseEditFields
-            draft={draft}
-            productOptions={productOptions}
-            onChange={onDraftChange}
-          />
+                  draft={draft}
+                  productOptions={productOptions}
+                  serviceNameOptions={serviceNameOptions}
+                  onChange={onDraftChange}
+                />
                 <FormActions
                   itemId={item.id}
                   loading={loading}

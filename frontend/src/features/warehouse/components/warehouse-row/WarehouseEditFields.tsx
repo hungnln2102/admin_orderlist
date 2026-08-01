@@ -1,7 +1,7 @@
 import React from "react";
 import { WarehouseItem, WarehouseService } from "../../types";
 import { ProductCategorySelect } from "../ProductCategorySelect";
-import type { ProductOption } from "../../hooks/useWarehouseProducts";
+import type { ServiceNameOption } from "../../hooks/useWarehouseServiceNames";
 import { TrashIcon, PlusIcon } from "@heroicons/react/24/outline";
 
 const inputCls =
@@ -11,13 +11,13 @@ const labelCls = "text-[10px] font-bold uppercase tracking-widest text-indigo-10
 
 type Props = {
   draft: WarehouseItem;
-  productOptions: ProductOption[];
+  serviceNameOptions: ServiceNameOption[];
   onChange: (key: keyof WarehouseItem, value: any) => void;
 };
 
 export const WarehouseEditFields: React.FC<Props> = ({
   draft,
-  productOptions,
+  serviceNameOptions,
   onChange,
 }) => {
   const services = draft.services || [];
@@ -89,11 +89,13 @@ export const WarehouseEditFields: React.FC<Props> = ({
               <div>
                 <p className={`${labelCls} mb-1`}>Sản phẩm</p>
                 <ProductCategorySelect
-                  value={String(srv.product_id || srv.category || "")}
-                  options={productOptions}
+                  value={String(srv.warehouse_product_name_id || srv.category || "")}
+                  options={serviceNameOptions}
                   onChange={(value, label) => {
+                    const selectedOpt = serviceNameOptions.find(o => o.value === value);
                     handleServicePatch(idx, {
-                      product_id: value,
+                      warehouse_product_name_id: selectedOpt ? Number(selectedOpt.value) : null,
+                      product_id: selectedOpt ? selectedOpt.product_id : null,
                       category: label,
                       display_name: label,
                     });

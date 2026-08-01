@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import { CheckIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { ProductOption } from "../../hooks/useWarehouseProducts";
+import type { ServiceNameOption } from "../../hooks/useWarehouseServiceNames";
 import { WarehouseItem, getWarehouseServiceDisplayName } from "../../types";
 import type { WarehouseTheme } from "../../utils/warehouseTheme";
 import {
@@ -16,6 +17,7 @@ type Props = {
   item: WarehouseItem;
   draft: WarehouseItem | null;
   productOptions: ProductOption[];
+  serviceNameOptions: ServiceNameOption[];
   theme: WarehouseTheme;
   loading: boolean;
   onDraftChange: (key: keyof WarehouseItem, value: string) => void;
@@ -31,6 +33,7 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
   item,
   draft,
   productOptions,
+  serviceNameOptions,
   theme,
   loading,
   onDraftChange,
@@ -131,6 +134,7 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
             <WarehouseEditFields
               draft={draft}
               productOptions={productOptions}
+              serviceNameOptions={serviceNameOptions}
               onChange={onDraftChange}
             />
           ) : (

@@ -4,6 +4,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import type { ProductOption } from "../../hooks/useWarehouseProducts";
+import type { ServiceNameOption } from "../../hooks/useWarehouseServiceNames";
 import { WarehouseItem, getWarehouseServiceDisplayName } from "../../types";
 import { getWarehouseTheme } from "../../utils/warehouseTheme";
 import { WarehouseRowExpanded } from "./WarehouseRowExpanded";
@@ -14,6 +15,7 @@ type Props = {
   isEditing: boolean;
   draft: WarehouseItem | null;
   productOptions: ProductOption[];
+  serviceNameOptions: ServiceNameOption[];
   totalColumns: number;
   loading: boolean;
   onToggle: (id: number) => void;
@@ -30,6 +32,7 @@ export const WarehouseRow = React.memo(function WarehouseRow({
   isEditing,
   draft,
   productOptions,
+  serviceNameOptions,
   totalColumns,
   loading,
   onToggle,
@@ -128,6 +131,7 @@ export const WarehouseRow = React.memo(function WarehouseRow({
         item={item}
         draft={draft}
         productOptions={productOptions}
+        serviceNameOptions={serviceNameOptions}
         theme={theme}
         loading={loading}
         onDraftChange={onDraftChange}

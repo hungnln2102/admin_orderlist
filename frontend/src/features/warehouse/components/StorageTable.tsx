@@ -2,6 +2,7 @@ import React from "react";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { OrdersPagination } from "@/features/orders/components/OrdersPagination";
 import type { ProductOption } from "../hooks/useWarehouseProducts";
+import type { ServiceNameOption } from "../hooks/useWarehouseServiceNames";
 import { WarehouseItem } from "../types";
 import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
 import { StorageMobileList } from "./StorageItemCard";
@@ -13,6 +14,7 @@ type StorageTableProps = {
   items: WarehouseItem[];
   filteredCount: number;
   productOptions: ProductOption[];
+  serviceNameOptions: ServiceNameOption[];
   draft: WarehouseItem | null;
   editingId: number | "new" | null;
   expandedItemId: number | null;
@@ -38,6 +40,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
   items,
   filteredCount,
   productOptions,
+  serviceNameOptions,
   draft,
   editingId,
   expandedItemId,
@@ -63,6 +66,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
       items={items}
       filteredCount={filteredCount}
       productOptions={productOptions}
+      serviceNameOptions={serviceNameOptions}
       draft={draft}
       editingId={editingId}
       expandedItemId={expandedItemId}
@@ -109,6 +113,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                     <WarehouseEditFields
                       draft={draft}
                       productOptions={productOptions}
+                      serviceNameOptions={serviceNameOptions}
                       onChange={onDraftChange}
                     />
                     <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-white/10 pt-4">
@@ -157,6 +162,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                 isEditing={editingId === item.id}
                 draft={draft}
                 productOptions={productOptions}
+                serviceNameOptions={serviceNameOptions}
                 totalColumns={WAREHOUSE_TOTAL_COLUMNS}
                 loading={loading}
                 onToggle={onToggleDetails}

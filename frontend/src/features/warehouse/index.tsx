@@ -11,6 +11,7 @@ import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
 import { useWarehouseProducts } from "./hooks/useWarehouseProducts";
+import { useWarehouseServiceNames } from "./hooks/useWarehouseServiceNames";
 import {
   WarehouseItem,
   getWarehouseServiceDisplayName,
@@ -186,6 +187,7 @@ export default function Storage() {
   };
 
       const { productOptions, loadingProducts, reloadProducts } = useWarehouseProducts(items);
+      const { serviceNameOptions, reloadNames } = useWarehouseServiceNames();
 
   const filtered = useMemo(() => {
     return items
@@ -279,6 +281,7 @@ export default function Storage() {
             items={currentItems}
             filteredCount={filtered.length}
             productOptions={productOptions}
+            serviceNameOptions={serviceNameOptions}
             draft={draft}
             editingId={editingId}
             expandedItemId={expandedItemId}
@@ -305,6 +308,7 @@ export default function Storage() {
           productOptions={productOptions} 
           onUpdate={() => {
             reloadProducts();
+            reloadNames();
             fetchItems();
           }}
         />

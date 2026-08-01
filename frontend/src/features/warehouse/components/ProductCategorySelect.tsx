@@ -1,10 +1,8 @@
 import React from "react";
 import SearchableSelect from "@/components/modals/CreateOrderModal/SearchableSelect";
-import type { ProductOption } from "../hooks/useWarehouseProducts";
-
 type Props = {
   value: string;
-  options: ProductOption[];
+  options: { value: string; label: string }[];
   onChange: (value: string, label: string) => void;
   disabled?: boolean;
   placeholder?: string;

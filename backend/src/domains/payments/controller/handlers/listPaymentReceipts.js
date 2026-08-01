@@ -66,7 +66,7 @@ const listPaymentReceipts = async (req, res) => {
       .leftJoin(
         { ft: TABLES.receiptFlowTypes },
         `ft.${FLOW_TYPE_COLS.ID}`,
-        `fs.${RECEIPT_STATE_COLS.FLOW_TYPE_ID}`
+        `fs.${RECEIPT_STATE_COLS.flowTypeId}`
       );
     if (missingOrderOnly) {
       const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
@@ -87,9 +87,9 @@ const listPaymentReceipts = async (req, res) => {
         postedOffFlowBankReceipt: `fs.${RECEIPT_STATE_COLS.postedOffFlowBankReceipt}`,
         reconciledAt: `fs.${RECEIPT_STATE_COLS.reconciledAt}`,
         adjustmentApplied: `fs.${RECEIPT_STATE_COLS.adjustmentApplied}`,
-        flowTypeId: `fs.${RECEIPT_STATE_COLS.FLOW_TYPE_ID}`,
-        flowClassifiedAt: `fs.${RECEIPT_STATE_COLS.FLOW_CLASSIFIED_AT}`,
-        flowNote: `fs.${RECEIPT_STATE_COLS.FLOW_NOTE}`,
+        flowTypeId: `fs.${RECEIPT_STATE_COLS.flowTypeId}`,
+        flowClassifiedAt: `fs.${RECEIPT_STATE_COLS.flowClassifiedAt}`,
+        flowNote: `fs.${RECEIPT_STATE_COLS.flowNote}`,
         flowTypeLabel: `ft.${FLOW_TYPE_COLS.LABEL}`,
         flowTypeCode: `ft.${FLOW_TYPE_COLS.CODE}`,
       })
