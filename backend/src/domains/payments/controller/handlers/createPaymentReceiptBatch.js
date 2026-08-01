@@ -1,4 +1,4 @@
-const { withTransaction } = require("@/db");
+const { withTransaction, db } = require("@/db");
 const { STATUS } = require("@/utils/statuses");
 const logger = require("@/utils/logger");
 const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
@@ -196,6 +196,31 @@ const createPaymentReceiptBatch = async (req, res) => {
         totalAmount,
       };
     });
+
+    // Send combined Telegram notification for the batch
+    try {
+      const { PRODUCT_SCHEMA, SCHEMA_ORDERS, tableName } = require("@/config/dbSchema");
+      const variantTable = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_ORDERS);
+      const ordersForNotification = await db(TABLES.orderList)
+        .leftJoin(variantTable, `${TABLES.orderList}.id_product`, `${variantTable}.id`)
+        .select(
+          `${TABLES.orderList}.id_order`,
+          `${TABLES.orderList}.id_product`,
+          `${TABLES.orderList}.customer`,
+          `${TABLES.orderList}.price`,
+          `${TABLES.orderList}.information_order`,
+          `${variantTable}.display_name as variant_display_name`,
+          `${variantTable}.variant_name as variant_name`
+        )
+        .whereIn(`${TABLES.orderList}.id_order`, result.orderCodes);
+
+      const { notifyBatchCreated } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
+      notifyBatchCreated(result, ordersForNotification).catch((err) => {
+        logger.error("[payments] Gửi telegram cho batch thất bại", err);
+      });
+    } catch (notifyErr) {
+      logger.error("[payments] Lỗi truy vấn đơn hàng để gửi telegram batch", notifyErr);
+    }
 
     return res.json({
       success: true,

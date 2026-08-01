@@ -9,6 +9,10 @@ const { notifyOrderCreated, notifyFourDaysRemaining, notifyZeroDaysRemaining } =
 function handleOrderCreated(orderData) {
   try {
     logger.info(`[TelegramSubscriber] Nhận sự kiện ORDER_CREATED cho đơn: ${orderData?.id_order || 'N/A'}`);
+    if (orderData?.skipTelegramNotification) {
+      logger.info(`[TelegramSubscriber] Bỏ qua gửi Telegram lẻ cho đơn gộp: ${orderData?.id_order}`);
+      return;
+    }
     notifyOrderCreated(orderData);
   } catch (error) {
     logger.error('[TelegramSubscriber] Lỗi khi xử lý ORDER_CREATED', { error: error.message });

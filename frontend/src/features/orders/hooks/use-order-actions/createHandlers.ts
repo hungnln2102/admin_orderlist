@@ -4,8 +4,9 @@ import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
 import { createImportPackage } from "@/features/warehouse/api/importPackageApi";
 import { formatCurrency, parseErrorResponse } from "../../utils/ordersHelpers";
-import type { CreatedOrderBatchView, RefundCreatePrefill } from "../useOrdersModals";
+import type { RefundCreatePrefill } from "../useOrdersModals";
 import type { CreateOrderPayload } from "./types";
+import { t } from "@/i18n";
 
 type ImportPackageMeta = {
   productId?: number | string | null;
@@ -138,6 +139,7 @@ export const buildSaveNewOrderHandler =
     closeCreateModal();
 
     const payloads = Array.isArray(newOrderData) ? newOrderData : [newOrderData];
+    const isBatch = payloads.length > 1;
 
     try {
       const createdOrders: Order[] = [];
@@ -147,6 +149,9 @@ export const buildSaveNewOrderHandler =
         const outgoing: Record<string, unknown> = {
           ...(payloads[i] as unknown as Record<string, unknown>),
         };
+        if (isBatch) {
+          outgoing.skip_telegram_notification = true;
+        }
         try {
           const importPackageMeta = outgoing.__import_package as ImportPackageMeta | undefined;
           delete outgoing.__import_package;

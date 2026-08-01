@@ -333,7 +333,10 @@ const attachCreateOrderRoute = (router) => {
             if (isMavnImportOrder(newOrder)) {
                 eventBus.emit(EVENTS.IMPORT_ORDER_CREATED, newOrder);
             } else {
-                eventBus.emit(EVENTS.ORDER_CREATED, newOrder);
+                eventBus.emit(EVENTS.ORDER_CREATED, {
+                    ...newOrder,
+                    skipTelegramNotification: !!req.body?.skip_telegram_notification,
+                });
             }
             res.status(201).json(normalized);
         } catch (error) {

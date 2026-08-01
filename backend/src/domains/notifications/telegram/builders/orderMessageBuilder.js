@@ -197,8 +197,49 @@ function buildExpiredOrderMessage(order, index, total) {
   return lines.join("\n");
 }
 
+function buildBatchOrderCreatedMessage(batch, orders, bankInfo) {
+  const bank = normalizeBankInfo(bankInfo);
+  if (!batch) return "";
+  const escBatch = batch.batchCode ? escapeHtml(batch.batchCode) : "...";
+  const escTotal = escapeHtml(`${formatCurrency(batch.totalAmount)} đ`);
+  const escStk = bank.accountNumber ? escapeHtml(bank.accountNumber) : "";
+
+  const separator1 = "━━━━━━ 📦 ━━━━━━";
+  const separator3 = "━━━━━━ 💳 ━━━━━━";
+
+  const orderLines = (orders || []).map((o, idx) => {
+    const escOrder = o.id_order ? escapeHtml(o.id_order) : "...";
+    const productName = o.variant_display_name || o.variant_name || o.id_product;
+    const escProduct = productName ? escapeHtml(productName) : "N/A";
+    const escInfo = o.information_order ? escapeHtml(o.information_order) : "N/A";
+    const escCustomer = o.customer ? escapeHtml(o.customer) : "N/A";
+    const escPrice = escapeHtml(`${formatCurrency(o.price)} đ`);
+    
+    return `${idx + 1}. Đơn <code>${escOrder}</code>: <b>${escProduct}</b> (${escInfo}) - Khách: <code>${escCustomer}</code> - Giá: <b>${escPrice}</b>`;
+  });
+
+  const lines = [
+    `✅ Nhóm đơn hàng <code>${escBatch}</code> đã được tạo thành công!`,
+    `Tổng số đơn: <b>${orders.length}</b>`,
+    "",
+    separator1,
+    "🔔 <b>CHI TIẾT CÁC ĐƠN HÀNG</b>",
+    ...orderLines,
+    "",
+    `💰 Tổng giá trị thanh toán: <b>${escTotal}</b>`,
+    "",
+    separator3,
+    "💳 <b>HƯỚNG DẪN THANH TOÁN NHÓM</b>",
+    escStk ? `🏦 STK: <code>${escStk}</code>` : null,
+    "ℹ️ Chuyển khoản <b>đúng số tiền</b> hiển thị trên QR (không cần ghi nội dung).",
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
 module.exports = {
   buildOrderCreatedMessage,
+  buildBatchOrderCreatedMessage,
   buildImportOrderCreatedMessage,
   buildCopyKeyboard,
   buildDueOrderMessage,

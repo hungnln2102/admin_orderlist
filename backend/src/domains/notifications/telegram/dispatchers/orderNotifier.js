@@ -1,6 +1,7 @@
 const { enqueueMessage } = require("@/domains/notifications/telegram/core/telegramClient");
 const { 
   buildOrderCreatedMessage, 
+  buildBatchOrderCreatedMessage,
   buildDueOrderMessage, 
   buildExpiredOrderMessage 
 } = require("@/domains/notifications/telegram/builders/orderMessageBuilder");
@@ -160,6 +161,26 @@ function notifyZeroDaysRemaining(orders) {
   });
 }
 
+async function notifyBatchCreated(batch, orders) {
+  if (!SEND_ORDER_NOTIFICATION) return;
+
+  try {
+    const defaultBank = await resolveDefaultShopBankAccount();
+    const text = buildBatchOrderCreatedMessage(batch, orders, defaultBank);
+    const price = Number(batch.totalAmount) || 0;
+
+    await enqueueOrderMessage({
+      topicId: ORDER_CREATED_TOPIC_ID,
+      text,
+      bank: defaultBank,
+      price,
+    });
+  } catch (error) {
+    const logger = require("@/utils/logger");
+    logger.error("[OrderNotifier] Lỗi khi notifyBatchCreated", { error: error.message });
+  }
+}
+
 module.exports = {
   sendOrderCreatedNotification: notifyOrderCreated,
   sendFourDaysRemainingNotification: notifyFourDaysRemaining,
@@ -167,4 +188,5 @@ module.exports = {
   notifyOrderCreated,
   notifyFourDaysRemaining,
   notifyZeroDaysRemaining,
+  notifyBatchCreated,
 };
