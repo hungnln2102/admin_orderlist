@@ -12,7 +12,7 @@ export function useWarehouseProducts(_items: WarehouseItem[]) {
   const fetchOptions = async () => {
     setLoadingProducts(true);
     try {
-      const res = await apiFetch("/api/products/packages");
+      const res = await apiFetch("/api/products/packages/options");
       if (res.ok) {
         const data = await res.json();
         const options = data.map((item: any) => ({

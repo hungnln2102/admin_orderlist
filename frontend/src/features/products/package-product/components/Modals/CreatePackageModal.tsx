@@ -53,7 +53,7 @@ export const CreatePackageModal: React.FC<CreatePackageModalProps> = ({
     if (!open) return;
     let cancelled = false;
     setPackagesLoading(true);
-    apiFetch("/api/products/packages")
+    apiFetch("/api/products/packages/options")
       .then((res) => res.json())
       .then((data: ProductPackageOption[]) => {
         if (cancelled || !Array.isArray(data)) return;

@@ -7,6 +7,7 @@ const {
   bulkDeletePackages,
   patchProductPackageOptions,
 } = require("@/domains/products/packages/controller");
+const { listProductPackages } = require("@/domains/products/controller");
 const {
   packageIdParam,
   createPackageRules,
@@ -17,6 +18,7 @@ const {
 const router = express.Router();
 
 router.get("/", listPackageProducts);
+router.get("/options", listProductPackages);
 router.patch(
   "/product-options/:productId",
   ...patchProductPackageOptionsRules,

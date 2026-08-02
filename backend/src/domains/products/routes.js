@@ -1,7 +1,6 @@
 const express = require("express");
 const {
   listProducts,
-  listProductPackages,
   getSuppliesByProductName,
   getSupplyPricesByProductName,
   updateSupplyPriceForProduct,
@@ -12,7 +11,6 @@ const { sourceIdParam } = require("@/domains/products/validators/productValidato
 const router = express.Router();
 
 router.get("/", listProducts);
-router.get("/packages", listProductPackages);
 router.get("/supplies-by-name/:productName", getSuppliesByProductName);
 router.get("/all-prices-by-name/:productName", getSupplyPricesByProductName);
 router.patch(
