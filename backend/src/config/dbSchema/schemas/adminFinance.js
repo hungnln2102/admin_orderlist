@@ -46,6 +46,7 @@ const ADMIN_SCHEMA = {
       BALANCE: "balance",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
+      IS_DELETED: "is_deleted",
     },
   },
   SHOP_BANK_ACCOUNT_LEDGER: {

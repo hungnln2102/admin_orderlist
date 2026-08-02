@@ -57,6 +57,7 @@ const findAccountIdByReceiver = async (executor, receiverAccount) => {
     `SELECT ${ACCOUNT_COLS.ID} AS id
      FROM ${ACCOUNT_TABLE}
      WHERE TRIM(REGEXP_REPLACE(${ACCOUNT_COLS.ACCOUNT_NUMBER}, '\\s+', '', 'g')) = ?
+       AND ${ACCOUNT_COLS.IS_DELETED} = false
      LIMIT 1`,
     [stkKey]
   );

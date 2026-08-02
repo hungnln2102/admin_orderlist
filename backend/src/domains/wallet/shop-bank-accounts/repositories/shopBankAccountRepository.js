@@ -26,6 +26,7 @@ const FALLBACK_COLUMNS = {
   balance: SCHEMA_COLS.BALANCE,
   createdAt: SCHEMA_COLS.CREATED_AT,
   updatedAt: SCHEMA_COLS.UPDATED_AT,
+  isDeleted: SCHEMA_COLS.IS_DELETED,
 };
 
 const columns = SHOP_BANK_ACCOUNTS_DEF?.columns || FALLBACK_COLUMNS;
@@ -51,23 +52,26 @@ const selectColumns = {
   balance: columns.balance,
   createdAt: columns.createdAt,
   updatedAt: columns.updatedAt,
+  isDeleted: columns.isDeleted,
 };
 
 const listShopBankAccounts = async () =>
   db(TABLE)
     .select(selectColumns)
+    .where(columns.isDeleted, false)
     .orderBy(columns.isDefault, "desc")
     .orderBy(columns.isActive, "desc")
     .orderBy(columns.id, "desc");
 
 const findShopBankAccountById = async (id) =>
-  db(TABLE).select(selectColumns).where(columns.id, id).first();
+  db(TABLE).select(selectColumns).where(columns.id, id).where(columns.isDeleted, false).first();
 
 const findDefaultActiveAccount = async () =>
   db(TABLE)
     .select(selectColumns)
     .where(columns.isActive, true)
     .where(columns.isDefault, true)
+    .where(columns.isDeleted, false)
     .orderBy(columns.id, "desc")
     .first();
 
@@ -76,6 +80,7 @@ const findShopBankAccountByNumberAndBankBin = async (accountNumber, bankBin) =>
     .select(selectColumns)
     .whereRaw("TRIM(??) = ?", [columns.accountNumber, accountNumber])
     .whereRaw("TRIM(??) = ?", [columns.bankBin, bankBin])
+    .where(columns.isDeleted, false)
     .first();
 
 const MAVRYK_DEFAULT_ACCOUNT_NUMBER = "9183400998";
@@ -91,6 +96,7 @@ const resolveMavrykDefaultBankAccount = async (amount = 0, executor = db) => {
   const primary = await executor(TABLE)
     .select(selectColumns)
     .where(columns.isActive, true)
+    .where(columns.isDeleted, false)
     .whereRaw("TRIM(REGEXP_REPLACE(??, '\\s+', '', 'g')) = ?", [
       columns.accountNumber,
       MAVRYK_DEFAULT_ACCOUNT_NUMBER,
@@ -102,6 +108,7 @@ const resolveMavrykDefaultBankAccount = async (amount = 0, executor = db) => {
   const fallbackRows = await executor(TABLE)
     .select(selectColumns)
     .where(columns.isActive, true)
+    .where(columns.isDeleted, false)
     .whereRaw("UPPER(TRIM(??)) = ?", [
       columns.accountHolder,
       MAVRYK_FALLBACK_HOLDER.toUpperCase(),
@@ -137,7 +144,15 @@ const updateShopBankAccount = async (trx, id, payload) => {
   return rows[0] || null;
 };
 
-const deleteShopBankAccount = async (id) => db(TABLE).where(columns.id, id).del();
+const deleteShopBankAccount = async (id, trx = db) =>
+  trx(TABLE)
+    .where(columns.id, id)
+    .update({
+      [columns.isDeleted]: true,
+      [columns.isActive]: false,
+      [columns.isDefault]: false,
+      [columns.updatedAt]: trx.fn.now(),
+    });
 
 const decrementBalance = async (id, amount, { client = db } = {}) => {
   return client(TABLE)

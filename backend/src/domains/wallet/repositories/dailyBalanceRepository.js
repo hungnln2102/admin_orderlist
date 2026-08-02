@@ -12,7 +12,7 @@ const WALLET_COLS = FINANCE_SCHEMA.MASTER_WALLETTYPES.COLS;
 const BALANCE_COLS = FINANCE_SCHEMA.TRANS_DAILYBALANCES.COLS;
 const DAILY_BALANCES_BASE_TABLE = FINANCE_SCHEMA.TRANS_DAILYBALANCES.TABLE;
 
-const DEFAULT_SUPPLIER_REFUND_WALLET_NAME = "VP BANK (MAVRYKSTORE)";
+const DEFAULT_SUPPLIER_REFUND_WALLET_NAME = "VP Bank (Cá nhân)";
 
 const toMoney = (value) => {
   const num = Number(value);
@@ -47,7 +47,7 @@ const findWalletTypeByName = async (executor, walletName) => {
 
   return executor(WALLET_TYPES_TABLE)
     .select({ id: WALLET_COLS.ID, name: WALLET_COLS.WALLET_NAME })
-    .whereRaw(`LOWER(COALESCE(??, '')) LIKE ?`, [WALLET_COLS.WALLET_NAME, "%mavrykstore%"])
+    .whereRaw(`LOWER(COALESCE(??, '')) LIKE ?`, [WALLET_COLS.WALLET_NAME, "%cá nhân%"])
     .orWhereRaw(`LOWER(COALESCE(??, '')) LIKE ?`, [WALLET_COLS.WALLET_NAME, "%vp bank%"])
     .orderBy(WALLET_COLS.ID, "asc")
     .first();

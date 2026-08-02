@@ -182,6 +182,14 @@ const deleteShopBankAccountItem = async (id) => {
     throw createHttpError(404, "Không tìm thấy tài khoản.");
   }
 
+  const balance = Number(current.balance) || 0;
+  if (balance !== 0) {
+    throw createHttpError(
+      400,
+      `Không thể xóa tài khoản khi số dư còn lại khác 0 (${balance.toLocaleString()} ₫). Vui lòng thực hiện rút tiền để số dư về 0 trước khi xóa.`
+    );
+  }
+
   try {
     await deleteShopBankAccount(normalizedId);
   } catch (error) {

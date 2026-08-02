@@ -165,7 +165,6 @@ const confirmPaymentSupply = async (req, res) => {
       const addAmount = isSupplierRefundToShop
         ? -Math.abs(expectedPaidAmount)
         : Math.abs(expectedPaidAmount);
-      await trx.raw(`DROP INDEX IF EXISTS ${SCHEMA_PARTNER}.uq_supplier_payments_supplier_id;`);
       const insertResult = await trx.raw(
         `
         INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid}, ${PS.shopBankAccountId})

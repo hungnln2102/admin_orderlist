@@ -142,7 +142,7 @@ const CreditCashoutStkModal: React.FC<CreditCashoutStkModalProps> = ({
                   required
                 />
                 <p className="mt-2 text-xs text-slate-400">
-                  Số tiền hoàn sẽ được cộng vào VP Bank (MAVRYKSTORE) trong Bảng Dòng tiền theo ngày.
+                  Số tiền hoàn sẽ được cộng vào VP Bank (Cá nhân) trong Bảng Dòng tiền theo ngày.
                   Các cột tài sản khác sẽ giữ nguyên giá trị liền kề trước đó.
                 </p>
               </div>
