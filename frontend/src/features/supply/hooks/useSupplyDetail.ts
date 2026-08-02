@@ -47,17 +47,18 @@ export const useSupplyDetail = (supplyId: number | null, isOpen: boolean) => {
   const [error, setError] = useState<string | null>(null);
   const [overview, setOverview] = useState<SupplyOverview | null>(null);
 
-  const fetchOverview = useCallback(async () => {
+  const fetchOverview = useCallback(async (quiet: boolean | React.SyntheticEvent = false) => {
     if (!supplyId) return;
-    setLoading(true);
+    const isQuiet = quiet === true;
+    if (!isQuiet) setLoading(true);
     setError(null);
     try {
       const data = await apiGet<SupplyOverview>(`/api/supplies/${supplyId}/overview`);
       setOverview(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra");
+      if (!isQuiet) setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra");
     } finally {
-      setLoading(false);
+      if (!isQuiet) setLoading(false);
     }
   }, [supplyId]);
 

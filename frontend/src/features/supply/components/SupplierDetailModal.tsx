@@ -12,6 +12,7 @@ import { SupplierSettlementPanel } from "./SupplierSettlementPanel";
 import { SupplierMonthlyOrdersPanel } from "./SupplierMonthlyOrdersPanel";
 import { SupplierOverviewCards } from "./SupplierOverviewCards";
 import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
+import toast from "react-hot-toast";
 
 interface Props {
   isOpen: boolean;
@@ -84,6 +85,19 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       .finally(() => setShopBankAccountsLoading(false));
   }, [isOpen]);
 
+  // Auto polling to check and update supplier payment status when modal is open and has unpaid payments
+  useEffect(() => {
+    if (!isOpen || !supplyId) return;
+    const hasUnpaid = unpaidPayments.length > 0;
+    if (!hasUnpaid) return;
+
+    const interval = setInterval(() => {
+      void fetchOverview(true);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isOpen, supplyId, unpaidPayments.length, fetchOverview]);
+
   const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
     const raw = Number(p.totalImport ?? p.import_value ?? 0);
     const paid = Number(p.paid ?? 0);
@@ -149,7 +163,15 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       shopBankAccountId: selectedShopBankAccount.id,
     });
     if (!result.success) {
-      setError(result.error || "Không thể thanh toán chu kỳ");
+      if (result.error?.includes("Không có log NCC chưa thanh toán để chốt")) {
+        toast.success("Chu kỳ thanh toán này đã được hệ thống tự động đối khớp và thanh toán thành công!");
+        setError(null);
+        void fetchOverview();
+      } else {
+        setError(result.error || "Không thể thanh toán chu kỳ");
+      }
+    } else {
+      toast.success("Thanh toán thành công!");
     }
   };
 
