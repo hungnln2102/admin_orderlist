@@ -1,17 +1,17 @@
 const { ORDERS_SCHEMA } = require("@/config/dbSchema");
 const { STATUS } = require("@/domains/orders/controller/constants");
-const { SLOT_KIND, openPaymentSlot } = require("@/domains/payment-slots");
+const { SLOT_KIND, openPaymentSlot } = require("@/domains/payments/payment-slots");
 const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
 const { resolveDefaultUsdtWallet } = require("@/services/usdtWalletResolver");
 const {
   getUsdtVndRate,
   convertVndToUsd,
-} = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
+} = require("@/domains/wallet/usdt-wallets/services/binanceExchangeRateService");
 const { normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");
 
 
 const resolveRefundCreditAllocation = async ({
-  trx,
+  _trx,
   payload,
   creditNoteForOrder,
   requestedCreditApplyAmount,

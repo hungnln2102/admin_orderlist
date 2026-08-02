@@ -1,5 +1,5 @@
 import { toHtmlFromPlain } from "@/shared/html";
-import type { ProductDescription } from "@/features/product-info/api/productDescApi";
+import type { ProductDescription } from "@/features/products/product-info/api/productDescApi";
 import {
   normalizeProductKey,
   normalizeVariantActive,

@@ -226,24 +226,19 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
   }
 };
 
-const sendGroupedRenewalNotification = async (items) => {
-  const sendEnabled =
-    SEND_RENEWAL_TO_TOPIC !== false && String(SEND_RENEWAL_TO_TOPIC) !== "false";
-  if (!items || !items.length || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
-
+const buildRenewalHeader = (items) => {
   const isAllSuccess = items.every(i => i.result?.success);
   const isAllFailed = items.every(i => !i.result?.success);
-  
-  let header = "";
   if (isAllSuccess) {
-    header = `✅ GIA HẠN TỰ ĐỘNG THÀNH CÔNG${items.length > 1 ? ` (${items.length} ĐƠN)` : ""}`;
-  } else if (isAllFailed) {
-    header = `❌ LỖI GIA HẠN TỰ ĐỘNG${items.length > 1 ? ` (${items.length} ĐƠN)` : ""}`;
-  } else {
-    header = `⚠️ GIA HẠN TỰ ĐỘNG (THÀNH CÔNG & LỖI) (${items.length} ĐƠN)`;
+    return `✅ GIA HẠN TỰ ĐỘNG THÀNH CÔNG${items.length > 1 ? ` (${items.length} ĐƠN)` : ""}`;
   }
+  if (isAllFailed) {
+    return `❌ LỖI GIA HẠN TỰ ĐỘNG${items.length > 1 ? ` (${items.length} ĐƠN)` : ""}`;
+  }
+  return `⚠️ GIA HẠN TỰ ĐỘNG (THÀNH CÔNG & LỖI) (${items.length} ĐƠN)`;
+};
 
-  // Tối ưu thông tin chung
+const extractCommonFields = (items) => {
   const allMatch = (key) => {
     if (items.length === 0) return false;
     const firstVal = items[0].result?.details?.[key];
@@ -253,34 +248,33 @@ const sendGroupedRenewalNotification = async (items) => {
 
   const commonOverrides = {};
   const checkFields = ['SAN_PHAM', 'NGAY_DANG_KY', 'HET_HAN', 'GIA_BAN', 'NGUON', 'GIA_NHAP'];
-  
   checkFields.forEach(field => {
     if (allMatch(field)) {
       commonOverrides[field] = items[0].result.details[field];
     }
   });
+  return commonOverrides;
+};
 
-  if (Object.keys(commonOverrides).length > 0) {
-    header += `\n──── Thông Tin Chung ────`;
-    if (commonOverrides.hasOwnProperty('SAN_PHAM')) header += `\n📦 Sản Phẩm: ${commonOverrides.SAN_PHAM}`;
-    if (commonOverrides.hasOwnProperty('NGAY_DANG_KY')) header += `\n📅 Ngày Đăng Ký: ${commonOverrides.NGAY_DANG_KY}`;
-    if (commonOverrides.hasOwnProperty('HET_HAN')) header += `\n📆 Hết Hạn: ${commonOverrides.HET_HAN}`;
-    if (commonOverrides.hasOwnProperty('GIA_BAN')) header += `\n💵 Giá Bán: ${formatCurrency(commonOverrides.GIA_BAN)}`;
-    
-    // Nếu có NGUON hoặc GIA_NHAP, nhóm riêng
-    if (commonOverrides.hasOwnProperty('NGUON') || commonOverrides.hasOwnProperty('GIA_NHAP')) {
-      header += `\n──── Chung: Nhà Cung Cấp ────`;
-      if (commonOverrides.hasOwnProperty('NGUON')) header += `\n🏷 Nhà Cung Cấp: ${commonOverrides.NGUON}`;
-      if (commonOverrides.hasOwnProperty('GIA_NHAP')) header += `\n💰 Giá Nhập: ${formatCurrency(commonOverrides.GIA_NHAP)}`;
-    }
-  }
+const buildCommonFieldsSection = (commonOverrides) => {
+  if (Object.keys(commonOverrides).length === 0) return "";
 
-  header += `\n──── Chi Tiết Các Đơn ────`;
-
-  const detailsBlocks = items.map(item => buildOrderDetailsBlock(item.orderCode, item.result, commonOverrides));
-  const text = header + "\n" + detailsBlocks.join("\n━━━━━━━━━━━━━━━━━━━━\n");
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  let section = `\n──── Thông Tin Chung ────`;
+  if (commonOverrides.hasOwnProperty('SAN_PHAM')) section += `\n📦 Sản Phẩm: ${commonOverrides.SAN_PHAM}`;
+  if (commonOverrides.hasOwnProperty('NGAY_DANG_KY')) section += `\n📅 Ngày Đăng Ký: ${commonOverrides.NGAY_DANG_KY}`;
+  if (commonOverrides.hasOwnProperty('HET_HAN')) section += `\n📆 Hết Hạn: ${commonOverrides.HET_HAN}`;
+  if (commonOverrides.hasOwnProperty('GIA_BAN')) section += `\n💵 Giá Bán: ${formatCurrency(commonOverrides.GIA_BAN)}`;
   
+  if (commonOverrides.hasOwnProperty('NGUON') || commonOverrides.hasOwnProperty('GIA_NHAP')) {
+    section += `\n──── Chung: Nhà Cung Cấp ────`;
+    if (commonOverrides.hasOwnProperty('NGUON')) section += `\n🏷 Nhà Cung Cấp: ${commonOverrides.NGUON}`;
+    if (commonOverrides.hasOwnProperty('GIA_NHAP')) section += `\n💰 Giá Nhập: ${formatCurrency(commonOverrides.GIA_NHAP)}`;
+  }
+  return section;
+};
+
+const sendTelegramGroupedMessage = async (text, sendEnabled) => {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const buildPayload = (includeTopic = true) => {
     const payload = {
       chat_id: TELEGRAM_CHAT_ID,
@@ -315,6 +309,22 @@ const sendGroupedRenewalNotification = async (items) => {
     }
     logger.error("Không thể gửi thông báo gia hạn gộp Telegram", { error: err?.message });
   }
+};
+
+const sendGroupedRenewalNotification = async (items) => {
+  const sendEnabled =
+    SEND_RENEWAL_TO_TOPIC !== false && String(SEND_RENEWAL_TO_TOPIC) !== "false";
+  if (!items || !items.length || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+
+  let header = buildRenewalHeader(items);
+  const commonOverrides = extractCommonFields(items);
+  header += buildCommonFieldsSection(commonOverrides);
+  header += `\n──── Chi Tiết Các Đơn ────`;
+
+  const detailsBlocks = items.map(item => buildOrderDetailsBlock(item.orderCode, item.result, commonOverrides));
+  const text = header + "\n" + detailsBlocks.join("\n━━━━━━━━━━━━━━━━━━━━\n");
+
+  await sendTelegramGroupedMessage(text, sendEnabled);
 };
 
 // Stubbed payment notification (disabled)

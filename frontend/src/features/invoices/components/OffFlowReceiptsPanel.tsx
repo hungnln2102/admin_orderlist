@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReceiptsTable } from "./ReceiptsTable";
 import { PaymentReceipt } from "../helpers";
 

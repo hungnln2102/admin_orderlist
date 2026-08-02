@@ -39,5 +39,8 @@ router.patch("/:supplyId", ...supplyIdParam, updateSupply);
 router.patch("/:supplyId/active", ...supplyIdParam, toggleSupplyActive);
 router.delete("/:supplyId", ...supplyIdParam, deleteSupply);
 
+// Sub-routes for supplier change context
+router.use("/supplier-change", require("../supplier-change/routes"));
+
 module.exports = router;
 module.exports.getSupplyInsights = getSupplyInsights;

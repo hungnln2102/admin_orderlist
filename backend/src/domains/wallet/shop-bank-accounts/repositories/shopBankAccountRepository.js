@@ -139,6 +139,16 @@ const updateShopBankAccount = async (trx, id, payload) => {
 
 const deleteShopBankAccount = async (id) => db(TABLE).where(columns.id, id).del();
 
+const decrementBalance = async (id, amount, { client = db } = {}) => {
+  return client(TABLE)
+    .where(columns.id, id)
+    .update({
+      [columns.balance]: client.raw(`COALESCE(??, 0) - ?`, [columns.balance, amount]),
+      [columns.totalWithdrawn]: client.raw(`COALESCE(??, 0) + ?`, [columns.totalWithdrawn, amount]),
+      [columns.updatedAt]: client.fn.now(),
+    });
+};
+
 module.exports = {
   SHOP_BANK_ACCOUNTS_DEF,
   /** Tên cột snake_case cho insert/update payload (use-cases) */
@@ -157,4 +167,5 @@ module.exports = {
   insertShopBankAccount,
   updateShopBankAccount,
   deleteShopBankAccount,
+  decrementBalance,
 };

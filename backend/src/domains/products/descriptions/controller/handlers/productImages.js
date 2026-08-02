@@ -2,8 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const logger = require("@/utils/logger");
 const { normalizeTextInput } = require("@/utils/normalizers");
-const { IMAGE_DIR, isImageFile } = require("@/domains/product-descriptions/controller/shared/constants");
-const { buildImageUrl } = require("@/domains/product-descriptions/controller/shared/urlHelpers");
+const { IMAGE_DIR, isImageFile } = require("@/domains/products/descriptions/controller/shared/constants");
+const { buildImageUrl } = require("@/domains/products/descriptions/controller/shared/urlHelpers");
 
 const uploadProductImage = (req, res) => {
   if (!req.file || !req.file.filename) {

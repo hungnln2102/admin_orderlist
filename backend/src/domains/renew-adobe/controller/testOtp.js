@@ -1,5 +1,5 @@
 const logger = require("@/utils/logger");
-const { fetchOtpBySource } = require("@/services/otpProviderService");
+const { fetchOtpBySource } = require("@/services/otp/otpProviderService");
 
 /**
  * Controller cho phép admin chủ động gọi thử nghiệm lấy OTP từ các nguồn khác nhau.

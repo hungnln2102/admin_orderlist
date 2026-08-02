@@ -17,7 +17,6 @@ const {
   tableName,
 } = require("@/config/dbSchema");
 const {
-  checkAdesAccount,
   checkAdesTransferStatus,
   renewAdesAccount,
   syncAdesAccount,

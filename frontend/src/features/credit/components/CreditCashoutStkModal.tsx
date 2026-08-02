@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { fetchShopBankAccountBalances } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
-import type { ShopBankAccountBalanceItem } from "@/features/shop-bank-accounts/types";
+import { fetchShopBankAccountBalances } from "@/features/wallet/shop-bank-accounts/api/shopBankAccountApi";
+import type { ShopBankAccountBalanceItem } from "@/features/wallet/shop-bank-accounts/types";
 import { formatMoneyVnd } from "../utils/creditTransform";
 import type { CreditLogItem } from "../types";
 

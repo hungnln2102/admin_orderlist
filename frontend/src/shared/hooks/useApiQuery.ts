@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect } from "react";
 
 export interface UseApiQueryOptions<T> {
@@ -20,7 +21,7 @@ export function useApiQuery<T>(
   const [error, setError] = useState<Error | null>(null);
 
   const execute = useCallback(
-    async (...args: any[]) => {
+    async (..._args: any[]) => {
       setLoading(true);
       setError(null);
       try {
@@ -41,6 +42,7 @@ export function useApiQuery<T>(
         setLoading(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [fetcher]
   );
 

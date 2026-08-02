@@ -5,13 +5,13 @@ const {
   updateTier,
   getVariantMargins,
   upsertVariantMargins,
-} = require("@/domains/pricing-tiers/controller");
+} = require("@/domains/products/pricing-tiers/controller");
 const {
   tierIdParam,
   createTierRules,
   variantIdParam,
   upsertMarginsRules,
-} = require("@/domains/pricing-tiers/validators/pricingTierValidator");
+} = require("@/domains/products/pricing-tiers/validators/pricingTierValidator");
 
 const router = express.Router();
 

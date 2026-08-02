@@ -4,7 +4,7 @@ const {
   SCHEMA_RECEIPT,
   tableName,
 } = require("@/config/dbSchema");
-const { normalizeAccountNumber } = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
+const { normalizeAccountNumber } = require("@/domains/wallet/shop-bank-accounts/helpers/shopBankInputs");
 
 const PAYMENT_RECEIPT_TABLE = tableName(
   RECEIPT_SCHEMA.PAYMENT_RECEIPT.TABLE,

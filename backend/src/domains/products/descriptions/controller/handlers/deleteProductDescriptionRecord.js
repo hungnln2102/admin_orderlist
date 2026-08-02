@@ -5,8 +5,8 @@ const {
   TABLES,
   productDescColNames,
   variantColNames,
-} = require("@/domains/product-descriptions/controller/shared/constants");
-const { invalidateWebsiteSeoCache } = require("@/domains/product-descriptions/controller/shared/cache");
+} = require("@/domains/products/descriptions/controller/shared/constants");
+const { invalidateWebsiteSeoCache } = require("@/domains/products/descriptions/controller/shared/cache");
 
 /** Xóa bản ghi desc_variant; gỡ liên kết variant (id_desc) trước khi xóa. */
 const deleteProductDescriptionRecord = async (req, res) => {

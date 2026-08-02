@@ -4,7 +4,7 @@ import { apiFetch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { CtvItem, CtvStatus } from "./types";
 import { CTV_STATUS_OPTIONS } from "./types";
-import { ROLES, ROLE_ID_CUSTOMER, sortCtvList } from "./constants";
+import { ROLES, sortCtvList } from "./constants";
 import { CtvListTable } from "./components/CtvListTable";
 
 const PAGE_SIZE = 10;

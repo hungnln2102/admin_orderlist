@@ -59,7 +59,7 @@ const {
   findActiveSlotByOrder,
   openPaymentSlot,
   SLOT_KIND,
-} = require("@/domains/payment-slots");
+} = require("@/domains/payments/payment-slots");
 const {
   resolveDefaultShopBankAccount,
 } = require("@/services/shopBankAccountResolver");
@@ -67,11 +67,11 @@ const {
 const { recomputeSummaryMonthTotalTax } = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   resolveMavrykDefaultBankAccount,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   debitShopBankExternalOut,
   SOURCE_KINDS: LEDGER_SOURCE_KINDS,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const storeExpenseTable = tableName(

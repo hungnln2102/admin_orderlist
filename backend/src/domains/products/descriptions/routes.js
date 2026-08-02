@@ -10,14 +10,14 @@ const {
   uploadProductImage,
   listProductImages,
   deleteProductImage,
-} = require("@/domains/product-descriptions/controller");
+} = require("@/domains/products/descriptions/controller");
 const {
   auditProductSeoProxy,
-} = require("@/domains/product-descriptions/controller/websiteSeoAudit");
+} = require("@/domains/products/descriptions/controller/websiteSeoAudit");
 
 const router = express.Router();
 
-const imageDir = path.join(__dirname, "../../image");
+const imageDir = path.join(__dirname, "../../../image");
 fs.mkdirSync(imageDir, { recursive: true });
 
 const storage = multer.diskStorage({

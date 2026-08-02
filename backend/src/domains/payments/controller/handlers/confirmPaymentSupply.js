@@ -11,13 +11,13 @@ const { createHttpError, toMonthKey } = require("@/domains/payments/controller/s
 const {
   findDefaultActiveAccount,
   findShopBankAccountById,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   creditShopBankFromPaymentReceipt,
   creditShopBankSupplierRefund,
   debitShopBankSupplierPayment,
   SOURCE_KINDS,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const {
   findSupplierRefundReceipt,
 } = require("@/domains/payments/controller/helpers/matchSupplierRefundReceipt");

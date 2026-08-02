@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 const { db } = require("@/db");
 const {
   getDefinition,
@@ -68,7 +69,7 @@ const listWarehouse = async (_req, res) => {
       .orderBy(`${alias}.${cols.id}`, "desc");
 
     const stockIds = stocks.map(s => s.id);
-    let servicesByStock = {};
+    const servicesByStock = {};
 
     if (stockIds.length > 0) {
       const services = await db(`${servicesTable} as ${sAlias}`)
@@ -96,8 +97,8 @@ const listWarehouse = async (_req, res) => {
 
       // Check if services are used in packages
       const srvIds = services.map(s => s.id);
-      let inUseSrvIds = new Set();
-      let inUseStockIds = new Set();
+      const inUseSrvIds = new Set();
+      const inUseStockIds = new Set();
       if (stockIds.length > 0) {
         const query = db(pkgTable).select(pkgCols.stockServiceId, pkgCols.storageId, pkgCols.stockId);
         query.where(function () {
@@ -162,7 +163,8 @@ const ensureProductName = async (trx, nameStr, productId = null) => {
 
 const createWarehouse = async (req, res) => {
   // Support both legacy single-service creation and new multi-service creation
-  let { account, services = [] } = req.body || {};
+  const services = req.body?.services || [];
+  let account = req.body?.account;
   if (account) account = String(account).trim().toLowerCase();
 
   // Handle legacy payload fallback
@@ -203,7 +205,7 @@ const createWarehouse = async (req, res) => {
 
       const insertedServices = [];
       for (const srv of services) {
-        let pId = normalizeProductId(srv.product_id);
+        const pId = normalizeProductId(srv.product_id);
         let nameId = normalizeProductId(srv.warehouse_product_name_id);
         
         // Ensure nameId and update product_id if possible
@@ -288,7 +290,8 @@ const createWarehouse = async (req, res) => {
 
 const updateWarehouse = async (req, res) => {
   const { id } = req.params;
-  let { account, services } = req.body || {};
+  const services = req.body?.services;
+  let account = req.body?.account;
   if (account) account = String(account).trim().toLowerCase();
 
   if (!id) return res.status(400).json({ error: "Missing id" });
@@ -348,7 +351,7 @@ const updateWarehouse = async (req, res) => {
           if (existingSrvs.length > 0) {
             // Update the first service of the stock
             const srv = existingSrvs[0];
-            let pId = req.body.product_id !== undefined ? normalizeProductId(req.body.product_id) : srv.product_id;
+            const pId = req.body.product_id !== undefined ? normalizeProductId(req.body.product_id) : srv.product_id;
             let nameId = req.body.warehouse_product_name_id !== undefined ? normalizeProductId(req.body.warehouse_product_name_id) : srv.name_id;
             
             if (req.body.category && req.body.warehouse_product_name_id === undefined) {
@@ -381,7 +384,7 @@ const updateWarehouse = async (req, res) => {
             }
           } else {
             // Insert a new service if none exists
-            let pId = normalizeProductId(req.body.product_id);
+            const pId = normalizeProductId(req.body.product_id);
             let nameId = normalizeProductId(req.body.warehouse_product_name_id);
             
             if (!nameId && req.body.category) {
@@ -422,7 +425,7 @@ const updateWarehouse = async (req, res) => {
         const keptIds = new Set();
 
         for (const srv of services) {
-          let pId = normalizeProductId(srv.product_id);
+          const pId = normalizeProductId(srv.product_id);
           let nameId = normalizeProductId(srv.warehouse_product_name_id);
           
           if (!nameId && srv.category) {

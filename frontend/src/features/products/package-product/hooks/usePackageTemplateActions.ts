@@ -126,7 +126,7 @@ export const usePackageTemplateActions = ({
       }
 
       try {
-        const response = await apiFetch("/api/package-products", {
+        const response = await apiFetch("/api/products/packages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

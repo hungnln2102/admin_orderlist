@@ -15,7 +15,7 @@ const getCredentials = () => {
   // Fallback to local file for dev if needed
   try {
     return require(path.join(__dirname, '../config/ga4-credentials.json'));
-  } catch (err) {
+  } catch (_err) {
     console.warn('GA4 credentials not found in env or local file');
     return {};
   }

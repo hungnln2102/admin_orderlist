@@ -3,9 +3,9 @@ import { PhotoIcon } from "@heroicons/react/24/outline";
 import type { ImageItem as ProductImageItem } from "@/shared/api/coreImageApi";
 import { fetchImages, uploadImage, deleteImage } from "@/shared/api/coreImageApi";
 
-const deleteProductImage = (fileName: string) => deleteImage("/api/product-images", fileName);
-const fetchProductImages = () => fetchImages("/api/product-images");
-const uploadProductImage = (file: File) => uploadImage(file, "/api/product-images/upload");
+const deleteProductImage = (fileName: string) => deleteImage("/api/products/images", fileName);
+const fetchProductImages = () => fetchImages("/api/products/images");
+const uploadProductImage = (file: File) => uploadImage(file, "/api/products/images/upload");
 import { SharedImagePickerModal } from "@/shared/components/ImagePicker/SharedImagePickerModal";
 
 /** Tránh cache trình duyệt khi URL không đổi sau upload/ghi đè file cùng đường dẫn. */

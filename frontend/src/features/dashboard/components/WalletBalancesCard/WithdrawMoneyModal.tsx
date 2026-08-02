@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import { formatNumberOnTyping } from "@/shared/money";
-import { fetchShopBankAccounts, recordShopBankAccountWithdrawal } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
-import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
+import { fetchShopBankAccounts, recordShopBankAccountWithdrawal } from "@/features/wallet/shop-bank-accounts/api/shopBankAccountApi";
+import type { ShopBankAccountItem } from "@/features/wallet/shop-bank-accounts/types";
 import { GenericFormModal, FormField } from "@/shared/components/GenericModal/GenericFormModal";
 
 type WithdrawMoneyModalProps = {

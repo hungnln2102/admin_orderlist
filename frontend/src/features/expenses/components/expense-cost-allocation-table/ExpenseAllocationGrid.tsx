@@ -10,7 +10,6 @@ import {
   FIXED_MERGE_COLUMNS,
   SLOT_COLUMN,
   LAST_FIXED_COLUMN_KEY,
-  FIXED_COLUMNS_WIDTH,
   TOTAL_COLUMN_WIDTH,
   formatMoney,
   hasSlotInPeriod,

@@ -18,7 +18,7 @@ type ImportPackageProps = React.ComponentProps<typeof ImportPackageBlock>;
 import type { CreateOrderCreationKind } from "../types";
 import { ORDER_FIELDS } from "../../../../constants";
 import { formatCurrencyPlain } from "@/shared/money";
-import { CubeIcon, ArchiveBoxArrowDownIcon, CalendarDaysIcon, CurrencyDollarIcon, PresentationChartLineIcon } from "@heroicons/react/24/outline";
+import { CubeIcon, ArchiveBoxArrowDownIcon, CalendarDaysIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import SearchableSelect from "../SearchableSelect";
 
 

@@ -1,4 +1,4 @@
-const { db, withTransaction } = require("@/db");
+const { withTransaction } = require("@/db");
 const logger = require("@/utils/logger");
 const {
   TABLES,
@@ -13,11 +13,11 @@ const {
   debitShopBankWithdraw,
   debitShopBankExternalOut,
   SOURCE_KINDS,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const {
   TABLE: SHOP_BANK_TABLE,
   columns: SHOP_BANK_COLS,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const { insertFinancialAuditLog } = require("../../../../../webhook/sepay/payments");
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");

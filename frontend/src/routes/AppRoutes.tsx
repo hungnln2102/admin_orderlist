@@ -12,12 +12,12 @@ const TaxPage = lazy(() => import("@/features/tax/pages/TaxPage"));
 const TrafficPage = lazy(() => import("@/features/traffic/pages/TrafficPage"));
 const Orders = lazy(() => import("@/features/orders/index.tsx"));
 const CreditLogsPage = lazy(() => import("@/features/credit/index.tsx"));
-const PackageProduct = lazy(() => import("@/features/package-product/index.tsx"));
-const ProductInfo = lazy(() => import("@/features/product-info/index.ts"));
+const PackageProduct = lazy(() => import("@/features/products/package-product/index.tsx"));
+const ProductInfo = lazy(() => import("@/features/products/product-info/index.ts"));
 const FormInfo = lazy(() => import("@/features/form-info/index.tsx"));
-const Pricing = lazy(() => import("@/features/pricing/index.tsx"));
+const Pricing = lazy(() => import("@/features/products/pricing/index.tsx"));
 const Sources = lazy(() => import("@/features/supply/index.tsx"));
-const ShowPrice = lazy(() => import("@/features/product-price"));
+const ShowPrice = lazy(() => import("@/features/products/product-price"));
 const BillOrder = lazy(() => import("@/features/bill-order/index.tsx"));
 const Invoices = lazy(() => import("@/features/invoices/index.tsx"));
 const Warehouse = lazy(() => import("@/features/warehouse/index.tsx"));
@@ -27,17 +27,17 @@ const AddMcoin = lazy(() => import("@/features/add-mcoin/index.tsx"));
 const ActiveKeys = lazy(() => import("@/features/active-keys/index.tsx"));
 const IpWhitelistPage = lazy(() => import("@/features/ip-whitelist/pages/IpWhitelistPage").then(m => ({ default: m.IpWhitelistPage })));
 const PaymentAccountsPage = lazy(() =>
-  import("@/features/payment-accounts/pages/PaymentAccountsPage").then((m) => ({
+  import("@/features/wallet/payment-accounts/pages/PaymentAccountsPage").then((m) => ({
     default: m.PaymentAccountsPage,
   }))
 );
 const ShopBankAccountsPage = lazy(() =>
-  import("@/features/shop-bank-accounts/pages/ShopBankAccountsPage").then((m) => ({
+  import("@/features/wallet/shop-bank-accounts/pages/ShopBankAccountsPage").then((m) => ({
     default: m.ShopBankAccountsPage,
   }))
 );
 const UsdtWalletsPage = lazy(() =>
-  import("@/features/usdt-wallets/pages/UsdtWalletsPage").then((m) => ({
+  import("@/features/wallet/usdt-wallets/pages/UsdtWalletsPage").then((m) => ({
     default: m.UsdtWalletsPage,
   }))
 );

@@ -6,7 +6,7 @@ import {
   type CreditOrderSelection,
 } from "../buildOrderPayload";
 import type { CreateOrderPrefillContext, Order, Product } from "../types";
-import type { PaymentMethod } from "@/features/usdt-wallets/types";
+import type { PaymentMethod } from "@/features/wallet/usdt-wallets/types";
 
 export type OrderDetailLine = {
   id: string;

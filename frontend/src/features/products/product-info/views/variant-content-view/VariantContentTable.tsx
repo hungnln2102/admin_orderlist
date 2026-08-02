@@ -8,7 +8,7 @@ import {
   ResponsiveTable,
   TableCard,
 } from "@/components/ui/ResponsiveTable";
-import type { ProductDescription } from "@/features/product-info/api/productDescApi";
+import type { ProductDescription } from "@/features/products/product-info/api/productDescApi";
 import { htmlToPlainText } from "@/shared/html";
 
 const preview = (html: string | undefined | null, max = 96) => {

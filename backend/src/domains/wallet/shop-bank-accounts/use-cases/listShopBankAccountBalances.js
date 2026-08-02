@@ -1,9 +1,9 @@
 const {
   listShopBankAccounts,
   SHOP_BANK_ACCOUNTS_DEF,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
-const { createHttpError } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
-const { normalizeRoundedMoney } = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
+const { createHttpError } = require("@/domains/wallet/shop-bank-accounts/validators/shopBankAccountValidator");
+const { normalizeRoundedMoney } = require("@/domains/wallet/shop-bank-accounts/helpers/shopBankInputs");
 
 
 const listShopBankAccountBalances = async () => {

@@ -3,7 +3,7 @@ import { formatCurrency } from "@/shared/money";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../constants";
 import { calculateExpirationDate, convertDMYToYMD } from "./helpers";
 import type { CreateOrderPrefillContext, Order, Product } from "./types";
-import type { PaymentMethod } from "@/features/usdt-wallets/types";
+import type { PaymentMethod } from "@/features/wallet/usdt-wallets/types";
 
 export type CreditOrderSelection = {
   id: number;
@@ -33,7 +33,7 @@ export type BuildOrderPayloadResult =
 
 export const isSharedOrderBaseComplete = (
   formData: Partial<Order> | undefined,
-  selectedSupplyId: number | null
+  _selectedSupplyId: number | null
 ): boolean => {
   if (!formData) return false;
   const isImport = String(formData[ORDER_FIELDS.ID_ORDER] || "").startsWith("MAVN");

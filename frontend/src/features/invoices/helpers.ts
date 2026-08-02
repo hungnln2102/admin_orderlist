@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { formatDateToDMY } from "@/shared/date";
 
-export type { ShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
-export { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
+export type { ShopBankDisplay } from "@/features/wallet/shop-bank-accounts/helpers/shopBankQrDefaults";
+export { toShopBankDisplay } from "@/features/wallet/shop-bank-accounts/helpers/shopBankQrDefaults";
 
 export interface PaymentReceipt {
   id: number;

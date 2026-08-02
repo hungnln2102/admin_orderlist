@@ -2,8 +2,8 @@ const {
   findLatestPendingSlotByOrder,
   findPendingSlotByAmount,
   fetchNextSuffix,
-} = require("@/domains/payment-slots/repositories/paymentSlotRepository");
-const { MAX_SUFFIX_ATTEMPTS, SUFFIX_MAX } = require("@/domains/payment-slots/constants");
+} = require("@/domains/payments/payment-slots/repositories/paymentSlotRepository");
+const { MAX_SUFFIX_ATTEMPTS, SUFFIX_MAX } = require("@/domains/payments/payment-slots/constants");
 const { createHttpError, normalizeMoney } = require("@/domains/payments/controller/shared/helpers");
 const { TABLES, PAYMENT_RECEIPT_BATCH_COLS } = require("@/domains/payments/controller/shared/constants");
 

@@ -104,7 +104,7 @@ const classifyReceipt = async (req, res) => {
           const reason = expense.reason;
 
           if (amountVal > 0 && shopBankAccountId) {
-            const { debitShopBankExternalOut, debitShopBankWithdraw } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+            const { debitShopBankExternalOut, debitShopBankWithdraw } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
             if (expenseType === "external_import") {
               await debitShopBankExternalOut(trx, {
                 accountId: shopBankAccountId,

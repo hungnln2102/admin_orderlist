@@ -1,4 +1,4 @@
-const { createHttpError } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
+const { createHttpError } = require("@/domains/wallet/shop-bank-accounts/validators/shopBankAccountValidator");
 
 const parseWithdrawnAmount = (value) => {
   if (value == null || value === "") {

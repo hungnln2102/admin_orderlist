@@ -1,5 +1,5 @@
 const logger = require("@/utils/logger");
-const mailOtpService = require("@/services/mailOtpService");
+const mailOtpService = require("@/services/otp/mailOtpService");
 const { fetchOtpFromAdesApi } = require("@/services/fix-ades/otpReader");
 const { readOtpFromTinyHost } = require("@/services/tinyhost");
 
@@ -207,7 +207,7 @@ async function fetchOtpBySource({
       return null;
     }
     try {
-      const { fetchYunaOrder } = require("@/services/yunaOtpService");
+      const { fetchYunaOrder } = require("@/services/otp/yunaOtpService");
       const result = await fetchYunaOrder(yunaOrderCode);
       if (result.success && result.items) {
         const emailLower = String(accountEmail || "").trim().toLowerCase();
@@ -221,7 +221,7 @@ async function fetchOtpBySource({
           if (directCode) return directCode;
 
           // Nếu YunaGRP chưa có mã, thử tự động cào từ hòm thư tạm
-          const { scrapeYunaOtp } = require("@/services/yunaOtpMailScraper");
+          const { scrapeYunaOtp } = require("@/services/otp/yunaOtpMailScraper");
           const scrapedOtp = await scrapeYunaOtp(accountEmail);
           if (scrapedOtp) {
             logger.info("[otp-provider] Tự động cào được OTP cho Yuna từ email: %s", scrapedOtp);

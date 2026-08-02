@@ -6,7 +6,7 @@ const {
   computeOrderAgeDays,
   classifyFlowByAge,
   isMavrykSupplierName,
-} = require("@/domains/supplier-change/priceCalculator");
+} = require("@/domains/supplies/supplier-change/priceCalculator");
 const {
   ORDER_COLS,
   SUPPLIER_COLS,
@@ -17,15 +17,15 @@ const {
   findSupplierById,
   findSupplyPriceForVariant,
   findLatestCostLog,
-} = require("@/domains/supplier-change/repository");
-const { ChangeSupplierError } = require("@/domains/supplier-change/service/errors");
-const { FLOWS } = require("@/domains/supplier-change/service/constants");
+} = require("@/domains/supplies/supplier-change/repository");
+const { ChangeSupplierError } = require("@/domains/supplies/supplier-change/service/errors");
+const { FLOWS } = require("@/domains/supplies/supplier-change/service/constants");
 const {
   monthKeyFromToday,
   fetchMonthlySnapshotSafe,
   notifyMonthlyDeltaSafe,
-} = require("@/domains/supplier-change/service/summary");
-const { runFlowA, runFlowBUnpaid, runFlowBPaid } = require("@/domains/supplier-change/service/flowHandlers");
+} = require("@/domains/supplies/supplier-change/service/summary");
+const { runFlowA, runFlowBUnpaid, runFlowBPaid } = require("@/domains/supplies/supplier-change/service/flowHandlers");
 
 async function executeChangeSupplier(trx, { orderId, newSupplyId, today }) {
   await enableAppManagedFlag(trx);

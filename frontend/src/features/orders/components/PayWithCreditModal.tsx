@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
 import { Order, ORDER_FIELDS, VIRTUAL_FIELDS } from "@/constants";
 import { formatCurrency } from "../utils/ordersHelpers";

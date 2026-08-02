@@ -4,7 +4,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../constants";
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
-import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { useDefaultShopBankAccount } from "@/features/wallet/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { buildViewOrderPaymentQrPayload, isImportOrderId } from "./paymentQr";
 import { getOrderQrEligibility } from "./qrEligibility";
 import { ViewOrderModalProps } from "./types";

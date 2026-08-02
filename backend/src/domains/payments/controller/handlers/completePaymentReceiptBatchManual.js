@@ -4,7 +4,7 @@ const {
   getReceiptFinancialState,
   creditShopBankFromPaymentReceipt,
 } = require("../../../../../webhook/sepay/payments");
-const { findDefaultActiveAccount } = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+const { findDefaultActiveAccount } = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const { STATUS: ORDER_STATUS } = require("@/utils/statuses");
 const { isMavnImportOrder, isMavrykShopSupplierName } = require("@/utils/orderHelpers");
 const { resolveDashboardImportDeltaOnPaid } = require("@/domains/orders/controller/finance/dashboardImportDeltaOnPaid");

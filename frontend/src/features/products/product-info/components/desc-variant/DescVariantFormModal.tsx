@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import type { ProductDescription } from "@/features/product-info/api/productDescApi";
+import type { ProductDescription } from "@/features/products/product-info/api/productDescApi";
 import {
   htmlToPlainText,
   normalizeRichHtmlForSave,
@@ -55,7 +55,7 @@ export const DescVariantFormModal: React.FC<DescVariantFormModalProps> = ({
       shortDescription: htmlToPlainText(item?.shortDescription || ""),
       imageUrl: item?.imageUrl || "",
     }),
-    [item, open]
+    [item]
   );
 
   const [rulesHtml, setRulesHtml] = useState(initial.rulesHtml);

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 /* Auto-generated from ../../../lang.xlsx by scripts/i18n/extract-lang.mjs. */
 export type LangCode = "lang_vn" | "lang_en" | "lang_cn";
 

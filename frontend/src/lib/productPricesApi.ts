@@ -12,9 +12,9 @@ export type ProductPriceUpdatePayload = {
   packageProduct?: string | null;
   categoryIds?: number[];
   categoryColors?: Record<number, string> | Array<{ id: number; color?: string | null }>;
-  /** Ảnh gói (product.image_url) — upload qua /api/product-images */
+  /** Ảnh gói (product.image_url) — upload qua /api/products/images */
   imageUrl?: string | null;
-  /** Ảnh biến thể (variant.image_url) — upload qua /api/variant-images */
+  /** Ảnh biến thể (variant.image_url) — upload qua /api/products/variant-images */
   variantImageUrl?: string | null;
 };
 
@@ -22,13 +22,13 @@ export const updateProductPrice = (
   productId: number,
   payload: ProductPriceUpdatePayload
 ): Promise<Record<string, unknown>> =>
-  apiPatch<Record<string, unknown>>(`/api/product-prices/${productId}`, payload || {});
+  apiPatch<Record<string, unknown>>(`/api/products/prices/${productId}`, payload || {});
 
 export const deleteProductPrice = async (
   productId: number
 ): Promise<ProductDeleteResponse> => {
   // Giữ apiFetch vì cần đọc response.text() cho normalizeErrorMessage
-  const response = await apiFetch(`/api/product-prices/${productId}`, {
+  const response = await apiFetch(`/api/products/prices/${productId}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
   });

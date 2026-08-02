@@ -120,9 +120,6 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
     setQApplied(q.trim());
   };
 
-  const canPrev = offset > 0;
-  const canNext = offset + rows.length < total;
-
   return (
     <div className="space-y-4">
       <SupplyCostTabs activeTab={activeTab} onChange={setActiveTab} />

@@ -4,7 +4,7 @@ const {
   getReceiptFinancialState,
   insertFinancialAuditLog,
 } = require("../../payments");
-const { creditShopBankFromPaymentReceipt } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { creditShopBankFromPaymentReceipt } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const { toMonthKey, monthKeyFromPaidDateYmd } = require("./postingPhase");
 
 async function processReceiptPhase(client, parsed, loopOrderCodes, resolvedBatchCodes) {

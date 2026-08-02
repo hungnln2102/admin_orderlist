@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
-import type { OrderListItem, PackageRow } from "@/features/package-product/utils/packageHelpers";
+import type { OrderListItem, PackageRow } from "@/features/products/package-product/utils/packageHelpers";
 import { ExpenseAllocationTableView } from "./expense-cost-allocation-table/ExpenseAllocationTableView";
 import {
   DATE_COLUMN_WIDTH,

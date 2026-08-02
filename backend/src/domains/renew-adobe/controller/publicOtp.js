@@ -6,7 +6,7 @@ const {
   RENEW_ADOBE_SCHEMA,
   tableName,
 } = require("@/config/dbSchema");
-const { fetchOtpBySource } = require("@/services/otpProviderService");
+const { fetchOtpBySource } = require("@/services/otp/otpProviderService");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

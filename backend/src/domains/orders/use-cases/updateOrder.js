@@ -11,7 +11,7 @@ const { resolveProductToVariantId } = require("@/domains/products/services/produ
 const {
   changeOrderSupplier,
   ChangeSupplierError,
-} = require("@/domains/supplier-change/service");
+} = require("@/domains/supplies/supplier-change/service");
 
 const updateOrderWithFinance = async ({
     trx,

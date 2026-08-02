@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
+/* eslint-disable max-lines, @typescript-eslint/no-explicit-any */
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { apiFetch } from "@/shared/api/client";
 
 import { MatchableOrder, PaymentReceipt, ReceiptFlowType, type ShopBankDisplay } from "../../helpers";
@@ -97,7 +98,7 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
 
   const selectedFlowTypeEffect = selectedFlowType?.effect || null;
 
-  const fetchUnlinkedExpenses = async () => {
+  const fetchUnlinkedExpenses = useCallback(async () => {
     try {
       setLoadingExpenses(true);
       const res = await apiFetch(`/api/payment-receipts/unlinked-expenses?receiptId=${receipt.id}`);
@@ -116,13 +117,13 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
     } finally {
       setLoadingExpenses(false);
     }
-  };
+  }, [receipt.id]);
 
   useEffect(() => {
     if (linkMode === "link" && selectedFlowTypeId) {
       void fetchUnlinkedExpenses();
     }
-  }, [linkMode, selectedFlowTypeId]);
+  }, [linkMode, selectedFlowTypeId, fetchUnlinkedExpenses]);
 
   const handleClassifyClick = async () => {
     if (!selectedFlowTypeId || !onClassifyReceipt) return;

@@ -11,14 +11,14 @@
  */
 
 const logger = require("@/utils/logger");
-const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
+const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/otp/mailOtpService/shared/imapClient");
 const {
   stripHtml,
   extractOtpFromText,
   isAdobeEmail,
   isVerificationEmail,
-} = require("@/services/mailOtpService/shared/otpExtractor");
-const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
+} = require("@/services/otp/mailOtpService/shared/otpExtractor");
+const { getMailBackupById } = require("@/services/otp/mailOtpService/repository/mailBackupRepo");
 
 /**
  * Lấy mã OTP từ hộp thư qua IMAP.

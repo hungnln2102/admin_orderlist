@@ -14,7 +14,7 @@ function getLogger() {
       cachedLogger = logger;
       return cachedLogger;
     }
-  } catch (e) {
+  } catch (_e) {
     // Ignore teardown errors in Jest
   }
   return { info: () => {}, error: () => {}, warn: () => {} };

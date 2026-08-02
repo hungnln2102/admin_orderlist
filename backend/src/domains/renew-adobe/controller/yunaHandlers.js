@@ -1,5 +1,5 @@
 const logger = require("@/utils/logger");
-const yunaOtpService = require("@/services/yunaOtpService");
+const yunaOtpService = require("@/services/otp/yunaOtpService");
 
 /**
  * Endpoint tra cứu mã đơn hàng YunaGRP.
@@ -23,9 +23,27 @@ const getYunaOrderData = async (req, res) => {
       });
     }
 
+    const items = (result.items || []).map(item => {
+      if (item.report_status === "pending") {
+        let emailPart = "";
+        if (item.name) {
+          const parts = String(item.name).split(/[#|]/);
+          emailPart = parts[0].trim();
+        }
+        return {
+          ...item,
+          name: emailPart ? `${emailPart}|********` : "********",
+          code: null,
+          account_user: emailPart,
+          account_pass: "********",
+        };
+      }
+      return item;
+    });
+
     return res.json({
       success: true,
-      items: result.items || [],
+      items,
       time_left: result.time_left,
     });
   } catch (error) {
@@ -72,7 +90,14 @@ const getSingleAccountOtp = async (req, res) => {
       });
     }
 
-    const { isSupportedYunaDomain, scrapeYunaOtp } = require("@/services/yunaOtpMailScraper");
+    if (matchedItem.report_status === "pending") {
+      return res.status(400).json({
+        success: false,
+        error: "Tài khoản này đã được báo lỗi, vui lòng chờ xử lý.",
+      });
+    }
+
+    const { isSupportedYunaDomain, scrapeYunaOtp } = require("@/services/otp/yunaOtpMailScraper");
     const isSupported = await isSupportedYunaDomain(email);
     if (!isSupported) {
       return res.json({

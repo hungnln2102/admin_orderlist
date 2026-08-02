@@ -26,12 +26,12 @@ const {
 } = require("../../../../webhook/sepay/payments");
 const {
   creditUsdtWalletFromOrder,
-} = require("@/domains/usdt-wallets/services/usdtWalletLedgerService");
+} = require("@/domains/wallet/usdt-wallets/services/usdtWalletLedgerService");
 const {
   findUsdtWalletById,
   findDefaultActiveUsdtWallet,
-} = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
-const { toUsd } = require("@/domains/usdt-wallets/services/usdtWalletLedgerService");
+} = require("@/domains/wallet/usdt-wallets/repositories/usdtWalletRepository");
+const { toUsd } = require("@/domains/wallet/usdt-wallets/services/usdtWalletLedgerService");
 const logger = require("@/utils/logger");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
@@ -110,6 +110,119 @@ const resolveUsdtWalletForCompletion = async (walletId, orderWalletId) => {
   return findDefaultActiveUsdtWallet();
 };
 
+const validateOrderForUsdtCompletion = async (client, normalizedId) => {
+  const stateRes = await client.query(
+    `SELECT
+      ${ORDER_COLS.id},
+      ${ORDER_COLS.idOrder},
+      ${ORDER_COLS.status},
+      ${ORDER_COLS.orderDate},
+      ${ORDER_COLS.price},
+      ${ORDER_COLS.cost},
+      ${ORDER_COLS.idSupply},
+      payment_method,
+      usdt_amount_usd,
+      usdt_exchange_rate,
+      usdt_wallet_id
+     FROM ${ORDER_TABLE}
+     WHERE ${ORDER_COLS.id} = $1
+     FOR UPDATE`,
+    [normalizedId]
+  );
+  const state = stateRes.rows[0] || null;
+  if (!state) {
+    throw { status: 404, error: "Không tìm thấy đơn hàng." };
+  }
+
+  const paymentMethod = String(state.payment_method || "bank").trim().toLowerCase();
+  if (paymentMethod !== "usdt") {
+    throw { status: 400, error: "Đơn này không phải thanh toán USDT." };
+  }
+
+  const currentStatus = state[ORDER_COLS.status];
+  if (currentStatus !== ORDER_STATUS.PROCESSING) {
+    throw { status: 409, error: "Chỉ có thể xác nhận USDT thủ công đơn đang xử lý." };
+  }
+
+  const saleAmountVnd = normalizeMoney(state[ORDER_COLS.price]);
+  const usdtAmountUsd = toUsd(state.usdt_amount_usd);
+  if (saleAmountVnd <= 0 && usdtAmountUsd <= 0) {
+    throw { status: 400, error: "Đơn USDT phải có số tiền VND hoặc USD hợp lệ." };
+  }
+
+  return { state, saleAmountVnd, usdtAmountUsd };
+};
+
+const resolveUsdtAmountToCredit = async (state, saleAmountVnd, usdtAmountUsd, options) => {
+  const usdtWallet = await resolveUsdtWalletForCompletion(
+    options.usdtWalletId ?? options.usdt_wallet_id,
+    state.usdt_wallet_id
+  );
+  if (!usdtWallet) {
+    throw { status: 400, error: "Vui lòng khai báo ví USDT mặc định trước khi xác nhận." };
+  }
+
+  const creditAmountUsd =
+    usdtAmountUsd > 0
+      ? usdtAmountUsd
+      : toUsd(saleAmountVnd / Number(state.usdt_exchange_rate || 0));
+
+  if (creditAmountUsd <= 0) {
+    throw { status: 400, error: "Không tính được số USDT cần ghi nhận." };
+  }
+
+  return { usdtWallet, creditAmountUsd };
+};
+
+const updateDashboardAndSupplierStats = async (client, state, saleAmountVnd, orderCode) => {
+  const cost = normalizeMoney(state[ORDER_COLS.cost]);
+  const postedRevenueDelta = saleAmountVnd;
+  const postedProfitDelta = normalizeMoney(saleAmountVnd - cost);
+  const paidMonthKey =
+    monthKeyFromPaidDateYmd(new Date().toISOString().slice(0, 10)) ||
+    toMonthKey(new Date().toISOString());
+
+  await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+    revenueDelta: postedRevenueDelta,
+    profitDelta: postedRevenueDelta,
+    ordersDelta: 1,
+  });
+
+  if (cost > 0) {
+    const manualImportDelta = await resolveDashboardImportDeltaOnPaid(
+      client,
+      state,
+      cost,
+      fetchSupplierNameBySupplyId,
+      paidMonthKey
+    );
+    await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+      profitDelta: -cost,
+      importDelta: manualImportDelta,
+    });
+  }
+
+  if (!isMavnImportOrder({ id_order: orderCode })) {
+    const supplierName = await fetchSupplierNameBySupplyId(
+      client,
+      state[ORDER_COLS.idSupply]
+    );
+    if (!isMavrykShopSupplierName(supplierName)) {
+      const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
+        referenceImport: saleAmountVnd,
+        client,
+      });
+      if (ensured?.supplierId && Number.isFinite(ensured.price)) {
+        await updatePaymentSupplyBalance(ensured.supplierId, ensured.price, new Date(), {
+          client,
+        });
+      }
+    }
+  }
+
+  return { postedRevenueDelta, postedProfitDelta };
+};
+
 const completeProcessingOrderWithManualUsdt = async (orderId, options = {}) => {
   const normalizedId = Number(orderId);
   if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
@@ -120,84 +233,15 @@ const completeProcessingOrderWithManualUsdt = async (orderId, options = {}) => {
   try {
     await client.query("BEGIN");
 
-    const stateRes = await client.query(
-      `SELECT
-        ${ORDER_COLS.id},
-        ${ORDER_COLS.idOrder},
-        ${ORDER_COLS.status},
-        ${ORDER_COLS.orderDate},
-        ${ORDER_COLS.price},
-        ${ORDER_COLS.cost},
-        ${ORDER_COLS.idSupply},
-        payment_method,
-        usdt_amount_usd,
-        usdt_exchange_rate,
-        usdt_wallet_id
-       FROM ${ORDER_TABLE}
-       WHERE ${ORDER_COLS.id} = $1
-       FOR UPDATE`,
-      [normalizedId]
-    );
-    const state = stateRes.rows[0] || null;
-    if (!state) {
-      await client.query("ROLLBACK");
-      return { status: 404, body: { error: "Không tìm thấy đơn hàng." } };
-    }
-
-    const paymentMethod = String(state.payment_method || "bank").trim().toLowerCase();
-    if (paymentMethod !== "usdt") {
-      await client.query("ROLLBACK");
-      return {
-        status: 400,
-        body: { error: "Đơn này không phải thanh toán USDT." },
-      };
-    }
-
+    const { state, saleAmountVnd, usdtAmountUsd } = await validateOrderForUsdtCompletion(client, normalizedId);
     const orderCode = String(state[ORDER_COLS.idOrder] || "").trim().toUpperCase();
-    const currentStatus = state[ORDER_COLS.status];
 
-    if (currentStatus !== ORDER_STATUS.PROCESSING) {
-      await client.query("ROLLBACK");
-      return {
-        status: 409,
-        body: { error: "Chỉ có thể xác nhận USDT thủ công đơn đang xử lý." },
-      };
-    }
-
-    const saleAmountVnd = normalizeMoney(state[ORDER_COLS.price]);
-    const usdtAmountUsd = toUsd(state.usdt_amount_usd);
-    if (saleAmountVnd <= 0 && usdtAmountUsd <= 0) {
-      await client.query("ROLLBACK");
-      return {
-        status: 400,
-        body: { error: "Đơn USDT phải có số tiền VND hoặc USD hợp lệ." },
-      };
-    }
-
-    const usdtWallet = await resolveUsdtWalletForCompletion(
-      options.usdtWalletId ?? options.usdt_wallet_id,
-      state.usdt_wallet_id
+    const { usdtWallet, creditAmountUsd } = await resolveUsdtAmountToCredit(
+      state,
+      saleAmountVnd,
+      usdtAmountUsd,
+      options
     );
-    if (!usdtWallet) {
-      await client.query("ROLLBACK");
-      return {
-        status: 400,
-        body: { error: "Vui lòng khai báo ví USDT mặc định trước khi xác nhận." },
-      };
-    }
-
-    const creditAmountUsd =
-      usdtAmountUsd > 0
-        ? usdtAmountUsd
-        : toUsd(saleAmountVnd / Number(state.usdt_exchange_rate || 0));
-
-    if (creditAmountUsd <= 0) {
-      await client.query("ROLLBACK");
-      return {
-        status: 400,
-        body: { error: "Không tính được số USDT cần ghi nhận." },
-      };
-    }
 
     await creditUsdtWalletFromOrder(client, {
       walletId: usdtWallet.id,
@@ -224,51 +268,12 @@ const completeProcessingOrderWithManualUsdt = async (orderId, options = {}) => {
       };
     }
 
-    const cost = normalizeMoney(state[ORDER_COLS.cost]);
-    const postedRevenueDelta = saleAmountVnd;
-    const postedProfitDelta = normalizeMoney(saleAmountVnd - cost);
-    const paidMonthKey =
-      monthKeyFromPaidDateYmd(new Date().toISOString().slice(0, 10)) ||
-      toMonthKey(new Date().toISOString());
-
-    await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-      revenueDelta: postedRevenueDelta,
-      profitDelta: postedRevenueDelta,
-      ordersDelta: 1,
-    });
-
-    let manualImportDelta = 0;
-    if (cost > 0) {
-      manualImportDelta = await resolveDashboardImportDeltaOnPaid(
-        client,
-        state,
-        cost,
-        fetchSupplierNameBySupplyId,
-        paidMonthKey
-      );
-      await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-        profitDelta: -cost,
-        importDelta: manualImportDelta,
-      });
-    }
-
-    if (!isMavnImportOrder({ id_order: orderCode })) {
-      const supplierName = await fetchSupplierNameBySupplyId(
-        client,
-        state[ORDER_COLS.idSupply]
-      );
-      if (!isMavrykShopSupplierName(supplierName)) {
-        const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
-          referenceImport: saleAmountVnd,
-          client,
-        });
-        if (ensured?.supplierId && Number.isFinite(ensured.price)) {
-          await updatePaymentSupplyBalance(ensured.supplierId, ensured.price, new Date(), {
-            client,
-          });
-        }
-      }
-    }
+    const { postedRevenueDelta, postedProfitDelta } = await updateDashboardAndSupplierStats(
+      client,
+      state,
+      saleAmountVnd,
+      orderCode
+    );
 
     await client.query("COMMIT");
     return {
@@ -287,6 +292,9 @@ const completeProcessingOrderWithManualUsdt = async (orderId, options = {}) => {
       await client.query("ROLLBACK");
     } catch (rollbackError) {
       logger.error("[manual-usdt] rollback failed", { error: rollbackError.message });
+    }
+    if (error.status) {
+      return { status: error.status, body: { error: error.error } };
     }
     logger.error("[manual-usdt] complete processing order failed", {
       orderId: normalizedId,

@@ -7,9 +7,9 @@
 
 const { db } = require("@/db");
 const { todayYMDInVietnam } = require("@/utils/normalizers");
-const { executeChangeSupplier } = require("@/domains/supplier-change/service/executor");
-const { ChangeSupplierError } = require("@/domains/supplier-change/service/errors");
-const { FLOWS } = require("@/domains/supplier-change/service/constants");
+const { executeChangeSupplier } = require("@/domains/supplies/supplier-change/service/executor");
+const { ChangeSupplierError } = require("@/domains/supplies/supplier-change/service/errors");
+const { FLOWS } = require("@/domains/supplies/supplier-change/service/constants");
 
 /**
  * @param {number} orderId

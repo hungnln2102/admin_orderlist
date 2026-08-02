@@ -9,8 +9,8 @@ const {
   removeUsdtWallet,
   listUsdtWalletBalancesHandler,
   postUsdtWalletWithdraw,
-} = require("@/domains/usdt-wallets/controller");
-const { createUsdtWalletRules } = require("@/domains/usdt-wallets/validators/usdtWalletValidator");
+} = require("@/domains/wallet/controller/paymentAccountController");
+const { createUsdtWalletRules } = require("@/domains/wallet/usdt-wallets/validators/usdtWalletValidator");
 
 const router = express.Router();
 

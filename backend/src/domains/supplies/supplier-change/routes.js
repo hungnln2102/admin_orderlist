@@ -4,7 +4,7 @@
  */
 
 const express = require("express");
-const { handleChangeSupplier } = require("@/domains/supplier-change/controller");
+const { handleChangeSupplier } = require("@/domains/supplies/supplier-change/controller");
 
 const router = express.Router();
 

@@ -11,7 +11,7 @@ const logger = require("@/utils/logger");
 const { quoteIdent } = require("@/utils/sql");
 const { supplierCache } = require("@/utils/cache");
 const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
-const { getNextSupplyId } = require("@/services/idService");
+const { getNextSupplyId } = require("@/services/identifierService");
 
 const ACCOUNT_HOLDER_MIGRATION_HINT =
   "Chua co cot account_holder. Chay migration: database/migrations/035_supplier_account_holder.sql";

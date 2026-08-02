@@ -17,7 +17,6 @@ import {
   NewspaperIcon,
   PencilSquareIcon,
   PhotoIcon,
-  ReceiptPercentIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
   TicketIcon,

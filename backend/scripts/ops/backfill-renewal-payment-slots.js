@@ -20,7 +20,7 @@ require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 const { db } = require("@/db");
 const {
   backfillRenewalPaymentSuffix,
-} = require("@/domains/payment-slots/use-cases/backfillRenewalPaymentSuffix");
+} = require("@/domains/payments/payment-slots/use-cases/backfillRenewalPaymentSuffix");
 
 function parseArgs(argv) {
   let dryRun = false;

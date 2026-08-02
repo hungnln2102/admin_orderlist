@@ -1,6 +1,6 @@
 import type React from "react";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
-import type { ProductDescription } from "@/features/product-info/api/productDescApi";
+import type { ProductDescription } from "@/features/products/product-info/api/productDescApi";
 import { DescVariantFormModal } from "../../components/desc-variant/DescVariantFormModal";
 
 type VariantContentModalsProps = {
@@ -36,7 +36,7 @@ const VariantContentModals: React.FC<VariantContentModalsProps> = ({
   deleteTarget,
   deleteSubmitting,
   onCloseCreate,
-  onCreated,
+  onCreated: _onCreated,
   onCloseView,
   onCloseEdit,
   onSave,
@@ -67,7 +67,7 @@ const VariantContentModals: React.FC<VariantContentModalsProps> = ({
     else if (mode === "view") onCloseView();
   };
 
-  const handleSave = async (payload: any) => {
+  const handleSave = async (payload: Parameters<VariantContentModalsProps["onSave"]>[0]) => {
     if (mode) {
       await onSave(payload, mode);
     }

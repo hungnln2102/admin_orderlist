@@ -68,7 +68,7 @@ export const useCategoryCreate = ({
     setCreatingCategory(true);
     setCreateCategoryError(null);
     try {
-      await apiPost("/api/categories", {
+      await apiPost("/api/products/categories", {
         name: trimmedName,
         color: (newCategoryColor || "").trim() || null,
       });

@@ -4,14 +4,14 @@ const {
   COLS,
   findShopBankAccountById,
   updateShopBankAccount,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
-const { sumReceivedByReceiver } = require("@/domains/shop-bank-accounts/repositories/shopBankReceiptTotalsRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
+const { sumReceivedByReceiver } = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankReceiptTotalsRepository");
 const {
   normalizeAccountNumber,
   normalizeRoundedMoney,
-} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
-const { createHttpError } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
-const { validateWithdrawnPayload } = require("@/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
+} = require("@/domains/wallet/shop-bank-accounts/helpers/shopBankInputs");
+const { createHttpError } = require("@/domains/wallet/shop-bank-accounts/validators/shopBankAccountValidator");
+const { validateWithdrawnPayload } = require("@/domains/wallet/shop-bank-accounts/validators/shopBankWithdrawnValidator");
 
 
 const updateShopBankAccountWithdrawn = async (id, payload) => {

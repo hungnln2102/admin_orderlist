@@ -51,7 +51,7 @@ export function usePricingTiers() {
     }
     setLoading(true);
     try {
-      const data = await apiGet<PricingTier[]>("/api/pricing-tiers");
+      const data = await apiGet<PricingTier[]>("/api/products/pricing-tiers");
       _sharedCache = data;
       _sharedTs = Date.now();
       if (mounted.current) {

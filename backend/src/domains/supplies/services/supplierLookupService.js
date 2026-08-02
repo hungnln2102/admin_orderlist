@@ -1,6 +1,6 @@
 const { db } = require("@/db");
 const { PARTNER_SCHEMA } = require("@/config/dbSchema");
-const { getNextSupplyId } = require("@/services/idService");
+const { getNextSupplyId } = require("@/services/identifierService");
 const { normalizeTextInput } = require("@/utils/normalizers");
 const {
   resolveSupplierNameColumn,

@@ -6,7 +6,7 @@ const {
 const {
   normalizeAccountNumber,
   normalizeRoundedMoney,
-} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
+} = require("@/domains/wallet/shop-bank-accounts/helpers/shopBankInputs");
 
 const LEDGER_TABLE = tableName(
   ADMIN_SCHEMA.SHOP_BANK_ACCOUNT_LEDGER.TABLE,

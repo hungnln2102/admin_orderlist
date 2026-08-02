@@ -7,13 +7,13 @@ const {
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("@/domains/product-descriptions/controller/shared/constants");
-const { normalizeImageUrl } = require("@/domains/product-descriptions/controller/shared/urlHelpers");
+} = require("@/domains/products/descriptions/controller/shared/constants");
+const { normalizeImageUrl } = require("@/domains/products/descriptions/controller/shared/urlHelpers");
 const {
   findVariantForProductId,
   mapProductDescRow,
-} = require("@/domains/product-descriptions/controller/shared/queries");
-const { invalidateWebsiteSeoCache } = require("@/domains/product-descriptions/controller/shared/cache");
+} = require("@/domains/products/descriptions/controller/shared/queries");
+const { invalidateWebsiteSeoCache } = require("@/domains/products/descriptions/controller/shared/cache");
 
 const saveProductDescription = async (req, res) => {
   const { productId, rules, description, imageUrl, shortDesc, descVariantId } =

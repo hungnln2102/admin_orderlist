@@ -1,5 +1,5 @@
 import { htmlToPlainText, sanitizeHtmlForDisplay, splitCombinedContent, toHtmlFromPlain } from "@/shared/html";
-import type { ProductDescription } from "@/features/product-info/api/productDescApi";
+import type { ProductDescription } from "@/features/products/product-info/api/productDescApi";
 import type { MergedProduct } from "./types";
 
 /** Có ít nhất quy tắc hoặc mô tả thật (không rỗng sau tách + sanitize), giống logic cột bảng sản phẩm. */

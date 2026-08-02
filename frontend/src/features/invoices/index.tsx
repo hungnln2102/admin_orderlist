@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { showAppNotification } from "@/lib/notifications";
-import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
-import { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
+import { useDefaultShopBankAccount } from "@/features/wallet/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { toShopBankDisplay } from "@/features/wallet/shop-bank-accounts/helpers/shopBankQrDefaults";
 import {
   PaymentReceipt,
   ReceiptCategory,

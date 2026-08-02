@@ -45,10 +45,10 @@ export const API_ENDPOINTS = {
   CALCULATE_PRICE: "/api/orders/calculate-price",
 
   PRODUCTS_ALL: "/api/products",
-  PRODUCT_DESCRIPTIONS: "/api/product-descriptions",
-  PRODUCT_PRICES: "/api/product-prices",
+  PRODUCT_DESCRIPTIONS: "/api/products/descriptions",
+  PRODUCT_PRICES: "/api/products/prices",
   PRODUCT_PRICE_DETAIL: (productId: number) =>
-    `/api/product-prices/${productId}`,
+    `/api/products/prices/${productId}`,
 
   SUPPLIES_BY_PRODUCT: (productName: string) =>
     `/api/products/supplies-by-name/${encodeURIComponent(productName)}`,
@@ -58,7 +58,7 @@ export const API_ENDPOINTS = {
   UPDATE_SUPPLY_PRICE: (productId: number, sourceId: number) =>
     `/api/products/${productId}/suppliers/${sourceId}/price`,
   CREATE_SUPPLY_PRICE: (productId: number) =>
-    `/api/product-prices/${productId}/suppliers`,
+    `/api/products/prices/${productId}/suppliers`,
   DELETE_SUPPLY_PRICE: (productId: number, sourceId: number) =>
     `/api/products/${productId}/suppliers/${sourceId}`,
 
@@ -124,7 +124,7 @@ export const API_ENDPOINTS = {
   USDT_WALLET_WITHDRAW: (id: number) => `/api/usdt-wallets/${id}/withdraw`,
   USDT_WALLET_SET_DEFAULT: (id: number) => `/api/usdt-wallets/${id}/set-default`,
   SITE_MAINTENANCE: "/api/site-maintenance",
-  PRICING_TIERS: "/api/pricing-tiers",
+  PRICING_TIERS: "/api/products/pricing-tiers",
 };
 
 // Keep UI aliases stable; values now sourced từ tableSql qua fieldMapper.

@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 
-import type { ProductDescription } from "@/features/product-info/api/productDescApi";
+import type { ProductDescription } from "@/features/products/product-info/api/productDescApi";
 import {
   createProductDescription,
   deleteProductDescriptionRecord,
   saveProductDescription,
-} from "@/features/product-info/api/productDescApi";
+} from "@/features/products/product-info/api/productDescApi";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 
 type SavePayload = {

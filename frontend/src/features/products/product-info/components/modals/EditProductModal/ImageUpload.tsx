@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import type { ImageItem as VariantImageItem } from "@/shared/api/coreImageApi";
 import { fetchImages, uploadImage, deleteImage } from "@/shared/api/coreImageApi";
 
-const deleteVariantImage = (fileName: string) => deleteImage("/api/variant-images", fileName);
-const fetchVariantImages = () => fetchImages("/api/variant-images");
-const uploadVariantImage = (file: File) => uploadImage(file, "/api/variant-images/upload");
+const deleteVariantImage = (fileName: string) => deleteImage("/api/products/variant-images", fileName);
+const fetchVariantImages = () => fetchImages("/api/products/variant-images");
+const uploadVariantImage = (file: File) => uploadImage(file, "/api/products/variant-images/upload");
 import { SharedImagePickerModal } from "@/shared/components/ImagePicker/SharedImagePickerModal";
 import { ImageUploadSurface } from "./ImageUploadSurface";
 

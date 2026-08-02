@@ -5,8 +5,8 @@ const {
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("@/domains/product-descriptions/controller/shared/constants");
-const { normalizeImageUrl } = require("@/domains/product-descriptions/controller/shared/urlHelpers");
+} = require("@/domains/products/descriptions/controller/shared/constants");
+const { normalizeImageUrl } = require("@/domains/products/descriptions/controller/shared/urlHelpers");
 
 /**
  * Tìm variant theo `productId` (so khớp display_name có/không hậu tố `--Nm`).

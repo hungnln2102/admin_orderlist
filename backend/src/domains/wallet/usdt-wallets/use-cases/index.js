@@ -9,14 +9,14 @@ const {
   insertUsdtWallet,
   updateUsdtWallet,
   deleteUsdtWallet,
-} = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
+} = require("@/domains/wallet/usdt-wallets/repositories/usdtWalletRepository");
 const {
   createHttpError,
   validateCreatePayload,
   validateUpdatePayload,
   validateDeletePayload,
   validateSetDefaultPayload,
-} = require("@/domains/usdt-wallets/validators/usdtWalletValidator");
+} = require("@/domains/wallet/usdt-wallets/validators/usdtWalletValidator");
 
 const ensureDefinition = () => {
   if (!USDT_WALLETS_DEF) {
@@ -54,7 +54,7 @@ const listUsdtWalletItems = async () => {
 
 const getDefaultUsdtWallet = async () => {
   ensureDefinition();
-  const { findDefaultActiveUsdtWallet } = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
+  const { findDefaultActiveUsdtWallet } = require("@/domains/wallet/usdt-wallets/repositories/usdtWalletRepository");
   const row = await findDefaultActiveUsdtWallet();
   if (!row) {
     throw createHttpError(404, "Chưa có ví USDT mặc định đang bật.");

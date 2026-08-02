@@ -1,4 +1,4 @@
-import { buildDateColumns, buildMonthColumns, isDateInColumns, PeriodColumn } from "@/shared/date/dateRanges";
+import { buildDateColumns, buildMonthColumns, isDateInColumns } from "@/shared/date/dateRanges";
 import { getAllocatedAmount, toMoneyNumber } from "@/shared/utils/financialMath";
 import type { TaxOrder } from "../api/taxApi";
 import type { TaxViewMode } from "../components/TaxDailyFormTable";

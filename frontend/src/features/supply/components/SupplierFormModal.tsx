@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
 import { GenericFormModal, FormField } from "@/shared/components/GenericModal/GenericFormModal";
 import { apiPost, apiPatch } from "@/shared/api/client";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { auditProductSeo } from "@/features/product-info/api/productDescApi";
+import { auditProductSeo } from "@/features/products/product-info/api/productDescApi";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { EMPTY_SEO_EVALUATION, SeoEvaluation } from "./seoScore";
 

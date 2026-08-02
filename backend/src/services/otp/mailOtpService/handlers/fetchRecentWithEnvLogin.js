@@ -4,8 +4,8 @@
  */
 
 const logger = require("@/utils/logger");
-const { createImapClient } = require("@/services/mailOtpService/shared/imapClient");
-const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
+const { createImapClient } = require("@/services/otp/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/otp/mailOtpService/repository/mailBackupRepo");
 
 /**
  * @param {Object} [options]

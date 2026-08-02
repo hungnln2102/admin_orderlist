@@ -1,5 +1,5 @@
 const { ORDERS_SCHEMA } = require("@/config/dbSchema");
-const { VALID_PREFIXES } = require("@/services/orderCodeService");
+const { VALID_PREFIXES } = require("@/services/identifierService");
 const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
 const { STATUS, COLS } = require("@/domains/orders/controller/constants");
 const {
@@ -57,7 +57,6 @@ const prepareCreateOrderPayload = async ({ body = {}, context }) => {
   const supplyIdCol = cols.ID_SUPPLY;
   const productIdCol = cols.ID_PRODUCT;
   const priceCol = cols.PRICE;
-  const costCol = cols.COST;
 
   if (payload[productIdCol] == null && body?.variant_id != null) {
     const numericVariant = Number(body.variant_id);

@@ -13,10 +13,10 @@ const { normalizeRawToYMD } = require("@/domains/orders/controller/helpers/norma
 const { mergeSummaryUpdates, monthKeyVietnamNow } = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   resolveMavrykDefaultBankAccount,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   recordMavnInternalSettlement,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const logger = require("@/utils/logger");
 
 const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);

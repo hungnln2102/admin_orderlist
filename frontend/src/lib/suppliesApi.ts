@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { apiGet, apiFetch, apiDelete as apiDeleteFn } from "./api";
+import { apiGet, apiFetch } from "./api";
 
 export interface SupplyOrderCostRow {
   orderPk: number;

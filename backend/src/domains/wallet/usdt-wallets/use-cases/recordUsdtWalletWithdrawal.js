@@ -2,18 +2,15 @@ const db = require("@/db/knexClient");
 const {
   USDT_WALLETS_DEF,
   findUsdtWalletById,
-  TABLE,
-  selectColumns,
-  columns,
-} = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
+} = require("@/domains/wallet/usdt-wallets/repositories/usdtWalletRepository");
 const {
   debitUsdtWalletWithdraw,
   SOURCE_KINDS,
   toUsd,
-} = require("@/domains/usdt-wallets/services/usdtWalletLedgerService");
-const { createHttpError } = require("@/domains/usdt-wallets/validators/usdtWalletValidator");
-const { validateWithdrawPayload } = require("@/domains/usdt-wallets/validators/usdtWalletWithdrawValidator");
-const { normalizeOptionalText } = require("@/domains/usdt-wallets/helpers/usdtWalletInputs");
+} = require("@/domains/wallet/usdt-wallets/services/usdtWalletLedgerService");
+const { createHttpError } = require("@/domains/wallet/usdt-wallets/validators/usdtWalletValidator");
+const { validateWithdrawPayload } = require("@/domains/wallet/usdt-wallets/validators/usdtWalletWithdrawValidator");
+const { normalizeOptionalText } = require("@/domains/wallet/usdt-wallets/helpers/usdtWalletInputs");
 
 
 const recordUsdtWalletWithdrawal = async (id, payload) => {

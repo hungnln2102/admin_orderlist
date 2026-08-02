@@ -1,4 +1,5 @@
-const sepayWebhookApp = require("../../../../webhook/sepay_webhook");
+const { runRenewal } = require("../../../../webhook/sepay/renewal");
+const { sendRenewalNotification } = require("../../../../webhook/sepay/notifications");
 const { db } = require("@/db");
 const { TABLES, STATUS } = require("@/domains/orders/controller/constants");
 const logger = require("@/utils/logger");
@@ -12,13 +13,13 @@ const attachRenewRoutes = (router) => {
         const forceRenewal = req.body?.forceRenewal ?? req.body?.force ?? true;
 
         try {
-            const result = await sepayWebhookApp.runRenewal(orderCode, {
+            const result = await runRenewal(orderCode, {
                 forceRenewal,
                 source: "manual",
             });
             if (result?.success) {
-                if (typeof sepayWebhookApp.sendRenewalNotification === "function") {
-                    sepayWebhookApp.sendRenewalNotification(orderCode, result).catch((err) => logger.error("sendRenewalNotification failed", { orderCode, error: err?.message }));
+                if (typeof sendRenewalNotification === "function") {
+                    sendRenewalNotification(orderCode, result).catch((err) => logger.error("sendRenewalNotification failed", { orderCode, error: err?.message }));
                 }
                 writeUserEventLog(req, {
                     action: "Gia hạn đơn hàng",

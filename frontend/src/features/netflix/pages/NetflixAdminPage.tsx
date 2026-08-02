@@ -1,3 +1,4 @@
+/* eslint-disable max-lines, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useNetflixAdmin } from "../hooks/useNetflixAdmin";

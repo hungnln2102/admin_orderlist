@@ -4,7 +4,7 @@ const {
   SCHEMA_PARTNER,
   tableName,
 } = require("@/config/dbSchema");
-const { isMavrykSupplierStrictForNccLog } = require("@/utils/orderHelpers");
+// const { isMavrykSupplierStrictForNccLog } = require("@/utils/orderHelpers");
 const { normalizeMoney } = require("../../../../../webhook/sepay/utils");
 
 const orderCols = ORDERS_SCHEMA.ORDER_LIST.COLS;
@@ -50,8 +50,8 @@ async function resolveDashboardImportDeltaOnPaid(
   executor,
   state,
   cost,
-  fetchSupplierNameBySupplyId,
-  paidMonthKey
+  _fetchSupplierNameBySupplyId,
+  _paidMonthKey
 ) {
   const c = normalizeMoney(cost);
   if (c <= 0) return 0;

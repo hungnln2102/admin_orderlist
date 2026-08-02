@@ -1,7 +1,7 @@
 const logger = require("@/utils/logger");
 const { insertFinancialAuditLog } = require("../../payments");
 const { tryAutoSettleSupplierPaymentByOutbound } = require("./autoSettleSupplierPayment");
-const { findAccountIdByReceiver } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { findAccountIdByReceiver } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const { hasSupplierSignature } = require("./supplierPaymentSignature");
 
 async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {

@@ -3,7 +3,7 @@ const EVENTS = require("@/events/eventTypes");
 const logger = require("@/utils/logger");
 
 const handleWarehouseStockCreated = async (payload) => {
-  const { stockId, account, services } = payload;
+  const { stockId, account, _services } = payload;
   logger.info(`[WarehouseSubscriber] Bắt được sự kiện WAREHOUSE_STOCK_CREATED cho tài khoản: ${account}`);
 
   try {

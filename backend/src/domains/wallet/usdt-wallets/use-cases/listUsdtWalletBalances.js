@@ -1,9 +1,9 @@
 const {
   listUsdtWallets,
   USDT_WALLETS_DEF,
-} = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
-const { createHttpError } = require("@/domains/usdt-wallets/validators/usdtWalletValidator");
-const { toUsd } = require("@/domains/usdt-wallets/services/usdtWalletLedgerService");
+} = require("@/domains/wallet/usdt-wallets/repositories/usdtWalletRepository");
+const { createHttpError } = require("@/domains/wallet/usdt-wallets/validators/usdtWalletValidator");
+const { toUsd } = require("@/domains/wallet/usdt-wallets/services/usdtWalletLedgerService");
 
 const listUsdtWalletBalances = async () => {
   if (!USDT_WALLETS_DEF) {

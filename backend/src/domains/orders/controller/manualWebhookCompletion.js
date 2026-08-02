@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 const {
   ORDER_COLS,
   ORDER_TABLE,
@@ -37,11 +38,11 @@ const {
 } = require("@/domains/orders/controller/finance/mavnCompleteProcessingPaidWithoutWebhook");
 const {
   creditShopBankFromPaymentReceipt,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const {
   findDefaultActiveAccount,
   findShopBankAccountById,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const logger = require("@/utils/logger");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);

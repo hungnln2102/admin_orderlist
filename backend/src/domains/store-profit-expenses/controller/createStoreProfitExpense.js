@@ -19,8 +19,8 @@ const {
 const {
   debitShopBankExternalOut,
   SOURCE_KINDS,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
-const { findShopBankAccountById } = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
+const { findShopBankAccountById } = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const parseShopBankAccountId = (body) => {

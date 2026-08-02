@@ -1,7 +1,7 @@
 import { normalizeExactVnd } from "@/shared/money";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "@/constants";
 import { buildSepayQrUrl } from "@/shared/vietqr";
-import { EMPTY_SHOP_BANK_QR_CONFIG } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
+import { EMPTY_SHOP_BANK_QR_CONFIG } from "@/features/wallet/shop-bank-accounts/helpers/shopBankQrDefaults";
 
 export type ShopBankQrOverride = {
   accountNumber: string;

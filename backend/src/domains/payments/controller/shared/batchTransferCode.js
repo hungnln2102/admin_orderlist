@@ -10,7 +10,7 @@ const {
   generateTransactionCode,
   normalizeTransactionCode,
   TRANSACTION_CODE_LENGTH,
-} = require("@/services/transactionCodeService");
+} = require("@/services/identifierService");
 const { generateCandidateBatchCode } = require("@/domains/payments/controller/shared/helpers");
 const logger = require("@/utils/logger");
 

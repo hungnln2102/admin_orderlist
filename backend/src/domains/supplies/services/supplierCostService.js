@@ -1,7 +1,7 @@
 const { db } = require("@/db");
 const { SCHEMA_SUPPLIER_COST, tableName } = require("@/config/dbSchema");
 const { SUPPLIER_COST_DEF } = require("@/config/dbSchema/shared");
-const { nextId } = require("@/services/idService");
+const { nextId } = require("@/services/identifierService");
 
 const SUPPLIER_COST_TABLE = tableName(
   SUPPLIER_COST_DEF.TABLE,

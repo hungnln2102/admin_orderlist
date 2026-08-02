@@ -1,6 +1,6 @@
 const { db } = require("@/db");
 const { TABLES } = require("@/domains/orders/controller/constants");
-const { nextId } = require("@/services/idService");
+const { nextId } = require("@/services/identifierService");
 
 /**
  * Creates a new order list entry.

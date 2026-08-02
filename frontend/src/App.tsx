@@ -6,7 +6,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { MainLayout } from "./components/layout/MainLayout";
 import { AppRoutes } from "./routes/AppRoutes";
 import AppNotification from "./components/modals/AppNotification";
-import PricingSellerPage from "@/features/pricing-seller";
+import PricingSellerPage from "@/features/products/pricing-seller";
 
 function AdminApp() {
   return (

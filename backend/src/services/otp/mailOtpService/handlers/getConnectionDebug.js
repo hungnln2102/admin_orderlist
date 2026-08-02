@@ -3,8 +3,8 @@
  * không lấy được mail (sai user/pass, alias trống, mailbox rỗng, ...).
  */
 
-const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
-const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
+const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/otp/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/otp/mailOtpService/repository/mailBackupRepo");
 
 /**
  * @param {number} mailBackupId

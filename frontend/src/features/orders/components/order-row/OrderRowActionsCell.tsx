@@ -5,7 +5,7 @@ import {
   PencilIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { ORDER_FIELDS, ORDER_STATUSES, Order } from "@/constants";
+import { ORDER_FIELDS, Order } from "@/constants";
 import {
   buildViewOrderPaymentQrPayload,
   getOrderQrEligibility,

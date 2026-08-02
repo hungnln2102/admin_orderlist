@@ -12,11 +12,11 @@ import {
   type NormalizedOrderRecord,
   type OrderListItem,
   type PackageRow,
-} from "@/features/package-product/utils/packageHelpers";
+} from "@/features/products/package-product/utils/packageHelpers";
 import {
   computeAugmentationForPackage,
   orderBelongsToPackageByProduct,
-} from "@/features/package-product/utils/packageMatchUtils";
+} from "@/features/products/package-product/utils/packageMatchUtils";
 import type { ExpenseFormRow, OrderListRow } from "../types";
 import { normalizeYmd } from "./periodColumns";
 

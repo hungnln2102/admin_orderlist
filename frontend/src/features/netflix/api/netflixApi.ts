@@ -1,4 +1,4 @@
-import { apiPost } from "@/lib/api";
+import { apiPost } from "@/shared/api";
 
 export interface NetflixHouseholdResponse {
   ok: boolean;

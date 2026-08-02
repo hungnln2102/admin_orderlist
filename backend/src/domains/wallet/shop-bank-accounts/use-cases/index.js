@@ -10,14 +10,14 @@ const {
   insertShopBankAccount,
   updateShopBankAccount,
   deleteShopBankAccount,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   createHttpError,
   validateCreatePayload,
   validateUpdatePayload,
   validateDeletePayload,
   validateSetDefaultPayload,
-} = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
+} = require("@/domains/wallet/shop-bank-accounts/validators/shopBankAccountValidator");
 
 const ensureDefinition = () => {
   if (!SHOP_BANK_ACCOUNTS_DEF) {

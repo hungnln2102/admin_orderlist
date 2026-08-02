@@ -3,7 +3,7 @@ import { apiGet } from "@/shared/api/client";
 import {
   fetchProductDescriptions,
   ProductDescription,
-} from "@/features/product-info/api/productDescApi";
+} from "@/features/products/product-info/api/productDescApi";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import {
   MergedProduct,

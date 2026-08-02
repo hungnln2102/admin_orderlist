@@ -8,12 +8,11 @@ const {
 } = require("@/domains/orders/controller/helpers");
 const { todayYMDInVietnam } = require("@/utils/normalizers");
 const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("@/config/dbSchema");
-const { nextId } = require("@/services/idService");
-const { generateUniqueOrderCode, VALID_PREFIXES } = require("@/services/orderCodeService");
+const { nextId, generateUniqueOrderCode, VALID_PREFIXES } = require("@/services/identifierService");
 const {
     openPaymentSlot,
     SLOT_KIND,
-} = require("@/domains/payment-slots");
+} = require("@/domains/payments/payment-slots");
 const {
     resolveDefaultShopBankAccount,
 } = require("@/services/shopBankAccountResolver");
@@ -23,7 +22,7 @@ const {
 const {
     getUsdtVndRate,
     convertVndToUsd,
-} = require("@/domains/usdt-wallets/services/binanceExchangeRateService");
+} = require("@/domains/wallet/usdt-wallets/services/binanceExchangeRateService");
 const logger = require("@/utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName, isMavnImportOrder } = require("@/utils/orderHelpers");
 const { lockRefundCreditNoteById, applyRefundCreditToTargetOrder, normalizeMoney } = require("@/domains/orders/controller/finance/refundCredits");

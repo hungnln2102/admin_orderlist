@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { apiPost } from "@/shared/api/client";
 import { buildSepayQrUrl } from "@/shared/vietqr";
-import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { useDefaultShopBankAccount } from "@/features/wallet/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
 export interface QrPayment {
   id: number;

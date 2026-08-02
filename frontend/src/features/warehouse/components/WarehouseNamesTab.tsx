@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { apiFetch, apiPost, apiPut, apiDelete } from "@/shared/api/client";
 import toast from "react-hot-toast";
@@ -38,7 +39,7 @@ export default function WarehouseNamesTab({ productOptions, onUpdate }: Warehous
         const data = await res.json();
         setItems(data);
       }
-    } catch (e) {
+    } catch {
       toast.error("Lỗi khi tải danh sách tên dịch vụ");
     } finally {
       setLoading(false);

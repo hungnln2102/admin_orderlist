@@ -11,7 +11,7 @@ const logger = require("@/utils/logger");
 const {
   openPaymentSlot,
   SLOT_KIND,
-} = require("@/domains/payment-slots");
+} = require("@/domains/payments/payment-slots");
 const {
   resolveDefaultShopBankAccount,
 } = require("@/services/shopBankAccountResolver");

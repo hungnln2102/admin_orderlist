@@ -1,7 +1,7 @@
 const { STATUS } = require("@/utils/statuses");
 const { decodeSupplierSignature } = require("./supplierPaymentSignature");
 const { insertFinancialAuditLog } = require("../../payments");
-const { debitShopBankSupplierPayment } = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { debitShopBankSupplierPayment } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
 const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("@/config/dbSchema");
 const logger = require("@/utils/logger");

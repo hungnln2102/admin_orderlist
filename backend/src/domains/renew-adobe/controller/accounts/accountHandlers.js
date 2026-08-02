@@ -2,7 +2,7 @@ const { db } = require("@/db");
 const logger = require("@/utils/logger");
 const { findAccountMatchByEmail, normalizeEmail } = require("@/domains/renew-adobe/controller/accountLookup");
 const { removeMappingsForAccount } = require("@/services/userAccountMappingService");
-const { normalizeOtpSource } = require("@/services/otpProviderService");
+const { normalizeOtpSource } = require("@/services/otp/otpProviderService");
 const {
   removeProfileDirForEmail,
 } = require("@/services/renew-adobe/adobe-renew-v2/shared/profileSession");

@@ -12,7 +12,6 @@ import { formatVndInput } from "../priceFormatters";
 import {
   applySelectedSupplierToEntry,
   createEmptyCreateForm,
-  parseJsonResponseText,
   updateCreateSupplierEntry,
   validateCreateProductForm,
   enableCustomSupplierEntry,

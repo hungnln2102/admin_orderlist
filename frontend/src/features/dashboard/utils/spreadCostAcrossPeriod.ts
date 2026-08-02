@@ -1,6 +1,6 @@
 /** Phân bổ cost MAVN theo ngày (cùng ý như Thuế — cost / ngày × overlap). */
 
-import { addDaysUtc, countDaysInclusive, isDateInColumns, PeriodColumn } from "@/shared/date/dateRanges";
+import { addDaysUtc, countDaysInclusive, PeriodColumn } from "@/shared/date/dateRanges";
 
 /** cost tổng, phân bổ đều theo termDays từ startDate YYYY-MM-DD */
 export function getCostPeriodAmount(

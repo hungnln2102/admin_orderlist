@@ -11,7 +11,7 @@ const {
   debitShopBankExternalOut,
   debitShopBankWithdraw,
   SOURCE_KINDS,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 const {
   RECEIPT_SCHEMA,

@@ -112,7 +112,7 @@ export const usePackageMutationActions = ({
       };
 
       try {
-        const response = await apiFetch("/api/package-products", {
+        const response = await apiFetch("/api/products/packages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -189,7 +189,7 @@ export const usePackageMutationActions = ({
       };
 
       try {
-        const response = await apiFetch(`/api/package-products/${rowId}`, {
+        const response = await apiFetch(`/api/products/packages/${rowId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

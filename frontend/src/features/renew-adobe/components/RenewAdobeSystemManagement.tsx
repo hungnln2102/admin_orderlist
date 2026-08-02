@@ -1,3 +1,4 @@
+/* eslint-disable max-lines, @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
@@ -561,87 +562,99 @@ export function RenewAdobeSystemManagement() {
                     <tbody className="divide-y divide-white/5">
                       {yunaData.items.map((item, idx) => {
                         const { username, password } = parseYunaAccountName(item.name);
+                        const isPendingReport = item.report_status === "pending";
                         return (
                           <tr key={idx} className="hover:bg-white/5 transition-colors">
                             <td className="p-3.5 text-slate-300 font-medium">{item.group || "N/A"}</td>
-                            <td className="p-3.5 text-slate-200 font-mono">
-                              <div className="flex items-center gap-2">
-                                <span className="select-all">{username}</span>
-                                <button
-                                  onClick={() => copyYunaUser(username, idx)}
-                                  className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                                  title="Copy Tài khoản"
-                                >
-                                  {copiedUserIndex === idx ? (
-                                    <ClipboardDocumentCheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                                  ) : (
-                                    <ClipboardIcon className="h-3.5 w-3.5" />
-                                  )}
-                                </button>
-                              </div>
-                            </td>
-                            <td className="p-3.5 text-slate-200 font-mono">
-                              {password ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="select-all">{password}</span>
-                                  <button
-                                    onClick={() => copyYunaPass(password, idx)}
-                                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                                    title="Copy Mật khẩu"
-                                  >
-                                    {copiedPassIndex === idx ? (
-                                      <ClipboardDocumentCheckIcon className="h-3.5 w-3.5 text-emerald-400" />
-                                    ) : (
-                                      <ClipboardIcon className="h-3.5 w-3.5" />
-                                    )}
-                                  </button>
+                            {isPendingReport ? (
+                              <td colSpan={4} className="p-3.5">
+                                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-rose-500/25 bg-rose-500/10 text-rose-300 text-xs">
+                                  <span className="text-sm">⚠️</span>
+                                  <span className="font-medium">Tài khoản này đã được báo lỗi, vui lòng chờ đến khi tài khoản hiển thị lại là đã được xử lý.</span>
                                 </div>
-                              ) : (
-                                <span className="text-slate-500 italic">-</span>
-                              )}
-                            </td>
-                            <td className="p-3.5">
-                              <div className="flex items-center justify-center gap-2">
-                                {yunaCountdown <= 0 ? (
-                                  <span className="text-slate-500 font-semibold italic">Đã hết hạn</span>
-                                ) : item.code ? (
-                                  <>
-                                    <span className="font-mono font-bold text-sm text-white bg-slate-950/60 px-2.5 py-1 rounded-md border border-white/5 select-all">
-                                      {item.code}
-                                    </span>
+                              </td>
+                            ) : (
+                              <>
+                                <td className="p-3.5 text-slate-200 font-mono">
+                                  <div className="flex items-center gap-2">
+                                    <span className="select-all">{username}</span>
                                     <button
-                                      onClick={() => copyYunaOtp(item.code, idx)}
-                                      className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                                      title="Copy OTP"
+                                      onClick={() => copyYunaUser(username, idx)}
+                                      className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                                      title="Copy Tài khoản"
                                     >
-                                      {copiedIndex === idx ? (
-                                        <ClipboardDocumentCheckIcon className="h-4 w-4 text-emerald-400" />
+                                      {copiedUserIndex === idx ? (
+                                        <ClipboardDocumentCheckIcon className="h-3.5 w-3.5 text-emerald-400" />
                                       ) : (
-                                        <ClipboardIcon className="h-4 w-4" />
+                                        <ClipboardIcon className="h-3.5 w-3.5" />
                                       )}
                                     </button>
-                                  </>
-                                ) : (
-                                  <span className="text-slate-500 italic">Chưa có mã</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => handleYunaReportError(item)}
-                                disabled={reportingItem !== null}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 transition-all font-semibold text-[11px]"
-                              >
-                                {reportingItem === item.name ? (
-                                  "Đang gửi..."
-                                ) : (
-                                  <>
-                                    <span>🚨</span>
-                                    <span>Báo lỗi</span>
-                                  </>
-                                )}
-                              </button>
-                            </td>
+                                  </div>
+                                </td>
+                                <td className="p-3.5 text-slate-200 font-mono">
+                                  {password ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="select-all">{password}</span>
+                                      <button
+                                        onClick={() => copyYunaPass(password, idx)}
+                                        className="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                                        title="Copy Mật khẩu"
+                                      >
+                                        {copiedPassIndex === idx ? (
+                                          <ClipboardDocumentCheckIcon className="h-3.5 w-3.5 text-emerald-400" />
+                                        ) : (
+                                          <ClipboardIcon className="h-3.5 w-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-500 italic">-</span>
+                                  )}
+                                </td>
+                                <td className="p-3.5">
+                                  <div className="flex items-center justify-center gap-2">
+                                    {yunaCountdown <= 0 ? (
+                                      <span className="text-slate-500 font-semibold italic">Đã hết hạn</span>
+                                    ) : item.code ? (
+                                      <>
+                                        <span className="font-mono font-bold text-sm text-white bg-slate-950/60 px-2.5 py-1 rounded-md border border-white/5 select-all">
+                                          {item.code}
+                                        </span>
+                                        <button
+                                          onClick={() => copyYunaOtp(item.code, idx)}
+                                          className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                                          title="Copy OTP"
+                                        >
+                                          {copiedIndex === idx ? (
+                                            <ClipboardDocumentCheckIcon className="h-4 w-4 text-emerald-400" />
+                                          ) : (
+                                            <ClipboardIcon className="h-4 w-4" />
+                                          )}
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <span className="text-slate-500 italic">Chưa có mã</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3.5 text-right">
+                                  <button
+                                    onClick={() => handleYunaReportError(item)}
+                                    disabled={reportingItem !== null}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 transition-all font-semibold text-[11px]"
+                                  >
+                                    {reportingItem === item.name ? (
+                                      "Đang gửi..."
+                                    ) : (
+                                      <>
+                                        <span>🚨</span>
+                                        <span>Báo lỗi</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </td>
+                              </>
+                            )}
                           </tr>
                         );
                       })}

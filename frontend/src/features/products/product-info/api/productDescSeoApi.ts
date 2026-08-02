@@ -6,7 +6,7 @@ export const auditProductSeo = async (
   payload: ProductSeoAuditPayload,
   signal?: AbortSignal
 ): Promise<ProductSeoAuditResult> => {
-  const response = await apiFetch("/api/product-descriptions/seo-audit", {
+  const response = await apiFetch("/api/products/descriptions/seo-audit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

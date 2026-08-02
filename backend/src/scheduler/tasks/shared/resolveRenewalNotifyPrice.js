@@ -6,8 +6,8 @@
 const logger = require("@/utils/logger");
 const {
   findLatestPendingSlotByOrder,
-} = require("@/domains/payment-slots/repositories/paymentSlotRepository");
-const { hasPaymentSuffix } = require("@/domains/payment-slots/helpers/paymentSuffix");
+} = require("@/domains/payments/payment-slots/repositories/paymentSlotRepository");
+const { hasPaymentSuffix } = require("@/domains/payments/payment-slots/helpers/paymentSuffix");
 const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
 const { openSingleRenewalSlot } = require("@/scheduler/tasks/shared/openRenewalSlots");
 

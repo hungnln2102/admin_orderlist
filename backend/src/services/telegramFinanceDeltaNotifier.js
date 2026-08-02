@@ -7,7 +7,7 @@ const {
 const { financeNotifier } = require("@/domains/notifications/telegram");
 const {
   sumActiveShopBankBalances,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankBalanceRepository");
 
 const monthlySummaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,

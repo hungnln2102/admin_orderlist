@@ -3,7 +3,7 @@ import { ORDER_FIELDS } from "../../../../constants";
 import { showAppNotification } from "@/lib/notifications";
 import { buildOrderPayload, isDraftOrderComplete } from "../buildOrderPayload";
 import { CreateOrderPrefillContext, Order, Product } from "../types";
-import type { PaymentMethod } from "@/features/usdt-wallets/types";
+import type { PaymentMethod } from "@/features/wallet/usdt-wallets/types";
 import type { CreditOrderSelection } from "../buildOrderPayload";
 
 type UseOrderSubmitParams = {

@@ -54,31 +54,34 @@ async function exportCookies(context, { includeWithExpiry = false } = {}) {
 }
 
 async function detectSessionValid(page, waitMs = 5000) {
-  const isLoginUiVisible = async () => {
-    const emailInputVisible = await page
-      .locator('input[name="username"], input[type="email"], input[name="email"]')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    const passwordInputVisible = await page
-      .locator('input[type="password"], input#password')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    return emailInputVisible || passwordInputVisible;
-  };
-
-  const isOrgSwitchVisible = async () =>
-    page.locator('button[data-testid="org-switch-button"]').first().isVisible().catch(() => false);
-
   const deadline = Date.now() + waitMs;
   while (Date.now() < deadline) {
     const urlNow = page.url() || "";
     const onAuthUrl = urlNow.includes("auth.services") || urlNow.includes("adobelogin.com") || urlNow.includes("auth.");
-
     if (onAuthUrl) return false;
-    if (await isLoginUiVisible()) return false;
-    if (await isOrgSwitchVisible()) return true;
+
+    // Chạy single evaluate để kiểm tra trạng thái DOM trong 1 roundtrip duy nhất
+    const state = await page.evaluate(() => {
+      const getVisible = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return false;
+        const s = window.getComputedStyle(el);
+        return s.display !== 'none' && s.visibility !== 'hidden' && el.getBoundingClientRect().width > 0;
+      };
+      if (
+        getVisible('input[name="username"], input[type="email"], input[name="email"]') ||
+        getVisible('input[type="password"], input#password')
+      ) {
+        return "login";
+      }
+      if (getVisible('button[data-testid="org-switch-button"]')) {
+        return "org";
+      }
+      return "unknown";
+    }).catch(() => "unknown");
+
+    if (state === "login") return false;
+    if (state === "org") return true;
 
     await page.waitForTimeout(250);
   }

@@ -7,12 +7,12 @@ const {
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("@/domains/product-descriptions/controller/shared/constants");
+} = require("@/domains/products/descriptions/controller/shared/constants");
 const {
   findVariantForProductId,
   mapProductDescRow,
-} = require("@/domains/product-descriptions/controller/shared/queries");
-const { invalidateWebsiteSeoCache } = require("@/domains/product-descriptions/controller/shared/cache");
+} = require("@/domains/products/descriptions/controller/shared/queries");
+const { invalidateWebsiteSeoCache } = require("@/domains/products/descriptions/controller/shared/cache");
 
 /**
  * Tạo bản ghi desc_variant. Có thể gắn variant (productId) nếu truyền mã;

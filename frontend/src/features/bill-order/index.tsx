@@ -4,7 +4,7 @@ import { apiFetch } from "@/shared/api/client";
 import { ORDER_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";
-import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { useDefaultShopBankAccount } from "@/features/wallet/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import {
   DEFAULT_FORM,
   InvoiceEntry,

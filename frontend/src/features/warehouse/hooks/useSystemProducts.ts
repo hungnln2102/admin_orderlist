@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { apiGet } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";

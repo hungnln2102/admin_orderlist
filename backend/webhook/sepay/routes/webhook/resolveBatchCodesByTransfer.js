@@ -5,7 +5,7 @@ const {
 } = require("./constants");
 const {
   normalizeTransactionCode,
-} = require("@/services/transactionCodeService");
+} = require("@/services/identifierService");
 const { isLegacyBatchTransferCode } = require("@/domains/payments/controller/shared/batchTransferCode");
 
 /**

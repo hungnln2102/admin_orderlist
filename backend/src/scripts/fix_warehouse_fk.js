@@ -1,17 +1,17 @@
 require("module-alias/register");
 const { db } = require("../db");
-const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, WAREHOUSE_SCHEMA, SCHEMA_WAREHOUSE, tableName } = require("../config/dbSchema");
+const { getDefinition, SCHEMA_PRODUCT, WAREHOUSE_SCHEMA, SCHEMA_WAREHOUSE } = require("../config/dbSchema");
 const logger = require("../utils/logger");
 
 const SRV_DEF = getDefinition("STOCK_SERVICES", WAREHOUSE_SCHEMA);
 
 async function getOrCreateVariant(typeStr, existingProductId = null) {
-  let variant = await db(`${SCHEMA_PRODUCT}.variant`).whereRaw("TRIM(LOWER(display_name)) = ?", [typeStr.toLowerCase()]).first();
+  const variant = await db(`${SCHEMA_PRODUCT}.variant`).whereRaw("TRIM(LOWER(display_name)) = ?", [typeStr.toLowerCase()]).first();
   if (variant) return variant.id;
 
   let prodId = existingProductId;
   if (!prodId) {
-    let prod = await db(`${SCHEMA_PRODUCT}.product`).whereRaw("TRIM(LOWER(package_name)) = ?", [typeStr.toLowerCase()]).first();
+    const prod = await db(`${SCHEMA_PRODUCT}.product`).whereRaw("TRIM(LOWER(package_name)) = ?", [typeStr.toLowerCase()]).first();
     if (!prod) {
       const [insertedProd] = await db(`${SCHEMA_PRODUCT}.product`).insert({ 
         package_name: typeStr,

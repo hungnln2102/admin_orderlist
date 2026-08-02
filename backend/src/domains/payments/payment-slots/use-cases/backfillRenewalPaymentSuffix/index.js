@@ -7,8 +7,8 @@
 const { pool } = require("@/config/database");
 const logger = require("@/utils/logger");
 const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
-const { fetchRenewalSuffixCandidates } = require("@/domains/payment-slots/use-cases/backfillRenewalPaymentSuffix/fetchCandidates");
-const { reconcileSingleRenewalOrder } = require("@/domains/payment-slots/use-cases/backfillRenewalPaymentSuffix/reconcileSingle");
+const { fetchRenewalSuffixCandidates } = require("@/domains/payments/payment-slots/use-cases/backfillRenewalPaymentSuffix/fetchCandidates");
+const { reconcileSingleRenewalOrder } = require("@/domains/payments/payment-slots/use-cases/backfillRenewalPaymentSuffix/reconcileSingle");
 
 /**
  * @param {object} [options]

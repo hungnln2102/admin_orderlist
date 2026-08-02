@@ -73,7 +73,7 @@ export const usePackageDeleteActions = ({
     }
 
     try {
-      const response = await apiFetch("/api/package-products/bulk-delete", {
+      const response = await apiFetch("/api/products/packages/bulk-delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packageIds }),
@@ -153,7 +153,7 @@ export const usePackageDeleteActions = ({
     };
 
     try {
-      const response = await apiFetch(`/api/package-products/${targetId}`, {
+      const response = await apiFetch(`/api/products/packages/${targetId}`, {
         method: "DELETE",
       });
 

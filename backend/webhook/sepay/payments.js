@@ -31,7 +31,7 @@ const { withSavepoint } = require("./savepoint");
 const {
   resolveOrderByExpectedAmount,
   markPaymentSlotMatched,
-} = require("@/domains/payment-slots");
+} = require("@/domains/payments/payment-slots");
 
 let paymentReceiptOrderColCache = null;
 let paymentReceiptColumnsCache = null;

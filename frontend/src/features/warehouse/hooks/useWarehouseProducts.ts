@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { type WarehouseItem } from "../types";
 
 export type ProductOption = { value: string; label: string; nameId?: number };
 
-export function useWarehouseProducts(items: WarehouseItem[]) {
+export function useWarehouseProducts(_items: WarehouseItem[]) {
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
 

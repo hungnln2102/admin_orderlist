@@ -4,8 +4,8 @@
  */
 
 const logger = require("@/utils/logger");
-const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
-const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
+const { toUidList, getImapHostFromProvider, createImapClient } = require("@/services/otp/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/otp/mailOtpService/repository/mailBackupRepo");
 
 /**
  * @param {number} mailBackupId - ID bản ghi trong mail_backup (bắt buộc).

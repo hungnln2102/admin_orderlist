@@ -11,7 +11,7 @@ const { resolveProductToVariantId } = require("@/domains/products/services/produ
 const {
   changeOrderSupplier,
   ChangeSupplierError,
-} = require("@/domains/supplier-change/service");
+} = require("@/domains/supplies/supplier-change/service");
 
 const updateOrderWithFinance = async ({
     trx,
@@ -27,10 +27,7 @@ const updateOrderWithFinance = async ({
         ensureSupplierRecord,
         normalizeTextInput,
     } = helpers;
-    const {
-        updateDashboardMonthlySummaryOnStatusChange,
-        syncMavnStoreProfitExpense,
-    } = require("@/domains/orders/controller/orderFinanceHelpers");
+
     const logger = require("@/utils/logger");
 
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;

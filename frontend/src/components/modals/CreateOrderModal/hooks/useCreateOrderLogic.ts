@@ -22,7 +22,7 @@ import { useSupplySelection } from "./useSupplySelection";
 import { useSuppliesData } from "./useSuppliesData";
 import { isDraftOrderComplete } from "../buildOrderPayload";
 import { useOrderDetailLines } from "./useOrderDetailLines";
-import type { PaymentMethod } from "@/features/usdt-wallets/types";
+import type { PaymentMethod } from "@/features/wallet/usdt-wallets/types";
 import { useCreateOrderCredit } from "./useCreateOrderCredit";
 
 export const useCreateOrderLogic = (

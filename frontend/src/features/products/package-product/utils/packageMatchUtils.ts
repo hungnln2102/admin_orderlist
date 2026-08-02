@@ -3,7 +3,6 @@
  * compare package account with exactly one order column: slot or information).
  */
 import type {
-  AugmentedRow,
   NormalizedOrderRecord,
   PackageRow,
   PackageSlotAssignment,

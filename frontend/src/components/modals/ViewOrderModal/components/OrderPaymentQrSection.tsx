@@ -24,7 +24,7 @@ export const OrderPaymentQrSection = ({
   orderId,
   qrCodeImageUrl,
   effectiveQrAmount,
-  qrMessage,
+  qrMessage: _qrMessage,
   keepOrderPrice,
   priceLoading,
   priceError,

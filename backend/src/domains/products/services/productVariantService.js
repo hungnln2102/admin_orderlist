@@ -1,6 +1,6 @@
 const { db } = require("@/db");
 const { PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("@/config/dbSchema");
-const { nextId } = require("@/services/idService");
+const { nextId } = require("@/services/identifierService");
 const { getTiers } = require("@/services/pricing/tierCache");
 const { TABLES } = require("@/domains/products/controller/constants");
 const { findProductIdByName } = require("@/domains/products/services/productLookupService");

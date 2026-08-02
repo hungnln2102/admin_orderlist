@@ -1,6 +1,5 @@
 import {
   API_ENDPOINTS,
-  ORDER_FIELDS,
   VIRTUAL_FIELDS,
   type Order,
 } from "@/constants";

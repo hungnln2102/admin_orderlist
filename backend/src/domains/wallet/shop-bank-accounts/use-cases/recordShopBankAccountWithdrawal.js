@@ -5,17 +5,17 @@ const {
   TABLE,
   selectColumns,
   columns,
-} = require("@/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+} = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   debitShopBankWithdraw,
   SOURCE_KINDS,
-} = require("@/domains/shop-bank-accounts/services/shopBankLedgerService");
-const { createHttpError } = require("@/domains/shop-bank-accounts/validators/shopBankAccountValidator");
-const { validateWithdrawPayload } = require("@/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
+} = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
+const { createHttpError } = require("@/domains/wallet/shop-bank-accounts/validators/shopBankAccountValidator");
+const { validateWithdrawPayload } = require("@/domains/wallet/shop-bank-accounts/validators/shopBankWithdrawnValidator");
 const {
   normalizeOptionalText,
   normalizeRoundedMoney,
-} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
+} = require("@/domains/wallet/shop-bank-accounts/helpers/shopBankInputs");
 const {
   TABLE: EXPENSE_TABLE,
   COLS: EXPENSE_COLS,

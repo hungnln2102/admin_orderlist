@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 const { db } = require("@/db");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
 const { normalizeTextInput } = require("@/utils/normalizers");
@@ -334,10 +335,9 @@ const createWalletType = async (req, res) => {
   }
 };
 
-const updateWalletType = async (req, res) => {
-  const id = Number(req.params.id);
+const fetchAndValidateWalletType = async (id) => {
   if (!Number.isFinite(id) || id <= 0) {
-    return res.status(400).json({ error: "ID cột ví không hợp lệ." });
+    throw { status: 400, error: "ID cột ví không hợp lệ." };
   }
   let legacyNoBalanceScope = false;
   let existing;
@@ -358,47 +358,58 @@ const updateWalletType = async (req, res) => {
     }
   }
   if (!existing) {
-    return res.status(404).json({ error: "Không tìm thấy cột ví." });
+    throw { status: 404, error: "Không tìm thấy cột ví." };
   }
+  return { existing, legacyNoBalanceScope };
+};
 
+const buildWalletTypePatch = (body, legacyNoBalanceScope) => {
   const patch = {};
-  if (req.body?.wallet_name !== undefined) {
-    const normalized = normalizeTextInput(String(req.body.wallet_name || ""));
+  if (body?.wallet_name !== undefined) {
+    const normalized = normalizeTextInput(String(body.wallet_name || ""));
     if (!normalized) {
-      return res.status(400).json({ error: "wallet_name không được để trống." });
+      throw { status: 400, error: "wallet_name không được để trống." };
     }
     patch[WALLET_COLS.WALLET_NAME] = normalized;
   }
-  if (req.body?.note !== undefined) {
-    const noteRaw = req.body.note;
+  if (body?.note !== undefined) {
+    const noteRaw = body.note;
     patch[WALLET_COLS.NOTE] =
       noteRaw === null || noteRaw === ""
         ? null
         : normalizeTextInput(String(noteRaw)) || null;
   }
-  if (req.body?.asset_code !== undefined) {
-    let ac = normalizeTextInput(String(req.body.asset_code || "")) || "VND";
+  if (body?.asset_code !== undefined) {
+    let ac = normalizeTextInput(String(body.asset_code || "")) || "VND";
     if (ac.length > 50) ac = ac.slice(0, 50);
     patch[WALLET_COLS.ASSET_CODE] = ac;
   }
-  if (req.body?.is_investment !== undefined) {
-    patch[WALLET_COLS.IS_INVESTMENT] = Boolean(req.body.is_investment);
+  if (body?.is_investment !== undefined) {
+    patch[WALLET_COLS.IS_INVESTMENT] = Boolean(body.is_investment);
   }
-  if (req.body?.balance_scope !== undefined) {
+  if (body?.balance_scope !== undefined) {
     if (legacyNoBalanceScope) {
-      return res.status(400).json({
+      throw {
+        status: 400,
         error:
           "Database chưa có cột balance_scope. Chạy file database/migrations/036_wallet_balance_scope.sql.",
-      });
+      };
     }
-    patch[WALLET_COLS.BALANCE_SCOPE] = parseBalanceScope(req.body.balance_scope);
+    patch[WALLET_COLS.BALANCE_SCOPE] = parseBalanceScope(body.balance_scope);
   }
 
   if (Object.keys(patch).length === 0) {
-    return res.status(400).json({ error: "Không có trường nào để cập nhật." });
+    throw { status: 400, error: "Không có trường nào để cập nhật." };
   }
+  return patch;
+};
 
+const updateWalletType = async (req, res) => {
+  const id = Number(req.params.id);
   try {
+    const { legacyNoBalanceScope } = await fetchAndValidateWalletType(id);
+    const patch = buildWalletTypePatch(req.body, legacyNoBalanceScope);
+
     await db(WALLET_TYPES_TABLE).where(WALLET_COLS.ID, id).update(patch);
 
     let row;
@@ -416,6 +427,9 @@ const updateWalletType = async (req, res) => {
     }
     res.json({ wallet: normalizeWalletRow(row) });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.error });
+    }
     logger.error("[wallets] update type failed", {
       error: error.message,
       stack: error.stack,

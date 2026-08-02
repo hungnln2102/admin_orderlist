@@ -1,5 +1,5 @@
 import { formatCurrency } from "@/shared/money";
-import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
+import type { ShopBankAccountItem } from "@/features/wallet/shop-bank-accounts/types";
 
 type UnpaidPayment = {
   id: number;

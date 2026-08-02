@@ -42,7 +42,7 @@ const TABLES = {
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
 };
 
-const IMAGE_DIR = path.join(__dirname, "../../../../image");
+const IMAGE_DIR = path.join(__dirname, "../../../../../image");
 try {
   fs.mkdirSync(IMAGE_DIR, { recursive: true });
 } catch {

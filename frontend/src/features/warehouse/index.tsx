@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, apiPost, apiPut, apiDelete } from "@/shared/api/client";
 

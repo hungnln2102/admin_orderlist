@@ -84,12 +84,17 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 const staticOpts = { maxAge: "30d", etag: true };
 app.use("/image", express.static(path.join(__dirname, "../image"), staticOpts));
 app.use(
+  "/public/uploads",
+  express.static(path.join(__dirname, "../public/uploads"), staticOpts)
+);
+// Phục vụ ngược tương thích cho các URL cũ trong CSDL trỏ đến image_product/image_variant
+app.use(
   "/image_product",
-  express.static(path.join(__dirname, "../image_product"), staticOpts)
+  express.static(path.join(__dirname, "../public/uploads"), staticOpts)
 );
 app.use(
   "/image_variant",
-  express.static(path.join(__dirname, "../image_variant"), staticOpts)
+  express.static(path.join(__dirname, "../public/uploads"), staticOpts)
 );
 
 const { pool: dbPool } = require("@/config/database");

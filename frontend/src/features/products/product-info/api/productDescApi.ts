@@ -12,9 +12,9 @@ import type {
 export { auditProductSeo } from "./productDescSeoApi";
 import { fetchImages, uploadImage, deleteImage } from "@/shared/api/coreImageApi";
 
-export const uploadProductImage = (file: File) => uploadImage(file, "/api/product-descriptions/upload-image");
-export const fetchProductImages = () => fetchImages("/api/product-descriptions/images");
-export const deleteProductImage = (fileName: string) => deleteImage("/api/product-descriptions/images", fileName);
+export const uploadProductImage = (file: File) => uploadImage(file, "/api/products/descriptions/upload-image");
+export const fetchProductImages = () => fetchImages("/api/products/descriptions/images");
+export const deleteProductImage = (fileName: string) => deleteImage("/api/products/descriptions/images", fileName);
 
 export type {
   CreateProductDescriptionPayload,
@@ -34,7 +34,7 @@ export const createProductDescription = async (
   payload: CreateProductDescriptionPayload
 ): Promise<ProductDescription> => {
   const trimmedPid = payload.productId?.trim();
-  const response = await apiFetch("/api/product-descriptions/create", {
+  const response = await apiFetch("/api/products/descriptions/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -65,7 +65,7 @@ export const createProductDescription = async (
 export const saveProductDescription = async (
   payload: ProductDescriptionSavePayload
 ): Promise<ProductDescription> => {
-  const response = await apiFetch("/api/product-descriptions", {
+  const response = await apiFetch("/api/products/descriptions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -95,7 +95,7 @@ export const deleteProductDescriptionRecord = async (
     throw new Error("ID desc_variant không hợp lệ.");
   }
   const response = await apiFetch(
-    `/api/product-descriptions/desc-variant/${encodeURIComponent(String(id))}`,
+    `/api/products/descriptions/desc-variant/${encodeURIComponent(String(id))}`,
     { method: "DELETE" }
   );
   if (!response.ok) {
@@ -126,7 +126,7 @@ export const fetchProductDescriptions = async (
   }
   const qs = searchParams.toString();
   const response = await apiFetch(
-    `/api/product-descriptions${qs ? `?${qs}` : ""}`
+    `/api/products/descriptions${qs ? `?${qs}` : ""}`
   );
   if (!response.ok) {
     const message = await response.text().catch(() => "");

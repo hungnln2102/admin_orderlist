@@ -17,13 +17,13 @@ export interface UpdateCategoryData {
 }
 
 export const fetchCategories = (): Promise<CategoryItem[]> =>
-  apiGet<CategoryItem[]>("/api/categories");
+  apiGet<CategoryItem[]>("/api/products/categories");
 
 export const createCategory = (data: CreateCategoryData): Promise<CategoryItem> =>
-  apiPost<CategoryItem>("/api/categories", data);
+  apiPost<CategoryItem>("/api/products/categories", data);
 
 export const updateCategory = (id: number, data: UpdateCategoryData): Promise<CategoryItem> =>
-  apiPut<CategoryItem>(`/api/categories/${id}`, data);
+  apiPut<CategoryItem>(`/api/products/categories/${id}`, data);
 
 export const deleteCategory = (id: number): Promise<void> =>
-  apiDelete(`/api/categories/${id}`);
+  apiDelete(`/api/products/categories/${id}`);

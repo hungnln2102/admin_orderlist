@@ -3,7 +3,7 @@ const {
   normalizeBoolean,
   normalizeOptionalText,
   normalizeWalletAddress,
-} = require("@/domains/usdt-wallets/helpers/usdtWalletInputs");
+} = require("@/domains/wallet/usdt-wallets/helpers/usdtWalletInputs");
 
 const SUPPORTED_NETWORKS = ["TRC20", "ERC20", "BEP20", "SOL", "TON"];
 

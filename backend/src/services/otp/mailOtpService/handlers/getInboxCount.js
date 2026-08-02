@@ -4,8 +4,8 @@
  */
 
 const logger = require("@/utils/logger");
-const { getImapHostFromProvider, createImapClient } = require("@/services/mailOtpService/shared/imapClient");
-const { getMailBackupById } = require("@/services/mailOtpService/repository/mailBackupRepo");
+const { getImapHostFromProvider, createImapClient } = require("@/services/otp/mailOtpService/shared/imapClient");
+const { getMailBackupById } = require("@/services/otp/mailOtpService/repository/mailBackupRepo");
 
 /**
  * Đếm số thư trong INBOX (cùng cách với test-imap-login: dùng status("INBOX", { messages: true })).

@@ -4,7 +4,7 @@ const {
   normalizeBankBin,
   normalizeBoolean,
   normalizeOptionalText,
-} = require("@/domains/shop-bank-accounts/helpers/shopBankInputs");
+} = require("@/domains/wallet/shop-bank-accounts/helpers/shopBankInputs");
 
 const createShopBankAccountRules = [
   body("accountNumber")

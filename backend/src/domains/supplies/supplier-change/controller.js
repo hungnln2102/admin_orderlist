@@ -3,7 +3,7 @@
  */
 
 const logger = require("@/utils/logger");
-const { changeOrderSupplier, ChangeSupplierError } = require("@/domains/supplier-change/service");
+const { changeOrderSupplier, ChangeSupplierError } = require("@/domains/supplies/supplier-change/service");
 
 const parseId = (raw) => {
   const n = Number(raw);

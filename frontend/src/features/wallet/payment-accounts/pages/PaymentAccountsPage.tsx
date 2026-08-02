@@ -1,7 +1,7 @@
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useSearchParams } from "react-router-dom";
-import { ShopBankAccountsPanel } from "@/features/shop-bank-accounts/components/ShopBankAccountsPanel";
-import { UsdtWalletsPanel } from "@/features/usdt-wallets/components/UsdtWalletsPanel";
+import { ShopBankAccountsPanel } from "@/features/wallet/shop-bank-accounts/components/ShopBankAccountsPanel";
+import { UsdtWalletsPanel } from "@/features/wallet/usdt-wallets/components/UsdtWalletsPanel";
 import { PaymentAccountsTabs } from "../components/PaymentAccountsTabs";
 import type { PaymentAccountTab } from "../types";
 

@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, type Order } from "@/constants";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { useDefaultShopBankAccount } from "@/features/wallet/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { buildSepayQrUrl } from "@/shared/vietqr";
 import { normalizeExactVnd } from "@/shared/money";
 import { formatCurrency } from "../utils/ordersHelpers";

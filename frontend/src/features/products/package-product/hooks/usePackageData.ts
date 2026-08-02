@@ -72,7 +72,7 @@ export const usePackageData = (): UsePackageDataResult => {
     (async () => {
       try {
         setPackagesLoading(true);
-        const res = await apiFetch("/api/package-products");
+        const res = await apiFetch("/api/products/packages");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as PackageRow[];
         if (cancelled) return;

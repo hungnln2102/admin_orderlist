@@ -3,7 +3,7 @@
  * Chạy hàng giờ; mặc định dọn pending > 30 ngày.
  */
 
-const repo = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const repo = require("@/domains/payments/payment-slots/repositories/paymentSlotRepository");
 const logger = require("@/utils/logger");
 
 /**

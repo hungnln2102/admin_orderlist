@@ -26,4 +26,13 @@ router.delete(
   deleteSupplyPriceForProduct,
 );
 
+// Sub-routes for products context
+router.use("/prices", require("./prices/routes"));
+router.use("/descriptions", require("./descriptions/routes"));
+router.use("/images", require("./images/routes"));
+router.use("/variant-images", require("./images/routes"));
+router.use("/categories", require("./categories/routes"));
+router.use("/packages", require("./packages/routes"));
+router.use("/pricing-tiers", require("./pricing-tiers/routes"));
+
 module.exports = router;

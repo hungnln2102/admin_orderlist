@@ -9,7 +9,7 @@ const {
 } = require("@/services/packageProductService");
 const { syncOrdersMatchingPackageAccount } = require("@/services/packageOrderAccountSync");
 const logger = require("@/utils/logger");
-const { pkgCols, TABLES, productCols } = require("@/domains/package-products/controller/constants");
+const { pkgCols, TABLES, productCols } = require("@/domains/products/packages/controller/constants");
 
 
 const normalizeMatchMode = (matchMode) =>

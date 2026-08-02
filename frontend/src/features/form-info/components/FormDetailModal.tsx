@@ -1,4 +1,4 @@
-import { ModalShell } from "@/features/package-product/components/Modals/ModalShell";
+import { ModalShell } from "@/features/products/package-product/components/Modals/ModalShell";
 import type { FormDetailView } from "../types";
 
 interface FormDetailModalProps {

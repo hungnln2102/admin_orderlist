@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Order } from "@/constants";
 import { apiGet } from "@/shared/api/client";
 

@@ -7,8 +7,8 @@ const {
   productDescColNames,
   productColNames,
   variantColNames,
-} = require("@/domains/product-descriptions/controller/shared/constants");
-const { mapProductDescRow } = require("@/domains/product-descriptions/controller/shared/queries");
+} = require("@/domains/products/descriptions/controller/shared/constants");
+const { mapProductDescRow } = require("@/domains/products/descriptions/controller/shared/queries");
 
 const listProductDescriptions = async (req, res) => {
   const search = normalizeTextInput(req.query.search || "");

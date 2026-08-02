@@ -27,7 +27,7 @@ export const useCategoryOptions = (): UseCategoryOptionsResult => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<CategoryItem[]>("/api/categories");
+      const data = await apiGet<CategoryItem[]>("/api/products/categories");
       if (!isMountedRef.current) return;
       const nextOptions = Array.isArray(data) ? data : [];
       nextOptions.sort((left, right) =>

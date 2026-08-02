@@ -23,7 +23,7 @@ const {
 const {
   normalizeAdobeSystemCode,
 } = require("@/services/renew-adobe/adobeSystemConstants");
-const { normalizeOtpSource } = require("@/services/otpProviderService");
+
 const {
   normalizeTrackingOtpSource,
 } = require("@/domains/renew-adobe/helpers/normalizeTrackingOtpSource");

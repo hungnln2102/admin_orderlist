@@ -1,14 +1,10 @@
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
-import { maskPassword } from "../utils/accountUtils";
+import { maskPassword, getOtpSourceLabel } from "../utils/accountUtils";
 import type { AdobeAdminAccount } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { UrlAccessCell } from "./UrlAccessCell";
 import { RenewAdobeAccountActions } from "./RenewAdobeAccountActions";
-import {
-  formatAdobeAdminSlotRatio,
-  getOtpSourceLabel,
-  RenewAdobeAccountMobileCard,
-} from "./RenewAdobeAccountMobileCard";
+import { RenewAdobeAccountMobileCard } from "./RenewAdobeAccountMobileCard";
 
 type RenewAdobeAccountsResponsiveTableProps = {
   accounts: AdobeAdminAccount[];

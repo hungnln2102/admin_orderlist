@@ -59,3 +59,16 @@ export function normalizeAdobeAdminAccount(
         : null,
   };
 }
+
+export function formatAdobeAdminSlotRatio(account: AdobeAdminAccount): string {
+  const trackingUserCount = account.tracking_user_count ?? 0;
+  const licenseUserCount = Number(account.user_count) || 0;
+  return `${trackingUserCount}/${licenseUserCount}`;
+}
+
+export const getOtpSourceLabel = (source?: AdobeAdminAccount["otp_source"]) => {
+  if (source === "tinyhost") return "TinyHost";
+  if (source === "hdsd") return "otp.hdsd.net";
+  if (source === "ades") return "OTP Ades";
+  return "IMAP";
+};

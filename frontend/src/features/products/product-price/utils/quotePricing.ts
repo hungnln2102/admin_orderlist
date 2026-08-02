@@ -30,7 +30,7 @@ export const computeLinePricing = (
 
   const basePrice = selected?.basePrice ?? 0;
   const fallbackRetailPrice = selected?.unitPrice ?? basePrice;
-  const wholesalePrice =
+  const _wholesalePrice =
     selected?.wholesalePrice && selected.wholesalePrice > 0
       ? selected.wholesalePrice
       : selected?.pctCtv && selected.pctCtv > 0

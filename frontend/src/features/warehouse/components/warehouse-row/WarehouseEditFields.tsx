@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { WarehouseItem, WarehouseService } from "../../types";
 import { ProductCategorySelect } from "../ProductCategorySelect";

@@ -7,7 +7,7 @@
  *   node scripts/ops/backfill-payment-slots.js --order=MAVCHMB3R
  *   node scripts/ops/backfill-payment-slots.js --limit=100
  *
- * @see ../../src/domains/payment-slots/use-cases/backfillPendingPaymentSlots.js
+ * @see ../../src/domains/payments/payment-slots/use-cases/backfillPendingPaymentSlots.js
  * @see ../../docs/payment-slot-suffix-matching.md
  */
 
@@ -17,7 +17,7 @@ require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 const { db } = require("@/db");
 const {
   backfillPendingPaymentSlots,
-} = require("@/domains/payment-slots/use-cases/backfillPendingPaymentSlots");
+} = require("@/domains/payments/payment-slots/use-cases/backfillPendingPaymentSlots");
 
 function parseArgs(argv) {
   let dryRun = false;

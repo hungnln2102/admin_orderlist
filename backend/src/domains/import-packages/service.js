@@ -1,7 +1,7 @@
 const { db, withTransaction } = require("@/db");
-const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, WAREHOUSE_SCHEMA, SCHEMA_WAREHOUSE, tableName } = require("@/config/dbSchema");
+const { getDefinition, SCHEMA_PRODUCT, WAREHOUSE_SCHEMA, SCHEMA_WAREHOUSE, tableName } = require("@/config/dbSchema");
 const { normalizeDateInput } = require("@/utils/normalizers");
-const { TABLES, ruleCols, stockCols, pkgCols, productCols } = require("@/domains/import-packages/constants");
+const { TABLES, ruleCols, stockCols, pkgCols } = require("@/domains/import-packages/constants");
 const logger = require("@/utils/logger");
 
 /**

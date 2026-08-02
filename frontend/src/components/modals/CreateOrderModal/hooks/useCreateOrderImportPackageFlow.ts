@@ -64,7 +64,6 @@ export const useCreateOrderImportPackageFlow = ({
       formData,
       handleSubmit,
       importPackageData,
-      importRule?.enabled,
       isImportOrder,
       pendingImportPackageRef,
       selectedProductId,

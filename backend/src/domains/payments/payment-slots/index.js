@@ -16,21 +16,21 @@
  *  - SLOT_KIND, SLOT_STATUS                    — enum hằng số
  */
 
-const constants = require("@/domains/payment-slots/constants");
-const { openPaymentSlot } = require("@/domains/payment-slots/use-cases/openPaymentSlot");
+const constants = require("@/domains/payments/payment-slots/constants");
+const { openPaymentSlot } = require("@/domains/payments/payment-slots/use-cases/openPaymentSlot");
 const {
   resolveOrderByExpectedAmount,
-} = require("@/domains/payment-slots/use-cases/resolveOrderByExpectedAmount");
-const { markPaymentSlotMatched } = require("@/domains/payment-slots/use-cases/markPaymentSlotMatched");
-const { expirePaymentSlots } = require("@/domains/payment-slots/use-cases/expirePaymentSlots");
+} = require("@/domains/payments/payment-slots/use-cases/resolveOrderByExpectedAmount");
+const { markPaymentSlotMatched } = require("@/domains/payments/payment-slots/use-cases/markPaymentSlotMatched");
+const { expirePaymentSlots } = require("@/domains/payments/payment-slots/use-cases/expirePaymentSlots");
 const {
   findLatestPendingSlotByOrder,
   findLatestMatchedSlotByOrder,
   findActiveSlotByOrder,
-} = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+} = require("@/domains/payments/payment-slots/repositories/paymentSlotRepository");
 const {
   backfillPendingPaymentSlots,
-} = require("@/domains/payment-slots/use-cases/backfillPendingPaymentSlots");
+} = require("@/domains/payments/payment-slots/use-cases/backfillPendingPaymentSlots");
 
 module.exports = {
   openPaymentSlot,

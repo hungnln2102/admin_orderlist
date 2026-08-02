@@ -20,32 +20,7 @@ const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 const ACC_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACC_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
-let otpSourceColumnExistsCache = null;
 
-async function trackingHasOtpSourceColumn() {
-  if (otpSourceColumnExistsCache !== null) return otpSourceColumnExistsCache;
-  if (!TRACK_COLS.OTP_SOURCE) {
-    otpSourceColumnExistsCache = false;
-    return false;
-  }
-  try {
-    const row = await db.raw(
-      `
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = ?
-        AND table_name = ?
-        AND column_name = ?
-      LIMIT 1
-      `,
-      [SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE, TRACK_COLS.OTP_SOURCE]
-    );
-    otpSourceColumnExistsCache = Boolean(row?.rows?.length);
-  } catch {
-    otpSourceColumnExistsCache = false;
-  }
-  return otpSourceColumnExistsCache;
-}
 
 const OTP_CFG_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,

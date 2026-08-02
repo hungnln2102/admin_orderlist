@@ -5,8 +5,8 @@ const {
 const {
   notifyFinanceMonthlyDelta,
 } = require("@/services/telegramFinanceDeltaNotifier");
-const { SUMMARY_COLS, fetchMonthlyTotals } = require("@/domains/supplier-change/repository");
-const { FLOWS, STATUSES_NEEDING_NCC_LOG } = require("@/domains/supplier-change/service/constants");
+const { SUMMARY_COLS, fetchMonthlyTotals } = require("@/domains/supplies/supplier-change/repository");
+const { FLOWS, STATUSES_NEEDING_NCC_LOG } = require("@/domains/supplies/supplier-change/service/constants");
 
 const toNum = (value) => {
   const n = Number(value);

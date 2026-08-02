@@ -12,7 +12,6 @@ import {
   countDaysInclusive,
 } from "@/shared/date/dateRanges";
 
-const TAX_START_DATE = new Date(2026, 3, 22);
 
 export const FIXED_COLUMNS: FixedColumn[] = [
   { key: "orderCode", label: "Mã Đơn Hàng", width: 154, left: 0 },

@@ -14,7 +14,9 @@ const SPECTRUM_MAX = 12;
  */
 async function dismissSpectrumDialogs(page, logPrefix) {
   for (let attempt = 0; attempt < SPECTRUM_MAX; attempt++) {
-    const grids = page.locator("div[class*='spectrum-Dialog-grid']");
+    const grids = page.locator(
+      "div[class*='spectrum-Dialog-grid']:not(#add-users-to-org-modal *):not([data-testid='product-assignment-modal'] *)"
+    );
     const n = await grids.count().catch(() => 0);
     /** @type {import('playwright').Locator | null} */
     let dialog = null;
@@ -22,19 +24,6 @@ async function dismissSpectrumDialogs(page, logPrefix) {
     for (let i = 0; i < n; i++) {
       const g = grids.nth(i);
       if (!(await g.isVisible({ timeout: 400 }).catch(() => false))) continue;
-
-      const skip = await g.evaluate((node) => {
-        let p = node.parentElement;
-        while (p) {
-          if (p.id === "add-users-to-org-modal") return true;
-          if (p.getAttribute && p.getAttribute("data-testid") === "product-assignment-modal") {
-            return true;
-          }
-          p = p.parentElement;
-        }
-        return false;
-      });
-      if (skip) continue;
 
       const dlg = page.getByRole("dialog").filter({ has: g });
       if (await dlg.isVisible({ timeout: 350 }).catch(() => false)) {

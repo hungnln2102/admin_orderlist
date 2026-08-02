@@ -3,7 +3,7 @@
  * payment_receipt được INSERT (hoặc dedupe) thành công.
  */
 
-const repo = require("@/domains/payment-slots/repositories/paymentSlotRepository");
+const repo = require("@/domains/payments/payment-slots/repositories/paymentSlotRepository");
 const logger = require("@/utils/logger");
 
 /**

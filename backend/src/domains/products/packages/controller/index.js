@@ -6,8 +6,8 @@ const {
   bulkDeletePackages,
   updateProductPackageOptions,
   fetchProductRequiresActivationForPackagePayload,
-} = require("@/domains/package-products/controller/service");
-const { pkgCols } = require("@/domains/package-products/controller/constants");
+} = require("@/domains/products/packages/controller/service");
+const { pkgCols } = require("@/domains/products/packages/controller/constants");
 const logger = require("@/utils/logger");
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");

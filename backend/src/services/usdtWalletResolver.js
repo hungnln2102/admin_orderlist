@@ -1,4 +1,4 @@
-const { findDefaultActiveUsdtWallet } = require("@/domains/usdt-wallets/repositories/usdtWalletRepository");
+const { findDefaultActiveUsdtWallet } = require("@/domains/wallet/usdt-wallets/repositories/usdtWalletRepository");
 
 const resolveDefaultUsdtWallet = async () => findDefaultActiveUsdtWallet();
 
