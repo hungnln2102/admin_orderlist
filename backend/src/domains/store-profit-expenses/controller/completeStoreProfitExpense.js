@@ -122,6 +122,29 @@ const completeStoreProfitExpense = async (req, res) => {
             sourceId: id,
             note: reason || null,
           });
+
+          if (!meta?.targetWalletId) {
+            throw new Error("Không thể hoàn tất rút tiền: Thiếu thông tin tài khoản nhận.");
+          }
+          const { incrementDailyWalletBalanceById } = require("@/domains/wallet/repositories/dailyBalanceRepository");
+          const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+          await incrementDailyWalletBalanceById(trx, {
+            walletId: Number(meta.targetWalletId),
+            recordDate: todayStr,
+            amount,
+          });
+
+          // Emit event MONEY_WITHDRAWN
+          const eventBus = require("@/events/eventBus");
+          const EVENTS = require("@/events/eventTypes");
+          eventBus.emit(EVENTS.MONEY_WITHDRAWN, {
+            amount,
+            bankAccountId: shopBankAccountId,
+            targetWalletId: Number(meta.targetWalletId),
+            reason: reason || null,
+            status: "completed",
+            expenseId: id,
+          });
         }
       }
 

@@ -38,7 +38,7 @@ export function RenewAdobeSystemManagement() {
   const [yunaLoading, setYunaLoading] = useState(false);
   const [yunaError, setYunaError] = useState<string | null>(null);
   const [yunaData, setYunaData] = useState<{
-    items: Array<{ name: string; code: string; group: string }>;
+    items: Array<{ name: string; code: string; group: string; report_status?: string }>;
     time_left: number;
   } | null>(null);
   const [yunaCountdown, setYunaCountdown] = useState<number>(0);
@@ -188,6 +188,18 @@ export function RenewAdobeSystemManagement() {
       const data = await res.json();
       if (res.ok && data.success) {
         setReportSuccess(data.message || `Đã báo cáo lỗi cho tài khoản ${item.name} thành công.`);
+        setYunaData((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            items: prev.items.map((i) => {
+              if (i.name === item.name && i.group === item.group) {
+                return { ...i, report_status: "pending" };
+              }
+              return i;
+            }),
+          };
+        });
       } else {
         setReportError(data.error || "Gửi báo cáo lỗi thất bại.");
       }

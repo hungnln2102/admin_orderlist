@@ -206,6 +206,8 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
         isOpen={withdrawModalOpen}
         onClose={() => setWithdrawModalOpen(false)}
         onSuccess={handleWithdrawSuccess}
+        walletColumns={columns}
+        currencyFormatter={currencyFormatter}
       />
 
       {error && (

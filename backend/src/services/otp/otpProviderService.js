@@ -217,6 +217,11 @@ async function fetchOtpBySource({
           return emailPart.trim() === emailLower;
         });
         if (match) {
+          if (match.report_status === "pending") {
+            logger.warn(`[otp-provider] Tài khoản Yuna ${accountEmail} đang ở trạng thái báo lỗi (pending). Không lấy OTP.`);
+            return null;
+          }
+
           const directCode = extractOtpCode(match.code);
           if (directCode) return directCode;
 

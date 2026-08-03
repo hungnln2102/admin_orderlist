@@ -32,6 +32,10 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
 
   const { id: normalizedId, amount } = validateWithdrawPayload(id, payload);
   const reason = normalizeOptionalText(payload?.reason);
+  const targetWalletId = payload?.targetWalletId ? Number(payload.targetWalletId) : null;
+  if (!targetWalletId) {
+    throw createHttpError(400, "Vui lòng chọn tài khoản nhận.");
+  }
   const current = await findShopBankAccountById(normalizedId);
   if (!current) {
     throw createHttpError(404, "Không tìm thấy tài khoản.");
@@ -47,6 +51,12 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
       [EXPENSE_COLS.SHOP_BANK_ACCOUNT_ID]: normalizedId,
       [EXPENSE_COLS.STATUS]: status,
     };
+
+    const { storeProfitExpensesHasMavnColumns } = require("@/domains/orders/controller/finance/storeProfitExpensesHasMavnColumns");
+    const hasMeta = await storeProfitExpensesHasMavnColumns();
+    if (hasMeta && targetWalletId) {
+      expensePayload[EXPENSE_COLS.EXPENSE_META] = trx.raw("?::jsonb", [JSON.stringify({ targetWalletId })]);
+    }
 
     const [created] = await trx(EXPENSE_TABLE).insert(expensePayload).returning([EXPENSE_COLS.ID]);
     const expenseId = Number(created?.id ?? created?.[EXPENSE_COLS.ID] ?? 0);
@@ -72,6 +82,28 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
           context: `recordShopBankAccountWithdrawal.withdrawal`,
         });
       }
+
+      if (targetWalletId) {
+        const { incrementDailyWalletBalanceById } = require("@/domains/wallet/repositories/dailyBalanceRepository");
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+        await incrementDailyWalletBalanceById(trx, {
+          walletId: targetWalletId,
+          recordDate: todayStr,
+          amount,
+        });
+      }
+
+      // Emit event MONEY_WITHDRAWN
+      const eventBus = require("@/events/eventBus");
+      const EVENTS = require("@/events/eventTypes");
+      eventBus.emit(EVENTS.MONEY_WITHDRAWN, {
+        amount,
+        bankAccountId: normalizedId,
+        targetWalletId,
+        reason,
+        status,
+        expenseId,
+      });
     }
 
     const updated = await trx(TABLE).select(selectColumns).where(columns.id, normalizedId).first();

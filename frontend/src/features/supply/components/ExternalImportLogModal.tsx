@@ -31,10 +31,8 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     fetchShopBankAccounts()
-      .then((res) => {
-        if (res.success && res.data) {
-          setAccounts(res.data.filter((acc) => acc.isActive));
-        }
+      .then((items) => {
+        setAccounts(items.filter((acc) => acc.isActive));
       })
       .catch(() => {
         // ignore
@@ -70,7 +68,7 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
   const fields: FormField[] = [
     {
       name: "accountId",
-      label: "Chọn tài khoản ngân hàng nguồn",
+      label: "Tài khoản ngân hàng nguồn",
       type: "select",
       required: true,
       colSpan: 2,

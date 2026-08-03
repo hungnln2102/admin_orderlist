@@ -23,6 +23,10 @@ const recordUsdtWalletWithdrawal = async (id, payload) => {
 
   const { id: normalizedId, amount } = validateWithdrawPayload(id, payload);
   const reason = normalizeOptionalText(payload?.reason);
+  const targetWalletId = payload?.targetWalletId ? Number(payload.targetWalletId) : null;
+  if (!targetWalletId) {
+    throw createHttpError(400, "Vui lòng chọn tài khoản nhận.");
+  }
   const current = await findUsdtWalletById(normalizedId);
   if (!current) {
     throw createHttpError(404, "Không tìm thấy ví.");
@@ -38,6 +42,28 @@ const recordUsdtWalletWithdrawal = async (id, payload) => {
       sourceId: withdrawId,
       note: reason,
     });
+
+    if (targetWalletId) {
+      const { incrementDailyWalletBalanceById } = require("@/domains/wallet/repositories/dailyBalanceRepository");
+      const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+      await incrementDailyWalletBalanceById(trx, {
+        walletId: targetWalletId,
+        recordDate: todayStr,
+        amount, // Since USDT wallet balance and daily balances are both numbers, we can increment normally
+      });
+    }
+  });
+
+  // Emit event MONEY_WITHDRAWN
+  const eventBus = require("@/events/eventBus");
+  const EVENTS = require("@/events/eventTypes");
+  eventBus.emit(EVENTS.MONEY_WITHDRAWN, {
+    amount,
+    usdtWalletId: normalizedId,
+    targetWalletId,
+    reason,
+    status: "completed",
+    withdrawId,
   });
 
   const updated = await findUsdtWalletById(normalizedId);

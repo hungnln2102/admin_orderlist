@@ -103,30 +103,9 @@ async function handleOrderDeleted(payload) {
  */
 async function handleWithdrawal(payload) {
   try {
-    const { amount, bankAccountId, monthKey } = payload;
-    const amountToDeduct = Number(amount) || 0;
-    if (amountToDeduct <= 0) return;
-
-    logger.info(`[FinancialMetrics] Rút tiền: Trừ Sổ Quỹ (Bank) -${amountToDeduct}`);
-    const finalMonthKey = monthKey || new Date().toISOString().slice(0, 7);
-
-    await db.transaction(async (trx) => {
-      if (bankAccountId) {
-        await shopBankAccountRepository.decrementBalance(bankAccountId, amountToDeduct, { client: trx });
-      }
-
-      const increments = {
-        [dashboardSummaryRepository.COLS.ESTIMATED_BANK_BALANCE]: -amountToDeduct,
-      };
-      await dashboardSummaryRepository.incrementMonthlyMetrics(finalMonthKey, increments, { client: trx });
-
-      await notifyFinanceMonthlyDelta({
-        monthKey: finalMonthKey,
-        bankBalanceDelta: -amountToDeduct,
-        context: `webhook.outbound_transfer`,
-        executor: trx,
-      });
-    });
+    const { amount, bankAccountId, usdtWalletId, targetWalletId, reason } = payload;
+    const amountVal = Number(amount) || 0;
+    logger.info(`[FinancialMetricsSubscriber] Rút tiền (MONEY_WITHDRAWN): Số tiền = ${amountVal}, Tài khoản nguồn = ${bankAccountId || usdtWalletId || 'N/A'}, Tài khoản nhận = ${targetWalletId || 'N/A'}, Lý do = ${reason || 'N/A'}`);
   } catch (error) {
     logger.error('[FinancialMetrics] Lỗi handleWithdrawal', { error: error.message });
   }

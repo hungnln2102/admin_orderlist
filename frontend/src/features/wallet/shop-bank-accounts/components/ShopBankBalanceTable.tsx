@@ -8,7 +8,6 @@ type ShopBankBalanceTableProps = {
   items: ShopBankAccountBalanceItem[];
   loading: boolean;
   error: string | null;
-  onOpenWithdraw: () => void;
   onEdit: (item: ShopBankAccountBalanceItem) => void;
   onDelete: (item: ShopBankAccountBalanceItem) => void;
 };
@@ -20,7 +19,6 @@ export function ShopBankBalanceTable({
   items,
   loading,
   error,
-  onOpenWithdraw,
   onEdit,
   onDelete,
 }: ShopBankBalanceTableProps) {
@@ -39,14 +37,6 @@ export function ShopBankBalanceTable({
             các STK = <span className="text-emerald-200">Lợi nhuận khả dụng</span> trên dashboard.
           </p>
         </div>
-        <GradientButton
-          type="button"
-          onClick={onOpenWithdraw}
-          disabled={loading}
-          className="!rounded-2xl shrink-0 !px-5 !py-2.5 !text-sm"
-        >
-          Rút tiền
-        </GradientButton>
       </div>
 
       {error ? <p className="px-6 py-4 text-sm text-rose-300">{error}</p> : null}

@@ -107,11 +107,13 @@ export const deleteUsdtWallet = (id: number): Promise<void> =>
 export async function recordUsdtWalletWithdrawal(
   id: number,
   amount: number,
-  reason?: string | null
+  reason?: string | null,
+  targetWalletId?: number | null
 ): Promise<UsdtWalletBalanceItem> {
   const data = await apiPost<{ item?: unknown }>(API_ENDPOINTS.USDT_WALLET_WITHDRAW(id), {
     amount,
     reason: reason?.trim() || null,
+    targetWalletId: targetWalletId || null,
   });
   return normalizeUsdtWalletBalanceItem(data?.item);
 }

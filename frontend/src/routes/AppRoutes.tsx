@@ -17,6 +17,7 @@ const ProductInfo = lazy(() => import("@/features/products/product-info/index.ts
 const FormInfo = lazy(() => import("@/features/form-info/index.tsx"));
 const Pricing = lazy(() => import("@/features/products/pricing/index.tsx"));
 const Sources = lazy(() => import("@/features/supply/index.tsx"));
+const ExternalImportsPage = lazy(() => import("@/features/supply/pages/ExternalImportsPage.tsx"));
 const ShowPrice = lazy(() => import("@/features/products/product-price"));
 const BillOrder = lazy(() => import("@/features/bill-order/index.tsx"));
 const Invoices = lazy(() => import("@/features/invoices/index.tsx"));
@@ -67,6 +68,7 @@ export function AppRoutes() {
         <Route path="/product-info" element={<ProductInfo />} />
         <Route path="/form-info" element={<FormInfo />} />
         <Route path="/sources" element={<Sources />} />
+        <Route path="/external-imports" element={<ExternalImportsPage />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/bill-order" element={<BillOrder />} />
         <Route path="/show-price" element={<ShowPrice />} />

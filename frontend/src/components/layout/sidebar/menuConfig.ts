@@ -22,6 +22,7 @@ import {
   TicketIcon,
   UserGroupIcon,
   FilmIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 
 export type MenuItem = {
@@ -104,6 +105,7 @@ export const menuSections: MenuSection[] = [
     tone: "emerald",
     items: [
       { name: "Nhà cung cấp", href: "/sources", icon: DocumentTextIcon },
+      { name: "Nhập ngoài luồng", href: "/external-imports", icon: ArrowDownTrayIcon },
       { name: "Báo giá", href: "/show-price", icon: DocumentIcon },
       { name: "Hóa đơn", href: "/bill-order", icon: DocumentIcon },
       { name: "Biên lai", href: "/invoices", icon: DocumentIcon },

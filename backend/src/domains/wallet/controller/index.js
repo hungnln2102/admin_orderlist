@@ -219,6 +219,7 @@ const saveDailyBalance = async (req, res) => {
         let amount;
         if (incomingByWallet.has(wid)) amount = incomingByWallet.get(wid);
         else if (existingByWallet.has(wid)) amount = existingByWallet.get(wid);
+        else if (w.balanceScope === "column_total") continue;
         else if (previousByWallet.has(wid)) amount = previousByWallet.get(wid);
         else continue;
 

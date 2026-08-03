@@ -40,12 +40,29 @@ export function GenericFormModal({
 }: GenericFormModalProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSelect, setActiveSelect] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setFormData(initialData || {});
+      setLocalError(null);
+      setActiveSelect(null);
     }
-  }, [isOpen, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".custom-dropdown-container")) {
+        return;
+      }
+      setActiveSelect(null);
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -55,6 +72,19 @@ export function GenericFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError(null);
+
+    // Validate required fields
+    for (const field of fields) {
+      if (field.required) {
+        const val = formData[field.name];
+        if (val === undefined || val === null || (typeof val === "string" && val.trim() === "")) {
+          setLocalError(`Vui lòng chọn hoặc điền thông tin: ${field.label}`);
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
@@ -96,20 +126,58 @@ export function GenericFormModal({
                     placeholder={field.placeholder}
                   />
                 ) : field.type === "select" ? (
-                  <select
-                    id={field.name}
-                    className={inputBaseClass}
-                    value={formData[field.name] || ""}
-                    onChange={(e) => handleChange(field.name, e.target.value)}
-                    required={field.required}
-                  >
-                    <option value="" disabled>-- Chọn {field.label.toLowerCase()} --</option>
-                    {field.options?.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative custom-dropdown-container">
+                    <button
+                      type="button"
+                      id={field.name}
+                      onClick={() => {
+                        setActiveSelect(activeSelect === field.name ? null : field.name);
+                      }}
+                      className={`${inputBaseClass} flex items-center justify-between text-left cursor-pointer`}
+                    >
+                      <span className={formData[field.name] !== undefined && formData[field.name] !== "" ? "text-slate-100" : "text-slate-600"}>
+                        {field.options?.find(opt => String(opt.value) === String(formData[field.name] || ""))?.label || `-- Chọn ${field.label.toLowerCase()} --`}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${activeSelect === field.name ? "rotate-180" : ""}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {activeSelect === field.name && (
+                      <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-md focus:outline-none custom-scrollbar">
+                        <div
+                          onClick={() => {
+                            handleChange(field.name, "");
+                            setActiveSelect(null);
+                          }}
+                          className="w-full rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-white/5 hover:text-slate-300 cursor-pointer transition-colors"
+                        >
+                          -- Chọn {field.label.toLowerCase()} --
+                        </div>
+                        {field.options?.map((opt) => (
+                          <div
+                            key={opt.value}
+                            onClick={() => {
+                              handleChange(field.name, opt.value);
+                              setActiveSelect(null);
+                            }}
+                            className={`w-full rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors ${
+                              String(opt.value) === String(formData[field.name] || "")
+                                ? "bg-indigo-600/20 text-indigo-300 font-semibold"
+                                : "text-slate-200 hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            {opt.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <input
                     id={field.name}
@@ -133,13 +201,13 @@ export function GenericFormModal({
             ))}
           </div>
 
-          {errorMessage && (
+          {(localError || errorMessage) && (
             <p className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-3 py-2 text-sm text-rose-200 mt-4">
-              {errorMessage}
+              {localError || errorMessage}
             </p>
           )}
 
-          <div className="sticky bottom-0 bg-zinc-950 pt-5 pb-1 flex justify-end gap-3 border-t border-white/5 mt-6">
+          <div className="sticky bottom-0 bg-slate-950 pt-5 pb-1 flex justify-end gap-3 border-t border-white/5 mt-6">
             <button
               type="button"
               onClick={onClose}

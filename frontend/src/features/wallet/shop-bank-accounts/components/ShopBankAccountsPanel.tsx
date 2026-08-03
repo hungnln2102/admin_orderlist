@@ -8,13 +8,11 @@ import {
   deleteShopBankAccount,
   fetchShopBankAccounts,
   fetchShopBankAccountBalances,
-  recordShopBankAccountWithdrawal,
   setDefaultShopBankAccount,
   updateShopBankAccount,
 } from "../api/shopBankAccountApi";
 import { DeleteShopBankAccountModal } from "./DeleteShopBankAccountModal";
 import { ShopBankBalanceTable } from "./ShopBankBalanceTable";
-import { ShopBankWithdrawModal } from "./ShopBankWithdrawModal";
 import { ShopBankAccountFormModal } from "./ShopBankAccountFormModal";
 import { ShopBankAccountTable } from "./ShopBankAccountTable";
 import type {
@@ -32,8 +30,6 @@ export function ShopBankAccountsPanel() {
   const [balancesLoading, setBalancesLoading] = useState(true);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [withdrawing, setWithdrawing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
@@ -149,23 +145,7 @@ export function ShopBankAccountsPanel() {
     }
   };
 
-  const handleWithdraw = async (accountId: number, amount: number) => {
-    setWithdrawing(true);
-    try {
-      await recordShopBankAccountWithdrawal(accountId, amount);
-      showAppNotification({ type: "success", message: "Đã ghi nhận rút tiền." });
-      setWithdrawOpen(false);
-      await loadBalances();
-    } catch (err) {
-      showAppNotification({
-        type: "error",
-        message: err instanceof Error ? err.message : "Không thể ghi nhận rút tiền.",
-      });
-      throw err;
-    } finally {
-      setWithdrawing(false);
-    }
-  };
+
 
   const handleDelete = async () => {
     if (!deleteItem) return;
@@ -202,7 +182,6 @@ export function ShopBankAccountsPanel() {
         items={balanceItems}
         loading={balancesLoading}
         error={balanceError}
-        onOpenWithdraw={() => setWithdrawOpen(true)}
         onEdit={openEdit}
         onDelete={setDeleteItem}
       />
@@ -264,13 +243,6 @@ export function ShopBankAccountsPanel() {
         onConfirm={handleDelete}
       />
 
-      <ShopBankWithdrawModal
-        open={withdrawOpen}
-        items={balanceItems}
-        submitting={withdrawing}
-        onClose={() => setWithdrawOpen(false)}
-        onSubmit={handleWithdraw}
-      />
     </div>
   );
 }

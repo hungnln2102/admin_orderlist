@@ -87,11 +87,13 @@ export async function fetchShopBankAccountBalances(): Promise<ShopBankAccountBal
 export async function recordShopBankAccountWithdrawal(
   id: number,
   amount: number,
-  reason?: string | null
+  reason?: string | null,
+  targetWalletId?: number | null
 ): Promise<ShopBankAccountBalanceItem> {
   const data = await apiPost<{ item?: unknown }>(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAW(id), {
     amount,
     reason: reason?.trim() || null,
+    targetWalletId: targetWalletId || null,
   });
   return normalizeShopBankAccountBalanceItem(data?.item);
 }
