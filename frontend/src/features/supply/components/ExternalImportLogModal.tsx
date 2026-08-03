@@ -50,7 +50,8 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
     }
 
     try {
-      await apiPost("/api/import-packages/external-log", {
+      await apiPost("/api/store-profit-expenses", {
+          expense_type: "external_import",
           shop_bank_account_id: Number(data.accountId),
           amount: amountNum,
           linked_order_code: (data.linkedOrderCode || "").trim() || null,

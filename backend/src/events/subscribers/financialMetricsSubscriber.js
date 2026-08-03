@@ -16,23 +16,29 @@ const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNo
  */
 async function handleOrderPaymentReceived(payload) {
   try {
-    const { amount, cost, profit: payloadProfit, monthKey, orderCode } = payload;
-    const revenue = Number(amount) || 0;
+    const { amount, cost, profit: payloadProfit, monthKey, orderCode, revenue: payloadRevenue, offFlow: payloadOffFlow } = payload;
+    
+    // Dùng giá trị đã được bóc tách từ payload. Fallback nếu là event từ hệ thống cũ.
+    const revenue = payloadRevenue !== undefined ? Number(payloadRevenue) : (orderCode ? (Number(amount) || 0) : 0);
+    const offFlow = payloadOffFlow !== undefined ? Number(payloadOffFlow) : (!orderCode ? (Number(amount) || 0) : 0);
     const importCost = Number(cost) || 0;
     const profit = payloadProfit !== undefined ? Number(payloadProfit) : (revenue - importCost);
 
-    logger.info(`[FinancialMetrics] Tiền vào đơn ${orderCode}: Doanh thu +${revenue}, Chi phí +${importCost}, Lợi nhuận +${profit}`);
+    logger.info(`[FinancialMetrics] Tiền vào đơn ${orderCode || 'NGOẠI LUỒNG'}: Doanh thu +${revenue}, Chi phí +${importCost}, Lợi nhuận +${profit}, Ngoài luồng +${offFlow}`);
 
     // Nếu thiếu monthKey, fallback về tháng hiện tại
     const finalMonthKey = monthKey || new Date().toISOString().slice(0, 7);
 
-    // 1. Cập nhật bảng dashboard_monthly_summary (Upsert) — CHỈ revenue/profit/import
-    const increments = {
-      [dashboardSummaryRepository.COLS.TOTAL_REVENUE]: revenue,
-      [dashboardSummaryRepository.COLS.TOTAL_PROFIT]: profit,
-      [dashboardSummaryRepository.COLS.TOTAL_IMPORT]: importCost,
-    };
-    await dashboardSummaryRepository.incrementMonthlyMetrics(finalMonthKey, increments);
+    // 1. Cập nhật bảng dashboard_monthly_summary (Upsert) các metric có thay đổi
+    const increments = {};
+    if (revenue !== 0) increments[dashboardSummaryRepository.COLS.TOTAL_REVENUE] = revenue;
+    if (profit !== 0) increments[dashboardSummaryRepository.COLS.TOTAL_PROFIT] = profit;
+    if (importCost !== 0) increments[dashboardSummaryRepository.COLS.TOTAL_IMPORT] = importCost;
+    if (offFlow !== 0) increments[dashboardSummaryRepository.COLS.TOTAL_OFF_FLOW_BANK_RECEIPT] = offFlow;
+
+    if (Object.keys(increments).length > 0) {
+      await dashboardSummaryRepository.incrementMonthlyMetrics(finalMonthKey, increments);
+    }
 
     // 3. Bắn Telegram thông báo biến động tháng & Ghi log audit
     await notifyFinanceMonthlyDelta({
@@ -41,6 +47,7 @@ async function handleOrderPaymentReceived(payload) {
       profitDelta: profit,
       importDelta: importCost,
       bankBalanceDelta: 0,
+      offFlowDelta: offFlow,
       context: payload.isRenewal ? `renewal.sepay:${orderCode}` : `webhook.sepay.combined`,
       executor: db,
     });

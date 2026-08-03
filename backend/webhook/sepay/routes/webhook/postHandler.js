@@ -367,6 +367,8 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
           eventBus.emit(EVENTS.SEPAY_MONEY_IN, {
             transactionId: transaction.transaction_id || transaction.id || null,
             amount: transferAmountNormalized,
+            revenue: postedRevenueDelta,
+            offFlow: postedOffFlowBankReceiptDelta,
             cost: postedImportDelta,
             profit: postedProfitDelta,
             monthKey: paidMonthKey,
