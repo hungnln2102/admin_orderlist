@@ -120,14 +120,14 @@ const ExternalImportTable: React.FC<ExternalImportTableProps> = ({
         logs.map((log, idx) => (
           <tr key={log.id} className="text-xs sm:text-sm text-white/90 hover:bg-indigo-900/10 transition-colors cursor-pointer group">
             <td className="px-3 sm:px-6 py-3 sm:py-4 text-white/50 font-medium whitespace-nowrap">{idx + 1}</td>
-            <td className="px-2 sm:px-4 py-3 sm:py-4 text-white/70 whitespace-nowrap">{formatDateToDMY(log.created_at)}</td>
-            <td className="px-2 sm:px-4 py-3 sm:py-4 font-semibold text-white/95 tracking-wide max-w-[120px] sm:max-w-[180px] truncate">{log.source_name || "—"}</td>
-            <td className="px-2 sm:px-4 py-3 sm:py-4 font-bold text-emerald-400 whitespace-nowrap">{formatCurrency(log.import_cost)}</td>
-            <td className="px-2 sm:px-4 py-3 sm:py-4 font-mono font-bold tracking-widest text-[11px] sm:text-xs text-indigo-300/80 whitespace-nowrap">{log.id_order || "—"}</td>
+            <td className="px-2 sm:px-4 py-3 sm:py-4 text-white/70 whitespace-nowrap">{formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}</td>
+            <td className="px-2 sm:px-4 py-3 sm:py-4 font-semibold text-white/95 tracking-wide max-w-[120px] sm:max-w-[180px] truncate">{log.expenseType === "mavn_import" ? "MAVN AUTO" : "MANUAL"}</td>
+            <td className="px-2 sm:px-4 py-3 sm:py-4 font-bold text-emerald-400 whitespace-nowrap">{formatCurrency(log.amount)}</td>
+            <td className="px-2 sm:px-4 py-3 sm:py-4 font-mono font-bold tracking-widest text-[11px] sm:text-xs text-indigo-300/80 whitespace-nowrap">{log.linkedOrderCode || "—"}</td>
             <td className="px-2 sm:px-4 py-3 sm:py-4 text-white/70 max-w-[150px] sm:max-w-[200px] truncate">{log.reason || "—"}</td>
             <td className="px-2 sm:px-4 py-3 sm:py-4">
               <span className="inline-flex rounded-md bg-white/5 px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-white/60 border border-white/10 whitespace-nowrap">
-                {log.trace_id || "—"}
+                {log.traceCode || "—"}
               </span>
             </td>
             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">

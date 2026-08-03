@@ -135,6 +135,7 @@ const attachUpdateOrderRoute = (router) => {
 
             eventBus.emit(EVENTS.ORDER_UPDATED, {
                 order: updated,
+                before: audit?.before || null,
                 auditDiff,
                 changedFields: Object.keys(req.body || {}),
                 source: "orders.update",

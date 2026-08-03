@@ -32,6 +32,17 @@ const toCleanString = (value) => {
   return typeof value === "string" ? value.trim() : String(value).trim();
 };
 
+async function executeSql(clientOrKnex, sql, params = []) {
+  if (typeof clientOrKnex.query === 'function') {
+    return clientOrKnex.query(sql, params);
+  } else if (typeof clientOrKnex.raw === 'function') {
+    const knexSql = sql.replace(/\$\d+/g, '?');
+    return clientOrKnex.raw(knexSql, params);
+  } else {
+    throw new Error("Invalid database connection client passed");
+  }
+}
+
 const normalizeMatchKey = (value) => {
   const s = toCleanString(value);
   return s ? s.toLowerCase().replace(/\s+/g, "") : "";
@@ -67,7 +78,7 @@ async function resolvePackageIdFromOrderProduct(client, idProductRaw) {
     Number.isFinite(num) && num >= 1 && String(num) === str;
 
   if (isNumericVariant) {
-    const r = await client.query(
+    const r = await executeSql(client,
       `SELECT ${V.productId} FROM ${VARIANT_TABLE} WHERE ${V.id} = $1 LIMIT 1`,
       [num]
     );
@@ -75,7 +86,7 @@ async function resolvePackageIdFromOrderProduct(client, idProductRaw) {
     return pid != null ? Number(pid) : null;
   }
 
-  const r2 = await client.query(
+  const r2 = await executeSql(client,
     `
       SELECT ${V.productId}
       FROM ${VARIANT_TABLE}
@@ -197,6 +208,125 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
   return { updated: ids.length, packageId, stockIds: Array.from(stockIdsMatched), serviceIds: ids, expiresAt: iso };
 }
 
+
+
+/**
+ * Đồng bộ ngày hết hạn của stock services khớp với packageId và accountUsername.
+ * Dựa trên ngày hết hạn của đơn MAVN mới nhất còn hoạt động.
+ *
+ * @param {import("pg").PoolClient|object} clientOrKnex
+ * @param {number} packageId
+ * @param {string} accountUsername
+ */
+async function syncStockExpiryForAccountAndPackage(clientOrKnex, packageId, accountUsername) {
+  if (!packageId || !toCleanString(accountUsername)) {
+    return { updated: 0, skipped: true, reason: "missing_package_or_account" };
+  }
+
+  // 1. Tìm tất cả các stock_services liên kết với packageId và accountUsername
+  const stockRes = await executeSql(clientOrKnex,
+    `
+      SELECT
+        ss.id AS service_id,
+        s.id AS stock_id,
+        s.account_username AS stock_username
+      FROM warehouse.stock_services ss
+      INNER JOIN warehouse.product_stocks s ON s.id = ss.stock_id
+      INNER JOIN warehouse.product_names pn ON ss.name_id = pn.id
+      WHERE pn.product_id = $1
+    `,
+    [packageId]
+  );
+
+  const serviceIdsToUpdate = new Set();
+  const stockIdsMatched = new Set();
+
+  for (const row of stockRes.rows) {
+    if (
+      row.stock_username &&
+      informationOrderMatchesAccountUsername(accountUsername, row.stock_username)
+    ) {
+      serviceIdsToUpdate.add(Number(row.service_id));
+      stockIdsMatched.add(Number(row.stock_id));
+    }
+  }
+
+  if (!serviceIdsToUpdate.size) {
+    logger.info("[MAVN stock sync] Không tìm thấy dòng kho khớp packageId và accountUsername", {
+      packageId,
+      accountUsername,
+    });
+    return { updated: 0, packageId, reason: "no_matching_stock" };
+  }
+
+  // 2. Tìm tất cả variant_id tương ứng với packageId
+  const variantRes = await executeSql(clientOrKnex,
+    `SELECT id FROM product.variant WHERE product_id = $1`,
+    [packageId]
+  );
+  const variantIds = variantRes.rows.map(r => Number(r.id)).filter(id => Number.isFinite(id));
+
+  let latestExpiryStr = null;
+  if (variantIds.length > 0) {
+    // 3. Tìm tất cả đơn MAVN active khớp với variantIds
+    const orderRes = await executeSql(clientOrKnex,
+      `
+        SELECT id_order, id_product, TO_CHAR(expired_at, 'YYYY-MM-DD') AS expired_at_str, information_order, status
+        FROM orders.order_list
+        WHERE id_product = ANY($1::bigint[])
+          AND id_order LIKE 'MAVN%'
+          AND status IN ('Chưa Thanh Toán', 'Đang Xử Lý', 'Đã Thanh Toán', 'Cần Gia Hạn')
+          AND canceled_at IS NULL
+      `,
+      [variantIds]
+    );
+
+    const activeOrders = [];
+    for (const order of orderRes.rows) {
+      if (
+        order.information_order &&
+        informationOrderMatchesAccountUsername(order.information_order, accountUsername)
+      ) {
+        activeOrders.push(order);
+      }
+    }
+
+    // 4. Tìm ngày hết hạn mới nhất
+    for (const order of activeOrders) {
+      if (order.expired_at_str) {
+        if (!latestExpiryStr || order.expired_at_str > latestExpiryStr) {
+          latestExpiryStr = order.expired_at_str;
+        }
+      }
+    }
+  }
+
+  const iso = latestExpiryStr || null;
+  const ids = Array.from(serviceIdsToUpdate).filter((id) => Number.isFinite(id));
+
+  // 5. Cập nhật expires_at cho stock_services
+  await executeSql(clientOrKnex,
+    `
+      UPDATE warehouse.stock_services
+      SET expires_at = $1::date,
+          updated_at = NOW()
+      WHERE id = ANY($2::bigint[])
+    `,
+    [iso, ids]
+  );
+
+  logger.info("[MAVN stock sync] Đã cập nhật ngày hết hạn kho dựa trên đơn nhập hàng", {
+    packageId,
+    accountUsername,
+    serviceIds: ids,
+    expiresAt: iso,
+  });
+
+  return { updated: ids.length, packageId, stockIds: Array.from(stockIdsMatched), serviceIds: ids, expiresAt: iso };
+}
+
 module.exports = {
   syncMavnStockExpiryAfterOrderRenewal,
+  syncStockExpiryForAccountAndPackage,
+  resolvePackageIdFromOrderProduct,
 };
