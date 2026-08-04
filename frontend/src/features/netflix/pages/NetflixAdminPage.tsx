@@ -165,7 +165,7 @@ export default function NetflixAdminPage() {
 
   // --- LOGIC CHO OUTLOOK FIX BOT ---
   const [serverUrl, setServerUrl] = useState(() => {
-    return localStorage.getItem("outlook_bot_server_url") || "https://sunny-shoe-keep-inner.trycloudflare.com";
+    return localStorage.getItem("outlook_bot_server_url") || "https://services-magnitude-recruitment-camel.trycloudflare.com";
   });
   const [showConfig, setShowConfig] = useState(false);
   const [outlookEmail, setOutlookEmail] = useState("");
