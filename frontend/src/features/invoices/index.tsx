@@ -198,13 +198,13 @@ export default function Invoices() {
     }
   };
 
-  const handleClassifyReceipt = async (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => {
+  const handleClassifyReceipt = async (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number, orderCodes?: string[]) => {
     setError(null);
     try {
       const response = await apiFetch(`/api/payment-receipts/${receiptId}/classify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flowTypeId, note, linkedExpenseId }),
+        body: JSON.stringify({ flowTypeId, note, linkedExpenseId, orderCodes }),
       });
       if (!response.ok) {
         let message = "Không thể phân loại biên lai.";

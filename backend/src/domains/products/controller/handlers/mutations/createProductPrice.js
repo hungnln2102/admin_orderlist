@@ -6,7 +6,6 @@ const {
 } = require("@/utils/normalizers");
 const logger = require("@/utils/logger");
 const { mapProductPriceRow } = require("@/domains/products/controller/mappers");
-const { pricingCache, supplierCache } = require("@/utils/cache");
 const { ensureSupplierRecord } = require("@/domains/supplies/services/supplierLookupService");
 const { upsertProductSupplierPrice } = require("@/domains/products/services/productSupplierMutationService");
 const {
@@ -210,10 +209,12 @@ const createProductPrice = async (req, res) => {
       throw lastError;
     }
 
-    pricingCache.clear();
-    supplierCache.clear();
     const viewRow = await fetchVariantView(inserted);
     const mapped = viewRow ? mapProductPriceRow(viewRow) : {};
+
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.PRODUCT_PRICE_CREATED, { price: mapped });
     writeUserEventLog(req, {
       action: "Them bang gia san pham",
       entity: "Bang gia",

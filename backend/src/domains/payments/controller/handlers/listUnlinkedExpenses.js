@@ -20,12 +20,19 @@ const listUnlinkedExpenses = async (req, res) => {
     }
 
     const absAmount = Math.abs(Number(receipt.amount) || 0);
+    const expenseType = req.query.expenseType ? String(req.query.expenseType).trim() : null;
 
     // Lọc các log chi phí chưa có link (expense_meta->>'payment_receipt_id' là null hoặc rỗng)
     // Ưu tiên trùng khớp số tiền trước
-    const matchingExpenses = await db(TABLES.storeProfitExpenses)
+    let matchingQuery = db(TABLES.storeProfitExpenses)
       .whereRaw(`(expense_meta->>'payment_receipt_id') IS NULL`)
-      .andWhere("amount", absAmount)
+      .andWhere("amount", absAmount);
+
+    if (expenseType) {
+      matchingQuery = matchingQuery.andWhere("expense_type", expenseType);
+    }
+
+    const matchingExpenses = await matchingQuery
       .orderBy("created_at", "desc")
       .limit(20);
 
@@ -34,9 +41,15 @@ const listUnlinkedExpenses = async (req, res) => {
       return res.json({ success: true, list: matchingExpenses });
     }
 
-    const recentExpenses = await db(TABLES.storeProfitExpenses)
+    let recentQuery = db(TABLES.storeProfitExpenses)
       .whereRaw(`(expense_meta->>'payment_receipt_id') IS NULL`)
-      .whereRaw(`created_at >= NOW() - INTERVAL '30 days'`)
+      .whereRaw(`created_at >= NOW() - INTERVAL '30 days'`);
+
+    if (expenseType) {
+      recentQuery = recentQuery.andWhere("expense_type", expenseType);
+    }
+
+    const recentExpenses = await recentQuery
       .orderBy("created_at", "desc")
       .limit(50);
 

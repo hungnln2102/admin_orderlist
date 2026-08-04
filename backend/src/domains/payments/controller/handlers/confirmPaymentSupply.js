@@ -5,7 +5,6 @@ const logger = require("@/utils/logger");
 const {
   TABLES,
   PS,
-  SCHEMA_PARTNER,
 } = require("@/domains/payments/controller/shared/constants");
 const { createHttpError, toMonthKey } = require("@/domains/payments/controller/shared/helpers");
 const {
@@ -264,6 +263,8 @@ const confirmPaymentSupply = async (req, res) => {
         paymentId: paymentSupplyId,
         amount: expectedPaidAmount,
         direction: isSupplierRefundToShop ? "supplier_refund_to_shop" : "shop_pay_to_supplier",
+        bankAccountId: shopBankAccountId,
+        monthKey: paidMonthKey,
       });
 
       return responsePayload;

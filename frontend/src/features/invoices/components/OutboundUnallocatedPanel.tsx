@@ -13,7 +13,7 @@ type OutboundUnallocatedPanelProps = {
   matchingReceiptId: number | null;
   onMatchReceipt: (receiptId: number, orderCode: string) => Promise<void>;
   flowTypes: ReceiptFlowType[];
-  onClassifyReceipt: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => Promise<void>;
+  onClassifyReceipt: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number, orderCodes?: string[]) => Promise<void>;
 };
 
 export function OutboundUnallocatedPanel({

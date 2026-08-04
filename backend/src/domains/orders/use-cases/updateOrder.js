@@ -160,6 +160,7 @@ const updateOrderWithFinance = async ({
         return { notFound: true };
     }
 
+    let createdCreditNote = null;
     try {
         await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
         await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
@@ -171,17 +172,22 @@ const updateOrderWithFinance = async ({
             prevStatus !== STATUS.REFUNDED &&
             (nextStatus === STATUS.PENDING_REFUND || nextStatus === STATUS.REFUNDED);
         if (enteredRefundLifecycle) {
-            const { createOrGetRefundCreditNoteForOrder } = require("@/domains/orders/controller/finance/refundCredits");
+            const { createOrGetRefundCreditNoteForOrder, getLatestRefundCreditNoteBySourceOrder } = require("@/domains/orders/controller/finance/refundCredits");
             const refundAmount = Number(updatedOrder?.[COLS.ORDER.REFUND] ?? updatedOrder?.refund) || 0;
             if (refundAmount > 0) {
-                await createOrGetRefundCreditNoteForOrder(trx, {
-                    sourceOrderListId: updatedOrder?.[COLS.ORDER.ID] ?? updatedOrder?.id,
+                const orderId = updatedOrder?.[COLS.ORDER.ID] ?? updatedOrder?.id;
+                const existingNote = await getLatestRefundCreditNoteBySourceOrder(trx, orderId);
+                const creditNote = await createOrGetRefundCreditNoteForOrder(trx, {
+                    sourceOrderListId: orderId,
                     sourceOrderCode: updatedOrder?.[COLS.ORDER.ID_ORDER] ?? updatedOrder?.id_order,
                     customerName: updatedOrder?.[COLS.ORDER.CUSTOMER] ?? updatedOrder?.customer,
                     customerContact: updatedOrder?.[COLS.ORDER.CONTACT] ?? updatedOrder?.contact,
                     refundAmount,
                     note: `Tạo tự động khi đơn chuyển ${nextStatus}`,
                 });
+                if (!existingNote && creditNote) {
+                    createdCreditNote = creditNote;
+                }
             }
         }
     } catch (debtErr) {
@@ -250,6 +256,7 @@ const updateOrderWithFinance = async ({
             after: normalized,
             changedFields: Object.keys(payload || {}),
         },
+        createdCreditNote,
     };
 };
 

@@ -252,6 +252,7 @@ const attachRefundCreditRoutes = (router) => {
             }
 
             let creditNote = await getLatestRefundCreditNoteBySourceOrder(trx, id);
+            let isNew = false;
             if (!creditNote) {
                 creditNote = await createOrGetRefundCreditNoteForOrder(trx, {
                     sourceOrderListId: id,
@@ -261,12 +262,18 @@ const attachRefundCreditRoutes = (router) => {
                     refundAmount,
                     note: `Tạo từ thao tác bù đơn cho đơn ${order.id_order || id}`,
                 });
+                isNew = true;
             }
 
             const previewPrefix = detectPreviewPrefix(order.id_order);
             const previewOrderCode = await generateUniqueOrderCode(previewPrefix, trx);
 
             await trx.commit();
+            if (isNew && creditNote) {
+                const eventBus = require("@/events/eventBus");
+                const EVENTS = require("@/events/eventTypes");
+                eventBus.emit(EVENTS.REFUND_CREDIT_CREATED, { creditNote });
+            }
             writeUserEventLog(req, {
                 action: "Tạo credit bù đơn",
                 entity: "Credit",

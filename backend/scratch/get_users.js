@@ -1,16 +1,19 @@
+// Scratch script to read database users
 require('module-alias/register');
-const { db } = require('@/db');
+const { db } = require('../src/db');
+const { ADMIN_SCHEMA, getDefinition, tableName, SCHEMA_ADMIN } = require('../src/config/dbSchema');
 
-async function run() {
+async function main() {
   try {
-    const users = await db('admin.users').select('username', 'passwordhash', 'role');
-    console.log("Users in DB:");
-    console.log(JSON.stringify(users, null, 2));
+    const USERS_DEF = getDefinition("USERS", ADMIN_SCHEMA);
+    const USERS_TABLE = tableName(USERS_DEF.tableName, SCHEMA_ADMIN);
+    console.log("Querying table:", USERS_TABLE);
+    const users = await db(USERS_TABLE).select("*");
+    console.log("Users:", JSON.stringify(users, null, 2));
   } catch (err) {
-    console.error("Error querying users:", err.message);
+    console.error("Error:", err);
   } finally {
-    process.exit(0);
+    await db.destroy();
   }
 }
-
-run();
+main();

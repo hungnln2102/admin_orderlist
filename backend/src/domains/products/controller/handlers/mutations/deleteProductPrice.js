@@ -1,7 +1,6 @@
 const { db } = require("@/db");
 const { quoteIdent } = require("@/utils/sql");
 const logger = require("@/utils/logger");
-const { pricingCache } = require("@/utils/cache");
 const { isVariantReferencedByOrders } = require("@/services/orderReferenceCheck");
 const { supplyPriceCols, TABLES } = require("@/domains/products/controller/constants");
 const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
@@ -36,7 +35,9 @@ const deleteProductPrice = async (req, res) => {
     if (!result.rowCount && (!result.rows || !result.rows.length)) {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
-    pricingCache.clear();
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.PRODUCT_PRICE_DELETED, { id: parsedId });
     writeUserEventLog(req, {
       action: "Xoa bang gia san pham",
       entity: "Bang gia",

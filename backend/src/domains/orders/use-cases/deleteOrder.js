@@ -10,7 +10,7 @@ const deleteOrderWithArchive = async ({
     const { isMavnImportOrder, isGiftOrder } = require("@/utils/orderHelpers");
     const { calcRemainingRefund } = require("@/domains/orders/services/orderFinanceSyncService");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("@/domains/orders/services/orderFinanceSyncService");
-    const { createOrGetRefundCreditNoteForOrder } = require("@/domains/orders/controller/finance/refundCredits");
+    const { createOrGetRefundCreditNoteForOrder, getLatestRefundCreditNoteBySourceOrder } = require("@/domains/orders/controller/finance/refundCredits");
     const { todayYMDInVietnam } = require("@/utils/normalizers");
     const orderId = order?.id;
     const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
@@ -58,6 +58,8 @@ const deleteOrderWithArchive = async ({
         normalizedStatus === STATUS.PAID ||
         normalizedStatus === STATUS.PROCESSING;
     let movedTo = shouldArchiveToCanceled ? "canceled" : "expired";
+    let existingNote = null;
+    let creditNote = null;
 
     if (shouldArchiveToCanceled) {
         const isGift = isGiftOrder(order);
@@ -105,8 +107,9 @@ const deleteOrderWithArchive = async ({
         }
         await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder);
 
+        existingNote = await getLatestRefundCreditNoteBySourceOrder(trx, orderId);
         if (archiveStatus === STATUS.REFUNDED && refundValue > 0) {
-            await createOrGetRefundCreditNoteForOrder(trx, {
+            creditNote = await createOrGetRefundCreditNoteForOrder(trx, {
                 sourceOrderListId: orderId,
                 sourceOrderCode: orderCode,
                 customerName: order?.customer,
@@ -122,6 +125,11 @@ const deleteOrderWithArchive = async ({
     }
 
     await trx.commit();
+    if (creditNote && !existingNote) {
+        const eventBus = require("@/events/eventBus");
+        const EVENTS = require("@/events/eventTypes");
+        eventBus.emit(EVENTS.REFUND_CREDIT_CREATED, { creditNote });
+    }
     const deletedOrderCode = order?.[idOrderCol] ?? order?.id_order;
     return {
         success: true,

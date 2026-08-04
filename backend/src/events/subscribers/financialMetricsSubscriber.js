@@ -151,36 +151,52 @@ async function handleManualExpense(payload) {
 
 /**
  * 6. Thanh toán NCC (Supplier Payment)
- * Công thức: Chỉ trừ tiền trong Bank (Cost đã được tính lúc thanh toán/gia hạn đơn)
+ * Công thức: Chỉ trừ/cộng estimated_bank_balance trong DashboardSummary.
+ * Tiền thực tế trong Bank và các log Telegram / Ledger đã được xử lý đồng bộ ở confirmPaymentSupply.js.
  */
 async function handleSupplierPayment(payload) {
   try {
-    const { amount, _supplierId, bankAccountId, monthKey } = payload;
-    const amountToDeduct = Number(amount) || 0;
-    if (amountToDeduct <= 0) return;
+    const { amount, monthKey, direction } = payload;
+    const amountVal = Number(amount) || 0;
+    if (amountVal <= 0) return;
 
-    logger.info(`[FinancialMetrics] Thanh toán NCC: Trừ Sổ Quỹ (Bank) -${amountToDeduct}`);
+    const isRefund = direction === "supplier_refund_to_shop";
+    const delta = isRefund ? amountVal : -amountVal;
+
+    logger.info(`[FinancialMetrics] Xác nhận thanh toán/hoàn tiền NCC: Cập nhật estimated_bank_balance ${delta}`);
     const finalMonthKey = monthKey || new Date().toISOString().slice(0, 7);
 
     await db.transaction(async (trx) => {
-      if (bankAccountId) {
-        await shopBankAccountRepository.decrementBalance(bankAccountId, amountToDeduct, { client: trx });
-      }
-
       const increments = {
-        [dashboardSummaryRepository.COLS.ESTIMATED_BANK_BALANCE]: -amountToDeduct,
+        [dashboardSummaryRepository.COLS.ESTIMATED_BANK_BALANCE]: delta,
       };
       await dashboardSummaryRepository.incrementMonthlyMetrics(finalMonthKey, increments, { client: trx });
-
-      await notifyFinanceMonthlyDelta({
-        monthKey: finalMonthKey,
-        bankBalanceDelta: -amountToDeduct,
-        context: `payments.confirmPaymentSupply`,
-        executor: trx,
-      });
     });
   } catch (error) {
     logger.error('[FinancialMetrics] Lỗi handleSupplierPayment', { error: error.message });
+  }
+}
+
+/**
+ * 7. Hoàn tiền credit (Refund Credit Cashout)
+ */
+async function handleRefundCreditUpdated(payload) {
+  try {
+    const { action, cashoutAmount, shopBankAccountId } = payload;
+    if (action === 'complete' && shopBankAccountId && cashoutAmount > 0) {
+      const amountToDeduct = Number(cashoutAmount) || 0;
+      logger.info(`[FinancialMetrics] Hoàn tiền credit: Trừ estimated_bank_balance -${amountToDeduct}`);
+      const cashoutMonthKey = new Date().toISOString().slice(0, 7);
+
+      await db.transaction(async (trx) => {
+        const increments = {
+          [dashboardSummaryRepository.COLS.ESTIMATED_BANK_BALANCE]: -amountToDeduct,
+        };
+        await dashboardSummaryRepository.incrementMonthlyMetrics(cashoutMonthKey, increments, { client: trx });
+      });
+    }
+  } catch (error) {
+    logger.error('[FinancialMetrics] Lỗi handleRefundCreditUpdated', { error: error.message });
   }
 }
 
@@ -189,8 +205,9 @@ function registerFinancialMetricsSubscribers() {
   eventBus.on(EVENTS.ORDER_DELETED, handleOrderDeleted);
   eventBus.on(EVENTS.MONEY_WITHDRAWN, handleWithdrawal);
   eventBus.on(EVENTS.MANUAL_EXPENSE_CREATED, handleManualExpense);
-  eventBus.on(EVENTS.SUPPLIER_PAID, handleSupplierPayment);
-  logger.info('[FinancialMetricsSubscriber] Đã khởi tạo và gắn Event SEPAY_MONEY_IN, ORDER_DELETED, MONEY_WITHDRAWN, MANUAL_EXPENSE, SUPPLIER_PAID');
+  eventBus.on(EVENTS.SUPPLY_PAYMENT_CONFIRMED, handleSupplierPayment);
+  eventBus.on(EVENTS.REFUND_CREDIT_UPDATED, handleRefundCreditUpdated);
+  logger.info('[FinancialMetricsSubscriber] Đã khởi tạo và gắn Event SEPAY_MONEY_IN, ORDER_DELETED, MONEY_WITHDRAWN, MANUAL_EXPENSE, SUPPLY_PAYMENT_CONFIRMED, REFUND_CREDIT_UPDATED');
 }
 
 module.exports = {
@@ -199,5 +216,6 @@ module.exports = {
   handleOrderDeleted,
   handleWithdrawal,
   handleManualExpense,
-  handleSupplierPayment
+  handleSupplierPayment,
+  handleRefundCreditUpdated
 };

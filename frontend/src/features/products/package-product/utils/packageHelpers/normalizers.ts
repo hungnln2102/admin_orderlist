@@ -1,7 +1,7 @@
 import { formatDateToDMY } from "@/shared/date";
 
-export const normalizeIdentifier = (value: string | null | undefined): string => {
-  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+export const normalizeIdentifier = (value: string | number | null | undefined): string => {
+  return (value === null || value === undefined ? "" : String(value)).toLowerCase().replace(/[^a-z0-9]/g, "");
 };
 
 export const buildIdentifierKeys = (value: string | null | undefined) => {

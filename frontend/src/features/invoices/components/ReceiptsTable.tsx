@@ -20,7 +20,7 @@ type ReceiptsTableProps = {
   onAllocate?: (receipt: PaymentReceipt) => void;
   showCategoryReason?: boolean;
   flowTypes?: ReceiptFlowType[];
-  onClassifyReceipt?: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => Promise<void>;
+  onClassifyReceipt?: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number, orderCodes?: string[]) => Promise<void>;
 };
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({

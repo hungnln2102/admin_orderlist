@@ -128,18 +128,18 @@ const allocateOutboundPaymentReceipt = async (req, res) => {
           const amountToApply = splitAmount + (i === 0 ? remainder : 0);
           
           const order = await trx(TABLES.orderList)
-            .select("id", "import_cost")
-            .where("order_code", code)
+            .select("id", "cost")
+            .where("id_order", code)
             .first();
             
           if (!order) {
             throw new Error(`Mã đơn hàng ${code} không tồn tại.`);
           }
           
-          const newCost = Number(order.import_cost || 0) + amountToApply;
+          const newCost = Number(order.cost || 0) + amountToApply;
           await trx(TABLES.orderList)
             .where("id", order.id)
-            .update({ import_cost: newCost, updated_at: trx.fn.now() });
+            .update({ cost: newCost, updated_at: trx.fn.now() });
             
           // Cũng phải trừ tiền bank vì đây là chi phí lấy từ bank
           await debitShopBankExternalOut(trx, {

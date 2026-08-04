@@ -7,6 +7,7 @@ const { registerTelegramSubscribers } = require("@/events/subscribers/telegramSu
 const { registerSepaySubscribers } = require("@/events/subscribers/sepaySubscriber");
 const { registerFinancialMetricsSubscribers } = require("@/events/subscribers/financialMetricsSubscriber");
 const { registerWarehouseSubscribers } = require("@/events/subscribers/warehouseSubscriber");
+const { registerProductPricingSubscribers } = require("@/events/subscribers/productPricingSubscriber");
 
 function registerAllSubscribers() {
   logger.info('[EventBus] Registering all subscribers...');
@@ -21,6 +22,7 @@ function registerAllSubscribers() {
   
   const { registerSupplierCostSubscribers } = require("@/events/subscribers/supplierCostSubscriber");
   registerSupplierCostSubscribers();
+  registerProductPricingSubscribers();
 
   logger.info('[EventBus] All subscribers registered successfully.');
 }

@@ -36,7 +36,7 @@ type ReceiptTableRowProps = {
   onAllocate?: (receipt: PaymentReceipt) => void;
   showCategoryReason?: boolean;
   flowTypes?: ReceiptFlowType[];
-  onClassifyReceipt?: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number) => Promise<void>;
+  onClassifyReceipt?: (receiptId: number, flowTypeId: number, note?: string, linkedExpenseId?: number, orderCodes?: string[]) => Promise<void>;
 };
 
 const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
@@ -77,6 +77,7 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
   const [classificationNote, setClassificationNote] = useState("");
   const [classifying, setClassifying] = useState(false);
   const [classificationError, setClassificationError] = useState<string | null>(null);
+  const [orderCodesInput, setOrderCodesInput] = useState("");
 
   const [linkMode, setLinkMode] = useState<"create" | "link">("create");
   const [unlinkedExpenses, setUnlinkedExpenses] = useState<any[]>([]);
@@ -85,12 +86,13 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
 
   // Lọc flow types theo chiều tiền (Thu vs Chi)
   const filteredFlowTypes = useMemo(() => {
+    const isOut = rowView.isOutboundTransfer || receipt.amount < 0;
     return flowTypes.filter(
       (ft) =>
         ft.direction === "neutral" ||
-        (receipt.amount > 0 ? ft.direction === "in" : ft.direction === "out")
+        (isOut ? ft.direction === "out" : ft.direction === "in")
     );
-  }, [flowTypes, receipt.amount]);
+  }, [flowTypes, receipt.amount, rowView.isOutboundTransfer]);
 
   const selectedFlowType = useMemo(() => {
     return flowTypes.find((ft) => ft.id === selectedFlowTypeId) || null;
@@ -101,7 +103,13 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
   const fetchUnlinkedExpenses = useCallback(async () => {
     try {
       setLoadingExpenses(true);
-      const res = await apiFetch(`/api/payment-receipts/unlinked-expenses?receiptId=${receipt.id}`);
+      const expenseType =
+        selectedFlowTypeEffect === "withdrawal"
+          ? "withdraw_profit"
+          : selectedFlowTypeEffect === "import_order"
+          ? "external_import"
+          : "";
+      const res = await apiFetch(`/api/payment-receipts/unlinked-expenses?receiptId=${receipt.id}&expenseType=${expenseType}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (data?.success && Array.isArray(data.list)) {
@@ -117,7 +125,7 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
     } finally {
       setLoadingExpenses(false);
     }
-  }, [receipt.id]);
+  }, [receipt.id, selectedFlowTypeEffect]);
 
   useEffect(() => {
     if (linkMode === "link" && selectedFlowTypeId) {
@@ -131,7 +139,10 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
       setClassifying(true);
       setClassificationError(null);
       const expenseId = linkMode === "link" && selectedExpenseId ? selectedExpenseId : undefined;
-      await onClassifyReceipt(receipt.id, selectedFlowTypeId, classificationNote, expenseId);
+      const orderCodes = selectedFlowTypeEffect === "import_order" && linkMode === "create" && orderCodesInput
+        ? orderCodesInput.split(",").map((c) => c.trim()).filter(Boolean)
+        : undefined;
+      await onClassifyReceipt(receipt.id, selectedFlowTypeId, classificationNote, expenseId, orderCodes);
     } catch (err) {
       setClassificationError(err instanceof Error ? err.message : "Không thể phân loại biên lai.");
     } finally {
@@ -179,49 +190,64 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
             </div>
           </td>
         ) : onClassifyReceipt && flowTypes.length > 0 ? (
-          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 align-middle">
             <div
-              className="space-y-2"
+              className="flex flex-col gap-2.5 p-3 rounded-2xl bg-slate-900/30 border border-white/5 shadow-inner min-w-[220px]"
               onClick={(event) => event.stopPropagation()}
               onDoubleClick={(event) => event.stopPropagation()}
             >
-              <select
-                value={selectedFlowTypeId || ""}
-                onChange={(event) => {
-                  const val = event.target.value;
-                  setSelectedFlowTypeId(val ? Number(val) : null);
-                  setClassificationError(null);
-                  setLinkMode("create");
-                  setUnlinkedExpenses([]);
-                  setSelectedExpenseId(null);
-                }}
-                disabled={classifying}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-              >
-                <option value="">Chọn loại phân loại...</option>
-                {filteredFlowTypes.map((ft) => (
-                  <option key={ft.id} value={ft.id}>
-                    {ft.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={selectedFlowTypeId || ""}
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    setSelectedFlowTypeId(val ? Number(val) : null);
+                    setClassificationError(null);
+                    setLinkMode("create");
+                    setUnlinkedExpenses([]);
+                    setSelectedExpenseId(null);
+                    setOrderCodesInput("");
+                  }}
+                  disabled={classifying}
+                  className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950/60 pl-3 pr-8 py-2 text-xs font-bold text-indigo-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all cursor-pointer"
+                >
+                  <option value="" className="bg-slate-950 text-white/60">Chọn loại phân loại...</option>
+                  {filteredFlowTypes.map((ft) => (
+                    <option key={ft.id} value={ft.id} className="bg-slate-950 text-white">
+                      {ft.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-white/40">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
 
               {selectedFlowTypeEffect === "order_match" ? (
-                <div className="space-y-2">
-                  <select
-                    value={selectedValue}
-                    onChange={(event) => void onSelectMatch(receipt, event.target.value)}
-                    disabled={isMatching}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-                  >
-                    <option value="">Chọn đơn cần ghép...</option>
-                    <option value="__manual__">Tự điền mã đơn hàng</option>
-                    {orderOptions.map((order) => (
-                      <option key={order.orderCode} value={order.orderCode}>
-                        {order.orderCode} - {order.status}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="relative">
+                    <select
+                      value={selectedValue}
+                      onChange={(event) => void onSelectMatch(receipt, event.target.value)}
+                      disabled={isMatching}
+                      className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950/60 pl-3 pr-8 py-2 text-xs font-bold text-indigo-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all cursor-pointer"
+                    >
+                      <option value="" className="bg-slate-950 text-white/60">Chọn đơn cần ghép...</option>
+                      <option value="__manual__" className="bg-slate-950 text-white">Tự điền mã đơn hàng</option>
+                      {orderOptions.map((order) => (
+                        <option key={order.orderCode} value={order.orderCode} className="bg-slate-950 text-white">
+                          {order.orderCode} - {order.status}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-white/40">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
                   {isManualInput && (
                     <div className="flex items-center gap-2">
                       <input
@@ -230,39 +256,48 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
                         onChange={(event) => onManualCodeChange(event.target.value)}
                         disabled={isMatching}
                         placeholder="Nhập mã đơn (VD: MAVC...)"
-                        className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-xs font-medium text-white placeholder-white/30 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => void onSubmitManualMatch(receipt)}
                         disabled={isMatching}
-                        className="shrink-0 rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
+                        className="shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-950/40 active:scale-[0.96] transition-all disabled:opacity-50"
                       >
                         Ghép
                       </button>
                     </div>
                   )}
                   {isMatching && (
-                    <p className="text-[10px] font-semibold text-indigo-200/70 animate-pulse">
+                    <p className="text-[10px] font-bold text-indigo-300/80 animate-pulse flex items-center gap-1">
+                      <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
                       Đang ghép đơn...
                     </p>
                   )}
                   {rowError && (
-                    <p className="text-[10px] font-semibold text-rose-300">{rowError}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2">
+                      <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>{rowError}</span>
+                    </div>
                   )}
                 </div>
               ) : selectedFlowTypeId ? (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
                   {/* Tabs/Toggles for Linking Options */}
                   {(selectedFlowTypeEffect === "withdrawal" || selectedFlowTypeEffect === "import_order") && (
-                    <div className="flex gap-2 p-1 bg-slate-950/40 rounded-xl border border-white/5">
+                    <div className="flex p-0.5 bg-slate-950/60 rounded-xl border border-white/5 gap-1">
                       <button
                         type="button"
                         onClick={() => setLinkMode("create")}
-                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-300 ${
                           linkMode === "create"
-                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                            : "text-slate-400 border border-transparent hover:text-white"
+                            ? "bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm"
+                            : "text-slate-400 border border-transparent hover:text-slate-200"
                         }`}
                       >
                         Tạo log mới
@@ -270,10 +305,10 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
                       <button
                         type="button"
                         onClick={() => setLinkMode("link")}
-                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-300 ${
                           linkMode === "link"
-                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                            : "text-slate-400 border border-transparent hover:text-white"
+                            ? "bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm"
+								            : "text-slate-400 border border-transparent hover:text-slate-200"
                         }`}
                       >
                         Ghép log có sẵn
@@ -288,41 +323,77 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
                       ) : unlinkedExpenses.length === 0 ? (
                         <p className="text-[10px] font-semibold text-rose-300 py-1">Không tìm thấy log chi phí phù hợp gần đây.</p>
                       ) : (
-                        <select
-                          value={selectedExpenseId || ""}
-                          onChange={(e) => setSelectedExpenseId(Number(e.target.value))}
-                          disabled={classifying}
-                          className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-                        >
-                          {unlinkedExpenses.map((exp) => (
-                            <option key={exp.id} value={exp.id}>
-                              {new Date(exp.created_at).toLocaleDateString("vi-VN")} - {exp.reason || "Không lý do"} ({Number(exp.amount).toLocaleString("vi-VN")}đ)
-                            </option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select
+                            value={selectedExpenseId || ""}
+                            onChange={(e) => setSelectedExpenseId(Number(e.target.value))}
+                            disabled={classifying}
+                            className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950/60 pl-3 pr-8 py-2 text-xs font-bold text-indigo-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all cursor-pointer"
+                          >
+                            {unlinkedExpenses.map((exp) => (
+                              <option key={exp.id} value={exp.id} className="bg-slate-950 text-white">
+                                {new Date(exp.created_at).toLocaleDateString("vi-VN")} - {exp.reason || "Không lý do"} ({Number(exp.amount).toLocaleString("vi-VN")}đ)
+                              </option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-white/40">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ) : (
-                    <input
-                      type="text"
-                      value={classificationNote}
-                      onChange={(event) => setClassificationNote(event.target.value)}
-                      disabled={classifying}
-                      placeholder="Ghi chú phân loại (tùy chọn)..."
-                      className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-                    />
+                    <div className="space-y-2">
+                      {selectedFlowTypeEffect === "import_order" && (
+                        <input
+                          type="text"
+                          value={orderCodesInput}
+                          onChange={(event) => setOrderCodesInput(event.target.value)}
+                          disabled={classifying}
+                          placeholder="Mã đơn phân bổ (phẩy, VD: MAV123...)"
+                          className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-xs font-medium text-white placeholder-white/30 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all font-mono"
+                        />
+                      )}
+                      <input
+                        type="text"
+                        value={classificationNote}
+                        onChange={(event) => setClassificationNote(event.target.value)}
+                        disabled={classifying}
+                        placeholder="Ghi chú phân loại (tùy chọn)..."
+                        className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-xs font-medium text-white placeholder-white/30 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all"
+                      />
+                    </div>
                   )}
 
                   <button
                     type="button"
                     onClick={handleClassifyClick}
                     disabled={classifying || (linkMode === "link" && !selectedExpenseId)}
-                    className="w-full rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-xs font-bold uppercase tracking-wider text-indigo-200 hover:bg-indigo-500/30 transition-colors disabled:opacity-60"
+                    className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-950/50 hover:shadow-indigo-500/20 active:scale-[0.98] hover:scale-[1.01] transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
                   >
-                    {classifying ? "Đang xử lý..." : linkMode === "link" ? "Xác nhận ghép log" : "Xác nhận phân loại"}
+                    {classifying ? (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Đang xử lý...
+                      </span>
+                    ) : linkMode === "link" ? (
+                      "Xác nhận ghép log"
+                    ) : (
+                      "Xác nhận phân loại"
+                    )}
                   </button>
                   {classificationError && (
-                    <p className="text-[10px] font-semibold text-rose-300">{classificationError}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 animate-in fade-in duration-200">
+                      <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>{classificationError}</span>
+                    </div>
                   )}
                 </div>
               ) : null}
@@ -342,26 +413,33 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
             </button>
           </td>
         ) : enableMatching ? (
-          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+          <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 align-middle">
             <div
-              className="space-y-2"
+              className="flex flex-col gap-2.5 p-3 rounded-2xl bg-slate-900/30 border border-white/5 shadow-inner min-w-[220px]"
               onClick={(event) => event.stopPropagation()}
               onDoubleClick={(event) => event.stopPropagation()}
             >
-              <select
-                value={selectedValue}
-                onChange={(event) => void onSelectMatch(receipt, event.target.value)}
-                disabled={isMatching}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
-              >
-                <option value="">Chọn đơn cần ghép...</option>
-                <option value="__manual__">Tự điền mã đơn hàng</option>
-                {orderOptions.map((order) => (
-                  <option key={order.orderCode} value={order.orderCode}>
-                    {order.orderCode} - {order.status}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={selectedValue}
+                  onChange={(event) => void onSelectMatch(receipt, event.target.value)}
+                  disabled={isMatching}
+                  className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950/60 pl-3 pr-8 py-2 text-xs font-bold text-indigo-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all cursor-pointer"
+                >
+                  <option value="" className="bg-slate-950 text-white/60">Chọn đơn cần ghép...</option>
+                  <option value="__manual__" className="bg-slate-950 text-white">Tự điền mã đơn hàng</option>
+                  {orderOptions.map((order) => (
+                    <option key={order.orderCode} value={order.orderCode} className="bg-slate-950 text-white">
+                      {order.orderCode} - {order.status}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-white/40">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
               {String(receipt.orderCode || "").trim() ? (
                 <p className="text-[10px] text-white/55 font-medium leading-snug">
                   CK đã gắn mã parse{" "}
@@ -379,25 +457,34 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
                     onChange={(event) => onManualCodeChange(event.target.value)}
                     disabled={isMatching}
                     placeholder="Nhập mã đơn (VD: MAVC...)"
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-xs font-medium text-white placeholder-white/30 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-60 transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => void onSubmitManualMatch(receipt)}
                     disabled={isMatching}
-                    className="shrink-0 rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
+                    className="shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-950/40 active:scale-[0.96] transition-all disabled:opacity-50"
                   >
                     Ghép
                   </button>
                 </div>
               )}
               {isMatching ? (
-                <p className="text-[10px] font-semibold text-indigo-200/70">
+                <p className="text-[10px] font-bold text-indigo-300/80 animate-pulse flex items-center gap-1">
+                  <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
                   Đang ghép biên lai...
                 </p>
               ) : null}
               {rowError ? (
-                <p className="text-[10px] font-semibold text-rose-300">{rowError}</p>
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 animate-in fade-in duration-200">
+                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>{rowError}</span>
+                </div>
               ) : null}
             </div>
           </td>

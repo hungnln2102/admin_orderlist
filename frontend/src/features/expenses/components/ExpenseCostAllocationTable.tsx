@@ -30,7 +30,7 @@ export const ExpenseCostAllocationTable: React.FC = () => {
     try {
       const [importOrdersRes, packagesRes, packageOrdersRes] = await Promise.all([
         apiFetch("/api/finance/allocations?scope=mavn_paid"),
-        apiFetch("/api/package-products"),
+        apiFetch("/api/products/packages"),
         apiFetch("/api/orders?scope=package_match"),
       ]);
 

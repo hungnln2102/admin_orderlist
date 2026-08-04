@@ -1,7 +1,6 @@
 const { db } = require("@/db");
 const { SCHEMA_PRODUCT, PRICING_TIER_SCHEMA } = require("@/config/dbSchema");
 const logger = require("@/utils/logger");
-const { invalidate: invalidateTierCache } = require("@/services/pricing/tierCache");
 const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
 const TIER_TABLE = `${SCHEMA_PRODUCT}.${PRICING_TIER_SCHEMA.PRICING_TIER.TABLE}`;
@@ -35,7 +34,9 @@ const createTier = async (req, res) => {
         [TIER_COLS.SORT_ORDER]: sort_order || 0,
       })
       .returning("*");
-    invalidateTierCache();
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.PRICING_TIER_CREATED, { tier: row });
     writeUserEventLog(req, {
       action: "Them nhom bang gia",
       entity: "Bang gia",
@@ -80,7 +81,9 @@ const updateTier = async (req, res) => {
       .returning("*");
 
     if (!row) return res.status(404).json({ error: "Không tìm thấy tier." });
-    invalidateTierCache();
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.PRICING_TIER_UPDATED, { tier: row });
     writeUserEventLog(req, {
       action: "Sua nhom bang gia",
       entity: "Bang gia",
@@ -160,6 +163,9 @@ const upsertVariantMargins = async (req, res) => {
         margins,
       },
     });
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.VARIANT_MARGINS_UPDATED, { variantId, margins });
     res.json({ success: true });
   } catch (err) {
     await trx.rollback();

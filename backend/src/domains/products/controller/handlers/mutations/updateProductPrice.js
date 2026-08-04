@@ -6,7 +6,6 @@ const {
 } = require("@/utils/normalizers");
 const logger = require("@/utils/logger");
 const { mapProductPriceRow } = require("@/domains/products/controller/mappers");
-const { pricingCache } = require("@/utils/cache");
 const {
   variantCols,
   productSchemaCols,
@@ -294,9 +293,12 @@ const updateProductPrice = async (req, res) => {
     await updateProductImageUrl(targetProductId, imageUrl);
     await updateProductCategories(targetProductId, normalizedCategoryIds, colorOverrides);
 
-    pricingCache.clear();
     const viewRow = await fetchVariantView(parsedId);
     const mapped = viewRow ? mapProductPriceRow(viewRow) : {};
+
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.PRODUCT_PRICE_UPDATED, { price: mapped });
     writeUserEventLog(req, {
       action: "Sua bang gia san pham",
       entity: "Bang gia",

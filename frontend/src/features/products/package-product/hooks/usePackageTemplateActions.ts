@@ -61,7 +61,7 @@ async function patchProductRequiresActivation(
   requiresActivation: boolean
 ): Promise<void> {
   const res = await apiFetch(
-    `/api/package-products/product-options/${productId}`,
+    `/api/products/packages/product-options/${productId}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

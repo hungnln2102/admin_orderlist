@@ -93,7 +93,7 @@ const attachUpdateOrderRoute = (router) => {
 
         const trx = await db.transaction();
         try {
-            const { updated, audit, error, notFound } = await updateOrderWithFinance({
+            const { updated, audit, error, notFound, createdCreditNote } = await updateOrderWithFinance({
                 trx,
                 id,
                 payload: req.body,
@@ -118,6 +118,11 @@ const attachUpdateOrderRoute = (router) => {
             }
 
             await trx.commit();
+            if (createdCreditNote) {
+                const eventBus = require("@/events/eventBus");
+                const EVENTS = require("@/events/eventTypes");
+                eventBus.emit(EVENTS.REFUND_CREDIT_CREATED, { creditNote: createdCreditNote });
+            }
             const auditDiff = buildOrderUpdateAudit(audit);
             await writeUserEventLog(req, {
                 action: "Sửa đơn hàng",

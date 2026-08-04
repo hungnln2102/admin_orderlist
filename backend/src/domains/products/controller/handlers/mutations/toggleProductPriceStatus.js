@@ -1,7 +1,6 @@
 const { db } = require("@/db");
 const { quoteIdent } = require("@/utils/sql");
 const logger = require("@/utils/logger");
-const { pricingCache } = require("@/utils/cache");
 const { variantCols, TABLES } = require("@/domains/products/controller/constants");
 const { writeUserEventLog } = require("@/domains/renew-adobe/services/systemEventLogService");
 
@@ -29,7 +28,14 @@ const toggleProductPriceStatus = async (req, res) => {
     if (!result.rows || !result.rows.length) {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
-    pricingCache.clear();
+    const eventBus = require("@/events/eventBus");
+    const EVENTS = require("@/events/eventTypes");
+    eventBus.emit(EVENTS.PRODUCT_PRICE_UPDATED, {
+      price: {
+        id: result.rows[0].id,
+        is_active: result.rows[0].is_active,
+      }
+    });
     writeUserEventLog(req, {
       action: isActive ? "Bat bang gia san pham" : "Tat bang gia san pham",
       entity: "Bang gia",
