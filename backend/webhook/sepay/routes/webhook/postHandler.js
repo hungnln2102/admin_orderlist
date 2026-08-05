@@ -22,7 +22,7 @@ const {
 } = require("./orderCodeResolution");
 const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
 const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpectedAmount");
-const { resolveOrderCodesByTransaction } = require("../../paymentReference");
+const { resolveOrderCodeByExactAmount } = require("./resolveOrderCodeByExactAmount");
 
 // Import newly extracted phases
 const { processReceiptPhase } = require("./receiptPhase");
@@ -77,7 +77,6 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
     batchCodes,
     transferAmountNormalized,
     supplierSettlementTransfer,
-    singleOrderCode,
   } = parsed;
   const potentialSupplierRefundTransfer = Boolean(parsed?.potentialSupplierRefundTransfer);
   const autoSupplierSettlement = parsed?.autoSupplierSettlement || null;
@@ -116,14 +115,49 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         resolvedBatchCodes,
         normalizeMoney
       );
-      
-      const transactionOrderCodes = await resolveOrderCodesByTransaction(client, paymentReferenceCodes);
-
       loopOrderCodes = buildWebhookLoopOrderCodes({
         batchOrderMap,
-        transactionOrderCodes,
-        singleOrderCode,
+        transactionOrderCodes: [],
+        singleOrderCode: "",
       });
+
+      if (loopOrderCodes.length === 0 && transferAmountNormalized > 0 && !supplierSettlementTransfer) {
+        const matchedCodeByAmount = await resolveOrderCodeByExactAmount(client, transferAmountNormalized);
+        if (matchedCodeByAmount) {
+          loopOrderCodes = [matchedCodeByAmount];
+        }
+      }
+
+      if (loopOrderCodes.length === 1 && transferAmountNormalized > 0 && !supplierSettlementTransfer) {
+        const checkCode = loopOrderCodes[0];
+        const stateRes = await client.query(
+          `SELECT
+            ${ORDER_COLS.id},
+            ${ORDER_COLS.price},
+            (
+              SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
+              FROM ${REFUND_CREDIT_APPLICATIONS_TABLE} rca
+              WHERE rca.target_order_list_id = ${ORDER_TABLE}.${ORDER_COLS.id}
+            ) AS credit_applied_amount
+          FROM ${ORDER_TABLE}
+          WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
+          LIMIT 1`,
+          [checkCode]
+        );
+        const state = stateRes.rows[0] || null;
+        if (state) {
+          const remainingPrice = Math.max(0, normalizeMoney(state[ORDER_COLS.price]) - normalizeMoney(state.credit_applied_amount));
+          const isExactMatch = Math.round(transferAmountNormalized) === Math.round(remainingPrice);
+          if (!isExactMatch) {
+            logger.info("[Webhook] Số tiền chuyển khoản không khớp chính xác số tiền còn lại của đơn. Hủy khớp đơn, chuyển sang tạo credit ngoài luồng.", {
+              orderCode: checkCode,
+              transferAmount: transferAmountNormalized,
+              remainingPrice,
+            });
+            loopOrderCodes = [];
+          }
+        }
+      }
 
       let getCurrentAmountForCode = createWebhookAmountForCodeResolver({
         batchCodes: resolvedBatchCodes,
