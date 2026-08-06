@@ -213,7 +213,8 @@ async function fetchOtpBySource({
         const emailLower = String(accountEmail || "").trim().toLowerCase();
         const match = result.items.find((item) => {
           const rawName = String(item.name || "").trim().toLowerCase();
-          const [emailPart] = rawName.split(/[#|]/);
+          const sepIdx = rawName.search(/[#|]/);
+          const emailPart = (sepIdx >= 0 ? rawName.slice(0, sepIdx) : rawName).trim();
           return emailPart.trim() === emailLower;
         });
         if (match) {

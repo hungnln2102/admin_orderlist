@@ -27,8 +27,9 @@ const getYunaOrderData = async (req, res) => {
       if (item.report_status === "pending") {
         let emailPart = "";
         if (item.name) {
-          const parts = String(item.name).split(/[#|]/);
-          emailPart = parts[0].trim();
+          const nameStr = String(item.name);
+          const sepIdx = nameStr.search(/[#|]/);
+          emailPart = (sepIdx >= 0 ? nameStr.slice(0, sepIdx) : nameStr).trim();
         }
         return {
           ...item,
@@ -79,8 +80,10 @@ const getSingleAccountOtp = async (req, res) => {
 
     const items = result.items || [];
     const matchedItem = items.find(item => {
-      const [emailPart] = String(item.name || "").trim().split(/[#|]/);
-      return emailPart.trim().toLowerCase() === email.trim().toLowerCase();
+      const nameStr = String(item.name || "").trim();
+      const sepIdx = nameStr.search(/[#|]/);
+      const emailPart = (sepIdx >= 0 ? nameStr.slice(0, sepIdx) : nameStr).trim();
+      return emailPart.toLowerCase() === email.trim().toLowerCase();
     });
 
     if (!matchedItem) {
