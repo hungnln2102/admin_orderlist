@@ -50,11 +50,14 @@ export function RenewAdobeSystemManagement() {
   const [copiedPassIndex, setCopiedPassIndex] = useState<number | null>(null);
 
   const parseYunaAccountName = (fullName: string) => {
-    const parts = fullName.split(/[#|]/);
-    return {
-      username: parts[0] || "",
-      password: parts[1] || "",
-    };
+    const sepIdx = fullName.search(/[#|]/);
+    if (sepIdx >= 0) {
+      return {
+        username: fullName.slice(0, sepIdx),
+        password: fullName.slice(sepIdx + 1),
+      };
+    }
+    return { username: fullName, password: "" };
   };
 
   // Load backup mailboxes if IMAP is selected
