@@ -24,10 +24,7 @@ const {
 const {
   resolveDashboardImportDeltaOnPaid,
 } = require("@/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("@/config/dbSchema");
 const {
-  qualifiedSummaryCol,
-  recomputeSummaryMonthTotalTax,
   monthKeyFromPaidDateYmd,
 } = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
@@ -44,9 +41,6 @@ const {
   findShopBankAccountById,
 } = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const logger = require("@/utils/logger");
-
-const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
-const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
 const toMonthKey = (value) => {
   const parsedDate = parseFlexibleDate(value);
@@ -77,32 +71,7 @@ const incrementDashboardSummaryByDelta = async (
   if (!monthKey) return;
   if (!revenue && !profit && !orders && !imp && !offFlow && !bankBalance) return;
 
-  await client.query(
-    `
-      INSERT INTO ${summaryTable} (
-        ${summaryCols.MONTH_KEY},
-        ${summaryCols.TOTAL_ORDERS},
-        ${summaryCols.TOTAL_REVENUE},
-        ${summaryCols.TOTAL_PROFIT},
-        ${summaryCols.TOTAL_IMPORT},
-        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
-        ${summaryCols.ESTIMATED_BANK_BALANCE},
-        ${summaryCols.UPDATED_AT}
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      ON CONFLICT (${summaryCols.MONTH_KEY})
-      DO UPDATE SET
-        ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
-        ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
-        ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
-        ${summaryCols.TOTAL_IMPORT} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_IMPORT)} + EXCLUDED.${summaryCols.TOTAL_IMPORT}),
-        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT} = ${qualifiedSummaryCol(summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT)} + EXCLUDED.${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
-        ${summaryCols.ESTIMATED_BANK_BALANCE} = ${qualifiedSummaryCol(summaryCols.ESTIMATED_BANK_BALANCE)} + EXCLUDED.${summaryCols.ESTIMATED_BANK_BALANCE},
-        ${summaryCols.UPDATED_AT} = NOW()
-    `,
-    [monthKey, orders, revenue, profit, imp, offFlow, bankBalance]
-  );
-  await recomputeSummaryMonthTotalTax(client, monthKey);
+  // View finance.dashboard_monthly_summary is now dynamic, no need to write physically.
   await notifyFinanceMonthlyDelta({
     monthKey,
     revenueDelta: revenue,

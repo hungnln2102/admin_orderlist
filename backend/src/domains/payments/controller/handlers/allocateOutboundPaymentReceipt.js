@@ -95,22 +95,33 @@ const allocateOutboundPaymentReceipt = async (req, res) => {
         const [created] = await trx(EXPENSE_TABLE).insert(expensePayload).returning([EXPENSE_COLS.ID]);
         const expenseId = Number(created?.id ?? created?.[EXPENSE_COLS.ID] ?? 0);
 
-        if (type === "withdrawal") {
-          await debitShopBankWithdraw(trx, {
-            accountId: defaultAccount.id,
-            amount: outAmount,
-            sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
-            sourceId: expenseId,
-            note: reason || `Rút tiền từ biên lai ${receiptId}`,
-          });
-        } else {
-          await debitShopBankExternalOut(trx, {
-            accountId: defaultAccount.id,
-            amount: outAmount,
-            sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
-            sourceId: expenseId,
-            note: reason || `Nhập ngoài luồng từ biên lai ${receiptId}`,
-          });
+        const { updateLedgerSource } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
+        const updated = await updateLedgerSource(trx, {
+          sourceKind: "payment_receipt",
+          sourceId: receiptId,
+          nextSourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+          nextSourceId: expenseId,
+          note: reason || (type === "withdrawal" ? `Rút tiền từ biên lai ${receiptId}` : `Nhập ngoài luồng từ biên lai ${receiptId}`),
+        });
+
+        if (!updated) {
+          if (type === "withdrawal") {
+            await debitShopBankWithdraw(trx, {
+              accountId: defaultAccount.id,
+              amount: outAmount,
+              sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+              sourceId: expenseId,
+              note: reason || `Rút tiền từ biên lai ${receiptId}`,
+            });
+          } else {
+            await debitShopBankExternalOut(trx, {
+              accountId: defaultAccount.id,
+              amount: outAmount,
+              sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+              sourceId: expenseId,
+              note: reason || `Nhập ngoài luồng từ biên lai ${receiptId}`,
+            });
+          }
         }
         logPayload = { expenseId, type, outAmount };
       } 
@@ -123,6 +134,7 @@ const allocateOutboundPaymentReceipt = async (req, res) => {
         const splitAmount = Math.floor(outAmount / orderCodes.length);
         const remainder = outAmount - (splitAmount * orderCodes.length);
         
+        let hasUpdatedLedger = false;
         for (let i = 0; i < orderCodes.length; i++) {
           const code = orderCodes[i];
           const amountToApply = splitAmount + (i === 0 ? remainder : 0);
@@ -141,14 +153,33 @@ const allocateOutboundPaymentReceipt = async (req, res) => {
             .where("id", order.id)
             .update({ cost: newCost, updated_at: trx.fn.now() });
             
-          // Cũng phải trừ tiền bank vì đây là chi phí lấy từ bank
-          await debitShopBankExternalOut(trx, {
-            accountId: defaultAccount.id,
-            amount: amountToApply,
-            sourceKind: "order_cost_allocation",
-            sourceId: order.id,
-            note: `Chi phí đơn hàng ${code} từ biên lai ${receiptId}`,
-          });
+          let shouldDebit = true;
+          if (i === 0) {
+            const { updateLedgerSource } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
+            const updated = await updateLedgerSource(trx, {
+              sourceKind: "payment_receipt",
+              sourceId: receiptId,
+              nextSourceKind: "order_cost_allocation",
+              nextSourceId: order.id,
+              note: `Chi phí đơn hàng ${code} từ biên lai ${receiptId}`,
+            });
+            if (updated) {
+              hasUpdatedLedger = true;
+              shouldDebit = false;
+            }
+          } else if (hasUpdatedLedger) {
+            shouldDebit = false;
+          }
+
+          if (shouldDebit) {
+            await debitShopBankExternalOut(trx, {
+              accountId: defaultAccount.id,
+              amount: amountToApply,
+              sourceKind: "order_cost_allocation",
+              sourceId: order.id,
+              note: `Chi phí đơn hàng ${code} từ biên lai ${receiptId}`,
+            });
+          }
 
           // Lấy order mới nhất sau cập nhật
           const updatedOrder = await trx(TABLES.orderList).where("id", order.id).first();

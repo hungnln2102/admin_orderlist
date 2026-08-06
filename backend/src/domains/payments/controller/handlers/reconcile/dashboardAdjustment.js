@@ -129,6 +129,8 @@ const applyReconcileDashboardAdjustment = async (
     importDelta,
     offFlowDelta,
     bankBalanceDelta,
+    refType: "payment_receipt",
+    refId: String(receiptId),
   });
 
   if (offFlowDelta > 0) {

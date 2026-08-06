@@ -4,6 +4,8 @@
     "description": "",
     "main": "src/server.js",
     "scripts": {
+        "test": "jest --runInBand --detectOpenHandles",
+        "test:watch": "jest --watch --runInBand",
         "test:yuna:scraper": "node tests/manual/test-yuna-mail-scraper.js",
         "test:yuna:otp": "node tests/manual/test-yuna-otp.js",
         "test:yuna:match": "node tests/manual/test-yuna-otp-match.js",

@@ -150,6 +150,8 @@ const applyOffFlowCreditCashout = async (trx, creditNote, cashoutAmount) => {
 
   await applyDashboardDelta(trx, monthKey, {
     offFlowDelta: -amount,
+    refType: "refund_credit_notes",
+    refId: String(creditNote?.[R.ID] || ""),
   });
 
   return { applied: true, monthKey, amount };

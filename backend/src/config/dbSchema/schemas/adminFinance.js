@@ -29,7 +29,7 @@ const ADMIN_SCHEMA = {
     },
   },
   SHOP_BANK_ACCOUNTS: {
-    TABLE: "shop_bank_accounts",
+    TABLE: "financial_accounts",
     COLS: {
       ID: "id",
       LABEL: "label",
@@ -50,10 +50,10 @@ const ADMIN_SCHEMA = {
     },
   },
   SHOP_BANK_ACCOUNT_LEDGER: {
-    TABLE: "shop_bank_account_ledger",
+    TABLE: "financial_account_ledger",
     COLS: {
       ID: "id",
-      SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
+      SHOP_BANK_ACCOUNT_ID: "financial_account_id",
       ENTRY_TYPE: "entry_type",
       AMOUNT: "amount",
       SIGNED_AMOUNT: "signed_amount",
@@ -65,12 +65,12 @@ const ADMIN_SCHEMA = {
     },
   },
   USDT_WALLETS: {
-    TABLE: "usdt_wallets",
+    TABLE: "financial_accounts",
     COLS: {
       ID: "id",
       LABEL: "label",
-      WALLET_ADDRESS: "wallet_address",
-      NETWORK: "network",
+      WALLET_ADDRESS: "account_number",
+      NETWORK: "bank_short_code",
       IS_DEFAULT: "is_default",
       IS_ACTIVE: "is_active",
       TOTAL_RECEIVED: "total_received",
@@ -81,10 +81,10 @@ const ADMIN_SCHEMA = {
     },
   },
   USDT_WALLET_LEDGER: {
-    TABLE: "usdt_wallet_ledger",
+    TABLE: "financial_account_ledger",
     COLS: {
       ID: "id",
-      USDT_WALLET_ID: "usdt_wallet_id",
+      USDT_WALLET_ID: "financial_account_id",
       ENTRY_TYPE: "entry_type",
       AMOUNT: "amount",
       SIGNED_AMOUNT: "signed_amount",
@@ -183,18 +183,12 @@ const FINANCE_SCHEMA = {
     COLS: {
       ID: "id",
       MONTH_KEY: "month_key",
-      REVENUE_DELTA: "revenue_delta",
-      PROFIT_DELTA: "profit_delta",
-      IMPORT_DELTA: "import_delta",
-      REFUND_DELTA: "refund_delta",
-      OFF_FLOW_DELTA: "off_flow_delta",
-      BANK_BALANCE_DELTA: "bank_balance_delta",
-      TAX_SNAPSHOT: "tax_snapshot",
-      OFF_FLOW_SNAPSHOT: "off_flow_snapshot",
-      BANK_BALANCE_SNAPSHOT: "bank_balance_snapshot",
-      // Legacy column kept for backward compatibility with old migrations/data.
-      AVAILABLE_PROFIT_SNAPSHOT: "available_profit_snapshot",
+      METRIC_TYPE: "metric_type",
+      DELTA: "delta",
+      SNAPSHOT: "snapshot",
       CONTEXT: "context",
+      REF_TYPE: "ref_type",
+      REF_ID: "ref_id",
       CREATED_AT: "created_at",
     },
   },

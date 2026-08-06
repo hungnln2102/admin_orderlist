@@ -47,16 +47,22 @@ const selectColumns = {
 const listUsdtWallets = async () =>
   db(TABLE)
     .select(selectColumns)
+    .where('account_type', 'usdt')
     .orderBy(columns.isDefault, "desc")
     .orderBy(columns.isActive, "desc")
     .orderBy(columns.id, "desc");
 
 const findUsdtWalletById = async (id) =>
-  db(TABLE).select(selectColumns).where(columns.id, id).first();
+  db(TABLE)
+    .select(selectColumns)
+    .where('account_type', 'usdt')
+    .where(columns.id, id)
+    .first();
 
 const findDefaultActiveUsdtWallet = async () =>
   db(TABLE)
     .select(selectColumns)
+    .where('account_type', 'usdt')
     .where(columns.isActive, true)
     .where(columns.isDefault, true)
     .orderBy(columns.id, "desc")
@@ -65,6 +71,7 @@ const findDefaultActiveUsdtWallet = async () =>
 const findUsdtWalletByAddress = async (walletAddress) =>
   db(TABLE)
     .select(selectColumns)
+    .where('account_type', 'usdt')
     .whereRaw("LOWER(TRIM(??)) = ?", [
       columns.walletAddress,
       String(walletAddress || "").trim().toLowerCase(),
@@ -72,13 +79,18 @@ const findUsdtWalletByAddress = async (walletAddress) =>
     .first();
 
 const clearDefaultFlags = async (trx) =>
-  trx(TABLE).where(columns.isDefault, true).update({
-    [columns.isDefault]: false,
-    [columns.updatedAt]: trx.fn.now(),
-  });
+  trx(TABLE)
+    .where('account_type', 'usdt')
+    .where(columns.isDefault, true)
+    .update({
+      [columns.isDefault]: false,
+      [columns.updatedAt]: trx.fn.now(),
+    });
 
 const insertUsdtWallet = async (trx, payload) => {
-  const rows = await trx(TABLE).insert(payload).returning(selectColumns);
+  const rows = await trx(TABLE)
+    .insert({ ...payload, account_type: 'usdt' })
+    .returning(selectColumns);
   return rows[0] || null;
 };
 
@@ -93,7 +105,11 @@ const updateUsdtWallet = async (trx, id, payload) => {
   return rows[0] || null;
 };
 
-const deleteUsdtWallet = async (id) => db(TABLE).where(columns.id, id).del();
+const deleteUsdtWallet = async (id) =>
+  db(TABLE)
+    .where('account_type', 'usdt')
+    .where(columns.id, id)
+    .del();
 
 module.exports = {
   USDT_WALLETS_DEF,

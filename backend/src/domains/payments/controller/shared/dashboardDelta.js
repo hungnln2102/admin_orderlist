@@ -1,8 +1,4 @@
-const { TABLES, SUMMARY_COLS } = require("@/domains/payments/controller/shared/constants");
 const { normalizeMoney } = require("@/domains/payments/controller/shared/helpers");
-const {
-  recomputeSummaryMonthTotalTax,
-} = require("@/domains/orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
 } = require("@/services/telegramFinanceDeltaNotifier");
@@ -22,6 +18,8 @@ const applyDashboardDelta = async (
     importDelta = 0,
     offFlowDelta = 0,
     bankBalanceDelta = 0,
+    refType = null,
+    refId = null,
   } = {}
 ) => {
   if (!monthKey) return;
@@ -33,32 +31,7 @@ const applyDashboardDelta = async (
   const bankBalance = normalizeMoney(bankBalanceDelta);
   if (!revenue && !profit && !orders && !imp && !offFlow && !bankBalance) return;
 
-  await trx.raw(
-    `
-      INSERT INTO ${TABLES.dashboardSummary} (
-        ${SUMMARY_COLS.monthKey},
-        ${SUMMARY_COLS.totalOrders},
-        ${SUMMARY_COLS.totalRevenue},
-        ${SUMMARY_COLS.totalProfit},
-        ${SUMMARY_COLS.totalImport},
-        ${SUMMARY_COLS.totalOffFlowBankReceipt},
-        ${SUMMARY_COLS.estimatedBankBalance},
-        ${SUMMARY_COLS.updatedAt}
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-      ON CONFLICT (${SUMMARY_COLS.monthKey})
-      DO UPDATE SET
-        ${SUMMARY_COLS.totalOrders} = GREATEST(0, ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOrders} + EXCLUDED.${SUMMARY_COLS.totalOrders}),
-        ${SUMMARY_COLS.totalRevenue} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalRevenue} + EXCLUDED.${SUMMARY_COLS.totalRevenue},
-        ${SUMMARY_COLS.totalProfit} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalProfit} + EXCLUDED.${SUMMARY_COLS.totalProfit},
-        ${SUMMARY_COLS.totalImport} = GREATEST(0, ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalImport} + EXCLUDED.${SUMMARY_COLS.totalImport}),
-        ${SUMMARY_COLS.totalOffFlowBankReceipt} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOffFlowBankReceipt} + EXCLUDED.${SUMMARY_COLS.totalOffFlowBankReceipt},
-        ${SUMMARY_COLS.estimatedBankBalance} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.estimatedBankBalance} + EXCLUDED.${SUMMARY_COLS.estimatedBankBalance},
-        ${SUMMARY_COLS.updatedAt} = NOW();
-    `,
-    [monthKey, orders, revenue, profit, imp, offFlow, bankBalance]
-  );
-  await recomputeSummaryMonthTotalTax(trx, monthKey);
+  // View finance.dashboard_monthly_summary is now dynamic, no need to write physically.
   await notifyFinanceMonthlyDelta({
     monthKey,
     revenueDelta: revenue,
@@ -68,6 +41,8 @@ const applyDashboardDelta = async (
     offFlowDelta: offFlow,
     bankBalanceDelta: bankBalance,
     context: "payments.applyDashboardDelta",
+    refType,
+    refId,
     executor: trx,
   });
 };

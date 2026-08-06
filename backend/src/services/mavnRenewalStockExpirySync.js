@@ -157,7 +157,7 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
         s.id AS stock_id,
         s.account_username AS stock_username
       FROM warehouse.stock_services ss
-      INNER JOIN warehouse.product_stocks s ON s.id = ss.stock_id
+      INNER JOIN business.product_keys s ON s.id = ss.stock_id
       INNER JOIN warehouse.product_names pn ON ss.name_id = pn.id
       WHERE pn.product_id = $1
     `,
@@ -231,7 +231,7 @@ async function syncStockExpiryForAccountAndPackage(clientOrKnex, packageId, acco
         s.id AS stock_id,
         s.account_username AS stock_username
       FROM warehouse.stock_services ss
-      INNER JOIN warehouse.product_stocks s ON s.id = ss.stock_id
+      INNER JOIN business.product_keys s ON s.id = ss.stock_id
       INNER JOIN warehouse.product_names pn ON ss.name_id = pn.id
       WHERE pn.product_id = $1
     `,
@@ -272,7 +272,7 @@ async function syncStockExpiryForAccountAndPackage(clientOrKnex, packageId, acco
     const orderRes = await executeSql(clientOrKnex,
       `
         SELECT id_order, id_product, TO_CHAR(expired_at, 'YYYY-MM-DD') AS expired_at_str, information_order, status
-        FROM orders.order_list
+        FROM business.order_list
         WHERE id_product = ANY($1::bigint[])
           AND id_order LIKE 'MAVN%'
           AND status IN ('Chưa Thanh Toán', 'Đang Xử Lý', 'Đã Thanh Toán', 'Cần Gia Hạn')

@@ -1,6 +1,6 @@
 const RENEW_ADOBE_SCHEMA = {
   ACCOUNT: {
-    TABLE: "accounts_admin",
+    TABLE: "system_bot_accounts",
     COLS: {
       ID: "id",
       EMAIL: "email",
@@ -101,7 +101,7 @@ const RENEW_ADOBE_SCHEMA = {
 const KEY_ACTIVE_SCHEMA = {
   /** Key kích hoạt ánh xạ orders.order_list (FK order_list_id); expires_at đồng bộ expired_at. */
   ORDER_LIST_KEYS: {
-    TABLE: "order_list_keys",
+    TABLE: "product_keys",
     COLS: {
       ID: "id",
       ORDER_LIST_ID: "order_list_id",

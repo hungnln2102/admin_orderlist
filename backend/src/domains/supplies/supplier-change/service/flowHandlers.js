@@ -42,7 +42,7 @@ async function runFlowA(
 
   if (isNewMavryk) {
     await trx.raw(
-      `DELETE FROM partner.supplier_order_cost_log WHERE order_list_id = ?`,
+      `DELETE FROM business.supplier_order_cost_log WHERE order_list_id = ?`,
       [orderId]
     );
     const needsMarker = STATUSES_NEEDING_NCC_LOG.has(orderStatus);

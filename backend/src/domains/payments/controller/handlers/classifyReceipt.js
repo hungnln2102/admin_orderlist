@@ -9,6 +9,7 @@ const {
 } = require("@/domains/payments/controller/shared/constants");
 const { applyDashboardDelta } = require("@/domains/payments/controller/shared/dashboardDelta");
 const { toMonthKey } = require("@/domains/payments/controller/shared/helpers");
+const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 
 /**
  * POST /api/payments/payment-receipts/:receiptId/classify
@@ -298,6 +299,18 @@ const classifyReceipt = async (req, res) => {
         await applyDashboardDelta(trx, receiptMonthKey, {
           offFlowDelta: amount,
           bankBalanceDelta: amount,
+          refType: "payment_receipt",
+          refId: String(receiptId),
+        });
+
+        // Also create the off-flow refund credit note
+        await ensureOffFlowRefundCreditNote(trx, {
+          paymentReceiptId: receiptId,
+          offFlowAmount: amount,
+          monthKey: receiptMonthKey,
+          sourceOrderCode: receiptRow[PAYMENT_RECEIPT_DEF.columns.orderCode] || null,
+          ruleBranch: "MANUAL_CLASSIFY_OFF_FLOW_BANK_RECEIPT",
+          note: note || `Credit ngoài luồng từ phân loại biên lai #${receiptId}`,
         });
       }
 

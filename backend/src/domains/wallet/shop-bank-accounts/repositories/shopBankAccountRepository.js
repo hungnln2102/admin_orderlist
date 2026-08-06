@@ -58,17 +58,24 @@ const selectColumns = {
 const listShopBankAccounts = async () =>
   db(TABLE)
     .select(selectColumns)
+    .where('account_type', 'bank')
     .where(columns.isDeleted, false)
     .orderBy(columns.isDefault, "desc")
     .orderBy(columns.isActive, "desc")
     .orderBy(columns.id, "desc");
 
 const findShopBankAccountById = async (id) =>
-  db(TABLE).select(selectColumns).where(columns.id, id).where(columns.isDeleted, false).first();
+  db(TABLE)
+    .select(selectColumns)
+    .where('account_type', 'bank')
+    .where(columns.id, id)
+    .where(columns.isDeleted, false)
+    .first();
 
 const findDefaultActiveAccount = async () =>
   db(TABLE)
     .select(selectColumns)
+    .where('account_type', 'bank')
     .where(columns.isActive, true)
     .where(columns.isDefault, true)
     .where(columns.isDeleted, false)
@@ -78,6 +85,7 @@ const findDefaultActiveAccount = async () =>
 const findShopBankAccountByNumberAndBankBin = async (accountNumber, bankBin) =>
   db(TABLE)
     .select(selectColumns)
+    .where('account_type', 'bank')
     .whereRaw("TRIM(??) = ?", [columns.accountNumber, accountNumber])
     .whereRaw("TRIM(??) = ?", [columns.bankBin, bankBin])
     .where(columns.isDeleted, false)
@@ -107,6 +115,7 @@ const resolveMavrykDefaultBankAccount = async (amount = 0, executor = db) => {
   const minAmount = Number.isFinite(Number(amount)) ? Math.max(0, Number(amount)) : 0;
   const fallbackRows = await executor(TABLE)
     .select(selectColumns)
+    .where('account_type', 'bank')
     .where(columns.isActive, true)
     .where(columns.isDeleted, false)
     .whereRaw("UPPER(TRIM(??)) = ?", [
@@ -123,13 +132,18 @@ const resolveMavrykDefaultBankAccount = async (amount = 0, executor = db) => {
 };
 
 const clearDefaultFlags = async (trx) =>
-  trx(TABLE).where(columns.isDefault, true).update({
-    [columns.isDefault]: false,
-    [columns.updatedAt]: trx.fn.now(),
-  });
+  trx(TABLE)
+    .where('account_type', 'bank')
+    .where(columns.isDefault, true)
+    .update({
+      [columns.isDefault]: false,
+      [columns.updatedAt]: trx.fn.now(),
+    });
 
 const insertShopBankAccount = async (trx, payload) => {
-  const rows = await trx(TABLE).insert(payload).returning(selectColumns);
+  const rows = await trx(TABLE)
+    .insert({ ...payload, account_type: 'bank' })
+    .returning(selectColumns);
   return rows[0] || null;
 };
 

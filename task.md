@@ -271,6 +271,16 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 ---
 
+## Phase 5 — Tối Ưu Hóa & Tái Cấu Trúc Database
+*Kế hoạch chi tiết lưu trữ tại: [docs/plans/2026-08-07_database_optimization_plan.md](file:///e:/Project/admin_store/admin_orderlist/docs/plans/2026-08-07_database_optimization_plan.md)*
+
+- [x] **DB-OPT-01** Triển khai mô hình Accounts dùng chung (Hợp nhất Bank Accounts & USDT Wallets)
+- [x] **DB-OPT-02** Chuyển đổi báo cáo tháng `dashboard_monthly_summary` thành Database View
+- [x] **DB-OPT-03** Triển khai kho khóa sản phẩm dùng chung (Hợp nhất `product_stocks` & `order_list_keys` thành `product_keys`)
+- [x] **DB-OPT-04** Đổi tên bảng `accounts_admin` thành `system_bot_accounts` để đồng bộ ngữ nghĩa
+
+---
+
 ## Định nghĩa xong (DoD) mỗi slice backend
 
 1. Path và method không đổi so với trước migrate.

@@ -14,11 +14,11 @@ const SLOT_STATUS = Object.freeze({
   EXPIRED: "expired",
 });
 
-const SUFFIX_SEQUENCE = "orders.payment_amount_suffix_seq";
+const SUFFIX_SEQUENCE = "business.payment_amount_suffix_seq";
 /** MAXVALUE của sequence — phải khớp với migration 107. */
 const SUFFIX_MAX = 100;
 
-const SLOTS_TABLE = "orders.order_payment_slots";
+const SLOTS_TABLE = "business.order_payment_slots";
 
 const SLOT_COLS = Object.freeze({
   ID: "id",

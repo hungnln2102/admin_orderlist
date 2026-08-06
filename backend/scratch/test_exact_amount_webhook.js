@@ -61,15 +61,45 @@ async function test() {
     const orderAfter1 = await db('order_list').where({ id_order: orderCode }).first();
     console.log(`Trạng thái đơn sau Test Case 1: ${orderAfter1.status} (Kỳ vọng: ${STATUS.UNPAID})`);
 
-    // Kiểm xem có tạo credit note trị giá 150.000đ cho biên nhận đó không
+    // Kiểm xem có tạo credit note trị giá 150.000đ cho biên nhận đó không (kỳ vọng là KHÔNG vì đã tắt auto-post)
     const receipt1 = await db('payment_receipt').where({ note: payload1.transaction_content }).orderBy('id', 'desc').first();
     if (receipt1) {
       const creditNote1 = await db('refund_credit_notes').where({ payment_receipt_id: receipt1.id }).first();
-      console.log(`Có tạo credit note cho biên lai #${receipt1.id}? ${creditNote1 ? 'CÓ' : 'KHÔNG'} (Kỳ vọng: CÓ)`);
-      if (creditNote1) {
-        console.log(`  - Mã credit: ${creditNote1.credit_code}`);
-        console.log(`  - Trạng thái credit: ${creditNote1.status}`);
-        console.log(`  - Số dư credit: ${creditNote1.available_amount} VND (Kỳ vọng: 150000)`);
+      console.log(`Có tự động tạo credit note cho biên lai #${receipt1.id}? ${creditNote1 ? 'CÓ' : 'KHÔNG'} (Kỳ vọng: KHÔNG)`);
+
+      const state1 = await db('payment_receipt').where({ id: receipt1.id }).first();
+      console.log(`Trạng thái is_financial_posted của biên lai #${receipt1.id}: ${state1?.is_financial_posted} (Kỳ vọng: false/undefined)`);
+
+      // Test Case 1.5: Mô phỏng phân loại thủ công biên lai này thành "Doanh thu ngoài luồng"
+      console.log("\n--- TEST CASE 1.5: Mô phỏng phân loại thủ công biên lai thành Doanh thu ngoài luồng ---");
+      const { classifyReceipt } = require('../src/domains/payments/controller/handlers/classifyReceipt');
+      const flowType = await db('receipt_flow_types').where({ effect: 'off_flow_revenue' }).first();
+      if (flowType) {
+        const req = {
+          params: { receiptId: String(receipt1.id) },
+          body: { flowTypeId: String(flowType.id) }
+        };
+        const res = {
+          statusCode: 200,
+          status: function(code) { this.statusCode = code; return this; },
+          json: function(data) { this.data = data; return this; }
+        };
+        await classifyReceipt(req, res);
+        console.log(`Kết quả phân loại:`, res.data);
+
+        // Sau khi phân loại thủ công, kiểm tra xem đã được post và tạo credit note chưa
+        const stateAfterClassify = await db('payment_receipt').where({ id: receipt1.id }).first();
+        console.log(`Sau khi phân loại: is_financial_posted: ${stateAfterClassify?.is_financial_posted} (Kỳ vọng: true)`);
+        console.log(`  - posted_off_flow_bank_receipt: ${Number(stateAfterClassify?.posted_off_flow_bank_receipt)} VND (Kỳ vọng: 150000)`);
+
+        const creditNoteAfterClassify = await db('refund_credit_notes').where({ payment_receipt_id: receipt1.id }).first();
+        console.log(`Có tạo credit note sau khi phân loại? ${creditNoteAfterClassify ? 'CÓ' : 'KHÔNG'} (Kỳ vọng: CÓ)`);
+        if (creditNoteAfterClassify) {
+          console.log(`  - Mã credit: ${creditNoteAfterClassify.credit_code}`);
+          console.log(`  - Số dư credit: ${creditNoteAfterClassify.available_amount} VND (Kỳ vọng: 150000)`);
+        }
+      } else {
+        console.error("Không tìm thấy receipt_flow_type cho off_flow_revenue!");
       }
     } else {
       console.error("Không tìm thấy biên lai được tạo cho Test Case 1!");
@@ -105,7 +135,7 @@ async function test() {
     const receipt2 = await db('payment_receipt').where({ note: payload2.transaction_content }).orderBy('id', 'desc').first();
     if (receipt2) {
       console.log(`Biên lai #${receipt2.id} có được gắn mã đơn? ${receipt2.id_order || 'KHÔNG'} (Kỳ vọng: ${orderCode})`);
-      const state2 = await db('payment_receipt_financial_state').where({ payment_receipt_id: receipt2.id }).first();
+      const state2 = await db('payment_receipt').where({ id: receipt2.id }).first();
       console.log(`  - is_financial_posted: ${state2?.is_financial_posted} (Kỳ vọng: true)`);
       console.log(`  - posted_revenue: ${Number(state2?.posted_revenue)} VND (Kỳ vọng: ${price})`);
     } else {

@@ -18,6 +18,30 @@ async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
     logger.warn("[Webhook] findAccountIdByReceiver failed", { error: e.message });
   }
 
+  // Debit shop bank balance immediately when webhook fires
+  if (bankAccountId && outboundAmount > 0 && receiptId) {
+    const { debitShopBankFromPaymentReceipt } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
+    try {
+      await debitShopBankFromPaymentReceipt(client, {
+        receiptId,
+        senderAccount,
+        accountId: bankAccountId,
+        amount: outboundAmount,
+        note: transaction.note || transaction.description || null,
+      });
+      logger.info("[Webhook] Auto-debit bank balance from outbound receipt", {
+        receiptId,
+        accountId: bankAccountId,
+        amount: outboundAmount,
+      });
+    } catch (ledgerError) {
+      logger.error("[Webhook][ShopBankLedger] debit from outbound receipt failed", {
+        receiptId,
+        error: ledgerError.message,
+      });
+    }
+  }
+
   const contentLower = contentRaw.toLowerCase();
   const isSupplierPaymentByContent =
     /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||

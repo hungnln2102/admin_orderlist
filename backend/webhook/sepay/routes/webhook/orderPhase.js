@@ -59,7 +59,9 @@ async function processOrderPaymentPhase({
 
       const statusValue = state[ORDER_COLS.status];
 
+      // [Disable auto-posting for PAID order to keep receipt unallocated]
       // Đơn đã Đã Thanh Toán + biên lai mới: tiền vào NH không ghi DT/LN.
+      /*
       if (
         receiptResult?.inserted &&
         currentAmountForCode > 0 &&
@@ -110,6 +112,7 @@ async function processOrderPaymentPhase({
         });
         continue;
       }
+      */
 
       const qrEligibility = getOrderQrPaymentEligibility(statusValue);
       if (!qrEligibility.canPayByQr && statusValue !== ORDER_STATUS.PROCESSING) {
@@ -282,7 +285,9 @@ async function processOrderPaymentPhase({
     }
   }
 
+  // [Disable auto-posting for unmatched receipts to keep them unallocated]
   // Xử lý khi không có đơn nào khớp (luồng chưa liên kết)
+  /*
   if (
     !alreadyFinancialPosted &&
     !loopOrderCodes.length &&
@@ -324,6 +329,7 @@ async function processOrderPaymentPhase({
       });
     }
   }
+  */
 
   // Cập nhật chi phí nhập hàng cho Nhà Cung Cấp
   if (receiptResult?.inserted) {

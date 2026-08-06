@@ -112,15 +112,27 @@ async function tryAutoSettleSupplierPaymentByOutbound({
   //    KHÔNG dùng baseAmount (350.000đ) vì bank đã trừ đúng số tiền thực
   let bankLedgerDelta = 0;
   if (shopBankAccountId) {
-    const ledgerResult = await debitShopBankSupplierPayment(client, {
-      accountId: shopBankAccountId,
-      amount: outboundAmount,
-      sourceKind: "payment_supply",
-      sourceId: paymentSupplyId,
+    const { updateLedgerSource } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
+    const updated = await updateLedgerSource(client, {
+      sourceKind: "payment_receipt",
+      sourceId: receiptId,
+      nextSourceKind: "payment_supply",
+      nextSourceId: paymentSupplyId,
       note: `Auto TT NCC supply ${supplierId} - via Webhook`,
     });
-    if (ledgerResult && !ledgerResult.skipped) {
+    if (updated) {
       bankLedgerDelta = -outboundAmount;
+    } else {
+      const ledgerResult = await debitShopBankSupplierPayment(client, {
+        accountId: shopBankAccountId,
+        amount: outboundAmount,
+        sourceKind: "payment_supply",
+        sourceId: paymentSupplyId,
+        note: `Auto TT NCC supply ${supplierId} - via Webhook`,
+      });
+      if (ledgerResult && !ledgerResult.skipped) {
+        bankLedgerDelta = -outboundAmount;
+      }
     }
   }
 

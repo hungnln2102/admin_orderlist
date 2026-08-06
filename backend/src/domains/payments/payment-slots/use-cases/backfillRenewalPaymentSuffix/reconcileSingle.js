@@ -109,7 +109,7 @@ async function reconcileSingleRenewalOrder(client, row, receiverAccount, options
 
     if (Number(row.slot_expected_amount) !== expectedAmount) {
       await client.query(
-        `UPDATE orders.order_payment_slots
+        `UPDATE business.order_payment_slots
          SET expected_amount = $1, base_amount = $2
          WHERE id = $3`,
         [expectedAmount, baseAmount, row.slot_id]

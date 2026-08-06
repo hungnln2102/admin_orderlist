@@ -36,14 +36,14 @@ const ORDERS_SCHEMA = {
     },
   },
   ORDER_CUSTOMER: {
-    TABLE: "order_customer",
+    TABLE: "order_list",
     COLS: {
       ID_ORDER: "id_order",
-      ACCOUNT_ID: "account_id",
-      STATUS: "status",
+      ACCOUNT_ID: "customer_account_id",
+      STATUS: "customer_status",
       CREATED_AT: "created_at",
-      UPDATED_AT: "updated_at",
-      PAYMENT_ID: "payment_id",
+      UPDATED_AT: "created_at",
+      PAYMENT_ID: "customer_payment_id",
     },
   },
 };
@@ -78,7 +78,7 @@ const PRODUCT_SCHEMA = {
     },
   },
   DESC_VARIANT: {
-    TABLE: "desc_variant",
+    TABLE: "variant",
     COLS: {
       ID: "id",
       RULES: "rules",
@@ -99,8 +99,8 @@ const PRODUCT_SCHEMA = {
       CREATED_AT: "created_at",
       FORM_ID: "form_id",
       UPDATED_AT: "updated_at",
-      /** FK → product.desc_variant.id */
-      DESC_VARIANT_ID: "id_desc",
+      /** Cột mô tả đã gộp vào variant, id_desc trỏ về chính nó (id) */
+      DESC_VARIANT_ID: "id",
       /** Ảnh hiển thị gói (ưu tiên trước ảnh product). */
       IMAGE_URL: "image_url",
       BASE_PRICE: "base_price",
@@ -108,7 +108,7 @@ const PRODUCT_SCHEMA = {
   },
   /** Alias bảng product.desc_variant (nội dung mô tả dùng chung). */
   PRODUCT_DESC: {
-    TABLE: "desc_variant",
+    TABLE: "variant",
     COLS: {
       ID: "id",
       RULES: "rules",
@@ -209,7 +209,7 @@ const PRICING_TIER_SCHEMA = {
 
 const WAREHOUSE_SCHEMA = {
   PRODUCT_STOCK: {
-    TABLE: "product_stocks",
+    TABLE: "product_keys",
     COLS: {
       ID: "id",
       ACCOUNT_USERNAME: "account_username",

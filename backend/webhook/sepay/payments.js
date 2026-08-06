@@ -39,21 +39,21 @@ const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
 // Always prioritize receipt schema for webhook receipt flow.
 // Do not fallback to orders.* because payment_receipt tables have been migrated.
 const PAYMENT_RECEIPT_SCHEMA =
-  process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
+  process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "billing";
 const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
-const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
+const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt`;
 const PAYMENT_RECEIPT_FINANCIAL_AUDIT_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_audit_log`;
 const RECEIPT_STATE_COLS = {
   ID: "id",
-  PAYMENT_RECEIPT_ID: "payment_receipt_id",
+  PAYMENT_RECEIPT_ID: "id",
   IS_FINANCIAL_POSTED: "is_financial_posted",
   POSTED_REVENUE: "posted_revenue",
   POSTED_PROFIT: "posted_profit",
   POSTED_OFF_FLOW_BANK_RECEIPT: "posted_off_flow_bank_receipt",
   RECONCILED_AT: "reconciled_at",
   ADJUSTMENT_APPLIED: "adjustment_applied",
-  CREATED_AT: "created_at",
-  UPDATED_AT: "updated_at",
+  CREATED_AT: "reconciled_at",
+  UPDATED_AT: "reconciled_at",
 };
 
 const getPaymentReceiptOrderColumn = async () => {
@@ -155,20 +155,7 @@ const buildReceiptIdempotencyKey = ({
   ].join("|");
 
 const ensureReceiptFinancialState = async (client, receiptId) => {
-  const normalizedId = Number(receiptId);
-  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return;
-  await client.query(
-    `
-      INSERT INTO ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE} (
-        payment_receipt_id
-      )
-      VALUES ($1)
-      ON CONFLICT (payment_receipt_id)
-      DO UPDATE SET
-        updated_at = NOW()
-    `,
-    [normalizedId]
-  );
+  // No-op because financial state columns are part of the payment_receipt table directly
 };
 
 const getReceiptFinancialState = async (client, receiptId) => {

@@ -931,3 +931,14 @@ Kiểm tra diff và file ngoài ý muốn.
 Báo cáo kết quả, bằng chứng và giới hạn xác minh.
 
 [!CAUTION]Không được đánh đổi khả năng bảo trì dài hạn để lấy một bản sửa nhanh nhưng che giấu nguyên nhân gốc. Khi chưa đủ dữ liệu, chưa có Knowledge Graph phù hợp hoặc chưa có quyền thực hiện, hành động đúng là dừng lại, báo cáo rõ ràng và xin chỉ dẫn từ User.
+
+16. Quy tắc lưu trữ kế hoạch dự án
+
+[!IMPORTANT]
+Mọi kế hoạch phát triển, refactor hoặc thay đổi lớn của dự án bắt buộc phải có file kế hoạch rõ ràng (.md).
+
+16.1. Vị trí lưu trữ
+Mọi file kế hoạch phải được lưu trữ trong thư mục docs/plans/ (tạo mới nếu chưa có). Không lưu rải rác ngoài thư mục quy định này.
+
+16.2. Tiêu chuẩn nội dung file kế hoạch
+Đầu mỗi file kế hoạch (.md) bắt buộc phải ghi rõ ngày tháng lập kế hoạch (ở định dạng YYYY-MM-DD) và tên người/tác nhân lập kế hoạch, giúp việc tìm kiếm và truy vết lịch sử luôn có sẵn và trực quan.

@@ -3,7 +3,6 @@ const {
   getDefinition,
   SCHEMA_PRODUCT,
   PRODUCT_SCHEMA,
-  SCHEMA_WAREHOUSE,
   WAREHOUSE_SCHEMA,
 } = require("@/config/dbSchema");
 
@@ -20,7 +19,7 @@ const TABLES = {
   packageProduct: tableName(PACKAGE_DEF.tableName, SCHEMA_PRODUCT),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
-  productStock: tableName(STOCK_DEF.tableName, SCHEMA_WAREHOUSE),
+  productStock: tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT),
 };
 
 module.exports = {

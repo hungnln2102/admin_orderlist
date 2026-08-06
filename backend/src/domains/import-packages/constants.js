@@ -14,7 +14,6 @@ const {
   PRODUCT_SCHEMA,
   SCHEMA_PRODUCT,
   WAREHOUSE_SCHEMA,
-  SCHEMA_WAREHOUSE,
 } = require("@/config/dbSchema");
 
 const RULE_DEF = {
@@ -37,7 +36,7 @@ const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 
 const TABLES = {
   rule: tableName(RULE_DEF.tableName, SCHEMA_PRODUCT),
-  stock: tableName(STOCK_DEF.tableName, SCHEMA_WAREHOUSE),
+  stock: tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT),
   package: tableName(PKG_DEF.tableName, SCHEMA_PRODUCT),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
 };

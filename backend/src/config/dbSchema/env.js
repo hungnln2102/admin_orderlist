@@ -7,34 +7,34 @@ const pickSchema = (...candidates) => candidates.find(Boolean);
 const SCHEMA_ORDERS = pickSchema(
   process.env.DB_SCHEMA_ORDERS,
   process.env.SCHEMA_ORDERS,
-  "orders"
+  "business"
 );
 const SCHEMA_RECEIPT = pickSchema(
   process.env.DB_SCHEMA_RECEIPT,
   process.env.SCHEMA_RECEIPT,
-  "receipt"
+  "billing"
 );
 const SCHEMA_PRODUCT = pickSchema(
   process.env.DB_SCHEMA_PRODUCT,
   process.env.SCHEMA_PRODUCT,
-  "product"
+  "business"
 );
 const SCHEMA_PARTNER = pickSchema(
   process.env.DB_SCHEMA_PARTNER,
   process.env.SCHEMA_PARTNER,
-  "partner"
+  "business"
 );
 const SCHEMA_ADMIN = pickSchema(
   process.env.DB_SCHEMA_ADMIN,
   process.env.SCHEMA_ADMIN,
-  "admin"
+  "finance"
 );
 const SCHEMA_FINANCE = pickSchema(
   process.env.DB_SCHEMA_FINANCE,
   process.env.SCHEMA_FINANCE,
   process.env.DB_SCHEMA_DASHBOARD,
   process.env.SCHEMA_DASHBOARD,
-  "dashboard"
+  "finance"
 );
 const SCHEMA_IDENTITY = pickSchema(
   process.env.DB_SCHEMA_CUSTOMER_WEB,
@@ -59,12 +59,12 @@ const SCHEMA_COMMON = pickSchema(
 const SCHEMA_PROMOTION = pickSchema(
   process.env.DB_SCHEMA_PROMOTION,
   process.env.SCHEMA_PROMOTION,
-  "promotion"
+  "business"
 );
 const SCHEMA_WALLET = pickSchema(
   process.env.DB_SCHEMA_WALLET,
   process.env.SCHEMA_WALLET,
-  "wallet"
+  "finance"
 );
 const SCHEMA_FORM_DESC = pickSchema(
   process.env.DB_SCHEMA_FORM_DESC,
@@ -134,4 +134,3 @@ const SCHEMA_WAREHOUSE = pickSchema(
   "warehouse"
 );
 module.exports.SCHEMA_WAREHOUSE = SCHEMA_WAREHOUSE;
-

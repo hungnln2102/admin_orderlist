@@ -179,12 +179,7 @@ const mergeSummaryUpdates = async (
         );
     }
 
-    await trx(summaryTable)
-        .insert(insertData)
-        .onConflict(summaryCols.MONTH_KEY)
-        .merge(mergeData);
-
-    await recomputeSummaryMonthTotalTax(trx, monthKey);
+    // View finance.dashboard_monthly_summary is now dynamic, no need to write physically.
     if (!notify) return;
     await notifyFinanceMonthlyDelta({
         monthKey,

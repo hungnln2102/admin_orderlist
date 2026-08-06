@@ -18,7 +18,6 @@ const financeLogTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_FINANCIAL_CHANGE_LOG.TABLE,
   SCHEMA_FINANCE
 );
-const financeLogCols = FINANCE_SCHEMA.DASHBOARD_FINANCIAL_CHANGE_LOG.COLS;
 
 const toNumber = (value) => {
   const n = Number(value);
@@ -145,18 +144,28 @@ const fetchMonthlySnapshot = async (executor, monthKey) => {
 
 const fetchPreviousFinanceLogSnapshot = async (executor, monthKey) => {
   if (!monthKey) return null;
-  return queryOne(
-    executor,
-    `SELECT
-      COALESCE(${financeLogCols.TAX_SNAPSHOT}::numeric, 0) AS tax_snapshot,
-      COALESCE(${financeLogCols.OFF_FLOW_SNAPSHOT}::numeric, 0) AS off_flow_snapshot,
-      COALESCE(${financeLogCols.BANK_BALANCE_SNAPSHOT}::numeric, 0) AS bank_balance_snapshot
-     FROM ${financeLogTable}
-     WHERE ${financeLogCols.MONTH_KEY} = $1
-     ORDER BY ${financeLogCols.ID} DESC
-     LIMIT 1`,
-    [monthKey]
-  );
+  const [taxRow, offFlowRow, bankBalanceRow] = await Promise.all([
+    queryOne(
+      executor,
+      `SELECT snapshot FROM ${financeLogTable} WHERE month_key = $1 AND metric_type = 'tax' ORDER BY id DESC LIMIT 1`,
+      [monthKey]
+    ),
+    queryOne(
+      executor,
+      `SELECT snapshot FROM ${financeLogTable} WHERE month_key = $1 AND metric_type = 'off_flow' ORDER BY id DESC LIMIT 1`,
+      [monthKey]
+    ),
+    queryOne(
+      executor,
+      `SELECT snapshot FROM ${financeLogTable} WHERE month_key = $1 AND metric_type = 'bank_balance' ORDER BY id DESC LIMIT 1`,
+      [monthKey]
+    ),
+  ]);
+  return {
+    tax_snapshot: toNumber(taxRow?.snapshot),
+    off_flow_snapshot: toNumber(offFlowRow?.snapshot),
+    bank_balance_snapshot: toNumber(bankBalanceRow?.snapshot),
+  };
 };
 
 const appendFinanceChangeLog = async (
@@ -169,75 +178,63 @@ const appendFinanceChangeLog = async (
     refundDelta = 0,
     offFlowDelta = 0,
     bankBalanceDelta = 0,
+    taxDelta = 0,
+    revenueSnapshot = 0,
+    profitSnapshot = 0,
+    importSnapshot = 0,
+    refundSnapshot = 0,
     taxSnapshot = 0,
     offFlowSnapshot = 0,
     bankBalanceSnapshot = 0,
     context = "",
+    refType = null,
+    refId = null,
   }
 ) => {
   if (!executor) return;
+  const entries = [];
+  const addEntry = (type, delta, snapshot) => {
+    if (toNumber(delta) !== 0) {
+      entries.push({
+        month_key: monthKey,
+        metric_type: type,
+        delta: toNumber(delta),
+        snapshot: toNumber(snapshot),
+        context: context || null,
+        ref_type: refType || null,
+        ref_id: refId || null,
+      });
+    }
+  };
+
+  addEntry("revenue", revenueDelta, revenueSnapshot);
+  addEntry("profit", profitDelta, profitSnapshot);
+  addEntry("import", importDelta, importSnapshot);
+  addEntry("refund", refundDelta, refundSnapshot);
+  addEntry("tax", taxDelta, taxSnapshot);
+  addEntry("off_flow", offFlowDelta, offFlowSnapshot);
+  addEntry("bank_balance", bankBalanceDelta, bankBalanceSnapshot);
+
+  if (entries.length === 0) return;
+
   if (executor && typeof executor.raw === "function") {
-    await executor.raw(
-      `INSERT INTO ${financeLogTable} (
-        ${financeLogCols.MONTH_KEY},
-        ${financeLogCols.REVENUE_DELTA},
-        ${financeLogCols.PROFIT_DELTA},
-        ${financeLogCols.IMPORT_DELTA},
-        ${financeLogCols.REFUND_DELTA},
-        ${financeLogCols.OFF_FLOW_DELTA},
-        ${financeLogCols.BANK_BALANCE_DELTA},
-        ${financeLogCols.TAX_SNAPSHOT},
-        ${financeLogCols.OFF_FLOW_SNAPSHOT},
-        ${financeLogCols.BANK_BALANCE_SNAPSHOT},
-        ${financeLogCols.CONTEXT}
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        monthKey,
-        revenueDelta,
-        profitDelta,
-        importDelta,
-        refundDelta,
-        offFlowDelta,
-        bankBalanceDelta,
-        taxSnapshot,
-        offFlowSnapshot,
-        bankBalanceSnapshot,
-        context || null,
-      ]
-    );
-    return;
-  }
-  if (typeof executor.query === "function") {
-    await executor.query(
-      `INSERT INTO ${financeLogTable} (
-        ${financeLogCols.MONTH_KEY},
-        ${financeLogCols.REVENUE_DELTA},
-        ${financeLogCols.PROFIT_DELTA},
-        ${financeLogCols.IMPORT_DELTA},
-        ${financeLogCols.REFUND_DELTA},
-        ${financeLogCols.OFF_FLOW_DELTA},
-        ${financeLogCols.BANK_BALANCE_DELTA},
-        ${financeLogCols.TAX_SNAPSHOT},
-        ${financeLogCols.OFF_FLOW_SNAPSHOT},
-        ${financeLogCols.BANK_BALANCE_SNAPSHOT},
-        ${financeLogCols.CONTEXT}
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [
-        monthKey,
-        revenueDelta,
-        profitDelta,
-        importDelta,
-        refundDelta,
-        offFlowDelta,
-        bankBalanceDelta,
-        taxSnapshot,
-        offFlowSnapshot,
-        bankBalanceSnapshot,
-        context || null,
-      ]
-    );
+    for (const entry of entries) {
+      await executor.raw(
+        `INSERT INTO ${financeLogTable} (
+          month_key, metric_type, delta, snapshot, context, ref_type, ref_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [entry.month_key, entry.metric_type, entry.delta, entry.snapshot, entry.context, entry.ref_type, entry.ref_id]
+      );
+    }
+  } else if (typeof executor.query === "function") {
+    for (const entry of entries) {
+      await executor.query(
+        `INSERT INTO ${financeLogTable} (
+          month_key, metric_type, delta, snapshot, context, ref_type, ref_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [entry.month_key, entry.metric_type, entry.delta, entry.snapshot, entry.context, entry.ref_type, entry.ref_id]
+      );
+    }
   }
 };
 
@@ -268,6 +265,8 @@ const notifyFinanceMonthlyDelta = async ({
   offFlowDelta = 0,
   bankBalanceDelta = 0,
   context = "",
+  refType = null,
+  refId = null,
   executor = null,
 }) => {
   const revenue = toNumber(revenueDelta);
@@ -334,10 +333,17 @@ const notifyFinanceMonthlyDelta = async ({
       refundDelta: refund,
       offFlowDelta: offFlow,
       bankBalanceDelta: bankDeltaForDisplay,
-      taxSnapshot: toNumber(monthlySnapshot?.total_tax),
-      offFlowSnapshot: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
+      taxDelta: taxDelta,
+      revenueSnapshot: snapshotAfter.revenue,
+      profitSnapshot: snapshotAfter.profit,
+      importSnapshot: snapshotAfter.importVal,
+      refundSnapshot: snapshotAfter.refund,
+      taxSnapshot: snapshotAfter.tax,
+      offFlowSnapshot: snapshotAfter.offFlow,
       bankBalanceSnapshot: bankAfterForDisplay,
       context,
+      refType,
+      refId,
     });
     const messageRows = [
       buildFlowLine("📊 Doanh thu tháng", snapshotBefore.revenue, snapshotAfter.revenue, revenue),

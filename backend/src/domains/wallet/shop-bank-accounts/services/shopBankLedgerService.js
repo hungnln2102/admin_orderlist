@@ -407,6 +407,59 @@ const recordMavnInternalSettlement = async (
   });
 };
 
+const debitShopBankFromPaymentReceipt = async (
+  executor,
+  { receiptId, senderAccount, accountId = null, amount, note = null }
+) => {
+  const normalizedAmount = normalizeRoundedMoney(amount);
+  const normalizedReceiptId = Number(receiptId);
+  if (!normalizedReceiptId || normalizedAmount <= 0) return null;
+
+  const existing = await findLedgerBySource(
+    executor,
+    SOURCE_KINDS.PAYMENT_RECEIPT,
+    normalizedReceiptId
+  );
+  if (existing) return { skipped: true, reason: "duplicate" };
+
+  const resolvedAccountId = await resolveAccountId(executor, {
+    accountId,
+    receiverAccount: senderAccount,
+  });
+  if (!resolvedAccountId) return { skipped: true, reason: "unknown_stk" };
+
+  const result = await insertLedgerAndUpdateAccount(executor, {
+    accountId: resolvedAccountId,
+    entryType: ENTRY_TYPES.EXTERNAL_OUT,
+    amount: normalizedAmount,
+    signedAmount: -normalizedAmount,
+    sourceKind: SOURCE_KINDS.PAYMENT_RECEIPT,
+    sourceId: normalizedReceiptId,
+    note,
+    incrementReceived: 0,
+    incrementWithdrawn: normalizedAmount,
+  });
+
+  return { accountId: resolvedAccountId, ...result };
+};
+
+const updateLedgerSource = async (
+  executor,
+  { sourceKind, sourceId, nextSourceKind, nextSourceId, note = null }
+) => {
+  const existing = await findLedgerBySource(executor, sourceKind, sourceId);
+  if (!existing) return null;
+
+  await runQuery(
+    executor,
+    `UPDATE ${LEDGER_TABLE}
+     SET ${LEDGER_COLS.SOURCE_KIND} = ?, ${LEDGER_COLS.SOURCE_ID} = ?, ${LEDGER_COLS.NOTE} = COALESCE(?, ${LEDGER_COLS.NOTE}), updated_at = NOW()
+     WHERE ${LEDGER_COLS.ID} = ?`,
+    [nextSourceKind, nextSourceId, note, existing.id]
+  );
+  return { id: existing.id };
+};
+
 module.exports = {
   ENTRY_TYPES,
   SOURCE_KINDS,
@@ -418,4 +471,6 @@ module.exports = {
   debitShopBankSupplierPayment,
   debitShopBankRefundCashout,
   recordMavnInternalSettlement,
+  debitShopBankFromPaymentReceipt,
+  updateLedgerSource,
 };

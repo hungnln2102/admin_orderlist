@@ -30,13 +30,13 @@ async function resolveRenewalNotifyPrice(client, row, computed) {
       const expectedNew = basePrice + suffix;
       if (expectedNew !== expected && basePrice > 0) {
         await client.query(
-          `UPDATE orders.order_payment_slots
+          `UPDATE business.order_payment_slots
            SET expected_amount = $1, base_amount = $2
            WHERE id = $3`,
           [expectedNew, basePrice, slot.id]
         );
         await client.query(
-          `UPDATE orders.order_list
+          `UPDATE business.order_list
            SET price = $1
            WHERE id_order = $2`,
           [expectedNew, orderCode]

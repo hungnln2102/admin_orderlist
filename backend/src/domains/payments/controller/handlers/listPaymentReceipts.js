@@ -4,7 +4,6 @@ const {
   TABLES,
   PAYMENT_RECEIPT_DEF,
   PAYMENT_RECEIPT_AUDIT_DEF,
-  RECEIPT_STATE_COLS,
   FLOW_TYPE_COLS,
 } = require("@/domains/payments/controller/shared/constants");
 
@@ -59,14 +58,9 @@ const listPaymentReceipts = async (req, res) => {
   try {
     let query = db({ pr: TABLES.paymentReceipt })
       .leftJoin(
-        { fs: TABLES.paymentReceiptState },
-        `fs.${RECEIPT_STATE_COLS.paymentReceiptId}`,
-        `pr.${PAYMENT_RECEIPT_DEF.columns.id}`
-      )
-      .leftJoin(
         { ft: TABLES.receiptFlowTypes },
         `ft.${FLOW_TYPE_COLS.ID}`,
-        `fs.${RECEIPT_STATE_COLS.flowTypeId}`
+        `pr.flow_type_id`
       );
     if (missingOrderOnly) {
       const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
@@ -81,15 +75,15 @@ const listPaymentReceipts = async (req, res) => {
         sender: `pr.${PAYMENT_RECEIPT_DEF.columns.sender}`,
         receiver: `pr.${PAYMENT_RECEIPT_DEF.columns.receiver}`,
         note: `pr.${PAYMENT_RECEIPT_DEF.columns.note}`,
-        isFinancialPosted: `fs.${RECEIPT_STATE_COLS.isFinancialPosted}`,
-        postedRevenue: `fs.${RECEIPT_STATE_COLS.postedRevenue}`,
-        postedProfit: `fs.${RECEIPT_STATE_COLS.postedProfit}`,
-        postedOffFlowBankReceipt: `fs.${RECEIPT_STATE_COLS.postedOffFlowBankReceipt}`,
-        reconciledAt: `fs.${RECEIPT_STATE_COLS.reconciledAt}`,
-        adjustmentApplied: `fs.${RECEIPT_STATE_COLS.adjustmentApplied}`,
-        flowTypeId: `fs.${RECEIPT_STATE_COLS.flowTypeId}`,
-        flowClassifiedAt: `fs.${RECEIPT_STATE_COLS.flowClassifiedAt}`,
-        flowNote: `fs.${RECEIPT_STATE_COLS.flowNote}`,
+        isFinancialPosted: `pr.is_financial_posted`,
+        postedRevenue: `pr.posted_revenue`,
+        postedProfit: `pr.posted_profit`,
+        postedOffFlowBankReceipt: `pr.posted_off_flow_bank_receipt`,
+        reconciledAt: `pr.reconciled_at`,
+        adjustmentApplied: `pr.adjustment_applied`,
+        flowTypeId: `pr.flow_type_id`,
+        flowClassifiedAt: `pr.flow_classified_at`,
+        flowNote: `pr.flow_note`,
         flowTypeLabel: `ft.${FLOW_TYPE_COLS.LABEL}`,
         flowTypeCode: `ft.${FLOW_TYPE_COLS.CODE}`,
       })
@@ -126,59 +120,6 @@ const listPaymentReceipts = async (req, res) => {
 
     res.json({ receipts, count: receipts.length, offset, limit });
   } catch (error) {
-    const missingStateTable =
-      error?.code === "42P01" &&
-      String(error?.message || "").includes("payment_receipt_financial_state");
-    if (missingStateTable) {
-      try {
-        let fallbackQuery = db({ pr: TABLES.paymentReceipt });
-        if (missingOrderOnly) {
-          const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
-          fallbackQuery = fallbackQuery.whereRaw(`COALESCE(TRIM(pr.${orderCol}::text), '') = ''`);
-        }
-        const fallbackRows = await fallbackQuery
-          .select({
-            id: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`,
-            orderCode: `pr.${PAYMENT_RECEIPT_DEF.columns.orderCode}`,
-            paidAt: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`,
-            amount: `pr.${PAYMENT_RECEIPT_DEF.columns.amount}`,
-            sender: `pr.${PAYMENT_RECEIPT_DEF.columns.sender}`,
-            receiver: `pr.${PAYMENT_RECEIPT_DEF.columns.receiver}`,
-            note: `pr.${PAYMENT_RECEIPT_DEF.columns.note}`,
-          })
-          .orderBy([
-            { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
-            { column: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`, order: "desc" },
-          ])
-          .offset(offset)
-          .limit(limit);
-
-        const outboundAuditMap = await loadOutboundAuditMap((fallbackRows || []).map((row) => row.id));
-        const receipts = (fallbackRows || []).map((row) => ({
-          id: row.id,
-          orderCode: row.orderCode,
-          paidAt: row.paidAt,
-          amount: Number(row.amount) || 0,
-          sender: row.sender,
-          receiver: row.receiver,
-          note: row.note,
-          isFinancialPosted: false,
-          postedRevenue: 0,
-          postedProfit: 0,
-          postedOffFlowBankReceipt: 0,
-          reconciledAt: null,
-          adjustmentApplied: false,
-          ...(outboundAuditMap.get(Number(row.id)) || {}),
-        }));
-        logger.warn("[payments] payment_receipt_financial_state missing, fallback query used");
-        return res.json({ receipts, count: receipts.length, offset, limit });
-      } catch (fallbackErr) {
-        logger.error("[payments] Fallback query failed (payment-receipts)", {
-          error: fallbackErr.message,
-          stack: fallbackErr.stack,
-        });
-      }
-    }
     logger.error("[payments] Query failed (payment-receipts)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải biên lai thanh toán." });
   }
