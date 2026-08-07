@@ -26,9 +26,9 @@ const subscribeToEvents = (eventBus, EVENTS) => {
             // If the payload does not have all info, we might need to fetch from order_list
             // But we will update the emit payload in renewal.js to include these
             if (id_order && registration_date != null) {
-                const orderRow = await db("orders.order_list").where("id_order", id_order).first();
+                const orderRow = await db("business.order_list").where("id_order", id_order).first();
                 if (orderRow) {
-                    await db("admin_finance.financial_allocation_ledger").insert({
+                    await db("finance.financial_allocation_ledger").insert({
                         order_list_id: orderRow.id,
                         id_order: id_order,
                         period_type: "RENEWAL",
@@ -61,7 +61,7 @@ async function insertInitialLedger(order) {
     const cost = order.cost || 0;
     const price = order.price || 0;
     
-    await db("admin_finance.financial_allocation_ledger").insert({
+    await db("finance.financial_allocation_ledger").insert({
         order_list_id: order.id,
         id_order: id_order,
         period_type: "INITIAL",

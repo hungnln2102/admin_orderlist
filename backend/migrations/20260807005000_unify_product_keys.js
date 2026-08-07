@@ -36,6 +36,20 @@ exports.up = async function (knex) {
 
     -- 5. Drop the old table
     DROP TABLE IF EXISTS system_automation.order_list_keys CASCADE;
+
+    -- 6. Update trigger function to point to business.product_keys
+    CREATE OR REPLACE FUNCTION system_automation.sync_order_list_keys_after_order_update()
+    RETURNS trigger AS $$
+    BEGIN
+      UPDATE business.product_keys k
+      SET
+        id_order = NEW.id_order,
+        expires_at = NEW.expired_at,
+        updated_at = NOW()
+      WHERE k.order_list_id = NEW.id;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
   `);
 };
 
@@ -86,5 +100,19 @@ exports.down = async function (knex) {
     ALTER TABLE warehouse.stock_services
       ADD CONSTRAINT stock_services_stock_id_fkey
       FOREIGN KEY (stock_id) REFERENCES warehouse.product_stocks(id) ON DELETE CASCADE;
+
+    -- 5. Restore trigger function to point to system_automation.order_list_keys
+    CREATE OR REPLACE FUNCTION system_automation.sync_order_list_keys_after_order_update()
+    RETURNS trigger AS $$
+    BEGIN
+      UPDATE system_automation.order_list_keys k
+      SET
+        id_order = NEW.id_order,
+        expires_at = NEW.expired_at,
+        updated_at = NOW()
+      WHERE k.order_list_id = NEW.id;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
   `);
 };

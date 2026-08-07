@@ -1,4 +1,4 @@
-const ACCOUNTS_TABLE = "system_automation.accounts_admin";
+const ACCOUNTS_TABLE = "system_automation.system_bot_accounts";
 const TRACKING_TABLE = "system_automation.order_user_tracking";
 const OTP_CONFIGS_TABLE = "system_automation.otp_configs";
 

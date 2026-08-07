@@ -56,23 +56,33 @@ const toFiniteMoney = (value) => {
 async function ensureVariantPriceTable(client) {
   const { rows } = await client.query(`
     SELECT
-      to_regclass('product.variant_margin') IS NOT NULL AS has_variant_margin,
-      to_regclass('product.variant_price') IS NOT NULL AS has_variant_price
+      to_regclass('product.variant_margin') IS NOT NULL AS has_product_margin,
+      to_regclass('product.variant_price') IS NOT NULL AS has_product_price,
+      to_regclass('business.variant_margin') IS NOT NULL AS has_business_margin,
+      to_regclass('business.variant_price') IS NOT NULL AS has_business_price
   `);
   const state = rows[0] || {};
 
-  if (state.has_variant_margin && !state.has_variant_price) {
+  if (state.has_product_margin) {
     await client.query(`ALTER TABLE product.variant_margin RENAME TO variant_price`);
+    await client.query(`ALTER TABLE product.variant_price SET SCHEMA business`);
+  } else if (state.has_business_margin) {
+    await client.query(`ALTER TABLE business.variant_margin RENAME TO variant_price`);
+  } else if (state.has_product_price) {
+    await client.query(`ALTER TABLE product.variant_price SET SCHEMA business`);
   }
 
-  if (!state.has_variant_margin && !state.has_variant_price) {
+  const checkRes = await client.query(`
+    SELECT to_regclass('business.variant_price') IS NOT NULL AS exists
+  `);
+  if (!checkRes.rows[0].exists) {
     throw new Error(
-      "Không tìm thấy cả product.variant_margin và product.variant_price."
+      "Không tìm thấy cả variant_margin và variant_price trong product hoặc business schema."
     );
   }
 
   await client.query(`
-    ALTER TABLE product.variant_price
+    ALTER TABLE business.variant_price
     ADD COLUMN IF NOT EXISTS price NUMERIC(15,2)
   `);
 }
@@ -141,13 +151,13 @@ async function main() {
 
     const tiersResult = await client.query(`
       SELECT id, key, pricing_rule, base_tier_key, sort_order
-      FROM product.pricing_tier
+      FROM business.pricing_tier
       WHERE COALESCE(is_active, true) = true
       ORDER BY sort_order ASC, id ASC
     `);
     const tiers = tiersResult.rows || [];
     if (!tiers.length) {
-      throw new Error("Không tìm thấy tier trong product.pricing_tier.");
+      throw new Error("Không tìm thấy tier trong business.pricing_tier.");
     }
     const tiersByKey = Object.fromEntries(tiers.map((tier) => [tier.key, tier]));
 
@@ -156,8 +166,8 @@ async function main() {
         v.id AS variant_id,
         COALESCE(MAX(sc.price), v.base_price, 0)::numeric AS pricing_base,
         COALESCE(MAX(sc.price), v.base_price, 0)::numeric AS import_cost
-      FROM product.variant v
-      LEFT JOIN product.supplier_cost sc
+      FROM business.variant v
+      LEFT JOIN business.supplier_cost sc
         ON sc.variant_id = v.id
       GROUP BY v.id, v.base_price
     `);
@@ -168,8 +178,8 @@ async function main() {
         vp.tier_id,
         vp.margin_ratio,
         pt.key AS tier_key
-      FROM product.variant_price vp
-      JOIN product.pricing_tier pt ON pt.id = vp.tier_id
+      FROM business.variant_price vp
+      JOIN business.pricing_tier pt ON pt.id = vp.tier_id
     `);
 
     const rowsByVariant = new Map();
@@ -207,7 +217,7 @@ async function main() {
 
         await client.query(
           `
-          UPDATE product.variant_price
+          UPDATE business.variant_price
           SET price = $3
           WHERE variant_id = $1 AND tier_id = $2
         `,

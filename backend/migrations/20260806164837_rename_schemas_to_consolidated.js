@@ -101,6 +101,24 @@ exports.up = async function (knex) {
     { oldSchema: 'wallet', newSchema: 'finance', table: 'wallets' }
   ];
 
+  await knex.raw(`
+    DO $$
+    BEGIN
+      -- Drop duplicate finance.com_profit_expenses if dashboard.com_profit_expenses exists
+      IF to_regclass('dashboard.com_profit_expenses') IS NOT NULL AND to_regclass('finance.com_profit_expenses') IS NOT NULL THEN
+        DROP TABLE finance.com_profit_expenses CASCADE;
+      END IF;
+
+      -- Rename the remaining com_profit_expenses to store_profit_expenses
+      IF to_regclass('dashboard.com_profit_expenses') IS NOT NULL THEN
+        ALTER TABLE dashboard.com_profit_expenses RENAME TO store_profit_expenses;
+      ELSIF to_regclass('finance.com_profit_expenses') IS NOT NULL THEN
+        ALTER TABLE finance.com_profit_expenses RENAME TO store_profit_expenses;
+      END IF;
+    END
+    $$;
+  `);
+
   for (const item of tablesToMove) {
     await knex.raw(`
       DO $$
@@ -760,4 +778,16 @@ exports.down = async function (knex) {
       $$;
     `);
   }
+
+  await knex.raw(`
+    DO $$
+    BEGIN
+      IF to_regclass('dashboard.store_profit_expenses') IS NOT NULL THEN
+        ALTER TABLE dashboard.store_profit_expenses RENAME TO com_profit_expenses;
+      ELSIF to_regclass('finance.store_profit_expenses') IS NOT NULL THEN
+        ALTER TABLE finance.store_profit_expenses RENAME TO com_profit_expenses;
+      END IF;
+    END
+    $$;
+  `);
 };

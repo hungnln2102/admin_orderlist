@@ -31,9 +31,9 @@ const resolveProductToVariantId = async (productNameOrId) => {
 };
 
 const ensureVariantRecord = async (productName, options = {}) => {
-  if (!productName) return { variantId: null, created: false };
+  if (!productName) return null;
   const name = String(productName).trim();
-  if (!name) return { variantId: null, created: false };
+  if (!name) return null;
 
   const displayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
   const variantNameCol = PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME;
@@ -45,7 +45,7 @@ const ensureVariantRecord = async (productName, options = {}) => {
     .select(variantIdCol)
     .first();
   if (existing && Number.isFinite(Number(existing[variantIdCol]))) {
-    return { variantId: Number(existing[variantIdCol]), created: false };
+    return Number(existing[variantIdCol]);
   }
 
   const variantId = await db.transaction(async (trx) => {
@@ -60,16 +60,6 @@ const ensureVariantRecord = async (productName, options = {}) => {
       [isActiveCol]: true,
     });
 
-    const descCols = PRODUCT_SCHEMA.PRODUCT_DESC.COLS;
-    const descTable = `${SCHEMA_PRODUCT}.${PRODUCT_SCHEMA.PRODUCT_DESC.TABLE}`;
-    const descRes = await trx.raw(
-      `INSERT INTO ${descTable} (${descCols.RULES}, ${descCols.DESCRIPTION}, ${descCols.SHORT_DESC}) VALUES (NULL, NULL, NULL) RETURNING ${descCols.ID} AS id`
-    );
-    const descVariantId = descRes.rows?.[0]?.id;
-    if (!Number.isFinite(Number(descVariantId))) {
-      throw new Error("Unable to create desc_variant for new variant.");
-    }
-
     const newVariantId = await nextId(TABLES.variant, variantIdCol, trx);
     await trx(TABLES.variant).insert({
       [variantIdCol]: newVariantId,
@@ -77,7 +67,6 @@ const ensureVariantRecord = async (productName, options = {}) => {
       [variantNameCol]: name,
       [displayNameCol]: name,
       [PRODUCT_SCHEMA.VARIANT.COLS.IS_ACTIVE]: true,
-      [PRODUCT_SCHEMA.VARIANT.COLS.DESC_VARIANT_ID]: Number(descVariantId),
     });
 
     const tiers = await getTiers();
@@ -117,7 +106,7 @@ const ensureVariantRecord = async (productName, options = {}) => {
     return newVariantId;
   });
 
-  return { variantId, created: true };
+  return variantId;
 };
 
 module.exports = {

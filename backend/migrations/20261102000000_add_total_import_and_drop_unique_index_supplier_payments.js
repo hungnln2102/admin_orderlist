@@ -1,4 +1,4 @@
-const SCHEMA = "partner";
+const SCHEMA = "business";
 const TABLE_NAME = "supplier_payments";
 
 exports.up = async function up(knex) {

@@ -2,14 +2,14 @@ jest.mock("@/services/telegramFinanceDeltaNotifier", () => ({
   notifyFinanceMonthlyDelta: jest.fn().mockResolvedValue(true),
 }));
 
-const { db } = require("../../src/db");
-const { processWebhookTransactionAsync } = require("../../webhook/sepay/routes/webhook/postHandler");
-const { parseWebhookTransaction } = require("../../webhook/sepay/routes/webhook/parsePhase");
+const { db } = require("@/db");
+const { processWebhookTransactionAsync } = require("webhook-sepay/routes/webhook/postHandler");
+const { parseWebhookTransaction } = require("webhook-sepay/routes/webhook/parsePhase");
 const { STATUS } = require("@/utils/statuses");
 const { classifyReceipt } = require("@/domains/payments/controller/handlers/classifyReceipt");
 
 describe("Phase 5 - Database Optimization and Schema Unification Tests", () => {
-  const TEST_PREFIX = "MAVTST";
+  const TEST_PREFIX = "MAVCTST";
   let testOrderCode;
   let testOrderId;
 
@@ -54,12 +54,26 @@ describe("Phase 5 - Database Optimization and Schema Unification Tests", () => {
     }
   };
 
+  let createdDefaultSystem = false;
+
   beforeAll(async () => {
     await cleanUpTestData();
+    const hasDefault = await db("system_automation.systems").where("system_code", "DEFAULT").first();
+    if (!hasDefault) {
+      await db("system_automation.systems").insert({
+        system_code: "DEFAULT",
+        system_name: "Default System",
+        created_at: new Date(),
+      });
+      createdDefaultSystem = true;
+    }
   });
 
   afterAll(async () => {
     await cleanUpTestData();
+    if (createdDefaultSystem) {
+      await db("system_automation.systems").where("system_code", "DEFAULT").del();
+    }
   });
 
   describe("Feature 1: Exact Webhook Match", () => {

@@ -273,7 +273,11 @@ const attachCreateOrderRoute = (router) => {
                 refundCreditApplication = applyRefundResult.application;
             }
 
-            // Bỏ qua đồng bộ MAVN và Dashboard để tối giản domain Orders
+            // Đồng bộ chi phí/tài chính MAVN khi tạo đơn nhập
+            if (isMavnCreate) {
+                const { syncMavnStoreProfitExpense } = require("@/domains/orders/controller/finance/mavnStoreExpenseSync");
+                await syncMavnStoreProfitExpense(trx, null, newOrder);
+            }
             await trx.commit();
 
 

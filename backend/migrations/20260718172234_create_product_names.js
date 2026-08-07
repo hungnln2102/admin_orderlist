@@ -3,6 +3,50 @@
  * @returns { Promise<void> }
  */
 exports.up = async function (knex) {
+  // A. Ensure product_id exists and product_type is renamed to product_type_old
+  const hasProductId = await knex.schema.withSchema("warehouse").hasColumn("stock_services", "product_id");
+  if (!hasProductId) {
+    await knex.schema.withSchema("warehouse").alterTable("stock_services", (table) => {
+      table.integer("product_id").unsigned().nullable().references("id").inTable("product.product").onDelete("SET NULL");
+    });
+  }
+
+  const hasProductType = await knex.schema.withSchema("warehouse").hasColumn("stock_services", "product_type");
+  if (hasProductType) {
+    await knex.schema.withSchema("warehouse").alterTable("stock_services", (table) => {
+      table.renameColumn("product_type", "product_type_old");
+    });
+  }
+
+  // B. Run data migration for product_id (from migrate_warehouse_product_id.js)
+  const servicesForProdId = await knex.withSchema("warehouse").table("stock_services")
+    .select("id", "product_type_old")
+    .whereNull("product_id")
+    .whereNotNull("product_type_old");
+
+  for (const srv of servicesForProdId) {
+    if (!srv.product_type_old || srv.product_type_old.trim() === "") continue;
+    const typeStr = srv.product_type_old.trim();
+
+    // Check in product.product
+    const prod = await knex.withSchema("product").table("product")
+      .whereRaw("TRIM(LOWER(package_name)) = ?", [typeStr.toLowerCase()]).first();
+
+    let prodId;
+    if (prod) {
+      prodId = prod.id;
+    } else {
+      const [inserted] = await knex.withSchema("product").table("product").insert({
+        package_name: typeStr,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }).returning("id");
+      prodId = inserted.id !== undefined ? inserted.id : inserted;
+    }
+
+    await knex.withSchema("warehouse").table("stock_services").where("id", srv.id).update({ product_id: prodId });
+  }
+
   // 1. Create product_names table
   await knex.schema.withSchema("warehouse").createTable("product_names", (table) => {
     table.increments("id").primary();
@@ -15,7 +59,7 @@ exports.up = async function (knex) {
     table.integer("name_id").unsigned().references("id").inTable("warehouse.product_names").onDelete("SET NULL");
   });
 
-  // 3. Migrate data
+  // 3. Migrate data to product_names
   const services = await knex.withSchema("warehouse").table("stock_services")
     .select("id", "product_type_old")
     .whereNotNull("product_type_old")
@@ -63,4 +107,10 @@ exports.down = async function (knex) {
   });
 
   await knex.schema.withSchema("warehouse").dropTable("product_names");
+
+  await knex.schema.withSchema("warehouse").alterTable("stock_services", (table) => {
+    table.renameColumn("product_type_old", "product_type");
+    table.dropColumn("product_id");
+  });
 };
+

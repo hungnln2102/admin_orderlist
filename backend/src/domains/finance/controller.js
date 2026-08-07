@@ -7,9 +7,9 @@ async function getAllocations(req, res) {
         // We will mock the shape of OrderListRow but populate it from the Ledger
         // Scope can be 'mavn_paid' or 'tax'
         
-        let query = db("admin_finance.financial_allocation_ledger as fal")
-            .join("orders.order_list as ol", "fal.order_list_id", "ol.id")
-            .leftJoin("product.variant as v", "ol.id_product", "v.id")
+        let query = db("finance.financial_allocation_ledger as fal")
+            .join("business.order_list as ol", "fal.order_list_id", "ol.id")
+            .leftJoin("business.variant as v", "ol.id_product", "v.id")
             .select(
                 "fal.id", // The unique ID for the frontend grid (can be the ledger ID)
                 "fal.order_list_id as original_order_id",

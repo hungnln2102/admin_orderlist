@@ -303,11 +303,11 @@ const updateProductPrice = async (req, res) => {
       action: "Sua bang gia san pham",
       entity: "Bang gia",
       entityId: parsedId,
-      message: `Sua bang gia san pham ${mapped?.sanPham || productId}`,
+      message: `Sua bang gia san pham ${mapped?.san_pham || productId}`,
       source: "products.product_prices",
       metadata: {
         productId: parsedId,
-        productCode: mapped?.sanPham || null,
+        productCode: mapped?.san_pham || null,
         changedFields: Object.keys(req.body || {}),
       },
     });

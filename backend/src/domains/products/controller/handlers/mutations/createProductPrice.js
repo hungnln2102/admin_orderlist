@@ -120,33 +120,16 @@ const createProductPrice = async (req, res) => {
               .ignore();
           }
 
-          const descRows = await trx.raw(
-            `
-            INSERT INTO ${TABLES.productDesc} (
-              ${quoteIdent(productDescCols.rules)},
-              ${quoteIdent(productDescCols.description)},
-              ${quoteIdent(productDescCols.shortDesc)},
-              ${quoteIdent(productDescCols.createdAt)},
-              ${quoteIdent(productDescCols.updatedAt)}
-            ) VALUES (?, ?, ?, NOW(), NOW())
-            RETURNING ${quoteIdent(productDescCols.id)} AS id;
-          `,
-            [null, null, null]
-          );
-          const descVariantId =
-            descRows?.rows?.[0]?.id ?? descRows?.rows?.[0]?.ID ?? null;
-          if (!descVariantId) {
-            throw new Error("Unable to create desc_variant row.");
-          }
-
           const variantInsert = await trx(TABLES.variant)
             .insert({
               [variantCols.productId]: productId,
               [variantCols.displayName]: productCode,
-              [variantCols.variantName]: normalizeTextInput(packageProduct) || null,
+              [variantCols.variantName]: normalizeTextInput(packageProduct) || productCode,
               [variantCols.isActive]: isActive,
-              [variantCols.descVariantId]: descVariantId,
               [variantCols.basePrice]: basePriceVal,
+              rules: null,
+              description: null,
+              short_desc: null,
               [variantCols.createdAt]: trx.fn.now(),
               [variantCols.updatedAt]: trx.fn.now(),
             })
@@ -219,7 +202,7 @@ const createProductPrice = async (req, res) => {
       action: "Them bang gia san pham",
       entity: "Bang gia",
       entityId: mapped?.id || inserted,
-      message: `Them bang gia san pham ${mapped?.sanPham || productCode}`,
+      message: `Them bang gia san pham ${mapped?.san_pham || productCode}`,
       source: "products.product_prices",
       metadata: {
         productId: mapped?.id || inserted || null,

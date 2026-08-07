@@ -182,6 +182,9 @@ async function processQueue() {
  */
 function enqueueMessage(payload, { isError = false } = {}) {
   return new Promise((resolve, reject) => {
+    if (process.env.NODE_ENV === "test") {
+      return resolve(false);
+    }
     if (!TELEGRAM_BOT_TOKEN) {
       getLogger().warn("[TelegramClient] Skipped - No bot token config");
       return resolve(false);

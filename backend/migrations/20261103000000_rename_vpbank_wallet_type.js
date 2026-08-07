@@ -1,4 +1,4 @@
-const SCHEMA = "dashboard";
+const SCHEMA = "finance";
 const TABLE_NAME = "master_wallettypes";
 
 exports.up = async function up(knex) {
