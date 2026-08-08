@@ -126,7 +126,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     isMultiReady,
     isDraftComplete,
     isLoading,
-    totalOrdersToCreate,
+    totalOrdersToCreate: detailLines.length,
     orderCreationKind,
   });
   const unitPrice = Number(formData[ORDER_FIELDS.PRICE]) || 0;

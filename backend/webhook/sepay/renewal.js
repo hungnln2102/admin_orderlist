@@ -270,18 +270,7 @@ const createAutoMavrykExternalImportLog = async ({
   );
   const monthKey = String(mkRes.rows?.[0]?.mk || "").trim();
   if (monthKey) {
-    await client.query(
-      `
-        INSERT INTO ${summaryTable}
-          (${summaryCols.MONTH_KEY}, ${summaryCols.TOTAL_PROFIT}, ${summaryCols.UPDATED_AT})
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (${summaryCols.MONTH_KEY})
-        DO UPDATE SET
-          ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
-          ${summaryCols.UPDATED_AT} = NOW()
-      `,
-      [monthKey, -normalizedAmount]
-    );
+    // View finance.dashboard_monthly_summary is dynamic, no physical write needed.
 
     if (!suppressFinanceNotify) {
       await notifyFinanceMonthlyDelta({
@@ -724,26 +713,7 @@ const runRenewal = async (
         const cost = normalizeMoney(finalGiaNhap);
         // NCC Mavryk/Shop: không ghi nhận cost vào profit khi renewal.
         const profit = skipNccLedger ? revenue : (revenue - cost);
-        await client.query(
-          `
-            INSERT INTO ${summaryTable} (
-              ${summaryCols.MONTH_KEY},
-              ${summaryCols.TOTAL_ORDERS},
-              ${summaryCols.TOTAL_REVENUE},
-              ${summaryCols.TOTAL_PROFIT},
-              ${summaryCols.UPDATED_AT}
-            )
-            VALUES ($1, $2, $3, $4, NOW())
-            ON CONFLICT (${summaryCols.MONTH_KEY})
-            DO UPDATE SET
-              ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${summaryTable}.${summaryCols.TOTAL_ORDERS} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
-              ${summaryCols.TOTAL_REVENUE} = ${summaryTable}.${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
-              ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
-              ${summaryCols.UPDATED_AT} = NOW()
-          `,
-          [effectiveMonthKey, 1, revenue, profit]
-        );
-        await recomputeSummaryMonthTotalTax(client, effectiveMonthKey);
+        // View finance.dashboard_monthly_summary is dynamic, no physical write or tax recomputation needed.
 
         const summaryAfter = await fetchMonthlySummarySnapshot(
           client,

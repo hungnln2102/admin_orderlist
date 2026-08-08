@@ -55,7 +55,7 @@ async function insertInitialLedger(order) {
     const order_date = order.order_date; // DATE
     if (!order_date) return; // Only track orders with start dates
     
-    const daysStr = order.days || "0";
+    const daysStr = String(order.days || "0");
     const days = parseInt(daysStr.replace(/\D/g, ""), 10) || 0;
     
     const cost = order.cost || 0;

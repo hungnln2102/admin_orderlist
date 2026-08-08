@@ -3,6 +3,21 @@ exports.up = async function (knex) {
   await knex.raw(`
     DO $$
     BEGIN
+      -- Nếu sequence đã tồn tại ở cả hai schema, ta drop bản ở business trước (để giữ bản ở orders vốn có last_value mới hơn: 93 so với 9)
+      IF EXISTS (
+        SELECT 1
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'orders' AND c.relname = 'payment_amount_suffix_seq' AND c.relkind = 'S'
+      ) AND EXISTS (
+        SELECT 1
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'business' AND c.relname = 'payment_amount_suffix_seq' AND c.relkind = 'S'
+      ) THEN
+        DROP SEQUENCE business.payment_amount_suffix_seq;
+      END IF;
+
       IF EXISTS (
         SELECT 1
         FROM pg_class c

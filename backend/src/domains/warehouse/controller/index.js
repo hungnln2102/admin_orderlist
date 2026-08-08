@@ -18,7 +18,7 @@ const EVENTS = require("@/events/eventTypes");
 
 const warehouseDef = getDefinition("PRODUCT_STOCK", WAREHOUSE_SCHEMA);
 const cols = warehouseDef.columns;
-const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_WAREHOUSE);
+const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_PRODUCT);
 
 const servicesDef = getDefinition("STOCK_SERVICES", WAREHOUSE_SCHEMA);
 const srvCols = servicesDef.columns;

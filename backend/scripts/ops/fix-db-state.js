@@ -1,9 +1,13 @@
-require("dotenv").config();
+module.paths.push('e:/Project/admin_store/admin_orderlist/backend/node_modules');
+const moduleAlias = require('module-alias');
+moduleAlias.addAlias('@', 'e:/Project/admin_store/admin_orderlist/backend/src');
+
+const { loadPostgresEnvForCli } = require('@/config/loadPostgresEnvForCli');
 const knex = require("knex");
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = loadPostgresEnvForCli();
 if (!DATABASE_URL) {
-  console.error("DATABASE_URL is not set in .env");
+  console.error("DATABASE_URL is not set");
   process.exit(1);
 }
 

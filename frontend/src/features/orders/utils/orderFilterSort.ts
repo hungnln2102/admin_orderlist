@@ -130,11 +130,17 @@ const compareOrders = (dataset: OrderDatasetKey) => (a: Order, b: Order) => {
     return remainingA - remainingB;
   }
 
+  const dbIdA = a.id;
+  const dbIdB = b.id;
+  if (dbIdA !== undefined && dbIdB !== undefined && dbIdA !== dbIdB) {
+    return dbIdB - dbIdA;
+  }
+
   const idA = a[ORDER_FIELDS.ID_ORDER] || "";
   const idB = b[ORDER_FIELDS.ID_ORDER] || "";
 
-  if (idA < idB) return -1;
-  if (idA > idB) return 1;
+  if (idA < idB) return 1;
+  if (idA > idB) return -1;
   return 0;
 };
 

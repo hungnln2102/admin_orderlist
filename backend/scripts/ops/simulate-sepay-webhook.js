@@ -122,7 +122,7 @@ async function main() {
 
   const payload = {
     transactionDate,
-    accountNumber: String(args["account-number"] || "918340998"),
+    accountNumber: String(args["account-number"] || "9183400998"),
     transferType: "in",
     transferAmount: amount,
     content,

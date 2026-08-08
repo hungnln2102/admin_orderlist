@@ -18,12 +18,12 @@ const {
 const {
   computeOrderCurrentPrice,
 } = require("../../../../webhook/sepay/renewalPricing");
-const { ORDERS_SCHEMA } = require("@/config/dbSchema");
+const { ORDERS_SCHEMA, SCHEMA_ORDERS, tableName } = require("@/config/dbSchema");
 const { isMavnImportOrder } = require("@/utils/orderHelpers");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const ORDER_TABLE_NAME = ORDERS_SCHEMA.ORDER_LIST.TABLE;
-const ORDER_TABLE_FQ = `orders.${ORDER_TABLE_NAME}`;
+const ORDER_TABLE_FQ = tableName(ORDER_TABLE_NAME, SCHEMA_ORDERS);
 
 /**
  * Mở renewal slot cho 1 đơn duy nhất trong savepoint riêng.

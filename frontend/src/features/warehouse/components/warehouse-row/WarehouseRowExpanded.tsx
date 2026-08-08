@@ -70,19 +70,19 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
     <tr className="warehouse-row__expandable animate-in fade-in slide-in-from-top-2 duration-300">
       <td
         colSpan={totalColumns}
-        className="warehouse-row__expandable-cell w-full max-w-0 px-4 pb-6 pt-1 sm:px-6 sm:pb-8"
+        className="warehouse-row__expandable-cell w-full max-w-0 px-4 pb-6 pt-1"
       >
         <div
-          className={`warehouse-row__expandable-content min-w-0 max-w-full rounded-[24px] border p-5 glass-panel-light shadow-2xl sm:rounded-[32px] sm:p-6 ${theme.expandablePanelClass}`}
+          className={`warehouse-row__expandable-content min-w-0 max-w-full rounded-[28px] border p-6 glass-panel-light shadow-2xl backdrop-blur-md ${theme.expandablePanelClass}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 text-center">
-              <p className="text-sm font-semibold text-indigo-50">
+          <div className="mb-5 flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-white">
                 {isEditing ? "Chỉnh sửa tài khoản" : "Chi tiết tài khoản"}
               </p>
               <p
-                className="mx-auto max-w-full truncate text-xs font-semibold uppercase tracking-wide text-indigo-200"
+                className="max-w-full truncate text-[11px] font-semibold uppercase tracking-wider text-indigo-300/80 mt-0.5"
                 title={`${categoryLabel} · ${accountLabel}`}
               >
                 {categoryLabel} · {accountLabel}
@@ -92,9 +92,9 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => void copyAll()}
-                className="ml-auto rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-900/40 hover:from-emerald-600 hover:to-green-700"
+                className="ml-auto rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-500/15 hover:from-emerald-600 hover:to-teal-700 active:scale-95 transition-all"
               >
-                {copied ? "Đã sao chép" : "Sao chép tất cả"}
+                {copied ? "✓ Đã sao chép" : "Sao chép tất cả"}
               </button>
             )}
             {isEditing && draft && (
@@ -103,27 +103,27 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
                   type="button"
                   disabled={loading}
                   onClick={() => onSave(item.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-500/30 hover:bg-emerald-500/30 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/20 px-3.5 py-2 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/30 transition-all disabled:opacity-50"
                 >
-                  <CheckIcon className="h-4 w-4" />
+                  <CheckIcon className="h-3.5 w-3.5" />
                   Lưu
                 </button>
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => onDelete(item.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-200 ring-1 ring-rose-500/25 hover:bg-rose-500/25 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/15 px-3.5 py-2 text-xs font-semibold text-rose-300 ring-1 ring-rose-500/25 hover:bg-rose-500/25 transition-all disabled:opacity-50"
                 >
-                  <TrashIcon className="h-4 w-4" />
+                  <TrashIcon className="h-3.5 w-3.5" />
                   Xoá
                 </button>
                 <button
                   type="button"
                   disabled={loading}
                   onClick={onCancel}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/60 ring-1 ring-white/10 hover:bg-white/10 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/70 ring-1 ring-white/10 hover:bg-white/10 transition-all disabled:opacity-50"
                 >
-                  <XMarkIcon className="h-4 w-4" />
+                  <XMarkIcon className="h-3.5 w-3.5" />
                   Huỷ
                 </button>
               </div>
@@ -140,45 +140,49 @@ export const WarehouseRowExpanded: React.FC<Props> = ({
           ) : (
             <>
               {(item.services && item.services.length > 0) ? (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-sm text-indigo-100">
-                    <thead className="text-[10px] uppercase text-indigo-300 border-b border-indigo-500/20">
-                      <tr>
-                        <th className="px-3 py-2">Dịch vụ</th>
-                        <th className="px-3 py-2">Mật khẩu</th>
-                        <th className="px-3 py-2">Mail Backup</th>
-                        <th className="px-3 py-2">2FA</th>
-                        <th className="px-3 py-2">Hạn sử dụng</th>
-                        <th className="px-3 py-2">Trạng thái</th>
-                        <th className="px-3 py-2">Ghi chú</th>
+                <div className="overflow-x-auto w-full rounded-2xl border border-white/5 bg-slate-950/40 shadow-inner">
+                  <table className="w-full text-left text-xs text-slate-300 border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950/60 text-[10px] font-bold uppercase tracking-wider text-indigo-300/80 border-b border-white/5">
+                        <th className="px-4 py-3 font-semibold">Dịch vụ</th>
+                        <th className="px-4 py-3 font-semibold">Mật khẩu</th>
+                        <th className="px-4 py-3 font-semibold">Mail Backup</th>
+                        <th className="px-4 py-3 font-semibold">2FA</th>
+                        <th className="px-4 py-3 font-semibold">Hạn sử dụng</th>
+                        <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                        <th className="px-4 py-3 font-semibold">Ghi chú</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-indigo-500/10">
+                    <tbody className="divide-y divide-white/5 font-medium">
                       {item.services.map((srv, idx) => (
-                        <tr key={srv.id || idx}>
-                          <td className="px-3 py-2 font-semibold text-white">{getWarehouseServiceDisplayName(srv) || "—"}</td>
-                          <td className="px-3 py-2">
+                        <tr key={srv.id || idx} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-4 py-3 font-bold text-white text-xs">{getWarehouseServiceDisplayName(srv) || "—"}</td>
+                          <td className="px-4 py-3">
                             <div className="w-fit max-w-full">
                               <CopyableValue value={srv.password} mono showButtonOnHover={false} />
                             </div>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-4 py-3">
                             <div className="w-fit max-w-full">
                               <CopyableValue value={srv.backup_email} showButtonOnHover={false} />
                             </div>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-4 py-3">
                             <div className="w-fit max-w-full">
                               <CopyableValue value={srv.two_fa} mono showButtonOnHover={false} />
                             </div>
                           </td>
-                          <td className="px-3 py-2">{srv.expires_at ? new Date(srv.expires_at).toLocaleDateString('vi-VN') : "—"}</td>
-                          <td className="px-3 py-2">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] ${srv.status === 'UNAVAILABLE' ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                              {srv.status === 'UNAVAILABLE' ? "Đang Sử Dụng" : (srv.status === 'AVAILABLE' ? "Tồn Kho" : srv.status || "--")}
+                          <td className="px-4 py-3 text-slate-400">{srv.expires_at ? new Date(srv.expires_at).toLocaleDateString('vi-VN') : "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+                              srv.status === 'UNAVAILABLE' 
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
+                                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            }`}>
+                              {srv.status === 'UNAVAILABLE' ? "Đang Sử Dụng" : "Tồn Kho"}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-xs opacity-75 max-w-[150px] truncate" title={srv.note || ""}>
+                          <td className="px-4 py-3 text-xs text-slate-400 max-w-[150px] truncate" title={srv.note || ""}>
                             {srv.note || "--"}
                           </td>
                         </tr>

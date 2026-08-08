@@ -77,6 +77,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
     batchCodes,
     transferAmountNormalized,
     supplierSettlementTransfer,
+    singleOrderCode,
   } = parsed;
   const potentialSupplierRefundTransfer = Boolean(parsed?.potentialSupplierRefundTransfer);
   const autoSupplierSettlement = parsed?.autoSupplierSettlement || null;
@@ -115,10 +116,13 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         resolvedBatchCodes,
         normalizeMoney
       );
+      const { resolveOrderCodesByTransaction } = require("../../paymentReference");
+      const transactionOrderCodes = await resolveOrderCodesByTransaction(client, paymentReferenceCodes);
+
       loopOrderCodes = buildWebhookLoopOrderCodes({
         batchOrderMap,
-        transactionOrderCodes: [],
-        singleOrderCode: "",
+        transactionOrderCodes,
+        singleOrderCode: singleOrderCode || "",
       });
 
       if (loopOrderCodes.length === 0 && transferAmountNormalized > 0 && !supplierSettlementTransfer) {

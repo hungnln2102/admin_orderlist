@@ -39,9 +39,7 @@ export const CreateOrderModalHeader: React.FC<CreateOrderModalHeaderProps> = ({
           {isImport ? "Import Builder" : "Order Builder"}
         </p>
         <h3 className="mt-1 text-xl sm:text-2xl font-black text-white tracking-tight">
-          {isImport 
-            ? "Tạo Đơn Nhập Hàng" 
-            : (multiOrderEnabled ? "Tạo đơn hàng gộp" : "Tạo đơn hàng mới")}
+          {isImport ? "Tạo Đơn Nhập Hàng" : "Tạo đơn hàng"}
         </h3>
         <p className="mt-2 text-xs text-slate-300/75 max-w-xl leading-relaxed">
           {isImport 

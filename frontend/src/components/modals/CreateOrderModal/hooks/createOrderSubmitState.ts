@@ -1,4 +1,4 @@
-﻿import { ORDER_FIELDS } from "../../../../constants";
+import { ORDER_FIELDS } from "../../../../constants";
 import type { CreateOrderCreationKind, Order } from "../types";
 
 export const getCreateOrderSubmitState = ({
@@ -32,10 +32,8 @@ export const getCreateOrderSubmitState = ({
     submitLabel = "Đang xử lý...";
   } else if (isImport) {
     submitLabel = "Tạo đơn nhập hàng";
-  } else if (multiOrderEnabled) {
-    submitLabel = totalOrdersToCreate > 1
-      ? "Tạo đơn hàng gộp (" + totalOrdersToCreate + " đơn)"
-      : "Tạo đơn hàng gộp";
+  } else if (multiOrderEnabled && totalOrdersToCreate >= 2) {
+    submitLabel = "Tạo đơn hàng gộp (" + totalOrdersToCreate + " đơn)";
   } else {
     submitLabel = "Tạo đơn hàng";
   }

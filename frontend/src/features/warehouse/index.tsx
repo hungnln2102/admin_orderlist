@@ -27,6 +27,7 @@ export default function Storage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [productFilter, setProductFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "available" | "empty">("all");
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [draft, setDraft] = useState<WarehouseItem | null>(null);
@@ -187,18 +188,23 @@ export default function Storage() {
     }
   };
 
-      const { productOptions, loadingProducts, reloadProducts } = useWarehouseProducts(items);
-      const { serviceNameOptions, reloadNames } = useWarehouseServiceNames();
+  const { productOptions, loadingProducts } = useWarehouseProducts(items);
+  const { serviceNameOptions, loadingNames, reloadNames } = useWarehouseServiceNames();
 
   const filtered = useMemo(() => {
     return items
       .filter((item) => {
+        // Status filter
+        const hasAvail = item.services?.some(s => s.status === 'AVAILABLE');
+        if (statusFilter === "available" && !hasAvail) return false;
+        if (statusFilter === "empty" && hasAvail) return false;
+
         if (productFilter.trim()) {
-          const filter = normalizeText(productFilter);
+          const filterId = Number(productFilter);
           const hasMatchingCat = item.services?.some(
-            (s) => normalizeText(getWarehouseServiceDisplayName(s)) === filter
+            (s) => Number(s.warehouse_product_name_id) === filterId
           );
-          if (!hasMatchingCat && normalizeText(item.category) !== filter) return false;
+          if (!hasMatchingCat) return false;
         }
         if (!search.trim()) return true;
         const q = normalizeText(search);
@@ -214,6 +220,13 @@ export default function Storage() {
         );
       })
       .sort((a, b) => {
+        // Available items first, empty last
+        const hasAvailA = a.services?.some(s => s.status === 'AVAILABLE') ? 1 : 0;
+        const hasAvailB = b.services?.some(s => s.status === 'AVAILABLE') ? 1 : 0;
+        if (hasAvailA !== hasAvailB) {
+          return hasAvailB - hasAvailA;
+        }
+
         const nameA = normalizeText(
           getWarehouseServiceDisplayName(a.services?.[0]) || a.category
         );
@@ -222,7 +235,7 @@ export default function Storage() {
         );
         return nameA.localeCompare(nameB, "vi");
       });
-  }, [items, search, productFilter]);
+  }, [items, search, productFilter, statusFilter]);
 
   const { currentItems, totalPages } = useMemo(
     () => getWarehousePaginated(filtered, currentPage, rowsPerPage),
@@ -236,7 +249,7 @@ export default function Storage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, productFilter, rowsPerPage]);
+  }, [search, productFilter, statusFilter, rowsPerPage]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -271,8 +284,10 @@ export default function Storage() {
             onSearchChange={setSearch}
             productFilter={productFilter}
             onProductFilterChange={setProductFilter}
-            productOptions={productOptions}
-            loadingProducts={loadingProducts}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            productOptions={serviceNameOptions}
+            loadingProducts={loadingNames}
             onCreate={startCreate}
             loading={loading}
             error={error}

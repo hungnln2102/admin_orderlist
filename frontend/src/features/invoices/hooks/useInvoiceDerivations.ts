@@ -54,9 +54,32 @@ export function useInvoiceDerivations({
   }, [receipts, searchTerm, dateStart, dateEnd, categoryFilter]);
 
   const stats = useMemo(() => {
-    const mavFlowReceipts = receipts.filter(
-      (item) => determineReceiptCategory(item) === "receipt"
-    );
+    const normalized = searchTerm.trim().toLowerCase();
+    const startTime = parseDMYDate(dateStart);
+    const endTime = parseDMYDate(dateEnd);
+
+    const mavFlowReceipts = receipts.filter((item) => {
+      const recordCategory = determineReceiptCategory(item);
+      if (recordCategory !== "receipt") return false;
+
+      const matchesSearch =
+        !normalized ||
+        [item.orderCode, item.note, resolveSender(item)]
+          .map((value) => value?.toLowerCase() ?? "")
+          .some((value) => value.includes(normalized));
+
+      const paidTimestamp = parseDMYDate(formatDateToDMY(item.paidAt) || "");
+
+      const withinStart =
+        startTime === null ||
+        paidTimestamp === null ||
+        paidTimestamp >= startTime;
+      const withinEnd =
+        endTime === null || paidTimestamp === null || paidTimestamp <= endTime;
+
+      return matchesSearch && withinStart && withinEnd;
+    });
+
     const totalAmount = mavFlowReceipts.reduce((sum, item) => sum + item.amount, 0);
     let latestPaidAt = "";
     for (const item of mavFlowReceipts) {
@@ -66,25 +89,25 @@ export function useInvoiceDerivations({
 
     return [
       {
-        name: "T?ng Bi?n Nh?n",
+        name: "Tổng Biên Nhận",
         value: mavFlowReceipts.length.toString(),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.sky,
       },
       {
-        name: "T?ng S? Ti?n",
+        name: "Tổng Số Tiền",
         value: formatCurrencyVndFull(totalAmount),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.emerald,
       },
       {
-        name: "Bi?n Nh?n G?n Nh?t",
+        name: "Biên Nhận Mới Nhất",
         value: latestPaidAt ? formatDateToDMY(latestPaidAt) ?? "--" : "--",
         icon: XCircleIcon,
         accent: STAT_CARD_ACCENTS.violet,
       },
     ];
-  }, [receipts]);
+  }, [receipts, searchTerm, dateStart, dateEnd]);
 
   const categoryCounts = useMemo(() => {
     return receipts.reduce(

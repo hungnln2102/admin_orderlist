@@ -65,12 +65,31 @@ const findAccountIdByReceiver = async (executor, receiverAccount) => {
   return row?.id ? Number(row.id) : null;
 };
 
+const findDefaultActiveAccountId = async (executor) => {
+  const result = await runQuery(
+    executor,
+    `SELECT ${ACCOUNT_COLS.ID} AS id
+     FROM ${ACCOUNT_TABLE}
+     WHERE ${ACCOUNT_COLS.IS_ACTIVE} = true
+       AND ${ACCOUNT_COLS.IS_DEFAULT} = true
+       AND ${ACCOUNT_COLS.IS_DELETED} = false
+       AND account_type = 'bank'
+     ORDER BY ${ACCOUNT_COLS.ID} DESC
+     LIMIT 1`
+  );
+  const row = result.rows?.[0];
+  return row?.id ? Number(row.id) : null;
+};
+
 const resolveAccountId = async (executor, { accountId = null, receiverAccount = "" } = {}) => {
   const normalizedAccountId = Number(accountId);
   if (Number.isFinite(normalizedAccountId) && normalizedAccountId > 0) {
     return normalizedAccountId;
   }
-  return findAccountIdByReceiver(executor, receiverAccount);
+  const matchedId = await findAccountIdByReceiver(executor, receiverAccount);
+  if (matchedId) return matchedId;
+
+  return findDefaultActiveAccountId(executor);
 };
 
 const findLedgerBySource = async (executor, sourceKind, sourceId) => {

@@ -39,7 +39,6 @@ export default function Invoices() {
     useInvoiceReceipts();
   const { flowTypes } = useReceiptFlowTypes();
   const [matchingReceiptId, setMatchingReceiptId] = useState<number | null>(null);
-  const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const [expandedReceiptId, setExpandedReceiptId] = useState<number | null>(
     null
   );
@@ -50,7 +49,6 @@ export default function Invoices() {
   const [qrNote, setQrNote] = useState("");
   const [selectedReceipt, setSelectedReceipt] =
     useState<PaymentReceipt | null>(null);
-  const dateRangeRef = useRef<HTMLDivElement | null>(null);
   const [receiptPage, setReceiptPage] = useState(1);
   const [outOfFlowPage, setOutOfFlowPage] = useState(1);
   const [outboundUnallocatedPage, setOutboundUnallocatedPage] = useState(1);
@@ -100,23 +98,7 @@ export default function Invoices() {
 
   const exportDisabled = loading || filteredReceipts.length === 0;
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dateRangeRef.current &&
-        !dateRangeRef.current.contains(event.target as Node)
-      ) {
-        setRangePickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  const dateRangeDisplay =
-    dateStart && dateEnd
-      ? `${dateStart} - ${dateEnd}`
-      : "dd/mm/yyyy - dd/mm/yyyy";
 
   const toggleRowDetails = (receiptId: number) => {
     setExpandedReceiptId((current) =>
@@ -263,12 +245,6 @@ export default function Invoices() {
           onSearchChange={setSearchTerm}
           dateStart={dateStart}
           dateEnd={dateEnd}
-          dateRangeDisplay={dateRangeDisplay}
-          rangePickerOpen={rangePickerOpen}
-          setRangePickerOpen={setRangePickerOpen}
-          dateRangeRef={dateRangeRef}
-          toDisplayDate={toDisplayDate}
-          toISODate={toISODate}
           onDateStartChange={setDateStart}
           onDateEndChange={setDateEnd}
           onExport={handleExportToExcel}
