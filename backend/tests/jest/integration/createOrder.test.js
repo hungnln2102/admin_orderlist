@@ -61,7 +61,7 @@ describe("Luồng kiểm thử: Tạo đơn hàng và thanh toán qua Webhook", 
       customer: "Jest Customer A",
       contact: "0987654321",
       payment_method: "bank",
-      reserved_order_code: `${TEST_PREFIX}C_NON_MAVRYK`
+      reserved_order_code: `${TEST_PREFIX}CNONMAVRYK`
     };
 
     const createRes = await request
@@ -131,7 +131,7 @@ describe("Luồng kiểm thử: Tạo đơn hàng và thanh toán qua Webhook", 
       customer: "Jest Customer Mavryk",
       contact: "0987654321",
       payment_method: "bank",
-      reserved_order_code: `${TEST_PREFIX}C_MAVRYK`
+      reserved_order_code: `${TEST_PREFIX}CMAVRYK`
     };
 
     const createRes = await request
@@ -162,7 +162,7 @@ describe("Luồng kiểm thử: Tạo đơn hàng và thanh toán qua Webhook", 
       code: null,
       transaction_content: `Chuyen khoan thanh toan don ${orderCode}`,
       reference_number: `TXN_TEST_${Date.now()}_M`,
-      description: "Payment for order Mavryk",
+      description: "Payment for order",
       note: `Chuyen khoan thanh toan don ${orderCode}`,
     };
 

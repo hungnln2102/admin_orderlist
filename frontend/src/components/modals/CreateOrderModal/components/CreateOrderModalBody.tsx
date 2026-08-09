@@ -39,6 +39,9 @@ type CreateOrderModalBodyProps = {
   };
   saveToWarehouse?: boolean;
   setSaveToWarehouse?: (value: boolean) => void;
+  shopBankAccounts?: any[];
+  selectedShopBankAccountId?: number | null;
+  onShopBankAccountChange?: (id: number | null) => void;
 };
 
 export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
@@ -53,11 +56,14 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
   importPackage,
   saveToWarehouse = true,
   setSaveToWarehouse,
+  shopBankAccounts = [],
+  selectedShopBankAccountId = null,
+  onShopBankAccountChange,
 }) => {
   const isImport = orderCreationKind === "import";
 
   if (isImport) {
-    const inputPremiumClass = "w-full rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-500/50 focus:bg-indigo-500/[0.05] focus:shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all duration-300 disabled:opacity-50";
+    const inputPremiumClass = "w-full rounded-xl border border-white/5 bg-[#030712] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-500/50 focus:bg-indigo-500/[0.05] focus:shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all duration-300 disabled:opacity-50";
     const labelPremiumClass = "block text-[11px] font-bold text-indigo-100/60 uppercase tracking-widest mb-2 ml-1";
 
     return (
@@ -228,6 +234,24 @@ export const CreateOrderModalBody: React.FC<CreateOrderModalBodyProps> = ({
                     </div>
                   )}
                 </div>
+
+                {pricing.isMavrykSupply && (
+                  <div className="group md:col-span-2">
+                    <label className={`${labelPremiumClass} !text-indigo-300/80`}>Tài khoản trừ tiền</label>
+                    <select
+                      value={selectedShopBankAccountId ?? ""}
+                      onChange={(e) => onShopBankAccountChange?.(e.target.value ? Number(e.target.value) : null)}
+                      className={inputPremiumClass}
+                    >
+                      <option value="" className="bg-[#030712] text-white/50">-- Chọn tài khoản ngân hàng --</option>
+                      {shopBankAccounts?.map((acc) => (
+                        <option key={acc.id} value={acc.id} className="bg-[#030712] text-white">
+                          {acc.bankDisplayName || acc.bankShortCode || "NH"} - {acc.accountNumber} ({acc.accountHolder})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
 

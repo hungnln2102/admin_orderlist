@@ -48,6 +48,7 @@ const attachCreateOrderRoute = (router) => {
         const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
         const grossSellingPriceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE;
         const requestedCreditNoteId = Number(req.body?.refund_credit_note_id);
+        const requestedShopBankAccountId = Number(req.body?.shop_bank_account_id ?? req.body?.shopBankAccountId) || null;
         const requestedCreditApplyAmount = normalizeMoney(req.body?.refund_credit_apply_amount);
         const requestedCreditSourceOrderCode = String(
             req.body?.refund_credit_source_order_code || ""
@@ -248,6 +249,13 @@ const attachCreateOrderRoute = (router) => {
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 
+            if (isMavnCreate && requestedShopBankAccountId) {
+                await trx("business.order_bank_accounts").insert({
+                    order_id: newOrder.id,
+                    shop_bank_account_id: requestedShopBankAccountId,
+                });
+            }
+
             let applyRefundResult = null;
             let refundCreditApplication = null;
             if (creditNoteForOrder && appliedCreditAmount > 0) {
@@ -276,7 +284,9 @@ const attachCreateOrderRoute = (router) => {
             // Đồng bộ chi phí/tài chính MAVN khi tạo đơn nhập
             if (isMavnCreate) {
                 const { syncMavnStoreProfitExpense } = require("@/domains/orders/controller/finance/mavnStoreExpenseSync");
-                await syncMavnStoreProfitExpense(trx, null, newOrder);
+                await syncMavnStoreProfitExpense(trx, null, newOrder, {
+                    shopBankAccountId: requestedShopBankAccountId,
+                });
             }
             await trx.commit();
 

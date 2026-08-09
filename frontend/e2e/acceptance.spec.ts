@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import crypto from "crypto";
+import { Buffer } from "buffer";
 
 test.describe("Admin Store E2E Acceptance Tests", () => {
   test.beforeEach(async ({ page }) => {

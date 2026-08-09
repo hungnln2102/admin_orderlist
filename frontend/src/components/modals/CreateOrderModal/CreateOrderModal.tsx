@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ORDER_FIELDS } from "../../../constants";
 import { usePricingTiers } from "@/shared/hooks/usePricingTiers";
 import { useCreateOrderLogic } from "./hooks/useCreateOrderLogic";
@@ -8,6 +8,7 @@ import { CreateOrderModalHeader } from "./components/CreateOrderModalHeader";
 import { CreateOrderModalBody } from "./components/CreateOrderModalBody";
 import { useCreateOrderModalDerived } from "./hooks/useCreateOrderModalDerived";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import { fetchShopBankAccounts } from "@/features/wallet/shop-bank-accounts/api/shopBankAccountApi";
 import { useCreateOrderImportPackageFlow } from "./hooks/useCreateOrderImportPackageFlow";
 import { useCreateOrderImportPackageSave } from "./hooks/useCreateOrderImportPackageSave";
 import { getCreateOrderSubmitState } from "./hooks/createOrderSubmitState";
@@ -21,8 +22,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const isImport = orderCreationKind === "import";
   const [saveToWarehouse, setSaveToWarehouse] = useState(isImport);
   const [customMode, setCustomMode] = useState(false);
+  const [shopBankAccounts, setShopBankAccounts] = useState<any[]>([]);
+
   const { pendingImportPackageRef, handleSaveWithImportPackage } =
     useCreateOrderImportPackageSave(onSave);
+
   const { orderCodeOptions } = usePricingTiers();
   const {
     formData,
@@ -61,6 +65,24 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     completeLineCount,
     isMultiReady,
   } = useCreateOrderLogic(isOpen, handleSaveWithImportPackage, customMode, prefillContext, orderCreationKind);
+
+  useEffect(() => {
+    if (isOpen && isImport) {
+      fetchShopBankAccounts()
+        .then((accounts) => {
+          const activeAccounts = accounts.filter((a) => a.isActive);
+          setShopBankAccounts(activeAccounts);
+
+          const defaultAcc = activeAccounts.find((a) => a.isDefault);
+          if (defaultAcc && !formData[ORDER_FIELDS.SHOP_BANK_ACCOUNT_ID]) {
+            updateForm({ [ORDER_FIELDS.SHOP_BANK_ACCOUNT_ID]: defaultAcc.id });
+          }
+        })
+        .catch((err) => {
+          console.error("Lỗi khi tải danh sách tài khoản ngân hàng:", err);
+        });
+    }
+  }, [isOpen, isImport, updateForm, formData[ORDER_FIELDS.SHOP_BANK_ACCOUNT_ID]]);
   const hasPrefillCredit = Boolean(prefillContext && Number(prefillContext.creditNoteId) > 0);
 
   const {
@@ -148,6 +170,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             onSubmit={handleSubmitWithPackage}
             saveToWarehouse={saveToWarehouse}
             setSaveToWarehouse={setSaveToWarehouse}
+            shopBankAccounts={shopBankAccounts}
+            selectedShopBankAccountId={formData[ORDER_FIELDS.SHOP_BANK_ACCOUNT_ID] != null ? Number(formData[ORDER_FIELDS.SHOP_BANK_ACCOUNT_ID]) : null}
+            onShopBankAccountChange={(id) => updateForm({ [ORDER_FIELDS.SHOP_BANK_ACCOUNT_ID]: id })}
             customer={{
               formData,
               onFieldChange: handleChange,

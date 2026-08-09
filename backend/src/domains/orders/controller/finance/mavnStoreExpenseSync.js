@@ -67,20 +67,49 @@ function monthKeyMavnDashboard() {
 
 async function resolveIsInternalSupplier(trx, row) {
   const supplyId = Number(row?.[COLS.ORDER.ID_SUPPLY] ?? row?.supply_id);
-  if (!Number.isFinite(supplyId) || supplyId <= 0) return false;
+  console.log('[DEBUG_SYNC] resolveIsInternalSupplier: supplyId =', supplyId);
+  if (!Number.isFinite(supplyId) || supplyId <= 0) {
+    console.log('[DEBUG_SYNC] resolveIsInternalSupplier: supplyId invalid, returning false');
+    return false;
+  }
   const supplier = await trx(supplierTable)
     .select(supplierCols.SUPPLIER_NAME)
     .where(supplierCols.ID, supplyId)
     .first();
-  return isMavrykShopSupplierName(supplier?.[supplierCols.SUPPLIER_NAME]);
+  console.log('[DEBUG_SYNC] resolveIsInternalSupplier: query result =', supplier);
+  const isInternal = isMavrykShopSupplierName(supplier?.[supplierCols.SUPPLIER_NAME]);
+  console.log('[DEBUG_SYNC] resolveIsInternalSupplier: isInternal =', isInternal);
+  return isInternal;
 }
 
-async function settleMavnInternalBankDelta(trx, { signedAmount, orderRow }) {
+async function settleMavnInternalBankDelta(trx, { signedAmount, orderRow, shopBankAccountId = null }) {
   const numericDelta = Number(signedAmount);
-  if (!Number.isFinite(numericDelta) || numericDelta === 0) return;
+  console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: signedAmount =', signedAmount, 'shopBankAccountId =', shopBankAccountId);
+  if (!Number.isFinite(numericDelta) || numericDelta === 0) {
+    console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: delta is 0 or invalid, returning');
+    return;
+  }
 
   const absAmount = Math.abs(numericDelta);
-  const mavrykAccount = await resolveMavrykDefaultBankAccount(absAmount, trx);
+  let mavrykAccount = null;
+
+  if (shopBankAccountId) {
+    const { findShopBankAccountById } = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
+    console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: calling findShopBankAccountById with id =', shopBankAccountId);
+    const account = await findShopBankAccountById(shopBankAccountId, trx);
+    console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: findShopBankAccountById result =', account);
+    if (account && account.isActive && !account.isDeleted) {
+      mavrykAccount = account;
+    } else {
+      console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: account not active or deleted, falling back to default');
+      mavrykAccount = await resolveMavrykDefaultBankAccount(absAmount, trx);
+    }
+  } else {
+    console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: no shopBankAccountId, falling back to default');
+    mavrykAccount = await resolveMavrykDefaultBankAccount(absAmount, trx);
+  }
+
+  console.log('[DEBUG_SYNC] settleMavnInternalBankDelta: resolved primary account =', mavrykAccount);
   if (!mavrykAccount?.id) {
     logger.warn(
       "[mavnStoreExpenseSync] Không tìm thấy STK Mavryk mặc định — bỏ qua trừ/cộng STK.",
@@ -112,6 +141,7 @@ async function applyInternalMavnDashboardDelta({
   afterRow,
   beforeAppliedAmount,
   afterAppliedAmount,
+  shopBankAccountId = null,
 }) {
   const beforeAmount = normalizeMoney(beforeAppliedAmount);
   const afterAmount = normalizeMoney(afterAppliedAmount);
@@ -132,6 +162,7 @@ async function applyInternalMavnDashboardDelta({
     await settleMavnInternalBankDelta(trx, {
       signedAmount: net,
       orderRow: afterRow || beforeRow,
+      shopBankAccountId,
     });
     return;
   }
@@ -146,6 +177,7 @@ async function applyInternalMavnDashboardDelta({
     await settleMavnInternalBankDelta(trx, {
       signedAmount: beforeAmount,
       orderRow: beforeRow,
+      shopBankAccountId,
     });
   }
 
@@ -159,6 +191,7 @@ async function applyInternalMavnDashboardDelta({
     await settleMavnInternalBankDelta(trx, {
       signedAmount: -afterAmount,
       orderRow: afterRow,
+      shopBankAccountId,
     });
   }
 }
@@ -223,10 +256,27 @@ async function deleteAutoExpenseLogsByOrderCode(trx, orderCode) {
  * - NCC Mavryk/Shop: ghi external_import theo đơn, trừ profit + bank.
  * - NCC khác: dùng supplier_order_cost_log (DB trigger) để trừ profit, KHÔNG trừ bank.
  */
-async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow) {
-  if (!afterRow) return;
-  if (!(await storeProfitExpensesHasMavnColumns())) return;
+async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow, options = {}) {
+  console.log('[DEBUG_SYNC] syncMavnStoreProfitExpense called');
+  if (!afterRow) {
+    console.log('[DEBUG_SYNC] syncMavnStoreProfitExpense: no afterRow');
+    return;
+  }
+  const hasMavnCols = await storeProfitExpensesHasMavnColumns();
+  console.log('[DEBUG_SYNC] storeProfitExpensesHasMavnColumns =', hasMavnCols);
+  if (!hasMavnCols) return;
 
+  let shopBankAccountId = options?.shopBankAccountId || null;
+  if (!shopBankAccountId) {
+    const orderId = Number(afterRow?.id ?? beforeRow?.id);
+    if (Number.isFinite(orderId) && orderId > 0) {
+      const mapping = await trx("business.order_bank_accounts")
+        .where("order_id", orderId)
+        .first();
+      shopBankAccountId = mapping?.shop_bank_account_id || null;
+    }
+  }
+  console.log('[DEBUG_SYNC] resolved shopBankAccountId =', shopBankAccountId);
   const idOrderCol = COLS.ORDER.ID_ORDER;
   const costCol = COLS.ORDER.COST;
   const priceCol = COLS.ORDER.PRICE;
@@ -260,6 +310,7 @@ async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow) {
       afterRow,
       beforeAppliedAmount,
       afterAppliedAmount,
+      shopBankAccountId,
     });
   } else {
     const beforeExternalAmount =

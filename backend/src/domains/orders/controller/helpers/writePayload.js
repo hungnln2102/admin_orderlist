@@ -23,7 +23,14 @@ const sanitizeOrderWritePayload = (raw = {}) => {
         let val = raw[col];
         if (col === COLS.ORDER.ORDER_DATE || col === COLS.ORDER.EXPIRY_DATE) {
             val = normalizeDateInput(val);
-        } else if (col === COLS.ORDER.COST || col === COLS.ORDER.PRICE || col === COLS.ORDER.GROSS_SELLING_PRICE || col === COLS.ORDER.DAYS || col === COLS.ORDER.ID_SUPPLY) {
+        } else if (
+            col === COLS.ORDER.COST ||
+            col === COLS.ORDER.PRICE ||
+            col === COLS.ORDER.GROSS_SELLING_PRICE ||
+            col === COLS.ORDER.DAYS ||
+            col === COLS.ORDER.ID_SUPPLY ||
+            col === COLS.ORDER.USDT_WALLET_ID
+        ) {
             val = toNullableNumber(val);
         } else if (typeof val === "string") {
             val = val.trim();

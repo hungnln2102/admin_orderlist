@@ -33,6 +33,7 @@ const updateOrderWithFinance = async ({
     } = require("@/domains/orders/services/orderFinanceSyncService");
     const logger = require("@/utils/logger");
 
+    const incomingShopBankAccountId = Number(payload?.shop_bank_account_id ?? payload?.shopBankAccountId) || null;
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
     const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
     // Accept supply (name) or id_supply/supply_id: resolve name -> id
@@ -162,8 +163,17 @@ const updateOrderWithFinance = async ({
 
     let createdCreditNote = null;
     try {
+        if (incomingShopBankAccountId && isMavnImportOrder(beforeOrder)) {
+            await trx("business.order_bank_accounts").where({ order_id: id }).del();
+            await trx("business.order_bank_accounts").insert({
+                order_id: id,
+                shop_bank_account_id: incomingShopBankAccountId,
+            });
+        }
         await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
-        await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
+        await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder, {
+            shopBankAccountId: incomingShopBankAccountId,
+        });
 
         const prevStatus = String(beforeOrder?.[COLS.ORDER.STATUS] ?? beforeOrder?.status ?? "").trim();
         const nextStatus = String(updatedOrder?.[COLS.ORDER.STATUS] ?? updatedOrder?.status ?? "").trim();

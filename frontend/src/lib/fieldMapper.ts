@@ -40,6 +40,7 @@ export const ORDER_FIELD_MAP = {
   USDT_AMOUNT_USD: ORDER_COLS.usdtAmountUsd,
   USDT_EXCHANGE_RATE: ORDER_COLS.usdtExchangeRate,
   USDT_WALLET_ID: ORDER_COLS.usdtWalletId,
+  SHOP_BANK_ACCOUNT_ID: ORDER_COLS.shopBankAccountId,
 } as const;
 
 // PURCHASE_ORDER_FIELDS mapping (subset of ORDER fields)

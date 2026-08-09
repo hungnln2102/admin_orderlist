@@ -27,6 +27,7 @@ const { cleanUpTestData } = require("../helpers/dbCleanup");
 const { TEST_PREFIX } = require("../helpers/testDataFactory");
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
+const { todayYMDInVietnam } = require("@/utils/normalizers");
 
 describe("Luồng kiểm thử: Sửa đơn hàng và đổi Nhà cung cấp (Supplier Change)", () => {
   beforeAll(async () => {
@@ -163,9 +164,10 @@ describe("Luồng kiểm thử: Sửa đơn hàng và đổi Nhà cung cấp (Su
     });
 
     // 2.2. Để tạo log NCC, đơn hàng phải ở trạng thái Đã Thanh Toán (PAID). Sửa đơn hàng sang PAID trước.
-    const todayStr = new Date().toISOString().split("T")[0];
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 30);
+    const todayStr = todayYMDInVietnam();
+    const [y, m, d] = todayStr.split("-").map(Number);
+    const expiryDate = new Date(Date.UTC(y, m - 1, d));
+    expiryDate.setUTCDate(expiryDate.getUTCDate() + 30);
     const expiryStr = expiryDate.toISOString().split("T")[0];
 
     await db("business.order_list")

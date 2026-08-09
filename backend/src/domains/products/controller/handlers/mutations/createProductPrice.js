@@ -25,6 +25,8 @@ const {
   normalizeCategoryIds,
   pickCategoryColor,
   resetVariantSequence,
+  isProductPkeyConflict,
+  resetProductSequence,
 } = require("@/domains/products/controller/handlers/mutations/shared");
 
 const createProductPrice = async (req, res) => {
@@ -180,8 +182,12 @@ const createProductPrice = async (req, res) => {
         break;
       } catch (error) {
         lastError = error;
-        if (attempt === 0 && isVariantPkeyConflict(error)) {
-          await resetVariantSequence();
+        if (attempt === 0 && (isVariantPkeyConflict(error) || isProductPkeyConflict(error))) {
+          if (isVariantPkeyConflict(error)) {
+            await resetVariantSequence();
+          } else {
+            await resetProductSequence();
+          }
           continue;
         }
         throw error;

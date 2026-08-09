@@ -28,7 +28,7 @@ Repo là **monorepo nhẹ** (orchestrator ở root, không khai báo `workspaces
 
 ## 2. Dependencies theo package
 
-### 2.1 `backend/package.json` â€” runtime
+### 2.1 `backend/package.json` — runtime
 
 | Package | Dùng cho |
 |--------|----------|
@@ -53,7 +53,7 @@ Repo là **monorepo nhẹ** (orchestrator ở root, không khai báo `workspaces
 
 **Dev:** `jest`, `supertest`, `eslint`, `prettier`, `nodemon`, `concurrently`.
 
-### 2.2 `frontend/package.json` â€” runtime
+### 2.2 `frontend/package.json` — runtime
 
 | Package | Dùng cho |
 |--------|----------|
@@ -62,7 +62,7 @@ Repo là **monorepo nhẹ** (orchestrator ở root, không khai báo `workspaces
 | `vite` (dev) | Build / dev server |
 | `axios` | Gọi API |
 | `@tiptap/*` | Editor rich text (mô tả sản phẩm / bài viết) |
-| `recharts` | Biá»ƒu Ä‘á»“ dashboard |
+| `recharts` | Biểu đồ dashboard |
 | `framer-motion` | Animation |
 | `@heroicons/react`, `lucide-react` | Icon |
 | `react-hot-toast` | Thông báo |
@@ -81,21 +81,21 @@ Không khai báo `dependencies` / `devDependencies` trong file hiện tại — 
 
 | Đường dẫn | Nội dung |
 |-----------|----------|
-| `backend/src/server.js` (default: `npm start`), `backend/index.js` (shim) | Khá»Ÿi Ä‘á»™ng API |
+| `backend/src/server.js` (default: `npm start`), `backend/index.js` (shim) | Khởi động API |
 | `backend/src/app.js` | Cấu hình Express |
 | `backend/src/routes/index.js` | **Gắn mọi route** protected (sau `authGuard`) |
 | `backend/src/routes/*.js` | Nhóm route theo domain |
 | `backend/src/controllers/*` | Handler HTTP theo domain |
 | `backend/src/config/dbSchema/` | Định nghĩa schema bảng / cột (product, orders, finance, …) |
 | `backend/src/db/knexClient.js` | Knex |
-| `backend/src/services/*` | Pricing, Adobe renew, Telegram, package sync, â€¦ |
+| `backend/src/services/*` | Pricing, Adobe renew, Telegram, package sync, … |
 | `backend/src/scheduler/` | Cron / tác vụ định kỳ |
-| `backend/src/middleware/` | `authGuard`, â€¦ |
+| `backend/src/middleware/` | `authGuard`, … |
 | `backend/webhook/sepay/` | Renewal, payment webhook, config pool |
 | `backend/scripts/migrations/` | Chạy migration (vd. `migrate:028`) |
 | `frontend/src/routes/AppRoutes.tsx` | Route React |
-| `frontend/src/features/*` | Feature: orders, dashboard, pricing, renew-adobe, content, â€¦ |
-| `frontend/src/lib/*` | API client, `tableSql`, `productDescApi`, â€¦ |
+| `frontend/src/features/*` | Feature: orders, dashboard, pricing, renew-adobe, content, … |
+| `frontend/src/lib/*` | API client, `tableSql`, `productDescApi`, … |
 | `frontend/src/components/` | Layout, modal dùng chung |
 | `shared/schema.js` | Định nghĩa bảng/cột dạng shared |
 
@@ -124,11 +124,11 @@ Các đường dẫn dưới đây là **prefix** dưới API (thường `/api` 
 **Luồng đặc biệt**
 
 - **Gia hạn đơn + dashboard tháng:** `backend/webhook/sepay/renewal.js` (`runRenewal`) — cập nhật đơn, ghi `finance.dashboard_monthly_summary`.
-- **Schema DB:** `backend/src/config/dbSchema/schemas/ordersProductPartner.js` (product, variant, `desc_variant`, â€¦).
+- **Schema DB:** `backend/src/config/dbSchema/schemas/ordersProductPartner.js` (product, variant, `desc_variant`, …).
 
 ---
 
-## 5. Frontend: feature â†” lib/API
+## 5. Frontend: feature ↔ lib/API
 
 | Feature (`frontend/src/features/`) | Giao tiếp / lib điển nhấn |
 |-----------------------------------|---------------------------|
@@ -182,7 +182,7 @@ Các đường dẫn dưới đây là **prefix** dưới API (thường `/api` 
 | `runRenewalBatch`, `fetchRenewalCandidates`, `processRenewalTask`, … | Lô / hàng đợi renewal | `routes/renewals.js`, webhook batch |
 | `computeOrderCurrentPrice` | Tính lại giá (không ghi DB) cho Telegram | `notifications.js` (cùng thư mục) |
 
-### 7.4 Webhook Sepay â€” `backend/webhook/sepay/payments.js`
+### 7.4 Webhook Sepay — `backend/webhook/sepay/payments.js`
 
 | Export | Vai trò | Nơi dùng |
 |--------|---------|----------|
@@ -195,7 +195,7 @@ Các đường dẫn dưới đây là **prefix** dưới API (thường `/api` 
 |--------|---------|----------|
 | `fetchProductPricing`, `fetchSupplyPrice`, `fetchMaxSupplyPrice`, `findSupplyId` | Đọc `variant` / `supplier_cost` | `renewal.js`, `payments.js`, `notifications.js` |
 | `parseFlexibleDate`, `formatDateDB`, `formatDateDMY`, `addMonthsClamped`, `daysUntil`, … | Ngày / duration | `renewal.js`, eligibility, tests |
-| `normalizeProductDuration`, `extractOrderCodeFromText`, â€¦ | Parse ná»™i dung CK / label SP | Webhook + renewal |
+| `normalizeProductDuration`, `extractOrderCodeFromText`, … | Parse nội dung CK / label SP | Webhook + renewal |
 
 ### 7.6 SQL an toàn — `backend/src/utils/sql.js`
 
@@ -207,7 +207,7 @@ Các đường dẫn dưới đây là **prefix** dưới API (thường `/api` 
 
 | Export | Nơi dùng |
 |--------|----------|
-| `normalizeTextInput`, `trimToLength`, `toNullableNumber`, `normalizeDateInput`, â€¦ | Controllers, ProductDescriptions, Orders, mappers |
+| `normalizeTextInput`, `trimToLength`, `toNullableNumber`, `normalizeDateInput`, … | Controllers, ProductDescriptions, Orders, mappers |
 
 ### 7.8 Mapper sản phẩm — `backend/src/controllers/ProductsController/mappers.js`
 
@@ -219,7 +219,7 @@ Các đường dẫn dưới đây là **prefix** dưới API (thường `/api` 
 
 | Hàm (export module) | Route | Frontend gọi qua |
 |---------------------|--------|------------------|
-| `listProductDescriptions`, `saveProductDescription`, `uploadProductImage`, `listProductImages`, `deleteProductImage` | `src/routes/productDescriptionsRoutes.js` â†’ `/api/product-descriptions/*` | `frontend/src/lib/productDescApi.ts` |
+| `listProductDescriptions`, `saveProductDescription`, `uploadProductImage`, `listProductImages`, `deleteProductImage` | `src/routes/productDescriptionsRoutes.js` → `/api/product-descriptions/*` | `frontend/src/lib/productDescApi.ts` |
 
 ---
 
@@ -227,11 +227,11 @@ Các đường dẫn dưới đây là **prefix** dưới API (thường `/api` 
 
 | File lib | Hàm / constant chính | Được import tại |
 |----------|----------------------|-----------------|
-| `productDescApi.ts` | `saveProductDescription`, `fetchProductDescriptions`, `auditProductSeo`, `uploadProductImage`, â€¦ | `features/product-info/hooks/useProductInfo.ts`, `useProductEdit.ts`, `useWebsiteSeoAudit.ts`, helpers |
+| `productDescApi.ts` | `saveProductDescription`, `fetchProductDescriptions`, `auditProductSeo`, `uploadProductImage`, … | `features/product-info/hooks/useProductInfo.ts`, `useProductEdit.ts`, `useWebsiteSeoAudit.ts`, helpers |
 | `pricingApi.ts` | `fetchCalculatedPrice` | `features/product-price/hooks/useQuoteCalculatedPriceMap.ts`, `CreateOrderModal/.../usePriceCalculation.ts`, `ViewOrderModal/.../useCalculatedPrice.ts` |
 | `tableSql.ts` / `fieldMapper.ts` | Map cột DB ↔ UI (ORDER_COLS, VARIANT_COLS, …) | Bảng dữ liệu toàn admin (orders, pricing, warehouse, …) — grep `tableSql` / `FIELD_MAP` trong `features/` |
 | `categoryApi.ts` | CRUD category | Feature content / category |
-| `formsApi.ts` | `fetchFormNames`, `createForm`, â€¦ | Form-info feature |
+| `formsApi.ts` | `fetchFormNames`, `createForm`, … | Form-info feature |
 | `errorHandler.ts` | `apiFetchWithErrorHandling`, `parseApiError` | Gọi API có xử lý lỗi thống nhất |
 | `refreshBus.ts` | `emitRefresh`, `onRefresh` | Invalidate UI sau mutation |
 | `notifications.ts` | `showAppNotification` | Toast toàn app |
@@ -411,7 +411,7 @@ Mục tiêu: nhìn một chỗ là biết luồng nào đang tác động doanh 
 ### Legacy trigger theo `payment_receipt`
 - Migration tạo trigger cũ:
   - `backend/migrations/20260601120000_trigger_dashboard_revenue_on_payment_receipt.js`
-- Migration drop trigger cÅ©:
+- Migration drop trigger cũ:
   - `backend/migrations/20260604191000_drop_legacy_payment_receipt_dashboard_trigger.js`
 
 Nếu môi trường nào chưa drop trigger legacy, có thể phát sinh cộng revenue ngoài flow ứng dụng hiện tại.
@@ -521,7 +521,7 @@ Trong nhánh hủy đơn, refund được ghi nhận ngay tại thời điểm t
 - Khi bấm hủy đơn, hệ thống xử lý theo một nhánh nghiệp vụ:
   - trừ trực tiếp `total_revenue`,
   - trừ trực tiếp `total_profit`,
-  - cá»™ng `total_refund`.
+  - cộng `total_refund`.
 - Tiền cần hoàn cho khách được note vào `daily_revenue_summary.revenue_reversed`:
   - chỉ ghi số tiền cần hoàn (`refund_amount`),
   - nếu trong ngày có nhiều đơn hoàn thì cộng dồn vào cùng ngày (`summary_date`).
@@ -867,7 +867,7 @@ Cần quy ước rõ (và giữ ổn định):
 Một trong các mô hình (chọn một làm chuẩn sản phẩm):
 
 1. **Theo ngày tuyến tính:**  
-   `cost_per_slot_per_day = import_cost / (term_days Ã— sá»‘_slot_active)`  
+   `cost_per_slot_per_day = import_cost / (term_days × số_slot_active)`  
    `carrying_until_sale = cost_per_slot_per_day × số_ngày_tồn_thực_tế`  
 2. **Theo kỳ đã phân bổ sẵn:** chỉ tính trên các ngày có “✓ slot chiếm chỗ” trong bảng phân bổ (nếu nghiệp vụ là slot không luôn full).
 3. **Kết hợp:** cost nhập cố định + điều chỉnh khi slot trống (không phát sinh carrying) — cần mô tả riêng.
@@ -907,20 +907,20 @@ Tài liệu này **không** ép một công thức cụ thể mà yêu cầu **p
 
 ```text
 [Nhập MAVN — đã TT]
-        â”‚
-        â–¼
+        │
+        ▼
 Xác định: cost nhập, kỳ (term), số slot, ngày bắt đầu phân bổ
-        â”‚
-        â–¼
+        │
+        ▼
 (Engine) Phân bổ carrying theo policy ──────► Báo cáo tồn / UI
-        â”‚
-        â–¼
+        │
+        ▼
 [Bán slot — đơn khách]
-        â”‚
-        â–¼
+        │
+        ▼
 (Engine) Lợi nhuận slot = Doanh thu − carrying đã tích − cost trực tiếp khác
-        â”‚
-        â–¼
+        │
+        ▼
 Ghi nhận vào báo cáo P&L slot (và ledger nếu có)
 ```
 
@@ -1001,14 +1001,14 @@ Migration:
 
 ```
 Tạo đơn / chuyển Cần Gia Hạn
-  â†’ openPaymentSlot (kind: new | renewal)
-  â†’ expected_amount = base_amount + suffix
-  â†’ UPDATE order_list.price = expected_amount
+  → openPaymentSlot (kind: new | renewal)
+  → expected_amount = base_amount + suffix
+  → UPDATE order_list.price = expected_amount
 
 Khách CK đúng expected_amount
-  â†’ Webhook insertPaymentReceipt
-  â†’ resolveOrderByExpectedAmount(receiver, amount)
-  â†’ markPaymentSlotMatched
+  → Webhook insertPaymentReceipt
+  → resolveOrderByExpectedAmount(receiver, amount)
+  → markPaymentSlotMatched
 
 Đơn paid / renewal xong / hủy slot cũ
   → suffix được giải phóng (unique chỉ áp pending)
@@ -1028,7 +1028,7 @@ Giá renewal **chốt tại lúc flip RENEWAL**, không đổi khi bảng giá t
 
 ## Webhook Sepay
 
-File: `backend/webhook/sepay/payments.js` â€” `insertPaymentReceipt`
+File: `backend/webhook/sepay/payments.js` — `insertPaymentReceipt`
 
 1. Không extract `orderCode` từ nội dung CK.
 2. Trong transaction: `resolveOrderByExpectedAmount({ receiverAccount, amount })`.
@@ -1067,7 +1067,7 @@ Public API: `openPaymentSlot`, `resolveOrderByExpectedAmount`, `markPaymentSlotM
 - Khách CK **làm tròn** (bỏ phần lẻ) → không match → admin gán tay qua receipt.
 - Cron (khuyến nghị): `expirePaymentSlots(pool, '30 days')` dọn slot pending quá hạn.
 
-## Triá»ƒn khai
+## Triển khai
 
 ```bash
 # Chạy migration (knex hoặc SQL thủ công)
@@ -1236,26 +1236,26 @@ Trong giai đoạn chuyển tiếp, code đang xử lý **vừa cột tổng cũ
 ### 4.3. Sơ đồ tư duy
 
 ```
-  TRÆ¯á»šC (má»™t cá»™t):
-  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  TRƯỚC (một cột):
+  ┌──────────────────────────────────────┐
   │  Số dư bank chung (dashboard/tháng)  │  ← webhook +, rút −, NCC −
-  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+  └──────────────────────────────────────┘
 
   SAU (tách theo STK, tổng không đổi):
-  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  ┌──────────────────────────────────────┐
   │     Lợi nhuận khả dụng (dashboard)    │
   │     = MB + VP + … (chỉ đọc tổng)      │
-  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                  â”‚
-     â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-     â–¼            â–¼            â–¼
-  â”Œâ”€â”€â”€â”€â”€â”€â”    â”Œâ”€â”€â”€â”€â”€â”€â”    â”Œâ”€â”€â”€â”€â”€â”€â”
+  └───────────────┬──────────────────────┘
+                  │
+     ┌────────────┼────────────┐
+     ▼            ▼            ▼
+  ┌──────┐    ┌──────┐    ┌──────┐
   │ STK  │    │ STK  │    │ STK  │   ← mọi cộng/trừ bank ghi ở đây
-  â”‚  MB  â”‚    â”‚  VP  â”‚    â”‚  â€¦   â”‚
-  â””â”€â”€â”€â”€â”€â”€â”˜    â””â”€â”€â”€â”€â”€â”€â”˜    â””â”€â”€â”€â”€â”€â”€â”˜
-       â”‚           â”‚           â”‚
-       â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                   â”‚
+  │  MB  │    │  VP  │    │  …   │
+  └──────┘    └──────┘    └──────┘
+       │           │           │
+       └───────────┴───────────┘
+                   │
             Sổ cái (lịch sử
             từng dòng vào/ra)
 ```
@@ -1297,7 +1297,7 @@ Mỗi STK shop có các chỉ số sau. Tất cả đều mô tả **cùng một
 | **Nhập hàng ngoài luồng** | Supply / log external import | Đã có — chọn STK chi trả |
 | **Thanh toán NCC** | Xác nhận chu kỳ NCC | **Cần bổ sung** — chọn STK shop dùng chuyển tiền |
 
-Sau má»—i giao dá»‹ch ra:
+Sau mỗi giao dịch ra:
 
 - Số dư **STK đó** giảm đúng số tiền.
 - **Lợi nhuận khả dụng** (tổng) giảm cùng số tiền — **tự khớp**, không cần cập nhật thêm cột tổng cũ.
@@ -1681,7 +1681,7 @@ Sau khi rà soát, **không** có double credit, nhưng **còn hai chỗ chưa c
 
 **Cách quan sát:** Vào đơn đó, đảo trạng thái khỏi hoàn → so sánh số dư STK và sổ tổng cũ trước/sau:
 - STK: không đổi (sai theo mô hình mới).
-- Sá»• tá»•ng cÅ©: tÄƒng (legacy).
+- Sổ tổng cũ: tăng (legacy).
 
 ---
 
@@ -1704,7 +1704,7 @@ Trước mỗi test:
 3. Ghi nhận **Lợi nhuận khả dụng** hiển thị trên dashboard.
 4. Đếm số dòng sổ cái STK liên quan (nếu cần đối chiếu chi tiết).
 
-Sau má»—i test, kiá»ƒm:
+Sau mỗi test, kiểm:
 
 - Tổng STK = giá trị ban đầu **± đúng số tiền của test** (không lệch một đồng).
 - Lợi nhuận khả dụng = tổng STK mới (luôn khớp).
@@ -1991,10 +1991,10 @@ Nếu sản phẩm có gói:
   │ Tài khoản / Email                │
   │ Mật khẩu                         │
   │ Mail dự phòng                    │
-  â”‚ 2FA                              â”‚
+  │ 2FA                              │
   │ Hạn sử dụng                      │
   │ Ghi chú                          │
-  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+  └──────────────────────────────────┘
 ```
 
 ### 3. Khi bấm lưu nhập hàng
@@ -2037,7 +2037,7 @@ Backend xử lý trong transaction:
 2. Load rule tạo gói của sản phẩm.
 3. Validate các field bắt buộc theo rule.
 4. Insert `PRODUCT_STOCK`.
-5. Insert `PACKAGE_PRODUCT` vá»›i `stock_id = product_stock.id`.
+5. Insert `PACKAGE_PRODUCT` với `stock_id = product_stock.id`.
 6. Nếu cần `storage_id`, insert thêm `PRODUCT_STOCK` cho storage hoặc dùng cùng stock tùy rule.
 7. Commit transaction.
 8. Trả về `{ warehouseItem, packageProduct }`.
@@ -2153,9 +2153,9 @@ Lý do:
 ### Phương án A: tận dụng field hiện có trên product
 Nếu chỉ cần biết sản phẩm có cần activation hay không, có thể dùng `product.package_requires_activation` hiện tại.
 
-Æ¯u Ä‘iá»ƒm:
+Ưu điểm:
 - Ít migration.
-- Nhanh triá»ƒn khai.
+- Nhanh triển khai.
 
 Nhược điểm:
 - Không đủ linh hoạt nếu mỗi sản phẩm cần bộ input khác nhau.
@@ -2176,7 +2176,7 @@ CREATE TABLE product.import_package_rules (
 );
 ```
 
-Æ¯u Ä‘iá»ƒm:
+Ưu điểm:
 - Mỗi sản phẩm có thể yêu cầu field khác nhau.
 - Dễ thêm field sau này như `recovery_code`, `cookie`, `profile_name`.
 
@@ -2206,22 +2206,22 @@ Nhược điểm:
 
 ```txt
 Admin chọn sản phẩm
-  â†“
+  ↓
 Frontend load rule theo sản phẩm
-  â†“
+  ↓
 Nếu sản phẩm có rule enabled
-  â†“
+  ↓
 Hiện block input tài khoản / mk / mail dự phòng / 2FA / hạn / note
-  â†“
+  ↓
 Admin bấm Lưu
-  â†“
+  ↓
 POST /api/import-packages
-  â†“
+  ↓
 Backend transaction:
   1. Insert PRODUCT_STOCK
   2. Insert PACKAGE_PRODUCT stock_id = stock.id
   3. Commit
-  â†“
+  ↓
 Frontend refresh Lô hàng + Gói sản phẩm
 ```
 
@@ -2463,10 +2463,10 @@ Mục tiêu hiện tại: **UI Tổng quan chỉ đọc số liệu đã lưu tr
 |-------------|----------|
 | `frontend/src/features/dashboard/pages/DashboardPage.tsx` | Tab `overview`: `OverviewSection` + filter khoảng ngày (`dashboardRange`) |
 | `frontend/src/features/dashboard/hooks/useDashboardStats.ts` | Gọi `fetchDashboardStats(range)`, `fetchChartData(year)` hoặc `fetchChartDataRange(from,to)` |
-| `frontend/src/features/dashboard/api/dashboardApi.ts` | `GET /api/dashboard/stats`, `/charts`, `/years`; mapping payload biá»ƒu Ä‘á»“ |
+| `frontend/src/features/dashboard/api/dashboardApi.ts` | `GET /api/dashboard/stats`, `/charts`, `/years`; mapping payload biểu đồ |
 | `frontend/src/features/dashboard/hooks/useMonthlySummary.ts` | `GET /api/dashboard/monthly-summary` (hiện UI bảng có thể ẩn nhưng API vẫn dùng được) |
 
-### 3.2. Backend â€” route
+### 3.2. Backend — route
 
 Prefix API: **`/api/dashboard`** (`backend/src/routes/dashboardRoutes.js`).
 
@@ -2555,7 +2555,7 @@ Phiếu credit gắn đơn nguồn hoàn tiền; dùng khi **tạo đơn mới**
 
 **ID:** `TQD-H03` · **Thời gian:** 2026-04-29
 
-- **Má»™t luá»“ng (API Tá»•ng quan â€” `service.js` + `availableProfitFromSummary.js` + `dashboardStoreExpenseDeductions.js`):**
+- **Một luồng (API Tổng quan — `service.js` + `availableProfitFromSummary.js` + `dashboardStoreExpenseDeductions.js`):**
   - **Lợi nhuận tháng** (`monthlyProfit`, biểu đồ, `GET /dashboard/monthly-summary`): `total_profit` trên `dashboard_monthly_summary` theo `month_key` **trừ** (trong tháng `created_at`) tổng `mavn_import` + `external_import` trong `store_profit_expenses`.
   - **Lợi nhuận khả dụng** (`availableProfit`): `SUM(total_profit)` mọi tháng trên summary **chỉ trừ** tổng `withdraw_profit` (xem **`TQD-H08`** nếu cần phân biệt với bản trước đã trừ thêm MAVN/external). `previous`: profit các tháng trước tháng hiện tại **trừ** `withdraw_profit` có `created_at` trước ngày 1 tháng hiện tại.
 
@@ -2823,7 +2823,7 @@ Yêu cầu **đăng nhập**; API `/api/product-prices/*` do backend phục vụ
 |-------------|-----------|----------|
 | `GET` | `/api/product-prices` | Danh sách variant + margin pivot + `max_supply_price` (MAX giá trong `supply_price` theo variant). Có **cache** server (`pricingCache` trong `handlers/list.js`). |
 | `POST` | `/api/product-prices` | Tạo variant / bản ghi giá mới (`createProductPrice`). |
-| `GET` | `/api/product-prices/:productId` | Má»™t variant theo id. |
+| `GET` | `/api/product-prices/:productId` | Một variant theo id. |
 | `PATCH` | `/api/product-prices/:productId` | Cập nhật variant (gói, mã, giá gốc, tỷ lệ, …). |
 | `PATCH` | `/api/product-prices/:productId/status` | Bật/tắt **hiển thị** (`is_active`). Body: `{ "is_active": boolean }`. |
 | `DELETE` | `/api/product-prices/:productId` | Xóa variant. |
@@ -2853,7 +2853,7 @@ Cột **Giá gốc** có thể **trống (-)** nếu chưa có `max_supply_price
 
 ### Cột bảng (nghiệp vụ)
 
-| Cá»™t | Ná»™i dung |
+| Cột | Nội dung |
 |------|----------|
 | Sản phẩm | Tên gói + variant / thời hạn (từ `package_product` + mã `san_pham`). |
 | Giá gốc | Cơ sở biên; ưu tiên max giá NCC. |
@@ -2926,11 +2926,11 @@ Cấu hình nhãn/endpoint: `ORDER_DATASET_CONFIG`, thứ tự tab: `ORDER_DATAS
 
 Định nghĩa trong `frontend/src/constants.ts` (`API_ENDPOINTS`), ví dụ:
 
-- `ORDERS` â†’ `/api/orders`
-- `ORDERS_IMPORT` â†’ `/api/orders/import`
-- `ORDERS_EXPIRED` â†’ `/api/orders/expired`
-- `ORDERS_CANCELED` â†’ `/api/orders/canceled`
-- `ORDER_BY_ID`, `ORDER_RENEW`, `ORDER_CANCELED_REFUND`, `CALCULATE_PRICE`, â€¦
+- `ORDERS` → `/api/orders`
+- `ORDERS_IMPORT` → `/api/orders/import`
+- `ORDERS_EXPIRED` → `/api/orders/expired`
+- `ORDERS_CANCELED` → `/api/orders/canceled`
+- `ORDER_BY_ID`, `ORDER_RENEW`, `ORDER_CANCELED_REFUND`, `CALCULATE_PRICE`, …
 
 Chi tiết gọi API (POST/PATCH/DELETE) nằm trong các hook/modal như `useOrderActions`, `CreateOrderModal`, `EditOrderModal`, v.v.
 
@@ -3010,9 +3010,9 @@ frontend/src/features/orders/
 
 | Loại | Công thức |
 |------|-----------|
-| MAVC | `cost / (1 âˆ’ pct_ctv)` |
-| MAVL | `MAVC / (1 âˆ’ pct_khach)` |
-| MAVK | `MAVL Ã— (1 âˆ’ pct_promo)` |
+| MAVC | `cost / (1 − pct_ctv)` |
+| MAVL | `MAVC / (1 − pct_khach)` |
+| MAVK | `MAVL × (1 − pct_promo)` |
 | MAVS | `MAVC / (1 − pct_stu)` hoặc **MAVL** nếu `pct_stu` rỗng |
 | MAVT | `0` |
 | MAVN | `cost` |
@@ -3126,9 +3126,9 @@ Mục tiêu của file:
 ## 4) Snapshot số liệu hiện tại (local, sau restore)
 
 Thời điểm chụp snapshot: **2026-05-09 23:5x (UTC+7)**  
-Database kiá»ƒm tra: **`mydtbmav` (PostgreSQL local host)**
+Database kiểm tra: **`mydtbmav` (PostgreSQL local host)**
 
-### 4.1 KPI tá»•ng quan
+### 4.1 KPI tổng quan
 
 - `total_orders`: **746**
 - `paid_orders`: **372**
@@ -3155,7 +3155,7 @@ Database kiá»ƒm tra: **`mydtbmav` (PostgreSQL local host)**
 
 ## 5) Query chuẩn để đối soát nhanh
 
-### 5.1 KPI tá»•ng
+### 5.1 KPI tổng
 
 ```sql
 select

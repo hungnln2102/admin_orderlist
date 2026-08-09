@@ -70,6 +70,7 @@ describe("Luồng kiểm thử: Nhập hàng (Import Order MAVN)", () => {
       order_date: new Date().toISOString().split("T")[0],
       reserved_order_code: "MAVNTST_INTERNAL",
       skip_telegram_notification: true,
+      shop_bank_account_id: MAVRYK_ACC_ID,
     };
 
     const createRes = await request
@@ -87,6 +88,11 @@ describe("Luồng kiểm thử: Nhập hàng (Import Order MAVN)", () => {
     expect(orderInDb.status).toBe(STATUS.PAID);
     expect(Number(orderInDb.price)).toBe(200000);
     expect(Number(orderInDb.cost)).toBe(200000);
+
+    // 1.1. Kiểm tra mapping tài khoản ngân hàng của đơn hàng
+    const orderBankMap = await db("business.order_bank_accounts").where({ order_id: createdOrder.id }).first();
+    expect(orderBankMap).toBeDefined();
+    expect(orderBankMap.shop_bank_account_id).toBe(MAVRYK_ACC_ID);
 
     // 2. Kiểm tra số dư tài khoản bank giảm
     const bankAccount = await db("finance.financial_accounts").where({ id: MAVRYK_ACC_ID }).first();

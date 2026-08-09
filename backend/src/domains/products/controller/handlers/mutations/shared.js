@@ -154,6 +154,25 @@ const resetVariantSequence = async () => {
   );
 };
 
+const isProductPkeyConflict = (error) =>
+  error &&
+  error.code === "23505" &&
+  (error.constraint === "package_pkey" || error.constraint === "product_pkey");
+
+const resetProductSequence = async () => {
+  const tableRef = TABLES.product;
+  const idColumn = productSchemaCols.id || "id";
+  await db.raw(
+    `
+    SELECT setval(
+      pg_get_serial_sequence(?, ?),
+      COALESCE((SELECT MAX(${quoteIdent(idColumn)}) FROM ${tableRef}), 0)
+    );
+  `,
+    [tableRef, idColumn]
+  );
+};
+
 module.exports = {
   fetchVariantView,
   isVariantPkeyConflict,
@@ -162,4 +181,6 @@ module.exports = {
   pickCategoryColor,
   hasProductCategoryColor,
   resetVariantSequence,
+  isProductPkeyConflict,
+  resetProductSequence,
 };

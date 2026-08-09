@@ -23,6 +23,7 @@ export const ORDER_COLS = {
   usdtAmountUsd: "usdt_amount_usd",
   usdtExchangeRate: "usdt_exchange_rate",
   usdtWalletId: "usdt_wallet_id",
+  shopBankAccountId: "shop_bank_account_id",
 };
 
 // 2. REFUND (Backend: REFUND)

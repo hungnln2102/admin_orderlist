@@ -74,12 +74,50 @@ async function cleanUpTestData(db) {
         .del()
         .catch(() => {});
     }
+
+    // Clean up ledger entries referencing these test orders to prevent key reuse collisions
+    await db("finance.financial_account_ledger")
+      .where("source_kind", "mavn_internal_sync")
+      .whereIn("source_id", orderIds)
+      .del()
+      .catch(() => {});
+
+    // Clean up store profit expenses linked to test order codes
+    await db("finance.store_profit_expenses")
+      .whereIn("linked_order_code", orderCodes)
+      .del()
+      .catch(() => {});
+
+    // Clean up supplier order cost logs linked to test order codes
+    await db("business.supplier_order_cost_log")
+      .whereIn("id_order", orderCodes)
+      .del()
+      .catch(() => {});
  
     await db("business.order_list")
       .whereIn("id", orderIds)
       .del()
       .catch(() => {});
   }
+
+  // Robust cleanup: Delete any orphan logs/ledgers with test prefix or note to prevent collisions on ID sequence reuse
+  await db("finance.financial_account_ledger")
+    .whereILike("note", `%${TEST_PREFIX}%`)
+    .orWhereILike("note", "%MAVNTST%")
+    .del()
+    .catch(() => {});
+
+  await db("finance.store_profit_expenses")
+    .whereILike("linked_order_code", `${TEST_PREFIX}%`)
+    .orWhereILike("linked_order_code", "MAVNTST%")
+    .del()
+    .catch(() => {});
+
+  await db("business.supplier_order_cost_log")
+    .whereILike("id_order", `${TEST_PREFIX}%`)
+    .orWhereILike("id_order", "MAVNTST%")
+    .del()
+    .catch(() => {});
 }
 
 module.exports = {

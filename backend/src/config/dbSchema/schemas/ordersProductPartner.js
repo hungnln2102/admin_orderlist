@@ -35,6 +35,13 @@ const ORDERS_SCHEMA = {
       USDT_WALLET_ID: "usdt_wallet_id",
     },
   },
+  ORDER_BANK_ACCOUNTS: {
+    TABLE: "order_bank_accounts",
+    COLS: {
+      ORDER_ID: "order_id",
+      SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
+    },
+  },
   ORDER_CUSTOMER: {
     TABLE: "order_list",
     COLS: {
