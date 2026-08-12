@@ -19,7 +19,7 @@ const {
   computeOrderCurrentPrice,
 } = require("../../../../webhook/sepay/renewalPricing");
 const { ORDERS_SCHEMA, SCHEMA_ORDERS, tableName } = require("@/config/dbSchema");
-const { isMavnImportOrder } = require("@/utils/orderHelpers");
+const { isMavnImportOrder, isGiftOrder } = require("@/utils/orderHelpers");
 
 const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const ORDER_TABLE_NAME = ORDERS_SCHEMA.ORDER_LIST.TABLE;
@@ -37,6 +37,10 @@ async function openSingleRenewalSlot(client, row, receiverAccount) {
 
   if (isMavnImportOrder({ id_order: orderCode })) {
     return { ok: false, reason: "skip_mavn_import" };
+  }
+
+  if (isGiftOrder({ id_order: orderCode })) {
+    return { ok: false, reason: "skip_gift_order" };
   }
 
   const savepoint = `renewal_slot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;

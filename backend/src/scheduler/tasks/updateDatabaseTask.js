@@ -9,12 +9,17 @@ const {
 const {
   openRenewalSlotsForFlippedOrders,
 } = require("@/scheduler/tasks/shared/openRenewalSlots");
+const { getOrderPrefixes } = require("@/utils/orderHelpers");
 
 let lastRunAt = null;
 
 function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
   return async function updateDatabaseTask(trigger = "cron") {
     const sqlDate = getSqlCurrentDate();
+    const prefixes = await getOrderPrefixes();
+    const importPrefix = String(prefixes.import || "MAVN").trim().toUpperCase();
+    const giftPrefix = String(prefixes.gift || "MAVT").trim().toUpperCase();
+
     logger.info(
       `[CRON] Bắt đầu cập nhật đơn hết hạn / cần gia hạn`,
       { trigger, date: process.env.MOCK_DATE || "CURRENT_DATE" }
@@ -75,6 +80,8 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
       SET ${COL.status} = '${STATUS.RENEWAL}'
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 4
         AND (${COL.status} = '${STATUS.PAID}')
+        AND ${COL.idOrder} NOT LIKE $1
+        AND ${COL.idOrder} NOT LIKE $2
       RETURNING
         ${ORDER_COLS.id} AS id,
         ${ORDER_COLS.idOrder} AS id_order,
@@ -82,7 +89,7 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
         ${ORDER_COLS.idSupply} AS supply_id,
         ${ORDER_COLS.cost} AS cost,
         ${ORDER_COLS.price} AS price;
-    `);
+    `, [`${importPrefix}%`, `${giftPrefix}%`]);
       logger.info(`Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (0 <= days left <= 4)`);
 
       await client.query("COMMIT");

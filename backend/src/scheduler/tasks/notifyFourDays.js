@@ -4,7 +4,7 @@ const logger = require("@/utils/logger");
 const { todayYMDInVietnam } = require("@/utils/normalizers");
 const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { fetchVariantDisplayNames } = require("@/scheduler/variantDisplayNames");
-const { ORDER_PREFIXES } = require("@/utils/orderHelpers");
+const { getOrderPrefixes } = require("@/utils/orderHelpers");
 const { buildRenewalQuery, normalizeNotifyRow } = require("@/scheduler/tasks/shared");
 const { resolveRenewalNotifyPrice } = require("@/scheduler/tasks/shared/resolveRenewalNotifyPrice");
 const {
@@ -56,11 +56,15 @@ async function checkDailyNotificationGuard(client, dateYmd, trigger) {
 }
 
 async function getRenewalNotificationCandidates(client, sqlDate) {
-  const result = await client.query(buildRenewalQuery(sqlDate, 4));
-
-  const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT")
+  const prefixes = await getOrderPrefixes();
+  const giftPrefix = String(prefixes.gift || "MAVT")
     .trim()
     .toUpperCase();
+  const importPrefix = String(prefixes.import || "MAVN")
+    .trim()
+    .toUpperCase();
+
+  const result = await client.query(buildRenewalQuery(sqlDate, 4, [importPrefix, giftPrefix]));
   const notifyRows = result.rows.filter((row) => {
     const code = String(row.id_order || row.idOrder || "")
       .trim()

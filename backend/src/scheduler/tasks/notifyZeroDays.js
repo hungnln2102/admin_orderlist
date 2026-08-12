@@ -4,6 +4,7 @@ const logger = require("@/utils/logger");
 const { todayYMDInVietnam } = require("@/utils/normalizers");
 const { fetchVariantDisplayNames } = require("@/scheduler/variantDisplayNames");
 const { buildRenewalQuery, normalizeNotifyRow } = require("@/scheduler/tasks/shared");
+const { getOrderPrefixes } = require("@/utils/orderHelpers");
 const {
   claimDailyNotificationRun,
   releaseDailyNotificationRun,
@@ -63,7 +64,10 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
       }
 
       // Chỉ check đúng điều kiện: số ngày còn lại = 0 VÀ status = Cần Gia Hạn.
-      const result = await client.query(buildRenewalQuery(sqlDate, 0));
+      const prefixes = await getOrderPrefixes();
+      const importPrefix = String(prefixes.import || "MAVN").trim().toUpperCase();
+      const giftPrefix = String(prefixes.gift || "MAVT").trim().toUpperCase();
+      const result = await client.query(buildRenewalQuery(sqlDate, 0, [importPrefix, giftPrefix]));
 
       logger.info(
         `Tìm thấy ${result.rowCount} đơn đúng ngày hết hạn (0 ngày còn lại, trạng thái = Cần Gia Hạn)`

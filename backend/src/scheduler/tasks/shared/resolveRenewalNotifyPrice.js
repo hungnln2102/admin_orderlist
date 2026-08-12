@@ -61,15 +61,24 @@ async function resolveRenewalNotifyPrice(client, row, computed) {
       const bank = await resolveDefaultShopBankAccount();
       const receiverAccount = String(bank?.accountNumber || "").trim();
       if (receiverAccount) {
-        const opened = await openSingleRenewalSlot(
-          client,
-          {
-            ...row,
-            id_order: orderCode,
-            supply_id: row.supply_id ?? row.id_supply,
-          },
-          receiverAccount
-        );
+        let opened;
+        await client.query("BEGIN");
+        try {
+          opened = await openSingleRenewalSlot(
+            client,
+            {
+              ...row,
+              id_order: orderCode,
+              supply_id: row.supply_id ?? row.id_supply,
+            },
+            receiverAccount
+          );
+          await client.query("COMMIT");
+        } catch (txnErr) {
+          await client.query("ROLLBACK").catch(() => {});
+          throw txnErr;
+        }
+
         if (opened.ok && Number(opened.expectedAmount) > 0) {
           return Number(opened.expectedAmount);
         }
