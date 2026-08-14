@@ -10,7 +10,7 @@ const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require
  * @param {number} daysLeft - exact `(expiry - sqlDate)` match in WHERE
  * @returns {string} SQL text
  */
-function buildRenewalQuery(sqlDate, daysLeft) {
+function buildRenewalQuery(sqlDate, daysLeft, skipPrefixes = []) {
   const d = Number(daysLeft);
   if (!Number.isFinite(d) || Math.trunc(d) !== d) {
     throw new TypeError(`buildRenewalQuery: daysLeft must be a finite integer, got ${daysLeft}`);
@@ -20,6 +20,16 @@ function buildRenewalQuery(sqlDate, daysLeft) {
       ? `,
         ( ${expiryDateSQL()} - ${sqlDate} ) AS days_left`
       : "";
+
+  let skipClause = "";
+  if (Array.isArray(skipPrefixes) && skipPrefixes.length > 0) {
+    const conditions = skipPrefixes
+      .filter(Boolean)
+      .map((p) => `${COL.idOrder} NOT LIKE '${String(p).trim().toUpperCase()}%'`);
+    if (conditions.length > 0) {
+      skipClause = `\n        AND ${conditions.join("\n        AND ")}`;
+    }
+  }
 
   return `
       SELECT
@@ -40,7 +50,7 @@ function buildRenewalQuery(sqlDate, daysLeft) {
         ${COL.status}${daysLeftSelect}
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = ${d}
-        AND ${COL.status} = '${STATUS.RENEWAL}'
+        AND ${COL.status} = '${STATUS.RENEWAL}'${skipClause}
       ORDER BY ${COL.idOrder}
     `;
 }
