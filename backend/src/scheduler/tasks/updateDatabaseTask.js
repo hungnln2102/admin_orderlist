@@ -33,12 +33,13 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
         `'${STATUS.PAID}'`,
         `'${STATUS.RENEWAL}'`,
       ].join(", ");
+      const normalizedStatusSQL = ["BTRIM(", COL.status, "::text)"].join("");
 
       const markExpired = await client.query(`
       UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS.EXPIRED}'
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
-        AND (${COL.status} IN (${statusToExpired}))
+        AND (${normalizedStatusSQL} IN (${statusToExpired}))
       RETURNING ${COL.idOrder};
     `);
       logger.info(`Đã cập nhật ${markExpired.rowCount} đơn hết hạn (< 0 ngày) sang status EXPIRED`);
@@ -74,7 +75,7 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
       UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS.RENEWAL}'
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 4
-        AND (${COL.status} = '${STATUS.PAID}')
+        AND (${normalizedStatusSQL} = '${STATUS.PAID}')
       RETURNING
         ${ORDER_COLS.id} AS id,
         ${ORDER_COLS.idOrder} AS id_order,

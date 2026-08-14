@@ -708,26 +708,13 @@ const runRenewal = async (
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
       const effectiveMonthKey = paymentMonthKey || monthKey;
       if (effectiveMonthKey && !shouldSkipSummaryForManual && normalizeMoney(paymentAmount) > 0) {
-        const summaryBefore = await fetchMonthlySummarySnapshot(client, effectiveMonthKey);
         const revenue = normalizeMoney(paymentAmount);
         const cost = normalizeMoney(finalGiaNhap);
         // NCC Mavryk/Shop: không ghi nhận cost vào profit khi renewal.
         const profit = skipNccLedger ? revenue : (revenue - cost);
-        // View finance.dashboard_monthly_summary is dynamic, no physical write or tax recomputation needed.
-
-        const summaryAfter = await fetchMonthlySummarySnapshot(
-          client,
-          effectiveMonthKey
-        );
-        const beforeRevenue = normalizeMoney(summaryBefore?.total_revenue);
-        const beforeProfit = normalizeMoney(summaryBefore?.total_profit);
-        const beforeImport = normalizeMoney(summaryBefore?.total_import);
-        const afterRevenue = normalizeMoney(summaryAfter?.total_revenue);
-        const afterProfit = normalizeMoney(summaryAfter?.total_profit);
-        const afterImport = normalizeMoney(summaryAfter?.total_import);
-        const revenueDelta = normalizeMoney(afterRevenue - beforeRevenue);
-        const profitDelta = normalizeMoney(afterProfit - beforeProfit);
-        const importDelta = normalizeMoney(afterImport - beforeImport);
+        const revenueDelta = revenue;
+        const profitDelta = profit;
+        const importDelta = skipNccLedger ? 0 : cost;
 
         if (!suppressFinanceNotify && (revenueDelta || profitDelta || importDelta)) {
           await notifyFinanceMonthlyDelta({

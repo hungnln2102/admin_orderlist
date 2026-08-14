@@ -152,6 +152,7 @@ services:
     environment:
       APP_ENV: docker
       NODE_ENV: production
+      RUN_CRON_ON_START: true
     command: ["node", "scheduler.js"]
     networks:
       - app-network

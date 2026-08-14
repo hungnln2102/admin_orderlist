@@ -83,8 +83,8 @@ async function dispatchWebhookRenewals({
         paymentAmount: currentAmountForCode,
         paymentMonthKey: paidMonthKey,
         paymentReceiptId: receiptId,
-        // Cuối luồng webhook sẽ gửi 1 tin BIẾN ĐỘNG THÁNG tổng hợp.
-        suppressFinanceNotify: true,
+        // Gia hạn tự gửi biến động tháng với delta của chính giao dịch webhook.
+        suppressFinanceNotify: false,
         // Gom tin nhắn Telegram gia hạn tự động
         suppressTelegramNotify: true,
       });
