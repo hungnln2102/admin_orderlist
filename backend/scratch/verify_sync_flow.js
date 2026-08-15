@@ -19,14 +19,14 @@ async function run() {
     console.log("=== VERIFYING EXPIRY SYNC FLOW ===");
 
     // 1. Find or mock a product, variant, and stock service
-    const product = await db('product.product').first();
+    const product = await db('business.product').first();
     if (!product) {
       console.error("No product found in database. Cannot run verification.");
       return;
     }
     console.log(`Using product: ${product.package_name} (ID: ${product.id})`);
 
-    const variant = await db('product.variant').where('product_id', product.id).first();
+    const variant = await db('business.variant').where('product_id', product.id).first();
     if (!variant) {
       console.error(`No variant found for product ID ${product.id}. Cannot run verification.`);
       return;
@@ -36,13 +36,13 @@ async function run() {
     const testAccount = "test_sync_flow_999@example.com";
 
     // Clean up old test data if any
-    await client.query("DELETE FROM orders.order_list WHERE id_order LIKE 'MAVNTEST%'");
+    await client.query("DELETE FROM business.order_list WHERE id_order LIKE 'MAVNTEST%'");
     await client.query("DELETE FROM warehouse.stock_services WHERE note = 'test_sync_flow'");
-    await client.query("DELETE FROM warehouse.product_stocks WHERE account_username = $1", [testAccount]);
+    await client.query("DELETE FROM business.product_keys WHERE account_username = $1", [testAccount]);
 
     // Create a product stock record
     const stockInsert = await client.query(
-      "INSERT INTO warehouse.product_stocks (account_username, created_at, updated_at) VALUES ($1, NOW(), NOW()) RETURNING id",
+      "INSERT INTO business.product_keys (account_username, created_at, updated_at) VALUES ($1, NOW(), NOW()) RETURNING id",
       [testAccount]
     );
     const stockId = stockInsert.rows[0].id;
@@ -85,7 +85,7 @@ async function run() {
     
     // Insert order record into database first
     const orderInsert = await client.query(
-      `INSERT INTO orders.order_list (id_order, id_product, information_order, expired_at, status, created_at)
+      `INSERT INTO business.order_list (id_order, id_product, information_order, expired_at, status, created_at)
        VALUES ('MAVNTEST01', $1, $2, $3::date, 'Đã Thanh Toán', NOW()) RETURNING *`,
       [variant.id, testAccount, expiryDate1]
     );
@@ -113,11 +113,11 @@ async function run() {
 
     // Update order in database
     await client.query(
-      "UPDATE orders.order_list SET expired_at = $1::date WHERE id_order = 'MAVNTEST01'",
+      "UPDATE business.order_list SET expired_at = $1::date WHERE id_order = 'MAVNTEST01'",
       [expiryDate2]
     );
     
-    const updatedOrder = (await client.query("SELECT * FROM orders.order_list WHERE id_order = 'MAVNTEST01'")).rows[0];
+    const updatedOrder = (await client.query("SELECT * FROM business.order_list WHERE id_order = 'MAVNTEST01'")).rows[0];
     
     // Emit the ORDER_UPDATED event
     eventBus.emit(EVENTS.ORDER_UPDATED, {
@@ -140,7 +140,7 @@ async function run() {
     console.log("\n--- SIMULATING ORDER DELETION ---");
     
     // Delete order from database
-    await client.query("DELETE FROM orders.order_list WHERE id_order = 'MAVNTEST01'");
+    await client.query("DELETE FROM business.order_list WHERE id_order = 'MAVNTEST01'");
 
     // Emit the ORDER_DELETED event
     eventBus.emit(EVENTS.ORDER_DELETED, {
@@ -161,7 +161,7 @@ async function run() {
     // Clean up database
     console.log("\nCleaning up test data...");
     await client.query("DELETE FROM warehouse.stock_services WHERE id = $1", [serviceId]);
-    await client.query("DELETE FROM warehouse.product_stocks WHERE id = $1", [stockId]);
+    await client.query("DELETE FROM business.product_keys WHERE id = $1", [stockId]);
     console.log("Cleanup complete!");
 
   } catch (err) {

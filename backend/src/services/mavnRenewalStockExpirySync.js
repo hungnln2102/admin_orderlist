@@ -261,10 +261,10 @@ async function syncStockExpiryForAccountAndPackage(clientOrKnex, packageId, acco
 
   // 2. Tìm tất cả variant_id tương ứng với packageId
   const variantRes = await executeSql(clientOrKnex,
-    `SELECT id FROM product.variant WHERE product_id = $1`,
+    `SELECT ${V.id} FROM ${VARIANT_TABLE} WHERE ${V.productId} = $1`,
     [packageId]
   );
-  const variantIds = variantRes.rows.map(r => Number(r.id)).filter(id => Number.isFinite(id));
+  const variantIds = variantRes.rows.map(r => Number(r[V.id])).filter(id => Number.isFinite(id));
 
   let latestExpiryStr = null;
   if (variantIds.length > 0) {
