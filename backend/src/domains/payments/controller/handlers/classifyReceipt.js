@@ -240,8 +240,7 @@ const classifyReceipt = async (req, res) => {
               shop_bank_account_id: defaultAccount.id,
               status: "completed",
               expense_meta: JSON.stringify(meta),
-              created_at: receiptRow.payment_date || trx.fn.now(),
-              updated_at: trx.fn.now()
+              created_at: receiptRow.payment_date || trx.fn.now()
             };
 
             const [created] = await trx(TABLES.storeProfitExpenses).insert(expensePayload).returning("id");
