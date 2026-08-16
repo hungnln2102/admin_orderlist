@@ -1,11 +1,15 @@
 const { db } = require("@/db");
-const { SCHEMA_PRODUCT, PRODUCT_SCHEMA, SCHEMA_WAREHOUSE, WAREHOUSE_SCHEMA, SCHEMA_PARTNER, PARTNER_SCHEMA, getDefinition, tableName } =
-  require("@/config/dbSchema");
 const {
-  formatDateOutput,
-  fromDbNumber,
-  getRowId,
-} = require("@/utils/normalizers");
+  SCHEMA_PRODUCT,
+  PRODUCT_SCHEMA,
+  SCHEMA_WAREHOUSE,
+  WAREHOUSE_SCHEMA,
+  SCHEMA_PARTNER,
+  PARTNER_SCHEMA,
+  getDefinition,
+  tableName,
+} = require("@/config/dbSchema");
+const { formatDateOutput, fromDbNumber, getRowId } = require("@/utils/normalizers");
 const { quoteIdent } = require("@/utils/sql");
 const { QUOTED_COLS } = require("@/utils/columns");
 
@@ -31,61 +35,59 @@ const SRV_COLS = SRV_DEF.columns;
 
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
-    pp.${QUOTED_COLS.packageProduct.id} AS package_id,
-    pp.${QUOTED_COLS.packageProduct.packageId} AS product_id,
-    p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)} AS package_name,
-    p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageRequiresActivation)} AS product_requires_activation,
-    stk.${quoteIdent(STOCK_COLS.accountUsername)} AS package_username,
-    ss1.${quoteIdent(SRV_COLS.passwordEncrypted)} AS package_password,
-    ss1.${quoteIdent(SRV_COLS.backupEmail)} AS package_mail_2nd,
-    ss1.${quoteIdent(SRV_COLS.note)} AS package_note,
-    ss1.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS package_two_fa,
-    COALESCE(s_supp.${quoteIdent(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)}, pp.${QUOTED_COLS.packageProduct.supplier}) AS package_supplier,
-    pp.${QUOTED_COLS.packageProduct.cost} AS package_import,
-    pp.${QUOTED_COLS.packageProduct.slot} AS package_slot,
-    ss1.${quoteIdent(SRV_COLS.expiresAt)} AS package_expired,
-    ss1.${quoteIdent(SRV_COLS.expiresAt)}::text AS package_expired_raw,
-    pp.${QUOTED_COLS.packageProduct.match} AS package_match,
-    pp.${QUOTED_COLS.packageProduct.stockId} AS stock_id,
-    pp.${QUOTED_COLS.packageProduct.storageId} AS storage_id,
-    pp.${QUOTED_COLS.packageProduct.storageTotal} AS storage_total,
-    stk2.${quoteIdent(STOCK_COLS.accountUsername)} AS storage_username,
-    ss2.${quoteIdent(SRV_COLS.passwordEncrypted)} AS storage_password,
-    ss2.${quoteIdent(SRV_COLS.backupEmail)} AS storage_mail,
-    ss2.${quoteIdent(SRV_COLS.note)} AS storage_note,
-    ss2.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS storage_two_fa,
-    COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
-  FROM ${TABLES.packageProduct} pp
-  LEFT JOIN ${TABLES.product} p ON p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)} = pp.${QUOTED_COLS.packageProduct.packageId}
-  LEFT JOIN ${TABLES.productStock} stk
-    ON stk.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.stockId}
-  LEFT JOIN (
-    SELECT DISTINCT ON (stock_id) * FROM ${TABLES.stockServices}
-  ) ss1 ON ss1.id = pp.${quoteIdent(PACKAGE_DEF.columns.stockServiceId)} OR (pp.${quoteIdent(PACKAGE_DEF.columns.stockServiceId)} IS NULL AND ss1.stock_id = stk.id)
-  LEFT JOIN ${TABLES.productStock} stk2
-    ON stk2.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.storageId}
-  LEFT JOIN (
-    SELECT DISTINCT ON (stock_id) * FROM ${TABLES.stockServices}
-  ) ss2 ON ss2.stock_id = stk2.id
-  LEFT JOIN (
-    SELECT
-      v.${quoteIdent(VARIANT_COLS.productId)} AS product_id,
-      ARRAY_REMOVE(
-        ARRAY_AGG(DISTINCT NULLIF(TRIM(v.${quoteIdent(VARIANT_COLS.displayName)}::text), '')),
-        NULL
-      ) AS product_codes
-    FROM ${TABLES.variant} v
-    GROUP BY v.${quoteIdent(VARIANT_COLS.productId)}
-  ) product_codes ON product_codes.product_id = pp.${QUOTED_COLS.packageProduct.packageId}
-  LEFT JOIN ${TABLES.supplier} s_supp ON s_supp.id::text = pp.${QUOTED_COLS.packageProduct.supplier}
-`;
+     pp.${QUOTED_COLS.packageProduct.id} AS package_id,
+     pp.${QUOTED_COLS.packageProduct.packageId} AS product_id,
+     p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)} AS package_name,
+     p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageRequiresActivation)} AS product_requires_activation,
+     stk.${quoteIdent(STOCK_COLS.accountUsername)} AS package_username,
+     COALESCE(ss_direct.${quoteIdent(SRV_COLS.passwordEncrypted)}, ss_fallback.${quoteIdent(SRV_COLS.passwordEncrypted)}) AS package_password,
+     COALESCE(ss_direct.${quoteIdent(SRV_COLS.backupEmail)}, ss_fallback.${quoteIdent(SRV_COLS.backupEmail)}) AS package_mail_2nd,
+     COALESCE(ss_direct.${quoteIdent(SRV_COLS.note)}, ss_fallback.${quoteIdent(SRV_COLS.note)}) AS package_note,
+     COALESCE(ss_direct.${quoteIdent(SRV_COLS.twoFaEncrypted)}, ss_fallback.${quoteIdent(SRV_COLS.twoFaEncrypted)}) AS package_two_fa,
+     COALESCE(s_supp.${quoteIdent(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)}, pp.${QUOTED_COLS.packageProduct.supplier}) AS package_supplier,
+     pp.${QUOTED_COLS.packageProduct.cost} AS package_import,
+     pp.${QUOTED_COLS.packageProduct.slot} AS package_slot,
+     COALESCE(ss_direct.${quoteIdent(SRV_COLS.expiresAt)}, ss_fallback.${quoteIdent(SRV_COLS.expiresAt)}) AS package_expired,
+     COALESCE(ss_direct.${quoteIdent(SRV_COLS.expiresAt)}::text, ss_fallback.${quoteIdent(SRV_COLS.expiresAt)}::text) AS package_expired_raw,
+     pp.${QUOTED_COLS.packageProduct.match} AS package_match,
+     pp.${QUOTED_COLS.packageProduct.stockId} AS stock_id,
+     pp.${QUOTED_COLS.packageProduct.storageId} AS storage_id,
+     pp.${QUOTED_COLS.packageProduct.storageTotal} AS storage_total,
+     stk2.${quoteIdent(STOCK_COLS.accountUsername)} AS storage_username,
+     ss2.${quoteIdent(SRV_COLS.passwordEncrypted)} AS storage_password,
+     ss2.${quoteIdent(SRV_COLS.backupEmail)} AS storage_mail,
+     ss2.${quoteIdent(SRV_COLS.note)} AS storage_note,
+     ss2.${quoteIdent(SRV_COLS.twoFaEncrypted)} AS storage_two_fa,
+     COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
+   FROM ${TABLES.packageProduct} pp
+   LEFT JOIN ${TABLES.product} p ON p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)} = pp.${QUOTED_COLS.packageProduct.packageId}
+   LEFT JOIN ${TABLES.productStock} stk
+     ON stk.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.stockId}
+   LEFT JOIN ${TABLES.stockServices} ss_direct
+     ON ss_direct.id = pp.${quoteIdent(PACKAGE_DEF.columns.stockServiceId)}
+   LEFT JOIN (
+     SELECT DISTINCT ON (stock_id) * FROM ${TABLES.stockServices} ORDER BY stock_id, id DESC
+   ) ss_fallback ON pp.${quoteIdent(PACKAGE_DEF.columns.stockServiceId)} IS NULL AND ss_fallback.stock_id = stk.id
+   LEFT JOIN ${TABLES.productStock} stk2
+     ON stk2.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.storageId}
+   LEFT JOIN (
+     SELECT DISTINCT ON (stock_id) * FROM ${TABLES.stockServices} ORDER BY stock_id, id DESC
+   ) ss2 ON ss2.stock_id = stk2.id
+   LEFT JOIN (
+     SELECT
+       v.${quoteIdent(VARIANT_COLS.productId)} AS product_id,
+       ARRAY_REMOVE(
+         ARRAY_AGG(DISTINCT NULLIF(TRIM(v.${quoteIdent(VARIANT_COLS.displayName)}::text), '')),
+         NULL
+       ) AS product_codes
+     FROM ${TABLES.variant} v
+     GROUP BY v.${quoteIdent(VARIANT_COLS.productId)}
+   ) product_codes ON product_codes.product_id = pp.${QUOTED_COLS.packageProduct.packageId}
+   LEFT JOIN ${TABLES.supplier} s_supp ON s_supp.id::text = pp.${QUOTED_COLS.packageProduct.supplier}
+ `;
 
 const summarizePackageInformation = (user, pass, mail) =>
-  [
-    user && `User: ${user}`,
-    pass && `Pass: ${pass}`,
-    mail && `Mail 2nd: ${mail}`,
-  ]
+  [user && `User: ${user}`, pass && `Pass: ${pass}`, mail && `Mail 2nd: ${mail}`]
     .filter(Boolean)
     .join(" | ") || null;
 
@@ -106,11 +108,13 @@ const mapPackageProductRow = (row) => {
         .map((code) => (typeof code === "string" ? code.trim() : ""))
         .filter((code) => Boolean(code))
     : [];
-  const productId = row.product_id != null ? getRowId(row, "product_id", "productId", "PRODUCT_ID") : null;
+  const productId =
+    row.product_id != null ? getRowId(row, "product_id", "productId", "PRODUCT_ID") : null;
   return {
     id: packageId,
     productId: productId != null ? Number(productId) : null,
-    package: (row.package_name != null && row.package_name !== "") ? String(row.package_name).trim() : "",
+    package:
+      row.package_name != null && row.package_name !== "" ? String(row.package_name).trim() : "",
     information: informationSummary,
     informationUser,
     informationPass,
@@ -146,9 +150,7 @@ const fetchPackageProductById = async (trxOrDb, id) => {
   const numericId = Number(id);
   if (!Number.isFinite(numericId)) return null;
   const client = trxOrDb || db;
-  const result = await client.raw(`${PACKAGE_PRODUCTS_SELECT} WHERE pp.id = ?`, [
-    numericId,
-  ]);
+  const result = await client.raw(`${PACKAGE_PRODUCTS_SELECT} WHERE pp.id = ?`, [numericId]);
   if (!result.rows?.length) return null;
   return mapPackageProductRow(result.rows[0]);
 };

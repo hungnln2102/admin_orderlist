@@ -8,3 +8,6 @@ my-backend/node_modules
 npm-debug.log*
 *.log
 .agents
+backend/scratch
+test.js
+temp.js

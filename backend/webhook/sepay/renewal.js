@@ -829,7 +829,25 @@ const runRenewal = async (
       logger.error("[EventBus] Lỗi phát sự kiện ORDER_RENEWED", { error: eventErr.message });
     }
 
-    return { success: true, details, processType: "renewal" };
+    const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
+    const effectiveMonthKey = paymentMonthKey || monthKey;
+    const revenue = normalizeMoney(paymentAmount);
+    const cost = normalizeMoney(finalGiaNhap);
+    const profit = skipNccLedger ? revenue : (revenue - cost);
+
+    const hasFinancialUpdate = effectiveMonthKey && !shouldSkipSummaryForManual && normalizeMoney(paymentAmount) > 0;
+
+    return {
+      success: true,
+      details,
+      processType: "renewal",
+      financialDeltas: hasFinancialUpdate ? {
+        monthKey: effectiveMonthKey,
+        revenueDelta: revenue,
+        profitDelta: profit,
+        importDelta: skipNccLedger ? 0 : cost,
+      } : null,
+    };
   } catch (err) {
     logger.error("Error renewing order", { orderCode, error: err.message, stack: err.stack });
     return { success: false, details: err.message || String(err), processType: "error" };

@@ -21,6 +21,7 @@ async function dispatchWebhookRenewals({
   ORDER_COLS,
 }) {
   const renewalOutcomes = [];
+  const monthlyDeltasMap = new Map(); // monthKey -> { revenueDelta, profitDelta, importDelta, codes: [] }
 
   for (const code of loopOrderCodes) {
     const currentAmountForCode = getCurrentAmountForCode(code);
@@ -83,8 +84,8 @@ async function dispatchWebhookRenewals({
         paymentAmount: currentAmountForCode,
         paymentMonthKey: paidMonthKey,
         paymentReceiptId: receiptId,
-        // Gia hạn tự gửi biến động tháng với delta của chính giao dịch webhook.
-        suppressFinanceNotify: false,
+        // Gia hạn tự gửi biến động tháng với delta của chính giao dịch webhook -> Đã gom lại ở cuối dispatchWebhookRenewals
+        suppressFinanceNotify: true,
         // Gom tin nhắn Telegram gia hạn tự động
         suppressTelegramNotify: true,
       });
@@ -94,6 +95,48 @@ async function dispatchWebhookRenewals({
           orderCode: code,
           result: outcome.lastRenewalResult
         });
+
+        // Tích lũy biến động tài chính
+        const deltas = outcome.lastRenewalResult.financialDeltas;
+        if (deltas && deltas.monthKey) {
+          if (!monthlyDeltasMap.has(deltas.monthKey)) {
+            monthlyDeltasMap.set(deltas.monthKey, {
+              revenueDelta: 0,
+              profitDelta: 0,
+              importDelta: 0,
+              codes: [],
+            });
+          }
+          const acc = monthlyDeltasMap.get(deltas.monthKey);
+          acc.revenueDelta += deltas.revenueDelta || 0;
+          acc.profitDelta += deltas.profitDelta || 0;
+          acc.importDelta += deltas.importDelta || 0;
+          acc.codes.push(code);
+        }
+      }
+    }
+  }
+
+  // Gửi một thông báo biến động tài chính tổng hợp cho mỗi monthKey
+  if (monthlyDeltasMap.size > 0) {
+    const { notifyFinanceMonthlyDelta } = require("@/services/telegramFinanceDeltaNotifier");
+    for (const [mKey, acc] of monthlyDeltasMap.entries()) {
+      if (acc.revenueDelta || acc.profitDelta || acc.importDelta) {
+        try {
+          await notifyFinanceMonthlyDelta({
+            monthKey: mKey,
+            revenueDelta: acc.revenueDelta,
+            profitDelta: acc.profitDelta,
+            importDelta: acc.importDelta,
+            refundDelta: 0,
+            offFlowDelta: 0,
+            bankBalanceDelta: 0,
+            context: `renewal.runRenewalBatch:${acc.codes.join(",")}`,
+            executor: client,
+          });
+        } catch (err) {
+          logger.error("[Webhook] Lỗi gửi biến động tháng gộp", { error: err.message });
+        }
       }
     }
   }
