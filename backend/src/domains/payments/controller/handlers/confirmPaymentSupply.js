@@ -193,6 +193,31 @@ const confirmPaymentSupply = async (req, res) => {
       let bankLedgerDelta = 0;
       if (paymentSupplyId && expectedPaidAmount > 0) {
         if (isSupplierRefundToShop) {
+          if (matchedReceipt) {
+            try {
+              const flowTypeRes = await trx.raw(
+                `SELECT id FROM billing.receipt_flow_types WHERE code = ? LIMIT 1`,
+                ["off_flow_revenue"]
+              );
+              const flowTypeId = flowTypeRes.rows?.[0]?.id || null;
+              await trx.raw(
+                `UPDATE billing.payment_receipt
+                 SET is_financial_posted = true,
+                     flow_type_id = ?,
+                     flow_classified_at = NOW(),
+                     flow_note = ?
+                 WHERE id = ?`,
+                [flowTypeId, `NCC refund supply ${resolvedSupplyId} (manual confirm)`, matchedReceipt.id]
+              );
+              logger.info("[confirmPaymentSupply] Marked refund receipt as posted", {
+                receiptId: matchedReceipt.id,
+                flowTypeId,
+              });
+            } catch (dbErr) {
+              logger.error("[confirmPaymentSupply] Failed to mark refund receipt as posted", dbErr);
+            }
+          }
+
           const ledgerResult = matchedReceipt
             ? await creditShopBankFromPaymentReceipt(trx, {
                 receiptId: matchedReceipt.id,

@@ -472,7 +472,7 @@ const updateLedgerSource = async (
   await runQuery(
     executor,
     `UPDATE ${LEDGER_TABLE}
-     SET ${LEDGER_COLS.SOURCE_KIND} = ?, ${LEDGER_COLS.SOURCE_ID} = ?, ${LEDGER_COLS.NOTE} = COALESCE(?, ${LEDGER_COLS.NOTE}), updated_at = NOW()
+     SET ${LEDGER_COLS.SOURCE_KIND} = ?, ${LEDGER_COLS.SOURCE_ID} = ?, ${LEDGER_COLS.NOTE} = COALESCE(?, ${LEDGER_COLS.NOTE})
      WHERE ${LEDGER_COLS.ID} = ?`,
     [nextSourceKind, nextSourceId, note, existing.id]
   );

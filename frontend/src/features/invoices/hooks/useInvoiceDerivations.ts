@@ -89,7 +89,7 @@ export function useInvoiceDerivations({
 
     return [
       {
-        name: "Tổng Biên Nhận",
+        name: "Tổng Biên Lai Đơn",
         value: mavFlowReceipts.length.toString(),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.sky,
@@ -101,7 +101,7 @@ export function useInvoiceDerivations({
         accent: STAT_CARD_ACCENTS.emerald,
       },
       {
-        name: "Biên Nhận Mới Nhất",
+        name: "Biên Lai Mới Nhất",
         value: latestPaidAt ? formatDateToDMY(latestPaidAt) ?? "--" : "--",
         icon: XCircleIcon,
         accent: STAT_CARD_ACCENTS.violet,

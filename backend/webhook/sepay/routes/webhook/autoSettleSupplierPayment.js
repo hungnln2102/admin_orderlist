@@ -146,8 +146,37 @@ async function tryAutoSettleSupplierPaymentByOutbound({
     });
   }
 
-  // 8. Audit log
+  // 8. Audit log & Mark payment receipt as posted under import_order (Thanh toán NCC) flow type
   if (receiptId) {
+    try {
+      const flowTypeRes = await client.query(
+        `SELECT id FROM billing.receipt_flow_types WHERE code = $1 LIMIT 1`,
+        ["import_order"]
+      );
+      const flowTypeId = flowTypeRes.rows[0]?.id || null;
+
+      await client.query(
+        `UPDATE billing.payment_receipt
+         SET is_financial_posted = true,
+             flow_type_id = $1,
+             flow_classified_at = NOW(),
+             flow_note = $2
+         WHERE id = $3`,
+        [flowTypeId, `Auto TT NCC supply ${supplierId} - via Webhook`, receiptId]
+      );
+      logger.info("[Webhook] Marked payment receipt as posted for supplier payment", {
+        receiptId,
+        flowTypeId,
+        supplierId,
+      });
+    } catch (dbErr) {
+      logger.error("[Webhook] Failed to mark payment receipt as posted for supplier payment", {
+        receiptId,
+        supplierId,
+        error: dbErr.message,
+      });
+    }
+
     await insertFinancialAuditLog(client, {
       payment_receipt_id: receiptId,
       order_code: "",

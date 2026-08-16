@@ -143,15 +143,15 @@ export const CATEGORY_OPTIONS: {
 }[] = [
     {
       value: "receipt",
-      label: "Biên Nhận",
-    },
-    {
-      value: "outbound-unallocated",
-      label: "Chưa liệt kê",
+      label: "Thanh toán đơn hàng",
     },
     {
       value: "out-of-flow",
-      label: "Ngoài luồng",
+      label: "Tiền ngoài luồng / Chi phí",
+    },
+    {
+      value: "outbound-unallocated",
+      label: "Chưa được liệt kê",
     },
   ];
 

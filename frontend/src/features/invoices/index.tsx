@@ -231,7 +231,7 @@ export default function Invoices() {
       <div className="space-y-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter">
-            Biên Nhận <span className="text-indigo-400">Thanh Toán</span>
+            Biên Lai <span className="text-indigo-400">Thanh Toán</span>
           </h1>
           <p className="text-sm font-medium text-indigo-200/60 uppercase tracking-[0.3em]">
             Digital Transaction Records & Ledger
@@ -328,7 +328,7 @@ export default function Invoices() {
 
         {!loading && filteredReceipts.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-white/70 text-lg mb-2">Không có Biên Nhận</div>
+            <div className="text-white/70 text-lg mb-2">Không có Biên Lai</div>
             <div className="text-white/60">Thử từ khóa khác</div>
           </div>
         )}
