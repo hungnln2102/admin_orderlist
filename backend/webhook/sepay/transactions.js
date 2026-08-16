@@ -61,6 +61,10 @@ const normalizeTransactionLikePayload = (raw = {}) => {
       "transferTime",
       "time",
     ]),
+    sender_account_number: pickFirst(raw, ["senderAccountNumber", "sender_account_number"]),
+    sender_name: pickFirst(raw, ["senderName", "sender_name"]),
+    receiver_account_number: pickFirst(raw, ["receiverAccountNumber", "receiver_account_number"]),
+    receiver_name: pickFirst(raw, ["receiverName", "receiver_name"]),
   };
 };
 

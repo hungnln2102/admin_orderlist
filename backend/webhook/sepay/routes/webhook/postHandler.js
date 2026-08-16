@@ -294,6 +294,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
         });
       }
 
+      let outboundResult = null;
       if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate) && transferAmountNormalized < 0 && paidMonthKey) {
         if (receiptResult?.duplicate) {
           logger.info("[Webhook] Outbound receipt duplicate → retry processOutboundPhase (idempotent)", {
@@ -301,7 +302,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
             amount: transferAmountNormalized,
           });
         }
-        await processOutboundPhase(client, parsed, receiptId, paidMonthKey);
+        outboundResult = await processOutboundPhase(client, parsed, receiptId, paidMonthKey);
       }
 
       // 4. Order Payment & Ledger Update Phase
@@ -346,24 +347,29 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
             posted_off_flow_bank_receipt: postedOffFlowBankReceiptDelta,
           });
         } else if (!alreadyFinancialPosted) {
-          await updateReceiptFinancialState(client, receiptId, {
-            is_financial_posted: false,
-            posted_revenue: 0,
-            posted_profit: 0,
-            posted_off_flow_bank_receipt: 0,
-          });
-          await insertFinancialAuditLog(client, {
-            payment_receipt_id: receiptId,
-            order_code: String(resolvedOrderCode || "").trim(),
-            rule_branch: "WEBHOOK_STATE_NOT_POSTED",
-            delta: {
+          const isOutboundSettled = outboundResult?.settled;
+          if (!isOutboundSettled) {
+            await updateReceiptFinancialState(client, receiptId, {
+              is_financial_posted: false,
               posted_revenue: 0,
               posted_profit: 0,
               posted_off_flow_bank_receipt: 0,
-              is_financial_posted: false,
-            },
-            source: "webhook",
-          });
+            });
+            await insertFinancialAuditLog(client, {
+              payment_receipt_id: receiptId,
+              order_code: String(resolvedOrderCode || "").trim(),
+              rule_branch: "WEBHOOK_STATE_NOT_POSTED",
+              delta: {
+                posted_revenue: 0,
+                posted_profit: 0,
+                posted_off_flow_bank_receipt: 0,
+                is_financial_posted: false,
+              },
+              source: "webhook",
+            });
+          } else {
+            logger.info("[Webhook] Skip resetting financial posted state as outbound was settled", { receiptId });
+          }
         }
       }
 

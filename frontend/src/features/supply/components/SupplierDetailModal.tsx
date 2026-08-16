@@ -44,6 +44,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   const [shopBankAccounts, setShopBankAccounts] = useState<ShopBankAccountItem[]>([]);
   const [selectedShopBankAccountId, setSelectedShopBankAccountId] = useState<number>(0);
   const [shopBankAccountsLoading, setShopBankAccountsLoading] = useState(false);
+  const [prevUnpaidCount, setPrevUnpaidCount] = useState<number | null>(null);
 
   // Tính toán các giá trị từ overview (phải đặt trước useMemo)
   const supply = overview?.supply;
@@ -97,6 +98,23 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
 
     return () => clearInterval(interval);
   }, [isOpen, supplyId, unpaidPayments.length, fetchOverview]);
+
+  // Auto close and refresh if polling detects that a payment has been matched (unpaidPayments count decreases)
+  useEffect(() => {
+    if (!isOpen) {
+      setPrevUnpaidCount(null);
+      return;
+    }
+    if (overview) {
+      const currentCount = overview.unpaidPayments?.length ?? 0;
+      if (prevUnpaidCount !== null && currentCount < prevUnpaidCount) {
+        toast.success("Hệ thống đã tự động đối khớp và thanh toán thành công!");
+        handleClose();
+      } else if (prevUnpaidCount !== currentCount) {
+        setPrevUnpaidCount(currentCount);
+      }
+    }
+  }, [overview, isOpen, prevUnpaidCount]);
 
   const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
     const raw = Number(p.totalImport ?? p.import_value ?? 0);
@@ -166,18 +184,20 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       if (result.error?.includes("Không có log NCC chưa thanh toán để chốt")) {
         toast.success("Chu kỳ thanh toán này đã được hệ thống tự động đối khớp và thanh toán thành công!");
         setError(null);
-        void fetchOverview();
+        handleClose();
       } else {
         setError(result.error || "Không thể thanh toán chu kỳ");
       }
     } else {
       toast.success("Thanh toán thành công!");
+      handleClose();
     }
   };
 
   const handleClose = () => {
     setSelectedPaymentId(null);
     setExpandedMonth(null);
+    onRefreshList?.();
     onClose();
   };
 

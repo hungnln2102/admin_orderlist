@@ -91,11 +91,26 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     useCreatedAt = true;
   }
 
+  const fromTs = `${from}T00:00:00+07:00`;
+  const toTs = `${to}T23:59:59.999+07:00`;
+  const p0Ts = `${p0}T00:00:00+07:00`;
+  const p1Ts = `${p1}T23:59:59.999+07:00`;
+
   const [currKpi, prevKpi, currOrd, prevOrd, estimatedBankBalance] = await Promise.all([
     sumDailyKpisForRange(from, to),
     sumDailyKpisForRange(p0, p1),
-    db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), [from, to]),
-    db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), [p0, p1]),
+    db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), {
+      fromTs,
+      toTs,
+      from,
+      to,
+    }),
+    db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), {
+      fromTs: p0Ts,
+      toTs: p1Ts,
+      from: p0,
+      to: p1,
+    }),
     fetchEstimatedBankBalancePair({ currentMonthKey, previousMonthKey }),
   ]);
 

@@ -86,14 +86,18 @@ async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
   });
 
   if (isSupplierPayment) {
+    let settled = false;
     try {
-      await tryAutoSettleSupplierPaymentByOutbound({
+      const result = await tryAutoSettleSupplierPaymentByOutbound({
         client,
         receiptId,
         transferAmountNormalized,
         paidMonthKey,
         shopBankAccountId: bankAccountId,
       });
+      if (result) {
+        settled = true;
+      }
     } catch (autoSettleErr) {
       logger.error("[Webhook] AutoSettle supplier failed", {
         receiptId,
@@ -101,7 +105,38 @@ async function processOutboundPhase(client, parsed, receiptId, paidMonthKey) {
         stack: autoSettleErr.stack,
       });
     }
+
+    if (!settled && receiptId) {
+      try {
+        const flowTypeRes = await client.query(
+          `SELECT id FROM billing.receipt_flow_types WHERE code = $1 LIMIT 1`,
+          ["import_order"]
+        );
+        const flowTypeId = flowTypeRes.rows[0]?.id || null;
+        if (flowTypeId) {
+          await client.query(
+            `UPDATE billing.payment_receipt
+             SET flow_type_id = $1,
+                 flow_classified_at = NOW(),
+                 flow_note = $2
+             WHERE id = $3`,
+            [flowTypeId, `Auto-detected supplier payment outbound (unmatched)`, receiptId]
+          );
+          logger.info("[Webhook] Pre-classified unmatched outbound supplier payment", {
+            receiptId,
+            flowTypeId,
+          });
+        }
+      } catch (classifyErr) {
+        logger.error("[Webhook] Failed to pre-classify unmatched outbound supplier payment", {
+          receiptId,
+          error: classifyErr.message,
+        });
+      }
+    }
+    return { isSupplierPayment: true, settled };
   }
+  return { isSupplierPayment: false, settled: false };
 }
 
 module.exports = { processOutboundPhase };

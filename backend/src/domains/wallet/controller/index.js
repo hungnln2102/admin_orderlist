@@ -92,18 +92,31 @@ const normalizeWalletRow = (w) => ({
   balanceScope: parseBalanceScope(w.balanceScope ?? w.balance_scope),
 });
 
-const listDailyBalances = async (_req, res) => {
+const listDailyBalances = async (req, res) => {
   try {
+    const limit = parseInt(req.query?.limit, 10) || 30;
     const wallets = await loadWalletTypesOrdered();
 
-    const balances = await db(DAILY_BALANCES_TABLE)
-      .select({
-        recordDate: BALANCE_COLS.RECORD_DATE,
-        walletId: BALANCE_COLS.WALLET_ID,
-      })
-      .sum({ amount: BALANCE_COLS.AMOUNT })
-      .groupBy(BALANCE_COLS.RECORD_DATE, BALANCE_COLS.WALLET_ID)
-      .orderBy(BALANCE_COLS.RECORD_DATE, "desc");
+    const distinctDates = await db(DAILY_BALANCES_TABLE)
+      .distinct(BALANCE_COLS.RECORD_DATE)
+      .whereNot(BALANCE_COLS.RECORD_DATE, COLUMN_TOTAL_RECORD_DATE)
+      .orderBy(BALANCE_COLS.RECORD_DATE, "desc")
+      .limit(limit);
+
+    const targetDates = distinctDates.map((r) => normalizeDate(r[BALANCE_COLS.RECORD_DATE] ?? r.record_date));
+
+    let balances = [];
+    if (targetDates.length > 0) {
+      balances = await db(DAILY_BALANCES_TABLE)
+        .select({
+          recordDate: BALANCE_COLS.RECORD_DATE,
+          walletId: BALANCE_COLS.WALLET_ID,
+        })
+        .sum({ amount: BALANCE_COLS.AMOUNT })
+        .whereIn(BALANCE_COLS.RECORD_DATE, targetDates)
+        .groupBy(BALANCE_COLS.RECORD_DATE, BALANCE_COLS.WALLET_ID)
+        .orderBy(BALANCE_COLS.RECORD_DATE, "desc");
+    }
 
     const normalizedWallets = wallets.map(normalizeWalletRow);
     const rowsByDate = new Map();

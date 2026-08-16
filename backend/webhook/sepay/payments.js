@@ -306,6 +306,35 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     transaction.transfer_type || transaction.transferType
   );
   const gateway = normalizeOptionalText(transaction.gateway);
+
+  const isOutbound = String(transferType).toLowerCase() === "out" || Number(amount) < 0;
+
+  // Default values
+  let senderValue = senderParsed || "";
+  let receiverValue = receiverAccount || "";
+
+  if (isOutbound) {
+    // Outbound: shop is sender, third party is receiver
+    senderValue = receiverAccount; // receiverAccount has the shop bank account number
+    const recName = transaction.receiver_name || "";
+    const recAcc = transaction.receiver_account_number || "";
+    if (recName && recAcc) {
+      receiverValue = `${recName} (${recAcc})`;
+    } else {
+      receiverValue = recName || recAcc || "";
+    }
+  } else {
+    // Inbound: third party is sender, shop is receiver
+    receiverValue = receiverAccount; // receiverAccount has the shop bank account number
+    const sndName = transaction.sender_name || "";
+    const sndAcc = transaction.sender_account_number || "";
+    if (sndName && sndAcc) {
+      senderValue = `${sndName} (${sndAcc})`;
+    } else {
+      senderValue = sndName || sndAcc || senderParsed || "";
+    }
+  }
+
   /** Giao dịch gốc. Cột `note` DB: khi orderCode đã resolve (explicit hoặc qua slot) thì ghi đúng mã đó — khớp `id_order`; ngược lại giữ text CK. */
   const transferNote = transaction.note || transaction.description || "";
 
@@ -464,8 +493,8 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     const existsRes = await client.query(existsSql, [
       paidDate,
       amount,
-      receiverAccount,
-      senderParsed || "",
+      receiverValue,
+      senderValue,
       noteValue,
       orderCode,
     ]);
@@ -498,8 +527,8 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       orderCode,
       paidDate,
       amount,
-      receiverAccount,
-      senderParsed || "",
+      receiverValue,
+      senderValue,
       noteValue,
     ];
 
