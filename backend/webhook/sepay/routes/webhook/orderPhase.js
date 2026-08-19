@@ -162,6 +162,57 @@ async function processOrderPaymentPhase({
           accumulatedAmount,
           creditAppliedAmount: state.credit_applied_amount,
         });
+
+        // SPLIT OVERPAID SURPLUS IN WEBHOOK
+        if (amountDecision.complete && amountDecision.offFlowCurrent > 0) {
+          const surplus = amountDecision.offFlowCurrent;
+          const finalCurrentAmount = currentAmountForCode - surplus;
+          const finalAccumulatedAmount = accumulatedAmount - surplus;
+          const transaction = parsed.transaction || {};
+
+          // Update original receipt amount in database
+          await client.query(
+            `UPDATE billing.payment_receipt SET amount = amount - $1 WHERE id = $2`,
+            [surplus, receiptId]
+          );
+
+          // Insert new transaction for the surplus amount
+          const splitNote = `[Tách dư GD #${receiptId}] ${transaction.note || transaction.description || ""}`;
+          await client.query(
+            `INSERT INTO billing.payment_receipt (
+              id_order, amount, payment_date, receiver, note, sender,
+              sepay_transaction_id, reference_code, transfer_type, gateway,
+              is_financial_posted, posted_revenue, posted_profit, posted_off_flow_bank_receipt,
+              reconciled_at, adjustment_applied
+            ) VALUES (
+              NULL, $1, $2, $3, $4, $5,
+              NULL, $6, $7, $8,
+              FALSE, 0, 0, 0,
+              NULL, FALSE
+            )`,
+            [
+              surplus,
+              receiptResult?.paidDate || transaction.transaction_date || new Date(),
+              transaction.account_number || transaction.accountNumber || "",
+              splitNote.slice(0, 1000),
+              transaction.sender || null,
+              transaction.reference_code || null,
+              transaction.transfer_type || null,
+              transaction.gateway || null
+            ]
+          );
+
+          logger.info(`[Webhook] Tách dư thành công: GD #${receiptId} giảm còn ${finalCurrentAmount}, tạo GD mới cho phần dư ${surplus}`);
+
+          // Recompute amount decision based on exact amount matched
+          amountDecision = computeWebhookAmountDecision({
+            orderPrice: orderPriceForWebhook,
+            currentAmount: finalCurrentAmount,
+            accumulatedAmount: finalAccumulatedAmount,
+            creditAppliedAmount: state.credit_applied_amount,
+          });
+        }
+
         amountDecisionByOrderCode.set(code, amountDecision);
         logger.info("[Webhook][FinancialDebug] Computed payment decision", {
           receiptId,

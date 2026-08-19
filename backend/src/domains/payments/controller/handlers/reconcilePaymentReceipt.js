@@ -107,15 +107,72 @@ const reconcilePaymentReceipt = async (req, res) => {
         .sum({ total_receipts: aAmtCol })
         .first();
       const totalReceiptsForOrderVnd = normalizeMoney(sumRes?.total_receipts);
+      const originalReceiptAmount = normalizeMoney(receiptRow[PAYMENT_RECEIPT_DEF.columns.amount]);
       const paymentDecision = computeDashboardPaymentDecision({
         orderPrice: orderSellingPriceVnd,
-        currentAmount: normalizeMoney(receiptRow[PAYMENT_RECEIPT_DEF.columns.amount]),
+        currentAmount: originalReceiptAmount,
         accumulatedAmount: totalReceiptsForOrderVnd,
         creditAppliedAmount: 0,
       });
+
+      // SPLIT OVERPAID SURPLUS
+      let finalReceiptAmount = originalReceiptAmount;
+      let finalTotalReceiptsForOrderVnd = totalReceiptsForOrderVnd;
+      let finalPaymentDecision = paymentDecision;
+
+      if (!adjustmentApplied && paymentDecision.complete && paymentDecision.offFlowCurrent > 0) {
+        const surplusAmount = paymentDecision.offFlowCurrent;
+        finalReceiptAmount = originalReceiptAmount - surplusAmount;
+
+        // Update original receipt amount in database
+        await trx(TABLES.paymentReceipt)
+          .where(PAYMENT_RECEIPT_DEF.columns.id, receiptId)
+          .update({
+            [PAYMENT_RECEIPT_DEF.columns.amount]: finalReceiptAmount,
+          });
+
+        // Insert new transaction for the surplus amount
+        const splitNote = `[Tách dư GD #${receiptId}] ${receiptRow[PAYMENT_RECEIPT_DEF.columns.note] || ""}`;
+        const insertedIds = await trx(TABLES.paymentReceipt)
+          .insert({
+            [PAYMENT_RECEIPT_DEF.columns.orderCode]: null,
+            [PAYMENT_RECEIPT_DEF.columns.amount]: surplusAmount,
+            [PAYMENT_RECEIPT_DEF.columns.paidDate]: receiptRow[PAYMENT_RECEIPT_DEF.columns.paidDate],
+            [PAYMENT_RECEIPT_DEF.columns.receiver]: receiptRow[PAYMENT_RECEIPT_DEF.columns.receiver],
+            [PAYMENT_RECEIPT_DEF.columns.note]: splitNote.slice(0, 1000),
+            [PAYMENT_RECEIPT_DEF.columns.sender]: receiptRow[PAYMENT_RECEIPT_DEF.columns.sender],
+            [PAYMENT_RECEIPT_DEF.columns.sepayTransactionId]: null,
+            [PAYMENT_RECEIPT_DEF.columns.referenceCode]: receiptRow[PAYMENT_RECEIPT_DEF.columns.referenceCode],
+            [PAYMENT_RECEIPT_DEF.columns.transferType]: receiptRow[PAYMENT_RECEIPT_DEF.columns.transferType],
+            [PAYMENT_RECEIPT_DEF.columns.gateway]: receiptRow[PAYMENT_RECEIPT_DEF.columns.gateway],
+            [RECEIPT_STATE_COLS.isFinancialPosted]: false,
+            [RECEIPT_STATE_COLS.postedRevenue]: 0,
+            [RECEIPT_STATE_COLS.postedProfit]: 0,
+            [RECEIPT_STATE_COLS.postedOffFlowBankReceipt]: 0,
+            [RECEIPT_STATE_COLS.reconciledAt]: null,
+            [RECEIPT_STATE_COLS.adjustmentApplied]: false,
+          })
+          .returning(PAYMENT_RECEIPT_DEF.columns.id);
+        
+        const newReceiptId = insertedIds[0]?.id || insertedIds[0];
+        logger.info(`[Reconcile] Tách dư thành công: GD #${receiptId} giảm còn ${finalReceiptAmount}, tạo GD mới #${newReceiptId} cho phần dư ${surplusAmount}`);
+
+        // Recompute decision based on the exact amount matched
+        finalTotalReceiptsForOrderVnd = totalReceiptsForOrderVnd - surplusAmount;
+        finalPaymentDecision = computeDashboardPaymentDecision({
+          orderPrice: orderSellingPriceVnd,
+          currentAmount: finalReceiptAmount,
+          accumulatedAmount: finalTotalReceiptsForOrderVnd,
+          creditAppliedAmount: 0,
+        });
+
+        // Mutate receiptRow in-memory fields so subsequent handlers use updated info
+        receiptRow[PAYMENT_RECEIPT_DEF.columns.amount] = finalReceiptAmount;
+      }
+
       // Giá bán 0/âm: giữ hành vi cũ (tự nâng mark paid nếu đơn Chưa Thanh Toán với luồng only).
       const paidAmountCoversOrder =
-        orderSellingPriceVnd <= 0 ? true : paymentDecision.complete;
+        orderSellingPriceVnd <= 0 ? true : finalPaymentDecision.complete;
 
       // Mặc định luồng "Sửa mã đơn" (reconcile_only) tự mark paid nếu đơn Chưa Thanh Toán
       // và tổng biên lai gắn mã đủ theo policy thiếu < 5.000 VND. Tránh đưa "Đã Thanh Toán"
@@ -134,9 +191,9 @@ const reconcilePaymentReceipt = async (req, res) => {
         orderRow,
         orderCodeRaw,
         statusValue,
-        paymentDecision,
+        paymentDecision: finalPaymentDecision,
         orderSellingPriceVnd,
-        totalReceiptsForOrderVnd,
+        totalReceiptsForOrderVnd: finalTotalReceiptsForOrderVnd,
         effectiveAction,
       });
 

@@ -169,7 +169,6 @@ const applyReconcileDashboardAdjustment = async (
       [RECEIPT_STATE_COLS.postedOffFlowBankReceipt]: nextPostedOffFlowBankReceipt,
       [RECEIPT_STATE_COLS.reconciledAt]: new Date(),
       [RECEIPT_STATE_COLS.adjustmentApplied]: true,
-      [RECEIPT_STATE_COLS.updatedAt]: new Date(),
     });
 
   await insertReconcileAuditLog(trx, {
