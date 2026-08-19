@@ -24,6 +24,12 @@ const TRACK_TABLE = tableName(
 );
 const TRACK_COLS = RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS;
 
+const OTP_CFG_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.OTP_CONFIGS.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const OTP_CFG_COLS = RENEW_ADOBE_SCHEMA.OTP_CONFIGS.COLS;
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 
@@ -37,16 +43,18 @@ const resolveSystemByEmail = async (req, res) => {
 
   try {
     const row = await db(TRACK_TABLE)
+      .leftJoin({ cfg: OTP_CFG_TABLE }, `cfg.${OTP_CFG_COLS.ID}`, `${TRACK_TABLE}.${TRACK_COLS.OTP_CONFIG_ID}`)
       .select(
-        TRACK_COLS.SYSTEM_NOTE,
-        TRACK_COLS.ORDER_ID,
-        TRACK_COLS.UPDATED_AT
+        `${TRACK_TABLE}.${TRACK_COLS.SYSTEM_NOTE}`,
+        `${TRACK_TABLE}.${TRACK_COLS.ORDER_ID}`,
+        `${TRACK_TABLE}.${TRACK_COLS.UPDATED_AT}`,
+        `cfg.${OTP_CFG_COLS.OTP_SOURCE} as otp_source`
       )
       .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [
-        TRACK_COLS.ACCOUNT,
+        `${TRACK_TABLE}.${TRACK_COLS.ACCOUNT}`,
         email,
       ])
-      .orderBy(TRACK_COLS.UPDATED_AT, "desc")
+      .orderBy(`${TRACK_TABLE}.${TRACK_COLS.UPDATED_AT}`, "desc")
       .first();
 
     if (!row) {
@@ -56,16 +64,50 @@ const resolveSystemByEmail = async (req, res) => {
       });
     }
 
-    const code = String(row[TRACK_COLS.SYSTEM_NOTE] || "").toLowerCase();
-    const systemNote = ALLOWED_ADOBE_SYSTEM_CODES.has(code)
-      ? code
+    const systemNoteCode = String(row[TRACK_COLS.SYSTEM_NOTE] || "").toLowerCase();
+    const systemNote = ALLOWED_ADOBE_SYSTEM_CODES.has(systemNoteCode)
+      ? systemNoteCode
       : DEFAULT_ADOBE_SYSTEM_CODE;
+
+    let otpSource = String(row.otp_source || "").trim().toLowerCase();
+    if (!otpSource) {
+      if (systemNote === "fix_ades") {
+        otpSource = "ades";
+      } else {
+        otpSource = "hdsd";
+      }
+    }
+
+    let otpServiceName = "OTP Code";
+    let otpDescription = "Nhấn nút để lấy mã OTP.";
+    let hasOtp = true;
+
+    if (otpSource === "yuna") {
+      otpServiceName = "Yuna OTP Auto-Scrape";
+      otpDescription = "Hệ thống tự động quét OTP từ YunaGRP. Vui lòng bấm nút 'Lấy mã OTP' để quét.";
+    } else if (otpSource === "hdsd") {
+      otpServiceName = "HDSD OTP Gateway";
+      otpDescription = "Hệ thống sẽ lấy OTP qua API HDSD. Vui lòng bấm nút 'Lấy mã OTP' để quét.";
+    } else if (otpSource === "imap") {
+      otpServiceName = "Email OTP IMAP";
+      otpDescription = "Hệ thống sẽ tự động quét email qua kết nối IMAP để lấy mã OTP. Vui lòng bấm nút 'Lấy mã OTP' để quét.";
+    } else if (otpSource === "tinyhost") {
+      otpServiceName = "TinyHost Mail OTP";
+      otpDescription = "Hệ thống sẽ quét email từ TinyHost. Vui lòng bấm nút 'Lấy mã OTP' để quét.";
+    } else if (otpSource === "ades") {
+      otpServiceName = "Ades Support OTP";
+      otpDescription = "Hệ thống sẽ tự động lấy mã OTP từ API Ades Support. Vui lòng bấm nút 'Lấy mã OTP' để quét.";
+    }
 
     return res.json({
       ok: true,
       email,
       system_note: systemNote,
       order_id: row[TRACK_COLS.ORDER_ID] || null,
+      otp_source: otpSource,
+      otp_service_name: otpServiceName,
+      otp_description: otpDescription,
+      has_otp: hasOtp,
     });
   } catch (error) {
     logger.error("[renew-adobe/public] resolve-system failed", {
