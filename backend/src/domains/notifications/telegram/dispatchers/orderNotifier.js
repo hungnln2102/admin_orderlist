@@ -111,6 +111,24 @@ async function sendBulkTelegramOrders(orders = [], config) {
   }
 }
 
+const formatDuration = (raw) => {
+  if (!raw) return "";
+  const match = String(raw).match(/^(\d+)([mMyYdD])$/i);
+  if (!match) return raw;
+  const num = match[1];
+  const unit = match[2].toLowerCase();
+  if (unit === "m") return `${num} tháng`;
+  if (unit === "y") return `${Number(num) * 12} tháng`;
+  if (unit === "d") return `${num} ngày`;
+  return raw;
+};
+
+const extractDurationSuffix = (displayName) => {
+  if (!displayName) return "";
+  const match = String(displayName).match(/--([\d]+[mMyYdD])/i);
+  return match ? formatDuration(match[1]) : "";
+};
+
 /**
  * Thông báo đơn tạo mới — enrich productName từ DB trước rồi gửi QR.
  */
@@ -121,8 +139,28 @@ async function notifyOrderCreated(order) {
     // Enrich productName từ DB (đặc thù của flow tạo đơn mới)
     let productName = order.id_product;
     if (order.id_product) {
-      const prod = await db("product").where("id", order.id_product).first();
-      if (prod?.package_name) productName = prod.package_name;
+      const str = String(order.id_product).trim();
+      const num = Number(str);
+      const isNumeric = Number.isFinite(num) && num >= 1 && String(num) === str;
+
+      let variantRow = null;
+      if (isNumeric) {
+        variantRow = await db("variant").where("id", num).first();
+      } else {
+        variantRow = await db("variant")
+          .where("display_name", str)
+          .orWhere("variant_name", str)
+          .first();
+      }
+
+      if (variantRow) {
+        const variantName = variantRow.variant_name ? String(variantRow.variant_name).trim() : "";
+        const displayName = variantRow.display_name ? String(variantRow.display_name).trim() : "";
+        const duration = extractDurationSuffix(displayName);
+        productName = variantName
+          ? `${variantName}${duration ? ` (${duration})` : ""}`
+          : displayName || str;
+      }
     }
     const enrichedOrder = { ...order, productName };
 

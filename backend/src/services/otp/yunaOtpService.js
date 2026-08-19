@@ -1,8 +1,22 @@
 const axios = require("axios");
 const logger = require("@/utils/logger");
+const { getConfigByKey } = require("@/services/externalApiConfigService");
 
-const YUNA_BASE_URL = "https://hub.yunagrp.com/2fa/";
-const DEFAULT_API_TOKEN = "d7c79d236dcb94c2ce0bfb3a10bf68d71ec02d08cfd07882beb4fe9152fb85cb";
+const YUNA_2FA_DEFAULTS = {
+  baseUrl: "https://hub.yunagrp.com/2fa/",
+  defaultToken: "d7c79d236dcb94c2ce0bfb3a10bf68d71ec02d08cfd07882beb4fe9152fb85cb",
+};
+
+async function getYunaConfig() {
+  const row = await getConfigByKey("yuna_2fa");
+  if (row) {
+    return {
+      baseUrl: row.base_url || YUNA_2FA_DEFAULTS.baseUrl,
+      defaultToken: (row.auth_config && row.auth_config.defaultToken) || YUNA_2FA_DEFAULTS.defaultToken,
+    };
+  }
+  return YUNA_2FA_DEFAULTS;
+}
 
 /**
  * Lấy động X-API-Token và Cookie từ trang 2fa.
@@ -10,8 +24,11 @@ const DEFAULT_API_TOKEN = "d7c79d236dcb94c2ce0bfb3a10bf68d71ec02d08cfd07882beb4f
  * @returns {Promise<{token: string, cookie: string|null}>}
  */
 async function fetchApiTokenAndCookie() {
+  const config = await getYunaConfig();
+  const baseUrl = config.baseUrl;
+  const fallbackToken = config.defaultToken;
   try {
-    const response = await axios.get(YUNA_BASE_URL, {
+    const response = await axios.get(baseUrl, {
       timeout: 10000,
       headers: {
         "User-Agent":
@@ -20,7 +37,7 @@ async function fetchApiTokenAndCookie() {
     });
     const html = response.data;
     const match = html.match(/<meta\s+name=["']api-token["']\s+content=["']([^"']+)["']/i);
-    let extractedToken = DEFAULT_API_TOKEN;
+    let extractedToken = fallbackToken;
     if (match && match[1]) {
       extractedToken = match[1].trim();
       logger.info("[yuna-otp] Lấy động API Token thành công: %s", extractedToken.slice(0, 8) + "...");
@@ -34,9 +51,9 @@ async function fetchApiTokenAndCookie() {
 
     return { token: extractedToken, cookie: cookieStr };
   } catch (error) {
-    logger.warn("[yuna-otp] Lấy động API Token từ %s thất bại: %s. Sẽ dùng token mặc định.", YUNA_BASE_URL, error.message);
+    logger.warn("[yuna-otp] Lấy động API Token từ %s thất bại: %s. Sẽ dùng token mặc định.", baseUrl, error.message);
   }
-  return { token: DEFAULT_API_TOKEN, cookie: null };
+  return { token: fallbackToken, cookie: null };
 }
 
 /**
@@ -67,7 +84,8 @@ async function fetchYunaOrder(orderCode) {
       headers["Cookie"] = cookie;
     }
 
-    const response = await axios.post(YUNA_BASE_URL, params, {
+    const config = await getYunaConfig();
+    const response = await axios.post(config.baseUrl, params, {
       timeout: 15000,
       headers,
     });
@@ -120,7 +138,8 @@ async function reportYunaError(orderCode, group, name) {
       headers["Cookie"] = cookie;
     }
 
-    const response = await axios.post(YUNA_BASE_URL, params, {
+    const config = await getYunaConfig();
+    const response = await axios.post(config.baseUrl, params, {
       timeout: 15000,
       headers,
     });

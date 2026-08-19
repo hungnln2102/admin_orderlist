@@ -125,7 +125,28 @@ const KEY_ACTIVE_SCHEMA = {
   },
 };
 
+/** Cấu hình API bên ngoài — cho phép Admin quản lý domain/endpoint động từ giao diện. */
+const EXTERNAL_API_CONFIGS_SCHEMA = {
+  EXTERNAL_API_CONFIGS: {
+    TABLE: "external_api_configs",
+    COLS: {
+      ID: "id",
+      SERVICE_KEY: "service_key",
+      SERVICE_NAME: "service_name",
+      DESCRIPTION: "description",
+      BASE_URL: "base_url",
+      ENDPOINTS: "endpoints",
+      AUTH_CONFIG: "auth_config",
+      FIELD_MAPPING: "field_mapping",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+};
+
 module.exports = {
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
+  EXTERNAL_API_CONFIGS_SCHEMA,
 };

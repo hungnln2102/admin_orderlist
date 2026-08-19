@@ -48,6 +48,9 @@ const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/Renew
 const RenewProfileCheckDeskPage = lazy(
   () => import("@/features/renew-adobe/storefront-check/RenewProfileCheckDeskPage"),
 );
+const ExternalApiConfigPage = lazy(
+  () => import("@/features/system-config/pages/ExternalApiConfigPage"),
+);
 const ArticlesPage = lazy(() => import("@/features/content/pages/ArticlesPage"));
 const CreateArticlePage = lazy(() => import("@/features/content/pages/CreateArticlePage"));
 const ArticleCategoriesPage = lazy(() => import("@/features/content/pages/ArticleCategoriesPage"));
@@ -86,6 +89,7 @@ export function AppRoutes() {
         <Route path="/renew-adobe-system-logs" element={<RenewSystemLogsPage />} />
         <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
         <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />
+        <Route path="/external-api-config" element={<ExternalApiConfigPage />} />
         <Route path="/netflix" element={<NetflixAdminPage />} />
         <Route path="/content/articles" element={<ArticlesPage />} />
         <Route path="/content/create" element={<CreateArticlePage />} />

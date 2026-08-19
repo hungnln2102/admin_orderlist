@@ -48,6 +48,7 @@ const { RECEIPT_SCHEMA } = require("@/config/dbSchema/schemas/receipt");
 const {
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
+  EXTERNAL_API_CONFIGS_SCHEMA,
 } = require("@/config/dbSchema/schemas/automation");
 
 module.exports = {
@@ -88,6 +89,7 @@ module.exports = {
   PARTNER_SCHEMA,
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
+  EXTERNAL_API_CONFIGS_SCHEMA,
   PRICING_TIER_SCHEMA,
   SCHEMA_WAREHOUSE,
   WAREHOUSE_SCHEMA,

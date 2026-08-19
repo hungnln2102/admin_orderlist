@@ -105,6 +105,13 @@ export const API_ENDPOINTS = {
     `/api/renew-adobe/yuna/order/${encodeURIComponent(orderCode)}`,
   RENEW_ADOBE_YUNA_REPORT_ERROR: "/api/renew-adobe/yuna/report-error",
 
+  // System Config - External API Management
+  SYSTEM_CONFIG_EXTERNAL_APIS: "/api/system-config/external-apis",
+  SYSTEM_CONFIG_EXTERNAL_API_BY_ID: (id: number) =>
+    `/api/system-config/external-apis/${id}`,
+  SYSTEM_CONFIG_EXTERNAL_API_TEST: (id: number) =>
+    `/api/system-config/external-apis/${id}/test`,
+
   CUSTOMER_STATUS: "/api/customer-status",
   IP_WHITELISTS: "/api/ip-whitelists",
   IP_WHITELIST_BY_ID: (id: number) => `/api/ip-whitelists/${id}`,

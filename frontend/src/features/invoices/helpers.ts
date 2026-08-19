@@ -117,15 +117,6 @@ export const determineReceiptCategory = (
       }
       : receiptOrCode;
 
-  const isPosted = Boolean(
-    ("isFinancialPosted" in receipt && (receipt as any).isFinancialPosted) ||
-    ("reconciledAt" in receipt && (receipt as any).reconciledAt)
-  );
-
-  if (!isPosted) {
-    return "outbound-unallocated";
-  }
-
   const normalized = (receipt.orderCode || "").toUpperCase().trim();
   const isOrderMatched = normalized.startsWith("MAV");
 
@@ -133,7 +124,12 @@ export const determineReceiptCategory = (
     return "receipt";
   }
 
-  return "out-of-flow";
+  // Nếu không khớp mã đơn hàng MAV, giao dịch phải được xác nhận tài chính (isFinancialPosted) mới thuộc "Tiền ngoài luồng / Chi phí"
+  if (receipt.isFinancialPosted) {
+    return "out-of-flow";
+  }
+
+  return "outbound-unallocated";
 };
 
 

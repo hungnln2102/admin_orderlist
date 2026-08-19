@@ -199,8 +199,8 @@ const createPaymentReceiptBatch = async (req, res) => {
 
     // Send combined Telegram notification for the batch
     try {
-      const { PRODUCT_SCHEMA, SCHEMA_ORDERS, tableName } = require("@/config/dbSchema");
-      const variantTable = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_ORDERS);
+      const { PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("@/config/dbSchema");
+      const variantTable = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT);
       const ordersForNotification = await db(TABLES.orderList)
         .leftJoin(variantTable, `${TABLES.orderList}.id_product`, `${variantTable}.id`)
         .select(

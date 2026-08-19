@@ -464,6 +464,97 @@ export function RenewAdobeSystemManagement() {
         </div>
       </div>
 
+      {/* ⚙️ Yuna API Config Card */}
+      <div className="rounded-[22px] bg-gradient-to-br from-slate-900/60 via-slate-800/40 to-slate-950/60 border border-white/10 shadow-xl backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() => setYunaConfigOpen((o) => !o)}
+          className="w-full flex items-center justify-between gap-3 p-6"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-amber-500/10 p-2.5 text-amber-300 border border-amber-500/20">
+              <Cog6ToothIcon className="h-6 w-6" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-lg font-bold text-slate-100">Cấu hình API Yuna</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Quản lý domain, endpoint và token của Yuna API</p>
+            </div>
+          </div>
+          {yunaConfigOpen ? (
+            <ChevronUpIcon className="h-5 w-5 text-slate-400" />
+          ) : (
+            <ChevronDownIcon className="h-5 w-5 text-slate-400" />
+          )}
+        </button>
+
+        {yunaConfigOpen && (
+          <div className="px-6 pb-6 space-y-4 border-t border-white/5 pt-4">
+            {yunaConfigLoading ? (
+              <p className="text-sm text-slate-400 animate-pulse">Đang tải cấu hình...</p>
+            ) : (
+              <>
+                {yunaConfigFields.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                      {field.label}
+                      {field.required && <span className="text-rose-400 ml-0.5">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      value={yunaConfigValues[field.key] || ""}
+                      onChange={(e) =>
+                        setYunaConfigValues((prev) => ({
+                          ...prev,
+                          [field.key]: e.target.value,
+                        }))
+                      }
+                      placeholder={field.label}
+                      className="w-full px-4 py-2.5 border border-white/10 rounded-xl bg-slate-950/40 text-sm text-slate-200 placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-amber-400 outline-none transition-all font-mono"
+                      disabled={yunaConfigSaving}
+                    />
+                  </div>
+                ))}
+
+                {yunaConfigError && (
+                  <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/5 text-rose-300 text-xs">
+                    {yunaConfigError}
+                  </div>
+                )}
+                {yunaConfigSuccess && (
+                  <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-300 text-xs">
+                    {yunaConfigSuccess}
+                  </div>
+                )}
+                {yunaConfigTestResult && (
+                  <div className="p-3 rounded-xl border border-sky-500/20 bg-sky-500/5 text-sky-300 text-xs">
+                    {yunaConfigTestResult}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleYunaConfigSave}
+                    disabled={yunaConfigSaving}
+                    className="rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 text-sm transition-colors shadow-lg shadow-amber-500/10"
+                  >
+                    {yunaConfigSaving ? "Đang lưu..." : "💾 Lưu cấu hình"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleYunaConfigTest}
+                    disabled={yunaConfigTesting}
+                    className="rounded-xl border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 disabled:opacity-50 text-sky-300 font-semibold px-5 py-2.5 text-sm transition-colors"
+                  >
+                    {yunaConfigTesting ? "Đang test..." : "🔗 Test kết nối Base URL"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* YunaGRP Order Lookup Card */}
       <div className="rounded-[22px] bg-gradient-to-br from-slate-900/60 via-slate-800/40 to-slate-950/60 border border-white/10 p-6 shadow-xl backdrop-blur-sm">
         <div className="flex items-center gap-3 mb-4">

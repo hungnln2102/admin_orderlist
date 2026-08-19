@@ -2,6 +2,23 @@ const { chromium } = require("playwright");
 const axios = require("axios");
 const logger = require("@/utils/logger");
 const { getPlaywrightProxyOptions } = require("@/services/renew-adobe/adobe-renew-v2/shared/proxyConfig");
+const { getConfigByKey } = require("@/services/externalApiConfigService");
+
+const YUNA_MAIL_DEFAULTS = {
+  rulesUrl: "https://mail.yunagrp.com/admin.php?public=rules",
+  mailApiUrl: "https://mail.yunagrp.com/api.php",
+};
+
+async function getYunaMailConfig() {
+  const row = await getConfigByKey("yuna_mail");
+  if (row && row.endpoints) {
+    return {
+      rulesUrl: row.endpoints.rules || YUNA_MAIL_DEFAULTS.rulesUrl,
+      mailApiUrl: row.endpoints.mail_api || YUNA_MAIL_DEFAULTS.mailApiUrl,
+    };
+  }
+  return YUNA_MAIL_DEFAULTS;
+}
 
 function isSlueOrKaine(email) {
   const domain = String(email || "").split("@")[1]?.toLowerCase();
@@ -27,14 +44,15 @@ async function getDomainRules() {
     return cachedRules;
   }
   try {
-    const res = await axios.get(`https://mail.yunagrp.com/admin.php?public=rules&_=${now}`, { timeout: 5000 });
+    const config = await getYunaMailConfig();
+    const res = await axios.get(`${config.rulesUrl}&_=${now}`, { timeout: 5000 });
     if (res.data && res.data.success && Array.isArray(res.data.rules)) {
       cachedRules = res.data.rules.filter(r => r && r.enabled !== false);
       lastRulesFetch = now;
       return cachedRules;
     }
   } catch (err) {
-    logger.warn(`[yuna-mail-scraper] Lỗi khi tải rules từ mail.yunagrp.com: ${err.message}`);
+    logger.warn(`[yuna-mail-scraper] Lỗi khi tải rules: ${err.message}`);
   }
   
   if (cachedRules) return cachedRules;
@@ -185,7 +203,8 @@ async function scrapeYunaOtp(email) {
     if (rule) {
       if (rule.action === "api_local") {
         logger.info(`[yuna-mail-scraper] Đang gọi api_local để lấy OTP cho email ${cleanEmail}`);
-        const res = await axios.get(`https://mail.yunagrp.com/api.php?email=${encodeURIComponent(cleanEmail)}&_=${Date.now()}`, { timeout: 10000 });
+        const config = await getYunaMailConfig();
+        const res = await axios.get(`${config.mailApiUrl}?email=${encodeURIComponent(cleanEmail)}&_=${Date.now()}`, { timeout: 10000 });
         if (res.data && res.data.status && res.data.data?.latest?.extracted_code) {
           const otp = res.data.data.latest.extracted_code;
           logger.info(`[yuna-mail-scraper] Tìm thấy OTP từ api_local cho ${cleanEmail}: ${otp}`);
