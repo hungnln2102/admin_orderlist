@@ -95,6 +95,7 @@ const reconcilePaymentReceipt = async (req, res) => {
         .where(PAYMENT_RECEIPT_DEF.columns.id, receiptId)
         .update({
           [PAYMENT_RECEIPT_DEF.columns.orderCode]: orderCodeRaw,
+          [PAYMENT_RECEIPT_DEF.columns.originalOrderCode]: orderCodeRaw,
         });
 
       const adjustmentApplied = !!stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied];
@@ -136,6 +137,7 @@ const reconcilePaymentReceipt = async (req, res) => {
         const insertedIds = await trx(TABLES.paymentReceipt)
           .insert({
             [PAYMENT_RECEIPT_DEF.columns.orderCode]: null,
+            [PAYMENT_RECEIPT_DEF.columns.originalOrderCode]: orderCodeRaw,
             [PAYMENT_RECEIPT_DEF.columns.amount]: surplusAmount,
             [PAYMENT_RECEIPT_DEF.columns.paidDate]: receiptRow[PAYMENT_RECEIPT_DEF.columns.paidDate],
             [PAYMENT_RECEIPT_DEF.columns.receiver]: receiptRow[PAYMENT_RECEIPT_DEF.columns.receiver],

@@ -86,6 +86,7 @@ const listPaymentReceipts = async (req, res) => {
         flowNote: `pr.flow_note`,
         flowTypeLabel: `ft.${FLOW_TYPE_COLS.LABEL}`,
         flowTypeCode: `ft.${FLOW_TYPE_COLS.CODE}`,
+        originalOrderCode: `pr.original_order_code`,
       })
       .orderBy([
         { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
@@ -115,6 +116,7 @@ const listPaymentReceipts = async (req, res) => {
       flowNote: row.flowNote || "",
       flowTypeLabel: row.flowTypeLabel || null,
       flowTypeCode: row.flowTypeCode || null,
+      originalOrderCode: row.originalOrderCode || null,
       ...(outboundAuditMap.get(Number(row.id)) || {}),
     }));
 

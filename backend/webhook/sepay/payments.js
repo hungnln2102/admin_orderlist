@@ -542,6 +542,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     pushOptionalColumn(PAYMENT_RECEIPT_COLS.referenceCode, referenceCode);
     pushOptionalColumn(PAYMENT_RECEIPT_COLS.transferType, transferType);
     pushOptionalColumn(PAYMENT_RECEIPT_COLS.gateway, gateway);
+    pushOptionalColumn(PAYMENT_RECEIPT_COLS.originalOrderCode, orderCode);
 
     const sql = `
       INSERT INTO ${PAYMENT_RECEIPT_TABLE_RESOLVED} (

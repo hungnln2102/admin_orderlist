@@ -25,6 +25,7 @@ const RECEIPT_SCHEMA = {
       FLOW_TYPE_ID: "flow_type_id",
       FLOW_CLASSIFIED_AT: "flow_classified_at",
       FLOW_NOTE: "flow_note",
+      ORIGINAL_ORDER_CODE: "original_order_code",
     },
   },
   PAYMENT_RECEIPT_FINANCIAL_STATE: {

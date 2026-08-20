@@ -28,6 +28,7 @@ export interface PaymentReceipt {
   flowNote?: string;
   flowTypeLabel?: string | null;
   flowTypeCode?: string | null;
+  originalOrderCode?: string | null;
 }
 
 export interface ReceiptFlowType {

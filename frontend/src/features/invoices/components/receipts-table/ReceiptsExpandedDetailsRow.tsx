@@ -36,6 +36,14 @@ const ReceiptsExpandedDetailsRow: React.FC<ReceiptsExpandedDetailsRowProps> = ({
               <p className="text-sm font-black text-white">{receipt.orderCode || "—"}</p>
             </div>
           ) : null}
+          {receipt.originalOrderCode && receipt.originalOrderCode !== receipt.orderCode ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">
+                Đơn gốc
+              </p>
+              <p className="text-sm font-black text-indigo-300">{receipt.originalOrderCode}</p>
+            </div>
+          ) : null}
           <div className="space-y-1">
             <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">
               Người gửi
