@@ -2,8 +2,8 @@ const { pool } = require("../../../../../webhook/sepay/config");
 const {
   insertPaymentReceipt,
   getReceiptFinancialState,
-  creditShopBankFromPaymentReceipt,
 } = require("../../../../../webhook/sepay/payments");
+const { creditShopBankFromPaymentReceipt } = require("@/domains/wallet/shop-bank-accounts/services/shopBankLedgerService");
 const { findDefaultActiveAccount } = require("@/domains/wallet/shop-bank-accounts/repositories/shopBankAccountRepository");
 const { STATUS: ORDER_STATUS } = require("@/utils/statuses");
 const { isMavnImportOrder, isMavrykShopSupplierName } = require("@/utils/orderHelpers");
