@@ -33,10 +33,14 @@ async function main() {
     let query = `
       SELECT o.*
       FROM ${ORDER_TABLE} o
-      LEFT JOIN business.supplier_order_cost_log l ON l.order_list_id = o.id
       WHERE o.status IN ('Đang Xử Lý', 'Đã Thanh Toán')
-        AND l.id IS NULL
         AND o.${ORDER_COLS.idProduct} IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 
+          FROM business.supplier_order_cost_log l 
+          WHERE l.order_list_id = o.id 
+            AND l.logged_at >= NOW() - INTERVAL '15 days'
+        )
     `;
     
     let params = [];
@@ -84,7 +88,9 @@ async function main() {
       if (supplierId) {
         // Check if log row exists now (in case ensureSupplyAndPriceFromOrder triggered it via update)
         const { rows: logRows } = await client.query(
-          `SELECT id FROM business.supplier_order_cost_log WHERE order_list_id = $1`,
+          `SELECT id FROM business.supplier_order_cost_log 
+           WHERE order_list_id = $1 
+             AND logged_at >= NOW() - INTERVAL '15 days'`,
           [order.id]
         );
 
