@@ -229,23 +229,45 @@ const completePaymentReceiptBatchManual = async (req, res) => {
         continue;
       }
 
+      let resolvedSupplierId = state[ORDER_COLS.idSupply];
+      let resolvedCost = normalizeMoney(state[ORDER_COLS.cost]);
+      const salePrice = normalizeMoney(state[ORDER_COLS.price]);
+
+      if (!isMavnImportOrder({ id_order: orderCode })) {
+        const supplierName = await fetchSupplierNameBySupplyId(client, resolvedSupplierId);
+        if (!isMavrykShopSupplierName(supplierName)) {
+          const { ensureSupplyAndPriceFromOrder } = require("../../../../../webhook/sepay/payments");
+          const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
+            referenceImport: salePrice,
+            client,
+          });
+          if (ensured?.supplierId) {
+            resolvedSupplierId = ensured.supplierId;
+            resolvedCost = ensured.price;
+          }
+        }
+      }
+
+      state[ORDER_COLS.idSupply] = resolvedSupplierId;
+      state[ORDER_COLS.cost] = resolvedCost;
+
       const nextStatus = ORDER_STATUS.PAID;
       const statusUpdateResult = await client.query(
         `UPDATE ${ORDER_TABLE}
-         SET ${ORDER_COLS.status} = $2
+         SET ${ORDER_COLS.status} = $2,
+             ${ORDER_COLS.idSupply} = $4,
+             ${ORDER_COLS.cost} = $5
          WHERE ${ORDER_COLS.id} = $1
            AND ${ORDER_COLS.status} = $3
          RETURNING *`,
-        [state.id, nextStatus, currentStatus]
+        [state.id, nextStatus, currentStatus, resolvedSupplierId, resolvedCost]
       );
 
       if (statusUpdateResult.rowCount > 0) {
-        const salePrice = normalizeMoney(state[ORDER_COLS.price]);
-        const cost = normalizeMoney(state[ORDER_COLS.cost]);
-        const profit = normalizeMoney(salePrice - cost);
+        const profit = normalizeMoney(salePrice - resolvedCost);
 
-        const manualImportDelta = cost > 0
-          ? await resolveDashboardImportDeltaOnPaid(client, state, cost, fetchSupplierNameBySupplyId, paidMonthKey)
+        const manualImportDelta = resolvedCost > 0
+          ? await resolveDashboardImportDeltaOnPaid(client, state, resolvedCost, fetchSupplierNameBySupplyId, paidMonthKey)
           : 0;
 
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
@@ -267,7 +289,7 @@ const completePaymentReceiptBatchManual = async (req, res) => {
             posted_revenue: salePrice,
             posted_profit: profit,
             profit_provisional_wire: salePrice,
-            profit_deduct_cost_on_paid: cost > 0 ? cost : undefined,
+            profit_deduct_cost_on_paid: resolvedCost > 0 ? resolvedCost : undefined,
             total_import_add_on_paid: manualImportDelta > 0 ? manualImportDelta : undefined,
             implied_margin_vnd: profit,
             month_key: paidMonthKey,
@@ -284,15 +306,11 @@ const completePaymentReceiptBatchManual = async (req, res) => {
         });
 
         // Sync supplier payment / supply balance if not Mavryk
-        const supplierName = await fetchSupplierNameBySupplyId(client, state[ORDER_COLS.idSupply]);
+        const supplierName = await fetchSupplierNameBySupplyId(client, resolvedSupplierId);
         if (!isMavrykShopSupplierName(supplierName)) {
-          const { ensureSupplyAndPriceFromOrder, updatePaymentSupplyBalance } = require("../../../../../webhook/sepay/payments");
-          const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
-            referenceImport: salePrice,
-            client,
-          });
-          if (ensured?.supplierId && Number.isFinite(ensured.price)) {
-            await updatePaymentSupplyBalance(ensured.supplierId, ensured.price, new Date(), {
+          const { updatePaymentSupplyBalance } = require("../../../../../webhook/sepay/payments");
+          if (resolvedSupplierId && Number.isFinite(resolvedCost)) {
+            await updatePaymentSupplyBalance(resolvedSupplierId, resolvedCost, new Date(), {
               client,
             });
           }

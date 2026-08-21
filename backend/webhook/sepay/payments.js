@@ -650,7 +650,7 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
 
     const productName = String(orderRes.rows[0].product_name || "").trim();
     const idSupplyRaw = orderRes.rows[0].id_supply;
-    const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
+    let supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
       ? Number(idSupplyRaw) || null
       : null;
     const costValue = normalizeMoney(orderRes.rows[0].cost_value);
@@ -662,6 +662,22 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
     }
 
     const resolvedProductId = variantId;
+
+    // Fallback: If supplierId is null but we have a variantId, resolve the latest supplierId from supplier_cost
+    if (resolvedProductId && !supplierId) {
+      const defaultSupplierRes = await client.query(
+        `SELECT ${SUPPLIER_COST_COLS.supplierId} AS supplier_id, ${SUPPLIER_COST_COLS.price} AS price
+         FROM ${SUPPLIER_COST_TABLE}
+         WHERE ${SUPPLIER_COST_COLS.variantId} = $1
+         ORDER BY ${SUPPLIER_COST_COLS.id} DESC
+         LIMIT 1`,
+        [resolvedProductId]
+      );
+      if (defaultSupplierRes.rows.length) {
+        supplierId = Number(defaultSupplierRes.rows[0].supplier_id) || null;
+      }
+    }
+
     let supplyPriceValue = costValue || referenceImport || 0;
     let supplyPriceScaled = false;
     let rawSupplyPrice = null;
@@ -722,6 +738,21 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
         }
         supplyPriceValue = supplyPriceValue || referenceImport || costValue;
       }
+    }
+
+    // Update order_list if needed (if supplierId or supplyPriceValue changed/resolved)
+    if (
+      (supplierId && supplierId !== idSupplyRaw) ||
+      (supplyPriceValue !== costValue)
+    ) {
+      await client.query(
+        `UPDATE ${ORDER_TABLE}
+         SET 
+           ${ORDER_COLS.idSupply} = $1,
+           ${ORDER_COLS.cost} = $2
+         WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($3)`,
+        [supplierId, supplyPriceValue, orderCode]
+      );
     }
 
     if (manageTransaction) {
