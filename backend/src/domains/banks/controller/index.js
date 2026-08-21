@@ -1,4 +1,6 @@
 const https = require("https");
+const fs = require("fs");
+const path = require("path");
 const logger = require("@/utils/logger");
 const { bankCache } = require("@/utils/cache");
 
@@ -94,13 +96,31 @@ const normalizeBanks = (items = []) => {
 };
 
 const fetchBanksFromSource = async () => {
-  const payload = await fetchJson(BANK_SOURCE_URL, BANK_SOURCE_TIMEOUT_MS);
-  const rawBanks = Array.isArray(payload?.data)
-    ? payload.data
-    : Array.isArray(payload)
-      ? payload
-      : [];
-  return normalizeBanks(rawBanks);
+  try {
+    const payload = await fetchJson(BANK_SOURCE_URL, BANK_SOURCE_TIMEOUT_MS);
+    const rawBanks = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+    return normalizeBanks(rawBanks);
+  } catch (error) {
+    logger.warn("[banks] External API fetch failed, loading fallback local banks list", {
+      error: error.message
+    });
+    try {
+      const fallbackPath = path.join(__dirname, "fallback_banks.json");
+      const fallbackContent = fs.readFileSync(fallbackPath, "utf8");
+      const rawBanks = JSON.parse(fallbackContent);
+      return normalizeBanks(rawBanks);
+    } catch (fsError) {
+      logger.error("[banks] Failed to load fallback local banks list", {
+        error: fsError.message,
+        stack: fsError.stack,
+      });
+      throw error;
+    }
+  }
 };
 
 const listBanks = async (_req, res) => {
