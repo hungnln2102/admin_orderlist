@@ -225,7 +225,7 @@ const completePaymentReceiptBatchManual = async (req, res) => {
 
       if (currentStatus === ORDER_STATUS.RENEWAL) {
         // Renewal orders should not be marked as PAID directly, runRenewal will do it.
-        renewalOrders.push(orderCode);
+        renewalOrders.push({ code: orderCode, amount: normalizeMoney(item.amount) });
         continue;
       }
 
@@ -320,18 +320,19 @@ const completePaymentReceiptBatchManual = async (req, res) => {
     }
 
     // Process renewals outside transaction (after commit)
-    for (const code of renewalOrders) {
+    for (const item of renewalOrders) {
       try {
-        logger.info(`[BatchManualPayment] Running renewal for batch item: ${code}`);
-        await runRenewal(code, {
+        logger.info(`[BatchManualPayment] Running renewal for batch item: ${item.code}`);
+        await runRenewal(item.code, {
           forceRenewal: true,
-          source: "manual",
+          source: "webhook",
+          paymentAmount: item.amount,
           paymentMonthKey: paidMonthKey,
           paymentReceiptId: receiptId,
         });
-        updatedOrders.push(code);
+        updatedOrders.push(item.code);
       } catch (err) {
-        logger.error(`[BatchManualPayment] Error in runRenewal for batch item: ${code}`, { error: err.message });
+        logger.error(`[BatchManualPayment] Error in runRenewal for batch item: ${item.code}`, { error: err.message });
       }
     }
 
