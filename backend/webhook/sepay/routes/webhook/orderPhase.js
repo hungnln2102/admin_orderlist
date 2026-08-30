@@ -170,27 +170,28 @@ async function processOrderPaymentPhase({
           const finalAccumulatedAmount = accumulatedAmount - surplus;
           const transaction = parsed.transaction || {};
 
-          // Update original receipt amount in database
+          // Update original receipt amount and set original_order_code in database
           await client.query(
-            `UPDATE billing.payment_receipt SET amount = amount - $1 WHERE id = $2`,
-            [surplus, receiptId]
+            `UPDATE billing.payment_receipt SET amount = amount - $1, original_order_code = $2 WHERE id = $3`,
+            [surplus, code, receiptId]
           );
 
-          // Insert new transaction for the surplus amount
+          // Insert new transaction for the surplus amount with original_order_code set to code
           const splitNote = `[Tách dư GD #${receiptId}] ${transaction.note || transaction.description || ""}`;
           await client.query(
             `INSERT INTO billing.payment_receipt (
-              id_order, amount, payment_date, receiver, note, sender,
+              id_order, original_order_code, amount, payment_date, receiver, note, sender,
               sepay_transaction_id, reference_code, transfer_type, gateway,
               is_financial_posted, posted_revenue, posted_profit, posted_off_flow_bank_receipt,
               reconciled_at, adjustment_applied
             ) VALUES (
-              NULL, $1, $2, $3, $4, $5,
-              NULL, $6, $7, $8,
+              NULL, $1, $2, $3, $4, $5, $6,
+              NULL, $7, $8, $9,
               FALSE, 0, 0, 0,
               NULL, FALSE
             )`,
             [
+              code,
               surplus,
               receiptResult?.paidDate || transaction.transaction_date || new Date(),
               transaction.account_number || transaction.accountNumber || "",

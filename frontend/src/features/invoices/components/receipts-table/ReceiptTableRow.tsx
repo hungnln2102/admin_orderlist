@@ -530,19 +530,26 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-white tracking-wider uppercase">
-                    {receipt.orderCode || "—"}
-                  </span>
-                  {enableOrderCodeEdit ? (
-                    <button
-                      type="button"
-                      onClick={() => onStartEditOrderCode(receipt)}
-                      disabled={isMatching}
-                      className="rounded-lg border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
-                    >
-                      Sửa
-                    </button>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white tracking-wider uppercase">
+                      {receipt.orderCode || "—"}
+                    </span>
+                    {enableOrderCodeEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => onStartEditOrderCode(receipt)}
+                        disabled={isMatching}
+                        className="rounded-lg border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
+                      >
+                        Sửa
+                      </button>
+                    ) : null}
+                  </div>
+                  {receipt.originalOrderCode && receipt.originalOrderCode !== receipt.orderCode ? (
+                    <span className="text-[10px] text-indigo-300 font-medium tracking-wide uppercase italic">
+                      Đơn gốc: {receipt.originalOrderCode}
+                    </span>
                   ) : null}
                 </div>
               )}

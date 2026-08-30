@@ -269,13 +269,35 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
       });
     }
 
+    let resolvedSupplierId = state[ORDER_COLS.idSupply];
+    let resolvedCost = normalizeMoney(state[ORDER_COLS.cost]);
+
+    if (!isMavnImportOrder({ id_order: orderCode })) {
+      const supplierName = await fetchSupplierNameBySupplyId(client, resolvedSupplierId);
+      if (!isMavrykShopSupplierName(supplierName)) {
+        const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
+          referenceImport: saleAmount,
+          client,
+        });
+        if (ensured?.supplierId) {
+          resolvedSupplierId = ensured.supplierId;
+          resolvedCost = ensured.price;
+        }
+      }
+    }
+
+    state[ORDER_COLS.idSupply] = resolvedSupplierId;
+    state[ORDER_COLS.cost] = resolvedCost;
+
     const statusUpdateResult = await client.query(
       `UPDATE ${ORDER_TABLE}
-       SET ${ORDER_COLS.status} = $2
+       SET ${ORDER_COLS.status} = $2,
+           ${ORDER_COLS.idSupply} = $4,
+           ${ORDER_COLS.cost} = $5
        WHERE ${ORDER_COLS.id} = $1
          AND ${ORDER_COLS.status} = $3
        RETURNING *`,
-      [normalizedId, ORDER_STATUS.PAID, ORDER_STATUS.PROCESSING]
+      [normalizedId, ORDER_STATUS.PAID, ORDER_STATUS.PROCESSING, resolvedSupplierId, resolvedCost]
     );
     if (!statusUpdateResult.rowCount) {
       await client.query("ROLLBACK");
@@ -353,15 +375,11 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
       if (!isMavnImportOrder({ id_order: orderCode })) {
         const supplierName = await fetchSupplierNameBySupplyId(
           client,
-          state[ORDER_COLS.idSupply]
+          resolvedSupplierId
         );
         if (!isMavrykShopSupplierName(supplierName)) {
-          const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
-            referenceImport: saleAmount,
-            client,
-          });
-          if (ensured?.supplierId && Number.isFinite(ensured.price)) {
-            await updatePaymentSupplyBalance(ensured.supplierId, ensured.price, new Date(), {
+          if (resolvedSupplierId && Number.isFinite(resolvedCost)) {
+            await updatePaymentSupplyBalance(resolvedSupplierId, resolvedCost, new Date(), {
               client,
             });
           }

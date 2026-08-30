@@ -693,9 +693,10 @@ const runRenewal = async (
       });
     }
 
+    let shouldSkipSummaryForManual = false;
     // Renewal: gia hạn thành công đều chuyển Đã Thanh Toán.
     if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
-      const shouldSkipSummaryForManual = isManualRenewal || (
+      shouldSkipSummaryForManual = isManualRenewal || (
         source === "manual" &&
         await hasPostedReceiptForOrder(client, orderCode, order[ORDER_COLS.orderDate])
       );
