@@ -322,13 +322,33 @@ async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow, options = {}
   const nextPrice = normalizeMoney(afterRow[priceCol] ?? afterRow.price);
   const wasInternal = beforeRow ? await resolveIsInternalSupplier(trx, beforeRow) : false;
   const isInternal = await resolveIsInternalSupplier(trx, afterRow);
-  const beforeAppliedAmount =
-    prevStatus === STATUS.PAID && prevPrice > 0 && wasInternal ? prevPrice : 0;
-  const afterAppliedAmount =
-    nextStatus === STATUS.PAID && nextPrice > 0 && isInternal ? nextPrice : 0;
+  
+  const supplyIdChanging = beforeRow && (String(beforeRow?.[COLS.ORDER.ID_SUPPLY] ?? beforeRow?.supply_id) !== String(afterRow[COLS.ORDER.ID_SUPPLY] ?? afterRow.supply_id));
+  let beforeAppliedAmount = 0;
+  let afterAppliedAmount = 0;
 
-  // Mutual exclusion: NCC nội bộ (Mavryk/Shop) dùng nhánh internal (trừ theo price + bank),
-  // NCC ngoài dùng nhánh external (trừ theo cost). Không chạy cả hai để tránh 2 lần biến động.
+  if (supplyIdChanging) {
+    const { computeProratedCostForNewSupplier, computeRefundFromOldSupplier } = require("@/domains/supplies/supplier-change/priceCalculator");
+    const { normalizeOrderRow } = require("@/domains/orders/controller/helpers/normalize");
+    const { todayYMDInVietnam } = require("@/utils/normalizers");
+    
+    const normalizedAfter = normalizeOrderRow(afterRow, todayYMDInVietnam());
+    const totalDays = Number(afterRow[COLS.ORDER.DAYS] ?? afterRow.days ?? 0);
+    const remainingDays = Number(normalizedAfter?.so_ngay_con_lai ?? 0);
+
+    if (wasInternal && prevStatus === STATUS.PAID && prevPrice > 0) {
+      beforeAppliedAmount = computeRefundFromOldSupplier({ oldImportCost: prevPrice, totalDays, remainingDays });
+    }
+    if (isInternal && nextStatus === STATUS.PAID && nextPrice > 0) {
+      afterAppliedAmount = computeProratedCostForNewSupplier({ fullPrice: nextPrice, totalDays, remainingDays });
+    }
+  } else {
+    beforeAppliedAmount = prevStatus === STATUS.PAID && prevPrice > 0 && wasInternal ? prevPrice : 0;
+    afterAppliedAmount = nextStatus === STATUS.PAID && nextPrice > 0 && isInternal ? nextPrice : 0;
+  }
+
+  // Mutual exclusion: NCC ná»™i bá»™ (Mavryk/Shop) dÃ¹ng nhÃ¡nh internal (trá»« theo price + bank),
+  // NCC ngoÃ i dÃ¹ng nhÃ¡nh external (trá»« theo cost). KhÃ´ng cháº¡y cáº£ hai Ä‘á»ƒ trÃ¡nh 2 láº§n biáº¿n Ä‘á»™ng.
   if (wasInternal || isInternal) {
     await applyInternalMavnDashboardDelta({
       trx,
@@ -338,7 +358,8 @@ async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow, options = {}
       afterAppliedAmount,
       shopBankAccountId,
     });
-  } else {
+  } else if (!supplyIdChanging) {
+    // External to External, only apply if NOT changing supplyId (because supplier-change handles it via applyProfitDeltaOnCostChange)
     const beforeExternalAmount =
       prevStatus === STATUS.PAID && prevCost > 0 && !wasInternal ? prevCost : 0;
     const afterExternalAmount =

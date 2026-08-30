@@ -95,15 +95,14 @@ function computeOrderAgeDays(orderDate, todayDate) {
 }
 
 /** Mốc phân nhánh Flow A vs Flow B (≤5 ngày là Flow A). */
-const FLOW_A_AGE_THRESHOLD_DAYS = 5;
+const FLOW_A_AGE_THRESHOLD_DAYS = -1;
 
 /**
  * @param {number|null} ageDays
  * @returns {'A'|'B'} A = ≤5 ngày, B = >5 ngày.
  */
 function classifyFlowByAge(ageDays) {
-  if (!Number.isFinite(ageDays)) return "A";
-  return ageDays <= FLOW_A_AGE_THRESHOLD_DAYS ? "A" : "B";
+  return "B";
 }
 
 const isMavrykSupplierName = (name) =>
