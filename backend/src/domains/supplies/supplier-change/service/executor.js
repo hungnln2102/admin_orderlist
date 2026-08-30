@@ -148,24 +148,63 @@ async function executeChangeSupplierInner(trx, { orderId, newSupplyId, today }) 
 
   const latestLog = await findLatestCostLog(trx, orderId);
   if (!latestLog) {
-    // > 5 ngày nhưng không có log NCC → fallback Flow A.
-    // Tính prorated refund từ NCC cũ (không phải full cost).
+    // Không có log NCC -> coi như chưa thanh toán. Không xoá log cũ (vì không có).
+    // Đi thẳng vào luồng insert log mới.
+    const { updateOrderSupplyAndCost, insertCostLog } = require("@/domains/supplies/supplier-change/repository");
+    const { applyProfitDeltaOnCostChange } = require("@/domains/supplies/supplier-change/service/summary");
+    const { FLOWS, NCC_STATUS_UNPAID } = require("@/domains/supplies/supplier-change/service/constants");
+
+    await updateOrderSupplyAndCost(trx, orderId, {
+      supplyId: newSupplyId,
+      cost: newCost,
+    });
+
+    // Prorated refund ảo (vì chưa trả tiền nhưng vẫn phải điều chỉnh profit nếu cần)
     const proratedOldRefund = computeRefundFromOldSupplier({
       oldImportCost: oldCost,
       totalDays,
       remainingDays,
     });
-    return runFlowA(trx, {
+
+    const profitDelta = await applyProfitDeltaOnCostChange(trx, {
       orderId,
-      newSupplyId,
-      newCost,
       oldCost,
-      isNewMavryk,
+      newCost,
       orderStatus,
-      idOrderText,
       monthKey,
       effectiveOldCostRefund: proratedOldRefund,
     });
+
+    if (isNewMavryk) {
+        const { insertCostLog, NCC_STATUS_PAID } = require("@/domains/supplies/supplier-change/repository");
+        await insertCostLog(trx, {
+            orderListId: orderId,
+            supplyId: newSupplyId,
+            idOrder: idOrderText,
+            importCost: 0,
+            refundAmount: 0,
+            nccPaymentStatus: NCC_STATUS_PAID,
+        });
+    } else {
+        await insertCostLog(trx, {
+            orderListId: orderId,
+            supplyId: newSupplyId,
+            idOrder: idOrderText,
+            importCost: newCost,
+            refundAmount: 0,
+            nccPaymentStatus: NCC_STATUS_UNPAID,
+        });
+    }
+
+    return {
+      flow: FLOWS.B_UNPAID,
+      orderId,
+      oldCost,
+      newCost,
+      profitDelta,
+      mavrykNew: isNewMavryk,
+      message: isNewMavryk ? "Flow B (Không có log cũ): Mavryk marker + bù profit" : "Flow B (Không có log cũ): log mới NCC + bù profit",
+    };
   }
 
   const nccPaymentStatus = String(latestLog.ncc_payment_status ?? "").trim();
