@@ -4,12 +4,103 @@ const express = require("express");
 const router = express.Router();
 
 const DEFAULT_COOLDOWN_SECONDS = 30;
-const OTP_ACCESS_CODE = "mvrk01";
+const netflixConfig = {
+  vivaBaseUrl: process.env.VIVA_BASE_URL || "https://vivarocky.in",
+  mainAccessCode: process.env.VIVA_MAIN_CODE || "mvrk56",
+  otpAccessCode: process.env.VIVA_OTP_ACCESS_CODE || "mvrk01",
+};
+
+function getVivaUrl(path) {
+  const base = (netflixConfig.vivaBaseUrl || "https://vivarocky.in").replace(/\/+$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
 const UPSTREAM_HEADERS = {
   "Content-Type": "application/x-www-form-urlencoded",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
 };
+
+/**
+ * Danh sách tab config cho Website.
+ * Đây là nguồn sự thật (source of truth) cho tab menu động.
+ * Thêm/sửa/xóa tab ở đây → Website tự cập nhật mà không cần sửa code Website.
+ *
+ * resultType: "link" | "code" | "text"
+ *   - "link"  → hiển thị nút mở link
+ *   - "code"  → hiển thị nút copy code
+ *   - "text"  → hiển thị text message
+ */
+const WEBSITE_TAB_CONFIGS = [
+  {
+    id: "household",
+    label: "Xác minh Hộ gia đình",
+    description: "Lấy link xác minh Household Netflix",
+    color: "rose",
+    apiEndpoint: "/api/netflix/public/household",
+    inputLabel: "Email Netflix",
+    inputPlaceholder: "example@email.com",
+    submitLabel: "Lấy link xác minh",
+    resultType: "link",
+  },
+  {
+    id: "otp",
+    label: "Mã OTP đăng nhập",
+    description: "Lấy mã OTP 4–8 số từ email Netflix",
+    color: "amber",
+    apiEndpoint: "/api/netflix/public/send-otp",
+    inputLabel: "Email Netflix",
+    inputPlaceholder: "example@email.com",
+    submitLabel: "Lấy mã OTP",
+    resultType: "code",
+  },
+  {
+    id: "six-digit",
+    label: "Mã 6 số đăng nhập",
+    description: "Lấy mã xác minh 6 số (TV login)",
+    color: "emerald",
+    apiEndpoint: "/api/netflix/public/six-digit-login",
+    inputLabel: "Email Netflix",
+    inputPlaceholder: "example@email.com",
+    submitLabel: "Lấy mã 6 số",
+    resultType: "code",
+  },
+];
+
+// GET /api/netflix/public/tabs — Trả về tab config cho Website render động
+router.get("/tabs", (req, res) => {
+  return res.json({ ok: true, tabs: WEBSITE_TAB_CONFIGS });
+});
+
+// GET /api/netflix/public/config — Trả về cấu hình API hiện tại
+router.get("/config", (req, res) => {
+  return res.json({ ok: true, data: netflixConfig });
+});
+
+// POST /api/netflix/public/config — Cập nhật cấu hình API tại runtime
+router.post("/config", (req, res) => {
+  const { vivaBaseUrl, mainAccessCode, otpAccessCode } = req.body || {};
+  if (vivaBaseUrl !== undefined && vivaBaseUrl.trim()) {
+    let cleanUrl = vivaBaseUrl.trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = `https://${cleanUrl}`;
+    }
+    netflixConfig.vivaBaseUrl = cleanUrl;
+  }
+  if (mainAccessCode !== undefined && mainAccessCode.trim()) {
+    netflixConfig.mainAccessCode = mainAccessCode.trim();
+  }
+  if (otpAccessCode !== undefined && otpAccessCode.trim()) {
+    netflixConfig.otpAccessCode = otpAccessCode.trim();
+  }
+  return res.json({
+    ok: true,
+    message: "Đã cập nhật cấu hình API Netflix VIVA thành công.",
+    data: netflixConfig,
+  });
+});
+
 
 const stripHtml = (value) =>
   (value || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -77,7 +168,7 @@ router.post("/household", async (req, res) => {
 
   try {
     const upstreamRes = await postUpstreamForm(
-      "https://vivarocky.in/household.php",
+      getVivaUrl("/household.php"),
       { email, user_email: email }
     );
 
@@ -186,8 +277,8 @@ router.post("/send-otp", async (req, res) => {
 
   try {
     const upstreamRes = await postUpstreamForm(
-      "https://vivarocky.in/signin_code.php",
-      { user_email: email, access_code: OTP_ACCESS_CODE }
+      getVivaUrl("/signin_code.php"),
+      { user_email: email, access_code: netflixConfig.otpAccessCode }
     );
 
     const html = await upstreamRes.text();
@@ -269,7 +360,7 @@ router.post("/six-digit-login", async (req, res) => {
 
   try {
     const upstreamRes = await postUpstreamForm(
-      "https://vivarocky.in/six_digit_login.php",
+      getVivaUrl("/six_digit_login.php"),
       { user_email: email }
     );
 
@@ -328,10 +419,10 @@ router.post("/six-digit-login", async (req, res) => {
 // --- CUSTOMER PANEL (cust.php) PROXY ENDPOINTS ---
 
 async function getCustSession() {
-  const res = await fetch("https://vivarocky.in/cust.php", {
+  const res = await fetch(getVivaUrl("/cust.php"), {
     method: "POST",
     headers: UPSTREAM_HEADERS,
-    body: "main_code=mvrk56&login_main=1",
+    body: `main_code=${encodeURIComponent(netflixConfig.mainAccessCode)}&login_main=1`,
   });
   const setCookie = res.headers.get("set-cookie") || "";
   const match = setCookie.match(/PHPSESSID=([^;]+)/);
@@ -396,7 +487,7 @@ router.post("/customer-panel/generate", async (req, res) => {
     if (permCountry) body.append("perm_country", "1");
     body.append("generate_sub", "1");
 
-    const upstreamRes = await fetch("https://vivarocky.in/cust.php", {
+    const upstreamRes = await fetch(getVivaUrl("/cust.php"), {
       method: "POST",
       headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
       body: body.toString(),
@@ -421,7 +512,7 @@ router.post("/customer-panel/toggle", async (req, res) => {
   if (!subCode) return res.status(400).json({ ok: false, error: "Missing subCode" });
   try {
     const { cookieHeader } = await getCustSession();
-    const upstreamRes = await fetch(`https://vivarocky.in/cust.php?toggle=1&sub=${encodeURIComponent(subCode)}`, {
+    const upstreamRes = await fetch(getVivaUrl(`/cust.php?toggle=1&sub=${encodeURIComponent(subCode)}`), {
       method: "GET",
       headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
     });
@@ -440,7 +531,7 @@ router.post("/customer-panel/delete", async (req, res) => {
   if (!subCode) return res.status(400).json({ ok: false, error: "Missing subCode" });
   try {
     const { cookieHeader } = await getCustSession();
-    const upstreamRes = await fetch(`https://vivarocky.in/cust.php?delete=1&sub=${encodeURIComponent(subCode)}`, {
+    const upstreamRes = await fetch(getVivaUrl(`/cust.php?delete=1&sub=${encodeURIComponent(subCode)}`), {
       method: "GET",
       headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
     });
@@ -465,7 +556,7 @@ router.post("/customer-panel/rename", async (req, res) => {
       edit_sub_code: "1",
     });
 
-    const upstreamRes = await fetch("https://vivarocky.in/cust.php", {
+    const upstreamRes = await fetch(getVivaUrl("/cust.php"), {
       method: "POST",
       headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
       body: body.toString(),
@@ -493,7 +584,7 @@ router.post("/customer-panel/update-perms", async (req, res) => {
     if (permCountry) body.append("perm_country", "1");
     body.append("edit_perms", "1");
 
-    const upstreamRes = await fetch("https://vivarocky.in/cust.php", {
+    const upstreamRes = await fetch(getVivaUrl("/cust.php"), {
       method: "POST",
       headers: { ...UPSTREAM_HEADERS, Cookie: cookieHeader },
       body: body.toString(),

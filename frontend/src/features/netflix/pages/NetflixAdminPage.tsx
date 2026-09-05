@@ -21,6 +21,8 @@ import {
   deleteSubAccessCode,
   renameSubAccessCode,
   updateSubAccessCodePerms,
+  fetchNetflixConfig,
+  updateNetflixConfig,
   SubAccessCodeItem,
 } from "../api/netflixApi";
 import { showAppNotification } from "@/lib/notifications";
@@ -163,9 +165,57 @@ export default function NetflixAdminPage() {
     }
   };
 
+  // --- CẤU HÌNH API GLOBAL (VIVA Upstream & Outlook Bot) ---
+  const [showGlobalConfig, setShowGlobalConfig] = useState(false);
+  const [vivaBaseUrl, setVivaBaseUrl] = useState("https://vivarocky.in");
+  const [mainAccessCode, setMainAccessCode] = useState("mvrk56");
+  const [otpAccessCode, setOtpAccessCode] = useState("mvrk01");
+  const [savingGlobalConfig, setSavingGlobalConfig] = useState(false);
+
+  useEffect(() => {
+    fetchNetflixConfig()
+      .then((res) => {
+        if (res.ok && res.data) {
+          if (res.data.vivaBaseUrl) setVivaBaseUrl(res.data.vivaBaseUrl);
+          if (res.data.mainAccessCode) setMainAccessCode(res.data.mainAccessCode);
+          if (res.data.otpAccessCode) setOtpAccessCode(res.data.otpAccessCode);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveGlobalConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingGlobalConfig(true);
+    try {
+      const res = await updateNetflixConfig({
+        vivaBaseUrl: vivaBaseUrl.trim(),
+        mainAccessCode: mainAccessCode.trim(),
+        otpAccessCode: otpAccessCode.trim(),
+      });
+
+      localStorage.setItem("outlook_bot_server_url", serverUrl.trim());
+
+      if (res.ok) {
+        showAppNotification("Đã cập nhật toàn bộ cấu hình API thành công!", "success");
+        setShowGlobalConfig(false);
+      } else {
+        showAppNotification(res.message || "Cập nhật thất bại.", "error");
+      }
+    } catch (err) {
+      showAppNotification("Có lỗi xảy ra khi cập nhật cấu hình API.", "error");
+    } finally {
+      setSavingGlobalConfig(false);
+    }
+  };
+
   // --- LOGIC CHO OUTLOOK FIX BOT ---
   const [serverUrl, setServerUrl] = useState(() => {
-    return localStorage.getItem("outlook_bot_server_url") || "https://services-magnitude-recruitment-camel.trycloudflare.com";
+    return (
+      localStorage.getItem("outlook_bot_server_url") ||
+      import.meta.env.VITE_OUTLOOK_BOT_SERVER_URL ||
+      "http://172.86.91.219:3002"
+    );
   });
   const [showConfig, setShowConfig] = useState(false);
   const [outlookEmail, setOutlookEmail] = useState("");
@@ -299,12 +349,125 @@ export default function NetflixAdminPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100">Quản lý Netflix & Outlook</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Hệ thống tích hợp lấy mã xác minh Netflix, quản lý Mã phụ VIVA và công cụ tự động sửa quy tắc Outlook.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">Quản lý Netflix & Outlook</h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Hệ thống tích hợp lấy mã xác minh Netflix, quản lý Mã phụ VIVA và công cụ tự động sửa quy tắc Outlook.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowGlobalConfig(true)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 font-semibold text-xs transition-all shadow-sm self-start md:self-auto"
+        >
+          <Cog6ToothIcon className="h-4 w-4 text-purple-400" />
+          <span>Cấu hình API Service</span>
+        </button>
       </div>
+
+      {/* MODAL CẤU HÌNH API HỆ THỐNG */}
+      {showGlobalConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Cog6ToothIcon className="h-5 w-5 text-purple-400" />
+                <h2 className="text-base font-bold text-slate-100">Cấu hình API & URL Service</h2>
+              </div>
+              <button
+                onClick={() => setShowGlobalConfig(false)}
+                className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGlobalConfig} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                  1. URL Server VIVA (Lấy OTP / Household / Sub-Code)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={vivaBaseUrl}
+                  onChange={(e) => setVivaBaseUrl(e.target.value)}
+                  placeholder="https://vivarocky.in"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Địa chỉ gốc của Server VIVA (Vd: https://vivarocky.in). Nếu VIVA đổi tên miền, bạn chỉ cần sửa URL ở đây!
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                    2. Main Access Code (VIVA Panel)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={mainAccessCode}
+                    onChange={(e) => setMainAccessCode(e.target.value)}
+                    placeholder="mvrk56"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">Mã truy cập Customer Panel VIVA</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                    3. OTP Access Code (Gửi OTP)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={otpAccessCode}
+                    onChange={(e) => setOtpAccessCode(e.target.value)}
+                    placeholder="mvrk01"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">Mã truy cập khi gửi lấy OTP</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+                  4. URL Server Bot (Fix Lỗi OTP Outlook WebSocket)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  placeholder="http://172.86.91.219:3002"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Server WebSocket tự động sửa quy tắc Outlook</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowGlobalConfig(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingGlobalConfig}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {savingGlobalConfig && <ArrowPathIcon className="h-4 w-4 animate-spin" />}
+                  <span>Lưu Cấu Hình API</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Tabs Bar (5 tabs) */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -697,12 +860,12 @@ export default function NetflixAdminPage() {
           {/* Cấu hình URL */}
           {showConfig && (
             <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-300">Cấu hình Server URL (Cloudflare Tunnel)</h3>
+              <h3 className="text-sm font-semibold text-slate-300">Cấu hình Server URL (Bot Fix / WebSocket)</h3>
               <div className="flex gap-2">
                 <input
                   type="text"
                   defaultValue={serverUrl}
-                  placeholder="https://..."
+                  placeholder="http://172.86.91.219:3002"
                   id="configUrlInput"
                   className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none"
                 />

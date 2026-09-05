@@ -60,11 +60,8 @@ async function getRenewalNotificationCandidates(client, sqlDate) {
   const giftPrefix = String(prefixes.gift || "MAVT")
     .trim()
     .toUpperCase();
-  const importPrefix = String(prefixes.import || "MAVN")
-    .trim()
-    .toUpperCase();
 
-  const result = await client.query(buildRenewalQuery(sqlDate, 4, [importPrefix, giftPrefix]));
+  const result = await client.query(buildRenewalQuery(sqlDate, 4, [giftPrefix]));
   const notifyRows = result.rows.filter((row) => {
     const code = String(row.id_order || row.idOrder || "")
       .trim()

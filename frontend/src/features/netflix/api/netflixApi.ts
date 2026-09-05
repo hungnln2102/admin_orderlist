@@ -1,4 +1,29 @@
-import { apiPost } from "@/shared/api";
+import { apiFetch, apiPost } from "@/shared/api";
+
+export interface NetflixConfigItem {
+  vivaBaseUrl: string;
+  mainAccessCode: string;
+  otpAccessCode: string;
+}
+
+export interface NetflixConfigResponse {
+  ok: boolean;
+  data?: NetflixConfigItem;
+  message?: string;
+  error?: string;
+}
+
+export async function fetchNetflixConfig(): Promise<NetflixConfigResponse> {
+  return apiFetch<NetflixConfigResponse>("/api/netflix/public/config");
+}
+
+export async function updateNetflixConfig(params: {
+  vivaBaseUrl?: string;
+  mainAccessCode?: string;
+  otpAccessCode?: string;
+}): Promise<NetflixConfigResponse> {
+  return apiPost<NetflixConfigResponse>("/api/netflix/public/config", params);
+}
 
 export interface NetflixHouseholdResponse {
   ok: boolean;
