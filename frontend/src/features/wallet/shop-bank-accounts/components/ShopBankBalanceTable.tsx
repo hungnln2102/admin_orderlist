@@ -45,14 +45,14 @@ export function ShopBankBalanceTable({
         <p className="px-6 py-10 text-center text-sm text-white/60">Đang tải số dư…</p>
       ) : (
         <ResponsiveTable>
-          <table className="min-w-full divide-y divide-white/5 text-white">
+          <table className="min-w-full table-fixed divide-y divide-white/5 text-white">
             <thead>
               <tr className="[&>th]:bg-white/[0.03] [&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-emerald-300/70">
-                <th>STK / Chủ TK</th>
-                <th className="text-right">Tổng tiền CK</th>
-                <th className="text-right">Số tiền đã rút</th>
-                <th className="text-right">Số tiền còn lại</th>
-                <th className="text-right">Thao tác</th>
+                <th className="w-[35%]">STK / Chủ TK</th>
+                <th className="w-[20%] text-right">Tổng tiền CK</th>
+                <th className="w-[20%] text-right">Số tiền đã rút</th>
+                <th className="w-[15%] text-right">Số tiền còn lại</th>
+                <th className="w-[10%] text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">

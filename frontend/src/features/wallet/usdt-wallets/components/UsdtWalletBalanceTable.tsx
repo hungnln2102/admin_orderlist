@@ -57,13 +57,13 @@ export function UsdtWalletBalanceTable({
         <p className="px-6 py-10 text-center text-sm text-white/60">Đang tải số dư…</p>
       ) : (
         <ResponsiveTable>
-          <table className="min-w-full divide-y divide-white/5 text-white">
+          <table className="min-w-full table-fixed divide-y divide-white/5 text-white">
             <thead>
               <tr className="[&>th]:bg-white/[0.03] [&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-cyan-300/70">
-                <th>Ví / Nhãn</th>
-                <th className="text-right">Tổng nạp (USD)</th>
-                <th className="text-right">Đã rút (USD)</th>
-                <th className="text-right">Còn lại (USD)</th>
+                <th className="w-[40%]">Ví / Nhãn</th>
+                <th className="w-[20%] text-right">Tổng nạp (USD)</th>
+                <th className="w-[20%] text-right">Đã rút (USD)</th>
+                <th className="w-[20%] text-right">Còn lại (USD)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
