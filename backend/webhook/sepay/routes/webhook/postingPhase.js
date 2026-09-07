@@ -26,7 +26,7 @@ const {
   requiredMinForSuccessfulPayment,
 } = require("@/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
 const logger = require("@/utils/logger");
-const { computeOrderCurrentPrice } = require("../../renewalPricing");
+
 const { withSavepoint } = require("../../savepoint");
 const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 const {
@@ -314,32 +314,6 @@ const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, status
   let baseOrderPrice = storedGross > 0 ? storedGross : stored;
   if (storedGross > 0 && netSalePrice > 0 && storedGross > netSalePrice) {
     baseOrderPrice = netSalePrice;
-  }
-  if (statusValue !== ORDER_STATUS.RENEWAL || !state) {
-    return baseOrderPrice;
-  }
-  const row = {
-    ...state,
-    [ORDER_COLS.idOrder]: state[ORDER_COLS.idOrder] ?? orderCode,
-  };
-  try {
-    const { price } = await computeOrderCurrentPrice(client, row);
-    const current = normalizeMoney(price);
-    if (current > 0 && current !== stored) {
-      logger.info("[Webhook] Gia hạn: so khớp CK theo giá bảng hiện tại (không snapshot đơn)", {
-        orderCode,
-        storedPrice: stored,
-        currentPrice: current,
-      });
-    }
-    if (current > 0) {
-      return current;
-    }
-  } catch (error) {
-    logger.warn("[Webhook] Không tính được giá hiện tại khi gia hạn, dùng giá trên đơn", {
-      orderCode,
-      error: error?.message,
-    });
   }
   return baseOrderPrice;
 };
