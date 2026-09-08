@@ -166,7 +166,8 @@ const createImportPackage = async (payload) => {
       srvRow = srv.id !== undefined ? srv : { id: srv };
     }
 
-    const resolvedMatchMode = matchMode ?? nameMatch ?? "information_order";
+    const resolvedMatchMode =
+      matchMode ?? nameMatch ?? rule?.default_match_mode ?? "information_order";
     const normalizedMatchMode =
       resolvedMatchMode === "slot" ? "slot" : "information_order";
     const resolvedSlotLimit =

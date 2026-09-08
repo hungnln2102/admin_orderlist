@@ -53,6 +53,8 @@ export const useCreateOrderImportPackageFlow = ({
           productId: selectedProductId,
           supplierId: selectedSupplyId,
           importPrice: Number(formData[ORDER_FIELDS.COST]) || null,
+          slotLimit: importRule?.defaultSlotLimit ?? undefined,
+          matchMode: importRule?.defaultMatchMode ?? undefined,
           data: importPackageData,
         };
       } else {
@@ -64,6 +66,7 @@ export const useCreateOrderImportPackageFlow = ({
       formData,
       handleSubmit,
       importPackageData,
+      importRule,
       isImportOrder,
       pendingImportPackageRef,
       selectedProductId,
