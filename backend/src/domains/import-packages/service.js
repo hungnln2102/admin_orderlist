@@ -4,13 +4,23 @@ const { normalizeDateInput } = require("@/utils/normalizers");
 const { TABLES, ruleCols, stockCols, pkgCols } = require("@/domains/import-packages/constants");
 const logger = require("@/utils/logger");
 
+const resolveProductId = async (trxOrDb, id) => {
+  const queryDb = trxOrDb || db;
+  const variantRow = await queryDb(tableName("variant", SCHEMA_PRODUCT))
+    .select("product_id")
+    .where("id", id)
+    .first();
+  return variantRow?.product_id ?? id;
+};
+
 /**
- * Doc rule cau hinh import-package theo productId.
+ * Doc rule cau hinh import-package theo productId (co ho tro map tu variant id).
  * Neu khong co rule thi tra ve null.
  */
 const findRuleByProductId = async (trxOrDb, productId) => {
+  const targetId = await resolveProductId(trxOrDb, productId);
   const row = await (trxOrDb || db)(TABLES.rule)
-    .where(ruleCols.productId, productId)
+    .where(ruleCols.productId, targetId)
     .first();
   return row || null;
 };
@@ -291,13 +301,15 @@ const listRules = async () => {
 };
 
 const getRuleByProductId = async (productId) => {
+  const targetId = await resolveProductId(db, productId);
   const row = await db(TABLES.rule)
-    .where(ruleCols.productId, productId)
+    .where(ruleCols.productId, targetId)
     .first();
   return row ? mapRule(row) : null;
 };
 
 const upsertRule = async (productId, payload) => {
+  const targetId = await resolveProductId(db, productId);
   const {
     enabled = false,
     fields = [],
@@ -307,12 +319,12 @@ const upsertRule = async (productId, payload) => {
 
   const now = new Date().toISOString();
   const existing = await db(TABLES.rule)
-    .where(ruleCols.productId, productId)
+    .where(ruleCols.productId, targetId)
     .first();
 
   if (existing) {
     const [updated] = await db(TABLES.rule)
-      .where(ruleCols.productId, productId)
+      .where(ruleCols.productId, targetId)
       .update({
         [ruleCols.enabled]: enabled,
         [ruleCols.fields]: JSON.stringify(fields),
@@ -326,7 +338,7 @@ const upsertRule = async (productId, payload) => {
 
   const [created] = await db(TABLES.rule)
     .insert({
-      [ruleCols.productId]: productId,
+      [ruleCols.productId]: targetId,
       [ruleCols.enabled]: enabled,
       [ruleCols.fields]: JSON.stringify(fields),
       [ruleCols.defaultSlotLimit]: defaultSlotLimit,
@@ -339,8 +351,9 @@ const upsertRule = async (productId, payload) => {
 };
 
 const deleteRule = async (productId) => {
+  const targetId = await resolveProductId(db, productId);
   const deleted = await db(TABLES.rule)
-    .where(ruleCols.productId, productId)
+    .where(ruleCols.productId, targetId)
     .del();
   return deleted > 0;
 };
