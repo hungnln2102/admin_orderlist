@@ -474,7 +474,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         <div
           className={`absolute ${
             align === "right" ? "right-0" : "left-0"
-          } top-[calc(100%+12px)] w-[calc(100vw-1.5rem)] md:w-[720px] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl z-50 p-6 flex flex-col md:flex-row gap-6 backdrop-blur-xl animate-in fade-in duration-200`}
+          } top-[calc(100%+12px)] w-[calc(100vw-1.5rem)] md:w-[720px] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl z-[100] p-6 flex flex-col md:flex-row gap-6 backdrop-blur-xl animate-in fade-in duration-200`}
         >
           {/* Left panel presets */}
           <div className="w-full md:w-36 flex-shrink-0 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible md:border-r border-white/[0.06] pr-0 md:pr-4 pb-3 md:pb-0">

@@ -38,7 +38,7 @@ export function OrdersFiltersBar({
   onDurationRangeChange,
 }: OrdersFiltersBarProps) {
   return (
-    <div className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-3.5 shadow-2xl backdrop-blur-md sm:rounded-3xl sm:p-4.5 lg:p-5">
+    <div className="relative z-30 min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-3.5 shadow-2xl backdrop-blur-md sm:rounded-3xl sm:p-4.5 lg:p-5">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4">
         {/* Unified Search & Scope Box */}
         <div className="group relative flex min-w-0 flex-1 items-center rounded-2xl border border-white/10 bg-slate-950/60 transition-all duration-200 focus-within:border-indigo-500/80 focus-within:ring-2 focus-within:ring-indigo-500/30 hover:border-white/20 xl:max-w-2xl">
