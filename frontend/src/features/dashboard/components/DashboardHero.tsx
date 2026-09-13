@@ -6,9 +6,11 @@ type DashboardHeroProps = {
 };
 
 export const DashboardHero: React.FC<DashboardHeroProps> = ({ rightSlot }) => (
-  <div className="dashboard-hero relative group overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/40 via-purple-950/30 to-slate-950/40 border border-indigo-500/20 p-6 lg:p-8 transition-all duration-700 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5),0_10px_30px_-15px_rgba(79,70,229,0.15)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6),0_15px_40px_-15px_rgba(79,70,229,0.25)] backdrop-blur-xl">
-    <div className="dashboard-hero__glow dashboard-hero__glow--right absolute -right-20 -top-20 w-96 h-96 bg-indigo-500/15 rounded-full blur-[100px] animate-pulse"></div>
-    <div className="dashboard-hero__glow dashboard-hero__glow--left absolute -left-20 -bottom-20 w-96 h-96 bg-purple-500/15 rounded-full blur-[100px] animate-pulse [animation-delay:2s]"></div>
+  <div className="dashboard-hero relative z-30 group rounded-3xl bg-gradient-to-br from-indigo-950/40 via-purple-950/30 to-slate-950/40 border border-indigo-500/20 p-6 lg:p-8 transition-all duration-700 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5),0_10px_30px_-15px_rgba(79,70,229,0.15)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6),0_15px_40px_-15px_rgba(79,70,229,0.25)] backdrop-blur-xl">
+    <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+      <div className="dashboard-hero__glow dashboard-hero__glow--right absolute -right-20 -top-20 w-96 h-96 bg-indigo-500/15 rounded-full blur-[100px] animate-pulse"></div>
+      <div className="dashboard-hero__glow dashboard-hero__glow--left absolute -left-20 -bottom-20 w-96 h-96 bg-purple-500/15 rounded-full blur-[100px] animate-pulse [animation-delay:2s]"></div>
+    </div>
 
     <div className="dashboard-hero__content relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-8">
       <div className="dashboard-hero__text min-w-0 flex-1 space-y-3">
