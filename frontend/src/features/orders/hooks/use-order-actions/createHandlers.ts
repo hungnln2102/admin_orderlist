@@ -12,6 +12,8 @@ type ImportPackageMeta = {
   productId?: number | string | null;
   supplierId?: number | string | null;
   importPrice?: number | string | null;
+  slotLimit?: number | null;
+  matchMode?: "information_order" | "slot" | null;
   data?: Record<string, unknown> | null;
 };
 
@@ -37,10 +39,26 @@ const postImportPackage = async (
     ? data.expires_at 
     : (outgoingOrder[ORDER_FIELDS.EXPIRY_DATE] as string | undefined);
 
+  const slotLimitVal =
+    typeof meta?.slotLimit === "number"
+      ? meta.slotLimit
+      : typeof data.slotLimit === "number"
+      ? data.slotLimit
+      : undefined;
+
+  const matchModeVal =
+    typeof meta?.matchMode === "string"
+      ? (meta.matchMode as "information_order" | "slot")
+      : typeof data.matchMode === "string"
+      ? (data.matchMode as "information_order" | "slot")
+      : undefined;
+
   await createImportPackage({
     productId,
     supplierId: toOptionalNumber(meta?.supplierId),
     importPrice: toOptionalNumber(meta?.importPrice),
+    slotLimit: slotLimitVal,
+    matchMode: matchModeVal,
     account: accountVal ?? null,
     password: typeof data.password === "string" ? data.password : null,
     backup_email: typeof data.backup_email === "string" ? data.backup_email : null,

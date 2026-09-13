@@ -60,13 +60,17 @@ async function getRenewalNotificationCandidates(client, sqlDate) {
   const giftPrefix = String(prefixes.gift || "MAVT")
     .trim()
     .toUpperCase();
+  const importPrefix = String(prefixes.import || "MAVN")
+    .trim()
+    .toUpperCase();
 
-  const result = await client.query(buildRenewalQuery(sqlDate, 4, [giftPrefix]));
+  const result = await client.query(buildRenewalQuery(sqlDate, 4, [giftPrefix, importPrefix]));
   const notifyRows = result.rows.filter((row) => {
     const code = String(row.id_order || row.idOrder || "")
       .trim()
       .toUpperCase();
-    return !(giftPrefix && code.startsWith(giftPrefix));
+    return !(giftPrefix && code.startsWith(giftPrefix))
+      && !(importPrefix && code.startsWith(importPrefix));
   });
   const skippedGiftCount = result.rows.length - notifyRows.length;
 

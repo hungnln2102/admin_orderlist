@@ -82,10 +82,18 @@ async function resolveRenewalNotifyPrice(client, row, computed) {
         if (opened.ok && Number(opened.expectedAmount) > 0) {
           return Number(opened.expectedAmount);
         }
-        logger.warn("[CRON] notifyFourDays: không mở được renewal slot", {
-          orderCode,
-          reason: opened.reason,
-        });
+        const SKIP_REASONS = new Set(["skip_mavn_import", "skip_gift_order"]);
+        if (SKIP_REASONS.has(opened.reason)) {
+          logger.debug("[CRON] notifyFourDays: bỏ qua mở renewal slot (skip có chủ đích)", {
+            orderCode,
+            reason: opened.reason,
+          });
+        } else {
+          logger.warn("[CRON] notifyFourDays: không mở được renewal slot", {
+            orderCode,
+            reason: opened.reason,
+          });
+        }
       } else {
         logger.warn(
           "[CRON] notifyFourDays: chưa có STK shop mặc định — giữ giá base không suffix",
