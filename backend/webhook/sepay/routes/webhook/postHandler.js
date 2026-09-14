@@ -338,6 +338,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
       } = deltas;
 
       // Update Financial State
+      const hasEligibleRenewal = loopOrderCodes.some(code => eligibilityByOrderCode.get(code)?.eligible);
       if (receiptId) {
         if (!alreadyFinancialPosted && (postedRevenueDelta !== 0 || postedProfitDelta !== 0 || postedOffFlowBankReceiptDelta !== 0)) {
           await updateReceiptFinancialState(client, receiptId, {
@@ -346,7 +347,7 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
             posted_profit: postedProfitDelta,
             posted_off_flow_bank_receipt: postedOffFlowBankReceiptDelta,
           });
-        } else if (!alreadyFinancialPosted) {
+        } else if (!alreadyFinancialPosted && !hasEligibleRenewal) {
           const isOutboundSettled = outboundResult?.settled;
           if (!isOutboundSettled) {
             await updateReceiptFinancialState(client, receiptId, {

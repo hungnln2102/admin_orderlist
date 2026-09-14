@@ -56,7 +56,7 @@ const searchPath = Array.from(
   )
 );
 
-const KNEX_POOL_MAX = Number(process.env.DB_KNEX_POOL_MAX) || 10;
+const KNEX_POOL_MAX = Number(process.env.DB_KNEX_POOL_MAX) || 25;
 const isTest = process.env.NODE_ENV === "test";
 
 const db = knex({

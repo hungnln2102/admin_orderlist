@@ -39,6 +39,11 @@ const buildRangeMonthlyChartQuery = (options = {}) => {
       ${birthDateExpr} AS birth_date,
       ${eventDateExpr} AS event_date
     FROM ${orderTable} ${o}
+    CROSS JOIN params p
+    WHERE
+      (${o}.${quoteIdent(orderCols.ORDER_DATE)} >= p.c0 - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.ORDER_DATE)} <= p.c1 + INTERVAL '2 days')
+      OR (${o}.${quoteIdent(orderCols.CREATED_AT)} >= p.c0 - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.CREATED_AT)} <= p.c1 + INTERVAL '2 days')
+      OR (${o}.${quoteIdent(orderCols.CANCELED_AT)} >= p.c0 - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.CANCELED_AT)} <= p.c1 + INTERVAL '2 days')
   ),
   monthly_event AS (
     SELECT
@@ -137,6 +142,11 @@ const buildRangeDailyChartQuery = (options = {}) => {
       ${birthDateExpr} AS birth_date,
       ${eventDateExpr} AS event_date
     FROM ${orderTable} ${o}
+    CROSS JOIN params p
+    WHERE
+      (${o}.${quoteIdent(orderCols.ORDER_DATE)} >= p.c0 - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.ORDER_DATE)} <= p.c1 + INTERVAL '2 days')
+      OR (${o}.${quoteIdent(orderCols.CREATED_AT)} >= p.c0 - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.CREATED_AT)} <= p.c1 + INTERVAL '2 days')
+      OR (${o}.${quoteIdent(orderCols.CANCELED_AT)} >= p.c0 - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.CANCELED_AT)} <= p.c1 + INTERVAL '2 days')
   ),
   daily_event AS (
     SELECT

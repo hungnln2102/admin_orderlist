@@ -104,7 +104,7 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
     setSubmitInfo(null);
     const ids = [...selected];
     if (ids.length === 0) {
-      setSubmitError("Ch?n ?t nh?t 1 ??n ?? th?m v?o tracking.");
+      setSubmitError("Chọn ít nhất 1 đơn để thêm vào tracking.");
       return;
     }
     setSubmitting(true);
@@ -118,9 +118,9 @@ export function useAddTrackingOrdersModal({ open, onSaved }: UseAddTrackingOrder
       onSaved?.({ upserted: result.upserted, accepted: result.accepted });
       const skippedNote =
         result.skipped && result.skipped.length > 0
-          ? ` B? qua ${result.skipped.length} ??n kh?ng h?p l?.`
+          ? ` Bỏ qua ${result.skipped.length} đơn không hợp lệ.`
           : "";
-      setSubmitInfo(`?? l?u ${result.upserted}/${result.requested} ??n.${skippedNote}`);
+      setSubmitInfo(`Đã lưu ${result.upserted}/${result.requested} đơn.${skippedNote}`);
       setSelected(new Set());
       const refreshed = await fetchMatchableOrders({ q: appliedSearch, excludeTracked });
       setItems(refreshed);

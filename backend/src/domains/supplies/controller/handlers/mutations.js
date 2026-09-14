@@ -257,7 +257,7 @@ const toggleSupplyActive = async (req, res) => {
       : activeValue;
 
   if (statusValue === undefined) {
-    return res.status(400).json({ error: "Thi?u tr?ng th?i nh? cung c?p." });
+    return res.status(400).json({ error: "Thiếu trạng thái nhà cung cấp." });
   }
 
   try {

@@ -185,7 +185,7 @@ async function ensureFixAdesEligible(email, res) {
 const publicCheckFixAdes = async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!email || !EMAIL_RE.test(email)) {
-    return res.status(400).json({ ok: false, error: "Email kh?ng h?p l?." });
+    return res.status(400).json({ ok: false, error: "Email không hợp lệ." });
   }
   const eligible = await findFixAdesTrackingRow(email);
   try {
@@ -196,7 +196,7 @@ const publicCheckFixAdes = async (req, res) => {
       return res.status(403).json({
         ok: false,
         error:
-          "Email kh?ng thu?c h? th?ng Fix Ades ho?c ch?a ???c k?ch ho?t. Vui l?ng ki?m tra l?i.",
+          "Email không thuộc hệ thống Fix Ades hoặc chưa được kích hoạt. Vui lòng kiểm tra lại.",
       });
     }
 

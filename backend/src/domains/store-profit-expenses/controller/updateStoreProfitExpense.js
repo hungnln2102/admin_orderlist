@@ -104,10 +104,10 @@ const updateStoreProfitExpense = async (req, res) => {
 
     const mapped = mapExpenseRow(updated);
     writeUserEventLog(req, {
-      action: "S?a log chi ph?",
-      entity: "Chi ph?",
+      action: "Sửa log chi phí",
+      entity: "Chi phí",
       entityId: mapped.id || id,
-      message: `S?a log chi ph? #${mapped.id || id}`,
+      message: `Sửa log chi phí #${mapped.id || id}`,
       source: "finance.store_profit_expenses",
       metadata: {
         expenseId: mapped.id || id,

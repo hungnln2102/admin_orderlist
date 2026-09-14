@@ -267,10 +267,10 @@ const saveDailyBalance = async (req, res) => {
       }));
 
     writeUserEventLog(req, {
-      action: "Th?m d?ng ti?n theo ng?y",
-      entity: "D?ng ti?n theo ng?y",
+      action: "Thêm dòng tiền theo ngày",
+      entity: "Dòng tiền theo ngày",
       entityId: dateStr,
-      message: `Th?m/c?p nh?t d?ng ti?n ng?y ${dateStr} (${changedWallets.length} c?t)`,
+      message: `Thêm/cập nhật dòng tiền ngày ${dateStr} (${changedWallets.length} cột)`,
       source: "finance.wallet_daily_balances",
       metadata: {
         recordDate: dateStr,

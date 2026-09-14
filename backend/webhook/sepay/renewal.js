@@ -731,14 +731,29 @@ const runRenewal = async (
           });
         }
 
-        if (paymentReceiptId) {
-          await updateReceiptFinancialState(client, paymentReceiptId, {
+        let targetReceiptId = paymentReceiptId;
+        if (!targetReceiptId) {
+          const findReceiptRes = await client.query(
+            `SELECT id FROM billing.payment_receipt WHERE LOWER(COALESCE(id_order::text, '')) = LOWER($1) AND (is_financial_posted IS NOT TRUE) ORDER BY id DESC LIMIT 1`,
+            [orderCode]
+          );
+          if (findReceiptRes.rows.length) {
+            targetReceiptId = findReceiptRes.rows[0].id;
+          }
+        }
+
+        if (targetReceiptId) {
+          await client.query(
+            `UPDATE billing.payment_receipt SET id_order = COALESCE(NULLIF(TRIM(id_order::text), ''), $1) WHERE id = $2`,
+            [orderCode, targetReceiptId]
+          );
+          await updateReceiptFinancialState(client, targetReceiptId, {
             is_financial_posted: true,
             posted_revenue: revenue,
             posted_profit: profit,
           });
           await insertFinancialAuditLog(client, {
-            payment_receipt_id: paymentReceiptId,
+            payment_receipt_id: targetReceiptId,
             order_code: orderCode,
             rule_branch: "RENEWAL_WEBHOOK_POST",
             delta: {
@@ -746,7 +761,7 @@ const runRenewal = async (
               posted_profit: profit,
               month_key: effectiveMonthKey,
             },
-            source: "webhook",
+            source: source || "webhook",
           });
         }
       }

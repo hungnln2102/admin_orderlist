@@ -42,7 +42,7 @@ export const getImportPriceBySupplyName = (
   return Number.isFinite(priceValue) ? Number(priceValue) : undefined;
 };
 
-/** NCC c?a h?ng n?i b?: kh?ng d?ng gi? nh?p; gi? b?n = l?i nhu?n (backend cost = 0). */
+/** NCC cửa hàng nội bộ: không dùng giá nhập; giá bán = lợi nhuận (backend cost = 0). */
 export const isMavrykShopSupplierName = (name: string | null | undefined): boolean => {
   const raw = String(name ?? "").trim().toLowerCase();
   return raw === "mavryk" || raw === "shop";

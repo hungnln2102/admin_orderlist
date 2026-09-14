@@ -18,7 +18,7 @@ export function InvoicesPagination({
   return (
     <div className="flex flex-col gap-3 px-1 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        Trang {activePage}/{totalPages} ? {totalItems} d?ng
+        Trang {activePage}/{totalPages} · {totalItems} dòng
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button

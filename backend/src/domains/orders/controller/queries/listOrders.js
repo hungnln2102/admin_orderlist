@@ -55,7 +55,7 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
                     pr.${paymentReceiptIdCol} AS latest_webhook_receipt_id
                 FROM ${TABLES.paymentReceipt} pr
                 WHERE COALESCE(${table}.${idOrderCol}::text, '') <> ''
-                  AND LOWER(COALESCE(pr.${paymentReceiptOrderCodeCol}::text, '')) = LOWER(${table}.${idOrderCol}::text)
+                  AND LOWER(TRIM(COALESCE(pr.${paymentReceiptOrderCodeCol}::text, ''))) = LOWER(TRIM(${table}.${idOrderCol}::text))
                 ORDER BY pr.${paymentReceiptPaidDateCol} DESC NULLS LAST, pr.${paymentReceiptIdCol} DESC
                 LIMIT 1
             ) latest_pr ON TRUE
@@ -68,7 +68,7 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
                     COALESCE(SUM(pr_sum.${paymentReceiptAmountCol})::numeric, 0) AS total_webhook_amount
                 FROM ${TABLES.paymentReceipt} pr_sum
                 WHERE COALESCE(${table}.${idOrderCol}::text, '') <> ''
-                  AND LOWER(COALESCE(pr_sum.${paymentReceiptOrderCodeCol}::text, '')) = LOWER(${table}.${idOrderCol}::text)
+                  AND LOWER(TRIM(COALESCE(pr_sum.${paymentReceiptOrderCodeCol}::text, ''))) = LOWER(TRIM(${table}.${idOrderCol}::text))
                   AND (
                     pr_sum.${paymentReceiptPaidDateCol}::date >= COALESCE(${table}.${orderDateCol}::date, '1970-01-01'::date)
                     OR (

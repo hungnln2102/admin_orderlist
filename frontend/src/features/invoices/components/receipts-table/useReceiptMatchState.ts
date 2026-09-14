@@ -34,7 +34,7 @@ export function useReceiptMatchState({ onMatchReceipt }: UseReceiptMatchStatePar
     if (!manualCode) {
       setRowErrorByReceiptId((prev) => ({
         ...prev,
-        [receipt.id]: "B?n ch?a nh?p m? ??n h?ng.",
+        [receipt.id]: "Bạn chưa nhập mã đơn hàng.",
       }));
       return;
     }

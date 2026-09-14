@@ -16,7 +16,7 @@ type UsePackageFormStateParams = {
   open: boolean;
   initialValues?: PackageFormValues;
   onSubmit: (values: PackageFormValues) => void;
-  /** B?t khi lo?i g?i c? tr??ng ?activation? ? khi false, kh?ng b?t bu?c k?ch ho?t d? ch?n match theo th?ng tin ??n. */
+  /** Bật khi loại gói có trường "activation" — khi false, không bắt buộc kích hoạt dù chọn match theo thông tin đơn. */
   requireActivationForInformation: boolean;
 };
 

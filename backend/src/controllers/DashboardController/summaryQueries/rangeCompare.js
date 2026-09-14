@@ -41,6 +41,11 @@ const buildRangeCompareStatsQuery = (options = {}) => {
       UPPER(TRIM(COALESCE(${o}.${quoteIdent(orderCols.ID_ORDER)}::text, ''))) AS id_order_upper,
       ${birthDateExpr} AS birth_date
     FROM ${orderTable} ${o}
+    CROSS JOIN params p
+    WHERE
+      (${o}.${quoteIdent(orderCols.ORDER_DATE)} >= LEAST(p.c0, p.p0) - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.ORDER_DATE)} <= GREATEST(p.c1, p.p1) + INTERVAL '2 days')
+      OR (${o}.${quoteIdent(orderCols.CREATED_AT)} >= LEAST(p.c0, p.p0) - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.CREATED_AT)} <= GREATEST(p.c1, p.p1) + INTERVAL '2 days')
+      OR (${o}.${quoteIdent(orderCols.CANCELED_AT)} >= LEAST(p.c0, p.p0) - INTERVAL '2 days' AND ${o}.${quoteIdent(orderCols.CANCELED_AT)} <= GREATEST(p.c1, p.p1) + INTERVAL '2 days')
   )
   SELECT
     COALESCE(SUM(CASE

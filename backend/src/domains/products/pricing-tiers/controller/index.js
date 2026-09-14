@@ -153,10 +153,10 @@ const upsertVariantMargins = async (req, res) => {
       logger.error("[PricingTier] Failed to sync renewal prices after upsertVariantMargins", { error: syncErr.message });
     }
     writeUserEventLog(req, {
-      action: "Sua bien loi nhuan bang gia",
-      entity: "Bang gia",
+      action: "Sửa biên lợi nhuận bảng giá",
+      entity: "Bảng giá",
       entityId: variantId,
-      message: `Sua bien loi nhuan bang gia cho s?n ph?m ${variantId}`,
+      message: `Sửa biên lợi nhuận bảng giá cho sản phẩm ${variantId}`,
       source: "products.variant_pricing_margins",
       metadata: {
         variantId,
