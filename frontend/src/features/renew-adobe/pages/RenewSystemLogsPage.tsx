@@ -130,10 +130,10 @@ export default function RenewSystemLogsPage() {
         <div className="rounded-3xl border border-sky-400/20 bg-sky-500/10 p-5">
           <ClockIcon className="h-7 w-7 text-sky-200" />
           <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-sky-100/55">
-            {activeTab === "system" ? vi("File log") : vi("Hoạt động")}
+            {activeTab === "system" ? (files.length > 0 ? vi("File log") : vi("Sự kiện")) : vi("Hoạt động")}
           </p>
           <p className="mt-1 text-3xl font-black text-sky-100">
-            {activeTab === "system" ? files.length : summary.total}
+            {activeTab === "system" ? (files.length > 0 ? files.length : summary.normal) : summary.total}
           </p>
         </div>
       </div>

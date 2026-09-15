@@ -72,9 +72,9 @@ export const describeLogLevelVi = (level: string): string => {
   return vi("Log hệ thống");
 };
 
-export const describeLogMessageVi = (message: string): string => {
+export const describeLogMessageVi = (message: string): string | null => {
   const text = String(message || "").toLowerCase();
-  if (!text) return vi("Chưa có nội dung mô tả.");
+  if (!text) return null;
   if (text.includes("redis") && text.includes("session")) {
     return vi("Lỗi session Redis: môi trường production đang yêu cầu Redis session store nhưng Redis chưa bật hoặc chưa có cấu hình/kết nối.");
   }
@@ -87,15 +87,9 @@ export const describeLogMessageVi = (message: string): string => {
   if (text.includes("telegram")) {
     return vi("Lỗi hoặc cảnh báo khi gửi thông báo Telegram.");
   }
-  if (text.includes("renewal")) {
-    return vi("Log liên quan luồng gia hạn Renew Adobe.");
+  if (text.includes("accounts_admin trống") || text.includes("chưa có tài khoản admin")) {
+    return vi("Chưa có tài khoản Admin Adobe trong hệ thống. Cron job tự động bỏ qua lượt kiểm tra.");
   }
-  if (text.includes("payment_receipt") || text.includes("payment receipt")) {
-    return vi("Log liên quan biên nhận thanh toán hoặc đồng bộ giao dịch.");
-  }
-  if (text.includes("auto assign")) {
-    return vi("Log liên quan tự động gắn tài khoản hoặc user cho Renew.");
-  }
-  return vi("Log vận hành cần kiểm tra thêm nội dung gốc.");
+  return null;
 };
 

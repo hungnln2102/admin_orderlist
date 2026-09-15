@@ -6,7 +6,7 @@ export function LogMeta({ item, compact = false }: { item: RenewSystemLogEntry; 
     ? []
     : Object.entries(item).filter(
     ([key, value]) =>
-      !["timestamp", "level", "message", "sourceFile", "raw"].includes(key) &&
+      !["timestamp", "level", "message", "sourceFile", "raw", "action", "entity", "entityId", "actor"].includes(key) &&
       value !== undefined &&
       value !== null &&
       value !== ""
@@ -15,7 +15,7 @@ export function LogMeta({ item, compact = false }: { item: RenewSystemLogEntry; 
 
   return (
     <div className="mt-3 space-y-3">
-      {!compact ? (
+      {!compact && description ? (
       <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 px-4 py-3">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/60">
           {vi("Diễn giải tiếng Việt")}
