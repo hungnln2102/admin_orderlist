@@ -56,45 +56,51 @@ const listPaymentReceipts = async (req, res) => {
     String(req.query.missingOrderCode ?? req.query.emptyOrderCode ?? "").trim() === "1";
 
   try {
-    let query = db({ pr: TABLES.paymentReceipt })
+    const query = db({ pr: TABLES.paymentReceipt })
       .leftJoin(
         { ft: TABLES.receiptFlowTypes },
         `ft.${FLOW_TYPE_COLS.ID}`,
         `pr.flow_type_id`
       );
+    let countQuery = db({ pr: TABLES.paymentReceipt });
     if (missingOrderOnly) {
       const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
-      query = query.whereRaw(`COALESCE(TRIM(pr.${orderCol}::text), '') = ''`);
+      countQuery = countQuery.whereRaw(`COALESCE(TRIM(pr.${orderCol}::text), '') = ''`);
     }
-    const rows = await query
-      .select({
-        id: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`,
-        orderCode: `pr.${PAYMENT_RECEIPT_DEF.columns.orderCode}`,
-        paidAt: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`,
-        amount: `pr.${PAYMENT_RECEIPT_DEF.columns.amount}`,
-        sender: `pr.${PAYMENT_RECEIPT_DEF.columns.sender}`,
-        receiver: `pr.${PAYMENT_RECEIPT_DEF.columns.receiver}`,
-        note: `pr.${PAYMENT_RECEIPT_DEF.columns.note}`,
-        isFinancialPosted: `pr.is_financial_posted`,
-        postedRevenue: `pr.posted_revenue`,
-        postedProfit: `pr.posted_profit`,
-        postedOffFlowBankReceipt: `pr.posted_off_flow_bank_receipt`,
-        reconciledAt: `pr.reconciled_at`,
-        adjustmentApplied: `pr.adjustment_applied`,
-        flowTypeId: `pr.flow_type_id`,
-        flowClassifiedAt: `pr.flow_classified_at`,
-        flowNote: `pr.flow_note`,
-        flowTypeLabel: `ft.${FLOW_TYPE_COLS.LABEL}`,
-        flowTypeCode: `ft.${FLOW_TYPE_COLS.CODE}`,
-        originalOrderCode: `pr.original_order_code`,
-      })
-      .orderBy([
-        { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
-        { column: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`, order: "desc" },
-      ])
-      .offset(offset)
-      .limit(limit);
 
+    const [rows, countRes] = await Promise.all([
+      query
+        .select({
+          id: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`,
+          orderCode: `pr.${PAYMENT_RECEIPT_DEF.columns.orderCode}`,
+          paidAt: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`,
+          amount: `pr.${PAYMENT_RECEIPT_DEF.columns.amount}`,
+          sender: `pr.${PAYMENT_RECEIPT_DEF.columns.sender}`,
+          receiver: `pr.${PAYMENT_RECEIPT_DEF.columns.receiver}`,
+          note: `pr.${PAYMENT_RECEIPT_DEF.columns.note}`,
+          isFinancialPosted: `pr.is_financial_posted`,
+          postedRevenue: `pr.posted_revenue`,
+          postedProfit: `pr.posted_profit`,
+          postedOffFlowBankReceipt: `pr.posted_off_flow_bank_receipt`,
+          reconciledAt: `pr.reconciled_at`,
+          adjustmentApplied: `pr.adjustment_applied`,
+          flowTypeId: `pr.flow_type_id`,
+          flowClassifiedAt: `pr.flow_classified_at`,
+          flowNote: `pr.flow_note`,
+          flowTypeLabel: `ft.${FLOW_TYPE_COLS.LABEL}`,
+          flowTypeCode: `ft.${FLOW_TYPE_COLS.CODE}`,
+          originalOrderCode: `pr.original_order_code`,
+        })
+        .orderBy([
+          { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
+          { column: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`, order: "desc" },
+        ])
+        .offset(offset)
+        .limit(limit),
+      countQuery.count("* as total"),
+    ]);
+
+    const totalCount = Number(countRes?.[0]?.total) || 0;
     const normalizedRows = (rows || []).filter(Boolean);
     const outboundAuditMap = await loadOutboundAuditMap(normalizedRows.map((row) => row.id));
     const receipts = normalizedRows.map((row) => ({
@@ -120,7 +126,7 @@ const listPaymentReceipts = async (req, res) => {
       ...(outboundAuditMap.get(Number(row.id)) || {}),
     }));
 
-    res.json({ receipts, count: receipts.length, offset, limit });
+    res.json({ receipts, count: receipts.length, totalCount, offset, limit });
   } catch (error) {
     logger.error("[payments] Query failed (payment-receipts)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải biên lai thanh toán." });

@@ -23,9 +23,11 @@ const {
   updatePaymentRules,
 } = require("@/domains/supplies/validators/supplyValidator");
 
+const { cacheControl } = require("@/middleware/cacheControl");
+
 router.get("/insights", getSupplyInsights);
 
-router.get("/", listSupplies);
+router.get("/", cacheControl(30, 60), listSupplies);
 router.get("/order-costs", listSupplyOrderCosts);
 router.get("/:supplyId/products", ...supplyIdParam, getProductsBySupply);
 router.get("/:supplyId/payments", ...supplyIdParam, listPaymentsBySupply);

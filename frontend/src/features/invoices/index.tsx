@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { showAppNotification } from "@/lib/notifications";
 import { useDefaultShopBankAccount } from "@/features/wallet/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { toShopBankDisplay } from "@/features/wallet/shop-bank-accounts/helpers/shopBankQrDefaults";
@@ -6,8 +6,6 @@ import {
   PaymentReceipt,
   ReceiptCategory,
   buildExportWorksheet,
-  toDisplayDate,
-  toISODate,
   formatCurrencyVndFull,
 } from "./helpers";
 import { apiFetch } from "@/shared/api/client";
