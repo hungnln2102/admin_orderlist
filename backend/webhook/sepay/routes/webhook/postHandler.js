@@ -24,6 +24,9 @@ const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTran
 const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpectedAmount");
 const { resolveOrderCodeByExactAmount } = require("./resolveOrderCodeByExactAmount");
 
+const { ensureOffFlowRefundCreditNote } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
+const { withSavepoint } = require("../../savepoint");
+
 // Import newly extracted phases
 const { processReceiptPhase } = require("./receiptPhase");
 const { processOrderPaymentPhase } = require("./orderPhase");
@@ -368,6 +371,25 @@ async function processWebhookTransactionAsync(reqBody, parsed) {
               },
               source: "webhook",
             });
+
+            if (transferAmountNormalized > 0 && (receiptResult?.inserted || receiptResult?.duplicate)) {
+              try {
+                await withSavepoint(client, "off_flow_credit_unlisted", async () => {
+                  await ensureOffFlowRefundCreditNote(client, {
+                    paymentReceiptId: receiptId,
+                    offFlowAmount: transferAmountNormalized,
+                    monthKey: paidMonthKey,
+                    ruleBranch: "WEBHOOK_UNLISTED_RECEIPT_CREDIT",
+                    note: `Credit khả dụng từ biên lai chưa liệt kê #${receiptId}`,
+                  });
+                });
+              } catch (creditErr) {
+                logger.warn("[Webhook] Không thể tạo credit cho biên lai chưa liệt kê", {
+                  receiptId,
+                  error: creditErr.message,
+                });
+              }
+            }
           } else {
             logger.info("[Webhook] Skip resetting financial posted state as outbound was settled", { receiptId });
           }

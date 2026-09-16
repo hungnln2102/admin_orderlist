@@ -65,7 +65,8 @@ const applyRenewAction = async (
   trx,
   { receiptId, orderCodeRaw, statusValueInitial }
 ) => {
-  if (statusValueInitial !== STATUS.RENEWAL) {
+  const s = String(statusValueInitial || "").trim();
+  if (s !== STATUS.RENEWAL && s !== "Cần Gia Hạn" && s !== "Đang Gia Hạn") {
     throw createHttpError(
       409,
       "Chỉ được dùng reconcile_and_renew cho đơn Cần Gia Hạn."

@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { MatchableOrder, PaymentReceipt, ReceiptFlowType, type ShopBankDisplay } from "../helpers";
 import ReceiptsMatchConfirmModal from "./receipts-table/ReceiptsMatchConfirmModal";
+import { PartialCreditReconcileConfirmModal } from "./PartialCreditReconcileConfirmModal";
 import { useReceiptMatchState } from "./receipts-table/useReceiptMatchState";
 import ReceiptTableRow from "./receipts-table/ReceiptTableRow";
 
@@ -68,6 +69,10 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
     ? "grid grid-cols-1 md:grid-cols-5 gap-6"
     : "grid grid-cols-1 md:grid-cols-4 gap-6";
 
+  const isPartialMatch = pendingConfirm?.receipt?.creditAvailableAmount !== undefined 
+    && pendingConfirm.receipt.creditAvailableAmount < pendingConfirm.receipt.amount 
+    && pendingConfirm.receipt.creditAvailableAmount > 0;
+
   return (
     <div className="bg-transparent overflow-visible">
       <div className="overflow-x-auto">
@@ -128,11 +133,21 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
           </tbody>
         </table>
       </div>
-      <ReceiptsMatchConfirmModal
-        pendingConfirm={pendingConfirm}
-        onCancel={() => setPendingConfirm(null)}
-        onConfirm={() => void handleConfirmMatch()}
-      />
+      {isPartialMatch && pendingConfirm ? (
+        <PartialCreditReconcileConfirmModal
+          open={true}
+          receipt={pendingConfirm.receipt}
+          targetOrderCode={pendingConfirm.orderCode}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={() => void handleConfirmMatch()}
+        />
+      ) : (
+        <ReceiptsMatchConfirmModal
+          pendingConfirm={pendingConfirm}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={() => void handleConfirmMatch()}
+        />
+      )}
     </div>
   );
 };

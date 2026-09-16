@@ -25,20 +25,36 @@ const {
   voidOffFlowCreditByReceiptId,
 } = require("@/domains/orders/controller/finance/offFlowRefundCredits");
 
+const isUnpaidStatus = (status) => {
+  const s = String(status || "").trim();
+  return s === STATUS.UNPAID || s === "Chưa Thanh Toán";
+};
+
+const isRenewalStatus = (status) => {
+  const s = String(status || "").trim();
+  return s === STATUS.RENEWAL || s === "Cần Gia Hạn" || s === "Đang Gia Hạn";
+};
+
 /**
  * Quyết định `effectiveAction` từ `requestedAction` + trạng thái đơn + khả năng cover.
  *
  * - `reconcile_only` + UNPAID + đủ tiền → tự nâng thành `mark_paid`.
- * - `reconcile_and_mark_paid` + UNPAID + thiếu tiền → hạ về `only` (vẫn gắn mã).
+ * - `reconcile_only` + RENEWAL + đủ tiền → tự nâng thành `renew`.
  */
 const resolveEffectiveAction = (requestedAction, statusValueInitial, paidAmountCoversOrder) => {
   if (requestedAction === RECONCILE_ACTIONS.ONLY) {
-    if (statusValueInitial === STATUS.UNPAID && paidAmountCoversOrder) {
+    if (isUnpaidStatus(statusValueInitial) && paidAmountCoversOrder) {
       return RECONCILE_ACTIONS.MARK_PAID;
     }
+    if (isRenewalStatus(statusValueInitial) && paidAmountCoversOrder) {
+      return RECONCILE_ACTIONS.RENEW;
+    }
   } else if (requestedAction === RECONCILE_ACTIONS.MARK_PAID) {
-    if (statusValueInitial === STATUS.UNPAID && !paidAmountCoversOrder) {
-      // Gắn mã vẫn lưu; không rollback — chỉ bỏ bước chuyển "Đã Thanh Toán" khi thiếu tiền.
+    if (!isUnpaidStatus(statusValueInitial) || !paidAmountCoversOrder) {
+      return RECONCILE_ACTIONS.ONLY;
+    }
+  } else if (requestedAction === RECONCILE_ACTIONS.RENEW) {
+    if (!isRenewalStatus(statusValueInitial) || !paidAmountCoversOrder) {
       return RECONCILE_ACTIONS.ONLY;
     }
   }
@@ -103,12 +119,65 @@ const reconcilePaymentReceipt = async (req, res) => {
       const orderSellingPriceVnd = normalizeMoney(orderRow[ORDER_COLS.price]);
       const oCodeCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
       const aAmtCol = PAYMENT_RECEIPT_DEF.columns.amount;
+      
+      let originalReceiptAmount = normalizeMoney(receiptRow[PAYMENT_RECEIPT_DEF.columns.amount]);
+
+      // Kiểm tra credit khả dụng
+      const activeCredits = await trx("billing.refund_credit_notes")
+        .where("payment_receipt_id", receiptId)
+        .whereIn("status", ["OPEN", "PARTIALLY_APPLIED"]);
+        
+      let availableAmount = originalReceiptAmount;
+      if (activeCredits.length > 0) {
+        availableAmount = activeCredits.reduce((sum, note) => sum + normalizeMoney(note.available_amount), 0);
+      } else {
+        // Kiểm tra xem có credit nào bị FULLY_APPLIED không
+        const fullyApplied = await trx("billing.refund_credit_notes")
+          .where("payment_receipt_id", receiptId)
+          .where("status", "FULLY_APPLIED")
+          .first();
+        if (fullyApplied) availableAmount = 0;
+      }
+
+      if (availableAmount <= 0) {
+        throw new Error("Biên lai đã được sử dụng hết credit, không thể ghép đơn.");
+      }
+
+      if (availableAmount < originalReceiptAmount) {
+        const usedAmount = originalReceiptAmount - availableAmount;
+        // Cập nhật biên lai hiện tại thành số tiền khả dụng
+        await trx(TABLES.paymentReceipt)
+          .where(PAYMENT_RECEIPT_DEF.columns.id, receiptId)
+          .update({ [PAYMENT_RECEIPT_DEF.columns.amount]: availableAmount });
+
+        // Tách phần đã dùng ra biên lai mới (is_financial_posted = true)
+        const splitNote = `[Đã dùng Credit ${usedAmount.toLocaleString("vi-VN")}đ] ${receiptRow[PAYMENT_RECEIPT_DEF.columns.note] || ""}`;
+        await trx(TABLES.paymentReceipt).insert({
+          [PAYMENT_RECEIPT_DEF.columns.idOrder]: null,
+          [PAYMENT_RECEIPT_DEF.columns.orderCode]: null,
+          [PAYMENT_RECEIPT_DEF.columns.originalOrderCode]: receiptRow[PAYMENT_RECEIPT_DEF.columns.originalOrderCode],
+          [PAYMENT_RECEIPT_DEF.columns.amount]: usedAmount,
+          [PAYMENT_RECEIPT_DEF.columns.paymentDate]: receiptRow[PAYMENT_RECEIPT_DEF.columns.paymentDate],
+          [PAYMENT_RECEIPT_DEF.columns.receiver]: receiptRow[PAYMENT_RECEIPT_DEF.columns.receiver],
+          [PAYMENT_RECEIPT_DEF.columns.note]: splitNote.slice(0, 1000),
+          [PAYMENT_RECEIPT_DEF.columns.sender]: receiptRow[PAYMENT_RECEIPT_DEF.columns.sender],
+          [PAYMENT_RECEIPT_DEF.columns.sepayTransactionId]: receiptRow[PAYMENT_RECEIPT_DEF.columns.sepayTransactionId],
+          [PAYMENT_RECEIPT_DEF.columns.referenceCode]: receiptRow[PAYMENT_RECEIPT_DEF.columns.referenceCode],
+          [PAYMENT_RECEIPT_DEF.columns.transferType]: receiptRow[PAYMENT_RECEIPT_DEF.columns.transferType],
+          [PAYMENT_RECEIPT_DEF.columns.gateway]: receiptRow[PAYMENT_RECEIPT_DEF.columns.gateway],
+          [RECEIPT_STATE_COLS.isFinancialPosted]: true,
+          [RECEIPT_STATE_COLS.postedRevenue]: 0,
+          [RECEIPT_STATE_COLS.postedProfit]: 0,
+          [RECEIPT_STATE_COLS.postedOffFlowBankReceipt]: 0,
+        });
+        originalReceiptAmount = availableAmount;
+      }
+
       const sumRes = await trx(TABLES.paymentReceipt)
         .whereRaw(`LOWER(TRIM(COALESCE(??, '')::text)) = LOWER(?)`, [oCodeCol, orderCodeRaw])
         .sum({ total_receipts: aAmtCol })
         .first();
       const totalReceiptsForOrderVnd = normalizeMoney(sumRes?.total_receipts);
-      const originalReceiptAmount = normalizeMoney(receiptRow[PAYMENT_RECEIPT_DEF.columns.amount]);
       const paymentDecision = computeDashboardPaymentDecision({
         orderPrice: orderSellingPriceVnd,
         currentAmount: originalReceiptAmount,

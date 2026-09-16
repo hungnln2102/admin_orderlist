@@ -20,7 +20,10 @@ const listMatchableOrders = async (req, res) => {
         customer: `o.${ORDER_COLS.customer}`,
         informationOrder: `o.${ORDER_COLS.informationOrder}`,
       })
-      .whereIn(`o.${ORDER_COLS.status}`, [STATUS.UNPAID, STATUS.RENEWAL])
+      .whereIn(`o.${ORDER_COLS.status}`, [
+        STATUS.UNPAID, STATUS.RENEWAL, STATUS.PROCESSING,
+        "Chưa Thanh Toán", "Cần Gia Hạn", "Đang Gia Hạn", "Đang Xử Lý"
+      ])
       .whereRaw(`COALESCE(TRIM(o.${ORDER_COLS.idOrder}::text), '') <> ''`)
       .orderBy([
         { column: `o.${ORDER_COLS.orderDate}`, order: "desc" },

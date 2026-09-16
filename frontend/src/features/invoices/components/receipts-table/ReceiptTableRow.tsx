@@ -150,10 +150,16 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
     }
   };
 
+  const isPartiallyUsed = receipt.creditAvailableAmount !== undefined && receipt.creditAvailableAmount < receipt.amount && receipt.creditAvailableAmount > 0;
+
   return (
     <>
       <tr
-        className="group/row cursor-pointer transition-all duration-500 relative z-10"
+        className={`group/row cursor-pointer transition-all duration-500 relative z-10 ${
+          isPartiallyUsed 
+            ? "[&>td]:!bg-amber-500/10 [&>td]:!border-amber-500/30 hover:[&>td]:!bg-amber-500/20" 
+            : ""
+        }`}
         onClick={() => onToggle(receipt.id)}
         onDoubleClick={() => (onSelectReceipt ? onSelectReceipt(receipt) : undefined)}
       >
@@ -563,9 +569,16 @@ const ReceiptTableRow: React.FC<ReceiptTableRowProps> = ({
           <div className="text-xs font-medium text-white/80">{rowView.receiverDisplay}</div>
         </td>
         <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-          <span className={`text-sm font-bold ${rowView.amountClassName} tracking-tight`}>
-            {rowView.amountDisplay}
-          </span>
+          <div className="flex flex-col gap-1">
+            <span className={`text-sm font-bold ${rowView.amountClassName} tracking-tight`}>
+              {rowView.amountDisplay}
+            </span>
+            {receipt.creditCode ? (
+              <span className="inline-flex items-center gap-1 w-max px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[10px] font-bold text-amber-300">
+                💳 {receipt.creditCode} {isPartiallyUsed ? `(Còn ${receipt.creditAvailableAmount?.toLocaleString('vi-VN')}đ)` : ""}
+              </span>
+            ) : null}
+          </div>
         </td>
         <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 max-w-xs">
           {rowView.isOutboundTransfer ? (

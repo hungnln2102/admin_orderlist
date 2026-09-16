@@ -15,6 +15,7 @@ const {
   updateReceiptFlowType,
   deleteReceiptFlowType,
   listUnlinkedExpenses,
+  getReceiptCreditHistory,
 } = require("@/domains/payments/controller");
 
 const router = express.Router();
@@ -26,6 +27,7 @@ router.get("/payment-receipts/batches/:batchCode", getPaymentReceiptBatchDetail)
 router.post("/payment-receipts/batches/:batchCode/complete-manual", completePaymentReceiptBatchManual);
 router.get("/payment-receipts/matchable-orders", listMatchableOrders);
 router.get("/payment-receipts/unlinked-expenses", listUnlinkedExpenses);
+router.get("/payment-receipts/:receiptId/credit-history", getReceiptCreditHistory);
 router.post("/payment-receipts/:receiptId/reconcile", reconcilePaymentReceipt);
 router.post("/payment-receipts/:receiptId/allocate-outbound", allocateOutboundPaymentReceipt);
 router.post("/payment-receipts/:receiptId/classify", classifyReceipt);

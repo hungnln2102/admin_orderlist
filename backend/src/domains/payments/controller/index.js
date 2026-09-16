@@ -30,6 +30,7 @@ const {
   deleteReceiptFlowType,
 } = require("@/domains/payments/controller/handlers/receiptFlowTypes");
 const { listUnlinkedExpenses } = require("@/domains/payments/controller/handlers/listUnlinkedExpenses");
+const { getReceiptCreditHistory } = require("@/domains/payments/controller/handlers/getReceiptCreditHistory");
 
 module.exports = {
   listPaymentReceipts,
@@ -47,4 +48,5 @@ module.exports = {
   updateReceiptFlowType,
   deleteReceiptFlowType,
   listUnlinkedExpenses,
+  getReceiptCreditHistory,
 };

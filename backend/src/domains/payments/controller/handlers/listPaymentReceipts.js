@@ -43,7 +43,30 @@ const loadOutboundAuditMap = async (receiptIds = []) => {
     });
   }
   return auditMap;
- };
+};
+
+const loadRefundCreditMap = async (receiptIds = []) => {
+  const uniqueIds = Array.from(
+    new Set((receiptIds || []).map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0))
+  );
+  if (!uniqueIds.length) return new Map();
+
+  const creditRows = await db("billing.refund_credit_notes")
+    .select("payment_receipt_id", "credit_code", "available_amount", "status")
+    .whereIn("payment_receipt_id", uniqueIds);
+
+  const creditMap = new Map();
+  for (const row of creditRows || []) {
+    const paymentReceiptId = Number(row.payment_receipt_id) || 0;
+    if (!paymentReceiptId) continue;
+    creditMap.set(paymentReceiptId, {
+      creditCode: row.credit_code,
+      creditAvailableAmount: Number(row.available_amount) || 0,
+      creditStatus: row.status,
+    });
+  }
+  return creditMap;
+};
 
 const listPaymentReceipts = async (req, res) => {
   const limitParam = Number.parseInt(req.query.limit, 10);
@@ -103,6 +126,8 @@ const listPaymentReceipts = async (req, res) => {
     const totalCount = Number(countRes?.[0]?.total) || 0;
     const normalizedRows = (rows || []).filter(Boolean);
     const outboundAuditMap = await loadOutboundAuditMap(normalizedRows.map((row) => row.id));
+    const creditMap = await loadRefundCreditMap(normalizedRows.map((row) => row.id));
+    
     const receipts = normalizedRows.map((row) => ({
       id: row.id,
       orderCode: row.orderCode,
@@ -124,6 +149,7 @@ const listPaymentReceipts = async (req, res) => {
       flowTypeCode: row.flowTypeCode || null,
       originalOrderCode: row.originalOrderCode || null,
       ...(outboundAuditMap.get(Number(row.id)) || {}),
+      ...(creditMap.get(Number(row.id)) || {}),
     }));
 
     res.json({ receipts, count: receipts.length, totalCount, offset, limit });

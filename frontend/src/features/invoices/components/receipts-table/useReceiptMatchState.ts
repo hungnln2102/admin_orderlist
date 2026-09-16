@@ -9,7 +9,7 @@ export function useReceiptMatchState({ onMatchReceipt }: UseReceiptMatchStatePar
   const [selectionByReceiptId, setSelectionByReceiptId] = useState<Record<number, string>>({});
   const [manualCodeByReceiptId, setManualCodeByReceiptId] = useState<Record<number, string>>({});
   const [rowErrorByReceiptId, setRowErrorByReceiptId] = useState<Record<number, string>>({});
-  const [pendingConfirm, setPendingConfirm] = useState<{ receiptId: number; orderCode: string } | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<{ receiptId: number; orderCode: string; receipt: PaymentReceipt } | null>(null);
   const [editingReceiptId, setEditingReceiptId] = useState<number | null>(null);
   const [editingOrderCode, setEditingOrderCode] = useState("");
 
@@ -24,7 +24,7 @@ export function useReceiptMatchState({ onMatchReceipt }: UseReceiptMatchStatePar
     setSelectionByReceiptId((prev) => ({ ...prev, [receipt.id]: value }));
     setRowErrorByReceiptId((prev) => ({ ...prev, [receipt.id]: "" }));
     if (!value || value === "__manual__") return;
-    setPendingConfirm({ receiptId: receipt.id, orderCode: value });
+    setPendingConfirm({ receiptId: receipt.id, orderCode: value, receipt });
   };
 
   const handleSubmitManualMatch = (receipt: PaymentReceipt) => {

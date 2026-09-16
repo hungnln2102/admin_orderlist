@@ -202,7 +202,9 @@ const applyRefundCreditToTargetOrder = async (
                 [R.SPLIT_FROM_NOTE_ID]: parentId,
                 [R.NOTE]: splitNote,
                 [R.SOURCE_KIND]: creditNote[R.SOURCE_KIND] || "ORDER_REFUND",
-                [R.PAYMENT_RECEIPT_ID]: null,
+                [R.PAYMENT_RECEIPT_ID]: creditNote[R.PAYMENT_RECEIPT_ID] != null
+                    ? Number(creditNote[R.PAYMENT_RECEIPT_ID])
+                    : null,
                 [R.OFF_FLOW_MONTH_KEY]: creditNote[R.OFF_FLOW_MONTH_KEY] ?? null,
             })
             .returning("*");
@@ -228,6 +230,25 @@ const applyRefundCreditToTargetOrder = async (
             .where({ [R.ID]: parentId })
             .first();
         activeForBalance = refreshed || activeForBalance;
+
+        // Nếu credit được dùng hết sạch (remainder == 0) và có liên kết với biên lai
+        if (creditNote[R.PAYMENT_RECEIPT_ID]) {
+            const rid = Number(creditNote[R.PAYMENT_RECEIPT_ID]);
+            try {
+                await trx("billing.payment_receipt")
+                    .where({ id: rid })
+                    .update({ is_financial_posted: true });
+            } catch (err) {
+                // Thử fallback nếu schema không có prefix billing
+                try {
+                    await trx("payment_receipt")
+                        .where({ id: rid })
+                        .update({ is_financial_posted: true });
+                } catch {
+                    // Ignore
+                }
+            }
+        }
     }
 
     return {

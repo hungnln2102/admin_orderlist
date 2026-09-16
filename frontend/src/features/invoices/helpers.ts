@@ -29,6 +29,9 @@ export interface PaymentReceipt {
   flowTypeLabel?: string | null;
   flowTypeCode?: string | null;
   originalOrderCode?: string | null;
+  creditCode?: string | null;
+  creditAvailableAmount?: number;
+  creditStatus?: string | null;
 }
 
 export interface ReceiptFlowType {
