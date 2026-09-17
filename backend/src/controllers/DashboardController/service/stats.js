@@ -11,7 +11,21 @@ const {
   computePreviousRange,
 } = require("@/controllers/DashboardController/service/shared");
 
+const statsCacheMap = new Map();
+const STATS_CACHE_TTL_MS = 60 * 1000; // 60s cache
+
+const clearDashboardStatsCache = () => {
+  statsCacheMap.clear();
+};
+
 const fetchDashboardStatsForDateRange = async ({ from, to }) => {
+  const cacheKey = `${from}_${to}`;
+  const cached = statsCacheMap.get(cacheKey);
+  const nowTs = Date.now();
+  if (cached && nowTs - cached.timestamp < STATS_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const { p0, p1 } = computePreviousRange(from, to);
   const currentMonthKey = currentCalendarMonthKey();
   const [cy, cm] = String(currentMonthKey).split("-").map(Number);
@@ -43,7 +57,7 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const marginC = revC - importC - refundC;
   const marginP = revP - importP - refundP;
 
-  return {
+  const result = {
     totalOrders: {
       current: totalOrdersCurr,
       previous: totalOrdersPrev,
@@ -72,6 +86,9 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     availableProfit: estimatedBankBalance,
     range: { from, to, previousFrom: p0, previousTo: p1 },
   };
+
+  statsCacheMap.set(cacheKey, { timestamp: nowTs, data: result });
+  return result;
 };
 
 const fetchDashboardStats = async () => {
@@ -88,4 +105,6 @@ const fetchDashboardStats = async () => {
 module.exports = {
   fetchDashboardStats,
   fetchDashboardStatsForDateRange,
+  clearDashboardStatsCache,
 };
+

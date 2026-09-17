@@ -6,6 +6,7 @@
 const {
   fetchDashboardStats,
   fetchDashboardStatsForDateRange,
+  clearDashboardStatsCache,
 } = require("@/controllers/DashboardController/service/stats");
 const {
   fetchDashboardChartsForDateRange,
@@ -19,6 +20,7 @@ const {
 module.exports = {
   fetchDashboardStats,
   fetchDashboardStatsForDateRange,
+  clearDashboardStatsCache,
   fetchDashboardYears,
   fetchDashboardMonthlySummary,
   fetchDashboardChartsFromSummary,
