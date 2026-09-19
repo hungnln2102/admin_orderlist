@@ -46,7 +46,7 @@ async function cleanupSlotSuffixSplitReceipts() {
       const childAmount = Number(child.amount) || 0;
 
       const parent = await db("billing.payment_receipt")
-        .select("id", "amount", "order_code", "note")
+        .select("id", "amount", "id_order", "note")
         .where("id", parentId)
         .first();
 
