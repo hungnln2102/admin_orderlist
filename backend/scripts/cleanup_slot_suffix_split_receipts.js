@@ -51,8 +51,16 @@ async function cleanupSlotSuffixSplitReceipts() {
         .first();
 
       if (!parent) {
-        console.log(`- Biên lai con #${child.id} (${childAmount}đ): Không tìm thấy biên lai gốc #${parentId}. Bỏ qua.`);
-        skippedCount++;
+        if (childAmount === 0) {
+          console.log(`- [Đã xóa rác 0đ] Biên lai con #${child.id} (${childAmount}đ): Không có parent #${parentId}.`);
+          if (isApplyMode) {
+            await db("billing.payment_receipt").where("id", child.id).del();
+          }
+          mergedCount++;
+        } else {
+          console.log(`- Biên lai con #${child.id} (${childAmount}đ): Không tìm thấy biên lai gốc #${parentId}. Bỏ qua.`);
+          skippedCount++;
+        }
         continue;
       }
 
