@@ -1,0 +1,24 @@
+{
+  "name": "admin_orderlist-v2-backend",
+  "version": "2.0.0",
+  "description": "Admin Order List - Version 2 Backend (Clean Architecture)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node -r module-alias/register src/server.js",
+    "dev": "nodemon -r module-alias/register src/server.js"
+  },
+  "_moduleAliases": {
+    "@": "src"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "knex": "^3.1.0",
+    "module-alias": "^2.2.3",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
