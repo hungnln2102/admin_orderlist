@@ -88,6 +88,7 @@ export const extractTransactionCodeFromNote = (
 export type ReceiptCategoryInput = Pick<
   PaymentReceipt,
   | "orderCode"
+  | "originalOrderCode"
   | "postedRevenue"
   | "postedProfit"
   | "postedOffFlowBankReceipt"
@@ -121,7 +122,7 @@ export const determineReceiptCategory = (
       }
       : receiptOrCode;
 
-  const normalized = (receipt.orderCode || "").toUpperCase().trim();
+  const normalized = (receipt.orderCode || receipt.originalOrderCode || "").toUpperCase().trim();
   const isOrderMatched = normalized.startsWith("MAV");
 
   if (isOrderMatched) {

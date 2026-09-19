@@ -28,5 +28,6 @@ export const normalizeReceiptRow = (
     flowNote: toSafeString(row?.flowNote),
     flowTypeLabel: row?.flowTypeLabel != null ? String(row.flowTypeLabel) : null,
     flowTypeCode: row?.flowTypeCode != null ? String(row.flowTypeCode) : null,
+    originalOrderCode: toSafeString(row?.originalOrderCode),
   };
 };
