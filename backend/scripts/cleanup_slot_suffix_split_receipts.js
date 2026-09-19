@@ -50,9 +50,9 @@ async function cleanupSlotSuffixSplitReceipts() {
         .where("id", parentId)
         .first();
 
-      if (!parent) {
-        if (childAmount === 0) {
-          console.log(`- [Đã xóa rác 0đ] Biên lai con #${child.id} (${childAmount}đ): Không có parent #${parentId}.`);
+      if (!parent || parent.id === child.id) {
+        if (childAmount <= 100) {
+          console.log(`- [Đã xóa rác slot-suffix] Biên lai con #${child.id} (${childAmount}đ): Không có parent hợp lệ #${parentId}.`);
           if (isApplyMode) {
             await db("billing.payment_receipt").where("id", child.id).del();
           }
