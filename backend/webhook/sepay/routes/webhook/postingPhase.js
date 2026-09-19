@@ -308,14 +308,11 @@ const computeWebhookAmountDecision = computeDashboardPaymentDecision;
 const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, statusValue) => {
   const stored = normalizeMoney(state?.[ORDER_COLS.price]);
   const storedGross = normalizeMoney(state?.[ORDER_COLS.grossSellingPrice]);
-  const creditApplied = normalizeMoney(state?.credit_applied_amount);
-  const netSalePrice = normalizeMoney(stored + creditApplied);
-  // Đơn có áp credit: `price` là số còn thu qua NH; gross có thể lệch — ưu tiên net sale.
-  let baseOrderPrice = storedGross > 0 ? storedGross : stored;
-  if (storedGross > 0 && netSalePrice > 0 && storedGross > netSalePrice) {
-    baseOrderPrice = netSalePrice;
+  // `price` (stored) là số tiền kỳ vọng thu qua NH (đã bao gồm slot suffix và trừ credit nếu có).
+  if (stored > 0) {
+    return stored;
   }
-  return baseOrderPrice;
+  return storedGross > 0 ? storedGross : 0;
 };
 
 const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
