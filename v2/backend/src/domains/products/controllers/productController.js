@@ -15,7 +15,7 @@ const getSuppliersForVariant = async (req, res) => {
   try {
     const { productId } = req.params;
     const result = await productService.getSuppliersForVariant(productId);
-    res.json(result);
+    res.json({ data: result });
   } catch (error) {
     console.error("Lỗi getSuppliersForVariant:", error);
     res.status(500).json({ error: "Không thể lấy danh sách NCC của sản phẩm" });
@@ -25,7 +25,7 @@ const getSuppliersForVariant = async (req, res) => {
 const getAllSuppliersList = async (_req, res) => {
   try {
     const result = await productService.getAllSuppliersList();
-    res.json(result);
+    res.json({ data: result });
   } catch (error) {
     console.error("Lỗi getAllSuppliersList:", error);
     res.status(500).json({ error: "Không thể lấy danh sách Nhà cung cấp" });
@@ -76,6 +76,18 @@ const addSupplierCost = async (req, res) => {
   }
 };
 
+const updateSupplierCost = async (req, res) => {
+  try {
+    const { supplierCostId } = req.params;
+    const { price } = req.body;
+    const result = await productService.updateSupplierCost(supplierCostId, price);
+    res.json({ message: "Cập nhật giá nguồn NCC thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi updateSupplierCost:", error);
+    res.status(500).json({ error: error.message || "Cập nhật giá nguồn NCC thất bại" });
+  }
+};
+
 const deleteSupplierCost = async (req, res) => {
   try {
     const { supplierCostId } = req.params;
@@ -95,5 +107,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   addSupplierCost,
+  updateSupplierCost,
   deleteSupplierCost,
 };

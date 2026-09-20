@@ -125,8 +125,10 @@ const getSuppliersForVariant = async (variantId) => {
     id: r.supplier_cost_id,
     variant_id: r.variant_id,
     supplier_id: r.supplier_id,
+    supplier_name: r.ncc_name || "N/A",
     ncc_name: r.ncc_name || "N/A",
     number_bank: r.number_bank || "",
+    price: parseFloat(r.gia_nhap || 0),
     gia_nhap: parseFloat(r.gia_nhap || 0),
     updated_at: r.updated_at,
   }));
@@ -142,7 +144,12 @@ const getAllSuppliersList = async () => {
     ORDER BY supplier_name ASC;
   `;
   const result = await db.raw(query);
-  return result.rows || [];
+  return (result.rows || []).map((r) => ({
+    id: r.id,
+    supplier_name: r.ncc_name || "N/A",
+    ncc_name: r.ncc_name || "N/A",
+    number_bank: r.number_bank || "",
+  }));
 };
 
 /**
@@ -382,15 +389,19 @@ const deleteProduct = async (id) => {
 };
 
 /**
- * Thêm giá nhập của Nhà Cung Cấp (NCC) cho sản phẩm
+ * Thêm giá nhập của Nhà Cung Cấp (NCC) cho sản phẩm (Event: SUPPLIER_COST_ADDED)
  */
 const addSupplierCost = async (variantId, supplierId, price) => {
   const vId = parseInt(variantId, 10);
   const sId = parseInt(supplierId, 10);
   const costPrice = parseFloat(price || 0);
 
+  const maxRes = await db("product.supplier_cost").max("id as maxId").first();
+  const nextId = (parseInt(maxRes?.maxId || 0, 10)) + 1;
+
   const [inserted] = await db("product.supplier_cost")
     .insert({
+      id: nextId,
       variant_id: vId,
       supplier_id: sId,
       price: costPrice,
@@ -402,6 +413,19 @@ const addSupplierCost = async (variantId, supplierId, price) => {
   const supplier = await db("partner.supplier").where({ id: sId }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
+  const supplierCostPayload = {
+    id: inserted.id,
+    variant_id: vId,
+    supplier_id: sId,
+    supplier_name: supplier?.supplier_name || "",
+    price: costPrice,
+    summary: `Thêm nguồn NCC "${supplier?.supplier_name || sId}" với giá nhập ${formatMoney(costPrice)}`,
+  };
+
+  // Emit SUPPLIER_COST_ADDED event
+  eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, supplierCostPayload);
+
+  // Emit PRODUCT_UPDATED event as well
   eventBus.emit(EVENTS.PRODUCT_UPDATED, {
     id: vId,
     action: "ADD_SUPPLIER_COST",
@@ -414,14 +438,65 @@ const addSupplierCost = async (variantId, supplierId, price) => {
         price: costPrice,
       },
     },
-    summary: `Thêm nguồn NCC "${supplier?.supplier_name || sId}" với giá nhập ${formatMoney(costPrice)}`,
+    summary: supplierCostPayload.summary,
   });
 
   return inserted;
 };
 
 /**
- * Xóa giá nhập của Nhà Cung Cấp (NCC)
+ * Cập nhật giá nhập của Nhà Cung Cấp (NCC) (Event: SUPPLIER_COST_UPDATED)
+ */
+const updateSupplierCost = async (supplierCostId, price) => {
+  const scId = parseInt(supplierCostId, 10);
+  const costPrice = parseFloat(price || 0);
+
+  const row = await db("product.supplier_cost").where({ id: scId }).first();
+  if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
+
+  const oldPrice = parseFloat(row.price || 0);
+
+  await db("product.supplier_cost")
+    .where({ id: scId })
+    .update({ price: costPrice, updated_at: db.fn.now() });
+
+  const supplier = await db("partner.supplier").where({ id: row.supplier_id }).first();
+  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+
+  const supplierCostPayload = {
+    id: scId,
+    variant_id: row.variant_id,
+    supplier_id: row.supplier_id,
+    supplier_name: supplier?.supplier_name || "",
+    old_price: oldPrice,
+    price: costPrice,
+    summary: `Cập nhật giá nhập NCC "${supplier?.supplier_name || row.supplier_id}": ${formatMoney(oldPrice)} ➔ ${formatMoney(costPrice)}`,
+  };
+
+  // Emit SUPPLIER_COST_UPDATED event
+  eventBus.emit(EVENTS.SUPPLIER_COST_UPDATED, supplierCostPayload);
+
+  // Emit PRODUCT_UPDATED event
+  eventBus.emit(EVENTS.PRODUCT_UPDATED, {
+    id: row.variant_id,
+    action: "UPDATE_SUPPLIER_COST",
+    changed_fields: ["supplier_cost"],
+    changes: {
+      supplier_cost: {
+        action: "UPDATE",
+        supplier_cost_id: scId,
+        old_price: oldPrice,
+        price: costPrice,
+      },
+    },
+    summary: supplierCostPayload.summary,
+  });
+
+  return { ...row, price: costPrice };
+};
+
+/**
+ * Xóa giá nhập của Nhà Cung Cấp (NCC) (Event: SUPPLIER_COST_DELETED)
  */
 const deleteSupplierCost = async (supplierCostId) => {
   const scId = parseInt(supplierCostId, 10);
@@ -431,6 +506,22 @@ const deleteSupplierCost = async (supplierCostId) => {
 
   await db("product.supplier_cost").where({ id: scId }).del();
 
+  const supplier = await db("partner.supplier").where({ id: row.supplier_id }).first();
+  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+
+  const supplierCostPayload = {
+    id: scId,
+    variant_id: row.variant_id,
+    supplier_id: row.supplier_id,
+    supplier_name: supplier?.supplier_name || "",
+    price: parseFloat(row.price || 0),
+    summary: `Xóa nguồn NCC "${supplier?.supplier_name || row.supplier_id}" (${formatMoney(row.price)}) khỏi sản phẩm`,
+  };
+
+  // Emit SUPPLIER_COST_DELETED event
+  eventBus.emit(EVENTS.SUPPLIER_COST_DELETED, supplierCostPayload);
+
+  // Emit PRODUCT_UPDATED event
   eventBus.emit(EVENTS.PRODUCT_UPDATED, {
     id: row.variant_id,
     action: "DELETE_SUPPLIER_COST",
@@ -441,7 +532,7 @@ const deleteSupplierCost = async (supplierCostId) => {
         supplier_cost_id: scId,
       },
     },
-    summary: `Xóa nguồn NCC (bản ghi giá #${scId}) khỏi sản phẩm`,
+    summary: supplierCostPayload.summary,
   });
 
   return row;
@@ -455,6 +546,8 @@ module.exports = {
   updateProduct,
   deleteProduct,
   addSupplierCost,
+  updateSupplierCost,
   deleteSupplierCost,
 };
+
 

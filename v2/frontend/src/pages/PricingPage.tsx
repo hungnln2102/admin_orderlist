@@ -11,11 +11,9 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Eye,
   Pencil,
   Trash2,
   ChevronDown,
-  ChevronUp,
   Building2,
   PlusCircle,
   X,
@@ -74,6 +72,12 @@ export const PricingPage: React.FC = () => {
   const [editingItem, setEditingItem] = useState<PricingItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<PricingItem | null>(null);
   const [addSupplierProductId, setAddSupplierProductId] = useState<number | null>(null);
+  const [editingSupplierCost, setEditingSupplierCost] = useState<{
+    productId: number;
+    supplierCostId: number;
+    supplierName: string;
+    price: number;
+  } | null>(null);
 
   // Form States
   const [productForm, setProductForm] = useState({
@@ -130,9 +134,8 @@ export const PricingPage: React.FC = () => {
     fetch("/api/products/all-suppliers")
       .then((res) => res.json())
       .then((data) => {
-        if (data.data) {
-          setAllSuppliers(data.data);
-        }
+        const list = Array.isArray(data) ? data : data.data || [];
+        setAllSuppliers(list);
       })
       .catch((err) => console.error("Lỗi tải danh sách NCC:", err));
   }, []);
@@ -143,7 +146,8 @@ export const PricingPage: React.FC = () => {
       const res = await fetch(`/api/products/${productId}/suppliers`);
       const data = await res.json();
       if (res.ok) {
-        setSupplierCosts((prev) => ({ ...prev, [productId]: data.data || [] }));
+        const list = Array.isArray(data) ? data : data.data || [];
+        setSupplierCosts((prev) => ({ ...prev, [productId]: list }));
       }
     } catch (err) {
       notify.error("Lỗi khi tải giá NCC của sản phẩm", "Lỗi Kết Nối");
@@ -302,13 +306,44 @@ export const PricingPage: React.FC = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        notify.success("Đã thêm nguồn NCC thành công", "Thành Công");
+        notify.success("Thêm nguồn NCC thành công! Đã phát event SUPPLIER_COST_ADDED", "Thành Công");
         const prodId = addSupplierProductId;
         setAddSupplierProductId(null);
         setSupplierForm({ supplier_id: 0, price: 0 });
         fetchSupplierCosts(prodId);
       } else {
         notify.error(data.error || "Thêm nguồn NCC thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit Supplier Cost
+  const handleEditSupplierCostSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplierCost) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/suppliers/${editingSupplierCost.supplierCostId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price: editingSupplierCost.price }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(
+          "Cập nhật giá NCC thành công! Đã phát event SUPPLIER_COST_UPDATED",
+          "Thành Công"
+        );
+        const prodId = editingSupplierCost.productId;
+        setEditingSupplierCost(null);
+        fetchSupplierCosts(prodId);
+      } else {
+        notify.error(data.error || "Cập nhật giá NCC thất bại", "Lỗi Sửa Dữ Liệu");
       }
     } catch (err) {
       notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
@@ -325,7 +360,7 @@ export const PricingPage: React.FC = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        notify.success("Đã xóa nguồn NCC", "Thành Công");
+        notify.success("Đã xóa nguồn NCC! Đã phát event SUPPLIER_COST_DELETED", "Thành Công");
         fetchSupplierCosts(productId);
       } else {
         notify.error(data.error || "Xóa nguồn NCC thất bại", "Lỗi Dữ Liệu");
@@ -414,6 +449,7 @@ export const PricingPage: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10.5px] border-b border-slate-800/80">
               <tr>
+                <th className="py-3.5 px-3 w-8 text-center"></th>
                 <th className="py-3.5 px-4">Sản Phẩm</th>
                 <th className="py-3.5 px-3 text-right">Giá Gốc</th>
                 <th className="py-3.5 px-3 text-right">Giá Bán Lẻ</th>
@@ -428,7 +464,7 @@ export const PricingPage: React.FC = () => {
             <tbody className="divide-y divide-slate-800/50 text-slate-300 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
                       <span className="text-xs">Đang tải dữ liệu bảng giá thực tế...</span>
@@ -437,7 +473,7 @@ export const PricingPage: React.FC = () => {
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Tag className="w-8 h-8 text-slate-600" />
                       <span className="text-xs font-semibold">Không tìm thấy sản phẩm nào</span>
@@ -459,7 +495,34 @@ export const PricingPage: React.FC = () => {
 
                   return (
                     <React.Fragment key={item.id}>
-                      <tr className={`transition-colors group ${isExpanded ? "bg-slate-900/80" : "hover:bg-slate-900/60"}`}>
+                      <tr
+                        onClick={() => toggleExpandRow(item.id)}
+                        className={`transition-colors group cursor-pointer ${
+                          isExpanded ? "bg-slate-900/80" : "hover:bg-slate-900/60"
+                        }`}
+                      >
+                        {/* Chevron Expand Icon */}
+                        <td className="py-3.5 px-3 text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpandRow(item.id);
+                            }}
+                            className={`p-1 rounded-md transition-all ${
+                              isExpanded
+                                ? "bg-indigo-500/20 text-indigo-400"
+                                : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                            }`}
+                            title={isExpanded ? "Thu gọn danh sách giá NCC" : "Mở rộng danh sách giá NCC"}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </button>
+                        </td>
+
                         {/* Product Name & Variant Name */}
                         <td className="py-3.5 px-4 max-w-[220px]">
                           <div>
@@ -521,25 +584,15 @@ export const PricingPage: React.FC = () => {
                           )}
                         </td>
 
-                        {/* 3 Action Buttons Icon: Expand NCC Details, Edit, Delete */}
+                        {/* Action Buttons: Edit, Delete */}
                         <td className="py-3.5 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            {/* Expand NCC Details Icon */}
-                            <button
-                              onClick={() => toggleExpandRow(item.id)}
-                              className={`p-1.5 rounded-lg transition-all ${
-                                isExpanded
-                                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                                  : "text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80 border border-slate-800"
-                              }`}
-                              title={isExpanded ? "Thu gọn NCC" : "Xem danh sách NCC & Giá nguồn"}
-                            >
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-
                             {/* Edit Product Icon */}
                             <button
-                              onClick={() => handleOpenEditModal(item)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditModal(item);
+                              }}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800/80 border border-slate-800 transition-all"
                               title="Sửa sản phẩm & Giá"
                             >
@@ -548,7 +601,10 @@ export const PricingPage: React.FC = () => {
 
                             {/* Delete Product Icon */}
                             <button
-                              onClick={() => setDeletingItem(item)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingItem(item);
+                              }}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 border border-slate-800 transition-all"
                               title="Xóa sản phẩm"
                             >
@@ -558,10 +614,10 @@ export const PricingPage: React.FC = () => {
                         </td>
                       </tr>
 
-                      {/* Expandable Supplier Cost Panel (matching V1 design) */}
+                      {/* Expandable Supplier Cost Panel */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan={9} className="p-4 bg-slate-950/70 border-b border-slate-800/80">
+                          <td colSpan={10} className="p-4 bg-slate-950/70 border-b border-slate-800/80">
                             <div className="bg-[#0f172a]/90 border border-indigo-500/20 rounded-xl p-5 shadow-2xl space-y-4">
                               <h3 className="text-center text-xs font-bold text-slate-200 tracking-wide uppercase">
                                 Chi tiết giá sản phẩm
@@ -676,13 +732,29 @@ export const PricingPage: React.FC = () => {
                                               {marginText}
                                             </td>
                                             <td className="py-3 px-4 text-center">
-                                              <button
-                                                onClick={() => handleDeleteSupplierCost(item.id, c.id)}
-                                                className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-all"
-                                                title="Xóa nguồn này"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </button>
+                                              <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                  onClick={() =>
+                                                    setEditingSupplierCost({
+                                                      productId: item.id,
+                                                      supplierCostId: c.id,
+                                                      supplierName: c.supplier_name,
+                                                      price: c.price,
+                                                    })
+                                                  }
+                                                  className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-all"
+                                                  title="Sửa giá nhập này"
+                                                >
+                                                  <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDeleteSupplierCost(item.id, c.id)}
+                                                  className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-all"
+                                                  title="Xóa nguồn này"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              </div>
                                             </td>
                                           </tr>
                                         );
@@ -1052,6 +1124,72 @@ export const PricingPage: React.FC = () => {
                   className="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold hover:brightness-110 disabled:opacity-50"
                 >
                   {submitting ? "Đang lưu..." : "Thêm Nguồn"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT SUPPLIER COST MODAL */}
+      {editingSupplierCost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-[#0b0f19] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-amber-400" />
+                Sửa Giá Nhập NCC
+              </h2>
+              <button
+                onClick={() => setEditingSupplierCost(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSupplierCostSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Nhà Cung Cấp</label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingSupplierCost.supplierName}
+                  className="w-full bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-2 text-slate-400 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Giá Nhập Nguồn Mới (₫) *</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="VD: 250000"
+                  value={editingSupplierCost.price || ""}
+                  onChange={(e) =>
+                    setEditingSupplierCost({
+                      ...editingSupplierCost,
+                      price: Number(e.target.value),
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingSupplierCost(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold hover:brightness-110 disabled:opacity-50"
+                >
+                  {submitting ? "Đang lưu..." : "Lưu Thay Đổi"}
                 </button>
               </div>
             </form>

@@ -12,8 +12,7 @@ router.put("/:productId", productController.updateProduct);
 router.delete("/:productId", productController.deleteProduct);
 
 router.post("/:productId/suppliers", productController.addSupplierCost);
+router.put("/suppliers/:supplierCostId", productController.updateSupplierCost);
 router.delete("/suppliers/:supplierCostId", productController.deleteSupplierCost);
-
-router.get("/", productController.getProductPrices);
 
 module.exports = router;

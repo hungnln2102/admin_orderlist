@@ -50,6 +50,17 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// POST /api/orders/:id/renew - Yêu cầu gia hạn đơn hàng (Chuyển sang "Cần gia hạn", sinh slot suffix)
+router.post("/:id/renew", async (req, res) => {
+  try {
+    const updated = await orderService.renewOrder(req.params.id, req.body);
+    res.json(updated);
+  } catch (err) {
+    console.error("[Orders API] Lỗi gia hạn đơn hàng:", err);
+    res.status(400).json({ error: err.message || "Không thể thực hiện gia hạn đơn hàng." });
+  }
+});
+
 // DELETE /api/orders/:id - Xóa đơn hàng
 router.delete("/:id", async (req, res) => {
   try {

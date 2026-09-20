@@ -4,6 +4,7 @@ import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { GenericPage } from "@/features/shared/GenericPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { PricingPage } from "@/pages/PricingPage";
+import { SuppliersPage } from "@/pages/SuppliersPage";
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -217,30 +218,7 @@ export const AppRoutes: React.FC = () => {
       />
 
       {/* 4. Nguồn hàng & Kho */}
-      <Route
-        path="/sources"
-        element={
-          <GenericPage
-            title="Quản Lý Nhà Cung Cấp"
-            category="Nguồn hàng & Kho"
-            description="Danh sách nhà cung cấp, thông tin liên hệ và số dư nợ"
-            stats={[
-              { title: "Tổng Nhà Cung Cấp", value: "18", subtitle: "Đang hợp tác", accent: "cyan" },
-              { title: "Tổng Tiền Nhập Tháng", value: "94.250.000 ₫", subtitle: "Tiền nhập hàng", accent: "purple" },
-            ]}
-            columns={[
-              { key: "name", label: "Nhà cung cấp" },
-              { key: "contact", label: "Liên hệ" },
-              { key: "balance", label: "Số dư thanh toán" },
-              { key: "rating", label: "Đánh giá" },
-            ]}
-            sampleData={[
-              { name: "Supplier Adobe Global", contact: "telegram @adobesupplier", balance: "0 ₫", rating: "5.0 ★" },
-              { name: "Khánh Canva Store", contact: "0909123888", balance: "1.200.000 ₫", rating: "4.9 ★" },
-            ]}
-          />
-        }
-      />
+      <Route path="/sources" element={<SuppliersPage />} />
       <Route
         path="/external-imports"
         element={

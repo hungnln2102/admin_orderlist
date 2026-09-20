@@ -138,3 +138,15 @@ body {
   background-size: 200% 100%;
   animation: shimmer 3s infinite;
 }
+
+/* Remove number input spinners globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

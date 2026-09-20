@@ -18,6 +18,7 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { DateRangePicker } from "../shared/components/DateRangePicker";
 import { useNotification } from "@/shared/context/NotificationContext";
@@ -61,12 +62,314 @@ const DEFAULT_FORM_DATA = {
   price: 150000,
   gross_selling_price: 150000,
   cost: 0,
-  status: "Đã Thanh Toán",
+  status: "Chưa Thanh Toán",
   payment_method: "bank",
   note: "",
   days: 365,
   order_date: "",
   expired_at: "",
+};
+
+export interface CatalogProduct {
+  id: number;
+  san_pham: string;
+  package_product: string;
+  base_price: number;
+  retail_price: number;
+  ctv_price: number;
+  student_price: number;
+  promo_price: number;
+  is_active: boolean;
+}
+
+export interface CatalogSupplierCost {
+  id: number;
+  variant_id: number;
+  supplier_id: number;
+  supplier_name: string;
+  ncc_name?: string;
+  number_bank?: string;
+  price: number;
+  gia_nhap?: number;
+}
+
+export interface CatalogSupplier {
+  id: number;
+  supplier_name: string;
+  ncc_name?: string;
+  number_bank?: string;
+}
+
+interface SearchableProductDropdownProps {
+  products: CatalogProduct[];
+  selectedProductId: number | null;
+  onSelectProduct: (productIdStr: string) => void;
+}
+
+const SearchableProductDropdown: React.FC<SearchableProductDropdownProps> = ({
+  products,
+  selectedProductId,
+  onSelectProduct,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+
+  const filteredProducts = useMemo(() => {
+    if (!search.trim()) return products;
+    const term = search.toLowerCase().trim();
+    return products.filter(
+      (p) =>
+        p.san_pham.toLowerCase().includes(term) ||
+        (p.package_product && p.package_product.toLowerCase().includes(term))
+    );
+  }, [products, search]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-left flex items-center justify-between hover:border-cyan-500/50 focus:outline-none transition-all cursor-pointer min-h-[38px]"
+      >
+        <span className="text-xs font-medium text-white break-words whitespace-normal leading-snug flex-1 pr-2">
+          {selectedProduct ? (
+            <span className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-cyan-300">{selectedProduct.san_pham}</span>
+              {selectedProduct.package_product && selectedProduct.package_product !== selectedProduct.san_pham && (
+                <span className="text-[10.5px] text-slate-400">({selectedProduct.package_product})</span>
+              )}
+            </span>
+          ) : (
+            <span className="text-slate-400">-- Chọn sản phẩm từ danh mục --</span>
+          )}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-1 transition-transform ${isOpen ? "rotate-180 text-cyan-400" : ""}`} />
+      </button>
+
+      {/* Downwards Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full sm:min-w-[600px] lg:min-w-[680px] mt-1.5 z-50 bg-[#0c1222] border border-cyan-500/40 rounded-xl shadow-2xl p-2.5 space-y-2 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-96 flex flex-col">
+          {/* Search Box */}
+          <div className="relative shrink-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Gõ tìm kiếm tên sản phẩm, gói..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+
+          {/* Product Items List */}
+          <div className="overflow-y-auto custom-scrollbar divide-y divide-slate-800/40 space-y-1 flex-1 max-h-72">
+            {filteredProducts.length === 0 ? (
+              <div className="p-3 text-center text-xs text-slate-500 italic">
+                Không tìm thấy sản phẩm khớp với từ khóa
+              </div>
+            ) : (
+              filteredProducts.map((p) => {
+                const isSelected = p.id === selectedProductId;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectProduct(String(p.id));
+                      setIsOpen(false);
+                      setSearch("");
+                    }}
+                    className={`w-full text-left p-2.5 rounded-lg transition-colors flex items-center justify-between gap-3 group ${
+                      isSelected
+                        ? "bg-cyan-500/20 text-cyan-200 font-bold border border-cyan-500/30"
+                        : "hover:bg-slate-800/80 text-slate-300"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 whitespace-normal break-words leading-snug">
+                        {p.san_pham}
+                      </div>
+                      {p.package_product && p.package_product !== p.san_pham && (
+                        <div className="text-[11px] text-slate-400 font-normal whitespace-normal break-words mt-0.5">
+                          {p.package_product}
+                        </div>
+                      )}
+                    </div>
+                    {p.retail_price > 0 && (
+                      <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md shrink-0">
+                        {new Intl.NumberFormat("vi-VN").format(p.retail_price)} ₫
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface SearchableSupplierDropdownProps {
+  productSuppliers: CatalogSupplierCost[];
+  allSuppliers: CatalogSupplier[];
+  selectedSupplierName: string;
+  onSelectSupplier: (supplierName: string) => void;
+  loadingSuppliers: boolean;
+}
+
+const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProps> = ({
+  productSuppliers,
+  allSuppliers,
+  selectedSupplierName,
+  onSelectSupplier,
+  loadingSuppliers,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const isProductSpecific = productSuppliers.length > 0;
+
+  const displayList = useMemo(() => {
+    if (isProductSpecific) {
+      return productSuppliers.map((s) => ({
+        id: s.id,
+        name: s.supplier_name || s.ncc_name || "",
+        cost: Number(s.price || s.gia_nhap || 0),
+        numberBank: s.number_bank || "",
+        isSpecific: true,
+      }));
+    }
+    return allSuppliers.map((s) => ({
+      id: s.id,
+      name: s.supplier_name || s.ncc_name || "",
+      cost: 0,
+      numberBank: s.number_bank || "",
+      isSpecific: false,
+    }));
+  }, [productSuppliers, allSuppliers, isProductSpecific]);
+
+  const filteredList = useMemo(() => {
+    if (!search.trim()) return displayList;
+    const term = search.toLowerCase().trim();
+    return displayList.filter(
+      (s) => s.name.toLowerCase().includes(term) || s.numberBank.includes(term)
+    );
+  }, [displayList, search]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedItem = displayList.find((s) => s.name === selectedSupplierName);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-left flex items-center justify-between hover:border-cyan-500/50 focus:outline-none transition-all cursor-pointer min-h-[38px]"
+      >
+        <span className="text-xs font-medium text-white break-words whitespace-normal leading-snug flex-1 pr-2">
+          {loadingSuppliers ? (
+            <span className="text-cyan-400 font-semibold animate-pulse">Đang tải NCC...</span>
+          ) : selectedSupplierName ? (
+            <span className="font-bold text-purple-300">{selectedSupplierName}</span>
+          ) : (
+            <span className="text-slate-400">-- Chọn nhà cung cấp --</span>
+          )}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-1 transition-transform ${isOpen ? "rotate-180 text-cyan-400" : ""}`} />
+      </button>
+
+      {/* Downwards Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full sm:min-w-[480px] mt-1.5 z-50 bg-[#0c1222] border border-cyan-500/40 rounded-xl shadow-2xl p-2.5 space-y-2 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-80 flex flex-col">
+          {/* Search Box */}
+          <div className="relative shrink-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Gõ tìm tên NCC..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+
+          {/* Supplier Items List */}
+          <div className="overflow-y-auto custom-scrollbar divide-y divide-slate-800/40 space-y-1 flex-1 max-h-56">
+            {filteredList.length === 0 ? (
+              <div className="p-3 text-center text-xs text-slate-500 italic">
+                Không tìm thấy nhà cung cấp nào
+              </div>
+            ) : (
+              filteredList.map((s) => {
+                const isSelected = s.name === selectedSupplierName;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectSupplier(s.name);
+                      setIsOpen(false);
+                      setSearch("");
+                    }}
+                    className={`w-full text-left p-2.5 rounded-lg transition-colors flex items-center justify-between gap-3 group ${
+                      isSelected
+                        ? "bg-purple-500/20 text-purple-200 font-bold border border-purple-500/30"
+                        : "hover:bg-slate-800/80 text-slate-300"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="text-xs font-bold text-slate-100 group-hover:text-purple-300 whitespace-normal break-words leading-snug">
+                        {s.name}
+                      </div>
+                      {s.numberBank && (
+                        <div className="text-[10px] text-slate-400 font-normal whitespace-normal mt-0.5">
+                          STK: {s.numberBank}
+                        </div>
+                      )}
+                    </div>
+                    {s.cost > 0 && (
+                      <span className="text-xs font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-md shrink-0">
+                        Giá nhập: {new Intl.NumberFormat("vi-VN").format(s.cost)} ₫
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" }) => {
@@ -90,6 +393,144 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   // Form states
   const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
+
+  // Catalog Data States for Dropdowns & Auto-fill
+  const [productsCatalog, setProductsCatalog] = useState<CatalogProduct[]>([]);
+  const [allSuppliersCatalog, setAllSuppliersCatalog] = useState<CatalogSupplier[]>([]);
+  const [productSuppliersCatalog, setProductSuppliersCatalog] = useState<CatalogSupplierCost[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState<boolean>(false);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [isCustomPriceMode, setIsCustomPriceMode] = useState<boolean>(false);
+
+  // Fetch product catalog and all suppliers catalog once
+  useEffect(() => {
+    fetch("/api/products/prices?limit=500")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.data) {
+          setProductsCatalog(data.data);
+        }
+      })
+      .catch((err) => console.error("Lỗi tải danh mục sản phẩm:", err));
+
+    fetch("/api/products/all-suppliers")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.data || [];
+        setAllSuppliersCatalog(list);
+      })
+      .catch((err) => console.error("Lỗi tải danh sách NCC:", err));
+  }, []);
+
+  const fetchSuppliersForProduct = async (productId: number) => {
+    setLoadingSuppliers(true);
+    try {
+      const res = await fetch(`/api/products/${productId}/suppliers`);
+      const data = await res.json();
+      if (res.ok) {
+        const list: CatalogSupplierCost[] = Array.isArray(data) ? data : data.data || [];
+        setProductSuppliersCatalog(list);
+        return list;
+      }
+    } catch (err) {
+      console.error("Lỗi tải NCC cho sản phẩm:", err);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+    setProductSuppliersCatalog([]);
+    return [];
+  };
+
+  const handleProductChange = async (productIdVal: string) => {
+    if (!productIdVal) {
+      setSelectedProductId(null);
+      setProductSuppliersCatalog([]);
+      return;
+    }
+
+    const pId = Number(productIdVal);
+    const prod = productsCatalog.find((p) => p.id === pId);
+    if (!prod) return;
+
+    setSelectedProductId(prod.id);
+    const sellingPrice = prod.retail_price > 0 ? prod.retail_price : (prod.ctv_price > 0 ? prod.ctv_price : prod.base_price);
+    const infoOrder = prod.package_product && prod.package_product !== prod.san_pham
+      ? `${prod.san_pham} (${prod.package_product})`
+      : prod.san_pham;
+
+    // Fetch suppliers for this specific product
+    const suppliers = await fetchSuppliersForProduct(prod.id);
+
+    let defaultSupplyName = formData.supply_id;
+    let defaultCost = formData.cost;
+
+    if (suppliers.length > 0) {
+      const lowestSupplier = [...suppliers].sort((a, b) => (Number(a.price || a.gia_nhap || 0)) - (Number(b.price || b.gia_nhap || 0)))[0];
+      defaultSupplyName = lowestSupplier.supplier_name || lowestSupplier.ncc_name || "";
+      defaultCost = Number(lowestSupplier.price || lowestSupplier.gia_nhap || 0);
+    } else if (prod.base_price > 0) {
+      defaultCost = prod.base_price;
+    }
+
+    // Auto-calculate duration days & expired_at from product package name (v1 logic)
+    const textToMatch = `${prod.san_pham} ${prod.package_product || ""}`;
+    let derivedDays = 365;
+    const matchM = textToMatch.match(/--(\d+)m/i) || textToMatch.match(/(\d+)\s*(tháng|month|m\b)/i);
+    const matchY = textToMatch.match(/(\d+)\s*(năm|year|y\b)/i);
+
+    if (matchM) {
+      const months = Number(matchM[1]);
+      if (months > 0) derivedDays = months === 12 ? 365 : months * 30;
+    } else if (matchY) {
+      const years = Number(matchY[1]);
+      if (years > 0) derivedDays = years * 365;
+    }
+
+    const baseDateStr = formData.order_date || new Date().toISOString().split("T")[0];
+    const baseDate = new Date(baseDateStr);
+    const expiryDate = new Date(baseDate.getTime() + derivedDays * 24 * 60 * 60 * 1000);
+    const expiryStr = expiryDate.toISOString().split("T")[0];
+
+    setFormData((prev) => ({
+      ...prev,
+      id_product: prod.san_pham,
+      information_order: infoOrder,
+      price: sellingPrice,
+      gross_selling_price: sellingPrice,
+      supply_id: defaultSupplyName,
+      cost: defaultCost,
+      days: derivedDays,
+      expired_at: expiryStr,
+    }));
+  };
+
+  const handleSupplierChange = (supplierVal: string) => {
+    if (!supplierVal) {
+      setFormData((prev) => ({ ...prev, supply_id: "", cost: 0 }));
+      return;
+    }
+
+    const foundInProduct = productSuppliersCatalog.find(
+      (s) => (s.supplier_name || s.ncc_name) === supplierVal || String(s.supplier_id) === supplierVal
+    );
+
+    if (foundInProduct) {
+      const costVal = Number(foundInProduct.price || foundInProduct.gia_nhap || 0);
+      setFormData((prev) => ({
+        ...prev,
+        supply_id: foundInProduct.supplier_name || foundInProduct.ncc_name || supplierVal,
+        cost: costVal,
+      }));
+    } else {
+      const foundInAll = allSuppliersCatalog.find(
+        (s) => (s.supplier_name || s.ncc_name) === supplierVal || String(s.id) === supplierVal
+      );
+      setFormData((prev) => ({
+        ...prev,
+        supply_id: foundInAll ? (foundInAll.supplier_name || foundInAll.ncc_name || supplierVal) : supplierVal,
+      }));
+    }
+  };
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -180,6 +621,64 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
   }, []);
+
+  const getDisplayProductName = useCallback(
+    (idProduct?: number | string) => {
+      if (!idProduct) return "";
+      const str = String(idProduct).trim();
+      if (!str) return "";
+
+      const parseDurationText = (text: string): string => {
+        if (!text) return "";
+        const lower = text.toLowerCase();
+        const matchM = lower.match(/--(\d+)m/i) || lower.match(/(\d+)\s*(tháng|month|m\b)/i);
+        const matchY = lower.match(/--(\d+)y/i) || lower.match(/(\d+)\s*(năm|year|y\b)/i);
+
+        if (matchM && Number(matchM[1]) > 0) {
+          const months = Number(matchM[1]);
+          return `${months} tháng`;
+        }
+        if (matchY && Number(matchY[1]) > 0) {
+          const years = Number(matchY[1]);
+          return `${years} năm`;
+        }
+        return "";
+      };
+
+      const pId = Number(str);
+      let variantName = "";
+      let rawName = str;
+
+      if (!isNaN(pId) && pId > 0) {
+        const found = productsCatalog.find((p) => p.id === pId);
+        if (found) {
+          variantName = found.package_product || found.san_pham;
+          rawName = `${found.san_pham} ${found.package_product || ""}`;
+        }
+      } else {
+        const found = productsCatalog.find(
+          (p) => p.san_pham.toLowerCase() === str.toLowerCase() || (p.package_product && p.package_product.toLowerCase() === str.toLowerCase())
+        );
+        if (found) {
+          variantName = found.package_product || found.san_pham;
+          rawName = `${found.san_pham} ${found.package_product || ""}`;
+        } else {
+          variantName = str;
+        }
+      }
+
+      const durationStr = parseDurationText(rawName);
+      if (durationStr) {
+        if (variantName.toLowerCase().includes(durationStr.toLowerCase())) {
+          return variantName;
+        }
+        return `${variantName} (${durationStr})`;
+      }
+
+      return variantName || str;
+    },
+    [productsCatalog]
+  );
 
   const getOrderPrefixConfig = useCallback((idOrder?: string) => {
     if (!idOrder) {
@@ -303,6 +802,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   const handleOpenCreate = () => {
     const today = new Date().toISOString().split("T")[0];
     const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    setSelectedProductId(null);
+    setProductSuppliersCatalog([]);
+    setIsCustomPriceMode(false);
     setFormData({
       ...DEFAULT_FORM_DATA,
       order_date: today,
@@ -316,14 +818,28 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     setIsViewModalOpen(true);
   };
 
-  const handleOpenEdit = (order: Order) => {
+  const handleOpenEdit = async (order: Order) => {
     setSelectedOrder(order);
+    setIsCustomPriceMode(false);
+    const prodName = order.id_product ? String(order.id_product) : "";
+    const matchedProd = productsCatalog.find(
+      (p) => p.san_pham.toLowerCase() === prodName.toLowerCase() || String(p.id) === prodName
+    );
+
+    if (matchedProd) {
+      setSelectedProductId(matchedProd.id);
+      await fetchSuppliersForProduct(matchedProd.id);
+    } else {
+      setSelectedProductId(null);
+      setProductSuppliersCatalog([]);
+    }
+
     setFormData({
       customer: order.customer || "",
       contact: order.contact || "",
       information_order: order.information_order || "",
       slot: order.slot || "",
-      id_product: order.id_product ? String(order.id_product) : "",
+      id_product: prodName,
       supply_id: order.supply_id ? String(order.supply_id) : "",
       price: Number(order.price || 0),
       gross_selling_price: Number(order.gross_selling_price || order.price || 0),
@@ -690,8 +1206,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                             {order.id_order || `#${order.id}`}
                           </div>
                           {order.id_product && (
-                            <span className="text-[10px] font-extrabold text-cyan-400/90 uppercase tracking-wider mt-1">
-                              {String(order.id_product)}
+                            <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider mt-1 truncate max-w-[160px] block" title={getDisplayProductName(order.id_product)}>
+                              {getDisplayProductName(order.id_product)}
                             </span>
                           )}
                         </div>
@@ -899,8 +1415,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                       {order.id_order || `#${order.id}`}
                     </span>
                     {order.id_product && (
-                      <span className="text-[10px] text-cyan-400/80 font-mono font-bold block mt-0.5">
-                        {order.id_product}
+                      <span className="text-[10px] text-cyan-400 font-mono font-bold block mt-0.5" title={getDisplayProductName(order.id_product)}>
+                        {getDisplayProductName(order.id_product)}
                       </span>
                     )}
                   </div>
@@ -1036,7 +1552,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       {/* Modal Xem Chi Tiết Đơn Hàng */}
       {isViewModalOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-150 my-8">
+          <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-150 my-8">
             <button
               onClick={() => setIsViewModalOpen(false)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
@@ -1081,7 +1597,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                   <div>
                     <span className="text-slate-400 text-xs font-semibold block uppercase tracking-wider">Tên / Mã Sản Phẩm</span>
                     <span className="font-mono text-cyan-300 font-semibold block mt-1 break-words">
-                      {selectedOrder.id_product || "—"}
+                      {getDisplayProductName(selectedOrder.id_product) || "—"}
                     </span>
                   </div>
                   <div>
@@ -1211,7 +1727,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       {/* Modal Tạo Đơn Hàng */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-150 my-4 max-h-[92vh] overflow-y-auto">
+          <div className="w-full max-w-[1350px] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-150 my-4 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setIsCreateModalOpen(false)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
@@ -1264,23 +1780,25 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <label className="block font-semibold text-slate-400 mb-1">Tên / Mã Sản Phẩm</label>
-                        <input
-                          type="text"
-                          value={formData.id_product}
-                          onChange={(e) => setFormData({ ...formData, id_product: e.target.value })}
-                          placeholder="Ví dụ: Adobe All Apps..."
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50 font-mono"
+                        <label className="block font-semibold text-slate-400 mb-1">
+                          Tên / Mã Sản Phẩm <span className="text-cyan-400 font-normal">({productsCatalog.length} sp)</span>
+                        </label>
+                        <SearchableProductDropdown
+                          products={productsCatalog}
+                          selectedProductId={selectedProductId}
+                          onSelectProduct={handleProductChange}
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-slate-400 mb-1">Nhà Cung Cấp / Nguồn Hàng</label>
-                        <input
-                          type="text"
-                          value={formData.supply_id}
-                          onChange={(e) => setFormData({ ...formData, supply_id: e.target.value })}
-                          placeholder="Ví dụ: NCC VietNam..."
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50 font-mono"
+                        <label className="block font-semibold text-slate-400 mb-1">
+                          Nhà Cung Cấp / Nguồn Hàng
+                        </label>
+                        <SearchableSupplierDropdown
+                          productSuppliers={productSuppliersCatalog}
+                          allSuppliers={allSuppliersCatalog}
+                          selectedSupplierName={formData.supply_id}
+                          onSelectSupplier={handleSupplierChange}
+                          loadingSuppliers={loadingSuppliers}
                         />
                       </div>
                     </div>
@@ -1337,8 +1855,22 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
                   {/* 4. Giá bán & Thanh toán */}
                   <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
-                    <div className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-800/60">
-                      <DollarSign className="w-3.5 h-3.5" /> 4. Giá Bán & Thanh Toán
+                    <div className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center justify-between pb-1 border-b border-slate-800/60">
+                      <span className="flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5" /> 4. Giá Bán & Thanh Toán
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomPriceMode((prev) => !prev)}
+                        className={`text-[10.5px] px-2.5 py-0.5 rounded-lg border font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                          isCustomPriceMode
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-sm"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                        title={isCustomPriceMode ? "Đang bật chế độ chỉnh sửa giá thủ công" : "Bấm để mở khóa chỉnh sửa giá thủ công"}
+                      >
+                        {isCustomPriceMode ? "🔓 Đang mở tùy chỉnh giá" : "🔒 Tùy chỉnh giá"}
+                      </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
@@ -1348,49 +1880,44 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                         <input
                           type="number"
                           required
+                          readOnly={!isCustomPriceMode}
                           value={formData.price}
                           onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50 font-bold"
+                          title={!isCustomPriceMode ? "Giá tự động tính từ Sản Phẩm & NCC. Bấm 'Tùy chỉnh giá' để tự nhập." : undefined}
+                          className={`w-full px-3 py-1.5 border rounded-xl font-bold transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            !isCustomPriceMode
+                              ? "bg-slate-950/80 border-slate-800/90 text-slate-300/80 cursor-not-allowed select-none opacity-85"
+                              : "bg-slate-900 border-slate-700 text-white focus:border-cyan-500/50"
+                          }`}
                         />
                       </div>
                       <div>
                         <label className="block font-semibold text-slate-400 mb-1">Giá Vốn Nhập Kho (VNĐ)</label>
                         <input
                           type="number"
+                          readOnly={!isCustomPriceMode}
                           value={formData.cost}
                           onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })}
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-purple-300 focus:border-cyan-500/50 font-bold"
+                          title={!isCustomPriceMode ? "Giá vốn tự động tính từ NCC. Bấm 'Tùy chỉnh giá' để tự nhập." : undefined}
+                          className={`w-full px-3 py-1.5 border rounded-xl font-bold transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            !isCustomPriceMode
+                              ? "bg-slate-950/80 border-slate-800/90 text-purple-300/70 cursor-not-allowed select-none opacity-85"
+                              : "bg-slate-900 border-slate-700 text-purple-300 focus:border-cyan-500/50"
+                          }`}
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block font-semibold text-slate-400 mb-1">Trạng Thái Đơn</label>
-                        <select
-                          value={formData.status}
-                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50"
-                        >
-                          <option value="Đã Thanh Toán">Đã Thanh Toán</option>
-                          <option value="Cần gia hạn">Cần gia hạn</option>
-                          <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
-                          <option value="Đã Hoàn">Đã Hoàn Tiền</option>
-                          <option value="Chưa Hoàn">Chưa Hoàn Tiền</option>
-                          <option value="Đã Hủy">Đã Hủy</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-slate-400 mb-1">Thanh Toán</label>
-                        <select
-                          value={formData.payment_method}
-                          onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50"
-                        >
-                          <option value="bank">Chuyển Khoản Ngân Hàng</option>
-                          <option value="usdt">Ví USDT (Crypto)</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label className="block font-semibold text-slate-400 mb-1">Thanh Toán</label>
+                      <select
+                        value={formData.payment_method}
+                        onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50"
+                      >
+                        <option value="bank">Chuyển Khoản Ngân Hàng</option>
+                        <option value="usdt">Ví USDT (Crypto)</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1419,7 +1946,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       {/* Modal Sửa Đơn Hàng */}
       {isEditModalOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-150 my-4 max-h-[92vh] overflow-y-auto">
+          <div className="w-full max-w-[1350px] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 relative space-y-4 animate-in fade-in zoom-in-95 duration-150 my-4 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setIsEditModalOpen(false)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
@@ -1470,23 +1997,25 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <label className="block font-semibold text-slate-400 mb-1">Tên / Mã Sản Phẩm</label>
-                        <input
-                          type="text"
-                          value={formData.id_product}
-                          onChange={(e) => setFormData({ ...formData, id_product: e.target.value })}
-                          placeholder="Ví dụ: Adobe All Apps..."
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50 font-mono"
+                        <label className="block font-semibold text-slate-400 mb-1">
+                          Tên / Mã Sản Phẩm <span className="text-cyan-400 font-normal">({productsCatalog.length} sp)</span>
+                        </label>
+                        <SearchableProductDropdown
+                          products={productsCatalog}
+                          selectedProductId={selectedProductId}
+                          onSelectProduct={handleProductChange}
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-slate-400 mb-1">Nhà Cung Cấp / Nguồn Hàng</label>
-                        <input
-                          type="text"
-                          value={formData.supply_id}
-                          onChange={(e) => setFormData({ ...formData, supply_id: e.target.value })}
-                          placeholder="Ví dụ: NCC VietNam..."
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50 font-mono"
+                        <label className="block font-semibold text-slate-400 mb-1">
+                          Nhà Cung Cấp / Nguồn Hàng
+                        </label>
+                        <SearchableSupplierDropdown
+                          productSuppliers={productSuppliersCatalog}
+                          allSuppliers={allSuppliersCatalog}
+                          selectedSupplierName={formData.supply_id}
+                          onSelectSupplier={handleSupplierChange}
+                          loadingSuppliers={loadingSuppliers}
                         />
                       </div>
                     </div>
@@ -1542,8 +2071,22 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
                   {/* 4. Giá bán & Thanh toán */}
                   <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
-                    <div className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-800/60">
-                      <DollarSign className="w-3.5 h-3.5" /> 4. Giá Bán & Thanh Toán
+                    <div className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center justify-between pb-1 border-b border-slate-800/60">
+                      <span className="flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5" /> 4. Giá Bán & Thanh Toán
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomPriceMode((prev) => !prev)}
+                        className={`text-[10.5px] px-2.5 py-0.5 rounded-lg border font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                          isCustomPriceMode
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-sm"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                        title={isCustomPriceMode ? "Đang bật chế độ chỉnh sửa giá thủ công" : "Bấm để mở khóa chỉnh sửa giá thủ công"}
+                      >
+                        {isCustomPriceMode ? "🔓 Đang mở tùy chỉnh giá" : "🔒 Tùy chỉnh giá"}
+                      </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
@@ -1553,18 +2096,30 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                         <input
                           type="number"
                           required
+                          readOnly={!isCustomPriceMode}
                           value={formData.price}
                           onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-cyan-500/50 font-bold"
+                          title={!isCustomPriceMode ? "Giá tự động tính từ Sản Phẩm & NCC. Bấm 'Tùy chỉnh giá' để tự nhập." : undefined}
+                          className={`w-full px-3 py-1.5 border rounded-xl font-bold transition-colors ${
+                            !isCustomPriceMode
+                              ? "bg-slate-950/80 border-slate-800/90 text-slate-300/80 cursor-not-allowed select-none opacity-85"
+                              : "bg-slate-900 border-slate-700 text-white focus:border-cyan-500/50"
+                          }`}
                         />
                       </div>
                       <div>
                         <label className="block font-semibold text-slate-400 mb-1">Giá Vốn Nhập Kho (VNĐ)</label>
                         <input
                           type="number"
+                          readOnly={!isCustomPriceMode}
                           value={formData.cost}
                           onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })}
-                          className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-purple-300 focus:border-cyan-500/50 font-bold"
+                          title={!isCustomPriceMode ? "Giá vốn tự động tính từ NCC. Bấm 'Tùy chỉnh giá' để tự nhập." : undefined}
+                          className={`w-full px-3 py-1.5 border rounded-xl font-bold transition-colors ${
+                            !isCustomPriceMode
+                              ? "bg-slate-950/80 border-slate-800/90 text-purple-300/70 cursor-not-allowed select-none opacity-85"
+                              : "bg-slate-900 border-slate-700 text-purple-300 focus:border-cyan-500/50"
+                          }`}
                         />
                       </div>
                     </div>

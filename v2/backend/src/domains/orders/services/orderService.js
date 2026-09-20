@@ -1,5 +1,6 @@
 const { db } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
+const { getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
 
 const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
 const getOrderTable = () => db.withSchema(SCHEMA_ORDERS).from("order_list");
@@ -98,12 +99,10 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     .select("*")
     .orderByRaw(`
       CASE
-        WHEN status ILIKE '%Chưa Thanh Toán%' THEN 1
-        WHEN status ILIKE '%Cần Gia Hạn%' OR status ILIKE '%Hết Hạn%' THEN 2
-        WHEN status ILIKE '%Đang Xử Lý%' OR status ILIKE '%Chờ xử lý%' THEN 3
-        WHEN status ILIKE '%Đã Thanh Toán%' OR status ILIKE '%Hoàn thành%' THEN 4
-        ELSE 5
-      END ASC,
+        WHEN status ILike '%Cần gia hạn%' THEN 1
+        WHEN status ILike '%Chưa Thanh Toán%' THEN 2
+        ELSE 3
+      END,
       id DESC
     `)
     .limit(limit)
@@ -111,13 +110,13 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
 
   return {
     data: orders,
-    tabCounts,
     pagination: {
       total,
       page: Number(page),
       limit: Number(limit),
-      totalPages: Math.ceil(total / limit) || 1,
+      totalPages: Math.ceil(total / Number(limit)) || 1,
     },
+    tabCounts,
   };
 }
 
@@ -134,7 +133,16 @@ async function getOrderById(id) {
  */
 async function createOrder(payload) {
   const id_order = payload.id_order || generateOrderCode();
-  const price = Number(payload.price || 0);
+  const rawPrice = Number(payload.price || 0);
+  const statusStr = String(payload.status || "Chưa Thanh Toán").toLowerCase();
+
+  let finalPrice = rawPrice;
+  if (statusStr.includes("chưa thanh toán") || statusStr.includes("chờ") || statusStr.includes("gia hạn")) {
+    if (rawPrice > 0) {
+      const suffix = await getAvailableSuffix();
+      finalPrice = applySuffixToPrice(rawPrice, suffix);
+    }
+  }
 
   const newOrderData = {
     id_order,
@@ -142,13 +150,13 @@ async function createOrder(payload) {
     contact: payload.contact || "",
     information_order: payload.information_order || "",
     slot: payload.slot || "",
-    price,
-    gross_selling_price: payload.gross_selling_price != null ? Number(payload.gross_selling_price) : price,
+    price: finalPrice,
+    gross_selling_price: payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice,
     cost: payload.cost != null ? Number(payload.cost) : 0,
-    status: payload.status || "Hoàn thành",
+    status: payload.status || "Chưa Thanh Toán",
     payment_method: payload.payment_method || "bank",
     note: payload.note || "",
-    days: payload.days ? Number(payload.days) : 30,
+    days: payload.days ? Number(payload.days) : 365,
     order_date: payload.order_date || null,
     expired_at: payload.expired_at || null,
     supply_id: payload.supply_id ? Number(payload.supply_id) : null,
@@ -200,7 +208,21 @@ async function updateOrder(id, payload) {
   if (payload.price !== undefined) updateFields.price = Number(payload.price);
   if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
   if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
-  if (payload.status !== undefined) updateFields.status = payload.status;
+
+  if (payload.status !== undefined) {
+    updateFields.status = payload.status;
+    const nextStatus = String(payload.status).toLowerCase();
+    if (nextStatus.includes("gia hạn") || nextStatus.includes("chưa thanh toán")) {
+      const basePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
+      if (basePrice > 0) {
+        const suffix = await getAvailableSuffix();
+        const finalPrice = applySuffixToPrice(basePrice, suffix);
+        updateFields.price = finalPrice;
+        updateFields.gross_selling_price = finalPrice;
+      }
+    }
+  }
+
   if (payload.payment_method !== undefined) updateFields.payment_method = payload.payment_method;
   if (payload.note !== undefined) updateFields.note = payload.note;
   if (payload.days !== undefined) updateFields.days = Number(payload.days);
@@ -278,6 +300,58 @@ async function updateOrder(id, payload) {
 }
 
 /**
+ * Gia hạn đơn hàng: Chuyển trạng thái sang "Cần gia hạn", cấp phát Slot Suffix (1..100) và tính lại tổng tiền
+ */
+async function renewOrder(id, payload = {}) {
+  const existingOrder = await getOrderTable().where({ id: Number(id) }).first();
+  if (!existingOrder) {
+    throw new Error("Không tìm thấy đơn hàng cần gia hạn.");
+  }
+
+  const rawBasePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
+  const basePrice = Math.floor(rawBasePrice / 1000) * 1000 || rawBasePrice;
+
+  // Cấp phát Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
+  const suffix = await getAvailableSuffix();
+  const finalPrice = applySuffixToPrice(basePrice, suffix);
+
+  const days = payload.days ? Number(payload.days) : Number(existingOrder.days || 365);
+
+  const updateFields = {
+    status: "Cần gia hạn",
+    price: finalPrice,
+    gross_selling_price: finalPrice,
+    days,
+  };
+
+  if (payload.note !== undefined) updateFields.note = payload.note;
+  if (payload.supply_id !== undefined) updateFields.supply_id = payload.supply_id ? Number(payload.supply_id) : null;
+
+  const [updatedOrder] = await getOrderTable()
+    .where({ id: Number(id) })
+    .update(updateFields)
+    .returning("*");
+
+  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+  const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "Cần gia hạn", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
+
+  // Phát event Domain: ORDER_UPDATED với action RENEWAL_REQUESTED
+  eventBus.emit(EVENTS.ORDER_UPDATED, {
+    orderId: updatedOrder.id,
+    id_order: updatedOrder.id_order,
+    customer: updatedOrder.customer,
+    previousStatus: existingOrder.status,
+    newStatus: updatedOrder.status,
+    price: updatedOrder.price,
+    days: updatedOrder.days,
+    summary,
+    action: "RENEWAL_REQUESTED",
+  });
+
+  return updatedOrder;
+}
+
+/**
  * Xóa đơn hàng + phát event ORDER_DELETED
  */
 async function deleteOrder(id) {
@@ -310,6 +384,7 @@ module.exports = {
   getOrderById,
   createOrder,
   updateOrder,
+  renewOrder,
   deleteOrder,
 };
 

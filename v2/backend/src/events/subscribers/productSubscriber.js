@@ -36,9 +36,43 @@ function registerProductEventSubscribers() {
     });
   });
 
-  console.log("✅ [EventBus] Đăng ký thành công Product Event Subscribers (CREATED, UPDATED, DELETED)");
+  // 4. Lắng nghe event SUPPLIER_COST_ADDED
+  eventBus.on(EVENTS.SUPPLIER_COST_ADDED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận SUPPLIER_COST_ADDED (SupplierCost #${data.id}):`, data.summary);
+    await recordEvent({
+      eventName: EVENTS.SUPPLIER_COST_ADDED,
+      aggregateType: "SUPPLIER_COST",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 5. Lắng nghe event SUPPLIER_COST_UPDATED
+  eventBus.on(EVENTS.SUPPLIER_COST_UPDATED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận SUPPLIER_COST_UPDATED (SupplierCost #${data.id}):`, data.summary);
+    await recordEvent({
+      eventName: EVENTS.SUPPLIER_COST_UPDATED,
+      aggregateType: "SUPPLIER_COST",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 6. Lắng nghe event SUPPLIER_COST_DELETED
+  eventBus.on(EVENTS.SUPPLIER_COST_DELETED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận SUPPLIER_COST_DELETED (SupplierCost #${data.id}):`, data.summary);
+    await recordEvent({
+      eventName: EVENTS.SUPPLIER_COST_DELETED,
+      aggregateType: "SUPPLIER_COST",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  console.log("✅ [EventBus] Đăng ký thành công Product & Supplier Cost Event Subscribers");
 }
 
 module.exports = {
   registerProductEventSubscribers,
 };
+
