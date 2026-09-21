@@ -42,7 +42,13 @@ const withTransaction = async (handler) => {
   }
 };
 
+const { TABLES, SCHEMAS, COLS } = require("./tables");
+
 module.exports = {
   db,
   withTransaction,
+  TABLES,
+  SCHEMAS,
+  COLS,
 };
+

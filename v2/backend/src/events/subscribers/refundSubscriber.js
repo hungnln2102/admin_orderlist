@@ -1,4 +1,4 @@
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
 const eventBus = require("../eventBus");
 const EVENTS = require("../eventTypes");
 
@@ -34,8 +34,8 @@ function registerRefundEventSubscribers() {
         updated_at: db.fn.now(),
       };
 
-      // Ghi nhận vào bảng billing.refund_credit_notes
-      const [inserted] = await db("billing.refund_credit_notes")
+      // Ghi nhận vào bảng refund_credit_notes
+      const [inserted] = await db(TABLES.REFUND_CREDIT_NOTES)
         .insert(payload)
         .returning("*");
 

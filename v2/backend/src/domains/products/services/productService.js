@@ -1,5 +1,11 @@
-const { db } = require("@/db");
+const { db, TABLES, COLS } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
+
+const V_COLS = COLS.VARIANT;
+const VP_COLS = COLS.VARIANT_PRICE;
+const SC_COLS = COLS.SUPPLIER_COST;
+const S_COLS = COLS.SUPPLIER;
+const P_COLS = COLS.PRODUCT;
 
 /**
  * Service lấy danh sách giá sản phẩm (Bảng giá Niêm yết)
@@ -14,38 +20,38 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "" } = {}) => {
   const params = [];
 
   if (search && search.trim()) {
-    whereClause += " AND (v.display_name ILIKE ? OR v.variant_name ILIKE ?)";
+    whereClause += ` AND (v.${V_COLS.DISPLAY_NAME} ILIKE ? OR v.${V_COLS.VARIANT_NAME} ILIKE ?)`;
     const term = `%${search.trim()}%`;
     params.push(term, term);
   }
 
   const countSql = `
     SELECT COUNT(*) AS total
-    FROM business.variant v
+    FROM ${TABLES.VARIANT} v
     ${whereClause}
   `;
 
   const dataSql = `
     SELECT
-      v.id,
-      v.display_name AS san_pham,
-      v.variant_name AS package_product,
-      v.base_price,
-      v.is_active,
-      COALESCE(p_retail.price, v.base_price, 0) AS retail_price,
-      COALESCE(p_ctv.price, 0) AS ctv_price,
-      COALESCE(p_student.price, 0) AS student_price,
-      COALESCE(p_promo.price, 0) AS promo_price,
-      p_retail.margin_ratio AS retail_margin_ratio,
-      p_ctv.margin_ratio AS ctv_margin_ratio,
-      v.updated_at
-    FROM business.variant v
-    LEFT JOIN business.variant_price p_retail ON p_retail.variant_id = v.id AND p_retail.tier_id = 2
-    LEFT JOIN business.variant_price p_ctv ON p_ctv.variant_id = v.id AND p_ctv.tier_id = 1
-    LEFT JOIN business.variant_price p_student ON p_student.variant_id = v.id AND p_student.tier_id = 4
-    LEFT JOIN business.variant_price p_promo ON p_promo.variant_id = v.id AND p_promo.tier_id = 3
+      v.${V_COLS.ID},
+      v.${V_COLS.DISPLAY_NAME} AS san_pham,
+      v.${V_COLS.VARIANT_NAME} AS package_product,
+      v.${V_COLS.BASE_PRICE},
+      v.${V_COLS.IS_ACTIVE},
+      COALESCE(p_retail.${VP_COLS.PRICE}, v.${V_COLS.BASE_PRICE}, 0) AS retail_price,
+      COALESCE(p_ctv.${VP_COLS.PRICE}, 0) AS ctv_price,
+      COALESCE(p_student.${VP_COLS.PRICE}, 0) AS student_price,
+      COALESCE(p_promo.${VP_COLS.PRICE}, 0) AS promo_price,
+      p_retail.${VP_COLS.MARGIN_RATIO} AS retail_margin_ratio,
+      p_ctv.${VP_COLS.MARGIN_RATIO} AS ctv_margin_ratio,
+      v.${V_COLS.UPDATED_AT}
+    FROM ${TABLES.VARIANT} v
+    LEFT JOIN ${TABLES.VARIANT_PRICE} p_retail ON p_retail.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_retail.${VP_COLS.TIER_ID} = 2
+    LEFT JOIN ${TABLES.VARIANT_PRICE} p_ctv ON p_ctv.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_ctv.${VP_COLS.TIER_ID} = 1
+    LEFT JOIN ${TABLES.VARIANT_PRICE} p_student ON p_student.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_student.${VP_COLS.TIER_ID} = 4
+    LEFT JOIN ${TABLES.VARIANT_PRICE} p_promo ON p_promo.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_promo.${VP_COLS.TIER_ID} = 3
     ${whereClause}
-    ORDER BY v.is_active DESC, v.display_name ASC
+    ORDER BY v.${V_COLS.IS_ACTIVE} DESC, v.${V_COLS.DISPLAY_NAME} ASC
     LIMIT ? OFFSET ?
   `;
 
@@ -107,30 +113,30 @@ const getSuppliersForVariant = async (variantId) => {
 
   const query = `
     SELECT
-      sc.id AS supplier_cost_id,
-      sc.variant_id,
-      sc.supplier_id,
-      s.supplier_name AS ncc_name,
-      s.number_bank,
-      COALESCE(sc.price, 0) AS gia_nhap,
-      sc.updated_at
-    FROM business.supplier_cost sc
-    JOIN business.supplier s ON s.id = sc.supplier_id
-    WHERE sc.variant_id = ?
-    ORDER BY sc.price ASC, s.supplier_name ASC;
+      sc.${SC_COLS.ID} AS supplier_cost_id,
+      sc.${SC_COLS.VARIANT_ID},
+      sc.${SC_COLS.SUPPLIER_ID},
+      s.${S_COLS.SUPPLIER_NAME} AS ncc_name,
+      s.${S_COLS.NUMBER_BANK},
+      COALESCE(sc.${SC_COLS.PRICE}, 0) AS gia_nhap,
+      sc.${SC_COLS.UPDATED_AT}
+    FROM ${TABLES.SUPPLIER_COST} sc
+    JOIN ${TABLES.SUPPLIER} s ON s.${S_COLS.ID} = sc.${SC_COLS.SUPPLIER_ID}
+    WHERE sc.${SC_COLS.VARIANT_ID} = ?
+    ORDER BY sc.${SC_COLS.PRICE} ASC, s.${S_COLS.SUPPLIER_NAME} ASC;
   `;
 
   const result = await db.raw(query, [parsedId]);
   return (result.rows || []).map((r) => ({
     id: r.supplier_cost_id,
-    variant_id: r.variant_id,
-    supplier_id: r.supplier_id,
+    variant_id: r[SC_COLS.VARIANT_ID],
+    supplier_id: r[SC_COLS.SUPPLIER_ID],
     supplier_name: r.ncc_name || "N/A",
     ncc_name: r.ncc_name || "N/A",
-    number_bank: r.number_bank || "",
+    number_bank: r[S_COLS.NUMBER_BANK] || "",
     price: parseFloat(r.gia_nhap || 0),
     gia_nhap: parseFloat(r.gia_nhap || 0),
-    updated_at: r.updated_at,
+    updated_at: r[SC_COLS.UPDATED_AT],
   }));
 };
 
@@ -139,16 +145,16 @@ const getSuppliersForVariant = async (variantId) => {
  */
 const getAllSuppliersList = async () => {
   const query = `
-    SELECT id, supplier_name AS ncc_name, number_bank
-    FROM business.supplier
-    ORDER BY supplier_name ASC;
+    SELECT ${S_COLS.ID}, ${S_COLS.SUPPLIER_NAME} AS ncc_name, ${S_COLS.NUMBER_BANK}
+    FROM ${TABLES.SUPPLIER}
+    ORDER BY ${S_COLS.SUPPLIER_NAME} ASC;
   `;
   const result = await db.raw(query);
   return (result.rows || []).map((r) => ({
-    id: r.id,
+    id: r[S_COLS.ID],
     supplier_name: r.ncc_name || "N/A",
     ncc_name: r.ncc_name || "N/A",
-    number_bank: r.number_bank || "",
+    number_bank: r[S_COLS.NUMBER_BANK] || "",
   }));
 };
 
@@ -170,52 +176,52 @@ const createProduct = async (data) => {
   const displayName = san_pham || package_product;
   const variantName = package_product || san_pham;
 
-  // Tim hoac tao product_id trong business.product
-  let catalogProduct = await db("business.product")
-    .whereRaw("LOWER(package_name) = LOWER(?)", [variantName || displayName])
+  // Tim hoac tao product_id trong catalog product
+  let catalogProduct = await db(TABLES.PRODUCT)
+    .whereRaw(`LOWER(${P_COLS.PACKAGE_NAME}) = LOWER(?)`, [variantName || displayName])
     .first();
 
   if (!catalogProduct) {
-    const firstProduct = await db("business.product").first();
+    const firstProduct = await db(TABLES.PRODUCT).first();
     if (firstProduct) {
       catalogProduct = firstProduct;
     } else {
-      const [newP] = await db("business.product")
+      const [newP] = await db(TABLES.PRODUCT)
         .insert({
-          package_name: variantName || displayName,
-          is_active: true,
-          created_at: db.fn.now(),
-          updated_at: db.fn.now(),
+          [P_COLS.PACKAGE_NAME]: variantName || displayName,
+          [P_COLS.IS_ACTIVE]: true,
+          [P_COLS.CREATED_AT]: db.fn.now(),
+          [P_COLS.UPDATED_AT]: db.fn.now(),
         })
         .returning("*");
       catalogProduct = newP;
     }
   }
 
-  const [insertedVariant] = await db("business.variant")
+  const [insertedVariant] = await db(TABLES.VARIANT)
     .insert({
-      product_id: catalogProduct.id,
-      display_name: displayName,
-      variant_name: variantName,
-      base_price: base_price || null,
-      is_active: is_active ?? true,
-      created_at: db.fn.now(),
-      updated_at: db.fn.now(),
+      [V_COLS.PRODUCT_ID]: catalogProduct[P_COLS.ID],
+      [V_COLS.DISPLAY_NAME]: displayName,
+      [V_COLS.VARIANT_NAME]: variantName,
+      [V_COLS.BASE_PRICE]: base_price || null,
+      [V_COLS.IS_ACTIVE]: is_active ?? true,
+      [V_COLS.CREATED_AT]: db.fn.now(),
+      [V_COLS.UPDATED_AT]: db.fn.now(),
     })
     .returning("*");
 
-  const variantId = insertedVariant.id;
+  const variantId = insertedVariant[V_COLS.ID];
 
   // Insert tier prices (1: CTV, 2: Customer, 3: Promo, 4: Student)
   const tierPrices = [
-    { variant_id: variantId, tier_id: 1, price: ctv_price || 0 },
-    { variant_id: variantId, tier_id: 2, price: retail_price || 0 },
-    { variant_id: variantId, tier_id: 3, price: promo_price || 0 },
-    { variant_id: variantId, tier_id: 4, price: student_price || 0 },
-  ].filter((p) => p.price > 0);
+    { [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: 1, [VP_COLS.PRICE]: ctv_price || 0 },
+    { [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: 2, [VP_COLS.PRICE]: retail_price || 0 },
+    { [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: 3, [VP_COLS.PRICE]: promo_price || 0 },
+    { [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: 4, [VP_COLS.PRICE]: student_price || 0 },
+  ].filter((p) => p[VP_COLS.PRICE] > 0);
 
   if (tierPrices.length > 0) {
-    await db("business.variant_price").insert(tierPrices);
+    await db(TABLES.VARIANT_PRICE).insert(tierPrices);
   }
 
   const resultProduct = {
@@ -244,20 +250,20 @@ const updateProduct = async (id, data) => {
   const variantId = parseInt(id, 10);
 
   // 1. Lấy trạng thái hiện tại (cũ) của sản phẩm & giá tiers
-  const oldVariant = await db("business.variant").where({ id: variantId }).first();
+  const oldVariant = await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
   if (!oldVariant) throw new Error("Sản phẩm không tồn tại");
 
-  const oldPrices = await db("business.variant_price").where({ variant_id: variantId });
+  const oldPrices = await db(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId });
   const getOldPrice = (tierId) => {
-    const found = oldPrices.find((p) => p.tier_id === tierId);
-    return found ? parseFloat(found.price || 0) : 0;
+    const found = oldPrices.find((p) => p[VP_COLS.TIER_ID] === tierId);
+    return found ? parseFloat(found[VP_COLS.PRICE] || 0) : 0;
   };
 
   const oldState = {
-    san_pham: oldVariant.display_name || "",
-    package_product: oldVariant.variant_name || "",
-    base_price: parseFloat(oldVariant.base_price || 0),
-    is_active: Boolean(oldVariant.is_active),
+    san_pham: oldVariant[V_COLS.DISPLAY_NAME] || "",
+    package_product: oldVariant[V_COLS.VARIANT_NAME] || "",
+    base_price: parseFloat(oldVariant[V_COLS.BASE_PRICE] || 0),
+    is_active: Boolean(oldVariant[V_COLS.IS_ACTIVE]),
     ctv_price: getOldPrice(1),
     retail_price: getOldPrice(2),
     promo_price: getOldPrice(3),
@@ -275,30 +281,30 @@ const updateProduct = async (id, data) => {
     is_active,
   } = data;
 
-  const updateFields = { updated_at: db.fn.now() };
-  if (san_pham !== undefined) updateFields.display_name = san_pham;
-  if (package_product !== undefined) updateFields.variant_name = package_product;
-  if (base_price !== undefined) updateFields.base_price = base_price || null;
-  if (is_active !== undefined) updateFields.is_active = is_active;
+  const updateFields = { [V_COLS.UPDATED_AT]: db.fn.now() };
+  if (san_pham !== undefined) updateFields[V_COLS.DISPLAY_NAME] = san_pham;
+  if (package_product !== undefined) updateFields[V_COLS.VARIANT_NAME] = package_product;
+  if (base_price !== undefined) updateFields[V_COLS.BASE_PRICE] = base_price || null;
+  if (is_active !== undefined) updateFields[V_COLS.IS_ACTIVE] = is_active;
 
-  await db("business.variant").where({ id: variantId }).update(updateFields);
+  await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).update(updateFields);
 
   // Update tier prices
   const upsertPrice = async (tierId, priceVal) => {
     if (priceVal === undefined) return;
-    const existing = await db("business.variant_price")
-      .where({ variant_id: variantId, tier_id: tierId })
+    const existing = await db(TABLES.VARIANT_PRICE)
+      .where({ [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: tierId })
       .first();
 
     if (existing) {
-      await db("business.variant_price")
-        .where({ variant_id: variantId, tier_id: tierId })
-        .update({ price: priceVal || 0 });
+      await db(TABLES.VARIANT_PRICE)
+        .where({ [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: tierId })
+        .update({ [VP_COLS.PRICE]: priceVal || 0 });
     } else if (priceVal > 0) {
-      await db("business.variant_price").insert({
-        variant_id: variantId,
-        tier_id: tierId,
-        price: priceVal,
+      await db(TABLES.VARIANT_PRICE).insert({
+        [VP_COLS.VARIANT_ID]: variantId,
+        [VP_COLS.TIER_ID]: tierId,
+        [VP_COLS.PRICE]: priceVal,
       });
     }
   };
@@ -368,18 +374,18 @@ const updateProduct = async (id, data) => {
 const deleteProduct = async (id) => {
   const variantId = parseInt(id, 10);
 
-  const variant = await db("business.variant").where({ id: variantId }).first();
+  const variant = await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
   if (!variant) throw new Error("Sản phẩm không tồn tại");
 
-  await db("business.variant_price").where({ variant_id: variantId }).del();
-  await db("business.supplier_cost").where({ variant_id: variantId }).del();
-  await db("business.variant").where({ id: variantId }).del();
+  await db(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId }).del();
+  await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.VARIANT_ID]: variantId }).del();
+  await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).del();
 
   const deletedPayload = {
     id: variantId,
-    san_pham: variant.display_name,
-    variant_name: variant.variant_name,
-    summary: `Đã xóa hoàn toàn sản phẩm "${variant.display_name}" (${variant.variant_name}) khỏi hệ thống`,
+    san_pham: variant[V_COLS.DISPLAY_NAME],
+    variant_name: variant[V_COLS.VARIANT_NAME],
+    summary: `Đã xóa hoàn toàn sản phẩm "${variant[V_COLS.DISPLAY_NAME]}" (${variant[V_COLS.VARIANT_NAME]}) khỏi hệ thống`,
   };
 
   // Emit Domain Event
@@ -396,30 +402,30 @@ const addSupplierCost = async (variantId, supplierId, price) => {
   const sId = parseInt(supplierId, 10);
   const costPrice = parseFloat(price || 0);
 
-  const maxRes = await db("business.supplier_cost").max("id as maxId").first();
+  const maxRes = await db(TABLES.SUPPLIER_COST).max(`${SC_COLS.ID} as maxId`).first();
   const nextId = (parseInt(maxRes?.maxId || 0, 10)) + 1;
 
-  const [inserted] = await db("business.supplier_cost")
+  const [inserted] = await db(TABLES.SUPPLIER_COST)
     .insert({
-      id: nextId,
-      variant_id: vId,
-      supplier_id: sId,
-      price: costPrice,
-      created_at: db.fn.now(),
-      updated_at: db.fn.now(),
+      [SC_COLS.ID]: nextId,
+      [SC_COLS.VARIANT_ID]: vId,
+      [SC_COLS.SUPPLIER_ID]: sId,
+      [SC_COLS.PRICE]: costPrice,
+      [SC_COLS.CREATED_AT]: db.fn.now(),
+      [SC_COLS.UPDATED_AT]: db.fn.now(),
     })
     .returning("*");
 
-  const supplier = await db("business.supplier").where({ id: sId }).first();
+  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: sId }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
-    id: inserted.id,
+    id: inserted[SC_COLS.ID],
     variant_id: vId,
     supplier_id: sId,
-    supplier_name: supplier?.supplier_name || "",
+    supplier_name: supplier?.[S_COLS.SUPPLIER_NAME] || "",
     price: costPrice,
-    summary: `Thêm nguồn NCC "${supplier?.supplier_name || sId}" với giá nhập ${formatMoney(costPrice)}`,
+    summary: `Thêm nguồn NCC "${supplier?.[S_COLS.SUPPLIER_NAME] || sId}" với giá nhập ${formatMoney(costPrice)}`,
   };
 
   // Emit SUPPLIER_COST_ADDED event
@@ -434,7 +440,7 @@ const addSupplierCost = async (variantId, supplierId, price) => {
       supplier_cost: {
         action: "ADD",
         supplier_id: sId,
-        supplier_name: supplier?.supplier_name || "",
+        supplier_name: supplier?.[S_COLS.SUPPLIER_NAME] || "",
         price: costPrice,
       },
     },
@@ -451,26 +457,26 @@ const updateSupplierCost = async (supplierCostId, price) => {
   const scId = parseInt(supplierCostId, 10);
   const costPrice = parseFloat(price || 0);
 
-  const row = await db("business.supplier_cost").where({ id: scId }).first();
+  const row = await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).first();
   if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
 
-  const oldPrice = parseFloat(row.price || 0);
+  const oldPrice = parseFloat(row[SC_COLS.PRICE] || 0);
 
-  await db("business.supplier_cost")
-    .where({ id: scId })
-    .update({ price: costPrice, updated_at: db.fn.now() });
+  await db(TABLES.SUPPLIER_COST)
+    .where({ [SC_COLS.ID]: scId })
+    .update({ [SC_COLS.PRICE]: costPrice, [SC_COLS.UPDATED_AT]: db.fn.now() });
 
-  const supplier = await db("business.supplier").where({ id: row.supplier_id }).first();
+  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: row[SC_COLS.SUPPLIER_ID] }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
     id: scId,
-    variant_id: row.variant_id,
-    supplier_id: row.supplier_id,
-    supplier_name: supplier?.supplier_name || "",
+    variant_id: row[SC_COLS.VARIANT_ID],
+    supplier_id: row[SC_COLS.SUPPLIER_ID],
+    supplier_name: supplier?.[S_COLS.SUPPLIER_NAME] || "",
     old_price: oldPrice,
     price: costPrice,
-    summary: `Cập nhật giá nhập NCC "${supplier?.supplier_name || row.supplier_id}": ${formatMoney(oldPrice)} ➔ ${formatMoney(costPrice)}`,
+    summary: `Cập nhật giá nhập NCC "${supplier?.[S_COLS.SUPPLIER_NAME] || row[SC_COLS.SUPPLIER_ID]}": ${formatMoney(oldPrice)} ➔ ${formatMoney(costPrice)}`,
   };
 
   // Emit SUPPLIER_COST_UPDATED event
@@ -478,7 +484,7 @@ const updateSupplierCost = async (supplierCostId, price) => {
 
   // Emit PRODUCT_UPDATED event
   eventBus.emit(EVENTS.PRODUCT_UPDATED, {
-    id: row.variant_id,
+    id: row[SC_COLS.VARIANT_ID],
     action: "UPDATE_SUPPLIER_COST",
     changed_fields: ["supplier_cost"],
     changes: {
@@ -492,7 +498,7 @@ const updateSupplierCost = async (supplierCostId, price) => {
     summary: supplierCostPayload.summary,
   });
 
-  return { ...row, price: costPrice };
+  return { ...row, [SC_COLS.PRICE]: costPrice };
 };
 
 /**
@@ -501,21 +507,21 @@ const updateSupplierCost = async (supplierCostId, price) => {
 const deleteSupplierCost = async (supplierCostId) => {
   const scId = parseInt(supplierCostId, 10);
 
-  const row = await db("business.supplier_cost").where({ id: scId }).first();
+  const row = await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).first();
   if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
 
-  await db("business.supplier_cost").where({ id: scId }).del();
+  await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).del();
 
-  const supplier = await db("business.supplier").where({ id: row.supplier_id }).first();
+  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: row[SC_COLS.SUPPLIER_ID] }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
     id: scId,
-    variant_id: row.variant_id,
-    supplier_id: row.supplier_id,
-    supplier_name: supplier?.supplier_name || "",
-    price: parseFloat(row.price || 0),
-    summary: `Xóa nguồn NCC "${supplier?.supplier_name || row.supplier_id}" (${formatMoney(row.price)}) khỏi sản phẩm`,
+    variant_id: row[SC_COLS.VARIANT_ID],
+    supplier_id: row[SC_COLS.SUPPLIER_ID],
+    supplier_name: supplier?.[S_COLS.SUPPLIER_NAME] || "",
+    price: parseFloat(row[SC_COLS.PRICE] || 0),
+    summary: `Xóa nguồn NCC "${supplier?.[S_COLS.SUPPLIER_NAME] || row[SC_COLS.SUPPLIER_ID]}" (${formatMoney(row[SC_COLS.PRICE])}) khỏi sản phẩm`,
   };
 
   // Emit SUPPLIER_COST_DELETED event
@@ -523,7 +529,7 @@ const deleteSupplierCost = async (supplierCostId) => {
 
   // Emit PRODUCT_UPDATED event
   eventBus.emit(EVENTS.PRODUCT_UPDATED, {
-    id: row.variant_id,
+    id: row[SC_COLS.VARIANT_ID],
     action: "DELETE_SUPPLIER_COST",
     changed_fields: ["supplier_cost"],
     changes: {
@@ -549,7 +555,3 @@ module.exports = {
   updateSupplierCost,
   deleteSupplierCost,
 };
-
-
-
-

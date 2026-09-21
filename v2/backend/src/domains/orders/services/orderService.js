@@ -1,9 +1,11 @@
-const { db } = require("@/db");
+const { db, TABLES, COLS } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
 
-const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
-const getOrderTable = () => db.withSchema(SCHEMA_ORDERS).from("order_list");
+const O_COLS = COLS.ORDER_LIST;
+const getOrderTable = () => db(TABLES.ORDER_LIST);
+
+
 
 /**
  * Trích xuất mã đơn ngẫu nhiên kiểu MAV...
