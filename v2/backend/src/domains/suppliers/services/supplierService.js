@@ -67,7 +67,7 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       COALESCE(SUM(l.import_cost), 0) AS total_import_cost,
       COALESCE(SUM(l.refund_amount), 0) AS total_refund,
       COALESCE(SUM(CASE WHEN l.ncc_payment_status = 'Chưa Thanh Toán' THEN (l.import_cost - l.refund_amount) ELSE 0 END), 0) AS total_unpaid_cost
-    FROM partner.supplier_order_cost_log l;
+    FROM business.supplier_order_cost_log l;
   `;
   const statsRes = await db.raw(statsQuery);
   const statsRow = statsRes.rows[0] || {};
@@ -87,8 +87,8 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       MAX(l.logged_at) AS last_order_date,
       COALESCE(SUM(CASE WHEN l.ncc_payment_status = 'Đã Thanh Toán' THEN (l.import_cost - l.refund_amount) ELSE 0 END), 0) AS total_paid,
       COALESCE(SUM(CASE WHEN l.ncc_payment_status = 'Chưa Thanh Toán' THEN (l.import_cost - l.refund_amount) ELSE 0 END), 0) AS total_debt
-    FROM partner.supplier s
-    LEFT JOIN partner.supplier_order_cost_log l ON l.supply_id = s.id
+    FROM business.supplier s
+    LEFT JOIN business.supplier_order_cost_log l ON l.supply_id = s.id
     ${whereClause}
     GROUP BY s.id, s.supplier_name, s.number_bank, s.bin_bank, s.account_holder, s.active_supply
     ${orderByClause};
@@ -150,7 +150,7 @@ const getSupplierCostLogs = async ({
 
   const countSql = `
     SELECT COUNT(*) AS total
-    FROM partner.supplier_order_cost_log l
+    FROM business.supplier_order_cost_log l
     ${whereClause}
   `;
   const countRes = await db.raw(countSql, params);
@@ -168,8 +168,8 @@ const getSupplierCostLogs = async ({
       COALESCE(l.ncc_payment_status, 'Chưa Thanh Toán') AS ncc_payment_status,
       l.logged_at,
       s.supplier_name
-    FROM partner.supplier_order_cost_log l
-    JOIN partner.supplier s ON s.id = l.supply_id
+    FROM business.supplier_order_cost_log l
+    JOIN business.supplier s ON s.id = l.supply_id
     ${whereClause}
     ORDER BY l.logged_at DESC, l.id DESC
     LIMIT ? OFFSET ?
@@ -205,7 +205,7 @@ const getSupplierCostLogs = async ({
  */
 const getSupplierDetailById = async (id) => {
   const supplierId = parseInt(id, 10);
-  const supplier = await db("partner.supplier").where({ id: supplierId }).first();
+  const supplier = await db("business.supplier").where({ id: supplierId }).first();
   if (!supplier) throw new Error("Không tìm thấy Nhà cung cấp");
 
   const bankMap = {
@@ -230,7 +230,7 @@ const getSupplierDetailById = async (id) => {
       COALESCE(SUM(CASE WHEN ncc_payment_status = 'Đã Thanh Toán' THEN (import_cost - refund_amount) ELSE 0 END), 0) AS total_paid,
       COALESCE(SUM(CASE WHEN ncc_payment_status = 'Chưa Thanh Toán' THEN (import_cost - refund_amount) ELSE 0 END), 0) AS remaining_debt,
       COALESCE(SUM(refund_amount), 0) AS total_refund
-    FROM partner.supplier_order_cost_log
+    FROM business.supplier_order_cost_log
     WHERE supply_id = ?;
   `, [supplierId]);
 
@@ -245,7 +245,7 @@ const getSupplierDetailById = async (id) => {
     SELECT
       EXTRACT(MONTH FROM logged_at) AS month_num,
       COUNT(id) AS order_count
-    FROM partner.supplier_order_cost_log
+    FROM business.supplier_order_cost_log
     WHERE supply_id = ?
     GROUP BY month_num
     ORDER BY month_num ASC;
@@ -307,11 +307,11 @@ const getSupplierDetailById = async (id) => {
  */
 const paySupplierDebt = async (id) => {
   const supplierId = parseInt(id, 10);
-  const supplier = await db("partner.supplier").where({ id: supplierId }).first();
+  const supplier = await db("business.supplier").where({ id: supplierId }).first();
   if (!supplier) throw new Error("Không tìm thấy Nhà cung cấp");
 
   // Đổi ncc_payment_status của tất cả đơn 'Chưa Thanh Toán' sang 'Đã Thanh Toán'
-  await db("partner.supplier_order_cost_log")
+  await db("business.supplier_order_cost_log")
     .where({ supply_id: supplierId, ncc_payment_status: "Chưa Thanh Toán" })
     .update({ ncc_payment_status: "Đã Thanh Toán" });
 
@@ -329,11 +329,11 @@ const paySupplierDebt = async (id) => {
  */
 const toggleSupplierStatus = async (id) => {
   const supplierId = parseInt(id, 10);
-  const existing = await db("partner.supplier").where({ id: supplierId }).first();
+  const existing = await db("business.supplier").where({ id: supplierId }).first();
   if (!existing) throw new Error("Không tìm thấy Nhà cung cấp");
 
   const newStatus = !existing.active_supply;
-  await db("partner.supplier").where({ id: supplierId }).update({ active_supply: newStatus });
+  await db("business.supplier").where({ id: supplierId }).update({ active_supply: newStatus });
 
   eventBus.emit(EVENTS.SUPPLIER_STATUS_TOGGLED, {
     id: supplierId,
@@ -362,7 +362,7 @@ const createSupplier = async (data) => {
     throw new Error("Vui lòng nhập tên nhà cung cấp");
   }
 
-  const [inserted] = await db("partner.supplier")
+  const [inserted] = await db("business.supplier")
     .insert({
       supplier_name: supplier_name.trim(),
       number_bank: number_bank ? number_bank.trim() : null,
@@ -390,7 +390,7 @@ const createSupplier = async (data) => {
  */
 const updateSupplier = async (id, data) => {
   const supplierId = parseInt(id, 10);
-  const existing = await db("partner.supplier").where({ id: supplierId }).first();
+  const existing = await db("business.supplier").where({ id: supplierId }).first();
   if (!existing) {
     throw new Error("Không tìm thấy Nhà cung cấp cần sửa");
   }
@@ -402,7 +402,7 @@ const updateSupplier = async (id, data) => {
   if (data.account_holder !== undefined) updateFields.account_holder = data.account_holder ? data.account_holder.trim() : null;
   if (data.active_supply !== undefined) updateFields.active_supply = Boolean(data.active_supply);
 
-  const [updated] = await db("partner.supplier")
+  const [updated] = await db("business.supplier")
     .where({ id: supplierId })
     .update(updateFields)
     .returning("*");
@@ -447,14 +447,14 @@ const updateSupplier = async (id, data) => {
  */
 const deleteSupplier = async (id) => {
   const supplierId = parseInt(id, 10);
-  const existing = await db("partner.supplier").where({ id: supplierId }).first();
+  const existing = await db("business.supplier").where({ id: supplierId }).first();
   if (!existing) {
     throw new Error("Không tìm thấy Nhà cung cấp cần xóa");
   }
 
-  await db("product.supplier_cost").where({ supplier_id: supplierId }).del();
-  await db("partner.supplier_order_cost_log").where({ supply_id: supplierId }).del();
-  await db("partner.supplier").where({ id: supplierId }).del();
+  await db("business.supplier_cost").where({ supplier_id: supplierId }).del();
+  await db("business.supplier_order_cost_log").where({ supply_id: supplierId }).del();
+  await db("business.supplier").where({ id: supplierId }).del();
 
   eventBus.emit(EVENTS.SUPPLIER_DELETED, {
     id: supplierId,
@@ -475,3 +475,4 @@ module.exports = {
   updateSupplier,
   deleteSupplier,
 };
+

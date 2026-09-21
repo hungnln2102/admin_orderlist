@@ -9,6 +9,9 @@ module.exports = {
   ORDER_DELETED: "ORDER_DELETED",
   ORDER_PAID: "ORDER_PAID",
   ORDER_RENEWED: "ORDER_RENEWED",
+  ORDER_CANCELED_REFUNDED: "ORDER_CANCELED_REFUNDED", // Keep this for backward compatibility or direct refunds
+  ORDER_PENDING_REFUND: "ORDER_PENDING_REFUND",
+  ORDER_EXPIRED: "ORDER_EXPIRED",
 
   // Product & Pricing Domain Events
   PRODUCT_CREATED: "PRODUCT_CREATED",

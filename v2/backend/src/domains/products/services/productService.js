@@ -21,7 +21,7 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "" } = {}) => {
 
   const countSql = `
     SELECT COUNT(*) AS total
-    FROM product.variant v
+    FROM business.variant v
     ${whereClause}
   `;
 
@@ -39,11 +39,11 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "" } = {}) => {
       p_retail.margin_ratio AS retail_margin_ratio,
       p_ctv.margin_ratio AS ctv_margin_ratio,
       v.updated_at
-    FROM product.variant v
-    LEFT JOIN product.variant_price p_retail ON p_retail.variant_id = v.id AND p_retail.tier_id = 2
-    LEFT JOIN product.variant_price p_ctv ON p_ctv.variant_id = v.id AND p_ctv.tier_id = 1
-    LEFT JOIN product.variant_price p_student ON p_student.variant_id = v.id AND p_student.tier_id = 4
-    LEFT JOIN product.variant_price p_promo ON p_promo.variant_id = v.id AND p_promo.tier_id = 3
+    FROM business.variant v
+    LEFT JOIN business.variant_price p_retail ON p_retail.variant_id = v.id AND p_retail.tier_id = 2
+    LEFT JOIN business.variant_price p_ctv ON p_ctv.variant_id = v.id AND p_ctv.tier_id = 1
+    LEFT JOIN business.variant_price p_student ON p_student.variant_id = v.id AND p_student.tier_id = 4
+    LEFT JOIN business.variant_price p_promo ON p_promo.variant_id = v.id AND p_promo.tier_id = 3
     ${whereClause}
     ORDER BY v.is_active DESC, v.display_name ASC
     LIMIT ? OFFSET ?
@@ -114,8 +114,8 @@ const getSuppliersForVariant = async (variantId) => {
       s.number_bank,
       COALESCE(sc.price, 0) AS gia_nhap,
       sc.updated_at
-    FROM product.supplier_cost sc
-    JOIN partner.supplier s ON s.id = sc.supplier_id
+    FROM business.supplier_cost sc
+    JOIN business.supplier s ON s.id = sc.supplier_id
     WHERE sc.variant_id = ?
     ORDER BY sc.price ASC, s.supplier_name ASC;
   `;
@@ -140,7 +140,7 @@ const getSuppliersForVariant = async (variantId) => {
 const getAllSuppliersList = async () => {
   const query = `
     SELECT id, supplier_name AS ncc_name, number_bank
-    FROM partner.supplier
+    FROM business.supplier
     ORDER BY supplier_name ASC;
   `;
   const result = await db.raw(query);
@@ -170,17 +170,17 @@ const createProduct = async (data) => {
   const displayName = san_pham || package_product;
   const variantName = package_product || san_pham;
 
-  // Tim hoac tao product_id trong product.product
-  let catalogProduct = await db("product.product")
+  // Tim hoac tao product_id trong business.product
+  let catalogProduct = await db("business.product")
     .whereRaw("LOWER(package_name) = LOWER(?)", [variantName || displayName])
     .first();
 
   if (!catalogProduct) {
-    const firstProduct = await db("product.product").first();
+    const firstProduct = await db("business.product").first();
     if (firstProduct) {
       catalogProduct = firstProduct;
     } else {
-      const [newP] = await db("product.product")
+      const [newP] = await db("business.product")
         .insert({
           package_name: variantName || displayName,
           is_active: true,
@@ -192,7 +192,7 @@ const createProduct = async (data) => {
     }
   }
 
-  const [insertedVariant] = await db("product.variant")
+  const [insertedVariant] = await db("business.variant")
     .insert({
       product_id: catalogProduct.id,
       display_name: displayName,
@@ -215,7 +215,7 @@ const createProduct = async (data) => {
   ].filter((p) => p.price > 0);
 
   if (tierPrices.length > 0) {
-    await db("product.variant_price").insert(tierPrices);
+    await db("business.variant_price").insert(tierPrices);
   }
 
   const resultProduct = {
@@ -244,10 +244,10 @@ const updateProduct = async (id, data) => {
   const variantId = parseInt(id, 10);
 
   // 1. Lấy trạng thái hiện tại (cũ) của sản phẩm & giá tiers
-  const oldVariant = await db("product.variant").where({ id: variantId }).first();
+  const oldVariant = await db("business.variant").where({ id: variantId }).first();
   if (!oldVariant) throw new Error("Sản phẩm không tồn tại");
 
-  const oldPrices = await db("product.variant_price").where({ variant_id: variantId });
+  const oldPrices = await db("business.variant_price").where({ variant_id: variantId });
   const getOldPrice = (tierId) => {
     const found = oldPrices.find((p) => p.tier_id === tierId);
     return found ? parseFloat(found.price || 0) : 0;
@@ -281,21 +281,21 @@ const updateProduct = async (id, data) => {
   if (base_price !== undefined) updateFields.base_price = base_price || null;
   if (is_active !== undefined) updateFields.is_active = is_active;
 
-  await db("product.variant").where({ id: variantId }).update(updateFields);
+  await db("business.variant").where({ id: variantId }).update(updateFields);
 
   // Update tier prices
   const upsertPrice = async (tierId, priceVal) => {
     if (priceVal === undefined) return;
-    const existing = await db("product.variant_price")
+    const existing = await db("business.variant_price")
       .where({ variant_id: variantId, tier_id: tierId })
       .first();
 
     if (existing) {
-      await db("product.variant_price")
+      await db("business.variant_price")
         .where({ variant_id: variantId, tier_id: tierId })
         .update({ price: priceVal || 0 });
     } else if (priceVal > 0) {
-      await db("product.variant_price").insert({
+      await db("business.variant_price").insert({
         variant_id: variantId,
         tier_id: tierId,
         price: priceVal,
@@ -368,12 +368,12 @@ const updateProduct = async (id, data) => {
 const deleteProduct = async (id) => {
   const variantId = parseInt(id, 10);
 
-  const variant = await db("product.variant").where({ id: variantId }).first();
+  const variant = await db("business.variant").where({ id: variantId }).first();
   if (!variant) throw new Error("Sản phẩm không tồn tại");
 
-  await db("product.variant_price").where({ variant_id: variantId }).del();
-  await db("product.supplier_cost").where({ variant_id: variantId }).del();
-  await db("product.variant").where({ id: variantId }).del();
+  await db("business.variant_price").where({ variant_id: variantId }).del();
+  await db("business.supplier_cost").where({ variant_id: variantId }).del();
+  await db("business.variant").where({ id: variantId }).del();
 
   const deletedPayload = {
     id: variantId,
@@ -396,10 +396,10 @@ const addSupplierCost = async (variantId, supplierId, price) => {
   const sId = parseInt(supplierId, 10);
   const costPrice = parseFloat(price || 0);
 
-  const maxRes = await db("product.supplier_cost").max("id as maxId").first();
+  const maxRes = await db("business.supplier_cost").max("id as maxId").first();
   const nextId = (parseInt(maxRes?.maxId || 0, 10)) + 1;
 
-  const [inserted] = await db("product.supplier_cost")
+  const [inserted] = await db("business.supplier_cost")
     .insert({
       id: nextId,
       variant_id: vId,
@@ -410,7 +410,7 @@ const addSupplierCost = async (variantId, supplierId, price) => {
     })
     .returning("*");
 
-  const supplier = await db("partner.supplier").where({ id: sId }).first();
+  const supplier = await db("business.supplier").where({ id: sId }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
@@ -451,16 +451,16 @@ const updateSupplierCost = async (supplierCostId, price) => {
   const scId = parseInt(supplierCostId, 10);
   const costPrice = parseFloat(price || 0);
 
-  const row = await db("product.supplier_cost").where({ id: scId }).first();
+  const row = await db("business.supplier_cost").where({ id: scId }).first();
   if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
 
   const oldPrice = parseFloat(row.price || 0);
 
-  await db("product.supplier_cost")
+  await db("business.supplier_cost")
     .where({ id: scId })
     .update({ price: costPrice, updated_at: db.fn.now() });
 
-  const supplier = await db("partner.supplier").where({ id: row.supplier_id }).first();
+  const supplier = await db("business.supplier").where({ id: row.supplier_id }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
@@ -501,12 +501,12 @@ const updateSupplierCost = async (supplierCostId, price) => {
 const deleteSupplierCost = async (supplierCostId) => {
   const scId = parseInt(supplierCostId, 10);
 
-  const row = await db("product.supplier_cost").where({ id: scId }).first();
+  const row = await db("business.supplier_cost").where({ id: scId }).first();
   if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
 
-  await db("product.supplier_cost").where({ id: scId }).del();
+  await db("business.supplier_cost").where({ id: scId }).del();
 
-  const supplier = await db("partner.supplier").where({ id: row.supplier_id }).first();
+  const supplier = await db("business.supplier").where({ id: row.supplier_id }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
@@ -549,5 +549,7 @@ module.exports = {
   updateSupplierCost,
   deleteSupplierCost,
 };
+
+
 
 

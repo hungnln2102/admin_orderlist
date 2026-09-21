@@ -232,6 +232,7 @@ interface SearchableSupplierDropdownProps {
   selectedSupplierName: string;
   onSelectSupplier: (supplierName: string) => void;
   loadingSuppliers: boolean;
+  disabled?: boolean;
 }
 
 const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProps> = ({
@@ -240,6 +241,7 @@ const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProps> = ({
   selectedSupplierName,
   onSelectSupplier,
   loadingSuppliers,
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -291,12 +293,15 @@ const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProps> = ({
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-left flex items-center justify-between hover:border-cyan-500/50 focus:outline-none transition-all cursor-pointer min-h-[38px]"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-left flex items-center justify-between focus:outline-none transition-all min-h-[38px] ${disabled ? "opacity-60 cursor-not-allowed hover:border-slate-800" : "cursor-pointer hover:border-cyan-500/50"}`}
       >
         <span className="text-xs font-medium text-white break-words whitespace-normal leading-snug flex-1 pr-2">
           {loadingSuppliers ? (
             <span className="text-cyan-400 font-semibold animate-pulse">Đang tải NCC...</span>
+          ) : disabled ? (
+            <span className="text-slate-500">-- Vui lòng chọn sản phẩm trước --</span>
           ) : selectedSupplierName ? (
             <span className="font-bold text-purple-300">{selectedSupplierName}</span>
           ) : (
@@ -908,13 +913,13 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       const res = await fetch(`/api/orders/${selectedOrder.id}`, {
         method: "DELETE",
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setIsDeleteModalOpen(false);
-        notify.success("Đã xóa đơn hàng thành công!", "Xóa Đơn Hàng");
+        notify.success(data.message || "Đã xử lý xóa đơn hàng!", "Xóa Đơn Hàng");
         fetchOrders();
       } else {
-        const errData = await res.json();
-        notify.error(errData.error || "Xóa đơn thất bại", "Lỗi Xóa Đơn");
+        notify.error(data.error || "Xóa đơn thất bại", "Lỗi Xóa Đơn");
       }
     } catch (err) {
       notify.error("Lỗi kết nối máy chủ", "Kết Nối Thất Bại");
@@ -1799,6 +1804,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                           selectedSupplierName={formData.supply_id}
                           onSelectSupplier={handleSupplierChange}
                           loadingSuppliers={loadingSuppliers}
+                          disabled={!selectedProductId}
                         />
                       </div>
                     </div>
@@ -2016,6 +2022,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                           selectedSupplierName={formData.supply_id}
                           onSelectSupplier={handleSupplierChange}
                           loadingSuppliers={loadingSuppliers}
+                          disabled={!selectedProductId}
                         />
                       </div>
                     </div>
@@ -2183,11 +2190,28 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
             <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-rose-400" /> Xác Nhận Xóa Đơn Hàng
             </h2>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Bạn có chắc chắn muốn xóa đơn hàng{" "}
-              <strong className="text-cyan-400 font-mono">#{selectedOrder.id_order || selectedOrder.id}</strong> của{" "}
-              <strong className="text-white">{selectedOrder.customer}</strong>?
-            </p>
+            <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
+              <p>
+                Bạn có chắc chắn muốn xóa đơn hàng{" "}
+                <strong className="text-cyan-400 font-mono">#{selectedOrder.id_order || selectedOrder.id}</strong> của{" "}
+                <strong className="text-white">{selectedOrder.customer}</strong>?
+              </p>
+              {String(selectedOrder.status || "").trim().toLowerCase() === "đã thanh toán" && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300">
+                  ⚠️ Đơn hàng <strong>Đã Thanh Toán</strong> sẽ được chuyển sang danh sách <strong>Chưa Hoàn</strong> để xử lý hoàn tiền.
+                </div>
+              )}
+              {String(selectedOrder.status || "").trim().toLowerCase() === "cần gia hạn" && (
+                <div className="p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300">
+                  ℹ️ Đơn <strong>Cần Gia Hạn</strong> sẽ được ngưng gia hạn và chuyển sang danh sách <strong>Hết Hạn</strong>.
+                </div>
+              )}
+              {["chưa thanh toán", "đang xử lý", "hết hạn"].includes(String(selectedOrder.status || "").trim().toLowerCase()) && (
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300">
+                  🗑️ Đơn hàng sẽ bị <strong>Xóa vĩnh viễn</strong> khỏi cơ sở dữ liệu.
+                </div>
+              )}
+            </div>
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setIsDeleteModalOpen(false)}

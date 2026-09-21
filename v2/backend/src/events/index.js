@@ -11,11 +11,13 @@ function registerAllSubscribers() {
   const { registerProductEventSubscribers } = require("./subscribers/productSubscriber");
   const { registerSupplierEventSubscribers } = require("./subscribers/supplierSubscriber");
   const { registerWebhookEventSubscribers } = require("./subscribers/webhookSubscriber");
+  const { registerRefundEventSubscribers } = require("./subscribers/refundSubscriber");
 
   registerOrderEventSubscribers();
   registerProductEventSubscribers();
   registerSupplierEventSubscribers();
   registerWebhookEventSubscribers();
+  registerRefundEventSubscribers();
 }
 
 

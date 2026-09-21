@@ -352,31 +352,118 @@ async function renewOrder(id, payload = {}) {
 }
 
 /**
- * Xóa đơn hàng + phát event ORDER_DELETED
+ * Tính toán số tiền hoàn lại theo số ngày còn lại của gói
+ */
+function calcRemainingRefund(order) {
+  if (!order || !order.price || order.price <= 0) return 0;
+  const now = new Date();
+  const expiredAt = order.expired_at ? new Date(order.expired_at) : null;
+  if (!expiredAt || expiredAt <= now) return 0;
+  
+  const orderDate = order.order_date ? new Date(order.order_date) : (order.created_at ? new Date(order.created_at) : null);
+  if (!orderDate) return 0;
+
+  const totalDays = Math.max(1, Math.ceil((expiredAt.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24)));
+  const remainingDays = Math.max(0, Math.ceil((expiredAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+  if (remainingDays <= 0) return 0;
+  const price = Number(order.price) || 0;
+  const refund = Math.round((price * remainingDays) / totalDays);
+  return Math.max(0, refund);
+}
+
+/**
+ * Xóa đơn hàng (Hard Delete) hoặc Hủy & Chuyển Trạng Thái (Soft Delete) + phát event
  */
 async function deleteOrder(id) {
-  const existingOrder = await getOrderTable().where({ id: Number(id) }).first();
-  if (!existingOrder) {
-    throw new Error("Không tìm thấy đơn hàng cần xóa.");
-  }
+  const { withTransaction } = require("@/db");
+  
+  return await withTransaction(async (trx) => {
+    const existingOrder = await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).first();
+    if (!existingOrder) {
+      throw new Error("Không tìm thấy đơn hàng cần xóa.");
+    }
 
-  await getOrderTable().where({ id: Number(id) }).del();
+    const currentStatusLower = String(existingOrder.status || "").trim().toLowerCase();
+    
+    // Hard Delete: Chưa Thanh Toán / Đang Xử Lý / Hết Hạn
+    const isHardDelete = ["chưa thanh toán", "đang xử lý", "hết hạn"].includes(currentStatusLower);
+    
+    // Soft Delete (Chờ Hoàn): Đã Thanh Toán
+    const isSoftDeletePendingRefund = currentStatusLower === "đã thanh toán";
+    
+    // Soft Delete (Ngừng Gia Hạn): Cần Gia Hạn
+    const isSoftDeleteExpired = currentStatusLower === "cần gia hạn";
+    
+    // Blocked: Đã Hoàn, Chưa Hoàn, Chờ Hoàn, Hủy, Đã Hủy
+    const isBlocked = ["đã hoàn", "chưa hoàn", "chờ hoàn", "hủy", "đã hủy"].some(s => currentStatusLower.includes(s));
 
-  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-  const summary = `Đã xóa đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
+    if (isBlocked) {
+      throw new Error(`Đơn hàng đang ở trạng thái "${existingOrder.status}" không thể xóa hoặc hủy thêm lần nữa.`);
+    }
 
-  // Phát event Domain: ORDER_DELETED
-  eventBus.emit(EVENTS.ORDER_DELETED, {
-    orderId: existingOrder.id,
-    id_order: existingOrder.id_order,
-    customer: existingOrder.customer,
-    price: existingOrder.price,
-    deletedOrder: existingOrder,
-    summary,
-    action: "DELETE",
+    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+    const todayYMD = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    if (isHardDelete) {
+      // 1. Luồng Xóa Vĩnh Viễn
+      await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).del();
+      
+      const summary = `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
+      eventBus.emit(EVENTS.ORDER_DELETED, {
+        orderId: existingOrder.id,
+        id_order: existingOrder.id_order,
+        customer: existingOrder.customer,
+        price: existingOrder.price,
+        deletedOrder: existingOrder,
+        summary,
+        action: "HARD_DELETE",
+      });
+
+      return { success: true, action: "deleted", message: `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order}` };
+    } 
+    else if (isSoftDeletePendingRefund) {
+      // 2. Luồng Hủy và Chờ Hoàn Tiền
+      await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).update({
+        status: "Chưa Hoàn",
+        canceled_at: existingOrder.canceled_at || todayYMD,
+      });
+
+      const summary = `Đã hủy đơn hàng #${existingOrder.id_order} và chuyển vào danh sách Chưa Hoàn.`;
+      
+      eventBus.emit(EVENTS.ORDER_PENDING_REFUND, {
+        orderId: existingOrder.id,
+        orderCode: existingOrder.id_order,
+        order: existingOrder,
+        canceledAt: todayYMD,
+        summary,
+        action: "SOFT_DELETE_PENDING_REFUND",
+      });
+
+      return { success: true, action: "pending_refund", message: summary };
+    }
+    else if (isSoftDeleteExpired) {
+      // 3. Luồng Ngừng Gia Hạn
+      await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).update({
+        status: "Hết Hạn",
+      });
+
+      const summary = `Đã chuyển đơn hàng #${existingOrder.id_order} sang danh sách Hết Hạn do ngừng gia hạn.`;
+      
+      eventBus.emit(EVENTS.ORDER_EXPIRED, {
+        orderId: existingOrder.id,
+        orderCode: existingOrder.id_order,
+        order: existingOrder,
+        summary,
+        action: "SOFT_DELETE_EXPIRED",
+      });
+
+      return { success: true, action: "expired", message: summary };
+    }
+    else {
+      throw new Error(`Trạng thái "${existingOrder.status}" không hỗ trợ thao tác xóa.`);
+    }
   });
-
-  return { success: true, message: `Đã xóa đơn hàng #${existingOrder.id_order}` };
 }
 
 module.exports = {
