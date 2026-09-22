@@ -1164,38 +1164,42 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       {/* Responsive View Switch: Desktop Table (>= md) vs Mobile Card Stack (< md) */}
 
       {/* 1. Desktop & Tablet Table (md+) */}
-      <div className="hidden md:block bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-xl shadow-xl">
-        <div className="overflow-x-auto custom-scrollbar w-full">
-          <table className="w-full min-w-[1150px] border-collapse text-white">
-            <thead>
-              <tr className="border-b border-slate-800/80 bg-slate-950/50 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                <th className="w-[130px] py-4 px-3 text-center">Sản Phẩm</th>
-                <th className="min-w-[220px] py-4 px-3 text-center">Thông Tin Đơn</th>
-                <th className="min-w-[160px] py-4 px-3 text-center">Khách Hàng</th>
-                <th className="w-[170px] py-4 px-3 text-center">Thời Hạn</th>
-                <th className="w-[90px] py-4 px-3 text-center">Còn Lại</th>
-                <th className="w-[120px] py-4 px-3 text-center">Giá Tiền</th>
-                <th className="w-[130px] py-4 px-3 text-center">Trạng Thái</th>
-                <th className="w-[110px] py-4 px-3 text-center pr-4">Thao Tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    <div className="flex flex-col items-center gap-2">
-                      <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-                      <span>Đang tải dữ liệu đơn hàng...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : orders.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    Không tìm thấy đơn hàng nào trong tab này.
-                  </td>
-                </tr>
-              ) : (
+      {(() => {
+        const isHideColumns = activeTab === "expired" || activeTab === "canceled";
+        const tableColSpan = isHideColumns ? 6 : 8;
+        return (
+          <div className="hidden md:block bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-xl shadow-xl">
+            <div className="overflow-x-auto custom-scrollbar w-full">
+              <table className="w-full min-w-[1150px] border-collapse text-white">
+                <thead>
+                  <tr className="border-b border-slate-800/80 bg-slate-950/50 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="w-[130px] py-4 px-3 text-center">Sản Phẩm</th>
+                    <th className="min-w-[220px] py-4 px-3 text-center">Thông Tin Đơn</th>
+                    <th className="min-w-[160px] py-4 px-3 text-center">Khách Hàng</th>
+                    <th className="w-[170px] py-4 px-3 text-center">Thời Hạn</th>
+                    {!isHideColumns && <th className="w-[90px] py-4 px-3 text-center">Còn Lại</th>}
+                    <th className="w-[120px] py-4 px-3 text-center">Giá Tiền</th>
+                    <th className="w-[130px] py-4 px-3 text-center">Trạng Thái</th>
+                    {!isHideColumns && <th className="w-[110px] py-4 px-3 text-center pr-4">Thao Tác</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={tableColSpan} className="py-12 text-center text-slate-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
+                          <span>Đang tải dữ liệu đơn hàng...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={tableColSpan} className="py-12 text-center text-slate-500">
+                        Không tìm thấy đơn hàng nào trong tab này.
+                      </td>
+                    </tr>
+                  ) : (
                 orders.map((order) => {
                   const remainingDays = calculateRemainingDays(order);
                   const prefixConfig = getOrderPrefixConfig(order.id_order);
@@ -1268,19 +1272,21 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                       </td>
 
                       {/* 5. CÒN LẠI */}
-                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                        <span
-                          className={`font-mono font-black text-sm ${
-                            remainingDays <= 0
-                              ? "text-rose-400"
-                              : remainingDays <= 4
-                              ? "text-amber-400"
-                              : "text-emerald-400"
-                          }`}
-                        >
-                          {remainingDays}
-                        </span>
-                      </td>
+                      {!isHideColumns && (
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          <span
+                            className={`font-mono font-black text-sm ${
+                              remainingDays <= 0
+                                ? "text-rose-400"
+                                : remainingDays <= 4
+                                ? "text-amber-400"
+                                : "text-emerald-400"
+                            }`}
+                          >
+                            {remainingDays}
+                          </span>
+                        </td>
+                      )}
 
                       {/* 6. GIÁ TIỀN & GIÁ TRỊ CÒN LẠI */}
                       <td className="py-3.5 px-3 text-center whitespace-nowrap">
@@ -1304,31 +1310,33 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                       </td>
 
                       {/* 8. THAO TÁC */}
-                      <td className="py-3.5 px-3 text-center pr-4 whitespace-nowrap">
-                        <div className="flex justify-center gap-1.5">
-                          <button
-                            onClick={() => handleOpenView(order)}
-                            className="p-1.5 bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 rounded-lg transition border border-slate-700 hover:border-cyan-500/30 active:scale-95"
-                            title="Xem chi tiết đơn hàng"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(order)}
-                            className="p-1.5 bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400 rounded-lg transition border border-slate-700 hover:border-amber-500/30 active:scale-95"
-                            title="Sửa đơn hàng"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenDelete(order)}
-                            className="p-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 rounded-lg transition border border-slate-700 hover:border-rose-500/30 active:scale-95"
-                            title="Xóa đơn hàng"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
+                      {!isHideColumns && (
+                        <td className="py-3.5 px-3 text-center pr-4 whitespace-nowrap">
+                          <div className="flex justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenView(order)}
+                              className="p-1.5 bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 rounded-lg transition border border-slate-700 hover:border-cyan-500/30 active:scale-95"
+                              title="Xem chi tiết đơn hàng"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(order)}
+                              className="p-1.5 bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400 rounded-lg transition border border-slate-700 hover:border-amber-500/30 active:scale-95"
+                              title="Sửa đơn hàng"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDelete(order)}
+                              className="p-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 rounded-lg transition border border-slate-700 hover:border-rose-500/30 active:scale-95"
+                              title="Xóa đơn hàng"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -1393,6 +1401,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
           </div>
         )}
       </div>
+        );
+      })()}
 
       {/* 2. Mobile Card Stack (< md) */}
       <div className="block md:hidden space-y-3">
@@ -1456,7 +1466,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                   <div className="flex justify-between items-center pt-1 border-t border-slate-800/60">
                     <span className="text-slate-400">Thời hạn:</span>
                     <span className="font-mono text-[11px] text-slate-300">
-                      {formatDateDisplay(order.order_date || order.created_at)} - {formatDateDisplay(order.expired_at)} ({remainingDays} ngày)
+                      {formatDateDisplay(order.order_date || order.created_at)} - {formatDateDisplay(order.expired_at)} {activeTab !== "expired" && activeTab !== "canceled" && `(${remainingDays} ngày)`}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-1 border-t border-slate-800/60">
@@ -1475,26 +1485,28 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/80 text-xs">
-                  <button
-                    onClick={() => handleOpenView(order)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-medium border border-slate-700"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Xem
-                  </button>
-                  <button
-                    onClick={() => handleOpenEdit(order)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium border border-slate-700"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" /> Sửa
-                  </button>
-                  <button
-                    onClick={() => handleOpenDelete(order)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs font-medium border border-slate-700"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Xóa
-                  </button>
-                </div>
+                {activeTab !== "expired" && activeTab !== "canceled" && (
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                    <button
+                      onClick={() => handleOpenView(order)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-medium border border-slate-700"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Xem
+                    </button>
+                    <button
+                      onClick={() => handleOpenEdit(order)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium border border-slate-700"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Sửa
+                    </button>
+                    <button
+                      onClick={() => handleOpenDelete(order)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs font-medium border border-slate-700"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Xóa
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })
@@ -2206,7 +2218,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
                   ℹ️ Đơn <strong>Cần Gia Hạn</strong> sẽ được ngưng gia hạn và chuyển sang danh sách <strong>Hết Hạn</strong>.
                 </div>
               )}
-              {["chưa thanh toán", "đang xử lý", "hết hạn"].includes(String(selectedOrder.status || "").trim().toLowerCase()) && (
+              {["chưa thanh toán", "đang xử lý", "chờ xử lý"].includes(String(selectedOrder.status || "").trim().toLowerCase()) && (
                 <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300">
                   🗑️ Đơn hàng sẽ bị <strong>Xóa vĩnh viễn</strong> khỏi cơ sở dữ liệu.
                 </div>

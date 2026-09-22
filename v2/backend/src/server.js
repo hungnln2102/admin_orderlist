@@ -10,8 +10,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Khởi chạy và đăng ký Event Subscribers khi khởi động Server
+// Khởi chạy và đăng ký Event Subscribers & Cron Scheduler khi khởi động Server
 registerAllSubscribers();
+require("@/scheduler");
 
 // Health Check Endpoint
 app.get("/api/health", async (req, res) => {

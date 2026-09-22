@@ -388,8 +388,8 @@ async function deleteOrder(id) {
 
     const currentStatusLower = String(existingOrder.status || "").trim().toLowerCase();
     
-    // Hard Delete: Chưa Thanh Toán / Đang Xử Lý / Hết Hạn
-    const isHardDelete = ["chưa thanh toán", "đang xử lý", "hết hạn"].includes(currentStatusLower);
+    // Hard Delete: Chưa Thanh Toán / Đang Xử Lý / Chờ Xử Lý
+    const isHardDelete = ["chưa thanh toán", "đang xử lý", "chờ xử lý"].includes(currentStatusLower);
     
     // Soft Delete (Chờ Hoàn): Đã Thanh Toán
     const isSoftDeletePendingRefund = currentStatusLower === "đã thanh toán";
@@ -397,11 +397,11 @@ async function deleteOrder(id) {
     // Soft Delete (Ngừng Gia Hạn): Cần Gia Hạn
     const isSoftDeleteExpired = currentStatusLower === "cần gia hạn";
     
-    // Blocked: Đã Hoàn, Chưa Hoàn, Chờ Hoàn, Hủy, Đã Hủy
-    const isBlocked = ["đã hoàn", "chưa hoàn", "chờ hoàn", "hủy", "đã hủy"].some(s => currentStatusLower.includes(s));
+    // Blocked: Hết Hạn, Đã Hoàn, Chưa Hoàn, Chờ Hoàn, Hủy, Đã Hủy
+    const isBlocked = ["đã hoàn", "chưa hoàn", "chờ hoàn", "hủy", "đã hủy", "hết hạn"].some(s => currentStatusLower.includes(s));
 
     if (isBlocked) {
-      throw new Error(`Đơn hàng đang ở trạng thái "${existingOrder.status}" không thể xóa hoặc hủy thêm lần nữa.`);
+      throw new Error(`Đơn hàng ở trạng thái "${existingOrder.status}" (hết hạn/hoàn tiền/đã hủy) không được phép xóa.`);
     }
 
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
