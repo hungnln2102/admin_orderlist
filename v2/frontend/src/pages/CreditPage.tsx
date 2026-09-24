@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -99,7 +98,7 @@ export const CreditPage: React.FC = () => {
   const [loadingUnavailable, setLoadingUnavailable] = useState(false);
   const [selectedCredit, setSelectedCredit] = useState<CreditNote | null>(null);
 
-  const LIMIT = 20;
+  const LIMIT = 10;
 
   const fetchAvailable = useCallback(async () => {
     setLoadingAvailable(true);
@@ -303,28 +302,19 @@ export const CreditPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
-            <span className="text-cyan-400 font-semibold uppercase tracking-wider">Bán hàng & Đơn hàng</span>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-bold uppercase tracking-wider">Đang hoạt động</span>
-          </div>
-          <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
-            <CreditCard size={24} className="text-cyan-400" />
-            Nhật Ký Tín Dụng & Refund Credit
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Quản lý các khoản dư / credit tích lũy của khách hàng
-          </p>
+      <div>
+        <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
+          <span className="text-cyan-400 font-semibold uppercase tracking-wider">Bán hàng & Đơn hàng</span>
+          <span>·</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-bold uppercase tracking-wider">Đang hoạt động</span>
         </div>
-        <button
-          onClick={refreshAll}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.06] hover:bg-white/10 text-zinc-300 text-sm transition-colors"
-        >
-          <RefreshCw size={14} />
-          Làm mới
-        </button>
+        <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
+          <CreditCard size={24} className="text-cyan-400" />
+          Nhật Ký Tín Dụng & Refund Credit
+        </h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          Quản lý các khoản dư / credit tích lũy của khách hàng
+        </p>
       </div>
 
       {/* Stats */}
