@@ -4,6 +4,7 @@ const logger = require("@/utils/logger");
 const { pool } = require("../../../webhook/sepay/config");
 const { ensureSupplyAndPriceFromOrder } = require("../../../webhook/sepay/payments");
 const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("@/config/dbSchema");
+const { NCC_PAYMENT_STATUS } = require("@/utils/statuses");
 
 const SUPPLIER_ORDER_COST_LOG_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER);
 const supplierOrderCostCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
@@ -42,7 +43,7 @@ async function handleOrderPaidOrRenewed(payload) {
           ${supplierOrderCostCols.IMPORT_COST},
           ${supplierOrderCostCols.REFUND_AMOUNT},
           ${supplierOrderCostCols.NCC_PAYMENT_STATUS}
-        ) VALUES ($1, $2, $3, $4, 0, 'Chưa Thanh Toán')`,
+        ) VALUES ($1, $2, $3, $4, 0, '${NCC_PAYMENT_STATUS.UNPAID}')`,
         [payload.orderListId, ensured.supplierId, orderCode, importCost]
       );
       logger.info("[SupplierCostSubscriber] Created supplier_order_cost_log fallback", {

@@ -17,6 +17,7 @@ const {
 const { normalizeSupplyStatus, formatDateOutput } = require("@/utils/normalizers");
 const { resolveSupplyStatusColumn } = require("@/domains/supplies/controller/helpers");
 const logger = require("@/utils/logger");
+const { NCC_PAYMENT_STATUS } = require("@/utils/statuses");
 const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 
 const SUPPLIER_COST_TABLE = TABLES.supplyPrice;
@@ -145,7 +146,7 @@ const getSupplyInsights = async (_req, res) => {
     `;
 
     const logCols = QUOTED_COLS.supplierOrderCostLog;
-    const paidNccLabel = "Đã Thanh Toán";
+    const paidNccLabel = NCC_PAYMENT_STATUS.PAID;
     const orderIdCol = quoteIdent(orderCols.id);
     const orderCostUnpaidSql = `
       WITH latest AS (

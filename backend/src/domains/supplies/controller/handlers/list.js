@@ -14,6 +14,7 @@ const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = r
 const logger = require("@/utils/logger");
 const { supplierCache } = require("@/utils/cache");
 const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
+const { NCC_PAYMENT_STATUS } = require("@/utils/statuses");
 const logCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
 
 const listSupplies = async (_req, res) => {
@@ -242,11 +243,11 @@ const listSupplyOrderCosts = async (req, res) => {
       )
       SELECT
         COUNT(*) FILTER (
-          WHERE TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán'
+          WHERE TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) <> '${NCC_PAYMENT_STATUS.PAID}'
         )::bigint AS order_count,
         COALESCE(SUM(
           CASE
-            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = '${NCC_PAYMENT_STATUS.PAID}'
             THEN 0::numeric
             ELSE GREATEST(
               0::numeric,
@@ -256,7 +257,7 @@ const listSupplyOrderCosts = async (req, res) => {
         ), 0) AS total_cost,
         COALESCE(SUM(
           CASE
-            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = '${NCC_PAYMENT_STATUS.PAID}'
             THEN 0::numeric
             ELSE COALESCE(latest.${refundAmountCol}, 0)::numeric
           END
@@ -279,7 +280,7 @@ const listSupplyOrderCosts = async (req, res) => {
       INNER JOIN ${supplierTable} ${sj} ON ${sj}.${supIdCol} = ${lt}.${supplyIdCol}
       ${whereSql}
       ORDER BY 
-        CASE WHEN TRIM(COALESCE(${lt}.${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán' THEN 0 ELSE 1 END ASC,
+        CASE WHEN TRIM(COALESCE(${lt}.${nccPaymentStatusCol}::text, '')) <> '${NCC_PAYMENT_STATUS.PAID}' THEN 0 ELSE 1 END ASC,
         ${lt}.${logIdCol} DESC
       OFFSET ?
       LIMIT ?
@@ -326,7 +327,7 @@ const listSupplyOrderCosts = async (req, res) => {
         cost: Number(row.cost_value) || 0,
         refund: Number(row.refund_value) || 0,
         nccPaymentStatus:
-          row.ncc_payment_status != null ? String(row.ncc_payment_status) : "Chưa Thanh Toán",
+          row.ncc_payment_status != null ? String(row.ncc_payment_status) : NCC_PAYMENT_STATUS.UNPAID,
         orderDate: row.order_date,
         canceledAt: row.canceled_at,
       }));

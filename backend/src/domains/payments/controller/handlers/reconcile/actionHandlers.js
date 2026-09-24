@@ -66,7 +66,7 @@ const applyRenewAction = async (
   { receiptId, orderCodeRaw, statusValueInitial }
 ) => {
   const s = String(statusValueInitial || "").trim();
-  if (s !== STATUS.RENEWAL && s !== "Cần Gia Hạn" && s !== "Đang Gia Hạn") {
+  if (s !== STATUS.RENEWAL && s !== "Đang Gia Hạn") { // "Đang Gia Hạn" = legacy DB value
     throw createHttpError(
       409,
       "Chỉ được dùng reconcile_and_renew cho đơn Cần Gia Hạn."

@@ -16,6 +16,7 @@ const {
   resolveSupplierNameColumn,
 } = require("@/domains/supplies/controller/helpers");
 const logger = require("@/utils/logger");
+const { NCC_PAYMENT_STATUS } = require("@/utils/statuses");
 const { supplierHasAccountHolderColumn } = require("@/utils/supplierAccountHolderColumn");
 
 const getSupplyOverview = async (req, res) => {
@@ -70,7 +71,7 @@ const getSupplyOverview = async (req, res) => {
     const idSupplyCol = quoteIdent(orderCols.idSupply);
     const ps = QUOTED_COLS.paymentSupply;
     const lc = QUOTED_COLS.supplierOrderCostLog;
-    const paidNccLabel = "Đã Thanh Toán";
+    const paidNccLabel = NCC_PAYMENT_STATUS.PAID;
     const statsQuery = `
       SELECT
         COUNT(*) FILTER (WHERE ${statusColumn} IS DISTINCT FROM '${STATUS.REFUNDED}' AND ${statusColumn} IS DISTINCT FROM '${STATUS.PENDING_REFUND}') AS total_orders,

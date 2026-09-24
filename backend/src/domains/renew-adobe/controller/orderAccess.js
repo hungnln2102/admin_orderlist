@@ -1,4 +1,5 @@
 const { db } = require("@/db");
+const { STATUS } = require("@/utils/statuses");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
@@ -17,7 +18,7 @@ const TBL_ORDER = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
 const ORD_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 
 const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
-const ALLOWED_ORDER_STATUSES = ["Đã Thanh Toán", "Cần Gia Hạn", "Đang Xử Lý"];
+const ALLOWED_ORDER_STATUSES = [STATUS.PAID, STATUS.RENEWAL, STATUS.PROCESSING];
 
 async function getRenewAdobeVariantIds() {
   const rows = await db(PS_TABLE)

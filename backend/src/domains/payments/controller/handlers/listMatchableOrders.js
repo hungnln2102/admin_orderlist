@@ -22,7 +22,7 @@ const listMatchableOrders = async (req, res) => {
       })
       .whereIn(`o.${ORDER_COLS.status}`, [
         STATUS.UNPAID, STATUS.RENEWAL, STATUS.PROCESSING,
-        "Chưa Thanh Toán", "Cần Gia Hạn", "Đang Gia Hạn", "Đang Xử Lý"
+        "Đang Gia Hạn", // legacy DB value — không có trong STATUS, giữ để backward-compatible
       ])
       .whereRaw(`COALESCE(TRIM(o.${ORDER_COLS.idOrder}::text), '') <> ''`)
       .orderBy([

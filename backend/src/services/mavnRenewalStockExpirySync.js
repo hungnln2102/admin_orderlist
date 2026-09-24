@@ -17,6 +17,7 @@ const {
   getDefinition,
 } = require("@/config/dbSchema");
 const logger = require("@/utils/logger");
+const { STATUS } = require("@/utils/statuses");
 
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
@@ -275,7 +276,7 @@ async function syncStockExpiryForAccountAndPackage(clientOrKnex, packageId, acco
         FROM business.order_list
         WHERE id_product = ANY($1::bigint[])
           AND id_order LIKE 'MAVN%'
-          AND status IN ('Chưa Thanh Toán', 'Đang Xử Lý', 'Đã Thanh Toán', 'Cần Gia Hạn')
+          AND status IN ('${STATUS.UNPAID}', '${STATUS.PROCESSING}', '${STATUS.PAID}', '${STATUS.RENEWAL}')
           AND canceled_at IS NULL
       `,
       [variantIds]

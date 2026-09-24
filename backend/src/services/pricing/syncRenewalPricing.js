@@ -1,5 +1,6 @@
 const { db } = require("@/db");
 const logger = require("@/utils/logger");
+const { STATUS } = require("@/utils/statuses");
 const { TABLES } = require("@/domains/orders/controller/constants");
 const { ORDERS_SCHEMA } = require("@/config/dbSchema");
 const { calculateOrderPricing } = require("@/services/pricing/orderPricingService");
@@ -22,7 +23,7 @@ async function syncRenewalOrdersPriceForVariant(variantId, trxOrDb = db) {
     // 1. Tìm tất cả đơn hàng RENEWAL có variant_id này
     const renewalOrders = await trxOrDb(TABLES.orderList)
       .where(idProductCol, variantId)
-      .where(statusCol, 'Cần Gia Hạn');
+      .where(statusCol, STATUS.RENEWAL);
 
     if (renewalOrders.length === 0) {
       return;

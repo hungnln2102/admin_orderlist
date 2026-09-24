@@ -27,12 +27,13 @@ const {
 
 const isUnpaidStatus = (status) => {
   const s = String(status || "").trim();
-  return s === STATUS.UNPAID || s === "Chưa Thanh Toán";
+  return s === STATUS.UNPAID;
 };
 
 const isRenewalStatus = (status) => {
   const s = String(status || "").trim();
-  return s === STATUS.RENEWAL || s === "Cần Gia Hạn" || s === "Đang Gia Hạn";
+  return s === STATUS.RENEWAL
+    || s === "Đang Gia Hạn"; // "Đang Gia Hạn" = legacy DB value, không có trong STATUS
 };
 
 /**

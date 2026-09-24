@@ -41,8 +41,10 @@ const SUMMARY_TABLE = tableName(
 );
 const SUMMARY_COLS = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
-const NCC_STATUS_UNPAID = "Chưa Thanh Toán";
-const NCC_STATUS_PAID = "Đã Thanh Toán";
+const { NCC_PAYMENT_STATUS } = require("@/utils/statuses");
+
+const NCC_STATUS_UNPAID = NCC_PAYMENT_STATUS.UNPAID;
+const NCC_STATUS_PAID = NCC_PAYMENT_STATUS.PAID;
 
 /** Đặt cờ session để trigger DB bỏ qua nhánh sync supply_id khi service tự quản lý. */
 async function enableAppManagedFlag(trx) {

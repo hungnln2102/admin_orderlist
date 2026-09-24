@@ -9,7 +9,7 @@ const resolveSharedStatuses = () => {
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
-      return require(candidate).ORDER_STATUS;
+      return require(candidate);
     }
   }
 
@@ -28,10 +28,21 @@ const FALLBACK_STATUSES = {
   RENEWAL: "Cần Gia Hạn",
 };
 
-const ORDER_STATUS = resolveSharedStatuses() || FALLBACK_STATUSES;
+/**
+ * Trạng thái thanh toán NCC — dùng cho cột `supplier_order_cost_log.ncc_payment_status`.
+ */
+const FALLBACK_NCC_PAYMENT_STATUS = {
+  UNPAID: "Chưa Thanh Toán",
+  PAID: "Đã Thanh Toán",
+};
+
+const shared = resolveSharedStatuses();
+const ORDER_STATUS = (shared && shared.ORDER_STATUS) || FALLBACK_STATUSES;
+const NCC_PAYMENT_STATUS = (shared && shared.NCC_PAYMENT_STATUS) || FALLBACK_NCC_PAYMENT_STATUS;
 
 const STATUS = ORDER_STATUS;
 
 module.exports = {
   STATUS,
+  NCC_PAYMENT_STATUS,
 };
