@@ -1,7 +1,6 @@
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
 
-const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
-const getOrderTable = () => db.withSchema(SCHEMA_ORDERS).from("order_list");
+const getOrderTable = () => db(TABLES.ORDER_LIST);
 
 /**
  * Tìm số suffix khả dụng nhỏ nhất từ 1 đến 100 chưa được dùng bởi bất kỳ đơn nào đang chờ thanh toán

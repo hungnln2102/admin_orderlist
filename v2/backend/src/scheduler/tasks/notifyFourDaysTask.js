@@ -1,7 +1,6 @@
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
 
-const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || "public";
-const TABLE_NAME = `${SCHEMA_ORDERS}.order_list`;
+const TARGET_TABLE = TABLES.ORDER_LIST;
 
 /**
  * Task rà soát & thông báo cho các đơn hàng còn đúng 4 ngày sử dụng (Nhắc nhở gia hạn lúc 7h sáng)
@@ -14,9 +13,12 @@ async function notifyFourDaysTask(trigger = "cron") {
 
     const result = await db.raw(`
       SELECT id, id_order, customer, contact, information_order, price, expired_at, status
-      FROM ${TABLE_NAME}
+      FROM ${TARGET_TABLE}
       WHERE (expired_at::date - ${todaySql}) = 4
-        AND status IN ('Cần gia hạn', 'CẦN GIA HẠN', 'Đã Thanh Toán', 'Hoàn thành')
+        AND (status ILIKE '%gia hạn%' OR status ILIKE '%Thanh Toán%')
+        AND status NOT ILIKE '%Đã Hoàn%'
+        AND status NOT ILIKE '%Chưa Hoàn%'
+        AND status NOT ILIKE '%Hủy%'
       ORDER BY id DESC;
     `);
 
@@ -40,3 +42,4 @@ async function notifyFourDaysTask(trigger = "cron") {
 }
 
 module.exports = { notifyFourDaysTask };
+

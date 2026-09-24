@@ -5,6 +5,7 @@ import { GenericPage } from "@/features/shared/GenericPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { PricingPage } from "@/pages/PricingPage";
 import { SuppliersPage } from "@/pages/SuppliersPage";
+import { CreditPage } from "@/pages/CreditPage";
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -57,26 +58,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* 2. Bán hàng & Đơn hàng */}
       <Route path="/orders" element={<OrdersPage />} />
-      <Route
-        path="/credit"
-        element={
-          <GenericPage
-            title="Nhật Ký Tín Dụng & Refund Credit"
-            category="Bán hàng & Đơn hàng"
-            description="Quản lý các khoản dư / credit tích lũy của khách hàng"
-            columns={[
-              { key: "creditCode", label: "Mã Credit" },
-              { key: "customer", label: "Khách hàng" },
-              { key: "amount", label: "Số tiền credit" },
-              { key: "status", label: "Trạng thái" },
-            ]}
-            sampleData={[
-              { creditCode: "CREDIT-587", customer: "Phạm Thi Lan Anh", amount: "10 ₫", status: "Khả dụng" },
-              { creditCode: "CREDIT-584", customer: "Nguyễn Ngọc Châu Hoàng", amount: "48 ₫", status: "Khả dụng" },
-            ]}
-          />
-        }
-      />
+      <Route path="/credit" element={<CreditPage />} />
       <Route
         path="/customer-list"
         element={

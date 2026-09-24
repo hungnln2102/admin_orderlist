@@ -320,7 +320,7 @@ async function renewOrder(id, payload = {}) {
   const days = payload.days ? Number(payload.days) : Number(existingOrder.days || 365);
 
   const updateFields = {
-    status: "Cần gia hạn",
+    status: "Cần Gia Hạn",
     price: finalPrice,
     gross_selling_price: finalPrice,
     days,
@@ -335,7 +335,7 @@ async function renewOrder(id, payload = {}) {
     .returning("*");
 
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-  const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "Cần gia hạn", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
+  const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "Cần Gia Hạn", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
 
   // Phát event Domain: ORDER_UPDATED với action RENEWAL_REQUESTED
   eventBus.emit(EVENTS.ORDER_UPDATED, {
@@ -381,7 +381,7 @@ async function deleteOrder(id) {
   const { withTransaction } = require("@/db");
   
   return await withTransaction(async (trx) => {
-    const existingOrder = await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).first();
+    const existingOrder = await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).first();
     if (!existingOrder) {
       throw new Error("Không tìm thấy đơn hàng cần xóa.");
     }
@@ -409,7 +409,7 @@ async function deleteOrder(id) {
 
     if (isHardDelete) {
       // 1. Luồng Xóa Vĩnh Viễn
-      await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).del();
+      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
       
       const summary = `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
       eventBus.emit(EVENTS.ORDER_DELETED, {
@@ -426,7 +426,7 @@ async function deleteOrder(id) {
     } 
     else if (isSoftDeletePendingRefund) {
       // 2. Luồng Hủy và Chờ Hoàn Tiền
-      await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).update({
+      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
         status: "Chưa Hoàn",
         canceled_at: existingOrder.canceled_at || todayYMD,
       });
@@ -446,7 +446,7 @@ async function deleteOrder(id) {
     }
     else if (isSoftDeleteExpired) {
       // 3. Luồng Ngừng Gia Hạn
-      await trx(SCHEMA_ORDERS + ".order_list").where({ id: Number(id) }).update({
+      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
         status: "Hết Hạn",
       });
 

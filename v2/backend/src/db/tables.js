@@ -10,7 +10,7 @@ const SCHEMAS = {
   PARTNER: process.env.DB_SCHEMA_PARTNER || "",
   PRODUCT: process.env.DB_SCHEMA_PRODUCT || "",
   ORDERS: process.env.DB_SCHEMA_ORDERS || "",
-  BILLING: process.env.DB_SCHEMA_BILLING || "",
+  RECEIPT: process.env.DB_SCHEMA_RECEIPT || "",
   SYSTEM: process.env.DB_SCHEMA_SYSTEM || "system_automation",
 };
 
@@ -28,7 +28,8 @@ const TABLES = {
   VARIANT_PRICE: formatTable(SCHEMAS.PRODUCT, "variant_price"),
   PRODUCT: formatTable(SCHEMAS.PRODUCT, "product"),
   ORDER_LIST: formatTable(SCHEMAS.ORDERS, "order_list"),
-  REFUND_CREDIT_NOTES: formatTable(SCHEMAS.BILLING, "refund_credit_notes"),
+  REFUND_CREDIT_NOTES: formatTable(SCHEMAS.RECEIPT, "refund_credit_notes"),
+  REFUND_CREDIT_APPLICATIONS: formatTable(SCHEMAS.RECEIPT, "refund_credit_applications"),
   DOMAIN_EVENT_STORE: formatTable(SCHEMAS.SYSTEM, "domain_event_store"),
 };
 
@@ -125,8 +126,20 @@ const COLS = {
     STATUS: "status",
     NOTE: "note",
     SOURCE_KIND: "source_kind",
+    ISSUED_AT: "issued_at",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
+  },
+  REFUND_CREDIT_APPLICATIONS: {
+    ID: "id",
+    CREDIT_NOTE_ID: "credit_note_id",
+    TARGET_ORDER_LIST_ID: "target_order_list_id",
+    TARGET_ORDER_CODE: "target_order_code",
+    APPLIED_AMOUNT: "applied_amount",
+    NOTE: "note",
+    APPLIED_BY: "applied_by",
+    APPLIED_AT: "applied_at",
+    CREATED_AT: "created_at",
   },
   DOMAIN_EVENT_STORE: {
     ID: "id",

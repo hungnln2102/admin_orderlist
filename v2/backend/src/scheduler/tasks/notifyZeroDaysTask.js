@@ -1,7 +1,6 @@
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
 
-const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || "public";
-const TABLE_NAME = `${SCHEMA_ORDERS}.order_list`;
+const TARGET_TABLE = TABLES.ORDER_LIST;
 
 /**
  * Task rà soát & thông báo cho các đơn hàng đúng 0 ngày còn lại (Hết hạn trong ngày)
@@ -14,9 +13,9 @@ async function notifyZeroDaysTask(trigger = "cron") {
 
     const result = await db.raw(`
       SELECT id, id_order, customer, contact, information_order, price, expired_at, status
-      FROM ${TABLE_NAME}
+      FROM ${TARGET_TABLE}
       WHERE (expired_at::date - ${todaySql}) = 0
-        AND status IN ('Cần gia hạn', 'CẦN GIA HẠN', 'Hết Hạn')
+        AND (status ILIKE '%gia hạn%' OR status ILIKE '%Hết Hạn%')
       ORDER BY id DESC;
     `);
 
@@ -40,3 +39,4 @@ async function notifyZeroDaysTask(trigger = "cron") {
 }
 
 module.exports = { notifyZeroDaysTask };
+

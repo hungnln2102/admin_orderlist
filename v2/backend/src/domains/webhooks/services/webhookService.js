@@ -31,7 +31,12 @@ async function handleIncomingWebhook(payload = {}) {
   );
 
   // 1. Ghi nhận sự kiện vào Event Store
-  await recordEvent(eventType, eventData, "WEBHOOK");
+  await recordEvent({
+    eventName: eventType,
+    aggregateType: "WEBHOOK",
+    aggregateId: eventData.referenceCode || eventData.accountNumber || "UNKNOWN",
+    payload: eventData,
+  });
 
   // 2. Bắn sự kiện sang EventBus cho các subscriber lắng nghe
   eventBus.emit(eventType, eventData);

@@ -39,6 +39,7 @@ app.use("/api/orders", require("@/domains/orders/routes"));
 app.use("/api/products", require("@/domains/products/routes"));
 app.use("/api/suppliers", require("@/domains/suppliers/routes"));
 app.use("/api/webhooks", require("@/domains/webhooks/routes"));
+app.use("/api/credits", require("@/domains/credits/routes"));
 
 app.listen(PORT, () => {
   console.log(`=================================`);

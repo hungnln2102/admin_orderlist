@@ -1,8 +1,7 @@
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 
-const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
-const getOrderTable = () => db.withSchema(SCHEMA_ORDERS).from("order_list");
+const getOrderTable = () => db(TABLES.ORDER_LIST);
 
 /**
  * Xử lý Webhook SePay / Ngân Hàng tự động khớp đơn hàng theo số tiền (Giá + Suffix 1..100)
