@@ -8,6 +8,7 @@ interface DateRangePickerProps {
   onChange: (start: string, end: string) => void;
   label?: string;
   className?: string;
+  openDirection?: "up" | "down" | "auto";
 }
 
 function formatDateDisplay(isoStr?: string): string {
@@ -30,7 +31,13 @@ function formatIso(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-
+interface CoordsState {
+  top?: number;
+  bottom?: number;
+  right?: number;
+  isMobile: boolean;
+  openUpwards: boolean;
+}
 
 export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   startDate,
@@ -38,11 +45,12 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onChange,
   label = "",
   className = "",
+  openDirection = "auto",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; right?: number; isMobile: boolean } | null>(null);
+  const [coords, setCoords] = useState<CoordsState | null>(null);
 
   const initialDate = startDate ? parseIso(startDate) : new Date();
   const [viewYear, setViewYear] = useState(initialDate.getFullYear());
@@ -53,13 +61,31 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     if (inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect();
       const isMobile = window.innerWidth < 640;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      const openUpwards =
+        openDirection === "up" ||
+        (openDirection === "auto" && spaceBelow < 380) ||
+        (openDirection !== "down" && spaceBelow < 380 && spaceAbove > 250);
+
       if (isMobile) {
-        const top = Math.max(16, Math.min(rect.bottom + 6, window.innerHeight - 440));
-        setCoords({ top, isMobile: true });
+        if (openUpwards) {
+          const bottom = Math.max(16, window.innerHeight - rect.top + 6);
+          setCoords({ bottom, isMobile: true, openUpwards: true });
+        } else {
+          const top = Math.max(16, Math.min(rect.bottom + 6, window.innerHeight - 440));
+          setCoords({ top, isMobile: true, openUpwards: false });
+        }
       } else {
         const right = Math.max(16, window.innerWidth - rect.right);
-        const top = rect.bottom + 6;
-        setCoords({ top, right, isMobile: false });
+        if (openUpwards) {
+          const bottom = window.innerHeight - rect.top + 6;
+          setCoords({ bottom, right, isMobile: false, openUpwards: true });
+        } else {
+          const top = rect.bottom + 6;
+          setCoords({ top, right, isMobile: false, openUpwards: false });
+        }
       }
     }
   };
@@ -180,7 +206,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         )}
       </div>
 
-      {/* Floating Popover Portal (Fixed Position Right Under Input, z-index 9999) */}
+      {/* Floating Popover Portal (Fixed Position relative to viewport, z-index 9999) */}
       {isOpen && coords &&
         createPortal(
           <div
@@ -189,14 +215,18 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               coords.isMobile
                 ? {
                     position: "fixed",
-                    top: `${coords.top}px`,
+                    ...(coords.openUpwards
+                      ? { bottom: `${coords.bottom}px` }
+                      : { top: `${coords.top}px` }),
                     left: "12px",
                     right: "12px",
                     maxHeight: "calc(100vh - 32px)",
                   }
                 : {
                     position: "fixed",
-                    top: `${coords.top}px`,
+                    ...(coords.openUpwards
+                      ? { bottom: `${coords.bottom}px` }
+                      : { top: `${coords.top}px` }),
                     right: `${coords.right}px`,
                   }
             }

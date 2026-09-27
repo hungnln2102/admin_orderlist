@@ -2,14 +2,26 @@ const productService = require("../services/productService");
 
 const getProductPrices = async (req, res) => {
   try {
-    const { page, limit, search } = req.query;
-    const result = await productService.getProductPrices({ page, limit, search });
+    const { page, limit, search, activeOnly } = req.query;
+    const isActiveOnly = activeOnly === "true" || activeOnly === "1";
+    const result = await productService.getProductPrices({ page, limit, search, activeOnly: isActiveOnly });
     res.json(result);
   } catch (error) {
     console.error("Lỗi getProductPrices:", error);
     res.status(500).json({ error: "Không thể lấy danh sách bảng giá sản phẩm" });
   }
 };
+
+const getPackageProducts = async (_req, res) => {
+  try {
+    const data = await productService.getPackageProducts();
+    res.json({ data });
+  } catch (error) {
+    console.error("Lỗi getPackageProducts:", error);
+    res.status(500).json({ error: "Không thể lấy danh sách kho gói sản phẩm" });
+  }
+};
+
 
 const getSuppliersForVariant = async (req, res) => {
   try {
@@ -101,6 +113,7 @@ const deleteSupplierCost = async (req, res) => {
 
 module.exports = {
   getProductPrices,
+  getPackageProducts,
   getSuppliersForVariant,
   getAllSuppliersList,
   createProduct,

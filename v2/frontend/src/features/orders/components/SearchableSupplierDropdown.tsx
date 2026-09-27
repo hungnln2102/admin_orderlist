@@ -96,10 +96,10 @@ export const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProp
 
       {/* Downwards Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 w-full sm:min-w-[500px] mt-1.5 z-50 bg-[#0c1222] border border-cyan-500/40 rounded-xl shadow-2xl p-2.5 space-y-2 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-80 flex flex-col">
+        <div className="absolute top-full right-0 left-auto sm:right-0 w-full sm:w-[480px] max-w-[calc(100vw-3rem)] mt-1.5 z-50 bg-[#0c1222] border border-cyan-500/40 rounded-xl shadow-2xl p-2.5 space-y-2 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-80 flex flex-col">
           {/* Header Info */}
           <div className="px-1 text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center justify-between">
-            <span>{isProductSpecific ? "NCC Cung cấp sản phẩm này (Tối ưu)" : "Tất cả nhà cung cấp"}</span>
+            <span>{isProductSpecific ? "Danh sách nhà cung cấp" : "Tất cả nhà cung cấp"}</span>
             <span className="text-slate-500 font-normal">{filteredList.length} NCC</span>
           </div>
 

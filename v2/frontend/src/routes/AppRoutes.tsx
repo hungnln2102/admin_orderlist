@@ -7,6 +7,7 @@ import { PricingPage } from "@/pages/PricingPage";
 import { SuppliersPage } from "@/pages/SuppliersPage";
 import { CreditPage } from "@/pages/CreditPage";
 import { PaymentWalletsPage } from "@/pages/PaymentWalletsPage";
+import { PackageManagementPage } from "@/features/packages/PackageManagementPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { useAuth } from "@/shared/context/AuthContext";
 
@@ -124,28 +125,7 @@ export const AppRoutes: React.FC = () => {
       />
 
 
-      {/* 3. Danh mục Sản phẩm & Giá */}
-      <Route
-        path="/package-products"
-        element={
-          <GenericPage
-            title="Gói Sản Phẩm & Combo"
-            category="Danh mục Sản phẩm & Giá"
-            description="Danh mục các gói phần mềm, tài khoản và dịch vụ combo"
-            columns={[
-              { key: "packageName", label: "Tên gói" },
-              { key: "duration", label: "Thời hạn" },
-              { key: "basePrice", label: "Giá gốc" },
-              { key: "salePrice", label: "Giá bán" },
-            ]}
-            sampleData={[
-              { packageName: "Adobe Creative Cloud All Apps", duration: "12 Tháng", basePrice: "400.000 ₫", salePrice: "640.000 ₫" },
-              { packageName: "Canva Pro Team Slot", duration: "12 Tháng", basePrice: "40.000 ₫", salePrice: "65.000 ₫" },
-              { packageName: "Capcut Pro All Devices", duration: "12 Tháng", basePrice: "180.000 ₫", salePrice: "300.000 ₫" },
-            ]}
-          />
-        }
-      />
+      <Route path="/package-products" element={<PackageManagementPage />} />
       <Route
         path="/product-info"
         element={
@@ -280,13 +260,12 @@ export const AppRoutes: React.FC = () => {
               { key: "orderCode", label: "Mã Đơn Gốc" },
               { key: "amount", label: "Số tiền" },
               { key: "sender", label: "Người gửi" },
-              { key: "note", label: "Nội dung chuyển khoản" },
               { key: "date", label: "Ngày thanh toán" },
             ]}
             sampleData={[
-              { receiptId: "#587", orderCode: "MAVLVS2BV", amount: "150.010 ₫", sender: "Phạm Thi Lan Anh", note: "[Chuyển khoản tự động] MOMO147322324274", date: "17/09/2026" },
-              { receiptId: "#584", orderCode: "MAVCMXRAN", amount: "65.048 ₫", sender: "Nguyễn Ngọc Châu Hoàng", note: "[Chuyển khoản tự động] ACSP/0m678894", date: "17/09/2026" },
-              { receiptId: "#582", orderCode: "MAVLFGQ69", amount: "149.973 ₫", sender: "Nguyễn Vũ Quang Huy", note: "Chuyển khoản NGUYEN VU QUANG HUY", date: "16/09/2026" },
+              { receiptId: "#587", orderCode: "MAVLVS2BV", amount: "150.010 ₫", sender: "Phạm Thi Lan Anh", date: "17/09/2026" },
+              { receiptId: "#584", orderCode: "MAVCMXRAN", amount: "65.048 ₫", sender: "Nguyễn Ngọc Châu Hoàng", date: "17/09/2026" },
+              { receiptId: "#582", orderCode: "MAVLFGQ69", amount: "149.973 ₫", sender: "Nguyễn Vũ Quang Huy", date: "16/09/2026" },
             ]}
           />
         }

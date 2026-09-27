@@ -110,8 +110,10 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     .limit(limit)
     .offset(offset);
 
+  const ordersWithQr = await Promise.all(orders.map(attachVietQrToOrder));
+
   return {
-    data: orders,
+    data: ordersWithQr,
     pagination: {
       total,
       page: Number(page),
@@ -123,11 +125,75 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
 }
 
 /**
+ * Tự động gắn ảnh VietQR (vietqr_url) & thông tin ngân hàng cho đơn hàng
+ */
+async function attachVietQrToOrder(order) {
+  if (!order) return order;
+  try {
+    const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") || (Number(order.cost || 0) > 0 && String(order.status || "").toLowerCase().includes("nhập hàng"));
+
+    let numSupplyId = Number(order.supply_id);
+    if (isImport && !isNaN(numSupplyId) && numSupplyId > 0) {
+      const supplier = await db("supplier.suppliers")
+        .where({ id: numSupplyId })
+        .first();
+      if (supplier && (supplier.number_bank || supplier.numberBank)) {
+        const bin = supplier.bin_bank || supplier.binBank || "970422";
+        const accNum = supplier.number_bank || supplier.numberBank;
+        const accName = supplier.account_holder || supplier.accountHolder || supplier.supplier_name || supplier.supplierName || "";
+        const amount = Math.round(Number(order.cost || order.price || 0));
+        return {
+          ...order,
+          vietqr_url: `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`,
+          bank_info: {
+            bank_name: supplier.bin_bank || bin,
+            account_number: accNum,
+            account_holder: accName,
+            type: "supplier",
+          },
+        };
+      }
+    }
+
+    // Default shop bank account for sales orders
+    let defaultBank = await db("admin.shop_bank_accounts").where({ is_default: true, is_active: true }).first();
+    if (!defaultBank) {
+      defaultBank = await db("admin.shop_bank_accounts").where({ is_active: true }).first();
+    }
+    if (!defaultBank) {
+      defaultBank = await db("finance.financial_accounts").where({ account_type: "bank" }).first();
+    }
+
+    if (defaultBank) {
+      const accNum = defaultBank.account_number || defaultBank.accountNumber;
+      const bin = defaultBank.bank_bin || defaultBank.bankBin || defaultBank.bank_short_code || defaultBank.bankShortCode || "MB";
+      const accName = defaultBank.account_holder || defaultBank.accountHolder || "";
+      const amount = Math.round(Number(order.price || 0));
+      if (accNum) {
+        return {
+          ...order,
+          vietqr_url: `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`,
+          bank_info: {
+            bank_name: defaultBank.bank_display_name || defaultBank.bankShortCode || bin,
+            account_number: accNum,
+            account_holder: accName,
+            type: "shop",
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[attachVietQrToOrder] Lỗi khi tạo VietQR:", err.message);
+  }
+  return order;
+}
+
+/**
  * Lấy chi tiết đơn hàng theo ID
  */
 async function getOrderById(id) {
   const order = await getOrderTable().where({ id: Number(id) }).first();
-  return order || null;
+  return order ? await attachVietQrToOrder(order) : null;
 }
 
 /**
@@ -161,12 +227,23 @@ async function createOrder(payload) {
     days: payload.days ? Number(payload.days) : 365,
     order_date: payload.order_date || null,
     expired_at: payload.expired_at || null,
-    supply_id: payload.supply_id ? Number(payload.supply_id) : null,
+    supply_id: (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null,
     created_at: db.fn.now(),
   };
 
-  if (payload.id_product != null) {
-    newOrderData.id_product = payload.id_product;
+  if (payload.id_product != null && payload.id_product !== "") {
+    const numProdId = Number(payload.id_product);
+    if (!isNaN(numProdId) && numProdId > 0) {
+      newOrderData.id_product = numProdId;
+    } else {
+      const matched = await db(TABLES.VARIANT)
+        .whereILike("display_name", String(payload.id_product))
+        .orWhereILike("variant_name", String(payload.id_product))
+        .first();
+      if (matched) {
+        newOrderData.id_product = matched.id;
+      }
+    }
   }
 
   const [createdOrder] = await getOrderTable()
@@ -189,7 +266,7 @@ async function createOrder(payload) {
     action: "CREATE",
   });
 
-  return createdOrder;
+  return await attachVietQrToOrder(createdOrder);
 }
 
 /**
@@ -206,7 +283,20 @@ async function updateOrder(id, payload) {
   if (payload.contact !== undefined) updateFields.contact = payload.contact;
   if (payload.information_order !== undefined) updateFields.information_order = payload.information_order;
   if (payload.slot !== undefined) updateFields.slot = payload.slot;
-  if (payload.id_product !== undefined) updateFields.id_product = payload.id_product || null;
+  if (payload.id_product !== undefined) {
+    const numProdId = Number(payload.id_product);
+    if (!isNaN(numProdId) && numProdId > 0) {
+      updateFields.id_product = numProdId;
+    } else if (payload.id_product) {
+      const matched = await db(TABLES.VARIANT)
+        .whereILike("display_name", String(payload.id_product))
+        .orWhereILike("variant_name", String(payload.id_product))
+        .first();
+      updateFields.id_product = matched ? matched.id : null;
+    } else {
+      updateFields.id_product = null;
+    }
+  }
   if (payload.price !== undefined) updateFields.price = Number(payload.price);
   if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
   if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
@@ -230,7 +320,7 @@ async function updateOrder(id, payload) {
   if (payload.days !== undefined) updateFields.days = Number(payload.days);
   if (payload.order_date !== undefined) updateFields.order_date = payload.order_date || null;
   if (payload.expired_at !== undefined) updateFields.expired_at = payload.expired_at || null;
-  if (payload.supply_id !== undefined) updateFields.supply_id = payload.supply_id ? Number(payload.supply_id) : null;
+  if (payload.supply_id !== undefined) updateFields.supply_id = (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null;
 
   const [updatedOrder] = await getOrderTable()
     .where({ id: Number(id) })
@@ -298,7 +388,7 @@ async function updateOrder(id, payload) {
   // Phát event Domain: ORDER_UPDATED
   eventBus.emit(EVENTS.ORDER_UPDATED, updatePayload);
 
-  return updatedOrder;
+  return await attachVietQrToOrder(updatedOrder);
 }
 
 /**

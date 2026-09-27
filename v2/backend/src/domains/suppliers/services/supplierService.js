@@ -262,9 +262,8 @@ const getSupplierDetailById = async (id) => {
   const bin = supplier[S_COLS.BIN_BANK] || "970422";
   const accNum = supplier[S_COLS.NUMBER_BANK] || "";
   const accName = supplier[S_COLS.ACCOUNT_HOLDER] || supplier[S_COLS.SUPPLIER_NAME];
-  const addInfo = `${supplier[S_COLS.SUPPLIER_NAME]} thanh toan cong no`;
   const vietqrUrl = accNum
-    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${remainingDebt}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(accName)}`
+    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${remainingDebt}&accountName=${encodeURIComponent(accName)}`
     : null;
 
   return {

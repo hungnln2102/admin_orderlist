@@ -87,7 +87,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
             ) : (
               orders.map((order, idx) => {
                 const prefixConfig = getOrderPrefixConfig(order.id_order);
-                const displayProduct = getDisplayProductName(order.id_product, productsCatalog);
+                const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.information_order);
                 const remainingDays = calculateRemainingDays(order);
 
                 return (

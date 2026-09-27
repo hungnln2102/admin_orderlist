@@ -19,6 +19,13 @@ export interface Order {
   days?: number | string;
   refund?: string;
   transaction?: string;
+  vietqr_url?: string;
+  bank_info?: {
+    bank_name?: string;
+    account_number?: string;
+    account_holder?: string;
+    type?: string;
+  };
 }
 
 export type OrderDatasetKey = "active" | "import" | "expired" | "canceled";
@@ -43,6 +50,7 @@ export const DEFAULT_FORM_DATA = {
   days: 365,
   order_date: "",
   expired_at: "",
+  order_prefix: "MAVC",
 };
 
 export interface CatalogProduct {
@@ -128,10 +136,13 @@ export function formatDateDisplay(dateStr?: string): string {
   return `${day}/${month}/${year}`;
 }
 
-export function getDisplayProductName(idProduct?: number | string, productsCatalog: CatalogProduct[] = []): string {
-  if (!idProduct) return "";
-  const str = String(idProduct).trim();
-  if (!str) return "";
+export function getDisplayProductName(
+  idProduct?: number | string,
+  productsCatalog: CatalogProduct[] = [],
+  fallbackName?: string
+): string {
+  if (!idProduct && !fallbackName) return "";
+  const str = String(idProduct || "").trim();
 
   const parseDurationText = (text: string): string => {
     if (!text) return "";
@@ -160,7 +171,7 @@ export function getDisplayProductName(idProduct?: number | string, productsCatal
       variantName = found.package_product || found.san_pham;
       rawName = `${found.san_pham} ${found.package_product || ""}`;
     }
-  } else {
+  } else if (str) {
     const found = productsCatalog.find(
       (p) => p.san_pham.toLowerCase() === str.toLowerCase() || (p.package_product && p.package_product.toLowerCase() === str.toLowerCase())
     );
@@ -172,15 +183,21 @@ export function getDisplayProductName(idProduct?: number | string, productsCatal
     }
   }
 
+  // Nếu không tìm thấy tên biến thể hoặc kết quả là số thuần túy (ID chưa khớp catalog)
+  if (!variantName || /^\d+$/.test(variantName)) {
+    if (fallbackName && fallbackName.trim()) return fallbackName.trim();
+    if (/^\d+$/.test(str)) return `Sản phẩm #${str}`;
+  }
+
   const durationStr = parseDurationText(rawName);
-  if (durationStr) {
+  if (durationStr && variantName) {
     if (variantName.toLowerCase().includes(durationStr.toLowerCase())) {
       return variantName;
     }
     return `${variantName} (${durationStr})`;
   }
 
-  return variantName || str;
+  return variantName || fallbackName || str;
 }
 
 export function getOrderPrefixConfig(idOrder?: string) {

@@ -64,7 +64,7 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
 
       {/* Downwards Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 w-full sm:min-w-[600px] lg:min-w-[680px] mt-1.5 z-50 bg-[#0c1222] border border-cyan-500/40 rounded-xl shadow-2xl p-2.5 space-y-2 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-96 flex flex-col">
+        <div className="absolute top-full left-0 w-full sm:w-[540px] md:w-[600px] max-w-[calc(100vw-3rem)] sm:max-w-[620px] mt-1.5 z-50 bg-[#0c1222] border border-cyan-500/40 rounded-xl shadow-2xl p-2.5 space-y-2 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-96 flex flex-col">
           {/* Search Box */}
           <div className="relative shrink-0">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />

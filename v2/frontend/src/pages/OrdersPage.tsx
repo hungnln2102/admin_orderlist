@@ -50,7 +50,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   // Fetch product catalog and all suppliers catalog once on mount
   useEffect(() => {
-    fetch("/api/products/prices?limit=500")
+    fetch("/api/products/prices?limit=500&activeOnly=true")
       .then((res) => res.json())
       .then((data) => {
         if (data.data) setProductsCatalog(data.data);
@@ -85,6 +85,58 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     return [];
   };
 
+  const resolvePriceByPrefix = (prod: CatalogProduct, prefix: string): number => {
+    const upper = String(prefix || "").toUpperCase();
+    if (upper.startsWith("MAVC")) {
+      return prod.ctv_price > 0 ? prod.ctv_price : (prod.retail_price > 0 ? prod.retail_price : prod.base_price);
+    }
+    if (upper.startsWith("MAVL")) {
+      return prod.retail_price > 0 ? prod.retail_price : (prod.ctv_price > 0 ? prod.ctv_price : prod.base_price);
+    }
+    if (upper.startsWith("MAVK")) {
+      return prod.promo_price > 0 ? prod.promo_price : (prod.retail_price > 0 ? prod.retail_price : prod.base_price);
+    }
+    if (upper.startsWith("MAVS")) {
+      return prod.student_price > 0 ? prod.student_price : (prod.ctv_price > 0 ? prod.ctv_price : (prod.retail_price > 0 ? prod.retail_price : prod.base_price));
+    }
+    if (upper.startsWith("MAVT")) {
+      return 0;
+    }
+    if (upper.startsWith("MAVN")) {
+      return prod.base_price > 0 ? prod.base_price : 0;
+    }
+    return prod.retail_price > 0 ? prod.retail_price : prod.base_price;
+  };
+
+  const handlePrefixChange = (prefixVal: string) => {
+    const isImport = prefixVal.startsWith("MAVN");
+    const isGift = prefixVal.startsWith("MAVT");
+
+    setFormData((prev: any) => {
+      const updated = { ...prev, order_prefix: prefixVal };
+
+      if (isImport) {
+        updated.status = "Đã Thanh Toán";
+        if (!prev.customer || prev.customer === "Khách Hàng" || prev.customer === "test") {
+          updated.customer = "Mavryk";
+        }
+      } else if (!isEditModalOpen) {
+        updated.status = "Chưa Thanh Toán";
+      }
+
+      if (selectedProductId) {
+        const prod = productsCatalog.find((p) => p.id === selectedProductId);
+        if (prod) {
+          const resolvedPrice = isGift ? 0 : resolvePriceByPrefix(prod, prefixVal);
+          updated.price = resolvedPrice;
+          updated.gross_selling_price = resolvedPrice;
+        }
+      }
+
+      return updated;
+    });
+  };
+
   const handleProductChange = async (productIdVal: string) => {
     if (!productIdVal) {
       setSelectedProductId(null);
@@ -97,24 +149,11 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     if (!prod) return;
 
     setSelectedProductId(prod.id);
-    const sellingPrice = prod.retail_price > 0 ? prod.retail_price : (prod.ctv_price > 0 ? prod.ctv_price : prod.base_price);
-    const infoOrder = prod.package_product && prod.package_product !== prod.san_pham
-      ? `${prod.san_pham} (${prod.package_product})`
-      : prod.san_pham;
+    const prefix = formData.order_prefix || "MAVC";
+    const sellingPrice = resolvePriceByPrefix(prod, prefix);
 
-    // Fetch suppliers for this specific product
-    const suppliers = await fetchSuppliersForProduct(prod.id);
-
-    let defaultSupplyName = formData.supply_id;
-    let defaultCost = formData.cost;
-
-    if (suppliers.length > 0) {
-      const lowestSupplier = [...suppliers].sort((a, b) => (Number(a.price || a.gia_nhap || 0)) - (Number(b.price || b.gia_nhap || 0)))[0];
-      defaultSupplyName = lowestSupplier.supplier_name || lowestSupplier.ncc_name || "";
-      defaultCost = Number(lowestSupplier.price || lowestSupplier.gia_nhap || 0);
-    } else if (prod.base_price > 0) {
-      defaultCost = prod.base_price;
-    }
+    // Fetch suppliers for this specific product to populate dropdown choices
+    await fetchSuppliersForProduct(prod.id);
 
     // Auto-calculate duration days & expired_at from product package name
     const textToMatch = `${prod.san_pham} ${prod.package_product || ""}`;
@@ -138,11 +177,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     setFormData((prev) => ({
       ...prev,
       id_product: prod.san_pham,
-      information_order: infoOrder,
       price: sellingPrice,
       gross_selling_price: sellingPrice,
-      supply_id: defaultSupplyName,
-      cost: defaultCost,
+      supply_id: "",
+      cost: 0,
       days: derivedDays,
       expired_at: expiryStr,
     }));
@@ -231,11 +269,24 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     setSelectedProductId(null);
     setProductSuppliersCatalog([]);
     setIsCustomPriceMode(false);
-    setFormData({
-      ...DEFAULT_FORM_DATA,
-      order_date: today,
-      expired_at: nextYear,
-    });
+    if (activeTab === "import") {
+      setFormData({
+        ...DEFAULT_FORM_DATA,
+        order_prefix: "MAVN",
+        status: "Đã Thanh Toán",
+        customer: "Mavryk",
+        order_date: today,
+        expired_at: nextYear,
+      });
+    } else {
+      setFormData({
+        ...DEFAULT_FORM_DATA,
+        order_prefix: "MAVC",
+        status: "Chưa Thanh Toán",
+        order_date: today,
+        expired_at: nextYear,
+      });
+    }
     setIsCreateModalOpen(true);
   };
 
@@ -251,6 +302,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     const matchedProd = productsCatalog.find(
       (p) => p.san_pham.toLowerCase() === prodName.toLowerCase() || String(p.id) === prodName
     );
+
+    let prefix = "MAVC";
+    const upperId = String(order.id_order || "").toUpperCase();
+    if (upperId.startsWith("MAVL")) prefix = "MAVL";
+    else if (upperId.startsWith("MAVC")) prefix = "MAVC";
+    else if (upperId.startsWith("MAVK")) prefix = "MAVK";
+    else if (upperId.startsWith("MAVS")) prefix = "MAVS";
+    else if (upperId.startsWith("MAVT")) prefix = "MAVT";
+    else if (upperId.startsWith("MAVN")) prefix = "MAVN";
 
     if (matchedProd) {
       setSelectedProductId(matchedProd.id);
@@ -270,12 +330,13 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       price: Number(order.price || 0),
       gross_selling_price: Number(order.gross_selling_price || order.price || 0),
       cost: Number(order.cost || 0),
-      status: order.status || "Đã Thanh Toán",
+      status: order.status || "Chưa Thanh Toán",
       payment_method: order.payment_method || "bank",
       note: order.note || "",
       days: Number(order.days || 365),
       order_date: order.order_date ? new Date(order.order_date).toISOString().split("T")[0] : "",
       expired_at: order.expired_at ? new Date(order.expired_at).toISOString().split("T")[0] : "",
+      order_prefix: prefix,
     });
     setIsEditModalOpen(true);
   };
@@ -288,15 +349,30 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const prefix = formData.order_prefix || "MAVC";
+      const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const generatedCode = `${prefix}${randomCode}`;
+
+      const payload = {
+        ...formData,
+        id_order: generatedCode,
+        status: prefix === "MAVN" ? "Đã Thanh Toán" : "Chưa Thanh Toán",
+        customer: prefix === "MAVN" && (!formData.customer || formData.customer === "Khách Hàng") ? "Mavryk" : (formData.customer || "Khách Hàng"),
+      };
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
+        const createdOrder = await res.json();
         setIsCreateModalOpen(false);
-        notify.success("Tạo đơn hàng thành công!", "Tạo Đơn Hàng");
         fetchOrders();
+        if (createdOrder && createdOrder.id_order) {
+          setSelectedOrder(createdOrder);
+          setIsViewModalOpen(true);
+        }
       } else {
         const errData = await res.json();
         notify.error(errData.error || "Tạo đơn thất bại", "Lỗi Tạo Đơn");
@@ -419,6 +495,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       <OrderCreateEditModal
         isOpen={isCreateModalOpen}
         isEdit={false}
+        isImportTab={activeTab === "import"}
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateSubmit}
         formData={formData}
@@ -430,6 +507,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         selectedProductId={selectedProductId}
         onProductChange={handleProductChange}
         onSupplierChange={handleSupplierChange}
+        onPrefixChange={handlePrefixChange}
         isCustomPriceMode={isCustomPriceMode}
         setIsCustomPriceMode={setIsCustomPriceMode}
       />
@@ -438,6 +516,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       <OrderCreateEditModal
         isOpen={isEditModalOpen}
         isEdit={true}
+        isImportTab={activeTab === "import"}
         onClose={() => setIsEditModalOpen(false)}
         onSubmit={handleEditSubmit}
         formData={formData}
@@ -449,6 +528,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         selectedProductId={selectedProductId}
         onProductChange={handleProductChange}
         onSupplierChange={handleSupplierChange}
+        onPrefixChange={handlePrefixChange}
         isCustomPriceMode={isCustomPriceMode}
         setIsCustomPriceMode={setIsCustomPriceMode}
       />

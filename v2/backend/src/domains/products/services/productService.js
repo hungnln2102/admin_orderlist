@@ -11,13 +11,18 @@ const P_COLS = COLS.PRODUCT;
  * Service lấy danh sách giá sản phẩm (Bảng giá Niêm yết)
  * Bao gồm Giá Gốc, Giá Bán Lẻ, Giá CTV, Giá Sinh Viên, Giá Khuyến Mãi & % Lợi Nhuận
  */
-const getProductPrices = async ({ page = 1, limit = 15, search = "" } = {}) => {
+const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly = false } = {}) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
-  const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 15));
+  const limitNum = Math.max(1, Math.min(1000, parseInt(limit, 10) || 15));
   const offset = (pageNum - 1) * limitNum;
 
   let whereClause = "WHERE 1=1";
   const params = [];
+
+  // Khi activeOnly = true, chỉ lấy sản phẩm đang hoạt động (dùng cho dropdown tạo đơn hàng)
+  if (activeOnly) {
+    whereClause += ` AND v.${V_COLS.IS_ACTIVE} = true`;
+  }
 
   if (search && search.trim()) {
     whereClause += ` AND (v.${V_COLS.DISPLAY_NAME} ILIKE ? OR v.${V_COLS.VARIANT_NAME} ILIKE ?)`;
@@ -36,6 +41,7 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "" } = {}) => {
       v.${V_COLS.ID},
       v.${V_COLS.DISPLAY_NAME} AS san_pham,
       v.${V_COLS.VARIANT_NAME} AS package_product,
+      p.${P_COLS.PACKAGE_NAME} AS parent_package_name,
       v.${V_COLS.BASE_PRICE},
       v.${V_COLS.IS_ACTIVE},
       COALESCE(p_retail.${VP_COLS.PRICE}, v.${V_COLS.BASE_PRICE}, 0) AS retail_price,
@@ -46,12 +52,13 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "" } = {}) => {
       p_ctv.${VP_COLS.MARGIN_RATIO} AS ctv_margin_ratio,
       v.${V_COLS.UPDATED_AT}
     FROM ${TABLES.VARIANT} v
+    LEFT JOIN ${TABLES.PRODUCT} p ON p.${P_COLS.ID} = v.${V_COLS.PRODUCT_ID}
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_retail ON p_retail.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_retail.${VP_COLS.TIER_ID} = 2
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_ctv ON p_ctv.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_ctv.${VP_COLS.TIER_ID} = 1
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_student ON p_student.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_student.${VP_COLS.TIER_ID} = 4
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_promo ON p_promo.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_promo.${VP_COLS.TIER_ID} = 3
     ${whereClause}
-    ORDER BY v.${V_COLS.IS_ACTIVE} DESC, v.${V_COLS.DISPLAY_NAME} ASC
+    ORDER BY v.${V_COLS.IS_ACTIVE} DESC, COALESCE(p.${P_COLS.PACKAGE_NAME}, v.${V_COLS.DISPLAY_NAME}) ASC, v.${V_COLS.DISPLAY_NAME} ASC
     LIMIT ? OFFSET ?
   `;
 
@@ -544,8 +551,82 @@ const deleteSupplierCost = async (supplierCostId) => {
   return row;
 };
 
+/**
+ * Service lấy danh sách Kho Gói Sản Phẩm từ bảng product.package_product
+ * Kết hợp với product.product (Lớp gói cha) và product.product_stocks (Thông tin tài khoản/email)
+ */
+const getPackageProducts = async () => {
+  const query = `
+    SELECT
+      pp.id,
+      pp.package_id,
+      p.package_name AS category,
+      COALESCE(ps.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
+      COALESCE(pp.supplier, 'Mavryk') AS supplier,
+      COALESCE(pp.cost, 0) AS cost_price,
+      COALESCE(pp.slot, 2) AS total_slots,
+      pp.match,
+      pp.stock_id,
+      pp.storage_id,
+      pp.storage_total,
+      pp.stock_service_id
+    FROM product.package_product pp
+    LEFT JOIN product.product p ON p.id = pp.package_id
+    LEFT JOIN product.product_stocks ps ON CAST(ps.id AS text) = CAST(pp.stock_id AS text)
+    ORDER BY p.package_name ASC, pp.id DESC;
+  `;
+
+  const result = await db.raw(query);
+  const rows = result.rows || [];
+
+  const ordersQuery = `
+    SELECT id, information_order, slot, status, expired_at, cost, supply_id
+    FROM orders.order_list
+    WHERE status != 'Đã hủy' AND status != 'Đã Xóa'
+  `;
+  const ordersRes = await db.raw(ordersQuery);
+  const ordersList = ordersRes.rows || [];
+
+  return rows.map((r) => {
+    const matchingOrders = ordersList.filter(
+      (o) =>
+        (o.information_order && r.account_info && o.information_order.toLowerCase().includes(r.account_info.toLowerCase())) ||
+        (o.slot && r.account_info && o.slot.toLowerCase().includes(r.account_info.toLowerCase()))
+    );
+
+    const totalSlots = parseInt(r.total_slots || 2, 10);
+    const usedSlots = Math.min(totalSlots, matchingOrders.length);
+
+    const slotAssignments = matchingOrders.map((ord, idx) => ({
+      slotNumber: idx + 1,
+      orderCode: ord.id_order || `ĐƠN #${ord.id}`,
+      customerName: ord.customer || "",
+      customerContact: ord.contact || ord.information_order || "",
+      slotLabel: ord.slot || `Slot ${idx + 1}`,
+    }));
+
+    return {
+      id: r.id,
+      package_id: r.package_id,
+      category: r.category || "Khác",
+      name: r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`,
+      accountInfo: r.account_info,
+      usedSlots,
+      totalSlots,
+      supplier: r.supplier,
+      costPrice: parseFloat(r.cost_price || 0),
+      expiredAt: "2026-12-31",
+      note: r.match ? `Match: ${r.match}` : "",
+      status: usedSlots >= totalSlots ? "expired" : usedSlots > 0 ? "warning" : "active",
+      slotAssignments,
+    };
+  });
+
+};
+
 module.exports = {
   getProductPrices,
+  getPackageProducts,
   getSuppliersForVariant,
   getAllSuppliersList,
   createProduct,
@@ -555,3 +636,4 @@ module.exports = {
   updateSupplierCost,
   deleteSupplierCost,
 };
+

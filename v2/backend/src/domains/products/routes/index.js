@@ -4,6 +4,7 @@ const productController = require("../controllers/productController");
 const router = express.Router();
 
 router.get("/prices", productController.getProductPrices);
+router.get("/packages", productController.getPackageProducts);
 router.get("/all-suppliers", productController.getAllSuppliersList);
 router.get("/:productId/suppliers", productController.getSuppliersForVariant);
 

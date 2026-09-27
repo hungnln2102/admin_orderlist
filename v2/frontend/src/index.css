@@ -150,3 +150,22 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Dark mode styling for native date inputs */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  filter: invert(0.8) sepia(1) saturate(5) hue-rotate(170deg);
+  transition: filter 0.2s ease, opacity 0.2s ease;
+  opacity: 0.85;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: invert(0.95) sepia(1) saturate(8) hue-rotate(170deg);
+}
