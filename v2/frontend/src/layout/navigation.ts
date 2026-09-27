@@ -89,8 +89,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     groupName: "Hệ thống & Ví",
     items: [
       { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
-      { name: "Tài khoản Thanh toán", path: "/payment-accounts", icon: CreditCard },
-      { name: "Ví USDT", path: "/usdt-wallets", icon: Wallet },
+      { name: "Tài khoản & Ví USDT", path: "/payment-accounts", icon: Wallet },
       { name: "IP Whitelist", path: "/ip-whitelist", icon: Shield },
       { name: "Cấu hình API bên thứ 3", path: "/external-api-config", icon: Sliders },
       { name: "Renew Adobe Admin", path: "/renew-adobe-admin", icon: RefreshCw },

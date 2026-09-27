@@ -8,6 +8,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
+
   return (
     <header className="h-16 bg-[#070a11]/80 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
       {/* Left: Mobile Menu Toggle & Search Header */}

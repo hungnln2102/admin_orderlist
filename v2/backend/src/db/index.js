@@ -3,6 +3,7 @@ const { DATABASE_URL } = require("@/config/env");
 
 const searchPath = [
   "public",
+  "admin",
   "business",
   "receipt",
   "orders",
@@ -10,6 +11,7 @@ const searchPath = [
   "partner",
   "product",
   "promotion",
+  "finance",
   "supplier",
   "supplier_cost",
   "wallet",

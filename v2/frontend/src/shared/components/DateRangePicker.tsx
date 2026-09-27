@@ -36,7 +36,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   startDate,
   endDate,
   onChange,
-  label = "Thời Hạn Đơn Hàng",
+  label = "",
   className = "",
 }) => {
   const [isOpen, setIsOpen] = useState(false);

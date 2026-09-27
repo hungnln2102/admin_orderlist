@@ -1,17 +1,60 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { GenericPage } from "@/features/shared/GenericPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { PricingPage } from "@/pages/PricingPage";
 import { SuppliersPage } from "@/pages/SuppliersPage";
 import { CreditPage } from "@/pages/CreditPage";
+import { PaymentWalletsPage } from "@/pages/PaymentWalletsPage";
+import { LoginPage } from "@/features/auth/pages/LoginPage";
+import { useAuth } from "@/shared/context/AuthContext";
+
+const ProtectedRoute: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-slate-400 font-sans">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Đang kiểm tra quyền truy cập...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+};
+
+const PublicOnlyRoute: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+};
 
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
 
       {/* 1. Tổng quan & Báo cáo */}
       <Route
@@ -289,42 +332,8 @@ export const AppRoutes: React.FC = () => {
           />
         }
       />
-      <Route
-        path="/payment-accounts"
-        element={
-          <GenericPage
-            title="Tài Khoản Thanh Toán"
-            category="Hệ thống & Ví"
-            description="Danh sách các cổng thanh toán hỗ trợ"
-            columns={[
-              { key: "gateway", label: "Cổng thanh toán" },
-              { key: "type", label: "Loại" },
-              { key: "status", label: "Trạng thái" },
-            ]}
-            sampleData={[
-              { gateway: "Sepay Auto Banking", type: "Chuyển khoản QR", status: "Hoạt động" },
-            ]}
-          />
-        }
-      />
-      <Route
-        path="/usdt-wallets"
-        element={
-          <GenericPage
-            title="Quản Lý Ví USDT"
-            category="Hệ thống & Ví"
-            description="Địa chỉ ví USDT (TRC20/BEP20) nhận thanh toán quốc tế"
-            columns={[
-              { key: "network", label: "Mạng lưới" },
-              { key: "address", label: "Địa chỉ ví" },
-              { key: "balance", label: "Số dư" },
-            ]}
-            sampleData={[
-              { network: "TRC20 (Tron)", address: "T9zX...8yK2", balance: "1,450.00 USDT" },
-            ]}
-          />
-        }
-      />
+      <Route path="/payment-accounts" element={<PaymentWalletsPage />} />
+      <Route path="/usdt-wallets" element={<Navigate to="/payment-accounts" replace />} />
       <Route
         path="/ip-whitelist"
         element={
@@ -507,6 +516,8 @@ export const AppRoutes: React.FC = () => {
           />
         }
       />
+
+      </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

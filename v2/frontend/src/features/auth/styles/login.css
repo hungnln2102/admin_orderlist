@@ -1,0 +1,102 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+.modern-login-root {
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+}
+
+@keyframes auroraFlow1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(60px, -40px) scale(1.15);
+    opacity: 0.75;
+  }
+}
+
+@keyframes auroraFlow2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-50px, 50px) scale(1.2);
+    opacity: 0.65;
+  }
+}
+
+@keyframes auroraFlow3 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate(40px, 30px) scale(1.1);
+    opacity: 0.55;
+  }
+}
+
+.aurora-blob-1 {
+  animation: auroraFlow1 14s ease-in-out infinite;
+}
+
+.aurora-blob-2 {
+  animation: auroraFlow2 18s ease-in-out infinite;
+}
+
+.aurora-blob-3 {
+  animation: auroraFlow3 12s ease-in-out infinite;
+}
+
+/* Shimmer animation on CTA button */
+@keyframes shimmerBeam {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmerBeam 3s ease-in-out infinite;
+}
+
+/* Glass Card Subtle Border Gradient Glow */
+.glass-glow-card {
+  position: relative;
+  background: rgba(13, 18, 30, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6),
+              0 0 40px rgba(99, 102, 241, 0.12);
+}
+
+.glass-glow-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.2), rgba(56, 189, 248, 0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Input Focus Glow */
+.modern-input {
+  background: rgba(7, 10, 17, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-input:focus {
+  background: rgba(11, 15, 25, 0.85);
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 0 20px rgba(99, 102, 241, 0.15);
+}

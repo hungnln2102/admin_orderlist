@@ -11,6 +11,8 @@ const SCHEMAS = {
   PRODUCT: process.env.DB_SCHEMA_PRODUCT || "",
   ORDERS: process.env.DB_SCHEMA_ORDERS || "",
   RECEIPT: process.env.DB_SCHEMA_RECEIPT || "",
+  ADMIN: process.env.DB_SCHEMA_ADMIN || "admin",
+  FINANCE: process.env.DB_SCHEMA_FINANCE || "finance",
   SYSTEM: process.env.DB_SCHEMA_SYSTEM || "system_automation",
 };
 
@@ -31,6 +33,10 @@ const TABLES = {
   REFUND_CREDIT_NOTES: formatTable(SCHEMAS.RECEIPT, "refund_credit_notes"),
   REFUND_CREDIT_APPLICATIONS: formatTable(SCHEMAS.RECEIPT, "refund_credit_applications"),
   DOMAIN_EVENT_STORE: formatTable(SCHEMAS.SYSTEM, "domain_event_store"),
+  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "shop_bank_accounts"),
+  USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "usdt_wallets"),
+  FINANCIAL_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
+  FINANCIAL_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
 };
 
 const COLS = {

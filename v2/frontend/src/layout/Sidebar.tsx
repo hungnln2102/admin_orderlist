@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { NAVIGATION_GROUPS } from "./navigation";
+import { useAuth } from "@/shared/context/AuthContext";
 import {
   Search,
   ChevronDown,
@@ -8,6 +9,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -23,7 +25,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onToggleCollapse,
 }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Tổng quan & Báo cáo": true,
     "Bán hàng & Đơn hàng": true,
@@ -243,17 +252,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div
             className={`flex items-center ${
               isCollapsed
-                ? "justify-center"
+                ? "flex-col gap-2 p-1"
                 : "gap-3 p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition-all"
             }`}
           >
             <div className="relative shrink-0">
               <div
                 className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-400 via-sky-500 to-indigo-500 p-0.5 flex items-center justify-center font-black text-xs text-white shadow-md"
-                title="Administrator"
+                title={user?.username || "Administrator"}
               >
-                <div className="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center text-cyan-300 font-extrabold">
-                  A
+                <div className="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center text-cyan-300 font-extrabold uppercase">
+                  {user?.username ? user.username.charAt(0) : "A"}
                 </div>
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#070a11] shadow-sm" />
@@ -261,13 +270,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-100 truncate">Administrator</p>
+                <p className="text-xs font-bold text-slate-100 truncate">
+                  {user?.username || "Administrator"}
+                </p>
                 <p className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                   Hệ Thống Online
                 </p>
               </div>
             )}
+
+            {/* Icon Button Đăng Xuất */}
+            <button
+              onClick={handleLogout}
+              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0"
+              title="Đăng xuất khỏi hệ thống"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>

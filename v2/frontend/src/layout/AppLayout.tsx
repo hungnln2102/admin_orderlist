@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 
@@ -7,10 +8,15 @@ interface AppLayoutProps {
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const location = useLocation();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("v2_sidebar_collapsed") === "true";
   });
+
+  if (location.pathname === "/login") {
+    return <>{children}</>;
+  }
 
   const handleToggleCollapse = () => {
     setIsCollapsed((prev) => {
