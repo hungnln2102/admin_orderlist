@@ -33,6 +33,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const remainingDays = calculateRemainingDays(order);
   const remainingValue = calculateRemainingValue(order);
 
+  const statusLower = String(order.status || "").toLowerCase();
+  const isPaid = statusLower.includes("đã thanh toán") || statusLower.includes("hoàn thành");
+  const isRefunded = statusLower.includes("đã hoàn");
+  const isPendingRefund = statusLower.includes("chưa hoàn") || statusLower.includes("chờ hoàn");
+  const isCanceled = statusLower.includes("đã hủy") || statusLower === "hủy";
+
   const handleCopy = (text: string, field: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -183,8 +189,43 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             )}
           </div>
 
-          {/* ─ VietQR Payment ─ */}
-          {vietQrUrl && (
+          {/* ─ VietQR Payment & Status Summary ─ */}
+          {isPaid ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 text-center space-y-1">
+              <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-sm">
+                <Check className="w-5 h-5 text-emerald-400" /> Đơn hàng đã được thanh toán thành công
+              </div>
+              <p className="text-xs text-slate-400">Không hiển thị mã QR thu tiền vì đơn hàng đã hoàn tất thanh toán.</p>
+            </div>
+          ) : isRefunded ? (
+            <div className="rounded-xl border border-pink-500/30 bg-pink-950/20 p-4 text-center space-y-1">
+              <div className="flex items-center justify-center gap-2 text-pink-400 font-bold text-sm">
+                <Clock className="w-4 h-4 text-pink-400" /> Đơn hàng đã được hoàn tiền
+              </div>
+              <p className="text-xs text-slate-400">Đơn hàng này đã hoàn tất thủ tục hoàn tiền.</p>
+            </div>
+          ) : isPendingRefund ? (
+            <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 text-center space-y-2">
+              <div className="flex items-center justify-center gap-2 text-purple-300 font-bold text-sm">
+                <Clock className="w-4 h-4 text-purple-300" /> Đơn hàng đang chờ hoàn tiền
+              </div>
+              <p className="text-xs text-slate-400">
+                Số tiền cần hoàn: <strong className="text-purple-300">{fmt(remainingValue || Number(order.price || 0))} ₫</strong>
+              </p>
+              {order.contact && (
+                <div className="text-[11px] text-slate-300 bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                  Thông tin liên hệ nhận hoàn tiền: <span className="font-bold text-cyan-300">{order.contact}</span>
+                </div>
+              )}
+            </div>
+          ) : isCanceled ? (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-4 text-center space-y-1">
+              <div className="flex items-center justify-center gap-2 text-rose-400 font-bold text-sm">
+                <X className="w-4 h-4 text-rose-400" /> Đơn hàng đã bị hủy
+              </div>
+              <p className="text-xs text-slate-400">Mã QR thanh toán không khả dụng cho đơn hàng đã hủy.</p>
+            </div>
+          ) : vietQrUrl ? (
             <div className="rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-950/30 to-slate-900/50 overflow-hidden">
               <div className="px-4 py-2.5 border-b border-cyan-500/10 flex items-center justify-between">
                 <div className="font-bold text-cyan-400 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
@@ -221,7 +262,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 </button>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* ─ Note ─ */}
           {order.note && (

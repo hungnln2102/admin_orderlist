@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Filter, DollarSign, CheckCircle2, Clock } from "lucide-react";
+import { Search, Filter, DollarSign, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { OrderDatasetKey } from "../types";
 import { DateRangePicker } from "@/shared/components/DateRangePicker";
 
@@ -15,8 +15,21 @@ interface OrderFilterBarProps {
   endDate: string;
   onDateRangeChange: (start: string, end: string) => void;
   totalRevenue: number;
+  totalCost?: number;
   paidCount: number;
   pendingCount: number;
+  todayCount?: number;
+  renewCount?: number;
+  processingCount?: number;
+  totalOrdersCount?: number;
+  totalRemainingValue?: number;
+  supplierRemainingValue?: number;
+  refundCustomerAmount?: number;
+  refundedCustomerAmount?: number;
+  refundSupplierAmount?: number;
+  pendingRefundCount?: number;
+  refundedCount?: number;
+  canceledCount?: number;
 }
 
 export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
@@ -31,8 +44,21 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
   endDate,
   onDateRangeChange,
   totalRevenue,
+  totalCost = 0,
   paidCount,
   pendingCount,
+  todayCount = 0,
+  renewCount = 0,
+  processingCount = 0,
+  totalOrdersCount = 0,
+  totalRemainingValue = 0,
+  supplierRemainingValue = 0,
+  refundCustomerAmount = 0,
+  refundedCustomerAmount = 0,
+  refundSupplierAmount = 0,
+  pendingRefundCount = 0,
+  refundedCount = 0,
+  canceledCount = 0,
 }) => {
   const DATASET_TABS_CONFIG = [
     {
@@ -73,41 +99,148 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
     },
   ];
 
+  const getCardsConfig = () => {
+    const fmt = (num: number) => new Intl.NumberFormat("vi-VN").format(num);
+
+    if (activeTab === "import") {
+      return [
+        {
+          title: "TỔNG ĐƠN ĐÃ NHẬP KHO",
+          mainValue: `${totalOrdersCount} đơn`,
+          subLabel: "Nhập hôm nay:",
+          subValue: `${todayCount} đơn`,
+          subColor: "text-purple-300",
+          icon: <Calendar className="w-4 h-4" />,
+          iconBg: "bg-purple-500/10 text-purple-300 border-purple-500/20",
+        },
+        {
+          title: "TỔNG GIÁ TIỀN ĐÃ NHẬP (VỐN)",
+          mainValue: `${fmt(totalCost)} ₫`,
+          subLabel: "Giá bán niêm yết:",
+          subValue: `${fmt(totalRevenue)} ₫`,
+          subColor: "text-cyan-300",
+          icon: <DollarSign className="w-4 h-4" />,
+          iconBg: "bg-purple-500/10 text-purple-300 border-purple-500/20",
+        },
+      ];
+    }
+
+    if (activeTab === "expired") {
+      return [
+        {
+          title: "TỔNG ĐƠN HẾT HẠN",
+          mainValue: `${totalOrdersCount} đơn`,
+          subLabel: "Hết hạn hôm nay:",
+          subValue: `${todayCount} đơn`,
+          subColor: "text-amber-300",
+          icon: <Clock className="w-4 h-4" />,
+          iconBg: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        },
+      ];
+    }
+
+    if (activeTab === "canceled") {
+      return [
+        {
+          title: "TỔNG ĐƠN HOÀN TIỀN & HỦY",
+          mainValue: `${totalOrdersCount} đơn`,
+          subLabel: "Chờ hoàn trả:",
+          subValue: `${pendingRefundCount} đơn`,
+          subColor: "text-pink-400",
+          icon: <Calendar className="w-4 h-4" />,
+          iconBg: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+        },
+        {
+          title: "TỔNG TIỀN HOÀN KHÁCH",
+          mainValue: `${fmt(refundCustomerAmount + refundedCustomerAmount)} ₫`,
+          subLabel: "Cần hoàn:",
+          subValue: `${fmt(refundCustomerAmount)} ₫ (Đã hoàn: ${fmt(refundedCustomerAmount)} ₫)`,
+          subColor: "text-emerald-400",
+          icon: <DollarSign className="w-4 h-4" />,
+          iconBg: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+        },
+      ];
+    }
+
+    // Default / Tab "active" (Đơn Bán Khách Hàng)
+    return [
+      {
+        title: "TỔNG GIÁ BÁN",
+        mainValue: `${fmt(totalRevenue)} ₫`,
+        subLabel: "Giá nhập (Vốn):",
+        subValue: `${fmt(totalCost)} ₫`,
+        subColor: "text-amber-300",
+        icon: <DollarSign className="w-4 h-4" />,
+        iconBg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      },
+      {
+        title: "ĐĂNG KÝ HÔM NAY",
+        mainValue: `${todayCount} đơn mới`,
+        subLabel: "Tổng hệ thống:",
+        subValue: `${totalOrdersCount} đơn`,
+        subColor: "text-cyan-300",
+        icon: <Calendar className="w-4 h-4" />,
+        iconBg: "bg-purple-500/10 text-purple-300 border-purple-500/20",
+      },
+      {
+        title: "CẦN GIA HẠN",
+        mainValue: `${renewCount || pendingCount} đơn`,
+        subLabel: "Đang xử lý:",
+        subValue: `${processingCount} đơn`,
+        subColor: "text-sky-400",
+        icon: <Clock className="w-4 h-4" />,
+        iconBg: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      },
+      {
+        title: "GIÁ TRỊ CÒN LẠI",
+        mainValue: `${fmt(totalRemainingValue)} ₫`,
+        subLabel: "Đã thanh toán:",
+        subValue: `${paidCount} đơn`,
+        subColor: "text-emerald-400",
+        icon: <CheckCircle2 className="w-4 h-4" />,
+        iconBg: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+      },
+    ];
+  };
+
+  const statCards = getCardsConfig();
+
+  const getGridColsClass = () => {
+    if (statCards.length === 1) return "grid-cols-1 w-full";
+    if (statCards.length === 2) return "grid-cols-1 md:grid-cols-2 w-full";
+    return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full";
+  };
+
   return (
     <div className="space-y-6">
-      {/* Stat Cards Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80 backdrop-blur-xl flex items-center gap-4">
-          <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Doanh Thu Trang Này</div>
-            <div className="text-lg font-bold text-white tracking-tight">
-              {new Intl.NumberFormat("vi-VN").format(totalRevenue)} ₫
+      {/* Stat Cards Summary (Dynamic Count Dual-Value Cards) */}
+      <div className={`grid gap-4 ${getGridColsClass()}`}>
+        {statCards.map((card, idx) => (
+          <div
+            key={idx}
+            className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80 backdrop-blur-xl flex flex-col justify-between space-y-2 shadow-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                {card.title}
+              </div>
+              <div className={`p-2 rounded-xl border ${card.iconBg}`}>
+                {card.icon}
+              </div>
+            </div>
+            <div>
+              <div className="text-lg font-extrabold text-white font-mono tracking-tight">
+                {card.mainValue}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between border-t border-slate-800/50 pt-1.5">
+                <span>{card.subLabel}</span>
+                <span className={`font-bold font-mono ${card.subColor}`}>
+                  {card.subValue}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80 backdrop-blur-xl flex items-center gap-4">
-          <div className="p-3 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Đã Thanh Toán</div>
-            <div className="text-lg font-bold text-white tracking-tight">{paidCount} đơn hàng</div>
-          </div>
-        </div>
-
-        <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80 backdrop-blur-xl flex items-center gap-4">
-          <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Chờ Xử Lý / Gia Hạn</div>
-            <div className="text-lg font-bold text-white tracking-tight">{pendingCount} đơn hàng</div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Dataset Tabs (4 Tabs) */}

@@ -97,6 +97,131 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
   const [countResult] = await query.clone().count("id as total");
   const total = Number(countResult?.total || 0);
 
+  // 3. Tính toán summary tổng trên toàn bộ danh sách đơn khớp filter/tab trong DB
+  let summary = {
+    totalRevenue: 0,
+    totalCost: 0,
+    totalRemainingValue: 0,
+    supplierRemainingValue: 0,
+    refundCustomerAmount: 0,
+    refundedCustomerAmount: 0,
+    refundSupplierAmount: 0,
+    paidCount: 0,
+    renewCount: 0,
+    processingCount: 0,
+    pendingCount: 0,
+    pendingRefundCount: 0,
+    refundedCount: 0,
+    canceledCount: 0,
+    todayCount: 0,
+    totalOrders: total,
+  };
+
+  try {
+    const summaryRows = await query
+      .clone()
+      .select("price", "cost", "days", "expired_at", "status", "created_at", "order_date");
+
+    let revenue = 0;
+    let cost = 0;
+    let remainingVal = 0;
+    let supplierRemVal = 0;
+    let refundCustomer = 0;
+    let refundedCustomer = 0;
+    let refundSupplier = 0;
+    let paid = 0;
+    let renew = 0;
+    let processing = 0;
+    let pending = 0;
+    let pendingRefund = 0;
+    let refunded = 0;
+    let canceled = 0;
+    let today = 0;
+
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    for (const row of summaryRows) {
+      const p = Number(row.price || 0);
+      const c = Number(row.cost || 0);
+      revenue += p;
+      cost += c;
+
+      const st = String(row.status || "").toLowerCase();
+      const isPaid = st.includes("đã thanh toán") || st.includes("hoàn thành");
+      const isRenew = st.includes("cần gia hạn");
+      const isProcessing = st.includes("đang xử lý") || st.includes("chờ xử lý");
+      const isPending =
+        st.includes("chưa thanh toán") ||
+        st.includes("chờ") ||
+        st.includes("gia hạn") ||
+        st.includes("hết hạn");
+      const isPendingRefund = st.includes("chưa hoàn") || st.includes("chờ hoàn");
+      const isRefunded = st.includes("đã hoàn");
+      const isCanceled = st.includes("hủy");
+
+      if (isPaid) paid++;
+      if (isRenew) renew++;
+      if (isProcessing) processing++;
+      if (isPending) pending++;
+      if (isPendingRefund) pendingRefund++;
+      if (isRefunded) refunded++;
+      if (isCanceled) canceled++;
+
+      const dateField = row.order_date || row.created_at;
+      if (dateField && String(dateField).startsWith(todayStr)) today++;
+
+      // Tính giá trị còn lại cho từng đơn
+      const days = Number(row.days || 365);
+      let remDays = 0;
+      if (row.expired_at) {
+        const expDate = new Date(row.expired_at);
+        if (!isNaN(expDate.getTime())) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          expDate.setHours(0, 0, 0, 0);
+          remDays = Math.max(0, Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+      }
+
+      const rowRemainingVal = days > 0 && remDays > 0 ? Math.round((p / days) * remDays) : 0;
+      const rowSupplierRemVal = days > 0 && remDays > 0 ? Math.round((c / days) * remDays) : 0;
+
+      if (!isCanceled && !isPendingRefund && !isRefunded) {
+        remainingVal += rowRemainingVal;
+        supplierRemVal += rowSupplierRemVal;
+      }
+
+      if (isPendingRefund) {
+        refundCustomer += rowRemainingVal > 0 ? rowRemainingVal : p;
+        refundSupplier += c;
+      } else if (isRefunded || isCanceled) {
+        refundedCustomer += p;
+        refundSupplier += c;
+      }
+    }
+
+    summary = {
+      totalRevenue: revenue,
+      totalCost: cost,
+      totalRemainingValue: remainingVal,
+      supplierRemainingValue: supplierRemVal,
+      refundCustomerAmount: refundCustomer,
+      refundedCustomerAmount: refundedCustomer,
+      refundSupplierAmount: refundSupplier,
+      paidCount: paid,
+      renewCount: renew,
+      processingCount: processing,
+      pendingCount: pending,
+      pendingRefundCount: pendingRefund,
+      refundedCount: refunded,
+      canceledCount: canceled,
+      todayCount: today,
+      totalOrders: total,
+    };
+  } catch (err) {
+    console.error("[getOrders] Lỗi tính summary:", err.message);
+  }
+
   const orders = await query
     .select("*")
     .orderByRaw(`
@@ -121,6 +246,7 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
       totalPages: Math.ceil(total / Number(limit)) || 1,
     },
     tabCounts,
+    summary,
   };
 }
 

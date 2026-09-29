@@ -1,5 +1,5 @@
 import React from "react";
-import { Bell, Search, Globe, RefreshCw, Menu } from "lucide-react";
+import { Bell, Globe, RefreshCw, Menu } from "lucide-react";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -11,8 +11,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
 
   return (
     <header className="h-16 bg-[#070a11]/80 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
-      {/* Left: Mobile Menu Toggle & Search Header */}
-      <div className="flex items-center gap-3 flex-1 max-w-md">
+      {/* Left: Mobile Menu Toggle */}
+      <div className="flex items-center gap-3">
         {/* Toggle Mobile Drawer (Chỉ hiển thị trên Mobile < lg) */}
         <button
           onClick={onToggleMobileSidebar}
@@ -21,15 +21,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileSidebar }) => {
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        <div className="relative w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Tìm đơn hàng, khách hàng, giao dịch..."
-            className="w-full glass-input rounded-xl pl-9 pr-4 py-2 text-xs placeholder:text-slate-500"
-          />
-        </div>
       </div>
 
       {/* Right Controls */}

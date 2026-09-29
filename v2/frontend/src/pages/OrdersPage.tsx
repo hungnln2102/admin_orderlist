@@ -9,6 +9,7 @@ import {
   CatalogProduct,
   CatalogSupplierCost,
   CatalogSupplier,
+  calculateRemainingValue,
   OrderFilterBar,
   OrderTable,
   OrderCreateEditModal,
@@ -214,6 +215,25 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     }
   };
 
+  const [serverSummary, setServerSummary] = useState<{
+    totalRevenue: number;
+    totalCost: number;
+    totalRemainingValue?: number;
+    supplierRemainingValue?: number;
+    refundCustomerAmount?: number;
+    refundedCustomerAmount?: number;
+    refundSupplierAmount?: number;
+    paidCount: number;
+    renewCount: number;
+    processingCount: number;
+    pendingCount: number;
+    pendingRefundCount?: number;
+    refundedCount?: number;
+    canceledCount?: number;
+    todayCount: number;
+    totalOrders: number;
+  } | null>(null);
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
@@ -228,6 +248,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         setTotalPages(data.pagination?.totalPages || 1);
         setTotalOrders(data.pagination?.total || 0);
         if (data.tabCounts) setTabCounts(data.tabCounts);
+        if (data.summary) setServerSummary(data.summary);
       } else {
         console.error("Lỗi lấy danh sách đơn:", data.error);
       }
@@ -255,13 +276,44 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     };
   }, [isCreateModalOpen, isEditModalOpen, isDeleteModalOpen, isViewModalOpen]);
 
-  // Stat summary calculations for active view (memoized)
-  const { totalRevenue, paidCount, pendingCount } = useMemo(() => {
+  // Stat summary calculations for active view (memoized from serverSummary or fallback)
+  const summaryData = useMemo(() => {
+    const fallbackRemainingValue = orders.reduce(
+      (sum: number, o: Order) => sum + calculateRemainingValue(o),
+      0
+    );
+
+    if (serverSummary) {
+      return {
+        ...serverSummary,
+        totalRemainingValue: serverSummary.totalRemainingValue ?? fallbackRemainingValue,
+      };
+    }
+
+    const todayStr = new Date().toISOString().split("T")[0];
     const revenue = orders.reduce((sum: number, o: Order) => sum + Number(o.price || 0), 0);
+    const cost = orders.reduce((sum: number, o: Order) => sum + Number(o.cost || 0), 0);
     const paid = orders.filter((o: Order) => o.status === "Hoàn thành" || o.status === "Đã Thanh Toán").length;
+    const renew = orders.filter((o: Order) => o.status === "Cần gia hạn" || o.status === "CẦN GIA HẠN").length;
+    const processing = orders.filter((o: Order) => o.status === "Đang xử lý" || o.status === "Chờ xử lý").length;
     const pending = orders.filter((o: Order) => o.status === "Chờ xử lý" || o.status === "Chưa Thanh Toán" || o.status === "Cần gia hạn" || o.status === "CẦN GIA HẠN" || o.status === "Hết Hạn").length;
-    return { totalRevenue: revenue, paidCount: paid, pendingCount: pending };
-  }, [orders]);
+    const today = orders.filter((o: Order) => {
+      const d = o.order_date || o.created_at;
+      return d && String(d).startsWith(todayStr);
+    }).length;
+
+    return {
+      totalRevenue: revenue,
+      totalCost: cost,
+      paidCount: paid,
+      renewCount: renew,
+      processingCount: processing,
+      pendingCount: pending,
+      todayCount: today,
+      totalOrders: orders.length,
+      totalRemainingValue: fallbackRemainingValue,
+    };
+  }, [serverSummary, orders]);
 
   const handleOpenCreate = () => {
     const today = new Date().toISOString().split("T")[0];
@@ -471,9 +523,22 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
           setEndDate(end);
           setPage(1);
         }}
-        totalRevenue={totalRevenue}
-        paidCount={paidCount}
-        pendingCount={pendingCount}
+        totalRevenue={summaryData.totalRevenue}
+        totalCost={summaryData.totalCost}
+        paidCount={summaryData.paidCount}
+        pendingCount={summaryData.pendingCount}
+        todayCount={summaryData.todayCount}
+        renewCount={summaryData.renewCount}
+        processingCount={summaryData.processingCount}
+        totalOrdersCount={summaryData.totalOrders}
+        totalRemainingValue={summaryData.totalRemainingValue}
+        supplierRemainingValue={summaryData.supplierRemainingValue}
+        refundCustomerAmount={summaryData.refundCustomerAmount}
+        refundedCustomerAmount={summaryData.refundedCustomerAmount}
+        refundSupplierAmount={summaryData.refundSupplierAmount}
+        pendingRefundCount={summaryData.pendingRefundCount}
+        refundedCount={summaryData.refundedCount}
+        canceledCount={summaryData.canceledCount}
       />
 
       {/* Order Table Section */}
@@ -482,6 +547,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         loading={loading}
         activeTab={activeTab}
         productsCatalog={productsCatalog}
+        allSuppliersCatalog={allSuppliersCatalog}
         page={page}
         totalPages={totalPages}
         totalOrders={totalOrders}
