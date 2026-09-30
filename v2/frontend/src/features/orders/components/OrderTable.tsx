@@ -73,6 +73,9 @@ export const OrderTable: React.FC<OrderTableProps> = ({
     return "Mavryk";
   };
 
+  const showActions = activeTab !== "expired" && activeTab !== "canceled";
+  const totalColumns = 7 + (activeTab === "import" ? 1 : 0) + (showActions ? 1 : 0);
+
   return (
     <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl overflow-hidden flex flex-col w-full">
       {/* 1. Desktop & Laptop Table View */}
@@ -88,13 +91,13 @@ export const OrderTable: React.FC<OrderTableProps> = ({
               <th className="py-3.5 px-3 w-28 text-right whitespace-nowrap">Giá Bán</th>
               {activeTab === "import" && <th className="py-3.5 px-3 w-24 text-right whitespace-nowrap">Giá Nhập</th>}
               <th className="py-3.5 px-3 w-32 text-center whitespace-nowrap">Trạng Thái</th>
-              <th className="py-3.5 px-3 w-28 text-right whitespace-nowrap">Thao Tác</th>
+              {showActions && <th className="py-3.5 px-3 w-28 text-right whitespace-nowrap">Thao Tác</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 text-xs">
             {loading ? (
               <tr>
-                <td colSpan={activeTab === "import" ? 9 : 8} className="py-16 text-center text-slate-400">
+                <td colSpan={totalColumns} className="py-16 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-3">
                     <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                     <span>Đang tải danh sách đơn hàng...</span>
@@ -103,7 +106,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={activeTab === "import" ? 9 : 8} className="py-16 text-center text-slate-500">
+                <td colSpan={totalColumns} className="py-16 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <ShoppingBag className="w-10 h-10 text-slate-600 stroke-[1.5]" />
                     <span className="text-sm font-medium">Không tìm thấy đơn hàng nào</span>
@@ -235,37 +238,40 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Action Buttons */}
-                      <td className="py-3.5 px-3 text-right whitespace-nowrap w-28">
-                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => onOpenView(order)}
-                            title="Xem chi tiết"
-                            className="p-1 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onOpenEdit(order)}
-                            title="Sửa đơn hàng"
-                            className="p-1 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onOpenDelete(order)}
-                            title="Xóa / Hủy đơn"
-                            className="p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
+                      {showActions && (
+                        <td className="py-3.5 px-3 text-right whitespace-nowrap w-28">
+                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => onOpenView(order)}
+                              title="Xem chi tiết"
+                              className="p-1 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => onOpenEdit(order)}
+                              title="Sửa đơn hàng"
+                              className="p-1 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => onOpenDelete(order)}
+                              title="Xóa / Hủy đơn"
+                              className="p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
 
                     {/* Expandable Dropdown Row */}
                     {isExpanded && (
                       <tr className="bg-slate-950/70 border-b border-slate-800/80 animate-in fade-in duration-200">
-                        <td colSpan={activeTab === "import" ? 9 : 8} className="p-4 sm:p-5">
+                        <td colSpan={totalColumns} className="p-4 sm:p-5">
+
                           <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-700/60 shadow-2xl space-y-4">
                             {/* Header inside Panel */}
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
@@ -474,26 +480,29 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                 </div>
 
                 {/* Mobile Actions */}
-                <div className="pt-2 border-t border-slate-800/60 flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => onOpenView(order)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Xem
-                  </button>
-                  <button
-                    onClick={() => onOpenEdit(order)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" /> Sửa
-                  </button>
-                  <button
-                    onClick={() => onOpenDelete(order)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Xóa
-                  </button>
-                </div>
+                {showActions && (
+                  <div className="pt-2 border-t border-slate-800/60 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => onOpenView(order)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Xem
+                    </button>
+                    <button
+                      onClick={() => onOpenEdit(order)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Sửa
+                    </button>
+                    <button
+                      onClick={() => onOpenDelete(order)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Xóa
+                    </button>
+                  </div>
+                )}
+
               </div>
             );
           })

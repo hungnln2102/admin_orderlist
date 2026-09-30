@@ -260,9 +260,10 @@ async function attachVietQrToOrder(order) {
 
     let numSupplyId = Number(order.supply_id);
     if (isImport && !isNaN(numSupplyId) && numSupplyId > 0) {
-      const supplier = await db("supplier.suppliers")
+      const supplier = await db(TABLES.SUPPLIER)
         .where({ id: numSupplyId })
         .first();
+
       if (supplier && (supplier.number_bank || supplier.numberBank)) {
         const bin = supplier.bin_bank || supplier.binBank || "970422";
         const accNum = supplier.number_bank || supplier.numberBank;
