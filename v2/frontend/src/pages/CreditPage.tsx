@@ -218,8 +218,11 @@ export const CreditPage: React.FC = () => {
     }
 
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="w-full">
+        {/* Desktop View */}
+        <div className="hidden sm:block overflow-x-auto custom-scrollbar flex-1 w-full">
+          <table className="w-full text-sm min-w-[800px]">
+            
           <thead>
             <tr className="border-b border-white/[0.06]">
               <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">Mã Credit</th>
@@ -294,7 +297,54 @@ export const CreditPage: React.FC = () => {
               </tr>
             ))}
           </tbody>
-        </table>
+        
+          </table>
+        </div>
+        {/* Mobile View */}
+        <div className="block sm:hidden divide-y divide-white/[0.06] p-3 space-y-3">
+          {items.map((item) => (
+            <div key={item.id} className="bg-white/[0.02] p-4 rounded-xl border border-white/[0.06] space-y-3 shadow-md">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                <span className="font-mono text-cyan-400 text-xs font-semibold">{item.credit_code}</span>
+                {item.is_available ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                    <CheckCircle size={10} /> Sẵn sàng
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-400/10 px-2 py-0.5 rounded-full border border-zinc-400/20">
+                    <XCircle size={10} /> Hết hiệu lực
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1.5 text-xs text-zinc-300">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Khách hàng:</span>
+                  <span className="font-medium text-right">{item.customer_name || "—"}<br/><span className="text-[10px] text-zinc-500">{item.customer_contact}</span></span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Đơn gốc:</span>
+                  <span className="font-mono">{item.source_order_code || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Số tiền Credit:</span>
+                  <span className="font-mono text-zinc-200">{formatCurrency(item.refund_amount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Còn lại:</span>
+                  <span className="font-mono font-bold text-emerald-400">{formatCurrency(item.available_amount)}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-end pt-2 border-t border-white/[0.06]">
+                <button
+                  onClick={() => openDetail(item)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors"
+                >
+                  Xem chi tiết
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };

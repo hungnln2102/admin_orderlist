@@ -283,12 +283,12 @@ async function attachVietQrToOrder(order) {
     }
 
     // Default shop bank account for sales orders
-    let defaultBank = await db("admin.shop_bank_accounts").where({ is_default: true, is_active: true }).first();
+    let defaultBank = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ is_default: true, is_active: true, account_type: "bank", is_deleted: false }).first();
     if (!defaultBank) {
-      defaultBank = await db("admin.shop_bank_accounts").where({ is_active: true }).first();
+      defaultBank = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ is_active: true, account_type: "bank", is_deleted: false }).first();
     }
     if (!defaultBank) {
-      defaultBank = await db("finance.financial_accounts").where({ account_type: "bank" }).first();
+      defaultBank = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ account_type: "bank", is_deleted: false }).first();
     }
 
     if (defaultBank) {

@@ -9,6 +9,7 @@ import { CreditPage } from "@/pages/CreditPage";
 import { PaymentWalletsPage } from "@/pages/PaymentWalletsPage";
 import { PackageManagementPage } from "@/features/packages/PackageManagementPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
+import { WarehousePage } from "@/pages/WarehousePage";
 import { useAuth } from "@/shared/context/AuthContext";
 
 const ProtectedRoute: React.FC = () => {
@@ -270,26 +271,7 @@ export const AppRoutes: React.FC = () => {
           />
         }
       />
-      <Route
-        path="/warehouse"
-        element={
-          <GenericPage
-            title="Kho Hàng & Tồn Kho Key"
-            category="Nguồn hàng & Kho"
-            description="Theo dõi tồn kho slot, key tài khoản và tự động cảnh báo hết hàng"
-            columns={[
-              { key: "product", label: "Sản phẩm" },
-              { key: "inStock", label: "Tồn kho" },
-              { key: "reserved", label: "Đã giữ chỗ" },
-              { key: "status", label: "Trạng thái kho" },
-            ]}
-            sampleData={[
-              { product: "Adobe All Apps Slot", inStock: "45 Slots", reserved: "2", status: "Sẵn hàng" },
-              { product: "Canva Pro Team Slot", inStock: "120 Slots", reserved: "5", status: "Sẵn hàng" },
-            ]}
-          />
-        }
-      />
+      <Route path="/warehouse" element={<WarehousePage />} />
 
       {/* 5. Hệ thống & Ví */}
       <Route

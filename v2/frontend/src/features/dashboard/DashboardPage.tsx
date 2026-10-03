@@ -32,9 +32,9 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl">
         <div>
           <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
             <span>Tổng Quan Báo Cáo</span>

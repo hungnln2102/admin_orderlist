@@ -358,7 +358,1084 @@ export const SuppliersPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            Quản Lý Nguồn Hàng
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Theo dõi công nợ, chi phí nhập hàng và chu kỳ thanh toán từ các đối tác cung cấp.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => fetchOverviewData()}
+            disabled={loadingOverview}
+            className="p-2.5 text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw className={`w-4 h-4 ${loadingOverview ? "animate-spin text-cyan-400" : ""}`} />
+          </button>
+
+          <button
+            onClick={() => {
+              setFormData({
+                supplier_name: "",
+                number_bank: "",
+                bin_bank: "",
+                account_holder: "",
+                active_supply: true,
+              });
+              setIsCreateModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-all shadow-md shadow-cyan-600/20 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm NCC</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Top 4 Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Card 1: TỔNG ĐƠN */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG ĐƠN
+            </div>
+            <div className="text-2xl font-black text-white">{stats.totalOrders}</div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <ShoppingBag className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 2: TỔNG NHẬP */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG NHẬP
+            </div>
+            <div className="text-xl font-black text-emerald-400">
+              {formatCurrency(stats.totalImportCost)}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <DollarSign className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 3: TỔNG HOÀN */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG HOÀN
+            </div>
+            <div className="text-xl font-black text-amber-400">
+              {formatCurrency(stats.totalRefund)}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <RotateCcw className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 4: TỔNG CHƯA THANH TOÁN */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG CHƯA THANH TOÁN
+            </div>
+            <div className="text-xl font-black text-rose-400">
+              {formatCurrency(stats.totalUnpaidCost)}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN UNIFIED MASTER-DETAIL TABLE */}
+      <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-5 shadow-2xl backdrop-blur-xl space-y-4">
+        {/* Search & Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative flex-1 w-full max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo nhà cung cấp..."
+              value={searchOverview}
+              onChange={(e) => setSearchOverview(e.target.value)}
+              className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50 transition-all"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            {/* Sort Priority Selector */}
+            <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+              <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+              <span className="font-semibold text-slate-300">Sắp xếp:</span>
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-slate-950/80 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+            >
+              <option value="priority">🔥 Tất cả</option>
+              <option value="active">🟢 NCC đang hoạt động</option>
+              <option value="debt">🔴 NCC đang còn dư nợ</option>
+              <option value="paid">💰 NCC có đã trả nhiều</option>
+            </select>
+
+            {/* Active Status Filter Selector */}
+            <div className="flex items-center gap-1.5 text-slate-400 text-xs ml-1">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Trạng thái:</span>
+            </div>
+            <select
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+              className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="active">Đang hợp tác</option>
+              <option value="inactive">Ngưng hợp tác</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Master-Detail Expandable Table */}
+        <div className="w-full">
+, useCallback } from "react";
+import {
+  Search,
+  RefreshCw,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ShoppingBag,
+  DollarSign,
+  RotateCcw,
+  Clock,
+  Pencil,
+  Trash2,
+  X,
+  AlertTriangle,
+  Power,
+  Eye,
+  Loader2,
+  FileText,
+  Filter,
+  ArrowUpDown,
+} from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
+
+export interface SupplierItem {
+  id: number;
+  supplier_name: string;
+  number_bank: string;
+  bin_bank: string;
+  account_holder: string;
+  active_supply: boolean;
+  total_orders: number;
+  current_month_orders: number;
+  current_month_cost: number;
+  last_order_date: string | null;
+  total_paid: number;
+  total_debt: number;
+}
+
+export interface SupplierCostLogItem {
+  id: string | number;
+  order_list_id: number;
+  supply_id: number;
+  id_order: string;
+  supplier_name: string;
+  import_cost: number;
+  refund_amount: number;
+  ncc_payment_status: string;
+  logged_at: string;
+}
+
+export interface SupplierDetailData {
+  general_info: {
+    id: number;
+    supplier_name: string;
+    bank_name: string;
+    number_bank: string;
+    bin_bank: string;
+    account_holder: string;
+    active_supply: boolean;
+  };
+  payment_overview: {
+    total_paid: number;
+    remaining_debt: number;
+    refund_amount: number;
+    unpaid_orders_count: number;
+  };
+  order_stats: {
+    total_orders: number;
+    paid_orders: number;
+    unpaid_orders: number;
+    canceled_orders: number;
+  };
+  unpaid_cycle: {
+    amount_needed: number;
+    refund_to_shop: number;
+    debt_by_order: number;
+    amount_paid: number;
+    payment_status: string;
+    shop_bank_accounts: { id: number; label: string }[];
+    vietqr_url: string | null;
+  };
+  monthly_orders: { month: string; count: number }[];
+}
+
+export const SuppliersPage: React.FC = () => {
+  const notify = useNotification();
+
+  // Suppliers Overview Data
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
+  const [loadingOverview, setLoadingOverview] = useState<boolean>(true);
+  const [searchOverview, setSearchOverview] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("priority");
+
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalImportCost: 0,
+    totalRefund: 0,
+    totalUnpaidCost: 0,
+  });
+
+  // Expandable Rows State & Cached Logs for each Supplier
+  const [expandedSupplierIds, setExpandedSupplierIds] = useState<number[]>([]);
+  const [supplierLogsMap, setSupplierLogsMap] = useState<
+    Record<number, { loading: boolean; logs: SupplierCostLogItem[] }>
+  >({});
+  const [supplierPageMap, setSupplierPageMap] = useState<Record<number, number>>({});
+  const [supplierPageSizeMap, setSupplierPageSizeMap] = useState<Record<number, number>>({});
+
+  // Modal States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [deletingSupplier, setDeletingSupplier] = useState<SupplierItem | null>(null);
+
+  // V1 Supplier Detail Modal State
+  const [selectedSupplierDetailId, setSelectedSupplierDetailId] = useState<number | null>(null);
+  const [supplierDetail, setSupplierDetail] = useState<SupplierDetailData | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    supplier_name: "",
+    number_bank: "",
+    bin_bank: "",
+    account_holder: "",
+    active_supply: true,
+  });
+
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const formatCurrency = (val: number) => {
+    if (!val || isNaN(val) || val <= 0) return "0 ₫";
+    return new Intl.NumberFormat("vi-VN").format(val) + " ₫";
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "-";
+      return d.toLocaleDateString("vi-VN");
+    } catch (e) {
+      return "-";
+    }
+  };
+
+  // Fetch Suppliers Data
+  const fetchOverviewData = useCallback(async () => {
+    setLoadingOverview(true);
+    try {
+      const res = await fetch(
+        `/api/suppliers/overview?search=${encodeURIComponent(
+          searchOverview
+        )}&activeFilter=${encodeURIComponent(activeFilter)}&sortBy=${encodeURIComponent(sortBy)}`
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setSuppliers(data.data || []);
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      } else {
+        notify.error("Không thể tải danh sách Nhà cung cấp", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi kết nối máy chủ backend", "Kết Nối Thất Bại");
+    } finally {
+      setLoadingOverview(false);
+    }
+  }, [searchOverview, activeFilter, sortBy, notify]);
+
+  // Fetch V1 Supplier Detail Modal Data
+  const fetchSupplierDetail = useCallback(async (supplierId: number) => {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/details`);
+      const data = await res.json();
+      if (res.ok) {
+        setSupplierDetail(data);
+      } else {
+        notify.error("Không thể tải chi tiết Nhà cung cấp", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi tải thông tin chi tiết NCC", "Lỗi Kết Nối");
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [notify]);
+
+  useEffect(() => {
+    if (selectedSupplierDetailId !== null) {
+      fetchSupplierDetail(selectedSupplierDetailId);
+    }
+  }, [selectedSupplierDetailId, fetchSupplierDetail]);
+
+  useEffect(() => {
+    fetchOverviewData();
+  }, [fetchOverviewData]);
+
+  // Toggle Row Expansion & Lazy Load Cost Logs for that Supplier
+  const toggleExpandSupplier = async (supplierId: number) => {
+    if (expandedSupplierIds.includes(supplierId)) {
+      setExpandedSupplierIds(expandedSupplierIds.filter((id) => id !== supplierId));
+    } else {
+      setExpandedSupplierIds([...expandedSupplierIds, supplierId]);
+      if (!supplierLogsMap[supplierId]) {
+        setSupplierLogsMap((prev) => ({ ...prev, [supplierId]: { loading: true, logs: [] } }));
+        try {
+          const res = await fetch(`/api/suppliers/cost-logs?supplierId=${supplierId}&limit=100`);
+          const data = await res.json();
+          setSupplierLogsMap((prev) => ({
+            ...prev,
+            [supplierId]: { loading: false, logs: data.data || [] },
+          }));
+        } catch (e) {
+          setSupplierLogsMap((prev) => ({
+            ...prev,
+            [supplierId]: { loading: false, logs: [] },
+          }));
+        }
+      }
+    }
+  };
+
+  // Toggle Supplier Power Status
+  const handleToggleStatus = async (supplier: SupplierItem) => {
+    try {
+      const res = await fetch(`/api/suppliers/${supplier.id}/toggle-status`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const nextStatus = data.data.active_supply;
+        notify.success(
+          `Đã ${nextStatus ? "kích hoạt" : "ngưng"} hợp tác với ${supplier.supplier_name}`,
+          "Cập Nhật Trạng Thái"
+        );
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Không thể đổi trạng thái", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    }
+  };
+
+  // Pay Debt Action inside V1 Modal
+  const handlePayDebtSubmit = async () => {
+    if (!selectedSupplierDetailId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${selectedSupplierDetailId}/pay-debt`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Thanh toán công nợ thành công!", "Thành Công");
+        fetchSupplierDetail(selectedSupplierDetailId);
+        fetchOverviewData();
+
+        // Invalidate expanded logs cache for this supplier
+        setSupplierLogsMap((prev) => {
+          const nextMap = { ...prev };
+          delete nextMap[selectedSupplierDetailId];
+          return nextMap;
+        });
+      } else {
+        notify.error(data.error || "Thanh toán thất bại", "Lỗi Thao Tác");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi xử lý thanh toán", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Create Supplier Submit
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.supplier_name.trim()) {
+      notify.warning("Vui lòng nhập tên nhà cung cấp!", "Thiếu Thông Tin");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Thêm nhà cung cấp mới thành công!", "Thành Công");
+        setIsCreateModalOpen(false);
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Thêm nhà cung cấp thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit Supplier Submit
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplier) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${editingSupplier.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Cập nhật thông tin Nhà cung cấp thành công!", "Thành Công");
+        setEditingSupplier(null);
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Cập nhật nhà cung cấp thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Supplier Confirm
+  const handleDeleteConfirm = async () => {
+    if (!deletingSupplier) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${deletingSupplier.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(`Đã xóa nhà cung cấp "${deletingSupplier.supplier_name}"!`, "Thành Công");
+        setDeletingSupplier(null);
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Xóa nhà cung cấp thất bại", "Lỗi Thao Tác");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            Quản Lý Nguồn Hàng
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Theo dõi công nợ, chi phí nhập hàng và chu kỳ thanh toán từ các đối tác cung cấp.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => fetchOverviewData()}
+            disabled={loadingOverview}
+            className="p-2.5 text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw className={`w-4 h-4 ${loadingOverview ? "animate-spin text-cyan-400" : ""}`} />
+          </button>
+
+          <button
+            onClick={() => {
+              setFormData({
+                supplier_name: "",
+                number_bank: "",
+                bin_bank: "",
+                account_holder: "",
+                active_supply: true,
+              });
+              setIsCreateModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-all shadow-md shadow-cyan-600/20 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm NCC</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Top 4 Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Card 1: TỔNG ĐƠN */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG ĐƠN
+            </div>
+            <div className="text-2xl font-black text-white">{stats.totalOrders}</div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <ShoppingBag className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 2: TỔNG NHẬP */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG NHẬP
+            </div>
+            <div className="text-xl font-black text-emerald-400">
+              {formatCurrency(stats.totalImportCost)}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <DollarSign className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 3: TỔNG HOÀN */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG HOÀN
+            </div>
+            <div className="text-xl font-black text-amber-400">
+              {formatCurrency(stats.totalRefund)}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <RotateCcw className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 4: TỔNG CHƯA THANH TOÁN */}
+        <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              TỔNG CHƯA THANH TOÁN
+            </div>
+            <div className="text-xl font-black text-rose-400">
+              {formatCurrency(stats.totalUnpaidCost)}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN UNIFIED MASTER-DETAIL TABLE */}
+      <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-5 shadow-2xl backdrop-blur-xl space-y-4">
+        {/* Search & Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative flex-1 w-full max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo nhà cung cấp..."
+              value={searchOverview}
+              onChange={(e) => setSearchOverview(e.target.value)}
+              className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50 transition-all"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            {/* Sort Priority Selector */}
+            <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+              <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+              <span className="font-semibold text-slate-300">Sắp xếp:</span>
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-slate-950/80 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+            >
+              <option value="priority">🔥 Tất cả</option>
+              <option value="active">🟢 NCC đang hoạt động</option>
+              <option value="debt">🔴 NCC đang còn dư nợ</option>
+              <option value="paid">💰 NCC có đã trả nhiều</option>
+            </select>
+
+            {/* Active Status Filter Selector */}
+            <div className="flex items-center gap-1.5 text-slate-400 text-xs ml-1">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Trạng thái:</span>
+            </div>
+            <select
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+              className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="active">Đang hợp tác</option>
+              <option value="inactive">Ngưng hợp tác</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Master-Detail Expandable Table */}
+        
+        {/* Mobile Card List View */}
+        <div className="block sm:hidden divide-y divide-slate-800/80 p-3 space-y-3">
+          {suppliers.map((s) => (
+            <div key={s.id} className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 shadow-md">
+              <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                <span className="font-bold text-white text-sm">{s.supplier_name}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${s.active_supply ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}`}>
+                  {s.active_supply ? 'Đang cấp' : 'Tạm dừng'}
+                </span>
+              </div>
+              <div className="space-y-1.5 text-xs text-slate-300">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Tài khoản Bank:</span>
+                  <span className="font-mono text-slate-200">{s.number_bank || "—"} ({s.account_holder || "—"})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Tổng đơn nhập:</span>
+                  <span className="font-semibold">{s.total_orders} đơn</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Còn nợ NCC:</span>
+                  <span className="font-mono font-bold text-amber-400">{new Intl.NumberFormat('vi-VN').format(s.total_debt || 0)} ₫</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+                <button
+                  onClick={() => handleOpenDetail(s)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-cyan-300 font-medium"
+                >
+                  Chi tiết
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingSupplier({
+                      id: s.id,
+                      supplier_name: s.supplier_name,
+                      number_bank: s.number_bank,
+                      bin_bank: s.bin_bank,
+                      account_holder: s.account_holder,
+                      active_supply: s.active_supply,
+                    });
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-300 font-medium"
+                >
+                  Sửa
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+  , useCallback } from "react";
+import {
+  Search,
+  RefreshCw,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ShoppingBag,
+  DollarSign,
+  RotateCcw,
+  Clock,
+  Pencil,
+  Trash2,
+  X,
+  AlertTriangle,
+  Power,
+  Eye,
+  Loader2,
+  FileText,
+  Filter,
+  ArrowUpDown,
+} from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
+
+export interface SupplierItem {
+  id: number;
+  supplier_name: string;
+  number_bank: string;
+  bin_bank: string;
+  account_holder: string;
+  active_supply: boolean;
+  total_orders: number;
+  current_month_orders: number;
+  current_month_cost: number;
+  last_order_date: string | null;
+  total_paid: number;
+  total_debt: number;
+}
+
+export interface SupplierCostLogItem {
+  id: string | number;
+  order_list_id: number;
+  supply_id: number;
+  id_order: string;
+  supplier_name: string;
+  import_cost: number;
+  refund_amount: number;
+  ncc_payment_status: string;
+  logged_at: string;
+}
+
+export interface SupplierDetailData {
+  general_info: {
+    id: number;
+    supplier_name: string;
+    bank_name: string;
+    number_bank: string;
+    bin_bank: string;
+    account_holder: string;
+    active_supply: boolean;
+  };
+  payment_overview: {
+    total_paid: number;
+    remaining_debt: number;
+    refund_amount: number;
+    unpaid_orders_count: number;
+  };
+  order_stats: {
+    total_orders: number;
+    paid_orders: number;
+    unpaid_orders: number;
+    canceled_orders: number;
+  };
+  unpaid_cycle: {
+    amount_needed: number;
+    refund_to_shop: number;
+    debt_by_order: number;
+    amount_paid: number;
+    payment_status: string;
+    shop_bank_accounts: { id: number; label: string }[];
+    vietqr_url: string | null;
+  };
+  monthly_orders: { month: string; count: number }[];
+}
+
+export const SuppliersPage: React.FC = () => {
+  const notify = useNotification();
+
+  // Suppliers Overview Data
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
+  const [loadingOverview, setLoadingOverview] = useState<boolean>(true);
+  const [searchOverview, setSearchOverview] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("priority");
+
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalImportCost: 0,
+    totalRefund: 0,
+    totalUnpaidCost: 0,
+  });
+
+  // Expandable Rows State & Cached Logs for each Supplier
+  const [expandedSupplierIds, setExpandedSupplierIds] = useState<number[]>([]);
+  const [supplierLogsMap, setSupplierLogsMap] = useState<
+    Record<number, { loading: boolean; logs: SupplierCostLogItem[] }>
+  >({});
+  const [supplierPageMap, setSupplierPageMap] = useState<Record<number, number>>({});
+  const [supplierPageSizeMap, setSupplierPageSizeMap] = useState<Record<number, number>>({});
+
+  // Modal States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [deletingSupplier, setDeletingSupplier] = useState<SupplierItem | null>(null);
+
+  // V1 Supplier Detail Modal State
+  const [selectedSupplierDetailId, setSelectedSupplierDetailId] = useState<number | null>(null);
+  const [supplierDetail, setSupplierDetail] = useState<SupplierDetailData | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    supplier_name: "",
+    number_bank: "",
+    bin_bank: "",
+    account_holder: "",
+    active_supply: true,
+  });
+
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const formatCurrency = (val: number) => {
+    if (!val || isNaN(val) || val <= 0) return "0 ₫";
+    return new Intl.NumberFormat("vi-VN").format(val) + " ₫";
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "-";
+      return d.toLocaleDateString("vi-VN");
+    } catch (e) {
+      return "-";
+    }
+  };
+
+  // Fetch Suppliers Data
+  const fetchOverviewData = useCallback(async () => {
+    setLoadingOverview(true);
+    try {
+      const res = await fetch(
+        `/api/suppliers/overview?search=${encodeURIComponent(
+          searchOverview
+        )}&activeFilter=${encodeURIComponent(activeFilter)}&sortBy=${encodeURIComponent(sortBy)}`
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setSuppliers(data.data || []);
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      } else {
+        notify.error("Không thể tải danh sách Nhà cung cấp", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi kết nối máy chủ backend", "Kết Nối Thất Bại");
+    } finally {
+      setLoadingOverview(false);
+    }
+  }, [searchOverview, activeFilter, sortBy, notify]);
+
+  // Fetch V1 Supplier Detail Modal Data
+  const fetchSupplierDetail = useCallback(async (supplierId: number) => {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/details`);
+      const data = await res.json();
+      if (res.ok) {
+        setSupplierDetail(data);
+      } else {
+        notify.error("Không thể tải chi tiết Nhà cung cấp", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi tải thông tin chi tiết NCC", "Lỗi Kết Nối");
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [notify]);
+
+  useEffect(() => {
+    if (selectedSupplierDetailId !== null) {
+      fetchSupplierDetail(selectedSupplierDetailId);
+    }
+  }, [selectedSupplierDetailId, fetchSupplierDetail]);
+
+  useEffect(() => {
+    fetchOverviewData();
+  }, [fetchOverviewData]);
+
+  // Toggle Row Expansion & Lazy Load Cost Logs for that Supplier
+  const toggleExpandSupplier = async (supplierId: number) => {
+    if (expandedSupplierIds.includes(supplierId)) {
+      setExpandedSupplierIds(expandedSupplierIds.filter((id) => id !== supplierId));
+    } else {
+      setExpandedSupplierIds([...expandedSupplierIds, supplierId]);
+      if (!supplierLogsMap[supplierId]) {
+        setSupplierLogsMap((prev) => ({ ...prev, [supplierId]: { loading: true, logs: [] } }));
+        try {
+          const res = await fetch(`/api/suppliers/cost-logs?supplierId=${supplierId}&limit=100`);
+          const data = await res.json();
+          setSupplierLogsMap((prev) => ({
+            ...prev,
+            [supplierId]: { loading: false, logs: data.data || [] },
+          }));
+        } catch (e) {
+          setSupplierLogsMap((prev) => ({
+            ...prev,
+            [supplierId]: { loading: false, logs: [] },
+          }));
+        }
+      }
+    }
+  };
+
+  // Toggle Supplier Power Status
+  const handleToggleStatus = async (supplier: SupplierItem) => {
+    try {
+      const res = await fetch(`/api/suppliers/${supplier.id}/toggle-status`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const nextStatus = data.data.active_supply;
+        notify.success(
+          `Đã ${nextStatus ? "kích hoạt" : "ngưng"} hợp tác với ${supplier.supplier_name}`,
+          "Cập Nhật Trạng Thái"
+        );
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Không thể đổi trạng thái", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    }
+  };
+
+  // Pay Debt Action inside V1 Modal
+  const handlePayDebtSubmit = async () => {
+    if (!selectedSupplierDetailId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${selectedSupplierDetailId}/pay-debt`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Thanh toán công nợ thành công!", "Thành Công");
+        fetchSupplierDetail(selectedSupplierDetailId);
+        fetchOverviewData();
+
+        // Invalidate expanded logs cache for this supplier
+        setSupplierLogsMap((prev) => {
+          const nextMap = { ...prev };
+          delete nextMap[selectedSupplierDetailId];
+          return nextMap;
+        });
+      } else {
+        notify.error(data.error || "Thanh toán thất bại", "Lỗi Thao Tác");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi xử lý thanh toán", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Create Supplier Submit
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.supplier_name.trim()) {
+      notify.warning("Vui lòng nhập tên nhà cung cấp!", "Thiếu Thông Tin");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Thêm nhà cung cấp mới thành công!", "Thành Công");
+        setIsCreateModalOpen(false);
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Thêm nhà cung cấp thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit Supplier Submit
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplier) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${editingSupplier.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Cập nhật thông tin Nhà cung cấp thành công!", "Thành Công");
+        setEditingSupplier(null);
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Cập nhật nhà cung cấp thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Supplier Confirm
+  const handleDeleteConfirm = async () => {
+    if (!deletingSupplier) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${deletingSupplier.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(`Đã xóa nhà cung cấp "${deletingSupplier.supplier_name}"!`, "Thành Công");
+        setDeletingSupplier(null);
+        fetchOverviewData();
+      } else {
+        notify.error(data.error || "Xóa nhà cung cấp thất bại", "Lỗi Thao Tác");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

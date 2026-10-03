@@ -371,7 +371,926 @@ export const PricingPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md">
+              DANH MỤC SẢN PHẨM & GIÁ
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Đang Hoạt Động
+            </span>
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            <Tag className="w-6 h-6 text-cyan-400" />
+            Bảng Giá Niêm Yết
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Điều chỉnh giá bán lẻ, giá CTV, giá Sinh Viên, giá Khuyến Mãi và giá gốc theo dữ liệu thực tế hệ thống.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={fetchPricingData}
+            disabled={loading}
+            className="p-2.5 text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            title="Làm mới bảng giá"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm active:scale-95"
+          >
+            <Download className="w-4 h-4 text-slate-400" />
+            <span>Xuất Excel</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400 hover:brightness-110 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tạo Mới</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter and Table Container */}
+      <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-5 shadow-2xl backdrop-blur-xl space-y-4">
+        {/* Search & Stats Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sản phẩm, tên gói..."
+              value={search}
+              onChange={handleSearchChange}
+              className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50 transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800/60">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Hiển thị: <strong className="text-cyan-300 font-semibold">{items.length}</strong> / {totalItems} kết quả</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Pricing Data Table */}
+        <div className="w-full">
+te, useEffect, useCallback } from "react";
+import {
+  Search,
+  RefreshCw,
+  Download,
+  Plus,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Trash2,
+  ChevronDown,
+  Building2,
+  PlusCircle,
+  X,
+  AlertTriangle,
+} from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
+
+export interface PricingItem {
+  id: number;
+  san_pham: string;
+  package_product: string;
+  base_price: number;
+  retail_price: number;
+  ctv_price: number;
+  student_price: number;
+  promo_price: number;
+  margin: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export interface SupplierCostItem {
+  id: number;
+  product_variant_id: number;
+  supplier_id: number;
+  price: number;
+  supplier_name: string;
+  number_bank?: string;
+}
+
+export interface Supplier {
+  id: number;
+  supplier_name: string;
+  number_bank?: string;
+}
+
+export const PricingPage: React.FC = () => {
+  const notify = useNotification();
+  const [items, setItems] = useState<PricingItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
+  // Expandable Row state for Supplier Prices
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [supplierCosts, setSupplierCosts] = useState<Record<number, SupplierCostItem[]>>({});
+  const [loadingSuppliers, setLoadingSuppliers] = useState<Record<number, boolean>>({});
+
+  // All suppliers list for adding new cost
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
+
+  // Modal States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<PricingItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<PricingItem | null>(null);
+  const [addSupplierProductId, setAddSupplierProductId] = useState<number | null>(null);
+  const [editingSupplierCost, setEditingSupplierCost] = useState<{
+    productId: number;
+    supplierCostId: number;
+    supplierName: string;
+    price: number;
+  } | null>(null);
+
+  // Form States
+  const [productForm, setProductForm] = useState({
+    name: "",
+    variant_name: "",
+    base_price: 0,
+    retail_price: 0,
+    ctv_price: 0,
+    student_price: 0,
+    promo_price: 0,
+  });
+
+  const [supplierForm, setSupplierForm] = useState({
+    supplier_id: 0,
+    price: 0,
+  });
+
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const formatCurrency = (val: number) => {
+    if (!val || isNaN(val) || val <= 0) return "-";
+    return new Intl.NumberFormat("vi-VN").format(val) + " ₫";
+  };
+
+  const fetchPricingData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/products/prices?page=${page}&limit=15&search=${encodeURIComponent(
+          search
+        )}`
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setItems(data.data || []);
+        setTotalPages(data.pagination?.totalPages || 1);
+        setTotalItems(data.pagination?.total || 0);
+      } else {
+        notify.error("Không thể tải danh sách bảng giá sản phẩm", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi kết nối máy chủ backend", "Kết Nối Thất Bại");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, notify]);
+
+  useEffect(() => {
+    fetchPricingData();
+  }, [fetchPricingData]);
+
+  // Load all suppliers list once
+  useEffect(() => {
+    fetch("/api/products/all-suppliers")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.data || [];
+        setAllSuppliers(list);
+      })
+      .catch((err) => console.error("Lỗi tải danh sách NCC:", err));
+  }, []);
+
+  const fetchSupplierCosts = async (productId: number) => {
+    setLoadingSuppliers((prev) => ({ ...prev, [productId]: true }));
+    try {
+      const res = await fetch(`/api/products/${productId}/suppliers`);
+      const data = await res.json();
+      if (res.ok) {
+        const list = Array.isArray(data) ? data : data.data || [];
+        setSupplierCosts((prev) => ({ ...prev, [productId]: list }));
+      }
+    } catch (err) {
+      notify.error("Lỗi khi tải giá NCC của sản phẩm", "Lỗi Kết Nối");
+    } finally {
+      setLoadingSuppliers((prev) => ({ ...prev, [productId]: false }));
+    }
+  };
+
+  const toggleExpandRow = (productId: number) => {
+    if (expandedRowId === productId) {
+      setExpandedRowId(null);
+    } else {
+      setExpandedRowId(productId);
+      if (!supplierCosts[productId]) {
+        fetchSupplierCosts(productId);
+      }
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
+
+  const handleExportExcel = () => {
+    notify.info(
+      "Tính năng Xuất Excel cho Bảng giá đang được phát triển.",
+      "Thông Báo Hệ Thống"
+    );
+  };
+
+  // Open Create Modal
+  const handleOpenCreateModal = () => {
+    setProductForm({
+      name: "",
+      variant_name: "",
+      base_price: 0,
+      retail_price: 0,
+      ctv_price: 0,
+      student_price: 0,
+      promo_price: 0,
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  // Submit Create Product
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productForm.name.trim()) {
+      notify.warning("Vui lòng nhập tên sản phẩm!", "Thiếu Thông Tin");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Tạo sản phẩm thành công! Đã phát event PRODUCT_CREATED", "Thành Công");
+        setIsCreateModalOpen(false);
+        fetchPricingData();
+      } else {
+        notify.error(data.error || "Tạo sản phẩm thất bại", "Lỗi Sửa Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (item: PricingItem) => {
+    setEditingItem(item);
+    setProductForm({
+      name: item.san_pham,
+      variant_name: item.package_product || item.san_pham,
+      base_price: item.base_price || 0,
+      retail_price: item.retail_price || 0,
+      ctv_price: item.ctv_price || 0,
+      student_price: item.student_price || 0,
+      promo_price: item.promo_price || 0,
+    });
+  };
+
+  // Submit Edit Product
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${editingItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Cập nhật sản phẩm thành công! Đã phát event PRODUCT_UPDATED", "Thành Công");
+        setEditingItem(null);
+        fetchPricingData();
+      } else {
+        notify.error(data.error || "Cập nhật sản phẩm thất bại", "Lỗi Sửa Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Product
+  const handleDeleteConfirm = async () => {
+    if (!deletingItem) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${deletingItem.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Xóa sản phẩm thành công! Đã phát event PRODUCT_DELETED", "Thành Công");
+        setDeletingItem(null);
+        fetchPricingData();
+      } else {
+        notify.error(data.error || "Xóa sản phẩm thất bại", "Lỗi Thao Tác");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Add Supplier Cost
+  const handleAddSupplierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addSupplierProductId) return;
+    if (!supplierForm.supplier_id || supplierForm.price <= 0) {
+      notify.warning("Vui lòng chọn NCC và nhập giá nhập hợp lệ!", "Thiếu Thông Tin");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${addSupplierProductId}/suppliers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(supplierForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Thêm nguồn NCC thành công! Đã phát event SUPPLIER_COST_ADDED", "Thành Công");
+        const prodId = addSupplierProductId;
+        setAddSupplierProductId(null);
+        setSupplierForm({ supplier_id: 0, price: 0 });
+        fetchSupplierCosts(prodId);
+      } else {
+        notify.error(data.error || "Thêm nguồn NCC thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit Supplier Cost
+  const handleEditSupplierCostSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplierCost) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/suppliers/${editingSupplierCost.supplierCostId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price: editingSupplierCost.price }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(
+          "Cập nhật giá NCC thành công! Đã phát event SUPPLIER_COST_UPDATED",
+          "Thành Công"
+        );
+        const prodId = editingSupplierCost.productId;
+        setEditingSupplierCost(null);
+        fetchSupplierCosts(prodId);
+      } else {
+        notify.error(data.error || "Cập nhật giá NCC thất bại", "Lỗi Sửa Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Supplier Cost
+  const handleDeleteSupplierCost = async (productId: number, supplierCostId: number) => {
+    try {
+      const res = await fetch(`/api/products/suppliers/${supplierCostId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Đã xóa nguồn NCC! Đã phát event SUPPLIER_COST_DELETED", "Thành Công");
+        fetchSupplierCosts(productId);
+      } else {
+        notify.error(data.error || "Xóa nguồn NCC thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi xóa NCC", "Lỗi Hệ Thống");
+    }
+  };
+
+  return (
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md">
+              DANH MỤC SẢN PHẨM & GIÁ
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Đang Hoạt Động
+            </span>
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            <Tag className="w-6 h-6 text-cyan-400" />
+            Bảng Giá Niêm Yết
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Điều chỉnh giá bán lẻ, giá CTV, giá Sinh Viên, giá Khuyến Mãi và giá gốc theo dữ liệu thực tế hệ thống.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={fetchPricingData}
+            disabled={loading}
+            className="p-2.5 text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            title="Làm mới bảng giá"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm active:scale-95"
+          >
+            <Download className="w-4 h-4 text-slate-400" />
+            <span>Xuất Excel</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400 hover:brightness-110 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tạo Mới</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter and Table Container */}
+      <div className="bg-[#0b0f19]/90 border border-slate-800/80 rounded-2xl p-5 shadow-2xl backdrop-blur-xl space-y-4">
+        {/* Search & Stats Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sản phẩm, tên gói..."
+              value={search}
+              onChange={handleSearchChange}
+              className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50 transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800/60">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Hiển thị: <strong className="text-cyan-300 font-semibold">{items.length}</strong> / {totalItems} kết quả</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Pricing Data Table */}
+        
+</div>
+
+        {/* Mobile Card List View */}
+        <div className="block sm:hidden divide-y divide-slate-800/80 p-3 space-y-3">
+          {items.map((item) => (
+            <div key={item.id} className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 shadow-md">
+              <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                <div className="font-bold text-white text-sm break-all">{item.san_pham}</div>
+              </div>
+              <div className="space-y-2 text-xs text-slate-300">
+                <div className="flex justify-between"><span>Gói / Phiên bản:</span><span className="font-mono text-cyan-400 font-semibold bg-cyan-500/10 px-2 py-0.5 rounded">{item.package_product}</span></div>
+                <div className="flex justify-between"><span>Giá nhập:</span><span className="font-mono font-medium text-slate-300">{new Intl.NumberFormat("vi-VN").format(item.base_price)} ₫</span></div>
+                <div className="flex justify-between"><span>Giá lẻ:</span><span className="font-mono font-bold text-emerald-400">{new Intl.NumberFormat("vi-VN").format(item.retail_price)} ₫</span></div>
+                <div className="flex justify-between"><span>Biên lợi nhuận:</span><span className="font-mono font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">{item.margin}</span></div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+                <button onClick={() => toggleExpandPrice(item.id)} className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-indigo-300 font-medium">NCC</button>
+                <button onClick={() => openEditModal(item)} className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-300 font-medium">Sửa</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+  te, useEffect, useCallback } from "react";
+import {
+  Search,
+  RefreshCw,
+  Download,
+  Plus,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Trash2,
+  ChevronDown,
+  Building2,
+  PlusCircle,
+  X,
+  AlertTriangle,
+} from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
+
+export interface PricingItem {
+  id: number;
+  san_pham: string;
+  package_product: string;
+  base_price: number;
+  retail_price: number;
+  ctv_price: number;
+  student_price: number;
+  promo_price: number;
+  margin: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export interface SupplierCostItem {
+  id: number;
+  product_variant_id: number;
+  supplier_id: number;
+  price: number;
+  supplier_name: string;
+  number_bank?: string;
+}
+
+export interface Supplier {
+  id: number;
+  supplier_name: string;
+  number_bank?: string;
+}
+
+export const PricingPage: React.FC = () => {
+  const notify = useNotification();
+  const [items, setItems] = useState<PricingItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
+  // Expandable Row state for Supplier Prices
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [supplierCosts, setSupplierCosts] = useState<Record<number, SupplierCostItem[]>>({});
+  const [loadingSuppliers, setLoadingSuppliers] = useState<Record<number, boolean>>({});
+
+  // All suppliers list for adding new cost
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
+
+  // Modal States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<PricingItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<PricingItem | null>(null);
+  const [addSupplierProductId, setAddSupplierProductId] = useState<number | null>(null);
+  const [editingSupplierCost, setEditingSupplierCost] = useState<{
+    productId: number;
+    supplierCostId: number;
+    supplierName: string;
+    price: number;
+  } | null>(null);
+
+  // Form States
+  const [productForm, setProductForm] = useState({
+    name: "",
+    variant_name: "",
+    base_price: 0,
+    retail_price: 0,
+    ctv_price: 0,
+    student_price: 0,
+    promo_price: 0,
+  });
+
+  const [supplierForm, setSupplierForm] = useState({
+    supplier_id: 0,
+    price: 0,
+  });
+
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const formatCurrency = (val: number) => {
+    if (!val || isNaN(val) || val <= 0) return "-";
+    return new Intl.NumberFormat("vi-VN").format(val) + " ₫";
+  };
+
+  const fetchPricingData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/products/prices?page=${page}&limit=15&search=${encodeURIComponent(
+          search
+        )}`
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setItems(data.data || []);
+        setTotalPages(data.pagination?.totalPages || 1);
+        setTotalItems(data.pagination?.total || 0);
+      } else {
+        notify.error("Không thể tải danh sách bảng giá sản phẩm", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi kết nối máy chủ backend", "Kết Nối Thất Bại");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, notify]);
+
+  useEffect(() => {
+    fetchPricingData();
+  }, [fetchPricingData]);
+
+  // Load all suppliers list once
+  useEffect(() => {
+    fetch("/api/products/all-suppliers")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.data || [];
+        setAllSuppliers(list);
+      })
+      .catch((err) => console.error("Lỗi tải danh sách NCC:", err));
+  }, []);
+
+  const fetchSupplierCosts = async (productId: number) => {
+    setLoadingSuppliers((prev) => ({ ...prev, [productId]: true }));
+    try {
+      const res = await fetch(`/api/products/${productId}/suppliers`);
+      const data = await res.json();
+      if (res.ok) {
+        const list = Array.isArray(data) ? data : data.data || [];
+        setSupplierCosts((prev) => ({ ...prev, [productId]: list }));
+      }
+    } catch (err) {
+      notify.error("Lỗi khi tải giá NCC của sản phẩm", "Lỗi Kết Nối");
+    } finally {
+      setLoadingSuppliers((prev) => ({ ...prev, [productId]: false }));
+    }
+  };
+
+  const toggleExpandRow = (productId: number) => {
+    if (expandedRowId === productId) {
+      setExpandedRowId(null);
+    } else {
+      setExpandedRowId(productId);
+      if (!supplierCosts[productId]) {
+        fetchSupplierCosts(productId);
+      }
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
+
+  const handleExportExcel = () => {
+    notify.info(
+      "Tính năng Xuất Excel cho Bảng giá đang được phát triển.",
+      "Thông Báo Hệ Thống"
+    );
+  };
+
+  // Open Create Modal
+  const handleOpenCreateModal = () => {
+    setProductForm({
+      name: "",
+      variant_name: "",
+      base_price: 0,
+      retail_price: 0,
+      ctv_price: 0,
+      student_price: 0,
+      promo_price: 0,
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  // Submit Create Product
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productForm.name.trim()) {
+      notify.warning("Vui lòng nhập tên sản phẩm!", "Thiếu Thông Tin");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Tạo sản phẩm thành công! Đã phát event PRODUCT_CREATED", "Thành Công");
+        setIsCreateModalOpen(false);
+        fetchPricingData();
+      } else {
+        notify.error(data.error || "Tạo sản phẩm thất bại", "Lỗi Sửa Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (item: PricingItem) => {
+    setEditingItem(item);
+    setProductForm({
+      name: item.san_pham,
+      variant_name: item.package_product || item.san_pham,
+      base_price: item.base_price || 0,
+      retail_price: item.retail_price || 0,
+      ctv_price: item.ctv_price || 0,
+      student_price: item.student_price || 0,
+      promo_price: item.promo_price || 0,
+    });
+  };
+
+  // Submit Edit Product
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${editingItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Cập nhật sản phẩm thành công! Đã phát event PRODUCT_UPDATED", "Thành Công");
+        setEditingItem(null);
+        fetchPricingData();
+      } else {
+        notify.error(data.error || "Cập nhật sản phẩm thất bại", "Lỗi Sửa Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Product
+  const handleDeleteConfirm = async () => {
+    if (!deletingItem) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${deletingItem.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Xóa sản phẩm thành công! Đã phát event PRODUCT_DELETED", "Thành Công");
+        setDeletingItem(null);
+        fetchPricingData();
+      } else {
+        notify.error(data.error || "Xóa sản phẩm thất bại", "Lỗi Thao Tác");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Add Supplier Cost
+  const handleAddSupplierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addSupplierProductId) return;
+    if (!supplierForm.supplier_id || supplierForm.price <= 0) {
+      notify.warning("Vui lòng chọn NCC và nhập giá nhập hợp lệ!", "Thiếu Thông Tin");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${addSupplierProductId}/suppliers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(supplierForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Thêm nguồn NCC thành công! Đã phát event SUPPLIER_COST_ADDED", "Thành Công");
+        const prodId = addSupplierProductId;
+        setAddSupplierProductId(null);
+        setSupplierForm({ supplier_id: 0, price: 0 });
+        fetchSupplierCosts(prodId);
+      } else {
+        notify.error(data.error || "Thêm nguồn NCC thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit Supplier Cost
+  const handleEditSupplierCostSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplierCost) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/suppliers/${editingSupplierCost.supplierCostId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price: editingSupplierCost.price }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(
+          "Cập nhật giá NCC thành công! Đã phát event SUPPLIER_COST_UPDATED",
+          "Thành Công"
+        );
+        const prodId = editingSupplierCost.productId;
+        setEditingSupplierCost(null);
+        fetchSupplierCosts(prodId);
+      } else {
+        notify.error(data.error || "Cập nhật giá NCC thất bại", "Lỗi Sửa Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Supplier Cost
+  const handleDeleteSupplierCost = async (productId: number, supplierCostId: number) => {
+    try {
+      const res = await fetch(`/api/products/suppliers/${supplierCostId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success("Đã xóa nguồn NCC! Đã phát event SUPPLIER_COST_DELETED", "Thành Công");
+        fetchSupplierCosts(productId);
+      } else {
+        notify.error(data.error || "Xóa nguồn NCC thất bại", "Lỗi Dữ Liệu");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi xóa NCC", "Lỗi Hệ Thống");
+    }
+  };
+
+  return (
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

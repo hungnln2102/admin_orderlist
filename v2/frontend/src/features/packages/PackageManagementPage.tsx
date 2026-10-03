@@ -249,7 +249,7 @@ export const PackageManagementPage: React.FC = () => {
   const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(v);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto pb-12">
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl">
         <div>
@@ -398,7 +398,7 @@ export const PackageManagementPage: React.FC = () => {
 
       {/* ── Main Data Table ── */}
       <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl overflow-hidden">
-        <div className="overflow-x-auto custom-scrollbar">
+        <div className="hidden sm:block overflow-x-auto custom-scrollbar">
           <table className="w-full min-w-[850px] border-collapse text-left">
             <thead>
               <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
@@ -617,6 +617,94 @@ export const PackageManagementPage: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ── Mobile Data List ── */}
+        <div className="block sm:hidden divide-y divide-slate-800/80 p-3 space-y-3">
+          {loading ? (
+            <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+              <div className="w-7 h-7 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+              <span>Đang tải danh sách kho gói...</span>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+              <Package className="w-9 h-9 text-slate-600 stroke-[1.5]" />
+              <span className="text-sm font-medium">Không tìm thấy gói nào thuộc loại "{selectedCategory}"</span>
+            </div>
+          ) : (
+            filteredItems.map((item) => {
+              const availSlots = Math.max(0, item.totalSlots - item.usedSlots);
+              const percentUsed = Math.min(100, Math.round((item.usedSlots / item.totalSlots) * 100));
+
+              return (
+                <div key={item.id} className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 shadow-md mt-3 first:mt-0 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-base">{item.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEditItem(item)}
+                        className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer bg-slate-800/50"
+                        title="Sửa thông tin gói"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setViewingItem(item)}
+                        className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer bg-slate-800/50"
+                        title="Xem chi tiết"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="font-mono text-slate-300 text-xs">
+                    {item.accountInfo}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold">
+                      <span className="text-white font-mono">
+                        {item.usedSlots} / {item.totalSlots} Vị trí
+                      </span>
+                      <span className={`text-[10px] uppercase font-bold ${availSlots === 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                        TRỐNG: {availSlots}
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          percentUsed >= 100
+                            ? "bg-rose-500"
+                            : percentUsed >= 50
+                            ? "bg-amber-400"
+                            : "bg-emerald-400"
+                        }`}
+                        style={{ width: `${percentUsed}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-slate-500 block">NCC</span>
+                      <span className="text-purple-300 font-semibold block">{item.supplier}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-slate-500 block">Ngày hết hạn</span>
+                      <span className="text-slate-300 font-mono block">{item.expiredAt}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1 mt-2">
+                     <span className="text-slate-500 block text-xs">Giá nhập</span>
+                     <span className="text-slate-200 font-mono font-bold text-sm block">{fmt(item.costPrice)} <span className="text-[10px] font-normal text-slate-500">VND</span></span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

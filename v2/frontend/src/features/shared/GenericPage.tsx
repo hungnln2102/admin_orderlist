@@ -34,9 +34,9 @@ export const GenericPage: React.FC<GenericPageProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto">
       {/* Top Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-sky-400">{category}</span>
@@ -118,8 +118,8 @@ export const GenericPage: React.FC<GenericPageProps> = ({
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="overflow-x-auto">
+        {/* Desktop Data Table */}
+        <div className="hidden sm:block overflow-x-auto custom-scrollbar flex-1 w-full">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800">
               <tr>
@@ -159,6 +159,39 @@ export const GenericPage: React.FC<GenericPageProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Data List */}
+        <div className="block sm:hidden divide-y divide-slate-800/80 space-y-3">
+          {filteredData.length > 0 ? (
+            filteredData.map((row, idx) => (
+              <div key={idx} className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 shadow-md mt-3 first:mt-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white">{String(row[columns[0]?.key] ?? "-")}</span>
+                  <button
+                    onClick={() => notify.info(`Chi tiết bản ghi: ${Object.values(row)[0]}`, title)}
+                    className="px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 text-[11px] font-semibold"
+                  >
+                    Chi tiết
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {columns.slice(1).map((col) => (
+                    <div key={col.key} className="space-y-1">
+                      <span className="text-slate-500 block">{col.label}</span>
+                      <span className="text-slate-300 font-medium block">
+                        {String(row[col.key] ?? "-")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-12 text-center text-slate-500 text-xs">
+              Không tìm thấy dữ liệu phù hợp.
+            </div>
+          )}
         </div>
       </GlassCard>
     </div>

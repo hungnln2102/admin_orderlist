@@ -11,7 +11,7 @@ const SCHEMAS = {
   PRODUCT: process.env.DB_SCHEMA_PRODUCT || "",
   ORDERS: process.env.DB_SCHEMA_ORDERS || "",
   RECEIPT: process.env.DB_SCHEMA_RECEIPT || "",
-  ADMIN: process.env.DB_SCHEMA_ADMIN || "admin",
+  ADMIN: process.env.DB_SCHEMA_ADMIN || "finance",
   FINANCE: process.env.DB_SCHEMA_FINANCE || "finance",
   SYSTEM: process.env.DB_SCHEMA_SYSTEM || "system_automation",
 };
@@ -33,13 +33,21 @@ const TABLES = {
   REFUND_CREDIT_NOTES: formatTable(SCHEMAS.RECEIPT, "refund_credit_notes"),
   REFUND_CREDIT_APPLICATIONS: formatTable(SCHEMAS.RECEIPT, "refund_credit_applications"),
   DOMAIN_EVENT_STORE: formatTable(SCHEMAS.SYSTEM, "domain_event_store"),
-  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "shop_bank_accounts"),
-  USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "usdt_wallets"),
+  USERS: formatTable(SCHEMAS.ADMIN, "users"),
+  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "financial_accounts"),
+  USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "financial_accounts"),
   FINANCIAL_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
   FINANCIAL_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
 };
 
 const COLS = {
+  USERS: {
+    ID: "userid",
+    USERNAME: "username",
+    PASSWORD_HASH: "passwordhash",
+    ROLE: "role",
+    CREATED_AT: "createdat",
+  },
   SUPPLIER: {
     ID: "id",
     SUPPLIER_NAME: "supplier_name",

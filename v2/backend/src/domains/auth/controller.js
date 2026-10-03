@@ -1,5 +1,5 @@
 const bcrypt = require("bcryptjs");
-const { db } = require("@/db");
+const { db, TABLES, COLS } = require("@/db");
 
 const verifyPassword = async (inputPassword, storedValue) => {
   const hashString = storedValue instanceof Buffer ? storedValue.toString() : String(storedValue || "");
@@ -20,14 +20,15 @@ const login = async (req, res) => {
   const normalizedUsername = String(username).trim().toLowerCase();
 
   try {
-    const user = await db("admin.users")
+    const userCols = COLS.USERS;
+    const user = await db(TABLES.USERS)
       .select({
-        id: "userid",
-        username: "username",
-        passwordhash: "passwordhash",
-        role: "role",
+        id: userCols.ID,
+        username: userCols.USERNAME,
+        passwordhash: userCols.PASSWORD_HASH,
+        role: userCols.ROLE,
       })
-      .whereRaw('LOWER("username") = ?', [normalizedUsername])
+      .whereRaw(`LOWER("${userCols.USERNAME}") = ?`, [normalizedUsername])
       .first();
 
     if (!user) {

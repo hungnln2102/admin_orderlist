@@ -541,8 +541,7 @@ export const PaymentWalletsPage: React.FC = () => {
       {/* Tab 1: Bank Payment Accounts Table */}
       {activeTab === "bank" && (
         <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="w-full">  {/* Desktop Bank Table */}  <div className="hidden sm:block overflow-x-auto custom-scrollbar flex-1 w-full">    <table className="w-full text-left border-collapse text-xs min-w-[850px]">      
               <thead>
                 <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none whitespace-nowrap">
                   <th className="py-3.5 px-4 w-12 text-center">#</th>
@@ -650,8 +649,7 @@ export const PaymentWalletsPage: React.FC = () => {
                   ))
                 )}
               </tbody>
-            </table>
-          </div>
+                </table>  </div>  {/* Mobile Bank Card View */}  <div className="block sm:hidden divide-y divide-slate-800/80 p-3 space-y-3">    {filteredBank.map((item) => (      <div key={item.id} className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 shadow-md">        <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">          <span className="font-bold text-cyan-400 font-mono text-sm">{item.accountNumber}</span>          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${item.isActive ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>{item.isActive ? "Đang chạy" : "Tắt"}</span>        </div>        <div className="space-y-1 text-xs text-slate-300">          <div className="flex justify-between"><span>Chủ tài khoản:</span><span className="font-semibold">{item.accountHolder}</span></div>          <div className="flex justify-between"><span>Ngân hàng:</span><span>{item.bankShortCode || item.bankDisplayName || "—"}</span></div>          <div className="flex justify-between"><span>Số dư khả dụng:</span><span className="font-bold text-emerald-400 font-mono">{formatVND(item.balanceRemaining)}</span></div>        </div>        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">          <button onClick={() => setWithdrawModalTarget({ id: item.id, type: "bank", label: `STK ${item.accountNumber}`, currentBalance: item.balanceRemaining })} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-semibold">Rút Tiền</button>          <button onClick={() => openEditModal(item)} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs">Sửa</button>        </div>      </div>    ))}  </div></div>
         </div>
       )}
 
