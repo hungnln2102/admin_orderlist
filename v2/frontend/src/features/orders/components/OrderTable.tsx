@@ -18,8 +18,8 @@ import {
   calculateRemainingValue,
   formatDateDisplay,
   getDisplayProductName,
-  getOrderPrefixConfig,
 } from "../types";
+import { getOrderPrefixConfig } from "../constants/orderPrefix";
 import { renderStatusBadge } from "./StatusBadge";
 
 interface OrderTableProps {
@@ -29,6 +29,7 @@ interface OrderTableProps {
   productsCatalog: CatalogProduct[];
   allSuppliersCatalog?: CatalogSupplier[];
   page: number;
+  pageSize?: number;
   totalPages: number;
   totalOrders: number;
   onPageChange: (newPage: number) => void;
@@ -47,6 +48,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
   productsCatalog,
   allSuppliersCatalog = [],
   page,
+  pageSize = 15,
   totalPages,
   totalOrders,
   onPageChange,
@@ -151,7 +153,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                               <ChevronDown className="w-3.5 h-3.5" />
                             )}
                           </button>
-                          <span>{(page - 1) * 15 + idx + 1}</span>
+                          <span>{(page - 1) * pageSize + idx + 1}</span>
                         </div>
                       </td>
 

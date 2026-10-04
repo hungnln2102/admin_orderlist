@@ -2,10 +2,13 @@ const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
 
-// Nạp .env từ v2/backend/.env trước, sau đó fallback sang backend/.env
+// Nạp .env từ v2/backend/.env trước, sau đó fallback sang backend/.env và .env.local
 const envPaths = [
+  path.resolve(__dirname, "../../.env.local"),
   path.resolve(__dirname, "../../.env"),
+  path.resolve(__dirname, "../../../backend/.env.local"),
   path.resolve(__dirname, "../../../backend/.env"),
+  path.resolve(__dirname, "../../../.env.local"),
   path.resolve(__dirname, "../../../.env"),
 ];
 

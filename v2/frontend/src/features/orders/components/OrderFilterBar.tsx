@@ -1,6 +1,7 @@
 import React from "react";
 import { Search, Filter, DollarSign, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { OrderDatasetKey } from "../types";
+import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../constants/orderStatus";
 import { DateRangePicker } from "@/shared/components/DateRangePicker";
 
 interface OrderFilterBarProps {
@@ -315,13 +316,13 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
               className="bg-transparent text-white text-xs font-medium focus:outline-none cursor-pointer"
             >
               <option value="ALL" className="bg-slate-900 text-white">Tất cả trạng thái</option>
-              <option value="Đã Thanh Toán" className="bg-slate-900 text-white">Đã Thanh Toán</option>
-              <option value="Chưa Thanh Toán" className="bg-slate-900 text-white">Chưa Thanh Toán</option>
-              <option value="Cần gia hạn" className="bg-slate-900 text-white">Cần gia hạn</option>
-              <option value="Hết Hạn" className="bg-slate-900 text-white">Hết Hạn</option>
-              <option value="Chưa Hoàn" className="bg-slate-900 text-white">Chưa Hoàn Tiền</option>
-              <option value="Đã Hoàn" className="bg-slate-900 text-white">Đã Hoàn Tiền</option>
-              <option value="Đã Hủy" className="bg-slate-900 text-white">Đã Hủy</option>
+              <option value={ORDER_STATUS.PAID} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.PAID]}</option>
+              <option value={ORDER_STATUS.UNPAID} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.UNPAID]}</option>
+              <option value={ORDER_STATUS.RENEW_REQUIRED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}</option>
+              <option value={ORDER_STATUS.EXPIRED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.EXPIRED]}</option>
+              <option value={ORDER_STATUS.REFUND_PENDING} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.REFUND_PENDING]}</option>
+              <option value={ORDER_STATUS.REFUNDED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.REFUNDED]}</option>
+              <option value={ORDER_STATUS.CANCELED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}</option>
             </select>
           </div>
 

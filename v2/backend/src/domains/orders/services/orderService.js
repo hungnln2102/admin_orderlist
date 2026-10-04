@@ -1,11 +1,35 @@
-const { db, TABLES, COLS } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
+const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
 
 const O_COLS = COLS.ORDER_LIST;
-const getOrderTable = () => db(TABLES.ORDER_LIST);
+const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
 
+// In-memory cache for default shop bank account (1 minute TTL)
+let cachedDefaultBank = null;
+let cachedBankTimestamp = 0;
+const BANK_CACHE_TTL_MS = 60 * 1000;
 
+async function getDefaultShopBank(trx) {
+  const now = Date.now();
+  if (cachedDefaultBank && now - cachedBankTimestamp < BANK_CACHE_TTL_MS) {
+    return cachedDefaultBank;
+  }
+  const queryDb = trx || db;
+  let defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS).where({ is_default: true, is_active: true }).first();
+  if (!defaultBank) {
+    defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS).where({ is_active: true }).first();
+  }
+  if (!defaultBank) {
+    defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS).first();
+  }
+  if (defaultBank) {
+    cachedDefaultBank = defaultBank;
+    cachedBankTimestamp = now;
+  }
+  return defaultBank;
+}
 
 /**
  * Trích xuất mã đơn ngẫu nhiên kiểu MAV...
@@ -20,45 +44,45 @@ function generateOrderCode() {
 }
 
 function applyCanceledFilter(builder) {
-  builder.where((b) => b.whereILike("status", "%Hoàn%").orWhereILike("status", "%Hủy%"));
+  builder.whereIn("status", [ORDER_STATUS.REFUND_PENDING, ORDER_STATUS.REFUNDED, ORDER_STATUS.CANCELED]);
 }
 
 function applyExpiredFilter(builder) {
-  builder.whereNot((b) => b.whereILike("status", "%Hoàn%").orWhereILike("status", "%Hủy%"))
-    .where((b) => {
-      b.whereILike("status", "%Hết Hạn%");
-    });
+  builder.whereNot(applyCanceledFilter)
+    .where("status", ORDER_STATUS.EXPIRED);
 }
 
 function applyImportFilter(builder) {
-  builder.whereNot((b) => b.whereILike("status", "%Hoàn%").orWhereILike("status", "%Hủy%"))
+  builder.whereNot(applyCanceledFilter)
     .whereNot(applyExpiredFilter)
     .where((b) => {
       b.whereILike("id_order", "MAVN%")
-       .orWhere((b2) => b2.where("cost", ">", 0).whereILike("status", "%Nhập Hàng%"));
+       .orWhere((b2) => b2.where("cost", ">", 0).where("status", ORDER_STATUS.PAID));
     });
 }
 
 function applyActiveFilter(builder) {
-  builder.whereNot((b) => b.whereILike("status", "%Hoàn%").orWhereILike("status", "%Hủy%"))
+  builder.whereNot(applyCanceledFilter)
     .whereNot(applyExpiredFilter)
     .whereNot((b) => {
       b.whereILike("id_order", "MAVN%")
-       .orWhere((b2) => b2.where("cost", ">", 0).whereILike("status", "%Nhập Hàng%"));
+       .orWhere((b2) => b2.where("cost", ">", 0).where("status", ORDER_STATUS.PAID));
     });
 }
 
 /**
- * Lấy danh sách đơn hàng có phân trang, lọc theo tab & tìm kiếm
+ * Lấy danh sách đơn hàng có phân trang, lọc theo tab & tìm kiếm (Tối ưu SQL Aggregation)
  */
 async function getOrders({ page = 1, limit = 20, search = "", status = "", tab = "" } = {}) {
   const offset = (Number(page) - 1) * Number(limit);
 
-  // 1. Tính toán tabCounts trên toàn bộ cơ sở dữ liệu
-  const [canceledRes] = await getOrderTable().where(applyCanceledFilter).count("id as count");
-  const [expiredRes] = await getOrderTable().where(applyExpiredFilter).count("id as count");
-  const [importRes] = await getOrderTable().where(applyImportFilter).count("id as count");
-  const [activeRes] = await getOrderTable().where(applyActiveFilter).count("id as count");
+  // 1. Tính toán tabCounts song song trên toàn bộ cơ sở dữ liệu (Tối ưu Promise.all)
+  const [[canceledRes], [expiredRes], [importRes], [activeRes]] = await Promise.all([
+    getOrderTable().where(applyCanceledFilter).count("id as count"),
+    getOrderTable().where(applyExpiredFilter).count("id as count"),
+    getOrderTable().where(applyImportFilter).count("id as count"),
+    getOrderTable().where(applyActiveFilter).count("id as count"),
+  ]);
 
   const tabCounts = {
     active: Number(activeRes?.count || 0),
@@ -97,137 +121,100 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
   const [countResult] = await query.clone().count("id as total");
   const total = Number(countResult?.total || 0);
 
-  // 3. Tính toán summary tổng trên toàn bộ danh sách đơn khớp filter/tab trong DB
-  let summary = {
-    totalRevenue: 0,
-    totalCost: 0,
-    totalRemainingValue: 0,
-    supplierRemainingValue: 0,
-    refundCustomerAmount: 0,
-    refundedCustomerAmount: 0,
-    refundSupplierAmount: 0,
-    paidCount: 0,
-    renewCount: 0,
-    processingCount: 0,
-    pendingCount: 0,
-    pendingRefundCount: 0,
-    refundedCount: 0,
-    canceledCount: 0,
-    todayCount: 0,
+  // 3. SQL Aggregation trực tiếp trong PostgreSQL (Tối ưu tốc độ, không kéo all rows về Node RAM)
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const [summaryRow] = await query.clone().select(
+    db.raw(`
+      COALESCE(SUM(price), 0)::numeric as "totalRevenue",
+      COALESCE(SUM(cost), 0)::numeric as "totalCost",
+      COALESCE(SUM(
+        CASE 
+          WHEN status = '${ORDER_STATUS.REFUND_PENDING}' THEN price 
+          ELSE 0 
+        END
+      ), 0)::numeric as "refundCustomerAmount",
+      COALESCE(SUM(
+        CASE 
+          WHEN status IN ('${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN price 
+          ELSE 0 
+        END
+      ), 0)::numeric as "refundedCustomerAmount",
+      COALESCE(SUM(
+        CASE 
+          WHEN status IN ('${ORDER_STATUS.REFUND_PENDING}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN cost 
+          ELSE 0 
+        END
+      ), 0)::numeric as "refundSupplierAmount",
+      COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.PAID}'
+      ) as "paidCount",
+      COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.RENEW_REQUIRED}'
+      ) as "renewCount",
+      COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.UNPAID}'
+      ) as "pendingCount",
+      COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.REFUND_PENDING}'
+      ) as "pendingRefundCount",
+      COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.REFUNDED}'
+      ) as "refundedCount",
+      COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.CANCELED}'
+      ) as "canceledCount",
+      COUNT(*) FILTER (
+        WHERE order_date::text LIKE '${todayStr}%' OR created_at::text LIKE '${todayStr}%'
+      ) as "todayCount"
+    `)
+  );
+
+  // Tính toán remaining values dựa trên SQL
+  const [remRow] = await query.clone().select(
+    db.raw(`
+      COALESCE(SUM(
+        CASE 
+          WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
+          THEN ROUND((price::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at - CURRENT_DATE), 0))
+          ELSE 0 
+        END
+      ), 0)::numeric as "totalRemainingValue",
+      COALESCE(SUM(
+        CASE 
+          WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
+          THEN ROUND((cost::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at - CURRENT_DATE), 0))
+          ELSE 0 
+        END
+      ), 0)::numeric as "supplierRemainingValue"
+    `)
+  );
+
+  const summary = {
+    totalRevenue: Number(summaryRow?.totalRevenue || 0),
+    totalCost: Number(summaryRow?.totalCost || 0),
+    totalRemainingValue: Number(remRow?.totalRemainingValue || 0),
+    supplierRemainingValue: Number(remRow?.supplierRemainingValue || 0),
+    refundCustomerAmount: Number(summaryRow?.refundCustomerAmount || 0),
+    refundedCustomerAmount: Number(summaryRow?.refundedCustomerAmount || 0),
+    refundSupplierAmount: Number(summaryRow?.refundSupplierAmount || 0),
+    paidCount: Number(summaryRow?.paidCount || 0),
+    renewCount: Number(summaryRow?.renewCount || 0),
+    processingCount: Number(summaryRow?.processingCount || 0),
+    pendingCount: Number(summaryRow?.pendingCount || 0),
+    pendingRefundCount: Number(summaryRow?.pendingRefundCount || 0),
+    refundedCount: Number(summaryRow?.refundedCount || 0),
+    canceledCount: Number(summaryRow?.canceledCount || 0),
+    todayCount: Number(summaryRow?.todayCount || 0),
     totalOrders: total,
   };
-
-  try {
-    const summaryRows = await query
-      .clone()
-      .select("price", "cost", "days", "expired_at", "status", "created_at", "order_date");
-
-    let revenue = 0;
-    let cost = 0;
-    let remainingVal = 0;
-    let supplierRemVal = 0;
-    let refundCustomer = 0;
-    let refundedCustomer = 0;
-    let refundSupplier = 0;
-    let paid = 0;
-    let renew = 0;
-    let processing = 0;
-    let pending = 0;
-    let pendingRefund = 0;
-    let refunded = 0;
-    let canceled = 0;
-    let today = 0;
-
-    const todayStr = new Date().toISOString().split("T")[0];
-
-    for (const row of summaryRows) {
-      const p = Number(row.price || 0);
-      const c = Number(row.cost || 0);
-      revenue += p;
-      cost += c;
-
-      const st = String(row.status || "").toLowerCase();
-      const isPaid = st.includes("đã thanh toán") || st.includes("hoàn thành");
-      const isRenew = st.includes("cần gia hạn");
-      const isProcessing = st.includes("đang xử lý") || st.includes("chờ xử lý");
-      const isPending =
-        st.includes("chưa thanh toán") ||
-        st.includes("chờ") ||
-        st.includes("gia hạn") ||
-        st.includes("hết hạn");
-      const isPendingRefund = st.includes("chưa hoàn") || st.includes("chờ hoàn");
-      const isRefunded = st.includes("đã hoàn");
-      const isCanceled = st.includes("hủy");
-
-      if (isPaid) paid++;
-      if (isRenew) renew++;
-      if (isProcessing) processing++;
-      if (isPending) pending++;
-      if (isPendingRefund) pendingRefund++;
-      if (isRefunded) refunded++;
-      if (isCanceled) canceled++;
-
-      const dateField = row.order_date || row.created_at;
-      if (dateField && String(dateField).startsWith(todayStr)) today++;
-
-      // Tính giá trị còn lại cho từng đơn
-      const days = Number(row.days || 365);
-      let remDays = 0;
-      if (row.expired_at) {
-        const expDate = new Date(row.expired_at);
-        if (!isNaN(expDate.getTime())) {
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          expDate.setHours(0, 0, 0, 0);
-          remDays = Math.max(0, Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-        }
-      }
-
-      const rowRemainingVal = days > 0 && remDays > 0 ? Math.round((p / days) * remDays) : 0;
-      const rowSupplierRemVal = days > 0 && remDays > 0 ? Math.round((c / days) * remDays) : 0;
-
-      if (!isCanceled && !isPendingRefund && !isRefunded) {
-        remainingVal += rowRemainingVal;
-        supplierRemVal += rowSupplierRemVal;
-      }
-
-      if (isPendingRefund) {
-        refundCustomer += rowRemainingVal > 0 ? rowRemainingVal : p;
-        refundSupplier += c;
-      } else if (isRefunded || isCanceled) {
-        refundedCustomer += p;
-        refundSupplier += c;
-      }
-    }
-
-    summary = {
-      totalRevenue: revenue,
-      totalCost: cost,
-      totalRemainingValue: remainingVal,
-      supplierRemainingValue: supplierRemVal,
-      refundCustomerAmount: refundCustomer,
-      refundedCustomerAmount: refundedCustomer,
-      refundSupplierAmount: refundSupplier,
-      paidCount: paid,
-      renewCount: renew,
-      processingCount: processing,
-      pendingCount: pending,
-      pendingRefundCount: pendingRefund,
-      refundedCount: refunded,
-      canceledCount: canceled,
-      todayCount: today,
-      totalOrders: total,
-    };
-  } catch (err) {
-    console.error("[getOrders] Lỗi tính summary:", err.message);
-  }
 
   const orders = await query
     .select("*")
     .orderByRaw(`
       CASE
-        WHEN status ILike '%Cần gia hạn%' THEN 1
-        WHEN status ILike '%Chưa Thanh Toán%' THEN 2
+        WHEN status = '${ORDER_STATUS.UNPAID}' THEN 1
+        WHEN status = '${ORDER_STATUS.RENEW_REQUIRED}' THEN 2
         ELSE 3
       END,
       id DESC
@@ -235,7 +222,7 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     .limit(limit)
     .offset(offset);
 
-  const ordersWithQr = await Promise.all(orders.map(attachVietQrToOrder));
+  const ordersWithQr = await Promise.all(orders.map((o) => attachVietQrToOrder(o)));
 
   return {
     data: ordersWithQr,
@@ -251,16 +238,17 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
 }
 
 /**
- * Tự động gắn ảnh VietQR (vietqr_url) & thông tin ngân hàng cho đơn hàng
+ * Tự động gắn ảnh VietQR (vietqr_url) & thông tin ngân hàng cho đơn hàng (Có cache bank)
  */
-async function attachVietQrToOrder(order) {
+async function attachVietQrToOrder(order, trx) {
   if (!order) return order;
   try {
     const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") || (Number(order.cost || 0) > 0 && String(order.status || "").toLowerCase().includes("nhập hàng"));
 
     let numSupplyId = Number(order.supply_id);
     if (isImport && !isNaN(numSupplyId) && numSupplyId > 0) {
-      const supplier = await db(TABLES.SUPPLIER)
+      const queryDb = trx || db;
+      const supplier = await queryDb(TABLES.SUPPLIER)
         .where({ id: numSupplyId })
         .first();
 
@@ -282,15 +270,8 @@ async function attachVietQrToOrder(order) {
       }
     }
 
-    // Default shop bank account for sales orders
-    let defaultBank = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ is_default: true, is_active: true, account_type: "bank", is_deleted: false }).first();
-    if (!defaultBank) {
-      defaultBank = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ is_active: true, account_type: "bank", is_deleted: false }).first();
-    }
-    if (!defaultBank) {
-      defaultBank = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ account_type: "bank", is_deleted: false }).first();
-    }
-
+    // Default shop bank account for sales orders (cached)
+    const defaultBank = await getDefaultShopBank(trx);
     if (defaultBank) {
       const accNum = defaultBank.account_number || defaultBank.accountNumber;
       const bin = defaultBank.bank_bin || defaultBank.bankBin || defaultBank.bank_short_code || defaultBank.bankShortCode || "MB";
@@ -324,301 +305,288 @@ async function getOrderById(id) {
 }
 
 /**
- * Tạo đơn hàng mới + phát event ORDER_CREATED
+ * Tạo đơn hàng mới + phát event ORDER_CREATED (Bọc Transaction)
  */
 async function createOrder(payload) {
-  const id_order = payload.id_order || generateOrderCode();
-  const rawPrice = Number(payload.price || 0);
-  const statusStr = String(payload.status || "Chưa Thanh Toán").toLowerCase();
+  return await withTransaction(async (trx) => {
+    const id_order = payload.id_order || generateOrderCode();
+    const rawPrice = Number(payload.price || 0);
+    const status = payload.status || ORDER_STATUS.UNPAID;
 
-  let finalPrice = rawPrice;
-  if (statusStr.includes("chưa thanh toán") || statusStr.includes("chờ") || statusStr.includes("gia hạn")) {
-    if (rawPrice > 0) {
-      const suffix = await getAvailableSuffix();
-      finalPrice = applySuffixToPrice(rawPrice, suffix);
-    }
-  }
-
-  const newOrderData = {
-    id_order,
-    customer: payload.customer || "Khách hàng",
-    contact: payload.contact || "",
-    information_order: payload.information_order || "",
-    slot: payload.slot || "",
-    price: finalPrice,
-    gross_selling_price: payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice,
-    cost: payload.cost != null ? Number(payload.cost) : 0,
-    status: payload.status || "Chưa Thanh Toán",
-    payment_method: payload.payment_method || "bank",
-    note: payload.note || "",
-    days: payload.days ? Number(payload.days) : 365,
-    order_date: payload.order_date || null,
-    expired_at: payload.expired_at || null,
-    supply_id: (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null,
-    created_at: db.fn.now(),
-  };
-
-  if (payload.id_product != null && payload.id_product !== "") {
-    const numProdId = Number(payload.id_product);
-    if (!isNaN(numProdId) && numProdId > 0) {
-      newOrderData.id_product = numProdId;
-    } else {
-      const matched = await db(TABLES.VARIANT)
-        .whereILike("display_name", String(payload.id_product))
-        .orWhereILike("variant_name", String(payload.id_product))
-        .first();
-      if (matched) {
-        newOrderData.id_product = matched.id;
+    let finalPrice = rawPrice;
+    if (status === ORDER_STATUS.UNPAID || status === ORDER_STATUS.RENEW_REQUIRED) {
+      if (rawPrice > 0) {
+        const suffix = await getAvailableSuffix();
+        finalPrice = applySuffixToPrice(rawPrice, suffix);
       }
     }
-  }
 
-  const [createdOrder] = await getOrderTable()
-    .insert(newOrderData)
-    .returning("*");
+    const newOrderData = {
+      id_order,
+      customer: payload.customer || "Khách hàng",
+      contact: payload.contact || "",
+      information_order: payload.information_order || "",
+      slot: payload.slot || "",
+      price: finalPrice,
+      gross_selling_price: payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice,
+      cost: payload.cost != null ? Number(payload.cost) : 0,
+      status: normStatus,
+      payment_method: payload.payment_method || "bank",
+      note: payload.note || "",
+      days: payload.days ? Number(payload.days) : 365,
+      order_date: payload.order_date || null,
+      expired_at: payload.expired_at || null,
+      supply_id: (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null,
+      created_at: db.fn.now(),
+    };
 
-  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-  const summary = `Tạo mới đơn hàng #${createdOrder.id_order} cho khách "${createdOrder.customer}" với tổng tiền ${formatMoney(createdOrder.price)} [Trạng thái: ${createdOrder.status}]`;
+    if (payload.id_product != null && payload.id_product !== "") {
+      const numProdId = Number(payload.id_product);
+      if (!isNaN(numProdId) && numProdId > 0) {
+        newOrderData.id_product = numProdId;
+      } else {
+        const matched = await trx(TABLES.VARIANT)
+          .whereILike("display_name", String(payload.id_product))
+          .orWhereILike("variant_name", String(payload.id_product))
+          .first();
+        if (matched) {
+          newOrderData.id_product = matched.id;
+        }
+      }
+    }
 
-  // Phát event Domain: ORDER_CREATED
-  eventBus.emit(EVENTS.ORDER_CREATED, {
-    orderId: createdOrder.id,
-    id_order: createdOrder.id_order,
-    customer: createdOrder.customer,
-    contact: createdOrder.contact,
-    price: createdOrder.price,
-    status: createdOrder.status,
-    summary,
-    created_at: createdOrder.created_at,
-    action: "CREATE",
+    const [createdOrder] = await getOrderTable(trx)
+      .insert(newOrderData)
+      .returning("*");
+
+    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+    const statusLabel = getOrderStatusLabel(createdOrder.status);
+    const summary = `Tạo mới đơn hàng #${createdOrder.id_order} cho khách "${createdOrder.customer}" với tổng tiền ${formatMoney(createdOrder.price)} [Trạng thái: ${statusLabel}]`;
+
+    // Phát event Domain: ORDER_CREATED
+    eventBus.emit(EVENTS.ORDER_CREATED, {
+      orderId: createdOrder.id,
+      id_order: createdOrder.id_order,
+      customer: createdOrder.customer,
+      contact: createdOrder.contact,
+      price: createdOrder.price,
+      status: createdOrder.status,
+      summary,
+      created_at: createdOrder.created_at,
+      action: "CREATE",
+    });
+
+    return await attachVietQrToOrder(createdOrder, trx);
   });
-
-  return await attachVietQrToOrder(createdOrder);
 }
 
 /**
- * Cập nhật đơn hàng + phát event ORDER_UPDATED với chi tiết diff
+ * Cập nhật đơn hàng + phát event ORDER_UPDATED với chi tiết diff (Bọc Transaction)
  */
 async function updateOrder(id, payload) {
-  const existingOrder = await getOrderTable().where({ id: Number(id) }).first();
-  if (!existingOrder) {
-    throw new Error("Không tìm thấy đơn hàng cần sửa.");
-  }
-
-  const updateFields = {};
-  if (payload.customer !== undefined) updateFields.customer = payload.customer;
-  if (payload.contact !== undefined) updateFields.contact = payload.contact;
-  if (payload.information_order !== undefined) updateFields.information_order = payload.information_order;
-  if (payload.slot !== undefined) updateFields.slot = payload.slot;
-  if (payload.id_product !== undefined) {
-    const numProdId = Number(payload.id_product);
-    if (!isNaN(numProdId) && numProdId > 0) {
-      updateFields.id_product = numProdId;
-    } else if (payload.id_product) {
-      const matched = await db(TABLES.VARIANT)
-        .whereILike("display_name", String(payload.id_product))
-        .orWhereILike("variant_name", String(payload.id_product))
-        .first();
-      updateFields.id_product = matched ? matched.id : null;
-    } else {
-      updateFields.id_product = null;
+  return await withTransaction(async (trx) => {
+    const existingOrder = await getOrderTable(trx).where({ id: Number(id) }).first();
+    if (!existingOrder) {
+      throw new Error("Không tìm thấy đơn hàng cần sửa.");
     }
-  }
-  if (payload.price !== undefined) updateFields.price = Number(payload.price);
-  if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
-  if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
 
-  if (payload.status !== undefined) {
-    updateFields.status = payload.status;
-    const nextStatus = String(payload.status).toLowerCase();
-    if (nextStatus.includes("gia hạn") || nextStatus.includes("chưa thanh toán")) {
-      const basePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
-      if (basePrice > 0) {
-        const suffix = await getAvailableSuffix();
-        const finalPrice = applySuffixToPrice(basePrice, suffix);
-        updateFields.price = finalPrice;
-        updateFields.gross_selling_price = finalPrice;
-      }
-    }
-  }
-
-  if (payload.payment_method !== undefined) updateFields.payment_method = payload.payment_method;
-  if (payload.note !== undefined) updateFields.note = payload.note;
-  if (payload.days !== undefined) updateFields.days = Number(payload.days);
-  if (payload.order_date !== undefined) updateFields.order_date = payload.order_date || null;
-  if (payload.expired_at !== undefined) updateFields.expired_at = payload.expired_at || null;
-  if (payload.supply_id !== undefined) updateFields.supply_id = (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null;
-
-  const [updatedOrder] = await getOrderTable()
-    .where({ id: Number(id) })
-    .update(updateFields)
-    .returning("*");
-
-  // Tính toán diff chi tiết (trường nào bị sửa, từ giá trị cũ sang mới)
-  const changes = {};
-  const changedFields = [];
-  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-  const summaryParts = [];
-
-  const labels = {
-    customer: "Khách hàng",
-    contact: "Liên hệ",
-    information_order: "Sản phẩm / Thông tin gói",
-    slot: "Slot / Tài khoản",
-    id_product: "Mã sản phẩm",
-    price: "Giá bán",
-    gross_selling_price: "Giá bán gộp",
-    cost: "Giá nhập",
-    status: "Trạng thái",
-    payment_method: "Phương thức thanh toán",
-    note: "Ghi chú",
-    days: "Thời hạn (ngày)",
-    order_date: "Ngày đặt hàng",
-    expired_at: "Ngày hết hạn",
-    supply_id: "Nhà cung cấp",
-  };
-
-  const isMoneyField = (f) => ["price", "gross_selling_price", "cost"].includes(f);
-
-  for (const [key, newVal] of Object.entries(updateFields)) {
-    const oldVal = existingOrder[key];
-    const oldCompare = oldVal == null ? "" : String(oldVal).trim();
-    const newCompare = newVal == null ? "" : String(newVal).trim();
-
-    if (oldCompare !== newCompare) {
-      changedFields.push(key);
-      changes[key] = { old: oldVal, new: newVal };
-      const label = labels[key] || key;
-
-      if (isMoneyField(key)) {
-        summaryParts.push(`${label}: ${formatMoney(Number(oldVal || 0))} ➔ ${formatMoney(Number(newVal || 0))}`);
+    const updateFields = {};
+    if (payload.customer !== undefined) updateFields.customer = payload.customer;
+    if (payload.contact !== undefined) updateFields.contact = payload.contact;
+    if (payload.information_order !== undefined) updateFields.information_order = payload.information_order;
+    if (payload.slot !== undefined) updateFields.slot = payload.slot;
+    if (payload.id_product !== undefined) {
+      const numProdId = Number(payload.id_product);
+      if (!isNaN(numProdId) && numProdId > 0) {
+        updateFields.id_product = numProdId;
+      } else if (payload.id_product) {
+        const matched = await trx(TABLES.VARIANT)
+          .whereILike("display_name", String(payload.id_product))
+          .orWhereILike("variant_name", String(payload.id_product))
+          .first();
+        updateFields.id_product = matched ? matched.id : null;
       } else {
-        summaryParts.push(`${label}: "${oldVal ?? ""}" ➔ "${newVal ?? ""}"`);
+        updateFields.id_product = null;
       }
     }
-  }
+    if (payload.price !== undefined) updateFields.price = Number(payload.price);
+    if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
+    if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
 
-  const updatePayload = {
-    orderId: updatedOrder.id,
-    id_order: updatedOrder.id_order,
-    customer: updatedOrder.customer,
-    previousStatus: existingOrder.status,
-    newStatus: updatedOrder.status,
-    changed_fields: changedFields,
-    changes,
-    old_values: existingOrder,
-    new_values: updatedOrder,
-    summary: summaryParts.length > 0 ? summaryParts.join("; ") : `Cập nhật đơn hàng #${updatedOrder.id_order}`,
-    action: "UPDATE",
-  };
+    if (payload.status !== undefined) {
+      const status = payload.status;
+      updateFields.status = status;
 
-  // Phát event Domain: ORDER_UPDATED
-  eventBus.emit(EVENTS.ORDER_UPDATED, updatePayload);
+      if (status === ORDER_STATUS.UNPAID || status === ORDER_STATUS.RENEW_REQUIRED) {
+        const basePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
+        if (basePrice > 0) {
+          const suffix = await getAvailableSuffix();
+          const finalPrice = applySuffixToPrice(basePrice, suffix);
+          updateFields.price = finalPrice;
+          updateFields.gross_selling_price = finalPrice;
+        }
+      }
+    }
 
-  return await attachVietQrToOrder(updatedOrder);
+    if (payload.payment_method !== undefined) updateFields.payment_method = payload.payment_method;
+    if (payload.note !== undefined) updateFields.note = payload.note;
+    if (payload.days !== undefined) updateFields.days = Number(payload.days);
+    if (payload.order_date !== undefined) updateFields.order_date = payload.order_date || null;
+    if (payload.expired_at !== undefined) updateFields.expired_at = payload.expired_at || null;
+    if (payload.supply_id !== undefined) updateFields.supply_id = (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null;
+
+    const [updatedOrder] = await getOrderTable(trx)
+      .where({ id: Number(id) })
+      .update(updateFields)
+      .returning("*");
+
+    // Tính toán diff chi tiết (trường nào bị sửa, từ giá trị cũ sang mới)
+    const changes = {};
+    const changedFields = [];
+    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+    const summaryParts = [];
+
+    const labels = {
+      customer: "Khách hàng",
+      contact: "Liên hệ",
+      information_order: "Sản phẩm / Thông tin gói",
+      slot: "Slot / Tài khoản",
+      id_product: "Mã sản phẩm",
+      price: "Giá bán",
+      gross_selling_price: "Giá bán gộp",
+      cost: "Giá nhập",
+      status: "Trạng thái",
+      payment_method: "Phương thức thanh toán",
+      note: "Ghi chú",
+      days: "Thời hạn (ngày)",
+      order_date: "Ngày đặt hàng",
+      expired_at: "Ngày hết hạn",
+      supply_id: "Nhà cung cấp",
+    };
+
+    const isMoneyField = (f) => ["price", "gross_selling_price", "cost"].includes(f);
+
+    for (const [key, newVal] of Object.entries(updateFields)) {
+      const oldVal = existingOrder[key];
+      const oldCompare = oldVal == null ? "" : String(oldVal).trim();
+      const newCompare = newVal == null ? "" : String(newVal).trim();
+
+      if (oldCompare !== newCompare) {
+        changedFields.push(key);
+        changes[key] = { old: oldVal, new: newVal };
+        const label = labels[key] || key;
+
+        if (isMoneyField(key)) {
+          summaryParts.push(`${label}: ${formatMoney(Number(oldVal || 0))} ➔ ${formatMoney(Number(newVal || 0))}`);
+        } else if (key === "status") {
+          summaryParts.push(`${label}: "${getOrderStatusLabel(oldVal)}" ➔ "${getOrderStatusLabel(newVal)}"`);
+        } else {
+          summaryParts.push(`${label}: "${oldVal ?? ""}" ➔ "${newVal ?? ""}"`);
+        }
+      }
+    }
+
+    const updatePayload = {
+      orderId: updatedOrder.id,
+      id_order: updatedOrder.id_order,
+      customer: updatedOrder.customer,
+      previousStatus: existingOrder.status,
+      newStatus: updatedOrder.status,
+      changed_fields: changedFields,
+      changes,
+      old_values: existingOrder,
+      new_values: updatedOrder,
+      summary: summaryParts.length > 0 ? summaryParts.join("; ") : `Cập nhật đơn hàng #${updatedOrder.id_order}`,
+      action: "UPDATE",
+    };
+
+    // Phát event Domain: ORDER_UPDATED
+    eventBus.emit(EVENTS.ORDER_UPDATED, updatePayload);
+
+    return await attachVietQrToOrder(updatedOrder, trx);
+  });
 }
 
 /**
- * Gia hạn đơn hàng: Chuyển trạng thái sang "Cần gia hạn", cấp phát Slot Suffix (1..100) và tính lại tổng tiền
+ * Gia hạn đơn hàng: Chuyển trạng thái sang ORDER_STATUS.RENEW_REQUIRED, cấp phát Slot Suffix và tính lại tổng tiền
  */
 async function renewOrder(id, payload = {}) {
-  const existingOrder = await getOrderTable().where({ id: Number(id) }).first();
-  if (!existingOrder) {
-    throw new Error("Không tìm thấy đơn hàng cần gia hạn.");
-  }
+  return await withTransaction(async (trx) => {
+    const existingOrder = await getOrderTable(trx).where({ id: Number(id) }).first();
+    if (!existingOrder) {
+      throw new Error("Không tìm thấy đơn hàng cần gia hạn.");
+    }
 
-  const rawBasePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
-  const basePrice = Math.floor(rawBasePrice / 1000) * 1000 || rawBasePrice;
+    const rawBasePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
+    const basePrice = Math.floor(rawBasePrice / 1000) * 1000 || rawBasePrice;
 
-  // Cấp phát Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
-  const suffix = await getAvailableSuffix();
-  const finalPrice = applySuffixToPrice(basePrice, suffix);
+    // Cấp phát Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
+    const suffix = await getAvailableSuffix();
+    const finalPrice = applySuffixToPrice(basePrice, suffix);
 
-  const days = payload.days ? Number(payload.days) : Number(existingOrder.days || 365);
+    const days = payload.days ? Number(payload.days) : Number(existingOrder.days || 365);
 
-  const updateFields = {
-    status: "Cần Gia Hạn",
-    price: finalPrice,
-    gross_selling_price: finalPrice,
-    days,
-  };
+    const updateFields = {
+      status: ORDER_STATUS.RENEW_REQUIRED,
+      price: finalPrice,
+      gross_selling_price: finalPrice,
+      days,
+    };
 
-  if (payload.note !== undefined) updateFields.note = payload.note;
-  if (payload.supply_id !== undefined) updateFields.supply_id = payload.supply_id ? Number(payload.supply_id) : null;
+    if (payload.note !== undefined) updateFields.note = payload.note;
+    if (payload.supply_id !== undefined) updateFields.supply_id = payload.supply_id ? Number(payload.supply_id) : null;
 
-  const [updatedOrder] = await getOrderTable()
-    .where({ id: Number(id) })
-    .update(updateFields)
-    .returning("*");
+    const [updatedOrder] = await getOrderTable(trx)
+      .where({ id: Number(id) })
+      .update(updateFields)
+      .returning("*");
 
-  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-  const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "Cần Gia Hạn", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
+    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+    const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "${getOrderStatusLabel(ORDER_STATUS.RENEW_REQUIRED)}", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
 
-  // Phát event Domain: ORDER_UPDATED với action RENEWAL_REQUESTED
-  eventBus.emit(EVENTS.ORDER_UPDATED, {
-    orderId: updatedOrder.id,
-    id_order: updatedOrder.id_order,
-    customer: updatedOrder.customer,
-    previousStatus: existingOrder.status,
-    newStatus: updatedOrder.status,
-    price: updatedOrder.price,
-    days: updatedOrder.days,
-    summary,
-    action: "RENEWAL_REQUESTED",
+    // Phát event Domain: ORDER_UPDATED với action RENEWAL_REQUESTED
+    eventBus.emit(EVENTS.ORDER_UPDATED, {
+      orderId: updatedOrder.id,
+      id_order: updatedOrder.id_order,
+      customer: updatedOrder.customer,
+      previousStatus: existingOrder.status,
+      newStatus: updatedOrder.status,
+      price: updatedOrder.price,
+      days: updatedOrder.days,
+      summary,
+      action: "RENEWAL_REQUESTED",
+    });
+
+    return updatedOrder;
   });
-
-  return updatedOrder;
-}
-
-/**
- * Tính toán số tiền hoàn lại theo số ngày còn lại của gói
- */
-function calcRemainingRefund(order) {
-  if (!order || !order.price || order.price <= 0) return 0;
-  const now = new Date();
-  const expiredAt = order.expired_at ? new Date(order.expired_at) : null;
-  if (!expiredAt || expiredAt <= now) return 0;
-  
-  const orderDate = order.order_date ? new Date(order.order_date) : (order.created_at ? new Date(order.created_at) : null);
-  if (!orderDate) return 0;
-
-  const totalDays = Math.max(1, Math.ceil((expiredAt.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24)));
-  const remainingDays = Math.max(0, Math.ceil((expiredAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-
-  if (remainingDays <= 0) return 0;
-  const price = Number(order.price) || 0;
-  const refund = Math.round((price * remainingDays) / totalDays);
-  return Math.max(0, refund);
 }
 
 /**
  * Xóa đơn hàng (Hard Delete) hoặc Hủy & Chuyển Trạng Thái (Soft Delete) + phát event
  */
 async function deleteOrder(id) {
-  const { withTransaction } = require("@/db");
-  
   return await withTransaction(async (trx) => {
     const existingOrder = await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).first();
     if (!existingOrder) {
       throw new Error("Không tìm thấy đơn hàng cần xóa.");
     }
 
-    const currentStatusLower = String(existingOrder.status || "").trim().toLowerCase();
+    const status = existingOrder.status;
     
-    // Hard Delete: Chưa Thanh Toán / Đang Xử Lý / Chờ Xử Lý
-    const isHardDelete = ["chưa thanh toán", "đang xử lý", "chờ xử lý"].includes(currentStatusLower);
+    // Hard Delete: UNPAID
+    const isHardDelete = status === ORDER_STATUS.UNPAID;
     
-    // Soft Delete (Chờ Hoàn): Đã Thanh Toán
-    const isSoftDeletePendingRefund = currentStatusLower === "đã thanh toán";
+    // Soft Delete (Chưa Hoàn): PAID
+    const isSoftDeletePendingRefund = status === ORDER_STATUS.PAID;
     
-    // Soft Delete (Ngừng Gia Hạn): Cần Gia Hạn
-    const isSoftDeleteExpired = currentStatusLower === "cần gia hạn";
+    // Soft Delete (Hết Hạn): RENEW_REQUIRED
+    const isSoftDeleteExpired = status === ORDER_STATUS.RENEW_REQUIRED;
     
-    // Blocked: Hết Hạn, Đã Hoàn, Chưa Hoàn, Chờ Hoàn, Hủy, Đã Hủy
-    const isBlocked = ["đã hoàn", "chưa hoàn", "chờ hoàn", "hủy", "đã hủy", "hết hạn"].some(s => currentStatusLower.includes(s));
+    // Blocked: EXPIRED, REFUNDED, REFUND_PENDING, CANCELED
+    const isBlocked = [ORDER_STATUS.EXPIRED, ORDER_STATUS.REFUNDED, ORDER_STATUS.REFUND_PENDING, ORDER_STATUS.CANCELED].includes(status);
 
     if (isBlocked) {
-      throw new Error(`Đơn hàng ở trạng thái "${existingOrder.status}" (hết hạn/hoàn tiền/đã hủy) không được phép xóa.`);
+      throw new Error(`Đơn hàng ở trạng thái "${getOrderStatusLabel(existingOrder.status)}" không được phép xóa.`);
     }
 
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
@@ -644,11 +612,11 @@ async function deleteOrder(id) {
     else if (isSoftDeletePendingRefund) {
       // 2. Luồng Hủy và Chờ Hoàn Tiền
       await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
-        status: "Chưa Hoàn",
+        status: ORDER_STATUS.REFUND_PENDING,
         canceled_at: existingOrder.canceled_at || todayYMD,
       });
 
-      const summary = `Đã hủy đơn hàng #${existingOrder.id_order} và chuyển vào danh sách Chưa Hoàn.`;
+      const summary = `Đã hủy đơn hàng #${existingOrder.id_order} và chuyển vào danh sách Chưa Hoàn Tiền.`;
       
       eventBus.emit(EVENTS.ORDER_PENDING_REFUND, {
         orderId: existingOrder.id,
@@ -664,7 +632,7 @@ async function deleteOrder(id) {
     else if (isSoftDeleteExpired) {
       // 3. Luồng Ngừng Gia Hạn
       await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
-        status: "Hết Hạn",
+        status: ORDER_STATUS.EXPIRED,
       });
 
       const summary = `Đã chuyển đơn hàng #${existingOrder.id_order} sang danh sách Hết Hạn do ngừng gia hạn.`;
@@ -693,4 +661,3 @@ module.exports = {
   renewOrder,
   deleteOrder,
 };
-

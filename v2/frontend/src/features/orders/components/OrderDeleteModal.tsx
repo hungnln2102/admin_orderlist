@@ -1,6 +1,8 @@
 import React from "react";
 import { AlertTriangle, Trash2, X } from "lucide-react";
-import { Order, getOrderPrefixConfig } from "../types";
+import { Order } from "../types";
+import { getOrderPrefixConfig } from "../constants/orderPrefix";
+import { ORDER_STATUS, ORDER_STATUS_LABELS, getOrderStatusLabel } from "../constants/orderStatus";
 
 interface OrderDeleteModalProps {
   isOpen: boolean;
@@ -18,11 +20,11 @@ export const OrderDeleteModal: React.FC<OrderDeleteModalProps> = ({
   if (!isOpen || !order) return null;
 
   const prefixConfig = getOrderPrefixConfig(order.id_order);
-  const statusLower = String(order.status || "").trim().toLowerCase();
+  const statusLabel = getOrderStatusLabel(order.status);
 
-  const isHardDelete = ["chưa thanh toán", "đang xử lý", "chờ xử lý"].includes(statusLower);
-  const isSoftDeletePendingRefund = statusLower === "đã thanh toán";
-  const isSoftDeleteExpired = statusLower === "cần gia hạn";
+  const isHardDelete = order.status === ORDER_STATUS.UNPAID;
+  const isSoftDeletePendingRefund = order.status === ORDER_STATUS.PAID;
+  const isSoftDeleteExpired = order.status === ORDER_STATUS.RENEW_REQUIRED;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -69,7 +71,7 @@ export const OrderDeleteModal: React.FC<OrderDeleteModalProps> = ({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Trạng thái hiện tại:</span>
-              <span className="font-bold text-amber-400">{order.status}</span>
+              <span className="font-bold text-amber-400">{statusLabel}</span>
             </div>
           </div>
 
@@ -77,22 +79,22 @@ export const OrderDeleteModal: React.FC<OrderDeleteModalProps> = ({
           <div className="p-3.5 rounded-xl border text-slate-300 leading-relaxed space-y-1 bg-rose-500/10 border-rose-500/20">
             {isHardDelete && (
               <p>
-                Đơn hàng ở trạng thái <strong className="text-rose-300">"{order.status}"</strong> sẽ bị{" "}
+                Đơn hàng ở trạng thái <strong className="text-rose-300">"{statusLabel}"</strong> sẽ bị{" "}
                 <strong className="text-rose-400 uppercase">Xóa Vĩnh Viễn</strong> khỏi hệ thống cơ sở dữ liệu. Thao tác này không thể hoàn tác!
               </p>
             )}
 
             {isSoftDeletePendingRefund && (
               <p>
-                Đơn hàng ở trạng thái <strong className="text-emerald-300">"Đã Thanh Toán"</strong> sẽ được chuyển sang danh sách{" "}
-                <strong className="text-purple-300 font-bold">"Chưa Hoàn Tiền"</strong> để theo dõi hoàn vốn cho khách hàng.
+                Đơn hàng ở trạng thái <strong className="text-emerald-300">"{ORDER_STATUS_LABELS[ORDER_STATUS.PAID]}"</strong> sẽ được chuyển sang danh sách{" "}
+                <strong className="text-purple-300 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.REFUND_PENDING]}"</strong> để theo dõi hoàn vốn cho khách hàng.
               </p>
             )}
 
             {isSoftDeleteExpired && (
               <p>
-                Đơn hàng ở trạng thái <strong className="text-amber-300">"Cần Gia Hạn"</strong> sẽ được hủy gia hạn và chuyển sang danh sách{" "}
-                <strong className="text-amber-400 font-bold">"Hết Hạn"</strong>.
+                Đơn hàng ở trạng thái <strong className="text-amber-300">"{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}"</strong> sẽ được hủy gia hạn và chuyển sang danh sách{" "}
+                <strong className="text-amber-400 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.EXPIRED]}"</strong>.
               </p>
             )}
 

@@ -56,6 +56,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Danh sách Đơn hàng", path: "/orders", icon: ShoppingCart },
       { name: "Nhật ký Credit", path: "/credit", icon: CreditCard },
+      { name: "Biên lai Thanh toán", path: "/invoices", icon: Receipt },
     ],
   },
   {
@@ -81,7 +82,6 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Nhà cung cấp", path: "/sources", icon: Building2 },
       { name: "Nhập ngoài luồng", path: "/external-imports", icon: PackagePlus },
-      { name: "Biên lai Thanh toán", path: "/invoices", icon: Boxes },
       { name: "Kho hàng & Mã Key", path: "/warehouse", icon: Warehouse },
     ],
   },

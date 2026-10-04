@@ -10,6 +10,7 @@ import { PaymentWalletsPage } from "@/pages/PaymentWalletsPage";
 import { PackageManagementPage } from "@/features/packages/PackageManagementPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { WarehousePage } from "@/pages/WarehousePage";
+import { ReceiptsPage } from "@/pages/ReceiptsPage";
 import { useAuth } from "@/shared/context/AuthContext";
 
 const ProtectedRoute: React.FC = () => {
@@ -244,33 +245,7 @@ export const AppRoutes: React.FC = () => {
           />
         }
       />
-      <Route
-        path="/invoices"
-        element={
-          <GenericPage
-            title="Biên Lai Thanh Toán & Đối Soát"
-            category="Nguồn hàng & Kho"
-            description="Toàn bộ biên lai ngân hàng, phân loại tự động và đối soát tài chính"
-            stats={[
-              { title: "Tổng Biên Lai Đơn", value: "1,180", subtitle: "Khớp thành công 100%", accent: "emerald" },
-              { title: "Chưa Được Liệt Kê", value: "0", subtitle: "Đã làm sạch rác slot suffix", accent: "cyan" },
-              { title: "Chi Phí & Ngoài Luồng", value: "14", subtitle: "Đã xác nhận tài chính", accent: "purple" },
-            ]}
-            columns={[
-              { key: "receiptId", label: "Mã GD" },
-              { key: "orderCode", label: "Mã Đơn Gốc" },
-              { key: "amount", label: "Số tiền" },
-              { key: "sender", label: "Người gửi" },
-              { key: "date", label: "Ngày thanh toán" },
-            ]}
-            sampleData={[
-              { receiptId: "#587", orderCode: "MAVLVS2BV", amount: "150.010 ₫", sender: "Phạm Thi Lan Anh", date: "17/09/2026" },
-              { receiptId: "#584", orderCode: "MAVCMXRAN", amount: "65.048 ₫", sender: "Nguyễn Ngọc Châu Hoàng", date: "17/09/2026" },
-              { receiptId: "#582", orderCode: "MAVLFGQ69", amount: "149.973 ₫", sender: "Nguyễn Vũ Quang Huy", date: "16/09/2026" },
-            ]}
-          />
-        }
-      />
+      <Route path="/invoices" element={<ReceiptsPage />} />
       <Route path="/warehouse" element={<WarehousePage />} />
 
       {/* 5. Hệ thống & Ví */}

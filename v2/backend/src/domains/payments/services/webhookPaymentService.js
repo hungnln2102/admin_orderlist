@@ -1,5 +1,6 @@
 const { db, TABLES } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
+const { ORDER_STATUS } = require("@/constants/orderStatus");
 
 const getOrderTable = () => db(TABLES.ORDER_LIST);
 
@@ -18,17 +19,12 @@ async function processPaymentWebhook(payload = {}) {
     };
   }
 
-  // 1. Tìm đơn hàng ở trạng thái Chưa Thanh Toán hoặc Cần gia hạn có giá khớp chính xác với transferAmount
+  // 1. Tìm đơn hàng ở trạng thái UNPAID hoặc RENEW_REQUIRED có giá khớp chính xác với transferAmount
   const matchedOrder = await getOrderTable()
     .where((builder) => {
       builder.where("price", transferAmount).orWhere("gross_selling_price", transferAmount);
     })
-    .where((builder) => {
-      builder
-        .whereILike("status", "%Chưa Thanh Toán%")
-        .orWhereILike("status", "%Cần gia hạn%")
-        .orWhereILike("status", "%Chờ xử lý%");
-    })
+    .whereIn("status", [ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED])
     .orderBy("id", "desc")
     .first();
 

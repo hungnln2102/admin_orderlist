@@ -1,4 +1,5 @@
 const { db, TABLES } = require("@/db");
+const { ORDER_STATUS } = require("@/constants/orderStatus");
 
 const getOrderTable = () => db(TABLES.ORDER_LIST);
 
@@ -7,15 +8,10 @@ const getOrderTable = () => db(TABLES.ORDER_LIST);
  */
 async function getAvailableSuffix() {
   try {
-    // 1. Lấy tất cả giá / suffix của các đơn đang ở trạng thái Chưa Thanh Toán hoặc Cần gia hạn
+    // 1. Lấy tất cả giá / suffix của các đơn đang ở trạng thái UNPAID hoặc RENEW_REQUIRED
     const pendingOrders = await getOrderTable()
       .select("price", "gross_selling_price")
-      .where((builder) => {
-        builder
-          .whereILike("status", "%Chưa Thanh Toán%")
-          .orWhereILike("status", "%Cần gia hạn%")
-          .orWhereILike("status", "%Chờ xử lý%");
-      });
+      .whereIn("status", [ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED]);
 
     // 2. Trích xuất các suffix (phần dư % 100) đang được sử dụng
     const usedSuffixes = new Set();

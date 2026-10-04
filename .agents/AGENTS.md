@@ -942,3 +942,15 @@ Mọi file kế hoạch phải được lưu trữ trong thư mục docs/plans/ 
 
 16.2. Tiêu chuẩn nội dung file kế hoạch
 Đầu mỗi file kế hoạch (.md) bắt buộc phải ghi rõ ngày tháng lập kế hoạch (ở định dạng YYYY-MM-DD) và tên người/tác nhân lập kế hoạch, giúp việc tìm kiếm và truy vết lịch sử luôn có sẵn và trực quan.
+
+17. Quy tắc bắt buộc cập nhật tài liệu V2 (README.md & ARCHITECTURE.md)
+
+[!IMPORTANT]
+Mọi thay đổi liên quan đến tính năng, giao diện trang hoặc luồng nghiệp vụ trên hệ thống V2 bắt buộc phải cập nhật lại 2 file tài liệu chuẩn sau khi hoàn thành:
+1. `v2/README.md` (đồng thời sao chép bản copy khớp nội dung tại `README.md` ở thư mục gốc).
+2. `v2/ARCHITECTURE.md` (sơ đồ kiến trúc hệ thống và luồng dữ liệu V2).
+
+17.1. Tiêu chuẩn ngôn ngữ trong README.md
+- BẮT BUỘC sử dụng thuật ngữ **tính năng nghiệp vụ dân dã, dễ hiểu cho người dùng/chủ shop**.
+- KHÔNG sử dụng thuật ngữ kỹ thuật chuyên ngành phức tạp (như "POST request", "JSON payload", "Database schema", "Pro-rata algorithm", "REST API"...).
+- Phải giải thích dưới dạng hành vi thực tế: "Nút bấm", "Hệ thống tự động lưu", "Công thức tự động tính tiền hoàn lại theo số ngày còn lại", "Ghi nhận nạp ví credit", "Tự động nhảy giá", v.v. để bất kỳ ai cũng có thể đọc và hiểu ngay lập tức.

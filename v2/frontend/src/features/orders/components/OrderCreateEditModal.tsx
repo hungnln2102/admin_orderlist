@@ -3,7 +3,10 @@ import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle } from "
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
-import { Order, CatalogProduct, CatalogSupplierCost, CatalogSupplier } from "../types";
+import { Order, CatalogProduct, CatalogSupplierCost, CatalogSupplier, OrderFormData } from "../types";
+import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../constants/orderStatus";
+import { ORDER_PREFIX, ORDER_PREFIX_CONFIGS } from "../constants/orderPrefix";
+import { parseDateToMidnight } from "../utils/durationUtils";
 
 interface OrderCreateEditModalProps {
   isOpen: boolean;
@@ -11,8 +14,8 @@ interface OrderCreateEditModalProps {
   isImportTab?: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
-  formData: any;
-  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  formData: OrderFormData;
+  setFormData: React.Dispatch<React.SetStateAction<OrderFormData>>;
   productsCatalog: CatalogProduct[];
   allSuppliersCatalog: CatalogSupplier[];
   productSuppliersCatalog: CatalogSupplierCost[];
@@ -46,8 +49,8 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const currentPrefix = formData.order_prefix || (isImportTab ? "MAVN" : "MAVC");
-  const isImportMode = isImportTab || currentPrefix === "MAVN";
+  const currentPrefix = formData.order_prefix || (isImportTab ? ORDER_PREFIX.MAVN : ORDER_PREFIX.MAVC);
+  const isImportMode = isImportTab || currentPrefix === ORDER_PREFIX.MAVN;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -111,14 +114,14 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-cyan-300 font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
                 >
                   {isImportMode ? (
-                    <option value="MAVN">MAVN — Nhập Hàng</option>
+                    <option value={ORDER_PREFIX.MAVN}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVN].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVN].shortLabel}</option>
                   ) : (
                     <>
-                      <option value="MAVC">MAVC — Cộng Tác Viên</option>
-                      <option value="MAVL">MAVL — Khách Lẻ</option>
-                      <option value="MAVK">MAVK — Khuyến Mãi</option>
-                      <option value="MAVS">MAVS — Sinh Viên</option>
-                      <option value="MAVT">MAVT — Quà Tặng (0đ)</option>
+                      <option value={ORDER_PREFIX.MAVC}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].shortLabel}</option>
+                      <option value={ORDER_PREFIX.MAVL}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].shortLabel}</option>
+                      <option value={ORDER_PREFIX.MAVK}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].shortLabel}</option>
+                      <option value={ORDER_PREFIX.MAVS}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].shortLabel}</option>
+                      <option value={ORDER_PREFIX.MAVT}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].shortLabel} (0đ)</option>
                     </>
                   )}
                 </select>
@@ -248,13 +251,13 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
                   >
-                    <option value="Đã Thanh Toán">Đã Thanh Toán</option>
-                    <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
-                    <option value="Cần gia hạn">Cần Gia Hạn</option>
-                    <option value="Hết Hạn">Hết Hạn</option>
-                    <option value="Chưa Hoàn">Chưa Hoàn Tiền</option>
-                    <option value="Đã Hoàn">Đã Hoàn Tiền</option>
-                    <option value="Đã Hủy">Đã Hủy</option>
+                    <option value={ORDER_STATUS.PAID}>{ORDER_STATUS_LABELS[ORDER_STATUS.PAID]}</option>
+                    <option value={ORDER_STATUS.UNPAID}>{ORDER_STATUS_LABELS[ORDER_STATUS.UNPAID]}</option>
+                    <option value={ORDER_STATUS.RENEW_REQUIRED}>{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}</option>
+                    <option value={ORDER_STATUS.EXPIRED}>{ORDER_STATUS_LABELS[ORDER_STATUS.EXPIRED]}</option>
+                    <option value={ORDER_STATUS.REFUND_PENDING}>{ORDER_STATUS_LABELS[ORDER_STATUS.REFUND_PENDING]}</option>
+                    <option value={ORDER_STATUS.REFUNDED}>{ORDER_STATUS_LABELS[ORDER_STATUS.REFUNDED]}</option>
+                    <option value={ORDER_STATUS.CANCELED}>{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}</option>
                   </select>
                 </div>
               )}
@@ -273,8 +276,8 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 endDate={formData.expired_at}
                 openDirection="up"
                 onChange={(start, end) => {
-                  const startDateObj = new Date(start || new Date().toISOString().split("T")[0]);
-                  const endDateObj = new Date(end || start);
+                  const startDateObj = parseDateToMidnight(start) || parseDateToMidnight(formData.order_date) || new Date();
+                  const endDateObj = parseDateToMidnight(end) || startDateObj;
                   const diffTime = endDateObj.getTime() - startDateObj.getTime();
                   const diffDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
                   setFormData({

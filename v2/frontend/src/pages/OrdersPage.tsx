@@ -1,35 +1,67 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { ShoppingBag, Plus } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import {
   Order,
-  OrderDatasetKey,
   OrdersPageProps,
+  OrderFormData,
   DEFAULT_FORM_DATA,
-  CatalogProduct,
-  CatalogSupplierCost,
-  CatalogSupplier,
-  calculateRemainingValue,
+  ORDER_STATUS,
+  useOrders,
+  useOrderCatalog,
   OrderFilterBar,
   OrderTable,
   OrderCreateEditModal,
   OrderDetailModal,
   OrderDeleteModal,
 } from "../features/orders";
+import {
+  ORDER_PREFIX,
+  getOrderPrefixConfig,
+  resolvePriceByPrefix,
+} from "../features/orders/constants/orderPrefix";
+import {
+  parsePackageDuration,
+  calculateExpirationDate,
+  formatDateYYYYMMDD,
+} from "../features/orders/utils/durationUtils";
 
 export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" }) => {
   const notify = useNotification();
-  const [activeTab, setActiveTab] = useState<OrderDatasetKey>(initialTab);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [search, setSearch] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [page, setPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalOrders, setTotalOrders] = useState<number>(0);
-  const [tabCounts, setTabCounts] = useState({ active: 0, import: 0, expired: 0, canceled: 0 });
+
+  // Custom Hooks for Orders Data & Catalog Data
+  const {
+    activeTab,
+    setActiveTab,
+    orders,
+    loading,
+    search,
+    setSearch,
+    statusFilter,
+    setStatusFilter,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    page,
+    setPage,
+    totalPages,
+    totalOrders,
+    tabCounts,
+    summaryData,
+    fetchOrders,
+  } = useOrders(initialTab);
+
+  const {
+    productsCatalog,
+    allSuppliersCatalog,
+    productSuppliersCatalog,
+    setProductSuppliersCatalog,
+    loadingSuppliers,
+    selectedProductId,
+    setSelectedProductId,
+    fetchSuppliersForProduct,
+  } = useOrderCatalog();
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -39,90 +71,23 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Form states
-  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
-
-  // Catalog Data States for Dropdowns & Auto-fill
-  const [productsCatalog, setProductsCatalog] = useState<CatalogProduct[]>([]);
-  const [allSuppliersCatalog, setAllSuppliersCatalog] = useState<CatalogSupplier[]>([]);
-  const [productSuppliersCatalog, setProductSuppliersCatalog] = useState<CatalogSupplierCost[]>([]);
-  const [loadingSuppliers, setLoadingSuppliers] = useState<boolean>(false);
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<OrderFormData>(DEFAULT_FORM_DATA);
   const [isCustomPriceMode, setIsCustomPriceMode] = useState<boolean>(false);
 
-  // Fetch product catalog and all suppliers catalog once on mount
-  useEffect(() => {
-    fetch("/api/products/prices?limit=500&activeOnly=true")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.data) setProductsCatalog(data.data);
-      })
-      .catch((err) => console.error("Lỗi tải danh mục sản phẩm:", err));
-
-    fetch("/api/products/all-suppliers")
-      .then((res) => res.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : data.data || [];
-        setAllSuppliersCatalog(list);
-      })
-      .catch((err) => console.error("Lỗi tải danh sách NCC:", err));
-  }, []);
-
-  const fetchSuppliersForProduct = async (productId: number) => {
-    setLoadingSuppliers(true);
-    try {
-      const res = await fetch(`/api/products/${productId}/suppliers`);
-      const data = await res.json();
-      if (res.ok) {
-        const list: CatalogSupplierCost[] = Array.isArray(data) ? data : data.data || [];
-        setProductSuppliersCatalog(list);
-        return list;
-      }
-    } catch (err) {
-      console.error("Lỗi tải NCC cho sản phẩm:", err);
-    } finally {
-      setLoadingSuppliers(false);
-    }
-    setProductSuppliersCatalog([]);
-    return [];
-  };
-
-  const resolvePriceByPrefix = (prod: CatalogProduct, prefix: string): number => {
-    const upper = String(prefix || "").toUpperCase();
-    if (upper.startsWith("MAVC")) {
-      return prod.ctv_price > 0 ? prod.ctv_price : (prod.retail_price > 0 ? prod.retail_price : prod.base_price);
-    }
-    if (upper.startsWith("MAVL")) {
-      return prod.retail_price > 0 ? prod.retail_price : (prod.ctv_price > 0 ? prod.ctv_price : prod.base_price);
-    }
-    if (upper.startsWith("MAVK")) {
-      return prod.promo_price > 0 ? prod.promo_price : (prod.retail_price > 0 ? prod.retail_price : prod.base_price);
-    }
-    if (upper.startsWith("MAVS")) {
-      return prod.student_price > 0 ? prod.student_price : (prod.ctv_price > 0 ? prod.ctv_price : (prod.retail_price > 0 ? prod.retail_price : prod.base_price));
-    }
-    if (upper.startsWith("MAVT")) {
-      return 0;
-    }
-    if (upper.startsWith("MAVN")) {
-      return prod.base_price > 0 ? prod.base_price : 0;
-    }
-    return prod.retail_price > 0 ? prod.retail_price : prod.base_price;
-  };
-
   const handlePrefixChange = (prefixVal: string) => {
-    const isImport = prefixVal.startsWith("MAVN");
-    const isGift = prefixVal.startsWith("MAVT");
+    const isImport = prefixVal.startsWith(ORDER_PREFIX.MAVN);
+    const isGift = prefixVal.startsWith(ORDER_PREFIX.MAVT);
 
-    setFormData((prev: any) => {
+    setFormData((prev) => {
       const updated = { ...prev, order_prefix: prefixVal };
 
       if (isImport) {
-        updated.status = "Đã Thanh Toán";
+        updated.status = ORDER_STATUS.PAID;
         if (!prev.customer || prev.customer === "Khách Hàng" || prev.customer === "test") {
           updated.customer = "Mavryk";
         }
       } else if (!isEditModalOpen) {
-        updated.status = "Chưa Thanh Toán";
+        updated.status = ORDER_STATUS.UNPAID;
       }
 
       if (selectedProductId) {
@@ -150,30 +115,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     if (!prod) return;
 
     setSelectedProductId(prod.id);
-    const prefix = formData.order_prefix || "MAVC";
+    const prefix = formData.order_prefix || ORDER_PREFIX.MAVC;
     const sellingPrice = resolvePriceByPrefix(prod, prefix);
 
-    // Fetch suppliers for this specific product to populate dropdown choices
     await fetchSuppliersForProduct(prod.id);
 
-    // Auto-calculate duration days & expired_at from product package name
     const textToMatch = `${prod.san_pham} ${prod.package_product || ""}`;
-    let derivedDays = 365;
-    const matchM = textToMatch.match(/--(\d+)m/i) || textToMatch.match(/(\d+)\s*(tháng|month|m\b)/i);
-    const matchY = textToMatch.match(/(\d+)\s*(năm|year|y\b)/i);
-
-    if (matchM) {
-      const months = Number(matchM[1]);
-      if (months > 0) derivedDays = months === 12 ? 365 : months * 30;
-    } else if (matchY) {
-      const years = Number(matchY[1]);
-      if (years > 0) derivedDays = years * 365;
-    }
-
-    const baseDateStr = formData.order_date || new Date().toISOString().split("T")[0];
-    const baseDate = new Date(baseDateStr);
-    const expiryDate = new Date(baseDate.getTime() + derivedDays * 24 * 60 * 60 * 1000);
-    const expiryStr = expiryDate.toISOString().split("T")[0];
+    const { days: derivedDays } = parsePackageDuration(textToMatch);
+    const baseDateStr = formData.order_date || formatDateYYYYMMDD(new Date());
+    const expiryStr = calculateExpirationDate(baseDateStr, derivedDays);
 
     setFormData((prev) => ({
       ...prev,
@@ -215,54 +165,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     }
   };
 
-  const [serverSummary, setServerSummary] = useState<{
-    totalRevenue: number;
-    totalCost: number;
-    totalRemainingValue?: number;
-    supplierRemainingValue?: number;
-    refundCustomerAmount?: number;
-    refundedCustomerAmount?: number;
-    refundSupplierAmount?: number;
-    paidCount: number;
-    renewCount: number;
-    processingCount: number;
-    pendingCount: number;
-    pendingRefundCount?: number;
-    refundedCount?: number;
-    canceledCount?: number;
-    todayCount: number;
-    totalOrders: number;
-  } | null>(null);
-
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/orders?page=${page}&limit=15&search=${encodeURIComponent(
-          search
-        )}&status=${encodeURIComponent(statusFilter)}&tab=${activeTab}`
-      );
-      const data = await res.json();
-      if (res.ok) {
-        setOrders(data.data || []);
-        setTotalPages(data.pagination?.totalPages || 1);
-        setTotalOrders(data.pagination?.total || 0);
-        if (data.tabCounts) setTabCounts(data.tabCounts);
-        if (data.summary) setServerSummary(data.summary);
-      } else {
-        console.error("Lỗi lấy danh sách đơn:", data.error);
-      }
-    } catch (err) {
-      console.error("Lỗi kết nối API:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, statusFilter, activeTab]);
-
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
   // Lock background body scroll when any modal is open
   useEffect(() => {
     const isAnyModalOpen = isCreateModalOpen || isEditModalOpen || isDeleteModalOpen || isViewModalOpen;
@@ -276,56 +178,17 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     };
   }, [isCreateModalOpen, isEditModalOpen, isDeleteModalOpen, isViewModalOpen]);
 
-  // Stat summary calculations for active view (memoized from serverSummary or fallback)
-  const summaryData = useMemo(() => {
-    const fallbackRemainingValue = orders.reduce(
-      (sum: number, o: Order) => sum + calculateRemainingValue(o),
-      0
-    );
-
-    if (serverSummary) {
-      return {
-        ...serverSummary,
-        totalRemainingValue: serverSummary.totalRemainingValue ?? fallbackRemainingValue,
-      };
-    }
-
-    const todayStr = new Date().toISOString().split("T")[0];
-    const revenue = orders.reduce((sum: number, o: Order) => sum + Number(o.price || 0), 0);
-    const cost = orders.reduce((sum: number, o: Order) => sum + Number(o.cost || 0), 0);
-    const paid = orders.filter((o: Order) => o.status === "Hoàn thành" || o.status === "Đã Thanh Toán").length;
-    const renew = orders.filter((o: Order) => o.status === "Cần gia hạn" || o.status === "CẦN GIA HẠN").length;
-    const processing = orders.filter((o: Order) => o.status === "Đang xử lý" || o.status === "Chờ xử lý").length;
-    const pending = orders.filter((o: Order) => o.status === "Chờ xử lý" || o.status === "Chưa Thanh Toán" || o.status === "Cần gia hạn" || o.status === "CẦN GIA HẠN" || o.status === "Hết Hạn").length;
-    const today = orders.filter((o: Order) => {
-      const d = o.order_date || o.created_at;
-      return d && String(d).startsWith(todayStr);
-    }).length;
-
-    return {
-      totalRevenue: revenue,
-      totalCost: cost,
-      paidCount: paid,
-      renewCount: renew,
-      processingCount: processing,
-      pendingCount: pending,
-      todayCount: today,
-      totalOrders: orders.length,
-      totalRemainingValue: fallbackRemainingValue,
-    };
-  }, [serverSummary, orders]);
-
   const handleOpenCreate = () => {
-    const today = new Date().toISOString().split("T")[0];
-    const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const today = formatDateYYYYMMDD(new Date());
+    const nextYear = calculateExpirationDate(today, 365);
     setSelectedProductId(null);
     setProductSuppliersCatalog([]);
     setIsCustomPriceMode(false);
     if (activeTab === "import") {
       setFormData({
         ...DEFAULT_FORM_DATA,
-        order_prefix: "MAVN",
-        status: "Đã Thanh Toán",
+        order_prefix: ORDER_PREFIX.MAVN,
+        status: ORDER_STATUS.PAID,
         customer: "Mavryk",
         order_date: today,
         expired_at: nextYear,
@@ -333,8 +196,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     } else {
       setFormData({
         ...DEFAULT_FORM_DATA,
-        order_prefix: "MAVC",
-        status: "Chưa Thanh Toán",
+        order_prefix: ORDER_PREFIX.MAVC,
+        status: ORDER_STATUS.UNPAID,
         order_date: today,
         expired_at: nextYear,
       });
@@ -355,14 +218,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       (p) => p.san_pham.toLowerCase() === prodName.toLowerCase() || String(p.id) === prodName
     );
 
-    let prefix = "MAVC";
-    const upperId = String(order.id_order || "").toUpperCase();
-    if (upperId.startsWith("MAVL")) prefix = "MAVL";
-    else if (upperId.startsWith("MAVC")) prefix = "MAVC";
-    else if (upperId.startsWith("MAVK")) prefix = "MAVK";
-    else if (upperId.startsWith("MAVS")) prefix = "MAVS";
-    else if (upperId.startsWith("MAVT")) prefix = "MAVT";
-    else if (upperId.startsWith("MAVN")) prefix = "MAVN";
+    const prefixConfig = getOrderPrefixConfig(order.id_order);
+    const prefix = prefixConfig.prefix;
 
     if (matchedProd) {
       setSelectedProductId(matchedProd.id);
@@ -382,12 +239,12 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       price: Number(order.price || 0),
       gross_selling_price: Number(order.gross_selling_price || order.price || 0),
       cost: Number(order.cost || 0),
-      status: order.status || "Chưa Thanh Toán",
+      status: order.status || ORDER_STATUS.UNPAID,
       payment_method: order.payment_method || "bank",
       note: order.note || "",
       days: Number(order.days || 365),
-      order_date: order.order_date ? new Date(order.order_date).toISOString().split("T")[0] : "",
-      expired_at: order.expired_at ? new Date(order.expired_at).toISOString().split("T")[0] : "",
+      order_date: formatDateYYYYMMDD(order.order_date),
+      expired_at: formatDateYYYYMMDD(order.expired_at),
       order_prefix: prefix,
     });
     setIsEditModalOpen(true);
@@ -401,15 +258,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const prefix = formData.order_prefix || "MAVC";
+      const prefix = formData.order_prefix || ORDER_PREFIX.MAVC;
       const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       const generatedCode = `${prefix}${randomCode}`;
 
       const payload = {
         ...formData,
         id_order: generatedCode,
-        status: prefix === "MAVN" ? "Đã Thanh Toán" : "Chưa Thanh Toán",
-        customer: prefix === "MAVN" && (!formData.customer || formData.customer === "Khách Hàng") ? "Mavryk" : (formData.customer || "Khách Hàng"),
+        status: prefix === ORDER_PREFIX.MAVN ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID,
+        customer: prefix === ORDER_PREFIX.MAVN && (!formData.customer || formData.customer === "Khách Hàng") ? "Mavryk" : (formData.customer || "Khách Hàng"),
       };
 
       const res = await fetch("/api/orders", {

@@ -6,14 +6,14 @@
  */
 
 const SCHEMAS = {
-  BUSINESS: process.env.DB_SCHEMA_BUSINESS || "",
-  PARTNER: process.env.DB_SCHEMA_PARTNER || "",
-  PRODUCT: process.env.DB_SCHEMA_PRODUCT || "",
-  ORDERS: process.env.DB_SCHEMA_ORDERS || "",
-  RECEIPT: process.env.DB_SCHEMA_RECEIPT || "",
-  ADMIN: process.env.DB_SCHEMA_ADMIN || "finance",
-  FINANCE: process.env.DB_SCHEMA_FINANCE || "finance",
-  SYSTEM: process.env.DB_SCHEMA_SYSTEM || "system_automation",
+  BUSINESS: process.env.DB_SCHEMA_BUSINESS || "business",
+  PARTNER: process.env.DB_SCHEMA_PARTNER || process.env.SCHEMA_PARTNER || "partner",
+  PRODUCT: process.env.DB_SCHEMA_PRODUCT || process.env.SCHEMA_PRODUCT || "product",
+  ORDERS: process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders",
+  RECEIPT: process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt",
+  ADMIN: process.env.DB_SCHEMA_ADMIN || process.env.SCHEMA_ADMIN || "admin",
+  FINANCE: process.env.DB_SCHEMA_FINANCE || process.env.SCHEMA_FINANCE || "finance",
+  SYSTEM: process.env.DB_SCHEMA_SYSTEM || process.env.DB_SCHEMA_RENEW_ADOBE || "system_automation",
 };
 
 /**
@@ -30,12 +30,14 @@ const TABLES = {
   VARIANT_PRICE: formatTable(SCHEMAS.PRODUCT, "variant_price"),
   PRODUCT: formatTable(SCHEMAS.PRODUCT, "product"),
   ORDER_LIST: formatTable(SCHEMAS.ORDERS, "order_list"),
+  PAYMENT_RECEIPT: formatTable(SCHEMAS.RECEIPT, "payment_receipt"),
+  PAYMENT_RECEIPT_ALLOCATIONS: formatTable(SCHEMAS.RECEIPT, "payment_receipt_allocations"),
   REFUND_CREDIT_NOTES: formatTable(SCHEMAS.RECEIPT, "refund_credit_notes"),
   REFUND_CREDIT_APPLICATIONS: formatTable(SCHEMAS.RECEIPT, "refund_credit_applications"),
   DOMAIN_EVENT_STORE: formatTable(SCHEMAS.SYSTEM, "domain_event_store"),
   USERS: formatTable(SCHEMAS.ADMIN, "users"),
-  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "financial_accounts"),
-  USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "financial_accounts"),
+  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "shop_bank_accounts"),
+  USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "usdt_wallets"),
   FINANCIAL_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
   FINANCIAL_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
 };
