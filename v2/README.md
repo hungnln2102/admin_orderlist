@@ -221,6 +221,11 @@ Trang **Biên Lai Thanh Toán & Đối Soát** nằm trong mục **Bán Hàng & 
 *Người dùng có thể bấm trực tiếp vào từng Thẻ Card Thống Kê để chuyển qua lại giữa 3 tập dữ liệu biên lai.*
 
 ### 8.2. Cơ Chế Phân Bổ & Phân Tách Số Dư Biên Lai (Receipt Balance Allocation)
+- **Tự Động Tạo & Gán Biên Lai Từ Webhook Ngân Hàng (SePay / VietQR):**
+  - Khi ngân hàng báo giao dịch **Tiền Vào**: Hệ thống tự động lưu vết tạo ngay một **Biên lai mới**.
+  - **Tự Động Khớp Đơn:** Nếu số tiền khớp vừa đúng giá của đơn hàng đang chờ (hoặc nội dung có mã đơn `MAV...`), hệ thống tự động đổi trạng thái đơn sang **`Đã Thanh Toán`** (hoặc tự tính cộng thêm ngày gia hạn), tự động gán biên lai cho đơn và đánh dấu biên lai là **`Đã Phân Bổ Hoàn Toàn`**.
+  - **Tự Động Liệt Kê Chờ Duyệt (Chưa Phân Bổ):** Nếu số tiền tiền vào không trùng khớp với đơn nào (hoặc khách chuyển thừa/chuyển lẻ), biên lai sẽ tự động nằm tại **Tab Chưa Được Liệt Kê** (`UNALLOCATED`) để chủ shop chủ động gán tay hoặc xử lý sau.
+  - **Tự Động Ghi Nhận Tiền Ra:** Mọi giao dịch chuyển tiền ra khỏi tài khoản ngân hàng sẽ được lưu vết vào **Tab Chi Phí & Ngoài Luồng** (`other`).
 - **Immutability (Bảo tồn giao dịch ngân hàng gốc):** Biên lai gốc giữ nguyên số tiền nhận/chuyển từ ngân hàng.
 - **Phân bổ đa dạng (Split Allocation):** 1 biên lai có thể được gán/khấu trừ cho nhiều đơn hàng khác nhau hoặc nạp vào Ví Credit khách cho đến khi số tiền còn dư bằng 0 ₫.
 

@@ -23,7 +23,7 @@ function registerWebhookEventSubscribers() {
   eventBus.on(EVENTS.WEBHOOK_MONEY_OUT, async (data) => {
     try {
       console.log(`📤 [Subscriber] Nhận sự kiện WEBHOOK_MONEY_OUT - Số tiền: ${data.amount} ₫ - Nội dung: "${data.content}"`);
-      // Dự phòng cho luồng xử lý chi phí / thanh toán nhà cung cấp tự động
+      await processPaymentWebhook({ ...data, transferType: "out" });
     } catch (err) {
       console.error("❌ [Subscriber] Lỗi khi xử lý WEBHOOK_MONEY_OUT:", err);
     }

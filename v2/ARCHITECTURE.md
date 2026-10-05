@@ -139,6 +139,24 @@ sequenceDiagram
     API-->>UI: Return Success + Pro-rata Refund Amount
     UI-->>User: Cập nhật UI, giảm doanh thu & chuyển đơn sang Tab 'canceled'
     end
+
+    rect rgb(20, 83, 45)
+    note over User, QR: 3. LUỒNG WEBHOOK & TỰ ĐỘNG KHỚP BIÊN LAI (WEBHOOK & AUTOMATED RECEIPT MATCHING)
+    participant Bank as Ngân Hàng / SePay Webhook
+    Bank->>API: POST /api/webhooks/sepay (Money In/Out Event)
+    API->>Event: Emit 'WEBHOOK_MONEY_IN' / 'WEBHOOK_MONEY_OUT'
+    Event->>API: Subscriber: processPaymentWebhook()
+    API->>DB: Check Idempotency (sepay_transaction_id)
+    API->>DB: INSERT INTO receipt.payment_receipt (status = 'UNALLOCATED')
+    alt Tìm thấy đơn hàng khớp số tiền / mã đơn
+        API->>DB: UPDATE receipt.payment_receipt (status = 'FULLY_ALLOCATED', unallocated_amount = 0)
+        API->>DB: INSERT INTO receipt.payment_receipt_allocations (allocation_type = 'ORDER', target_code = id_order)
+        API->>DB: UPDATE business.orders (status = 'Đã Thanh Toán' / gia hạn expired_at)
+        API->>Event: Emit Event 'ORDER_PAID' / 'ORDER_RENEWED'
+    else Không tìm thấy đơn trùng khớp
+        API-->>API: Giữ trạng thái UNALLOCATED (Biên lai nằm ở Tab Chưa được liệt kê)
+    end
+    end
 ```
 
 ---
@@ -190,6 +208,32 @@ erDiagram
         date expired_at
     }
 
+    receipt_payment_receipt {
+        int id PK
+        date payment_date
+        numeric amount
+        numeric unallocated_amount
+        string status
+        string transfer_type
+        bigint sepay_transaction_id
+        string reference_code
+        string gateway
+        string sender
+        string receiver
+        text note
+    }
+
+    receipt_payment_receipt_allocations {
+        bigint id PK
+        bigint receipt_id FK
+        string allocation_type
+        string target_code
+        numeric amount
+        numeric remaining_balance
+        text note
+        string created_by
+    }
+
     billing_shop_bank_accounts {
         int id PK
         string account_number
@@ -223,6 +267,8 @@ erDiagram
     business_customers ||--o{ business_orders : "sở hữu"
     business_orders ||--o{ finance_credit_notes : "tạo credit khi hủy"
     business_products ||--o{ business_orders : "được bán trong"
+    receipt_payment_receipt ||--o{ receipt_payment_receipt_allocations : "có các lượt phân bổ"
+    business_orders ||--o{ receipt_payment_receipt_allocations : "được phân bổ bởi"
 ```
 
 ---
