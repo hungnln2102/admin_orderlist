@@ -7,12 +7,13 @@
 
 const SCHEMAS = {
   BUSINESS: process.env.DB_SCHEMA_BUSINESS || "business",
-  PARTNER: process.env.DB_SCHEMA_PARTNER || process.env.SCHEMA_PARTNER || "partner",
-  PRODUCT: process.env.DB_SCHEMA_PRODUCT || process.env.SCHEMA_PRODUCT || "product",
-  ORDERS: process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders",
-  RECEIPT: process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt",
-  ADMIN: process.env.DB_SCHEMA_ADMIN || process.env.SCHEMA_ADMIN || "admin",
+  PARTNER: process.env.DB_SCHEMA_PARTNER || process.env.SCHEMA_PARTNER || "business",
+  PRODUCT: process.env.DB_SCHEMA_PRODUCT || process.env.SCHEMA_PRODUCT || "business",
+  ORDERS: process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "business",
+  RECEIPT: process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "billing",
+  ADMIN: process.env.DB_SCHEMA_ADMIN || process.env.SCHEMA_ADMIN || "finance",
   FINANCE: process.env.DB_SCHEMA_FINANCE || process.env.SCHEMA_FINANCE || "finance",
+  DASHBOARD: process.env.DB_SCHEMA_DASHBOARD || "finance",
   SYSTEM: process.env.DB_SCHEMA_SYSTEM || process.env.DB_SCHEMA_RENEW_ADOBE || "system_automation",
 };
 
@@ -38,10 +39,12 @@ const TABLES = {
   REFUND_CREDIT_APPLICATIONS: formatTable(SCHEMAS.RECEIPT, "refund_credit_applications"),
   DOMAIN_EVENT_STORE: formatTable(SCHEMAS.SYSTEM, "domain_event_store"),
   USERS: formatTable(SCHEMAS.ADMIN, "users"),
-  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "shop_bank_accounts"),
+  SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.ADMIN, "financial_accounts"),
   USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "usdt_wallets"),
   FINANCIAL_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
   FINANCIAL_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
+  DASHBOARD_MONTHLY_SUMMARY: formatTable(SCHEMAS.DASHBOARD, "dashboard_monthly_summary"),
+  DAILY_REVENUE_SUMMARY: formatTable(SCHEMAS.DASHBOARD, "daily_revenue_summary"),
   SYSTEM_CONFIGS: formatTable(SCHEMAS.SYSTEM, "system_configs"),
   NOTIFICATION_LOGS: formatTable(SCHEMAS.SYSTEM, "notification_logs"),
 };

@@ -1,16 +1,24 @@
 /**
- * Migration 20261004000001: Refactor Order Statuses & Restructure Payment Receipts (V1 to V2)
+ * Migration 20261004000001: V2 Database Refactoring & Initialization
+ * Consolidates all V2 schema changes into a single migration file:
+ * 1. Order Status Standardization & Indexing
+ * 2. Payment Receipt Allocations & Restructuring
+ * 3. System Configs Table & Default Configurations Seed
+ * 4. Notification Logs Table & Telegram Configs Seed
  */
 
 const schemaOrders = process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "business";
 const schemaReceipt = process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "billing";
+const schemaSystem = process.env.DB_SCHEMA_SYSTEM || process.env.DB_SCHEMA_RENEW_ADOBE || "system_automation";
 
 /**
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
 exports.up = async function (knex) {
-  // 1. Cập nhật các bản ghi legacy về đúng mã ORDER_STATUS chuẩn
+  // ==========================================
+  // 1. REFACTOR ORDER STATUSES & INDEX
+  // ==========================================
   await knex.raw(`
     UPDATE ${schemaOrders}.order_list
     SET status = CASE
@@ -26,19 +34,19 @@ exports.up = async function (knex) {
     WHERE status NOT IN ('PAID', 'UNPAID', 'RENEW_REQUIRED', 'EXPIRED', 'REFUND_PENDING', 'REFUNDED', 'CANCELED');
   `);
 
-  // 2. Tạo Index B-Tree cho cột status của order_list
   await knex.raw(`
     CREATE INDEX IF NOT EXISTS idx_order_list_status_v2 ON ${schemaOrders}.order_list (status);
   `);
 
-  // 3. Tái cấu trúc bảng ${schemaReceipt}.payment_receipt: Thêm unallocated_amount & status
+  // ==========================================
+  // 2. PAYMENT RECEIPT ALLOCATIONS & RESTRUCTURING
+  // ==========================================
   await knex.raw(`
     ALTER TABLE ${schemaReceipt}.payment_receipt 
       ADD COLUMN IF NOT EXISTS unallocated_amount NUMERIC(15, 2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'UNALLOCATED';
   `);
 
-  // 4. Tạo bảng phân bổ / đối soát biên lai: ${schemaReceipt}.payment_receipt_allocations
   await knex.raw(`
     CREATE TABLE IF NOT EXISTS ${schemaReceipt}.payment_receipt_allocations (
       id BIGSERIAL PRIMARY KEY,
@@ -56,9 +64,7 @@ exports.up = async function (knex) {
     CREATE INDEX IF NOT EXISTS idx_receipt_allocations_target_code ON ${schemaReceipt}.payment_receipt_allocations(target_code);
   `);
 
-  // 5. Backfill dữ liệu phân bổ đợt 1 từ bảng payment_receipt hiện tại sang payment_receipt_allocations
-  
-  // 5a. Phân bổ cho các Biên lai Đơn hàng (có id_order)
+  // Backfill allocations from payment_receipt
   await knex.raw(`
     INSERT INTO ${schemaReceipt}.payment_receipt_allocations (receipt_id, allocation_type, target_code, amount, remaining_balance, note, created_by)
     SELECT id, 'ORDER', id_order, amount, 0, 'Auto-migrated from V1 order receipt', 'SYSTEM_MIGRATION'
@@ -66,7 +72,6 @@ exports.up = async function (knex) {
     WHERE id_order IS NOT NULL AND id_order != '';
   `);
 
-  // 5b. Phân bổ cho các Biên lai Chi phí (transfer_type = 'out' và không có id_order)
   await knex.raw(`
     INSERT INTO ${schemaReceipt}.payment_receipt_allocations (receipt_id, allocation_type, target_code, amount, remaining_balance, note, created_by)
     SELECT id, 'OUTGOING', NULL, amount, 0, 'Auto-migrated from V1 outgoing receipt', 'SYSTEM_MIGRATION'
@@ -74,8 +79,6 @@ exports.up = async function (knex) {
     WHERE (id_order IS NULL OR id_order = '') AND transfer_type = 'out';
   `);
 
-  // 5c. Cập nhật unallocated_amount và status cho bảng ${schemaReceipt}.payment_receipt
-  // Đã phân bổ 100% (Cho các biên lai có id_order hoặc transfer_type = 'out')
   await knex.raw(`
     UPDATE ${schemaReceipt}.payment_receipt
     SET unallocated_amount = 0,
@@ -83,7 +86,6 @@ exports.up = async function (knex) {
     WHERE (id_order IS NOT NULL AND id_order != '') OR transfer_type = 'out';
   `);
 
-  // Chưa phân bổ (Cho các biên lai còn lại)
   await knex.raw(`
     UPDATE ${schemaReceipt}.payment_receipt
     SET unallocated_amount = amount,
@@ -91,13 +93,59 @@ exports.up = async function (knex) {
     WHERE (id_order IS NULL OR id_order = '') AND (transfer_type IS NULL OR transfer_type != 'out');
   `);
 
-  // 6. Xóa cột legacy id_order khỏi ${schemaReceipt}.payment_receipt
-  // Bỏ qua bước này vì view finance.dashboard_monthly_summary đang phụ thuộc vào cột id_order.
-  /*
+  // ==========================================
+  // 3. SYSTEM CONFIGS TABLE & SEED
+  // ==========================================
   await knex.raw(`
-    ALTER TABLE ${schemaReceipt}.payment_receipt DROP COLUMN IF EXISTS id_order;
+    CREATE TABLE IF NOT EXISTS ${schemaSystem}.system_configs (
+      id BIGSERIAL PRIMARY KEY,
+      config_key VARCHAR(100) UNIQUE NOT NULL,
+      config_value TEXT NOT NULL,
+      data_type VARCHAR(20) NOT NULL DEFAULT 'STRING',
+      description TEXT,
+      group_name VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_by VARCHAR(100) DEFAULT 'SYSTEM'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_system_configs_key ON ${schemaSystem}.system_configs(config_key);
+    CREATE INDEX IF NOT EXISTS idx_system_configs_group ON ${schemaSystem}.system_configs(group_name);
   `);
-  */
+
+  await knex.raw(`
+    INSERT INTO ${schemaSystem}.system_configs (config_key, config_value, data_type, description, group_name)
+    VALUES
+      ('RENEWAL_WARN_DAYS', '4', 'NUMBER', 'Số ngày trước khi hết hạn để gửi thông báo nhắc gia hạn', 'ORDER_BUSINESS'),
+      ('USDT_EXCHANGE_RATE', '25400', 'NUMBER', 'Tỷ giá quy đổi mặc định từ 1 USDT sang VND', 'FINANCE'),
+      ('SEPAY_AUTO_MATCH', 'true', 'BOOLEAN', 'Bật/tắt tính năng tự động khớp biên lai chuyển khoản ngân hàng', 'PAYMENT'),
+      ('TELEGRAM_ENABLED', 'true', 'BOOLEAN', 'Bật/tắt toàn bộ dịch vụ thông báo Telegram', 'NOTIFY'),
+      ('TELEGRAM_ORDER_TOPIC_ID', '', 'STRING', 'ID của Topic nhận thông báo Đơn Hàng Mới', 'NOTIFY'),
+      ('TELEGRAM_RENEWAL_TOPIC_ID', '', 'STRING', 'ID của Topic nhận thông báo Cần Gia Hạn / Hết Hạn', 'NOTIFY'),
+      ('TELEGRAM_FINANCE_TOPIC_ID', '', 'STRING', 'ID của Topic nhận thông báo Biến Động Tài Chính (Sepay, Chuyển tiền)', 'NOTIFY'),
+      ('TELEGRAM_SYSTEM_ALERT_TOPIC_ID', '', 'STRING', 'ID của Topic nhận cảnh báo Lỗi Hệ Thống khẩn cấp', 'NOTIFY')
+    ON CONFLICT (config_key) DO NOTHING;
+  `);
+
+  // ==========================================
+  // 4. NOTIFICATION LOGS TABLE
+  // ==========================================
+  await knex.raw(`
+    CREATE TABLE IF NOT EXISTS ${schemaSystem}.notification_logs (
+      id BIGSERIAL PRIMARY KEY,
+      channel VARCHAR(30) NOT NULL DEFAULT 'TELEGRAM',
+      event_type VARCHAR(100) NOT NULL,
+      recipient VARCHAR(100),
+      message_content TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+      error_message TEXT,
+      sent_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notification_logs_channel ON ${schemaSystem}.notification_logs(channel);
+    CREATE INDEX IF NOT EXISTS idx_notification_logs_status ON ${schemaSystem}.notification_logs(status);
+    CREATE INDEX IF NOT EXISTS idx_notification_logs_event ON ${schemaSystem}.notification_logs(event_type);
+  `);
 };
 
 /**
@@ -105,12 +153,21 @@ exports.up = async function (knex) {
  * @returns { Promise<void> }
  */
 exports.down = async function (knex) {
-  // Thêm lại cột id_order
+  // 4. Drop notification_logs
+  await knex.raw(`
+    DROP TABLE IF EXISTS ${schemaSystem}.notification_logs;
+  `);
+
+  // 3. Drop system_configs
+  await knex.raw(`
+    DROP TABLE IF EXISTS ${schemaSystem}.system_configs;
+  `);
+
+  // 2. Rollback payment_receipt_allocations & columns
   await knex.raw(`
     ALTER TABLE ${schemaReceipt}.payment_receipt ADD COLUMN IF NOT EXISTS id_order VARCHAR(100);
   `);
 
-  // Khôi phục cột id_order từ bảng allocations nếu bảng tồn tại
   const hasAllocationsTable = await knex.schema.withSchema(schemaReceipt).hasTable('payment_receipt_allocations');
   if (hasAllocationsTable) {
     await knex.raw(`
@@ -121,7 +178,6 @@ exports.down = async function (knex) {
     `);
   }
 
-  // Xóa bảng allocations & các cột mới
   await knex.raw(`
     DROP TABLE IF EXISTS ${schemaReceipt}.payment_receipt_allocations;
     ALTER TABLE ${schemaReceipt}.payment_receipt 
@@ -129,7 +185,7 @@ exports.down = async function (knex) {
       DROP COLUMN IF EXISTS status;
   `);
 
-  // Rollback order_list status
+  // 1. Rollback order_list status & index
   await knex.raw(`
     UPDATE ${schemaOrders}.order_list
     SET status = CASE

@@ -65,6 +65,7 @@ app.use("/api/invoices", require("@/domains/invoices/routes"));
 app.use("/api/credits", require("@/domains/credits/routes"));
 app.use("/api/wallets", require("@/domains/wallets/routes"));
 app.use("/api/system", require("@/domains/system/routes"));
+app.use("/api/dashboard", require("@/domains/dashboard/routes"));
 
 app.listen(PORT, () => {
   console.log(`=================================`);
