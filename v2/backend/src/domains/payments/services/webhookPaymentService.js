@@ -1,36 +1,53 @@
+/**
+ * webhookPaymentService.js (V2)
+ * Xử lý Webhook thanh toán từ SePay / Ngân Hàng.
+ *
+ * Luồng xử lý:
+ *  1. Kiểm tra Idempotency (Chống trùng lặp theo sepay_transaction_id).
+ *  2. Lưu Biên lai mới vào bảng payment_receipt (status=UNALLOCATED).
+ *  3. Nếu là Tiền ra (out): Lưu xong, trả về.
+ *  4. Nếu là Tiền vào (in):
+ *     a. Tìm đơn hàng khớp theo MÃ ĐƠN trong nội dung chuyển khoản.
+ *     b. Nếu chưa khớp, tìm theo SỐ TIỀN khớp với price hoặc gross_selling_price.
+ *     c. NẾU KHỚP: Ghi phân bổ, cập nhật đơn hàng sang PAID (+ cộng ngày nếu gia hạn), bắn EventBus.
+ *     d. KHÔNG KHỚP: Giữ Biên lai ở UNALLOCATED.
+ */
 const { db, TABLES } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
+const { RECEIPT_STATUS, TRANSFER_TYPE, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
+const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
+
+// Regex nhận diện mã đơn hàng V2 (dạng ORD-XXXXX hoặc ORDXXXXX)
+const ORDER_CODE_REGEX = /ORD[-_]?\d+/i;
+
+// Các trạng thái đơn hàng hợp lệ cần thanh toán
+const PAYABLE_STATUSES = [
+  ORDER_STATUS.UNPAID,
+  ORDER_STATUS.RENEW_REQUIRED,
+  "Chưa Thanh Toán", // Tương thích ngược V1
+  "Cần Gia Hạn",     // Tương thích ngược V1
+];
 
 const getOrderTable = (trx = db) => trx(TABLES.ORDER_LIST);
 const getReceiptTable = (trx = db) => trx(TABLES.PAYMENT_RECEIPT);
 const getAllocationsTable = (trx = db) => trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS);
 
 /**
- * Xử lý Webhook SePay / Ngân Hàng:
- * 1. Kiểm tra Idempotency (Chống trùng lặp theo sepay_transaction_id).
- * 2. Lưu thông tin vào bảng Biên lai (payment_receipt).
- * 3. Nếu là Tiền vào (in): Tìm đơn hàng khớp số tiền / mã đơn.
- *    - NẾU KHỚP: Cập nhật Biên lai -> FULLY_ALLOCATED, tạo bản ghi payment_receipt_allocations, đổi trạng thái Đơn hàng sang PAID (hoặc gia hạn).
- *    - NẾU KHÔNG KHỚP: Giữ nguyên Biên lai ở trạng thái UNALLOCATED (Biên lai chưa phân bổ / chưa liệt kê).
- * 4. Nếu là Tiền ra (out): Lưu Biên lai tiền ra.
+ * Xử lý Webhook thanh toán từ SePay / Ngân Hàng.
+ * @param {object} payload - Dữ liệu Webhook nhận được
  */
 async function processPaymentWebhook(payload = {}) {
   const rawAmount = payload.transferAmount ?? payload.amount ?? payload.accumulatedAmount ?? payload.price ?? 0;
   const transferAmount = Math.round(Math.abs(Number(rawAmount)));
 
   if (!transferAmount || transferAmount <= 0) {
-    return {
-      success: false,
-      matched: false,
-      reason: "Số tiền chuyển khoản không hợp lệ (<= 0)",
-    };
+    return { success: false, matched: false, reason: "Số tiền chuyển khoản không hợp lệ (<= 0)" };
   }
 
   const rawTransferType = String(
-    payload.transferType || payload.transfer_type || (Number(rawAmount) < 0 ? "out" : "in")
+    payload.transferType || payload.transfer_type || (Number(rawAmount) < 0 ? TRANSFER_TYPE.OUT : TRANSFER_TYPE.IN)
   ).toLowerCase();
-  const isOutbound = rawTransferType === "out" || Number(rawAmount) < 0;
+  const isOutbound = rawTransferType === TRANSFER_TYPE.OUT || Number(rawAmount) < 0;
 
   const rawSepayTxId = payload.id || payload.sepay_transaction_id || payload.transactionId || null;
   const numSepayTxId = (rawSepayTxId && !isNaN(Number(rawSepayTxId))) ? String(rawSepayTxId).trim() : null;
@@ -46,174 +63,105 @@ async function processPaymentWebhook(payload = {}) {
       .first();
 
     if (existing) {
-      console.log(`ℹ️ [Webhook] Giao dịch sepay_transaction_id: ${numSepayTxId} đã tồn tại trong Biên lai #${existing.id}`);
       return {
         success: true,
         duplicate: true,
         receiptId: existing.id,
-        matched: existing.status === "FULLY_ALLOCATED",
+        matched: existing.status === RECEIPT_STATUS.FULLY_ALLOCATED,
         amount: transferAmount,
         status: existing.status,
       };
     }
   }
 
-  // Execute in DB Transaction
   return await db.transaction(async (trx) => {
-    // 2. Tạo Biên lai mới (payment_receipt)
-    const initialStatus = "UNALLOCATED";
-    const initialUnallocated = isOutbound ? 0 : transferAmount;
-
+    // 2. Tạo Biên lai mới — Luôn bắt đầu ở UNALLOCATED
     const [receiptIdRes] = await getReceiptTable(trx)
       .insert({
         payment_date: paymentDate,
         amount: transferAmount,
-        unallocated_amount: initialUnallocated,
-        status: initialStatus,
+        unallocated_amount: isOutbound ? 0 : transferAmount,
+        status: RECEIPT_STATUS.UNALLOCATED,
         sender: payload.accountNumber || payload.sender || gateway || null,
         receiver: payload.receiver || null,
-        gateway: gateway,
+        gateway,
         reference_code: referenceCode,
         sepay_transaction_id: numSepayTxId,
-        transfer_type: isOutbound ? "out" : "in",
+        transfer_type: isOutbound ? TRANSFER_TYPE.OUT : TRANSFER_TYPE.IN,
         note: noteContent,
       })
       .returning("id");
 
     const receiptId = typeof receiptIdRes === "object" ? receiptIdRes.id : receiptIdRes;
 
-    // Nếu là Tiền ra (OUT)
+    // 3. Tiền ra (OUT) — Lưu Biên lai rồi dừng
     if (isOutbound) {
-      console.log(`📤 [Webhook] Đã lưu Biên lai Tiền ra #${receiptId} - Số tiền: ${transferAmount} ₫`);
       return {
         success: true,
         matched: false,
         receiptId,
-        transferType: "out",
+        transferType: TRANSFER_TYPE.OUT,
         amount: transferAmount,
+        reason: `Đã lưu Biên lai Tiền ra #${receiptId}`,
       };
     }
 
-    // 3. Nếu là Tiền vào (IN): Tìm đơn hàng khớp số tiền / mã đơn
-    const UNPAID_STATUSES = [
-      ORDER_STATUS.UNPAID,
-      "Chưa Thanh Toán",
-      ORDER_STATUS.RENEW_REQUIRED,
-      "Cần Gia Hạn",
-    ];
-
-    // 3a. Tìm theo mã đơn hàng trong nội dung chuyển khoản trước (VD: ORD1234)
+    // 4. Tiền vào (IN) — Tìm đơn hàng phù hợp
     let matchedOrder = null;
+
+    // 4a. Ưu tiên: Tìm theo MÃ ĐƠN trong nội dung chuyển khoản
     if (noteContent && noteContent.trim()) {
-      const matchOrderCode = noteContent.match(/ORD[-_]?\d+/i);
+      const matchOrderCode = noteContent.match(ORDER_CODE_REGEX);
       if (matchOrderCode) {
         const targetCode = matchOrderCode[0].toUpperCase();
         matchedOrder = await getOrderTable(trx)
           .where("id_order", targetCode)
-          .whereIn("status", UNPAID_STATUSES)
+          .whereIn("status", PAYABLE_STATUSES)
           .first();
       }
     }
 
-    // 3b. Nếu chưa khớp theo mã, tìm đơn hàng có giá/gross_selling_price vừa đúng bằng transferAmount
+    // 4b. Fallback: Tìm theo SỐ TIỀN khớp với price hoặc gross_selling_price
     if (!matchedOrder) {
       matchedOrder = await getOrderTable(trx)
         .where((builder) => {
           builder.where("price", transferAmount).orWhere("gross_selling_price", transferAmount);
         })
-        .whereIn("status", UNPAID_STATUSES)
+        .whereIn("status", PAYABLE_STATUSES)
         .orderBy("id", "desc")
         .first();
     }
 
-    // NẾU KHÔNG KHỚP ĐƠN HÀNG NÀO: Giữ Biên lai ở trạng thái UNALLOCATED
+    // KHÔNG KHỚP ĐƠN NÀO — Giữ Biên lai ở UNALLOCATED
     if (!matchedOrder) {
-      console.log(`ℹ️ [Webhook] Đã tạo Biên lai Chưa phân bổ #${receiptId} - Số tiền: ${new Intl.NumberFormat("vi-VN").format(transferAmount)} ₫ (Không khớp đơn)`);
       return {
         success: true,
         matched: false,
         receiptId,
         amount: transferAmount,
-        reason: `Đã lưu biên lai #${receiptId} chưa phân bổ (Không khớp đơn hàng)`,
+        reason: `Đã lưu Biên lai #${receiptId} chưa phân bổ (Không khớp đơn hàng nào)`,
       };
     }
 
-    // NẾU KHỚP ĐƠN HÀNG THÀNH CÔNG
-    const isRenewal = String(matchedOrder.status).toLowerCase().includes("gia hạn");
-    const now = new Date();
-    let newExpiredAt = matchedOrder.expired_at;
-    const daysToAdd = Number(matchedOrder.days || 365);
-
-    if (isRenewal) {
-      let baseExpiry = now;
-      if (matchedOrder.expired_at) {
-        const parsed = new Date(matchedOrder.expired_at);
-        if (!isNaN(parsed.getTime()) && parsed > now) {
-          baseExpiry = parsed;
-        }
-      }
-      const expiryDate = new Date(baseExpiry.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-      newExpiredAt = expiryDate.toISOString().split("T")[0];
-    }
-
-    // Cập nhật trạng thái Biên lai sang FULLY_ALLOCATED
+    // KHỚP ĐƠN HÀNG THÀNH CÔNG — Cập nhật Biên lai, Phân bổ, Đơn hàng
     await getReceiptTable(trx)
       .where({ id: receiptId })
-      .update({
-        status: "FULLY_ALLOCATED",
-        unallocated_amount: 0,
-      });
+      .update({ status: RECEIPT_STATUS.FULLY_ALLOCATED, unallocated_amount: 0 });
 
-    // Tạo bản ghi phân bổ payment_receipt_allocations
     await getAllocationsTable(trx).insert({
       receipt_id: receiptId,
-      allocation_type: "ORDER",
+      allocation_type: ALLOCATION_TYPE.ORDER,
       target_code: matchedOrder.id_order,
       amount: transferAmount,
       remaining_balance: 0,
       note: `Tự động khớp Webhook (#${matchedOrder.id_order})`,
-      created_by: "SYSTEM_WEBHOOK",
+      created_by: ALLOCATION_CREATOR.SYSTEM_WEBHOOK,
     });
 
-    // Cập nhật Đơn hàng sang "Đã Thanh Toán"
-    const updateFields = {
-      status: "Đã Thanh Toán",
-    };
-    if (isRenewal && newExpiredAt) {
-      updateFields.expired_at = newExpiredAt;
-    }
-
-    const [updatedOrder] = await getOrderTable(trx)
-      .where({ id: matchedOrder.id })
-      .update(updateFields)
-      .returning("*");
-
-    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-    console.log(`✅ [Webhook] Tự động tạo Biên lai #${receiptId} & Khớp thành công đơn #${updatedOrder.id_order} - Số tiền: ${formatMoney(transferAmount)}`);
-
-    // Bắn các sự kiện domain sang EventBus
-    eventBus.emit(EVENTS.ORDER_PAID, {
-      orderId: updatedOrder.id,
-      id_order: updatedOrder.id_order,
-      customer: updatedOrder.customer,
-      amount: transferAmount,
-      status: updatedOrder.status,
+    const { updatedOrder, isRenewal } = await processOrderPayment(trx, matchedOrder, transferAmount, {
       receiptId,
-      isRenewal,
       action: "WEBHOOK_PAYMENT_MATCH",
     });
-
-    if (isRenewal) {
-      eventBus.emit(EVENTS.ORDER_RENEWED, {
-        orderId: updatedOrder.id,
-        id_order: updatedOrder.id_order,
-        customer: updatedOrder.customer,
-        daysAdded: daysToAdd,
-        newExpiredAt: updatedOrder.expired_at,
-        receiptId,
-        action: "RENEWAL_COMPLETED",
-      });
-    }
 
     return {
       success: true,
@@ -230,7 +178,4 @@ async function processPaymentWebhook(payload = {}) {
   });
 }
 
-module.exports = {
-  processPaymentWebhook,
-};
-
+module.exports = { processPaymentWebhook };

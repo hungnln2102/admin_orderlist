@@ -33,6 +33,7 @@ app.use(
 // Khởi chạy và đăng ký Event Subscribers & Cron Scheduler khi khởi động Server
 registerAllSubscribers();
 require("@/scheduler");
+require("@/domains/system/services/systemConfigService").initCache();
 
 // Health Check Endpoint
 app.get("/api/health", async (req, res) => {
@@ -63,6 +64,7 @@ app.use("/api/webhooks", require("@/domains/webhooks/routes"));
 app.use("/api/invoices", require("@/domains/invoices/routes"));
 app.use("/api/credits", require("@/domains/credits/routes"));
 app.use("/api/wallets", require("@/domains/wallets/routes"));
+app.use("/api/system", require("@/domains/system/routes"));
 
 app.listen(PORT, () => {
   console.log(`=================================`);

@@ -11,6 +11,7 @@ import { PackageManagementPage } from "@/features/packages/PackageManagementPage
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { WarehousePage } from "@/pages/WarehousePage";
 import { ReceiptsPage } from "@/pages/ReceiptsPage";
+import { SystemPage } from "@/pages/SystemPage";
 import { useAuth } from "@/shared/context/AuthContext";
 
 const ProtectedRoute: React.FC = () => {
@@ -249,6 +250,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/warehouse" element={<WarehousePage />} />
 
       {/* 5. Hệ thống & Ví */}
+      <Route path="/system-config" element={<SystemPage />} />
       <Route
         path="/shop-bank-accounts"
         element={

@@ -12,12 +12,14 @@ function registerAllSubscribers() {
   const { registerSupplierEventSubscribers } = require("./subscribers/supplierSubscriber");
   const { registerWebhookEventSubscribers } = require("./subscribers/webhookSubscriber");
   const { registerRefundEventSubscribers } = require("./subscribers/refundSubscriber");
+  const { registerTelegramSubscriber } = require("./subscribers/telegramSubscriber");
 
   registerOrderEventSubscribers();
   registerProductEventSubscribers();
   registerSupplierEventSubscribers();
   registerWebhookEventSubscribers();
   registerRefundEventSubscribers();
+  registerTelegramSubscriber();
 }
 
 

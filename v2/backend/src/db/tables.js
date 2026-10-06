@@ -29,6 +29,8 @@ const TABLES = {
   VARIANT: formatTable(SCHEMAS.PRODUCT, "variant"),
   VARIANT_PRICE: formatTable(SCHEMAS.PRODUCT, "variant_price"),
   PRODUCT: formatTable(SCHEMAS.PRODUCT, "product"),
+  PACKAGE_PRODUCT: formatTable(SCHEMAS.PRODUCT, "package_product"),
+  PRODUCT_STOCKS: formatTable(SCHEMAS.PRODUCT, "product_stocks"),
   ORDER_LIST: formatTable(SCHEMAS.ORDERS, "order_list"),
   PAYMENT_RECEIPT: formatTable(SCHEMAS.RECEIPT, "payment_receipt"),
   PAYMENT_RECEIPT_ALLOCATIONS: formatTable(SCHEMAS.RECEIPT, "payment_receipt_allocations"),
@@ -40,6 +42,8 @@ const TABLES = {
   USDT_WALLETS: formatTable(SCHEMAS.ADMIN, "usdt_wallets"),
   FINANCIAL_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
   FINANCIAL_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
+  SYSTEM_CONFIGS: formatTable(SCHEMAS.SYSTEM, "system_configs"),
+  NOTIFICATION_LOGS: formatTable(SCHEMAS.SYSTEM, "notification_logs"),
 };
 
 const COLS = {

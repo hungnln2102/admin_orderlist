@@ -1,5 +1,6 @@
 const { db, TABLES, COLS } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
+const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 
 const S_COLS = COLS.SUPPLIER;
 const LOG_COLS = COLS.SUPPLIER_ORDER_COST_LOG;
@@ -68,7 +69,7 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       COUNT(l.${LOG_COLS.ID}) AS total_orders,
       COALESCE(SUM(l.${LOG_COLS.IMPORT_COST}), 0) AS total_import_cost,
       COALESCE(SUM(l.${LOG_COLS.REFUND_AMOUNT}), 0) AS total_refund,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = 'Chưa Thanh Toán' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_unpaid_cost
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_unpaid_cost
     FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l;
   `;
   const statsRes = await db.raw(statsQuery);
@@ -87,8 +88,8 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       COUNT(CASE WHEN l.${LOG_COLS.LOGGED_AT} >= DATE_TRUNC('month', CURRENT_DATE) THEN l.${LOG_COLS.ID} END) AS current_month_orders,
       COALESCE(SUM(CASE WHEN l.${LOG_COLS.LOGGED_AT} >= DATE_TRUNC('month', CURRENT_DATE) THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS current_month_cost,
       MAX(l.${LOG_COLS.LOGGED_AT}) AS last_order_date,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = 'Đã Thanh Toán' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = 'Chưa Thanh Toán' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_debt
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_debt
     FROM ${TABLES.SUPPLIER} s
     LEFT JOIN ${TABLES.SUPPLIER_ORDER_COST_LOG} l ON l.${LOG_COLS.SUPPLY_ID} = s.${S_COLS.ID}
     ${whereClause}
@@ -167,7 +168,7 @@ const getSupplierCostLogs = async ({
       l.${LOG_COLS.ID_ORDER},
       COALESCE(l.${LOG_COLS.IMPORT_COST}, 0) AS import_cost,
       COALESCE(l.${LOG_COLS.REFUND_AMOUNT}, 0) AS refund_amount,
-      COALESCE(l.${LOG_COLS.NCC_PAYMENT_STATUS}, 'Chưa Thanh Toán') AS ncc_payment_status,
+      COALESCE(l.${LOG_COLS.NCC_PAYMENT_STATUS}, '${SUPPLIER_PAYMENT_STATUS.UNPAID}') AS ncc_payment_status,
       l.${LOG_COLS.LOGGED_AT},
       s.${S_COLS.SUPPLIER_NAME}
     FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l
@@ -226,11 +227,11 @@ const getSupplierDetailById = async (id) => {
   const statsRes = await db.raw(`
     SELECT
       COUNT(${LOG_COLS.ID}) AS total_orders,
-      COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = 'Đã Thanh Toán' THEN 1 END) AS paid_orders,
-      COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = 'Chưa Thanh Toán' THEN 1 END) AS unpaid_orders,
-      COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = 'Đã Hủy' OR ${LOG_COLS.NCC_PAYMENT_STATUS} = 'Hủy' THEN 1 END) AS canceled_orders,
-      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = 'Đã Thanh Toán' THEN (${LOG_COLS.IMPORT_COST} - ${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = 'Chưa Thanh Toán' THEN (${LOG_COLS.IMPORT_COST} - ${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS remaining_debt,
+      COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN 1 END) AS paid_orders,
+      COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN 1 END) AS unpaid_orders,
+      COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.CANCELED}' OR ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.CANCEL}' THEN 1 END) AS canceled_orders,
+      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN (${LOG_COLS.IMPORT_COST} - ${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (${LOG_COLS.IMPORT_COST} - ${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS remaining_debt,
       COALESCE(SUM(${LOG_COLS.REFUND_AMOUNT}), 0) AS total_refund
     FROM ${TABLES.SUPPLIER_ORDER_COST_LOG}
     WHERE ${LOG_COLS.SUPPLY_ID} = ?;
@@ -293,7 +294,7 @@ const getSupplierDetailById = async (id) => {
       refund_to_shop: totalRefund,
       debt_by_order: remainingDebt,
       amount_paid: 0,
-      payment_status: remainingDebt > 0 ? "CHƯA THANH TOÁN" : "ĐÃ THANH TOÁN",
+      payment_status: remainingDebt > 0 ? SUPPLIER_PAYMENT_STATUS.UNPAID : SUPPLIER_PAYMENT_STATUS.PAID,
       shop_bank_accounts: [
         { id: 1, label: "0378304963 • MB • NGO LE NGOC HUNG (mặc định)" },
       ],
@@ -313,8 +314,8 @@ const paySupplierDebt = async (id) => {
 
   // Đổi ncc_payment_status của tất cả đơn 'Chưa Thanh Toán' sang 'Đã Thanh Toán'
   await db(TABLES.SUPPLIER_ORDER_COST_LOG)
-    .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: "Chưa Thanh Toán" })
-    .update({ [LOG_COLS.NCC_PAYMENT_STATUS]: "Đã Thanh Toán" });
+    .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
+    .update({ [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.PAID });
 
   eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, {
     id: supplierId,

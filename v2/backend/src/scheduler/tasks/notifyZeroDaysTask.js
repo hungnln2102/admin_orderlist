@@ -1,4 +1,5 @@
 const { db, TABLES } = require("@/db");
+const { ORDER_STATUS } = require("@/constants/orderStatus");
 
 const TARGET_TABLE = TABLES.ORDER_LIST;
 
@@ -15,7 +16,7 @@ async function notifyZeroDaysTask(trigger = "cron") {
       SELECT id, id_order, customer, contact, information_order, price, expired_at, status
       FROM ${TARGET_TABLE}
       WHERE (expired_at::date - ${todaySql}) = 0
-        AND (status ILIKE '%gia hạn%' OR status ILIKE '%Hết Hạn%')
+        AND status IN ('${ORDER_STATUS.RENEW_REQUIRED}', '${ORDER_STATUS.EXPIRED}')
       ORDER BY id DESC;
     `);
 

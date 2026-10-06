@@ -27,7 +27,8 @@ import {
   PenTool,
   FolderKanban,
   Image,
-  Logs
+  Logs,
+  Settings
 } from "lucide-react";
 
 export interface MenuItem {
@@ -88,6 +89,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
   {
     groupName: "Hệ thống & Ví",
     items: [
+      { name: "Cấu hình Hệ thống", path: "/system-config", icon: Settings },
       { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
       { name: "Tài khoản & Ví USDT", path: "/payment-accounts", icon: Wallet },
       { name: "IP Whitelist", path: "/ip-whitelist", icon: Shield },

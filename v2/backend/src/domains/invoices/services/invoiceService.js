@@ -1,14 +1,25 @@
+/**
+ * invoiceService.js (V2)
+ * Quản lý Biên lai thanh toán (Admin UI):
+ *   - getInvoices(): Lấy danh sách biên lai chia theo tab (orders, other, unlisted) + thống kê.
+ *   - allocateReceipt(): Phân bổ số dư biên lai bằng tay (gán mã đơn, chi phí, credit...).
+ *     → Dùng chung processOrderPayment (cập nhật trạng thái đơn, cộng ngày gia hạn, phát EventBus).
+ */
 const { db, TABLES } = require("@/db");
+const { ORDER_STATUS } = require("@/constants/orderStatus");
+const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
+const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
 
 const getReceiptTable = () => db(TABLES.PAYMENT_RECEIPT);
-const getAllocationsTable = () => db(TABLES.PAYMENT_RECEIPT_ALLOCATIONS);
+
+// ────────────── Tab Filter Helpers ──────────────
 
 function applyOrdersTabFilter(builder) {
   builder.whereExists(function () {
     this.select(db.raw("1"))
       .from(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
       .whereRaw(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.receipt_id = ${TABLES.PAYMENT_RECEIPT}.id`)
-      .where(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type`, "ORDER");
+      .where(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type`, ALLOCATION_TYPE.ORDER);
   });
 }
 
@@ -19,17 +30,19 @@ function applyOtherTabFilter(builder) {
         this.select(db.raw("1"))
           .from(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
           .whereRaw(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.receipt_id = ${TABLES.PAYMENT_RECEIPT}.id`)
-          .where(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type`, "!=", "ORDER");
+          .where(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type`, "!=", ALLOCATION_TYPE.ORDER);
       });
   });
 }
 
 function applyUnlistedTabFilter(builder) {
-  builder.where(`${TABLES.PAYMENT_RECEIPT}.status`, "UNALLOCATED")
+  builder.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.UNALLOCATED)
     .where((b) => {
       b.whereNull(`${TABLES.PAYMENT_RECEIPT}.transfer_type`).orWhere(`${TABLES.PAYMENT_RECEIPT}.transfer_type`, "!=", "out");
     });
 }
+
+// ────────────── getInvoices ──────────────
 
 /**
  * Lấy danh sách biên lai thanh toán chia theo 3 tab (orders, other, unlisted) + Thống kê song song
@@ -103,9 +116,9 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
 
   // Lọc thêm theo matched nếu có
   if (matched === "yes") {
-    query = query.where(`${TABLES.PAYMENT_RECEIPT}.status`, "!=", "UNALLOCATED");
+    query = query.where(`${TABLES.PAYMENT_RECEIPT}.status`, "!=", RECEIPT_STATUS.UNALLOCATED);
   } else if (matched === "no") {
-    query = query.where(`${TABLES.PAYMENT_RECEIPT}.status`, "UNALLOCATED");
+    query = query.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.UNALLOCATED);
   }
 
   // Tìm kiếm từ khóa
@@ -148,10 +161,14 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
   };
 }
 
+// ────────────── allocateReceipt ──────────────
+
 /**
- * Phân bổ số dư biên lai thanh toán (Gán mã đơn, đợt nhập, chi phí hoặc credit)
+ * Phân bổ số dư biên lai thanh toán (Admin bấm gán thủ công).
+ * Nếu gán cho Đơn hàng (ORDER): Cập nhật trạng thái đơn + cộng ngày gia hạn + phát EventBus.
+ *
  * @param {number|string} receiptId
- * @param {object} payload
+ * @param {object} payload - { allocation_type, target_code, amount, note, created_by }
  */
 async function allocateReceipt(receiptId, payload) {
   const { allocation_type, target_code, amount, note, created_by } = payload || {};
@@ -177,21 +194,21 @@ async function allocateReceipt(receiptId, payload) {
   }
 
   const newUnallocated = currentUnallocated - allocAmount;
-  const newStatus = newUnallocated <= 0 ? "FULLY_ALLOCATED" : "PARTIALLY_ALLOCATED";
+  const newStatus = newUnallocated <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.PARTIALLY_ALLOCATED;
 
   return await db.transaction(async (trx) => {
-    // 1. Thêm bản ghi phân bổ mới vào payment_receipt_allocations
+    // 1. Thêm bản ghi phân bổ
     const [allocId] = await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).insert({
       receipt_id: id,
-      allocation_type: allocation_type || "ORDER",
+      allocation_type: allocation_type || ALLOCATION_TYPE.ORDER,
       target_code: target_code ? target_code.trim() : null,
       amount: allocAmount,
       remaining_balance: newUnallocated,
       note: note ? note.trim() : null,
-      created_by: created_by || "ADMIN",
+      created_by: created_by || ALLOCATION_CREATOR.ADMIN,
     }).returning("id");
 
-    // 2. Cập nhật lại số dư và trạng thái của payment_receipt gốc
+    // 2. Cập nhật số dư và trạng thái Biên lai gốc
     await trx(TABLES.PAYMENT_RECEIPT)
       .where({ id })
       .update({
@@ -199,15 +216,18 @@ async function allocateReceipt(receiptId, payload) {
         status: newStatus,
       });
 
-    // 3. Nếu gán cho Đơn hàng (ORDER), kiểm tra và cập nhật trạng thái Đơn hàng sang PAID
-    if ((allocation_type === "ORDER" || !allocation_type) && target_code) {
+    // 3. Nếu gán cho Đơn hàng (ORDER): Cập nhật trạng thái đơn + gia hạn + phát EventBus
+    let orderResult = null;
+    const resolvedAllocType = allocation_type || ALLOCATION_TYPE.ORDER;
+    if (resolvedAllocType === ALLOCATION_TYPE.ORDER && target_code) {
       const code = target_code.trim();
       const order = await trx(TABLES.ORDER_LIST).where({ id_order: code }).first();
+
       if (order) {
-        // Cập nhật trạng thái đơn hàng thành PAID (Đã Thanh Toán)
-        await trx(TABLES.ORDER_LIST)
-          .where({ id_order: code })
-          .update({ status: "PAID" });
+        orderResult = await processOrderPayment(trx, order, allocAmount, {
+          receiptId: id,
+          action: "ADMIN_MANUAL_ALLOCATE",
+        });
       }
     }
 
@@ -217,6 +237,12 @@ async function allocateReceipt(receiptId, payload) {
       allocated_amount: allocAmount,
       unallocated_amount: newUnallocated,
       status: newStatus,
+      orderUpdated: orderResult ? {
+        id_order: orderResult.updatedOrder.id_order,
+        newStatus: orderResult.updatedOrder.status,
+        isRenewal: orderResult.isRenewal,
+        newExpiredAt: orderResult.newExpiredAt,
+      } : null,
     };
   });
 }

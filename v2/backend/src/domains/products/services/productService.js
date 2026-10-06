@@ -1,5 +1,6 @@
 const { db, TABLES, COLS } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
+const { ORDER_STATUS } = require("@/constants/orderStatus");
 
 const V_COLS = COLS.VARIANT;
 const VP_COLS = COLS.VARIANT_PRICE;
@@ -570,9 +571,9 @@ const getPackageProducts = async () => {
       pp.storage_id,
       pp.storage_total,
       pp.stock_service_id
-    FROM product.package_product pp
-    LEFT JOIN product.product p ON p.id = pp.package_id
-    LEFT JOIN product.product_stocks ps ON CAST(ps.id AS text) = CAST(pp.stock_id AS text)
+    FROM ${TABLES.PACKAGE_PRODUCT} pp
+    LEFT JOIN ${TABLES.PRODUCT} p ON p.id = pp.package_id
+    LEFT JOIN ${TABLES.PRODUCT_STOCKS} ps ON CAST(ps.id AS text) = CAST(pp.stock_id AS text)
     ORDER BY p.package_name ASC, pp.id DESC;
   `;
 
@@ -581,8 +582,8 @@ const getPackageProducts = async () => {
 
   const ordersQuery = `
     SELECT id, information_order, slot, status, expired_at, cost, supply_id
-    FROM orders.order_list
-    WHERE status != 'Đã hủy' AND status != 'Đã Xóa'
+    FROM ${TABLES.ORDER_LIST}
+    WHERE status NOT IN ('${ORDER_STATUS.CANCELED}', 'Đã Xóa')
   `;
   const ordersRes = await db.raw(ordersQuery);
   const ordersList = ordersRes.rows || [];

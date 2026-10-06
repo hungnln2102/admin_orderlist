@@ -33,6 +33,9 @@ module.exports = {
   // Webhook Domain Events
   WEBHOOK_MONEY_IN: "WEBHOOK_MONEY_IN",
   WEBHOOK_MONEY_OUT: "WEBHOOK_MONEY_OUT",
+
+  // System Config Domain Events
+  SYSTEM_CONFIG_UPDATED: "SYSTEM_CONFIG_UPDATED",
 };
 
 

@@ -242,6 +242,33 @@ Trang **Biên Lai Thanh Toán & Đối Soát** nằm trong mục **Bán Hàng & 
 
 ---
 
+## 9. TRANG CẤU HÌNH HỆ THỐNG (QUẢN LÝ THÔNG SỐ VẬN HÀNH & THÔNG BÁO TELEGRAM) - `SystemPage`
+
+Trang **Cấu Hình Hệ Thống** giúp chủ shop và người quản trị linh hoạt thay đổi các tham số chạy nền (số ngày nhắc hết hạn, tỷ giá tiền, bật/tắt gửi tin Telegram) ngay trên giao diện Web mà không cần khởi động lại máy chủ.
+
+### 9.1. Tab 1: Cấu Hình Vận Hành & Giá (`general`)
+- **Khung Cảnh Báo Hết Hạn Đơn Hàng:**
+  - **Ô nhập `Số ngày cảnh báo trước khi hết hạn (RENEWAL_WARN_DAYS)`:** Thay đổi số ngày hệ thống bắt đầu quét và tự động gửi tin nhắn nhắc khách hàng gia hạn (VD: 4 ngày).
+  - **Nút `Lưu`:** Lưu ngay tham số mới vào hệ thống.
+- **Khung Tài Chính & Khớp Thanh Toán:**
+  - **Ô nhập `Tỷ giá USDT / VND (USDT_EXCHANGE_RATE)`:** Cập nhật tỷ giá quy đổi tiền điện tử USDT sang tiền Việt Nam Đồng.
+  - **Nút gạt `Sepay Auto Match`:** Nút gạt Bật/Tắt tính năng tự động khớp biên lai ngân hàng SePay với đơn hàng chưa thanh toán.
+
+### 9.2. Tab 2: Thông Báo Telegram (`telegram`)
+- **Nút gạt tổng `Dịch Vụ Thông Báo Telegram`:** Nút gạt Bật/Tắt toàn bộ tiến trình đẩy tin nhắn lên Telegram. Khi gạt Tắt, hệ thống tạm dừng gửi tin nhắn để tránh làm phiền.
+- **Cấu hình Topic ID cho từng loại tin:**
+  - **Ô nhập `Topic ID - Đơn Hàng Mới`:** ID nhóm Telegram nhận thông báo mỗi khi có đơn hàng mới được tạo.
+  - **Ô nhập `Topic ID - Cảnh Báo Gia Hạn`:** ID nhóm Telegram nhận danh sách đơn hàng sắp hết hạn hoặc đã hết hạn.
+  - **Ô nhập `Topic ID - Biến Động Số Dư`:** ID nhóm Telegram nhận thông báo tiền chuyển vào/ra tài khoản ngân hàng.
+  - **Ô nhập `Topic ID - Cảnh Báo Lỗi Khẩn Cấp`:** ID nhóm Telegram nhận cảnh báo sự cố kỹ thuật.
+
+### 9.3. Tab 3: Nhật Ký Thông Báo (`logs`)
+- **Bảng Nhật Ký Thông Báo (Notification Audit Logs):** Giám sát lịch sử tất cả các tin nhắn đã gửi đi.
+  - Hiển thị: Mã ID, Kênh (`TELEGRAM`), Loại sự kiện (`ORDER_CREATED`, `WEBHOOK_MONEY_IN`...), Nội dung tin nhắn, Trạng thái (`SENT` 🟢 - Đã gửi thành công, `FAILED` 🔴 - Lỗi gửi tin), Thời gian phát sinh.
+  - **Dropdown `Bộ lọc trạng thái`:** Lọc xem danh sách tin nhắn gửi thành công hoặc các tin bị lỗi để kiểm tra nguyên nhân.
+
+---
+
 ## 📝 TỔNG HỢP DANH MỤC CÁC MODAL & CỬA SỔ NỔI TRONG HỆ THỐNG
 
 | Trang | Tên Cửa Sổ Modal | Chức Năng & Các Nút Bấm Chính |
@@ -264,6 +291,7 @@ Trang **Biên Lai Thanh Toán & Đối Soát** nằm trong mục **Bán Hàng & 
 | **Packages** | `PackageCreateEditModal`| Thêm/sửa gói sản phẩm & dung lượng slot. *Nút: Lưu Gói Sản Phẩm, Hủy.* |
 | **Packages** | `PackageDetailModal` | Xem thông tin chi tiết gói. *Nút: Đóng.* |
 | **Invoices** | `AllocateReceiptModal` | Phân bổ số dư biên lai & gán mã đơn/hạng mục chi phí/khách tip. *Nút: Chọn 4 Loại Phân Bổ (Đơn khách, Khách tip, NCC, Chi phí vận hành), Set 50%/100%, Xác Nhận Phân Bổ, Hủy Bỏ.* |
+| **System** | `SystemPage` | Cấu hình động thông số vận hành & Telegram. *Nút: Lưu từng tham số, Nút gạt Bật/Tắt Telegram, Nút gạt Sepay Auto Match, Tải lại cấu hình, Lọc nhật ký thông báo.* |
 
 ---
 *Tài liệu danh mục tính năng & nút bấm này là chuẩn vận hành chính thức của Admin Store V2.*
