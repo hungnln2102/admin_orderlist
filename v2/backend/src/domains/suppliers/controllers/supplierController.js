@@ -27,6 +27,23 @@ const getCostLogs = async (req, res) => {
   }
 };
 
+const getCostLogsForSupplier = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { orderCodeSearch, page, limit } = req.query;
+    const result = await supplierService.getSupplierCostLogs({
+      supplierId: id,
+      orderCodeSearch,
+      page,
+      limit,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi getCostLogsForSupplier:", error);
+    res.status(500).json({ error: error.message || "Không thể lấy lịch sử đơn NCC" });
+  }
+};
+
 const getSupplierDetail = async (req, res) => {
   try {
     const { id } = req.params;
@@ -95,6 +112,7 @@ const deleteSupplier = async (req, res) => {
 module.exports = {
   getOverview,
   getCostLogs,
+  getCostLogsForSupplier,
   getSupplierDetail,
   payDebt,
   toggleStatus,

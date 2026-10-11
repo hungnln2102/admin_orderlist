@@ -15,17 +15,16 @@
 const { db, TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
-const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
-
-// Regex nhận diện mã đơn hàng V2 (dạng ORD-XXXXX hoặc ORDXXXXX)
-const ORDER_CODE_REGEX = /ORD[-_]?\d+/i;
+const { processCompleteOrder } = require("@/domains/orders/services/orderService");
 
 // Các trạng thái đơn hàng hợp lệ cần thanh toán
 const PAYABLE_STATUSES = [
   ORDER_STATUS.UNPAID,
   ORDER_STATUS.RENEW_REQUIRED,
+  ORDER_STATUS.PROCESSING,
   "Chưa Thanh Toán", // Tương thích ngược V1
   "Cần Gia Hạn",     // Tương thích ngược V1
+  "Đang Xử Lý",      // Tương thích ngược V1
 ];
 
 const getOrderTable = (trx = db) => trx(TABLES.ORDER_LIST);
@@ -106,31 +105,14 @@ async function processPaymentWebhook(payload = {}) {
       };
     }
 
-    // 4. Tiền vào (IN) — Tìm đơn hàng phù hợp
-    let matchedOrder = null;
-
-    // 4a. Ưu tiên: Tìm theo MÃ ĐƠN trong nội dung chuyển khoản
-    if (noteContent && noteContent.trim()) {
-      const matchOrderCode = noteContent.match(ORDER_CODE_REGEX);
-      if (matchOrderCode) {
-        const targetCode = matchOrderCode[0].toUpperCase();
-        matchedOrder = await getOrderTable(trx)
-          .where("id_order", targetCode)
-          .whereIn("status", PAYABLE_STATUSES)
-          .first();
-      }
-    }
-
-    // 4b. Fallback: Tìm theo SỐ TIỀN khớp với price hoặc gross_selling_price
-    if (!matchedOrder) {
-      matchedOrder = await getOrderTable(trx)
-        .where((builder) => {
-          builder.where("price", transferAmount).orWhere("gross_selling_price", transferAmount);
-        })
-        .whereIn("status", PAYABLE_STATUSES)
-        .orderBy("id", "desc")
-        .first();
-    }
+    // 4. Tiền vào (IN) — Tìm đơn hàng phù hợp theo SỐ TIỀN THỰC CHUYỂN (Chính xác đến từng đồng nhờ slot suffix)
+    const matchedOrder = await getOrderTable(trx)
+      .where((builder) => {
+        builder.where("price", transferAmount).orWhere("gross_selling_price", transferAmount);
+      })
+      .whereIn("status", PAYABLE_STATUSES)
+      .orderBy("id", "desc")
+      .first();
 
     // KHÔNG KHỚP ĐƠN NÀO — Giữ Biên lai ở UNALLOCATED
     if (!matchedOrder) {
@@ -158,7 +140,7 @@ async function processPaymentWebhook(payload = {}) {
       created_by: ALLOCATION_CREATOR.SYSTEM_WEBHOOK,
     });
 
-    const { updatedOrder, isRenewal } = await processOrderPayment(trx, matchedOrder, transferAmount, {
+    const { updatedOrder, isRenewal } = await processCompleteOrder(trx, matchedOrder, transferAmount, {
       receiptId,
       action: "WEBHOOK_PAYMENT_MATCH",
     });

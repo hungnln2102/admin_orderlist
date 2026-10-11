@@ -557,6 +557,14 @@ const deleteSupplierCost = async (supplierCostId) => {
  * Kết hợp với product.product (Lớp gói cha) và product.product_stocks (Thông tin tài khoản/email)
  */
 const getPackageProducts = async () => {
+  await db.raw(`
+    CREATE TABLE IF NOT EXISTS business.product_stocks (
+      id SERIAL PRIMARY KEY,
+      account_username VARCHAR(255),
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `).catch(() => {});
+
   const query = `
     SELECT
       pp.id,

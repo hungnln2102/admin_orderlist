@@ -1,0 +1,53 @@
+/**
+ * clearData.js
+ * Script dọn dẹp (truncate) toàn bộ dữ liệu giao dịch, đơn hàng và thống kê để test lại luồng từ đầu.
+ */
+
+require("module-alias/register");
+const { db } = require("./index");
+
+async function clearAllData() {
+  console.log("🧹 [ClearData] Bắt đầu xóa sạch dữ liệu local để test luồng mới...");
+  try {
+    await db.raw('TRUNCATE TABLE business.order_list CASCADE;');
+    console.log("✅ Đã xóa sạch order_list");
+  } catch (e) { console.log("⚠️ order_list:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE billing.payment_receipt CASCADE;');
+    console.log("✅ Đã xóa sạch payment_receipt");
+  } catch (e) { console.log("⚠️ payment_receipt:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE billing.payment_receipt_allocations CASCADE;');
+    console.log("✅ Đã xóa sạch payment_receipt_allocations");
+  } catch (e) { console.log("⚠️ payment_receipt_allocations:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE finance.daily_revenue_summary CASCADE;');
+    console.log("✅ Đã xóa sạch daily_revenue_summary");
+  } catch (e) { console.log("⚠️ daily_revenue_summary:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE finance.dashboard_monthly_summary CASCADE;');
+    console.log("✅ Đã xóa sạch dashboard_monthly_summary");
+  } catch (e) { console.log("⚠️ dashboard_monthly_summary:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE system_automation.domain_event_store CASCADE;');
+    console.log("✅ Đã xóa sạch domain_event_store");
+  } catch (e) { console.log("⚠️ domain_event_store:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE system_automation.notification_logs CASCADE;');
+    console.log("✅ Đã xóa sạch notification_logs");
+  } catch (e) { console.log("⚠️ notification_logs:", e.message); }
+
+  console.log("🎉 [ClearData] Hoàn tất dọn dẹp toàn bộ dữ liệu!");
+  process.exit(0);
+}
+
+clearAllData().catch((err) => {
+  console.error("❌ [ClearData] Lỗi:", err);
+  process.exit(1);
+});

@@ -42,7 +42,7 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
         {loadingDetail || !supplierDetail ? (
           <div className="py-16 text-center text-slate-400">
             <Loader2 className="w-8 h-8 text-cyan-400 animate-spin inline mr-2" />
-            Đang tải dữ liệu chi tiết Nhà cung cấp V1...
+            Đang tải dữ liệu chi tiết Nhà cung cấp...
           </div>
         ) : (
           <div className="space-y-5 text-xs">

@@ -10,6 +10,7 @@ import {
   RotateCcw,
   XCircle,
   RefreshCw,
+  ShoppingBag,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -46,18 +47,21 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Filter state
-  const [period, setPeriod] = useState<"day" | "month" | "year" | "custom">("month");
+  const [period, setPeriod] = useState<"week" | "month" | "year" | "custom" | "day">("month");
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
   const [selectedYear, setSelectedYear] = useState<string>(() => String(new Date().getFullYear()));
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Active Chart Tab state: "financial" or "orders"
+  const [activeChartTab, setActiveChartTab] = useState<"financial" | "orders">("financial");
 
   // Hover & Pin states for chart column items
   const [hoveredFinancialIdx, setHoveredFinancialIdx] = useState<number | null>(null);
@@ -74,12 +78,8 @@ export const DashboardPage: React.FC = () => {
     const params = new URLSearchParams();
     params.set("period", period);
 
-    if (period === "day") {
-      params.set("date", selectedDate);
-    } else if (period === "month") {
+    if (period === "month") {
       params.set("month", selectedMonth);
-    } else if (period === "year") {
-      params.set("year", selectedYear);
     } else if (period === "custom") {
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
@@ -98,7 +98,7 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [period, selectedMonth, selectedYear, selectedDate, startDate, endDate]);
+  }, [period, selectedMonth, startDate, endDate]);
 
   const summary = data?.summary || {
     totalOrders: 0,
@@ -135,6 +135,15 @@ export const DashboardPage: React.FC = () => {
 
   const formatVND = (num: number) => {
     return new Intl.NumberFormat("vi-VN").format(Math.round(num)) + " ₫";
+  };
+
+  const formatShorthand = (num: number): string => {
+    if (!num || num === 0) return "0";
+    const abs = Math.abs(num);
+    if (abs >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+    if (abs >= 1_000_000) return `${(num / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+    if (abs >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
+    return `${Math.round(num)}`;
   };
 
   // Helper cho đường cong mượt Bezier
@@ -186,9 +195,59 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  // Helper xác định mốc nhãn được hiển thị (hiện toàn bộ cho 12 mốc chuẩn)
-  const isTickVisible = (_label: string, _index: number, _totalItems: number, _activeIdx: number | null): boolean => {
-    return true;
+  // Helper xác định mốc nhãn được hiển thị theo yêu cầu (1, 5, 10, 15, 20, 25, 30/31 cho tháng; toàn bộ cho năm/ngày)
+  const isTickVisible = (label: string, index: number, totalItems: number, activeIdx: number | null): boolean => {
+    if (activeIdx === index) return true;
+    if (totalItems <= 15) return true;
+    const num = parseInt(label.replace(/\D/g, ""), 10);
+    if (!isNaN(num)) {
+      return num === 1 || num === 5 || num === 10 || num === 15 || num === 20 || num === 25 || num === 30 || num === 31 || index === 0 || index === totalItems - 1;
+    }
+    return index % 3 === 0;
+  };
+
+  const getVisibleTicks = () => {
+    if (chartData.length <= 15) return chartData.map((d, i) => ({ ...d, index: i }));
+    const step = Math.max(1, Math.floor(chartData.length / 6));
+    const ticks = [];
+    for (let i = 0; i < chartData.length; i += step) {
+      ticks.push({ ...chartData[i], index: i });
+    }
+    if (ticks[ticks.length - 1].index !== chartData.length - 1) {
+      ticks.push({ ...chartData[chartData.length - 1], index: chartData.length - 1 });
+    }
+    return ticks;
+  };
+
+  const svgWidth = 1000;
+  const paddingX = 40;
+  const usableWidth = svgWidth - paddingX * 2; // 920
+  const getX = (i: number, len: number = chartData.length) => {
+    if (len <= 1) return svgWidth / 2;
+    return paddingX + (i / (len - 1)) * usableWidth;
+  };
+
+  const handleSvgMouseMove = (e: React.MouseEvent<any>, isFinancial: boolean) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const svgX = Math.max(0, Math.min(1000, (clickX / rect.width) * 1000));
+    
+    let closestIdx = 0;
+    let minDiff = Infinity;
+    chartData.forEach((_, i) => {
+      const ptX = getX(i);
+      const diff = Math.abs(ptX - svgX);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = i;
+      }
+    });
+
+    if (isFinancial) {
+      setHoveredFinancialIdx(closestIdx);
+    } else {
+      setHoveredOrderIdx(closestIdx);
+    }
   };
 
   return (
@@ -213,10 +272,10 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center bg-slate-950/90 p-1 rounded-xl border border-slate-800/90 shadow-inner">
             {(
               [
-                { key: "day", label: "Hôm nay" },
-                { key: "month", label: "Tháng này" },
-                { key: "year", label: "Năm nay" },
-                { key: "custom", label: "Tùy chỉnh" },
+                { key: "week", label: "Tuần" },
+                { key: "month", label: "Tháng" },
+                { key: "year", label: "Năm" },
+                { key: "custom", label: "Tùy Chỉnh" },
               ] as const
             ).map((item) => (
               <button
@@ -235,13 +294,10 @@ export const DashboardPage: React.FC = () => {
 
           {/* Sub-filter Input Container with Fixed Stable Height & Alignment */}
           <div className="flex items-center min-h-[34px] min-w-[150px] justify-start">
-            {period === "day" && (
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-sky-500 transition-colors w-[150px]"
-              />
+            {period === "week" && (
+              <span className="text-xs text-slate-400 font-medium px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl">
+                7 ngày gần đây
+              </span>
             )}
 
             {period === "month" && (
@@ -254,17 +310,9 @@ export const DashboardPage: React.FC = () => {
             )}
 
             {period === "year" && (
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-sky-500 transition-colors w-[130px] cursor-pointer"
-              >
-                {[2024, 2025, 2026, 2027].map((y) => (
-                  <option key={y} value={y}>
-                    Năm {y}
-                  </option>
-                ))}
-              </select>
+              <span className="text-xs text-slate-400 font-medium px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl">
+                1 năm qua
+              </span>
             )}
 
             {period === "custom" && (
@@ -360,384 +408,342 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* 2 Stat Line Charts Side-by-Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart 1: Doanh Thu, Chi Phí & Lợi Nhuận */}
-        <GlassCard className="space-y-4" glow="cyan">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-2">
+      {/* Single Full-Width Interactive Chart with Tab Switcher */}
+      <GlassCard className="space-y-4" glow={activeChartTab === "financial" ? "cyan" : "emerald"}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+          <div className="flex items-center gap-3">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Biểu Đồ Doanh Thu, Chi Phí & Lợi Nhuận</span>
+                <span>{activeChartTab === "financial" ? "Biểu Đồ Doanh Thu, Chi Phí & Lợi Nhuận" : "Biểu Đồ Số Lượng Đơn Hàng"}</span>
               </h3>
-              <p className="text-xs text-slate-400">{data?.chartSubtitle || "Xu hướng biến động tài chính theo thời gian"}</p>
-            </div>
-            {/* Chart Legend */}
-            <div className="flex items-center gap-3 text-[11px]">
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                <span className="text-slate-300">Doanh thu</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                <span className="text-slate-300">Lợi nhuận</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                <span className="text-slate-300">Chi phí</span>
-              </div>
+              <p className="text-xs text-slate-400">{data?.chartSubtitle || "Xu hướng biến động theo thời gian"}</p>
             </div>
           </div>
 
-          {/* SVG Financial Line & Area Chart */}
-          <div className="h-72 rounded-xl bg-slate-950/80 border border-slate-800/80 p-4 relative overflow-hidden flex flex-col justify-between">
-            {loading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 z-20">
-                <RefreshCw className="w-6 h-6 animate-spin text-sky-400" />
-              </div>
-            ) : null}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Tab Switcher Buttons */}
+            <div className="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800/80">
+              <button
+                onClick={() => setActiveChartTab("financial")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeChartTab === "financial"
+                    ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/40 shadow-md"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Doanh Thu & Tài Chính</span>
+              </button>
+              <button
+                onClick={() => setActiveChartTab("orders")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeChartTab === "orders"
+                    ? "bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-500/40 shadow-md"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Số Lượng Đơn Hàng</span>
+              </button>
+            </div>
 
-            {chartData.length > 0 ? (
-              <div className="relative w-full h-full flex flex-col justify-between">
-                {/* Y-axis grid lines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-                  <div className="border-b border-slate-700 w-full" />
-                  <div className="border-b border-slate-700 w-full" />
-                  <div className="border-b border-slate-700 w-full" />
-                  <div className="border-b border-slate-700 w-full" />
+            {/* Dynamic Chart Legend */}
+            {activeChartTab === "financial" ? (
+              <div className="flex items-center gap-3 text-[11px]">
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                  <span className="text-slate-300">Doanh thu</span>
                 </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                  <span className="text-slate-300">Lợi nhuận</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                  <span className="text-slate-300">Chi phí</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-[11px]">
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <span className="text-slate-300">Tổng đơn</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                  <span className="text-slate-300">Đơn hủy</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-                {/* SVG Curves & Area Gradients */}
-                <svg className="w-full h-48 overflow-visible z-10" preserveAspectRatio="none" viewBox={`0 0 ${chartData.length * 50} 200`}>
-                  <defs>
-                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
-                    </linearGradient>
-                    <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#c084fc" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#c084fc" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
+        {/* SVG Chart Box */}
+        <div className="h-80 rounded-xl bg-slate-950/80 border border-slate-800/80 p-4 relative overflow-visible flex flex-col justify-between">
+          {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 z-20 rounded-xl">
+              <RefreshCw className={`w-6 h-6 animate-spin ${activeChartTab === "financial" ? "text-cyan-400" : "text-emerald-400"}`} />
+            </div>
+          ) : null}
 
-                  {/* Pre-calculate point positions */}
-                  {(() => {
-                    const revPts = chartData.map((d, i) => ({
-                      x: i * 50 + 25,
-                      y: Math.max(15, Math.min(175, 175 - (d.revenue / financialMaxVal) * 155)),
-                    }));
-                    const profPts = chartData.map((d, i) => ({
-                      x: i * 50 + 25,
-                      y: Math.max(15, Math.min(175, 175 - (d.profit / financialMaxVal) * 155)),
-                    }));
-                    const costPts = chartData.map((d, i) => ({
-                      x: i * 50 + 25,
-                      y: Math.max(15, Math.min(175, 175 - (d.cost / financialMaxVal) * 155)),
-                    }));
+          {chartData.length > 0 ? (
+            <div className="relative w-full h-full flex flex-col justify-between">
+              {/* Y-axis grid lines */}
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+                <div className="border-b border-slate-700 w-full" />
+                <div className="border-b border-slate-700 w-full" />
+                <div className="border-b border-slate-700 w-full" />
+                <div className="border-b border-slate-700 w-full" />
+              </div>
 
-                    return (
-                      <>
-                        {/* Area Fill for Revenue */}
-                        <path d={getSmoothAreaPath(revPts, 175)} fill="url(#revenueGrad)" />
+              {activeChartTab === "financial" ? (
+                /* Financial Chart View */
+                <>
+                  <svg 
+                    className="w-full h-56 overflow-visible z-10 cursor-crosshair" 
+                    preserveAspectRatio="none" 
+                    viewBox="0 0 1000 200"
+                    onMouseMove={(e) => handleSvgMouseMove(e, true)}
+                    onMouseLeave={() => setHoveredFinancialIdx(null)}
+                  >
+                    <defs>
+                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#c084fc" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="#c084fc" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
 
-                        {/* Revenue Bezier Path */}
-                        <path d={getSmoothPath(revPts)} fill="none" stroke="#22d3ee" strokeWidth="3" strokeLinecap="round" />
+                    {(() => {
+                      const revPts = chartData.map((d, i) => ({
+                        x: getX(i),
+                        y: Math.max(20, Math.min(175, 175 - (d.revenue / financialMaxVal) * 150)),
+                      }));
+                      const profPts = chartData.map((d, i) => ({
+                        x: getX(i),
+                        y: Math.max(20, Math.min(175, 175 - (d.profit / financialMaxVal) * 150)),
+                      }));
+                      const costPts = chartData.map((d, i) => ({
+                        x: getX(i),
+                        y: Math.max(20, Math.min(175, 175 - (d.cost / financialMaxVal) * 150)),
+                      }));
 
-                        {/* Profit Bezier Path */}
-                        <path d={getSmoothPath(profPts)} fill="none" stroke="#c084fc" strokeWidth="3" strokeLinecap="round" />
+                      return (
+                        <>
+                          <path d={getSmoothAreaPath(revPts, 175)} fill="url(#revenueGrad)" />
+                          <path d={getSmoothPath(revPts)} fill="none" stroke="#22d3ee" strokeWidth="3" strokeLinecap="round" />
+                          <path d={getSmoothPath(profPts)} fill="none" stroke="#c084fc" strokeWidth="3" strokeLinecap="round" />
+                          <path d={getSmoothPath(costPts)} fill="none" stroke="#fb7185" strokeWidth="2.5" strokeDasharray="4 4" strokeLinecap="round" />
 
-                        {/* Cost Bezier Path */}
-                        <path d={getSmoothPath(costPts)} fill="none" stroke="#fb7185" strokeWidth="2.5" strokeDasharray="4 4" strokeLinecap="round" />
+                          {activeFinancialIdx !== null && (
+                            <line
+                              x1={getX(activeFinancialIdx)}
+                              y1={10}
+                              x2={getX(activeFinancialIdx)}
+                              y2={180}
+                              stroke="#38bdf8"
+                              strokeWidth="1.5"
+                              strokeDasharray="3 3"
+                              opacity="0.7"
+                            />
+                          )}
 
-                        {/* Guideline on column hover / pin */}
-                        {activeFinancialIdx !== null && (
-                          <line
-                            x1={activeFinancialIdx * 50 + 25}
-                            y1={10}
-                            x2={activeFinancialIdx * 50 + 25}
-                            y2={180}
-                            stroke="#38bdf8"
-                            strokeWidth="1.5"
-                            strokeDasharray="3 3"
-                            opacity="0.7"
-                          />
-                        )}
+                          {chartData.map((d, i) => {
+                            const x = getX(i);
+                            const revY = revPts[i].y;
+                            const profY = profPts[i].y;
+                            const costY = costPts[i].y;
+                            const isActive = activeFinancialIdx === i;
+                            const isShowText = chartData.length <= 15 || i % 3 === 0 || isActive;
 
-                        {/* Nodes (Circles with concentric overlap handling + Click Target) */}
-                        {chartData.map((d, i) => {
-                          const x = i * 50 + 25;
-                          const revY = revPts[i].y;
-                          const profY = profPts[i].y;
-                          const costY = costPts[i].y;
-                          const isActive = activeFinancialIdx === i;
-                          const isOverlap = Math.abs(revY - profY) < 3;
+                            return (
+                              <g key={i}>
+                                {isActive && (
+                                  <>
+                                    <circle cx={x} cy={revY} r="6" fill="#22d3ee" stroke="#0f172a" strokeWidth="2" />
+                                    <circle cx={x} cy={profY} r="6" fill="#c084fc" stroke="#0f172a" strokeWidth="2" />
+                                    <circle cx={x} cy={costY} r="5" fill="#fb7185" stroke="#0f172a" strokeWidth="1.5" />
+                                  </>
+                                )}
+                              </g>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </svg>
 
-                          return (
-                            <g key={i}>
-                              {/* Cost circle */}
-                              <circle cx={x} cy={costY} r={isActive ? "6" : "3.5"} fill="#fb7185" stroke="#0f172a" strokeWidth="1.5" pointerEvents="none" />
+                  {/* Floating Glass Tooltip */}
+                  {activeFinancialIdx !== null && (
+                    <div
+                      className={`absolute top-2 z-30 p-3 bg-slate-950/95 backdrop-blur-md border border-cyan-500/50 rounded-xl shadow-2xl pointer-events-none transition-all duration-200 text-xs min-w-[190px] ${
+                        activeFinancialIdx > chartData.length / 2 ? "left-4" : "right-4"
+                      }`}
+                    >
+                      <p className="font-bold text-slate-200 border-b border-slate-800 pb-1.5 mb-2 flex items-center justify-between">
+                        <span>Mốc: {period === "month" ? `Ngày ${chartData[activeFinancialIdx].label}` : chartData[activeFinancialIdx].label}</span>
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                      </p>
+                      <div className="space-y-1.5 font-mono text-[11px]">
+                        <p className="text-cyan-400 font-semibold flex justify-between gap-4">
+                          <span>Doanh thu:</span>
+                          <span>{formatVND(chartData[activeFinancialIdx].revenue)}</span>
+                        </p>
+                        <p className="text-purple-400 font-semibold flex justify-between gap-4">
+                          <span>Lợi nhuận:</span>
+                          <span>{formatVND(chartData[activeFinancialIdx].profit)}</span>
+                        </p>
+                        <p className="text-rose-400 font-semibold flex justify-between gap-4">
+                          <span>Chi phí:</span>
+                          <span>{formatVND(chartData[activeFinancialIdx].cost)}</span>
+                        </p>
+                      </div>
+                      <p className="text-[9px] text-sky-400/90 border-t border-slate-800/80 pt-1.5 mt-2 italic font-sans flex items-center justify-between">
+                        <span>💡 {period === "month" || period === "year" ? "Click mốc để xem chi tiết" : "Click mốc để ghim số liệu"}</span>
+                      </p>
+                    </div>
+                  )}
 
-                              {/* Overlap concentric circle vs separate circles */}
-                              {isOverlap ? (
-                                <g pointerEvents="none">
-                                  <circle cx={x} cy={revY} r={isActive ? "8" : "5.5"} fill="#22d3ee" stroke="#0f172a" strokeWidth="2" />
-                                  <circle cx={x} cy={profY} r={isActive ? "4.5" : "3"} fill="#c084fc" />
-                                </g>
-                              ) : (
-                                <g pointerEvents="none">
-                                  <circle cx={x} cy={revY} r={isActive ? "6" : "4"} fill="#22d3ee" stroke="#0f172a" strokeWidth="2" />
-                                  <circle cx={x} cy={profY} r={isActive ? "6" : "4"} fill="#c084fc" stroke="#0f172a" strokeWidth="2" />
-                                </g>
-                              )}
-
-                              {/* Interactive Hit Target Circle */}
-                              <circle
-                                cx={x}
-                                cy={revY}
-                                r="18"
-                                fill="transparent"
-                                className="cursor-pointer"
-                                onClick={() => handlePointClick(i, d.label, true)}
-                                onMouseEnter={() => setHoveredFinancialIdx(i)}
-                                onMouseLeave={() => setHoveredFinancialIdx(null)}
-                              />
-                            </g>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
-                </svg>
-
-                {/* X-Axis Labels & Unified Column Hover Tooltip */}
-                <div className="flex justify-between items-center pt-2 border-t border-slate-800 z-10">
-                  {chartData.map((d, i) => {
-                    const totalItems = chartData.length;
-                    const isVisible = isTickVisible(d.label, i, totalItems, activeFinancialIdx);
-
-                    return (
+                  {/* X-Axis Labels */}
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800 z-10 px-2">
+                    {getVisibleTicks().map((t) => (
                       <div
-                        key={i}
-                        className="flex-1 text-center cursor-pointer relative group py-1"
-                        onClick={() => handlePointClick(i, d.label, true)}
-                        onMouseEnter={() => setHoveredFinancialIdx(i)}
+                        key={t.index}
+                        className="text-center cursor-pointer py-1"
+                        onClick={() => handlePointClick(t.index, t.label, true)}
+                        onMouseEnter={() => setHoveredFinancialIdx(t.index)}
                         onMouseLeave={() => setHoveredFinancialIdx(null)}
                       >
-                        <span className={`text-[11px] font-bold transition-all inline-block ${activeFinancialIdx === i ? "text-cyan-400 font-black scale-110" : isVisible ? "text-slate-400" : "text-slate-600 text-[9px]"}`}>
-                          {isVisible ? d.label : "•"}
+                        <span className={`text-[10px] sm:text-xs font-bold transition-all inline-block ${activeFinancialIdx === t.index ? "text-cyan-400 font-black scale-110" : "text-slate-400"}`}>
+                          {t.label}
                         </span>
-
-                        {/* Unified Floating Glass Tooltip */}
-                        {activeFinancialIdx === i && (
-                          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-cyan-500/40 p-2.5 rounded-xl shadow-2xl z-30 min-w-[160px] pointer-events-none">
-                            <p className="text-[11px] font-bold text-slate-300 border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center">
-                              <span>Mốc: {period === "month" ? `Ngày ${d.label}` : d.label}</span>
-                              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                            </p>
-                            <div className="space-y-1">
-                              <p className="text-[11px] text-cyan-400 font-semibold flex justify-between gap-3">
-                                <span>Doanh thu:</span>
-                                <span className="font-mono">{formatVND(d.revenue)}</span>
-                              </p>
-                              <p className="text-[11px] text-purple-400 font-semibold flex justify-between gap-3">
-                                <span>Lợi nhuận:</span>
-                                <span className="font-mono">{formatVND(d.profit)}</span>
-                              </p>
-                              <p className="text-[11px] text-rose-400 font-semibold flex justify-between gap-3">
-                                <span>Chi phí:</span>
-                                <span className="font-mono">{formatVND(d.cost)}</span>
-                              </p>
-                            </div>
-                            <p className="text-[9px] text-sky-400/90 border-t border-slate-800/80 pt-1 mt-1.5 italic font-sans flex items-center justify-between">
-                              <span>💡 {period === "month" || period === "year" ? "Click mốc để xem chi tiết" : "Click mốc để ghim số liệu"}</span>
-                            </p>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-xs">Không có dữ liệu trong khoảng thời gian này</div>
-            )}
-          </div>
-        </GlassCard>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Orders Chart View */
+                <>
+                  <svg 
+                    className="w-full h-56 overflow-visible z-10 cursor-crosshair" 
+                    preserveAspectRatio="none" 
+                    viewBox="0 0 1000 200"
+                    onMouseMove={(e) => handleSvgMouseMove(e, false)}
+                    onMouseLeave={() => setHoveredOrderIdx(null)}
+                  >
+                    <defs>
+                      <linearGradient id="orderGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
 
-        {/* Chart 2: Biểu Đồ Số Lượng Đơn Hàng */}
-        <GlassCard className="space-y-4" glow="emerald">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-2">
-            <div>
-              <h3 className="text-base font-bold text-white">Biểu Đồ Số Lượng Đơn Hàng</h3>
-              <p className="text-xs text-slate-400">{data?.chartSubtitle || "Biến động lượng đơn hàng theo thời gian"}</p>
-            </div>
-            {/* Chart Legend */}
-            <div className="flex items-center gap-3 text-[11px]">
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="text-slate-300">Tổng đơn</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                <span className="text-slate-300">Đơn hủy</span>
-              </div>
-            </div>
-          </div>
+                    {(() => {
+                      const orderPts = chartData.map((d, i) => ({
+                        x: getX(i),
+                        y: Math.max(20, Math.min(175, 175 - (d.orders / orderMaxVal) * 150)),
+                      }));
+                      const cancelPts = chartData.map((d, i) => ({
+                        x: getX(i),
+                        y: Math.max(20, Math.min(175, 175 - ((d.canceled || 0) / orderMaxVal) * 150)),
+                      }));
 
-          {/* SVG Order Count Chart */}
-          <div className="h-72 rounded-xl bg-slate-950/80 border border-slate-800/80 p-4 relative overflow-hidden flex flex-col justify-between">
-            {loading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 z-20">
-                <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
-              </div>
-            ) : null}
+                      return (
+                        <>
+                          <path d={getSmoothAreaPath(orderPts, 175)} fill="url(#orderGrad)" />
+                          <path d={getSmoothPath(orderPts)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+                          <path d={getSmoothPath(cancelPts)} fill="none" stroke="#fb7185" strokeWidth="2.5" strokeDasharray="4 4" strokeLinecap="round" />
 
-            {chartData.length > 0 ? (
-              <div className="relative w-full h-full flex flex-col justify-between">
-                {/* Y-axis grid lines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-                  <div className="border-b border-slate-700 w-full" />
-                  <div className="border-b border-slate-700 w-full" />
-                  <div className="border-b border-slate-700 w-full" />
-                  <div className="border-b border-slate-700 w-full" />
-                </div>
+                          {activeOrderIdx !== null && (
+                            <line
+                              x1={getX(activeOrderIdx)}
+                              y1={10}
+                              x2={getX(activeOrderIdx)}
+                              y2={180}
+                              stroke="#34d399"
+                              strokeWidth="1.5"
+                              strokeDasharray="3 3"
+                              opacity="0.7"
+                            />
+                          )}
 
-                {/* SVG Lines */}
-                <svg className="w-full h-48 overflow-visible z-10" preserveAspectRatio="none" viewBox={`0 0 ${chartData.length * 50} 200`}>
-                  <defs>
-                    <linearGradient id="orderGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
+                          {chartData.map((d, i) => {
+                            const x = getX(i);
+                            const orderY = orderPts[i].y;
+                            const cancelY = cancelPts[i].y;
+                            const isActive = activeOrderIdx === i;
+                            const isShowText = chartData.length <= 15 || i % 3 === 0 || isActive;
 
-                  {/* Pre-calculate point positions */}
-                  {(() => {
-                    const orderPts = chartData.map((d, i) => ({
-                      x: i * 50 + 25,
-                      y: Math.max(15, Math.min(175, 175 - (d.orders / orderMaxVal) * 155)),
-                    }));
-                    const cancelPts = chartData.map((d, i) => ({
-                      x: i * 50 + 25,
-                      y: Math.max(15, Math.min(175, 175 - ((d.canceled || 0) / orderMaxVal) * 155)),
-                    }));
+                            return (
+                              <g key={i}>
+                                {isActive && (
+                                  <>
+                                    <circle cx={x} cy={orderY} r="6" fill="#10b981" stroke="#0f172a" strokeWidth="2" />
+                                    <circle cx={x} cy={cancelY} r="6" fill="#fb7185" stroke="#0f172a" strokeWidth="2" />
+                                  </>
+                                )}
+                              </g>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </svg>
 
-                    return (
-                      <>
-                        {/* Area Fill for Total Orders */}
-                        <path d={getSmoothAreaPath(orderPts, 175)} fill="url(#orderGrad)" />
+                  {/* Floating Glass Tooltip */}
+                  {activeOrderIdx !== null && (
+                    <div
+                      className={`absolute top-2 z-30 p-3 bg-slate-950/95 backdrop-blur-md border border-emerald-500/50 rounded-xl shadow-2xl pointer-events-none transition-all duration-200 text-xs min-w-[170px] ${
+                        activeOrderIdx > chartData.length / 2 ? "left-4" : "right-4"
+                      }`}
+                    >
+                      <p className="font-bold text-slate-200 border-b border-slate-800 pb-1.5 mb-2 flex items-center justify-between">
+                        <span>Mốc: {period === "month" ? `Ngày ${chartData[activeOrderIdx].label}` : chartData[activeOrderIdx].label}</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      </p>
+                      <div className="space-y-1.5 font-mono text-[11px]">
+                        <p className="text-emerald-400 font-semibold flex justify-between gap-4">
+                          <span>Tổng đơn:</span>
+                          <span>{chartData[activeOrderIdx].orders} đơn</span>
+                        </p>
+                        <p className="text-rose-400 font-semibold flex justify-between gap-4">
+                          <span>Đơn hủy:</span>
+                          <span>{chartData[activeOrderIdx].canceled || 0} đơn</span>
+                        </p>
+                      </div>
+                      <p className="text-[9px] text-emerald-400/90 border-t border-slate-800/80 pt-1.5 mt-2 italic font-sans flex items-center justify-between">
+                        <span>💡 {period === "month" || period === "year" ? "Click mốc để xem chi tiết" : "Click mốc để ghim số liệu"}</span>
+                      </p>
+                    </div>
+                  )}
 
-                        {/* Total Orders Bezier Path */}
-                        <path d={getSmoothPath(orderPts)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-
-                        {/* Canceled Orders Bezier Path */}
-                        <path d={getSmoothPath(cancelPts)} fill="none" stroke="#fb7185" strokeWidth="2.5" strokeDasharray="4 4" strokeLinecap="round" />
-
-                        {/* Guideline on column hover / pin */}
-                        {activeOrderIdx !== null && (
-                          <line
-                            x1={activeOrderIdx * 50 + 25}
-                            y1={10}
-                            x2={activeOrderIdx * 50 + 25}
-                            y2={180}
-                            stroke="#34d399"
-                            strokeWidth="1.5"
-                            strokeDasharray="3 3"
-                            opacity="0.7"
-                          />
-                        )}
-
-                        {/* Nodes (Circles with concentric overlap handling + Click Target) */}
-                        {chartData.map((d, i) => {
-                          const x = i * 50 + 25;
-                          const orderY = orderPts[i].y;
-                          const cancelY = cancelPts[i].y;
-                          const isActive = activeOrderIdx === i;
-                          const isOverlap = Math.abs(orderY - cancelY) < 3;
-
-                          return (
-                            <g key={i}>
-                              {isOverlap ? (
-                                <g pointerEvents="none">
-                                  <circle cx={x} cy={orderY} r={isActive ? "8" : "5.5"} fill="#10b981" stroke="#0f172a" strokeWidth="2" />
-                                  <circle cx={x} cy={cancelY} r={isActive ? "4.5" : "3"} fill="#fb7185" />
-                                </g>
-                              ) : (
-                                <g pointerEvents="none">
-                                  <circle cx={x} cy={orderY} r={isActive ? "6" : "4"} fill="#10b981" stroke="#0f172a" strokeWidth="2" />
-                                  <circle cx={x} cy={cancelY} r={isActive ? "6" : "4"} fill="#fb7185" stroke="#0f172a" strokeWidth="2" />
-                                </g>
-                              )}
-
-                              {/* Interactive Hit Target Circle */}
-                              <circle
-                                cx={x}
-                                cy={orderY}
-                                r="18"
-                                fill="transparent"
-                                className="cursor-pointer"
-                                onClick={() => handlePointClick(i, d.label, false)}
-                                onMouseEnter={() => setHoveredOrderIdx(i)}
-                                onMouseLeave={() => setHoveredOrderIdx(null)}
-                              />
-                            </g>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
-                </svg>
-
-                {/* X-Axis Labels & Unified Tooltip */}
-                <div className="flex justify-between items-center pt-2 border-t border-slate-800 z-10">
-                  {chartData.map((d, i) => {
-                    const totalItems = chartData.length;
-                    const isVisible = isTickVisible(d.label, i, totalItems, activeOrderIdx);
-
-                    return (
+                  {/* X-Axis Labels */}
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800 z-10 px-2">
+                    {getVisibleTicks().map((t) => (
                       <div
-                        key={i}
-                        className="flex-1 text-center cursor-pointer relative group py-1"
-                        onClick={() => handlePointClick(i, d.label, false)}
-                        onMouseEnter={() => setHoveredOrderIdx(i)}
+                        key={t.index}
+                        className="text-center cursor-pointer py-1"
+                        onClick={() => handlePointClick(t.index, t.label, false)}
+                        onMouseEnter={() => setHoveredOrderIdx(t.index)}
                         onMouseLeave={() => setHoveredOrderIdx(null)}
                       >
-                        <span className={`text-[11px] font-bold transition-all inline-block ${activeOrderIdx === i ? "text-emerald-400 font-black scale-110" : isVisible ? "text-slate-400" : "text-slate-600 text-[9px]"}`}>
-                          {isVisible ? d.label : "•"}
+                        <span className={`text-[10px] sm:text-xs font-bold transition-all inline-block ${activeOrderIdx === t.index ? "text-emerald-400 font-black scale-110" : "text-slate-400"}`}>
+                          {t.label}
                         </span>
-
-                        {/* Unified Floating Glass Tooltip */}
-                        {activeOrderIdx === i && (
-                          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-emerald-500/40 p-2.5 rounded-xl shadow-2xl z-30 min-w-[140px] pointer-events-none">
-                            <p className="text-[11px] font-bold text-slate-300 border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center">
-                              <span>Mốc: {period === "month" ? `Ngày ${d.label}` : d.label}</span>
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            </p>
-                            <div className="space-y-1">
-                              <p className="text-[11px] text-emerald-400 font-semibold flex justify-between gap-3">
-                                <span>Tổng đơn:</span>
-                                <span className="font-mono">{d.orders} đơn</span>
-                              </p>
-                              <p className="text-[11px] text-rose-400 font-semibold flex justify-between gap-3">
-                                <span>Đơn hủy:</span>
-                                <span className="font-mono">{d.canceled || 0} đơn</span>
-                              </p>
-                            </div>
-                            <p className="text-[9px] text-emerald-400/90 border-t border-slate-800/80 pt-1 mt-1.5 italic font-sans flex items-center justify-between">
-                              <span>💡 {period === "month" || period === "year" ? "Click mốc để xem chi tiết" : "Click mốc để ghim số liệu"}</span>
-                            </p>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-xs">Không có dữ liệu đơn hàng</div>
-            )}
-          </div>
-        </GlassCard>
-      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-500 text-xs">Không có dữ liệu trong khoảng thời gian này</div>
+          )}
+        </div>
+      </GlassCard>
     </div>
   );
 };

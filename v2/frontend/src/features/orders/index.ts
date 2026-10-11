@@ -12,4 +12,5 @@ export * from "./components/OrderTable";
 export * from "./components/OrderCreateEditModal";
 export * from "./components/OrderDetailModal";
 export * from "./components/OrderDeleteModal";
+export * from "./components/PayWithCreditModal";
 

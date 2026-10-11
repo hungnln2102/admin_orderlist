@@ -61,6 +61,45 @@ router.post("/:id/renew", async (req, res) => {
   }
 });
 
+// POST /api/orders/:id/process - Chuyển sang Đang Xử Lý (Thanh toán)
+router.post("/:id/process", async (req, res) => {
+  try {
+    const updated = await orderService.processOrderToProcessing(req.params.id);
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error("[Orders API] Lỗi chuyển đơn sang Đang Xử Lý:", err);
+    res.status(400).json({ error: err.message || "Không thể chuyển đơn sang Đang Xử Lý." });
+  }
+});
+
+// POST /api/orders/:id/complete - Hoàn thành đơn hàng (sang Đã Thanh Toán)
+router.post("/:id/complete", async (req, res) => {
+  try {
+    const order = await orderService.getOrderById(req.params.id);
+    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng." });
+    const { updatedOrder } = await orderService.processCompleteOrder(null, order, order.price, { action: "ADMIN_COMPLETE" });
+    res.json({ success: true, data: updatedOrder });
+  } catch (err) {
+    console.error("[Orders API] Lỗi hoàn thành đơn hàng:", err);
+    res.status(400).json({ error: err.message || "Không thể hoàn thành đơn hàng." });
+  }
+});
+
+// POST /api/orders/:id/pay-credit - Thanh toán bằng Credit
+router.post("/:id/pay-credit", async (req, res) => {
+  try {
+    const { credit_note_id } = req.body;
+    if (!credit_note_id) {
+      return res.status(400).json({ error: "Thiếu mã credit_note_id." });
+    }
+    const updated = await orderService.payOrderWithCredit(req.params.id, credit_note_id);
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error("[Orders API] Lỗi thanh toán bằng credit:", err);
+    res.status(400).json({ error: err.message || "Không thể thanh toán bằng credit." });
+  }
+});
+
 // DELETE /api/orders/:id - Xóa đơn hàng
 router.delete("/:id", async (req, res) => {
   try {

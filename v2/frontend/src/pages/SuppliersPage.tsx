@@ -123,7 +123,7 @@ export const SuppliersPage: React.FC = () => {
       const res = await fetch(`/api/suppliers/${supplierId}/detail`);
       const data = await res.json();
       if (res.ok) {
-        setSupplierDetail(data.data || null);
+        setSupplierDetail(data || null);
       } else {
         notify.error(data.error || "Không thể tải chi tiết Nhà cung cấp", "Lỗi Dữ Liệu");
       }

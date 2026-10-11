@@ -312,6 +312,11 @@ const paySupplierDebt = async (id) => {
   const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).first();
   if (!supplier) throw new Error("Không tìm thấy Nhà cung cấp");
 
+  const unpaidLogs = await db(TABLES.SUPPLIER_ORDER_COST_LOG)
+    .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID });
+
+  const totalPaidAmount = unpaidLogs.reduce((sum, log) => sum + Number(log[LOG_COLS.IMPORT_COST] || 0), 0);
+
   // Đổi ncc_payment_status của tất cả đơn 'Chưa Thanh Toán' sang 'Đã Thanh Toán'
   await db(TABLES.SUPPLIER_ORDER_COST_LOG)
     .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
@@ -320,7 +325,8 @@ const paySupplierDebt = async (id) => {
   eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, {
     id: supplierId,
     supplier_name: supplier[S_COLS.SUPPLIER_NAME],
-    summary: `Đã thanh toán công nợ cho nhà cung cấp "${supplier[S_COLS.SUPPLIER_NAME]}"`,
+    amount: totalPaidAmount,
+    summary: `Đã thanh toán công nợ cho nhà cung cấp "${supplier[S_COLS.SUPPLIER_NAME]}" (${totalPaidAmount.toLocaleString('vi-VN')} ₫)`,
   });
 
   return { success: true, message: `Đã cập nhật thanh toán công nợ cho NCC ${supplier[S_COLS.SUPPLIER_NAME]}` };

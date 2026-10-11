@@ -14,6 +14,7 @@ import {
   OrderCreateEditModal,
   OrderDetailModal,
   OrderDeleteModal,
+  PayWithCreditModal,
 } from "../features/orders";
 import {
   ORDER_PREFIX,
@@ -68,11 +69,73 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false);
+  const [isPayWithCreditModalOpen, setIsPayWithCreditModalOpen] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Form states
   const [formData, setFormData] = useState<OrderFormData>(DEFAULT_FORM_DATA);
   const [isCustomPriceMode, setIsCustomPriceMode] = useState<boolean>(false);
+
+  const handleMarkPaid = async (order: Order) => {
+    try {
+      const res = await fetch(`/api/orders/${order.id}/process`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        notify.success(`Đã chuyển đơn #${order.id_order} sang Đang Xử Lý thành công!`);
+        fetchOrders();
+      } else {
+        throw new Error(data.error || "Không thể chuyển trạng thái.");
+      }
+    } catch (err: any) {
+      console.error("Lỗi chuyển đơn sang Đang Xử Lý:", err);
+      notify.error(err.message || "Lỗi hệ thống.");
+    }
+  };
+
+  const handleCompleteOrder = async (order: Order) => {
+    try {
+      const res = await fetch(`/api/orders/${order.id}/complete`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        notify.success(`Đã hoàn thành đơn #${order.id_order} (Đã Thanh Toán)! Đã ghi nhận doanh thu.`);
+        fetchOrders();
+      } else {
+        throw new Error(data.error || "Không thể hoàn thành đơn hàng.");
+      }
+    } catch (err: any) {
+      console.error("Lỗi hoàn thành đơn hàng:", err);
+      notify.error(err.message || "Lỗi hệ thống.");
+    }
+  };
+
+  const handleOpenPayWithCredit = (order: Order) => {
+    setSelectedOrder(order);
+    setIsPayWithCreditModalOpen(true);
+  };
+
+  const handleRenewOrder = async (order: Order) => {
+    try {
+      const res = await fetch(`/api/orders/${order.id}/renew`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(`Yêu cầu gia hạn đơn #${order.id_order} thành công!`);
+        fetchOrders();
+      } else {
+        throw new Error(data.error || "Không thể gia hạn.");
+      }
+    } catch (err: any) {
+      console.error("Lỗi gia hạn:", err);
+      notify.error(err.message || "Lỗi hệ thống khi gia hạn.");
+    }
+  };
 
   const handlePrefixChange = (prefixVal: string) => {
     const isImport = prefixVal.startsWith(ORDER_PREFIX.MAVN);
@@ -167,7 +230,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   // Lock background body scroll when any modal is open
   useEffect(() => {
-    const isAnyModalOpen = isCreateModalOpen || isEditModalOpen || isDeleteModalOpen || isViewModalOpen;
+    const isAnyModalOpen = isCreateModalOpen || isEditModalOpen || isDeleteModalOpen || isViewModalOpen || isPayWithCreditModalOpen;
     if (isAnyModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
@@ -176,7 +239,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isCreateModalOpen, isEditModalOpen, isDeleteModalOpen, isViewModalOpen]);
+  }, [isCreateModalOpen, isEditModalOpen, isDeleteModalOpen, isViewModalOpen, isPayWithCreditModalOpen]);
 
   const handleOpenCreate = () => {
     const today = formatDateYYYYMMDD(new Date());
@@ -229,13 +292,18 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       setProductSuppliersCatalog([]);
     }
 
+    const matchedSupplier = allSuppliersCatalog.find(
+      (s) => String(s.id) === String(order.supply_id) || (s.supplier_name || s.ncc_name) === order.supply_id
+    );
+    const supplierName = (matchedSupplier ? (matchedSupplier.supplier_name || matchedSupplier.ncc_name) : null) || (order.supply_id ? String(order.supply_id) : "") || "";
+
     setFormData({
       customer: order.customer || "",
       contact: order.contact || "",
       information_order: order.information_order || "",
       slot: order.slot || "",
       id_product: prodName,
-      supply_id: order.supply_id ? String(order.supply_id) : "",
+      supply_id: supplierName,
       price: Number(order.price || 0),
       gross_selling_price: Number(order.gross_selling_price || order.price || 0),
       cost: Number(order.cost || 0),
@@ -257,6 +325,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProductId && !formData.id_product) {
+      notify.error("Vui lòng chọn sản phẩm từ catalog", "Thiếu Thông Tin");
+      return;
+    }
+    if (!formData.supply_id) {
+      notify.error("Vui lòng chọn nhà cung cấp (NCC)", "Thiếu Thông Tin");
+      return;
+    }
     try {
       const prefix = formData.order_prefix || ORDER_PREFIX.MAVC;
       const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -293,6 +369,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProductId && !formData.id_product) {
+      notify.error("Vui lòng chọn sản phẩm từ catalog", "Thiếu Thông Tin");
+      return;
+    }
+    if (!formData.supply_id) {
+      notify.error("Vui lòng chọn nhà cung cấp (NCC)", "Thiếu Thông Tin");
+      return;
+    }
     if (!selectedOrder) return;
     try {
       const res = await fetch(`/api/orders/${selectedOrder.id}`, {
@@ -412,6 +496,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         onOpenView={handleOpenView}
         onOpenEdit={handleOpenEdit}
         onOpenDelete={handleOpenDelete}
+        onMarkPaid={handleMarkPaid}
+        onCompleteOrder={handleCompleteOrder}
+        onPayWithCredit={handleOpenPayWithCredit}
+        onRenewOrder={handleRenewOrder}
       />
 
       {/* Create Order Modal */}
@@ -470,6 +558,16 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirmDelete={handleDeleteSubmit}
         order={selectedOrder}
+      />
+
+      {/* Pay With Credit Modal */}
+      <PayWithCreditModal
+        isOpen={isPayWithCreditModalOpen}
+        onClose={() => setIsPayWithCreditModalOpen(false)}
+        order={selectedOrder}
+        onSuccess={() => {
+          fetchOrders();
+        }}
       />
     </div>
   );

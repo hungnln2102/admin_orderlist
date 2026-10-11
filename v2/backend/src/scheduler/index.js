@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const { updateOrderStatusTask } = require("./tasks/updateOrderStatusTask");
 const { notifyZeroDaysTask } = require("./tasks/notifyZeroDaysTask");
 const { notifyFourDaysTask } = require("./tasks/notifyFourDaysTask");
+const { finalizeDailySummaryTask } = require("./tasks/finalizeDailySummaryTask");
 
 const TIMEZONE = "Asia/Ho_Chi_Minh";
 
@@ -34,10 +35,25 @@ cron.schedule(
   { scheduled: true, timezone: TIMEZONE }
 );
 
+// 3. Cron 23:55 hàng ngày - Chốt số liệu doanh thu / đơn hàng cuối ngày
+cron.schedule(
+  "55 23 * * *",
+  async () => {
+    console.log("[Scheduler] 🕒 Cron 23:55 được kích hoạt (Chốt số liệu ngày)");
+    try {
+      await finalizeDailySummaryTask("cron_2355");
+    } catch (err) {
+      console.error("[Scheduler] Lỗi trong Cron 23:55:", err.message);
+    }
+  },
+  { scheduled: true, timezone: TIMEZONE }
+);
+
 console.log(`=================================`);
 console.log(`⏰ Cron Scheduler V2 initialized:`);
 console.log(` - Cron 00:00 (0h): Cập nhật trạng thái đơn & Thông báo 0 ngày`);
 console.log(` - Cron 07:00 (7h): Thông báo nhắc gia hạn đơn 4 ngày`);
+console.log(` - Cron 23:55: Chốt số liệu thống kê doanh thu cuối ngày`);
 console.log(` - Timezone: ${TIMEZONE}`);
 console.log(`=================================`);
 
@@ -45,4 +61,5 @@ module.exports = {
   updateOrderStatusTask,
   notifyZeroDaysTask,
   notifyFourDaysTask,
+  finalizeDailySummaryTask,
 };

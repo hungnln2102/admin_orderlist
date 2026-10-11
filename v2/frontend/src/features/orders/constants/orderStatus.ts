@@ -3,6 +3,7 @@
  */
 export const ORDER_STATUS = {
   UNPAID: 'UNPAID',
+  PROCESSING: 'PROCESSING',
   PAID: 'PAID',
   RENEW_REQUIRED: 'RENEW_REQUIRED',
   EXPIRED: 'EXPIRED',
@@ -18,6 +19,7 @@ export type OrderStatusValue = (typeof ORDER_STATUS)[keyof typeof ORDER_STATUS];
  */
 export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
   [ORDER_STATUS.UNPAID]: 'Chưa Thanh Toán',
+  [ORDER_STATUS.PROCESSING]: 'Đang Xử Lý',
   [ORDER_STATUS.PAID]: 'Đã Thanh Toán',
   [ORDER_STATUS.RENEW_REQUIRED]: 'Cần Gia Hạn',
   [ORDER_STATUS.EXPIRED]: 'Hết Hạn',

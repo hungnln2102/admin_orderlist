@@ -3,6 +3,7 @@
  */
 const ORDER_STATUS = Object.freeze({
   UNPAID: 'UNPAID',
+  PROCESSING: 'PROCESSING',
   PAID: 'PAID',
   RENEW_REQUIRED: 'RENEW_REQUIRED',
   EXPIRED: 'EXPIRED',
@@ -16,6 +17,7 @@ const ORDER_STATUS = Object.freeze({
  */
 const ORDER_STATUS_LABELS = Object.freeze({
   [ORDER_STATUS.UNPAID]: 'Chưa Thanh Toán',
+  [ORDER_STATUS.PROCESSING]: 'Đang Xử Lý',
   [ORDER_STATUS.PAID]: 'Đã Thanh Toán',
   [ORDER_STATUS.RENEW_REQUIRED]: 'Cần Gia Hạn',
   [ORDER_STATUS.EXPIRED]: 'Hết Hạn',
@@ -24,7 +26,12 @@ const ORDER_STATUS_LABELS = Object.freeze({
   [ORDER_STATUS.CANCELED]: 'Đã Hủy',
 });
 
+const getOrderStatusLabel = (status) => {
+  return ORDER_STATUS_LABELS[status] || status || "Không rõ";
+};
+
 module.exports = {
   ORDER_STATUS,
   ORDER_STATUS_LABELS,
+  getOrderStatusLabel,
 };

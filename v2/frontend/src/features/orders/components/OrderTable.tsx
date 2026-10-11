@@ -20,6 +20,7 @@ import {
   getDisplayProductName,
 } from "../types";
 import { getOrderPrefixConfig } from "../constants/orderPrefix";
+import { ORDER_STATUS } from "../constants/orderStatus";
 import { renderStatusBadge } from "./StatusBadge";
 
 interface OrderTableProps {
@@ -39,6 +40,7 @@ interface OrderTableProps {
   onRenewOrder?: (order: Order) => void;
   onMarkPaid?: (order: Order) => void;
   onPayWithCredit?: (order: Order) => void;
+  onCompleteOrder?: (order: Order) => void;
 }
 
 export const OrderTable: React.FC<OrderTableProps> = ({
@@ -58,6 +60,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
   onRenewOrder,
   onMarkPaid,
   onPayWithCredit,
+  onCompleteOrder,
 }) => {
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
 
@@ -287,29 +290,42 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                               </div>
 
                               <div className="flex items-center gap-2 flex-wrap">
-                                {onPayWithCredit && (
-                                  <button
-                                    onClick={() => onPayWithCredit(order)}
-                                    className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 rounded-full shadow-md shadow-cyan-900/30 transition-all cursor-pointer active:scale-95"
-                                  >
-                                    Thanh Toán bằng Credit
-                                  </button>
-                                )}
-                                {onMarkPaid && (
-                                  <button
-                                    onClick={() => onMarkPaid(order)}
-                                    className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 rounded-full shadow-md shadow-emerald-900/30 transition-all cursor-pointer active:scale-95"
-                                  >
-                                    Thanh Toán
-                                  </button>
-                                )}
-                                {onRenewOrder && (
-                                  <button
-                                    onClick={() => onRenewOrder(order)}
-                                    className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 rounded-full shadow-md shadow-amber-900/30 transition-all cursor-pointer active:scale-95"
-                                  >
-                                    Gia Hạn
-                                  </button>
+                                {order.status === ORDER_STATUS.PROCESSING ? (
+                                  onCompleteOrder && (
+                                    <button
+                                      onClick={() => onCompleteOrder(order)}
+                                      className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 rounded-full shadow-md shadow-emerald-900/30 transition-all cursor-pointer active:scale-95"
+                                    >
+                                      Hoàn thành
+                                    </button>
+                                  )
+                                ) : order.status === ORDER_STATUS.PAID ? null : (
+                                  <>
+                                    {onPayWithCredit && (
+                                      <button
+                                        onClick={() => onPayWithCredit(order)}
+                                        className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 rounded-full shadow-md shadow-cyan-900/30 transition-all cursor-pointer active:scale-95"
+                                      >
+                                        Thanh Toán bằng Credit
+                                      </button>
+                                    )}
+                                    {onMarkPaid && (
+                                      <button
+                                        onClick={() => onMarkPaid(order)}
+                                        className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 rounded-full shadow-md shadow-blue-900/30 transition-all cursor-pointer active:scale-95"
+                                      >
+                                        Thanh Toán
+                                      </button>
+                                    )}
+                                    {onRenewOrder && order.status === ORDER_STATUS.RENEW_REQUIRED && (
+                                      <button
+                                        onClick={() => onRenewOrder(order)}
+                                        className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 rounded-full shadow-md shadow-amber-900/30 transition-all cursor-pointer active:scale-95"
+                                      >
+                                        Gia Hạn
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>

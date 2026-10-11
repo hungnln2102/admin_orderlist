@@ -159,23 +159,35 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Chọn Sản Phẩm từ Catalog</label>
-                <SearchableProductDropdown
-                  products={productsCatalog}
-                  selectedProductId={selectedProductId}
-                  onSelectProduct={onProductChange}
-                />
+                <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Sản Phẩm" : "Chọn Sản Phẩm từ Catalog *"}</label>
+                {isEdit ? (
+                  <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-cyan-300 font-bold flex items-center min-h-[38px]">
+                    {productsCatalog.find((p) => p.id === Number(formData.id_product) || p.san_pham === formData.id_product)?.san_pham || formData.id_product || "Không đổi"}
+                  </div>
+                ) : (
+                  <SearchableProductDropdown
+                    products={productsCatalog}
+                    selectedProductId={selectedProductId}
+                    onSelectProduct={onProductChange}
+                  />
+                )}
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Chọn Nhà Cung Cấp (NCC)</label>
-                <SearchableSupplierDropdown
-                  productSuppliers={productSuppliersCatalog}
-                  allSuppliers={allSuppliersCatalog}
-                  selectedSupplierName={formData.supply_id}
-                  onSelectSupplier={onSupplierChange}
-                  loadingSuppliers={loadingSuppliers}
-                />
+                <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Nhà Cung Cấp (NCC)" : "Chọn Nhà Cung Cấp (NCC) *"}</label>
+                {isEdit ? (
+                  <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-purple-300 font-bold flex items-center min-h-[38px]">
+                    {formData.supply_id || "Chưa có NCC"}
+                  </div>
+                ) : (
+                  <SearchableSupplierDropdown
+                    productSuppliers={productSuppliersCatalog}
+                    allSuppliers={allSuppliersCatalog}
+                    selectedSupplierName={formData.supply_id}
+                    onSelectSupplier={onSupplierChange}
+                    loadingSuppliers={loadingSuppliers}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -187,9 +199,10 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Thông Tin Sản Phẩm</label>
+                <label className="block text-slate-400 mb-1 font-medium">Thông Tin Sản Phẩm *</label>
                 <input
                   type="text"
+                  required
                   placeholder="Ví dụ: Gói 1 Tháng, 1 Năm..."
                   value={formData.information_order}
                   onChange={(e) => setFormData({ ...formData, information_order: e.target.value })}
@@ -210,57 +223,30 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             </div>
 
             {/* Pricing Details */}
-            <div className={`grid grid-cols-1 ${isEdit ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3 pt-2`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-slate-400 font-medium">
-                    Giá Bán ({currentPrefix === "MAVC" ? "CTV" : currentPrefix === "MAVL" ? "Bán Lẻ" : currentPrefix === "MAVK" ? "Khuyến Mãi" : currentPrefix === "MAVS" ? "Sinh Viên" : currentPrefix === "MAVT" ? "Quà Tặng" : "Nhập Hàng"}) (₫) *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomPriceMode(!isCustomPriceMode)}
-                    className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
-                  >
-                    {isCustomPriceMode ? "Khóa giá" : "Tùy chỉnh"}
-                  </button>
-                </div>
+                <label className="block text-slate-400 mb-1 font-medium">
+                  Giá Bán ({currentPrefix === "MAVC" ? "CTV" : currentPrefix === "MAVL" ? "Bán Lẻ" : currentPrefix === "MAVK" ? "Khuyến Mãi" : currentPrefix === "MAVS" ? "Sinh Viên" : currentPrefix === "MAVT" ? "Quà Tặng" : "Nhập Hàng"}) (₫) *
+                </label>
                 <input
                   type="number"
                   required
+                  readOnly
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: Number(e.target.value), gross_selling_price: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none cursor-not-allowed opacity-90 select-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Giá Vốn Nhập NCC (₫)</label>
+                <label className="block text-slate-400 mb-1 font-medium">Giá Vốn Nhập NCC (₫) *</label>
                 <input
                   type="number"
+                  required
+                  readOnly
                   value={formData.cost}
-                  onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-bold font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-purple-300 font-bold font-mono focus:outline-none cursor-not-allowed opacity-90 select-none"
                 />
               </div>
-
-              {isEdit && (
-                <div>
-                  <label className="block text-slate-400 mb-1 font-medium">Trạng Thái Đơn *</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
-                  >
-                    <option value={ORDER_STATUS.PAID}>{ORDER_STATUS_LABELS[ORDER_STATUS.PAID]}</option>
-                    <option value={ORDER_STATUS.UNPAID}>{ORDER_STATUS_LABELS[ORDER_STATUS.UNPAID]}</option>
-                    <option value={ORDER_STATUS.RENEW_REQUIRED}>{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}</option>
-                    <option value={ORDER_STATUS.EXPIRED}>{ORDER_STATUS_LABELS[ORDER_STATUS.EXPIRED]}</option>
-                    <option value={ORDER_STATUS.REFUND_PENDING}>{ORDER_STATUS_LABELS[ORDER_STATUS.REFUND_PENDING]}</option>
-                    <option value={ORDER_STATUS.REFUNDED}>{ORDER_STATUS_LABELS[ORDER_STATUS.REFUNDED]}</option>
-                    <option value={ORDER_STATUS.CANCELED}>{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}</option>
-                  </select>
-                </div>
-              )}
             </div>
           </div>
 

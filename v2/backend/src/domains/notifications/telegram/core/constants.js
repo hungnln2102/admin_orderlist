@@ -18,15 +18,32 @@ function parseOptionalTopicId(raw) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
+const getConfigVal = (configKey, envVal, defaultVal = "") => {
+  const dynamicVal = systemConfigService.get(configKey);
+  if (dynamicVal !== null && dynamicVal !== undefined && String(dynamicVal).trim() !== "") {
+    return String(dynamicVal).trim();
+  }
+  return String(envVal || defaultVal).trim();
+};
 
-// Các cờ kích hoạt/tắt
-const SEND_ORDER_NOTIFICATION = String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !== "false";
-const SEND_FINANCE_DELTA_NOTIFICATION = String(process.env.SEND_FINANCE_DELTA_NOTIFICATION ?? "true").toLowerCase() !== "false";
-const SEND_ERROR_NOTIFICATION = String(process.env.SEND_ERROR_NOTIFICATION || "true").toLowerCase() !== "false";
-const SEND_ORDER_TO_TOPIC = String(process.env.SEND_ORDER_TO_TOPIC ?? "true").toLowerCase() !== "false";
-const SEND_ORDER_COPY_BUTTONS = String(process.env.SEND_ORDER_COPY_BUTTONS || "true").toLowerCase() !== "false";
+const TELEGRAM_BOT_TOKEN = getConfigVal("TELEGRAM_BOT_TOKEN", process.env.TELEGRAM_BOT_TOKEN);
+const TELEGRAM_CHAT_ID = getConfigVal("TELEGRAM_CHAT_ID", process.env.TELEGRAM_CHAT_ID);
+
+const getBoolConfig = (configKey, envVal, defaultVal = true) => {
+  const dynamicVal = systemConfigService.get(configKey);
+  if (dynamicVal !== null && dynamicVal !== undefined) {
+    if (typeof dynamicVal === 'boolean') return dynamicVal;
+    return String(dynamicVal).toLowerCase() !== 'false';
+  }
+  return String(envVal ?? defaultVal).toLowerCase() !== 'false';
+};
+
+// Các cờ kích hoạt/tắt (Đọc từ systemConfigService với fallback qua env)
+const SEND_ORDER_NOTIFICATION = getBoolConfig("SEND_ORDER_NOTIFICATION", process.env.SEND_ORDER_NOTIFICATION, true);
+const SEND_FINANCE_DELTA_NOTIFICATION = getBoolConfig("SEND_FINANCE_DELTA_NOTIFICATION", process.env.SEND_FINANCE_DELTA_NOTIFICATION, true);
+const SEND_ERROR_NOTIFICATION = getBoolConfig("SEND_ERROR_NOTIFICATION", process.env.SEND_ERROR_NOTIFICATION, true);
+const SEND_ORDER_TO_TOPIC = getBoolConfig("SEND_ORDER_TO_TOPIC", process.env.SEND_ORDER_TO_TOPIC, true);
+const SEND_ORDER_COPY_BUTTONS = getBoolConfig("SEND_ORDER_COPY_BUTTONS", process.env.SEND_ORDER_COPY_BUTTONS, true);
 
 // Topic IDs (Đọc từ systemConfigService với fallback qua env)
 const getTopicId = (configKey, envVal, defaultVal) => {

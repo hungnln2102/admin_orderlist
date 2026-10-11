@@ -77,32 +77,9 @@ export const OrderDeleteModal: React.FC<OrderDeleteModalProps> = ({
 
           {/* Action Explanation Box */}
           <div className="p-3.5 rounded-xl border text-slate-300 leading-relaxed space-y-1 bg-rose-500/10 border-rose-500/20">
-            {isHardDelete && (
-              <p>
-                Đơn hàng ở trạng thái <strong className="text-rose-300">"{statusLabel}"</strong> sẽ bị{" "}
-                <strong className="text-rose-400 uppercase">Xóa Vĩnh Viễn</strong> khỏi hệ thống cơ sở dữ liệu. Thao tác này không thể hoàn tác!
-              </p>
-            )}
-
-            {isSoftDeletePendingRefund && (
-              <p>
-                Đơn hàng ở trạng thái <strong className="text-emerald-300">"{ORDER_STATUS_LABELS[ORDER_STATUS.PAID]}"</strong> sẽ được chuyển sang danh sách{" "}
-                <strong className="text-purple-300 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.REFUND_PENDING]}"</strong> để theo dõi hoàn vốn cho khách hàng.
-              </p>
-            )}
-
-            {isSoftDeleteExpired && (
-              <p>
-                Đơn hàng ở trạng thái <strong className="text-amber-300">"{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}"</strong> sẽ được hủy gia hạn và chuyển sang danh sách{" "}
-                <strong className="text-amber-400 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.EXPIRED]}"</strong>.
-              </p>
-            )}
-
-            {!isHardDelete && !isSoftDeletePendingRefund && !isSoftDeleteExpired && (
-              <p>
-                Hệ thống sẽ tự động xử lý trạng thái hủy/xóa cho đơn hàng <strong>#{order.id_order}</strong>.
-              </p>
-            )}
+            <p>
+              Thao tác này sẽ cập nhật trạng thái đơn hàng <strong>#{order.id_order}</strong> thành <strong className="text-rose-400 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}"</strong> (Đã Hủy).
+            </p>
           </div>
         </div>
 

@@ -17,6 +17,13 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
           {label}
         </span>
       );
+    case ORDER_STATUS.PROCESSING:
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-sm shadow-blue-500/10 whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
+          {label}
+        </span>
+      );
     case ORDER_STATUS.RENEW_REQUIRED:
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/10 whitespace-nowrap">

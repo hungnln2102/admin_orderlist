@@ -4,6 +4,8 @@ const supplierController = require("../controllers/supplierController");
 
 router.get("/overview", supplierController.getOverview);
 router.get("/cost-logs", supplierController.getCostLogs);
+router.get("/:id/logs", supplierController.getCostLogsForSupplier);
+router.get("/:id/detail", supplierController.getSupplierDetail);
 router.get("/:id/details", supplierController.getSupplierDetail);
 router.post("/:id/pay-debt", supplierController.payDebt);
 router.patch("/:id/toggle-status", supplierController.toggleStatus);

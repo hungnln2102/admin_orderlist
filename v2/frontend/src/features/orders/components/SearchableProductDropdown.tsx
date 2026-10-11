@@ -6,12 +6,14 @@ interface SearchableProductDropdownProps {
   products: CatalogProduct[];
   selectedProductId: number | null;
   onSelectProduct: (productIdStr: string) => void;
+  disabled?: boolean;
 }
 
 export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps> = ({
   products,
   selectedProductId,
   onSelectProduct,
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -44,8 +46,9 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-left flex items-center justify-between hover:border-cyan-500/50 focus:outline-none transition-all cursor-pointer min-h-[38px]"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-left flex items-center justify-between transition-all min-h-[38px] ${disabled ? "cursor-not-allowed opacity-80 bg-slate-950/80" : "hover:border-cyan-500/50 focus:outline-none cursor-pointer"}`}
       >
         <span className="text-xs font-medium text-white break-words whitespace-normal leading-snug flex-1 pr-2">
           {selectedProduct ? (

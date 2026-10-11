@@ -116,13 +116,32 @@ exports.up = async function (knex) {
     INSERT INTO ${schemaSystem}.system_configs (config_key, config_value, data_type, description, group_name)
     VALUES
       ('RENEWAL_WARN_DAYS', '4', 'NUMBER', 'Số ngày trước khi hết hạn để gửi thông báo nhắc gia hạn', 'ORDER_BUSINESS'),
+      ('RENEWAL_NOTIFICATION_TIME', '07:00', 'STRING', 'Thời gian trong ngày tự động gửi thông báo nhắc gia hạn đơn hàng', 'ORDER_BUSINESS'),
       ('USDT_EXCHANGE_RATE', '25400', 'NUMBER', 'Tỷ giá quy đổi mặc định từ 1 USDT sang VND', 'FINANCE'),
       ('SEPAY_AUTO_MATCH', 'true', 'BOOLEAN', 'Bật/tắt tính năng tự động khớp biên lai chuyển khoản ngân hàng', 'PAYMENT'),
       ('TELEGRAM_ENABLED', 'true', 'BOOLEAN', 'Bật/tắt toàn bộ dịch vụ thông báo Telegram', 'NOTIFY'),
+      ('TELEGRAM_BOT_TOKEN', '', 'STRING', 'Telegram Bot API Token (HTTP API)', 'NOTIFY'),
+      ('TELEGRAM_CHAT_ID', '', 'STRING', 'Telegram Group / Chat ID', 'NOTIFY'),
+      ('SEND_ORDER_NOTIFICATION', 'true', 'BOOLEAN', 'Bật/tắt thông báo đơn hàng mới', 'NOTIFY'),
+      ('SEND_FINANCE_DELTA_NOTIFICATION', 'true', 'BOOLEAN', 'Bật/tắt thông báo biến động tài chính', 'NOTIFY'),
+      ('SEND_ERROR_NOTIFICATION', 'true', 'BOOLEAN', 'Bật/tắt thông báo lỗi hệ thống', 'NOTIFY'),
+      ('SEND_ORDER_TO_TOPIC', 'true', 'BOOLEAN', 'Bật/tắt gửi đơn hàng vào Topic riêng biệt', 'NOTIFY'),
+      ('SEND_ORDER_COPY_BUTTONS', 'true', 'BOOLEAN', 'Bật/tắt nút bấm copy thông tin đơn hàng trên Telegram', 'NOTIFY'),
       ('TELEGRAM_ORDER_TOPIC_ID', '', 'STRING', 'ID của Topic nhận thông báo Đơn Hàng Mới', 'NOTIFY'),
       ('TELEGRAM_RENEWAL_TOPIC_ID', '', 'STRING', 'ID của Topic nhận thông báo Cần Gia Hạn / Hết Hạn', 'NOTIFY'),
       ('TELEGRAM_FINANCE_TOPIC_ID', '', 'STRING', 'ID của Topic nhận thông báo Biến Động Tài Chính (Sepay, Chuyển tiền)', 'NOTIFY'),
-      ('TELEGRAM_SYSTEM_ALERT_TOPIC_ID', '', 'STRING', 'ID của Topic nhận cảnh báo Lỗi Hệ Thống khẩn cấp', 'NOTIFY')
+      ('TELEGRAM_SYSTEM_ALERT_TOPIC_ID', '', 'STRING', 'ID của Topic nhận cảnh báo Lỗi Hệ Thống khẩn cấp', 'NOTIFY'),
+      ('GOOGLE_API_KEY', '', 'STRING', 'Google API Key (Google Sheets, Maps, etc.)', 'INTEGRATION'),
+      ('AI_API_KEY', '', 'STRING', 'AI / Gemini / OpenAI API Key', 'INTEGRATION'),
+      ('SEPAY_API_KEY', '', 'STRING', 'SePay API Key dùng để gọi API SePay', 'PAYMENT'),
+      ('SEPAY_WEBHOOK_SECRET', '', 'STRING', 'SePay Webhook Secret Token xác thực webhook', 'PAYMENT'),
+      ('WEBHOOK_SECRET', '', 'STRING', 'General Webhook Secret xác thực webhook chung', 'PAYMENT'),
+      ('ENABLE_DB_BACKUP', 'false', 'BOOLEAN', 'Bật/tắt tính năng tự động backup database lên Google Drive', 'BACKUP'),
+      ('GOOGLE_DRIVE_FOLDER_ID', '', 'STRING', 'ID thư mục Google Drive lưu trữ các bản backup database', 'BACKUP'),
+      ('BACKUP_RETENTION_DAYS', '7', 'NUMBER', 'Số ngày lưu trữ file backup trước khi tự động xoá cũ', 'BACKUP'),
+      ('GOOGLE_DRIVE_OAUTH_CLIENT_ID', '', 'STRING', 'Google Drive OAuth Client ID', 'BACKUP'),
+      ('GOOGLE_DRIVE_OAUTH_CLIENT_SECRET', '', 'STRING', 'Google Drive OAuth Client Secret', 'BACKUP'),
+      ('GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN', '', 'STRING', 'Google Drive OAuth Refresh Token', 'BACKUP')
     ON CONFLICT (config_key) DO NOTHING;
   `);
 

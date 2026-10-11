@@ -2,9 +2,12 @@ const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
 const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
+const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
+
+const isCustomerMavryk = (c) => String(c || "").trim().toLowerCase() === "mavryk";
 
 // In-memory cache for default shop bank account (1 minute TTL)
 let cachedDefaultBank = null;
@@ -44,7 +47,13 @@ function generateOrderCode() {
 }
 
 function applyCanceledFilter(builder) {
-  builder.whereIn("status", [ORDER_STATUS.REFUND_PENDING, ORDER_STATUS.REFUNDED, ORDER_STATUS.CANCELED]);
+  builder.where(function(b) {
+    b.whereIn("status", [ORDER_STATUS.REFUND_PENDING, ORDER_STATUS.REFUNDED])
+     .orWhere(function(sub) {
+       sub.where("status", ORDER_STATUS.CANCELED)
+          .where("was_paid", true);
+     });
+  });
 }
 
 function applyExpiredFilter(builder) {
@@ -55,18 +64,14 @@ function applyExpiredFilter(builder) {
 function applyImportFilter(builder) {
   builder.whereNot(applyCanceledFilter)
     .whereNot(applyExpiredFilter)
-    .where((b) => {
-      b.whereILike("id_order", "MAVN%")
-       .orWhere((b2) => b2.where("cost", ">", 0).where("status", ORDER_STATUS.PAID));
-    });
+    .whereILike("id_order", "MAVN%");
 }
 
 function applyActiveFilter(builder) {
   builder.whereNot(applyCanceledFilter)
     .whereNot(applyExpiredFilter)
     .whereNot((b) => {
-      b.whereILike("id_order", "MAVN%")
-       .orWhere((b2) => b2.where("cost", ">", 0).where("status", ORDER_STATUS.PAID));
+      b.whereILike("id_order", "MAVN%");
     });
 }
 
@@ -222,7 +227,8 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     .limit(limit)
     .offset(offset);
 
-  const ordersWithQr = await Promise.all(orders.map((o) => attachVietQrToOrder(o)));
+  const ordersWithSupplier = await Promise.all(orders.map((o) => attachSupplierInfo(o)));
+  const ordersWithQr = await Promise.all(ordersWithSupplier.map((o) => attachVietQrToOrder(o)));
 
   return {
     data: ordersWithQr,
@@ -235,6 +241,55 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     tabCounts,
     summary,
   };
+}
+
+async function resolveSupplyId(trx, supplyInput) {
+  if (!supplyInput) return null;
+  const num = Number(supplyInput);
+  if (!isNaN(num) && num > 0) {
+    const foundById = await trx(TABLES.SUPPLIER).where({ id: num }).first();
+    if (foundById) return foundById.id;
+  }
+  const foundByName = await trx(TABLES.SUPPLIER)
+    .whereILike(COLS.SUPPLIER.SUPPLIER_NAME, String(supplyInput).trim())
+    .first();
+  if (foundByName) return foundByName.id;
+  return null;
+}
+
+async function attachSupplierInfo(order, trx) {
+  if (!order) return order;
+  try {
+    const queryDb = trx || db;
+    let supplyId = order.supply_id;
+    if (!supplyId) {
+      const log = await queryDb(TABLES.SUPPLIER_ORDER_COST_LOG)
+        .where({ order_list_id: order.id })
+        .first();
+      if (log && log.supply_id) {
+        supplyId = log.supply_id;
+      }
+    }
+
+    let supplierName = "";
+    if (supplyId) {
+      const supplier = await queryDb(TABLES.SUPPLIER)
+        .where({ id: Number(supplyId) })
+        .first();
+      if (supplier) {
+        supplierName = supplier[COLS.SUPPLIER.SUPPLIER_NAME] || "";
+      }
+    }
+
+    return {
+      ...order,
+      supply_id: supplyId || order.supply_id || null,
+      supplier_name: supplierName,
+    };
+  } catch (err) {
+    console.error("[attachSupplierInfo] Lỗi:", err.message);
+    return order;
+  }
 }
 
 /**
@@ -321,22 +376,29 @@ async function createOrder(payload) {
       }
     }
 
+    const customerVal = payload.customer || "Khách hàng";
+    const isMavryk = isCustomerMavryk(customerVal);
+    const rawCost = Number(payload.cost || 0);
+    const finalCost = isMavryk ? 0 : rawCost;
+
+    const isPaid = status === ORDER_STATUS.PAID || String(id_order).toUpperCase().startsWith("MAVN");
     const newOrderData = {
       id_order,
-      customer: payload.customer || "Khách hàng",
+      customer: customerVal,
       contact: payload.contact || "",
       information_order: payload.information_order || "",
       slot: payload.slot || "",
       price: finalPrice,
       gross_selling_price: payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice,
-      cost: payload.cost != null ? Number(payload.cost) : 0,
-      status: normStatus,
+      cost: finalCost,
+      status: status,
+      was_paid: isPaid,
       payment_method: payload.payment_method || "bank",
       note: payload.note || "",
       days: payload.days ? Number(payload.days) : 365,
       order_date: payload.order_date || null,
       expired_at: payload.expired_at || null,
-      supply_id: (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null,
+      supply_id: await resolveSupplyId(trx, payload.supply_id),
       created_at: db.fn.now(),
     };
 
@@ -365,14 +427,9 @@ async function createOrder(payload) {
 
     // Phát event Domain: ORDER_CREATED
     eventBus.emit(EVENTS.ORDER_CREATED, {
+      ...createdOrder,
       orderId: createdOrder.id,
-      id_order: createdOrder.id_order,
-      customer: createdOrder.customer,
-      contact: createdOrder.contact,
-      price: createdOrder.price,
-      status: createdOrder.status,
       summary,
-      created_at: createdOrder.created_at,
       action: "CREATE",
     });
 
@@ -389,6 +446,9 @@ async function updateOrder(id, payload) {
     if (!existingOrder) {
       throw new Error("Không tìm thấy đơn hàng cần sửa.");
     }
+
+    const targetCustomer = payload.customer !== undefined ? payload.customer : existingOrder.customer;
+    const isMavryk = isCustomerMavryk(targetCustomer);
 
     const updateFields = {};
     if (payload.customer !== undefined) updateFields.customer = payload.customer;
@@ -411,11 +471,19 @@ async function updateOrder(id, payload) {
     }
     if (payload.price !== undefined) updateFields.price = Number(payload.price);
     if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
-    if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
+    
+    if (isMavryk) {
+      updateFields.cost = 0;
+    } else if (payload.cost !== undefined) {
+      updateFields.cost = Number(payload.cost);
+    }
 
     if (payload.status !== undefined) {
       const status = payload.status;
       updateFields.status = status;
+      if (status === ORDER_STATUS.PAID) {
+        updateFields.was_paid = true;
+      }
 
       if (status === ORDER_STATUS.UNPAID || status === ORDER_STATUS.RENEW_REQUIRED) {
         const basePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
@@ -433,7 +501,9 @@ async function updateOrder(id, payload) {
     if (payload.days !== undefined) updateFields.days = Number(payload.days);
     if (payload.order_date !== undefined) updateFields.order_date = payload.order_date || null;
     if (payload.expired_at !== undefined) updateFields.expired_at = payload.expired_at || null;
-    if (payload.supply_id !== undefined) updateFields.supply_id = (payload.supply_id && !isNaN(Number(payload.supply_id)) && Number(payload.supply_id) > 0) ? Number(payload.supply_id) : null;
+    if (payload.supply_id !== undefined) {
+      updateFields.supply_id = await resolveSupplyId(trx, payload.supply_id);
+    }
 
     const [updatedOrder] = await getOrderTable(trx)
       .where({ id: Number(id) })
@@ -572,30 +642,15 @@ async function deleteOrder(id) {
     }
 
     const status = existingOrder.status;
-    
-    // Hard Delete: UNPAID
-    const isHardDelete = status === ORDER_STATUS.UNPAID;
-    
-    // Soft Delete (Chưa Hoàn): PAID
-    const isSoftDeletePendingRefund = status === ORDER_STATUS.PAID;
-    
-    // Soft Delete (Hết Hạn): RENEW_REQUIRED
-    const isSoftDeleteExpired = status === ORDER_STATUS.RENEW_REQUIRED;
-    
-    // Blocked: EXPIRED, REFUNDED, REFUND_PENDING, CANCELED
-    const isBlocked = [ORDER_STATUS.EXPIRED, ORDER_STATUS.REFUNDED, ORDER_STATUS.REFUND_PENDING, ORDER_STATUS.CANCELED].includes(status);
-
-    if (isBlocked) {
-      throw new Error(`Đơn hàng ở trạng thái "${getOrderStatusLabel(existingOrder.status)}" không được phép xóa.`);
-    }
-
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
     const todayYMD = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    if (isHardDelete) {
-      // 1. Luồng Xóa Vĩnh Viễn
+    // Chỉ đơn Đã Thanh Toán (PAID) khi xóa mới chuyển sang Đã Hủy (CANCELED) để nằm trong tab Hoàn Tiền.
+    // Các đơn chưa thanh toán hoặc trạng thái khác khi xóa sẽ XÓA VĨNH VIỄN (Hard Delete).
+    const isPaidOrder = status === ORDER_STATUS.PAID;
+
+    if (!isPaidOrder) {
       await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
-      
       const summary = `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
       eventBus.emit(EVENTS.ORDER_DELETED, {
         orderId: existingOrder.id,
@@ -606,50 +661,234 @@ async function deleteOrder(id) {
         summary,
         action: "HARD_DELETE",
       });
-
       return { success: true, action: "deleted", message: `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order}` };
-    } 
-    else if (isSoftDeletePendingRefund) {
-      // 2. Luồng Hủy và Chờ Hoàn Tiền
-      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
-        status: ORDER_STATUS.REFUND_PENDING,
-        canceled_at: existingOrder.canceled_at || todayYMD,
-      });
-
-      const summary = `Đã hủy đơn hàng #${existingOrder.id_order} và chuyển vào danh sách Chưa Hoàn Tiền.`;
-      
-      eventBus.emit(EVENTS.ORDER_PENDING_REFUND, {
-        orderId: existingOrder.id,
-        orderCode: existingOrder.id_order,
-        order: existingOrder,
-        canceledAt: todayYMD,
-        summary,
-        action: "SOFT_DELETE_PENDING_REFUND",
-      });
-
-      return { success: true, action: "pending_refund", message: summary };
     }
-    else if (isSoftDeleteExpired) {
-      // 3. Luồng Ngừng Gia Hạn
-      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
-        status: ORDER_STATUS.EXPIRED,
+
+    // Đơn Đã Thanh Toán khi xóa -> Chuyển thành Đã Hủy (CANCELED) để nằm trong tab Hoàn Tiền
+    await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
+      status: ORDER_STATUS.CANCELED,
+      canceled_at: existingOrder.canceled_at || todayYMD,
+    });
+
+    const summary = `Đã hủy đơn hàng đã thanh toán #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
+
+    eventBus.emit(EVENTS.ORDER_CANCELED_REFUNDED, {
+      orderId: existingOrder.id,
+      orderCode: existingOrder.id_order,
+      order: existingOrder,
+      refundAmount: Number(existingOrder.price || 0),
+      canceledAt: todayYMD,
+      summary,
+      action: "ORDER_CANCELED",
+    });
+
+    return { success: true, action: "canceled", message: summary };
+  });
+}
+
+async function processOrderToProcessing(id) {
+  return await withTransaction(async (trx) => {
+    const existingOrder = await getOrderTable(trx).where({ id: Number(id) }).first();
+    if (!existingOrder) {
+      throw new Error("Không tìm thấy đơn hàng.");
+    }
+
+    const isRenewal = isRenewalOrder(existingOrder.status);
+    const daysToAdd = Number(existingOrder.days || 365);
+
+    const updateFields = {
+      status: ORDER_STATUS.PROCESSING,
+    };
+
+    let newExpiredAt = null;
+    if (isRenewal) {
+      newExpiredAt = calculateNewExpiry(existingOrder.expired_at, daysToAdd);
+      updateFields.expired_at = newExpiredAt;
+    }
+
+    const [updatedOrder] = await getOrderTable(trx)
+      .where({ id: Number(id) })
+      .update(updateFields)
+      .returning("*");
+
+    const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+      .where({ order_list_id: updatedOrder.id })
+      .first();
+
+    const importCost = Number(updatedOrder.cost || 0);
+    if (!existingLog && importCost > 0) {
+      let supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
+      if (!supplyId) {
+        const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();
+        supplyId = defaultSupplier ? defaultSupplier.id : 1;
+      }
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+        order_list_id: updatedOrder.id,
+        supply_id: supplyId,
+        id_order: updatedOrder.id_order,
+        import_cost: importCost,
+        ncc_payment_status: 'Chưa Thanh Toán',
+        logged_at: db.fn.now(),
       });
 
-      const summary = `Đã chuyển đơn hàng #${existingOrder.id_order} sang danh sách Hết Hạn do ngừng gia hạn.`;
-      
-      eventBus.emit(EVENTS.ORDER_EXPIRED, {
-        orderId: existingOrder.id,
-        orderCode: existingOrder.id_order,
-        order: existingOrder,
-        summary,
-        action: "SOFT_DELETE_EXPIRED",
+      eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+        cost: importCost,
+        supplier_id: updatedOrder.supply_id,
+        summary: `Thêm chi phí nhập hàng cho đơn #${updatedOrder.id_order}: ${importCost} ₫`,
+      });
+    }
+
+    const summary = `Đơn hàng #${updatedOrder.id_order} đã chuyển sang Đang Xử Lý. Đã ghi nhận chi phí nhập hàng.`;
+    eventBus.emit(EVENTS.ORDER_UPDATED, {
+      orderId: updatedOrder.id,
+      id_order: updatedOrder.id_order,
+      customer: updatedOrder.customer,
+      previousStatus: existingOrder.status,
+      newStatus: updatedOrder.status,
+      summary,
+      action: "SET_PROCESSING",
+    });
+
+    return updatedOrder;
+  });
+}
+
+async function processCompleteOrder(trxContext, order, amount, options = {}) {
+  const runWithTrx = async (trx) => {
+    const isRenewal = isRenewalOrder(order.status);
+    const daysToAdd = Number(order.days || 365);
+
+    const updateFields = {
+      status: ORDER_STATUS.PAID,
+      was_paid: true,
+    };
+
+    let newExpiredAt = null;
+    if (isRenewal && !order.expired_at) {
+      newExpiredAt = calculateNewExpiry(order.expired_at, daysToAdd);
+      updateFields.expired_at = newExpiredAt;
+    }
+
+    const [updatedOrder] = await getOrderTable(trx)
+      .where({ id: order.id })
+      .update(updateFields)
+      .returning("*");
+
+    const payAmount = amount != null ? Number(amount) : Number(updatedOrder.price || 0);
+
+    eventBus.emit(EVENTS.ORDER_PAID, {
+      orderId: updatedOrder.id,
+      id_order: updatedOrder.id_order,
+      customer: updatedOrder.customer,
+      amount: payAmount,
+      price: Number(updatedOrder.price || 0),
+      cost: Number(updatedOrder.cost || 0),
+      order_date: updatedOrder.order_date,
+      status: updatedOrder.status,
+      isRenewal,
+      action: options.action || "COMPLETED",
+    });
+
+    if (isRenewal) {
+      eventBus.emit(EVENTS.ORDER_RENEWED, {
+        orderId: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+        customer: updatedOrder.customer,
+        daysAdded: daysToAdd,
+        newExpiredAt: updatedOrder.expired_at,
+        action: options.action || "COMPLETED",
+      });
+    }
+
+    return { updatedOrder, isRenewal };
+  };
+
+  if (trxContext) {
+    return await runWithTrx(trxContext);
+  } else {
+    return await withTransaction(async (trx) => {
+      return await runWithTrx(trx);
+    });
+  }
+}
+
+async function payOrderWithCredit(id, creditNoteId) {
+  return await withTransaction(async (trx) => {
+    const order = await getOrderTable(trx).where({ id: Number(id) }).first();
+    if (!order) throw new Error("Không tìm thấy đơn hàng.");
+
+    const creditNote = await trx(TABLES.REFUND_CREDIT_NOTES).where({ id: Number(creditNoteId) }).first();
+    if (!creditNote) throw new Error("Không tìm thấy mã credit.");
+
+    const orderPrice = Number(order.price || 0);
+    const availableAmount = Number(creditNote.available_amount || 0);
+
+    if (availableAmount < orderPrice) {
+      throw new Error(`Số dư credit (${availableAmount.toLocaleString()} ₫) không đủ thanh toán đơn hàng (${orderPrice.toLocaleString()} ₫).`);
+    }
+
+    await trx(TABLES.REFUND_CREDIT_APPLICATIONS).insert({
+      credit_note_id: creditNote.id,
+      target_order_list_id: order.id,
+      target_order_code: order.id_order,
+      applied_amount: orderPrice,
+      note: `Thanh toán đơn #${order.id_order} bằng credit ${creditNote.credit_code}`,
+      applied_by: 'ADMIN',
+    });
+
+    const newAvailable = availableAmount - orderPrice;
+    const newStatus = newAvailable <= 0 ? 'FULLY_APPLIED' : 'PARTIALLY_APPLIED';
+    await trx(TABLES.REFUND_CREDIT_NOTES)
+      .where({ id: creditNote.id })
+      .update({
+        available_amount: newAvailable,
+        status: newStatus,
+        updated_at: db.fn.now(),
       });
 
-      return { success: true, action: "expired", message: summary };
+    const isRenewal = isRenewalOrder(order.status);
+    const daysToAdd = Number(order.days || 365);
+    const updateFields = {
+      status: ORDER_STATUS.PROCESSING,
+      payment_method: 'credit',
+    };
+
+    if (isRenewal) {
+      updateFields.expired_at = calculateNewExpiry(order.expired_at, daysToAdd);
     }
-    else {
-      throw new Error(`Trạng thái "${existingOrder.status}" không hỗ trợ thao tác xóa.`);
+
+    const [updatedOrder] = await getOrderTable(trx)
+      .where({ id: order.id })
+      .update(updateFields)
+      .returning("*");
+
+    const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+      .where({ order_list_id: updatedOrder.id })
+      .first();
+    const importCost = Number(updatedOrder.cost || 0);
+    if (!existingLog && importCost > 0) {
+      let supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
+      if (!supplyId) {
+        const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();
+        supplyId = defaultSupplier ? defaultSupplier.id : 1;
+      }
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+        order_list_id: updatedOrder.id,
+        supply_id: supplyId,
+        id_order: updatedOrder.id_order,
+        import_cost: importCost,
+        ncc_payment_status: 'Chưa Thanh Toán',
+        logged_at: db.fn.now(),
+      });
+
+      eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+        cost: importCost,
+        supplier_id: updatedOrder.supply_id,
+        summary: `Thêm chi phí nhập hàng cho đơn #${updatedOrder.id_order} thanh toán bằng credit: ${importCost} ₫`,
+      });
     }
+
+    return updatedOrder;
   });
 }
 
@@ -660,4 +899,7 @@ module.exports = {
   updateOrder,
   renewOrder,
   deleteOrder,
+  processOrderToProcessing,
+  processCompleteOrder,
+  payOrderWithCredit,
 };

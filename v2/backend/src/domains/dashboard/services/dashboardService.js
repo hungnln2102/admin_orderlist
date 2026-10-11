@@ -4,44 +4,45 @@ const { ORDER_STATUS } = require("@/constants/orderStatus");
 /**
  * Trả về dải thời gian và thông số bộ lọc
  */
-function parseDateRange({ period = "month", date, month, year, startDate, endDate }) {
+function parseDateRange({ period = "month", month, year, startDate, endDate }) {
   const now = new Date();
 
   let start = new Date();
   let end = new Date();
   let prevStart = new Date();
   let prevEnd = new Date();
-  let bucketMode = "day"; // 'hour' | 'day' | 'month'
+  let bucketMode = "day"; // 'day'
   let targetYear = now.getFullYear();
   let targetMonthStr = String(now.getMonth() + 1).padStart(2, "0");
 
-  if (period === "day") {
-    bucketMode = "hour";
-    const targetDateStr = date || now.toISOString().slice(0, 10);
-    start = new Date(`${targetDateStr}T00:00:00.000Z`);
-    end = new Date(`${targetDateStr}T23:59:59.999Z`);
+  if (period === "week") {
+    bucketMode = "day";
+    end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    start = new Date(end);
+    start.setDate(start.getDate() - 6); // 7 days including today
+    start.setHours(0, 0, 0, 0);
 
-    prevStart = new Date(start);
-    prevStart.setDate(prevStart.getDate() - 1);
-    prevEnd = new Date(end);
-    prevEnd.setDate(prevEnd.getDate() - 1);
+    const diffMs = end.getTime() - start.getTime() + 1;
+    prevStart = new Date(start.getTime() - diffMs);
+    prevEnd = new Date(start.getTime() - 1);
   } else if (period === "year") {
-    bucketMode = "month";
-    targetYear = parseInt(year || now.getFullYear(), 10);
-    start = new Date(Date.UTC(targetYear, 0, 1, 0, 0, 0));
-    end = new Date(Date.UTC(targetYear, 11, 31, 23, 59, 59, 999));
+    bucketMode = "day"; // View by day like Binance 1Y view
+    end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    start = new Date(end);
+    start.setFullYear(start.getFullYear() - 1); // 1 year ago up to today
+    start.setHours(0, 0, 0, 0);
 
-    prevStart = new Date(Date.UTC(targetYear - 1, 0, 1, 0, 0, 0));
-    prevEnd = new Date(Date.UTC(targetYear - 1, 11, 31, 23, 59, 59, 999));
+    const diffMs = end.getTime() - start.getTime() + 1;
+    prevStart = new Date(start.getTime() - diffMs);
+    prevEnd = new Date(start.getTime() - 1);
   } else if (period === "custom" && startDate && endDate) {
     start = new Date(`${startDate}T00:00:00.000Z`);
     end = new Date(`${endDate}T23:59:59.999Z`);
 
     const diffMs = end.getTime() - start.getTime();
-    const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-    if (diffDays <= 2) bucketMode = "hour";
-    else if (diffDays <= 60) bucketMode = "day";
-    else bucketMode = "month";
+    bucketMode = "day";
 
     prevStart = new Date(start.getTime() - diffMs);
     prevEnd = new Date(end.getTime() - diffMs);
@@ -68,15 +69,18 @@ function parseDateRange({ period = "month", date, month, year, startDate, endDat
 /**
  * Thống kê trực tiếp từ CSDL order_list theo dải ngày order_date
  */
+/**
+ * Thống kê từ bảng daily_revenue_summary theo dải ngày summary_date
+ */
 async function getOrderStatsForRange(start, end) {
-  const rawStats = await db(TABLES.ORDER_LIST)
-    .whereBetween("order_date", [start.toISOString(), end.toISOString()])
+  const rawStats = await db(TABLES.DAILY_REVENUE_SUMMARY)
+    .whereBetween("summary_date", [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)])
     .select(
-      db.raw("COUNT(*)::integer as total_orders"),
-      db.raw("COUNT(*) FILTER (WHERE status = 'CANCELED')::integer as canceled_orders"),
-      db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN price ELSE 0 END), 0)::numeric as total_revenue"),
-      db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN cost ELSE 0 END), 0)::numeric as total_cost"),
-      db.raw("COALESCE(SUM(refund), 0)::numeric as total_refund")
+      db.raw("COALESCE(SUM(dashboard_orders_count), 0)::integer as total_orders"),
+      db.raw("COALESCE(SUM(dashboard_canceled_count), 0)::integer as canceled_orders"),
+      db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as total_revenue"),
+      db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost"),
+      db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as total_refund")
     )
     .first();
 
@@ -91,12 +95,12 @@ async function getOrderStatsForRange(start, end) {
 }
 
 /**
- * Tính toán báo cáo tổng quan Dashboard (Nguồn dữ liệu chuẩn Single Source of Truth)
+ * Tính toán báo cáo tổng quan Dashboard từ bảng daily_revenue_summary
  */
 async function getDashboardSummary(params = {}) {
   const { start, end, prevStart, prevEnd, bucketMode, targetYear, period } = parseDateRange(params);
 
-  // 1. Thống kê kỳ hiện tại & kỳ so sánh trực tiếp từ order_list theo order_date
+  // 1. Thống kê kỳ hiện tại & kỳ so sánh từ daily_revenue_summary
   const currentStats = await getOrderStatsForRange(start, end);
   const prevStats = await getOrderStatsForRange(prevStart, prevEnd);
 
@@ -108,7 +112,7 @@ async function getDashboardSummary(params = {}) {
   const canceledGrowth = prevCanceled > 0 ? (((canceledOrders - prevCanceled) / prevCanceled) * 100).toFixed(1) : canceledOrders > 0 ? "100" : "0";
   const revenueGrowth = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : totalRevenue > 0 ? "100" : "0";
   const profitGrowth = prevProfit > 0 ? (((totalProfit - prevProfit) / prevProfit) * 100).toFixed(1) : totalProfit > 0 ? "100" : "0";
-  const costGrowth = prevCost > 0 ? (((totalCost - prevCost) / prevCost) * 100).toFixed(1) : costGrowth > 0 ? "100" : "0";
+  const costGrowth = prevCost > 0 ? (((totalCost - prevCost) / prevCost) * 100).toFixed(1) : totalCost > 0 ? "100" : "0";
   const refundGrowth = prevRefund > 0 ? (((totalRefund - prevRefund) / prevRefund) * 100).toFixed(1) : totalRefund > 0 ? "100" : "0";
 
   // 2. Lấy dữ liệu biểu đồ linh hoạt theo bucketMode ('hour' | 'day' | 'month')
@@ -158,19 +162,18 @@ async function getDashboardSummary(params = {}) {
       });
     }
   } else if (bucketMode === "day") {
-    chartSubtitle = period === "month" ? "Xu hướng biến động 12 mốc trong tháng" : "Xu hướng biến động theo mốc";
-    const dayRows = await db(TABLES.ORDER_LIST)
-      .whereBetween("order_date", [start.toISOString(), end.toISOString()])
+    chartSubtitle = period === "month" ? "Xu hướng biến động từng ngày trong tháng" : "Xu hướng biến động theo ngày";
+    const dayRows = await db(TABLES.DAILY_REVENUE_SUMMARY)
+      .whereBetween("summary_date", [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)])
       .select(
-        db.raw("TO_CHAR(order_date::timestamp, 'YYYY-MM-DD') as day_key"),
-        db.raw("COUNT(*)::integer as orders"),
-        db.raw("COUNT(*) FILTER (WHERE status = 'CANCELED')::integer as canceled"),
-        db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN price ELSE 0 END), 0)::numeric as revenue"),
-        db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN cost ELSE 0 END), 0)::numeric as cost"),
-        db.raw("COALESCE(SUM(refund), 0)::numeric as refund")
+        db.raw("TO_CHAR(summary_date, 'YYYY-MM-DD') as day_key"),
+        db.raw("COALESCE(dashboard_orders_count, 0)::integer as orders"),
+        db.raw("COALESCE(dashboard_canceled_count, 0)::integer as canceled"),
+        db.raw("COALESCE(earned_revenue, 0)::numeric as revenue"),
+        db.raw("COALESCE(total_shop_cost, 0)::numeric as cost"),
+        db.raw("COALESCE(revenue_reversed, 0)::numeric as refund")
       )
-      .groupBy("day_key")
-      .orderBy("day_key", "asc");
+      .orderBy("summary_date", "asc");
 
     const dayMap = new Map();
     dayRows.forEach((r) => {
@@ -210,48 +213,17 @@ async function getDashboardSummary(params = {}) {
       curr.setUTCDate(curr.getUTCDate() + 1);
     }
 
-    // Chia đều các ngày trong tháng/khoảng chọn thành đúng 12 điểm (12 buckets)
-    const TARGET_BUCKETS = 12;
-    if (daysList.length <= TARGET_BUCKETS) {
-      daysList.forEach((item) => {
-        chartData.push({
-          label: item.label,
-          orders: item.orders,
-          canceled: item.canceled,
-          revenue: item.revenue,
-          cost: item.cost,
-          profit: item.profit,
-        });
+    // Trả về đầy đủ tất cả các ngày trong tháng (VD: 30 ngày)
+    daysList.forEach((item) => {
+      chartData.push({
+        label: item.label,
+        orders: item.orders,
+        canceled: item.canceled,
+        revenue: item.revenue,
+        cost: item.cost,
+        profit: item.profit,
       });
-    } else {
-      const totalDays = daysList.length;
-      for (let k = 0; k < TARGET_BUCKETS; k++) {
-        const startIdx = Math.floor((k * totalDays) / TARGET_BUCKETS);
-        const endIdx = Math.floor(((k + 1) * totalDays) / TARGET_BUCKETS);
-        const subList = daysList.slice(startIdx, endIdx);
-
-        const repItem = subList[0];
-        const label = repItem ? repItem.label : `Mốc ${k + 1}`;
-
-        let orders = 0, canceled = 0, revenue = 0, cost = 0, profit = 0;
-        subList.forEach((it) => {
-          orders += it.orders;
-          canceled += it.canceled;
-          revenue += it.revenue;
-          cost += it.cost;
-          profit += it.profit;
-        });
-
-        chartData.push({
-          label,
-          orders,
-          canceled,
-          revenue,
-          cost,
-          profit,
-        });
-      }
-    }
+    });
   } else {
     chartSubtitle = "Xu hướng biến động 12 Tháng";
     const yearStart = new Date(Date.UTC(targetYear, 0, 1, 0, 0, 0));
