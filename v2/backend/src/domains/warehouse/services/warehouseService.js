@@ -1,5 +1,6 @@
 const { db } = require("@/db");
 const { TABLES } = require("@/db/tables");
+const { eventBus, EVENTS } = require("@/events");
 const { getVietnamDateString } = require("@/utils/time");
 
 /**
@@ -141,21 +142,41 @@ const createWarehouseAccount = async (payload) => {
         nameId = insertedP.id || insertedP;
       }
 
-      await trx(TABLES.STOCK_SERVICES).insert({
-        stock_id: stockId,
-        name_id: nameId,
-        password_encrypted: slot.password || null,
-        backup_email: slot.backup_email || null,
-        two_fa_encrypted: slot.two_fa || null,
-        expires_at: slot.expires_at ? new Date(slot.expires_at) : null,
-        status: slot.status || "AVAILABLE",
-        note: slot.note || null,
-        created_at: now,
-        updated_at: now,
-      });
+      const existingService = await trx(TABLES.STOCK_SERVICES)
+        .where({ stock_id: stockId, name_id: nameId })
+        .first();
+
+      if (existingService) {
+        await trx(TABLES.STOCK_SERVICES)
+          .where({ id: existingService.id })
+          .update({
+            password_encrypted: slot.password || existingService.password_encrypted,
+            backup_email: slot.backup_email || existingService.backup_email,
+            two_fa_encrypted: slot.two_fa || existingService.two_fa_encrypted,
+            expires_at: slot.expires_at ? new Date(slot.expires_at) : existingService.expires_at,
+            status: slot.status || existingService.status || "AVAILABLE",
+            note: slot.note || existingService.note,
+            updated_at: now,
+          });
+      } else {
+        await trx(TABLES.STOCK_SERVICES).insert({
+          stock_id: stockId,
+          name_id: nameId,
+          password_encrypted: slot.password || null,
+          backup_email: slot.backup_email || null,
+          two_fa_encrypted: slot.two_fa || null,
+          expires_at: slot.expires_at ? new Date(slot.expires_at) : null,
+          status: slot.status || "AVAILABLE",
+          note: slot.note || null,
+          created_at: now,
+          updated_at: now,
+        });
+      }
     }
 
-    return { id: stockId, account: normalizedAccount };
+    const result = { id: stockId, account: normalizedAccount };
+    eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, result);
+    return result;
   });
 };
 
@@ -233,6 +254,8 @@ const createCatalogItem = async ({ name, category, productId = null }) => {
       product_id: productId || null,
     })
     .returning("*");
+
+  eventBus.emit(EVENTS.WAREHOUSE_CATALOG_CREATED, inserted);
 
   return inserted;
 };

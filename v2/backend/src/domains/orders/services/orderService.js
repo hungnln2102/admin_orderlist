@@ -421,6 +421,105 @@ async function createOrder(payload) {
       .insert(newOrderData)
       .returning("*");
 
+    if (payload.save_to_warehouse !== false && String(id_order).toUpperCase().startsWith("MAVN")) {
+      try {
+        const accountUsername = payload.information_order 
+          ? String(payload.information_order).trim().toLowerCase()
+          : (payload.slot ? (payload.slot.split('|')[0] || payload.customer).trim().toLowerCase() : String(payload.customer || "mavryk").trim().toLowerCase());
+        
+        let productName = payload.information_order || "Dịch vụ";
+        const prodIdToLookup = newOrderData.id_product || payload.id_product;
+        if (prodIdToLookup) {
+          try {
+            const variantRow = await trx(TABLES.VARIANT)
+              .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.id`, `${TABLES.VARIANT}.product_id`)
+              .select(
+                `${TABLES.VARIANT}.display_name as variant_display`,
+                `${TABLES.VARIANT}.variant_name as variant_name`,
+                `${TABLES.PRODUCT}.package_name as parent_package_name`
+              )
+              .where(`${TABLES.VARIANT}.id`, Number(prodIdToLookup))
+              .first();
+
+            if (variantRow) {
+              productName = variantRow.parent_package_name || variantRow.variant_name || variantRow.variant_display || productName;
+            }
+          } catch (e) {
+            console.log("[OrderService] Không resolve được sản phẩm chính cho kho:", e.message);
+          }
+        }
+        
+        let pName = await trx(TABLES.PRODUCT_NAMES)
+          .whereRaw("LOWER(name) = ?", [productName.toLowerCase().trim()])
+          .first();
+
+        let nameId = pName?.id;
+        if (!nameId) {
+          const [insertedP] = await trx(TABLES.PRODUCT_NAMES)
+            .insert({ name: productName.trim() })
+            .returning("id");
+          nameId = insertedP.id || insertedP;
+        }
+
+        let stock = await trx(TABLES.PRODUCT_KEYS)
+          .whereRaw("LOWER(account_username) = ?", [accountUsername])
+          .first();
+
+        let stockId = stock?.id;
+        if (!stockId) {
+          const [newStock] = await trx(TABLES.PRODUCT_KEYS)
+            .insert({
+              account_username: accountUsername,
+              created_at: new Date(),
+            })
+            .returning("*");
+          stockId = newStock.id;
+        }
+
+        const existingService = await trx(TABLES.STOCK_SERVICES)
+          .where({
+            stock_id: stockId,
+            name_id: nameId,
+          })
+          .first();
+
+        if (existingService) {
+          await trx(TABLES.STOCK_SERVICES)
+            .where({ id: existingService.id })
+            .update({
+              password_encrypted: payload.slot || existingService.password_encrypted,
+              expires_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expires_at,
+              status: "AVAILABLE",
+              note: payload.note || existingService.note,
+              updated_at: new Date(),
+            });
+        } else {
+          await trx(TABLES.STOCK_SERVICES).insert({
+            stock_id: stockId,
+            name_id: nameId,
+            password_encrypted: payload.slot || null,
+            backup_email: "",
+            two_fa_encrypted: null,
+            expires_at: payload.expired_at ? new Date(payload.expired_at) : null,
+            status: "AVAILABLE",
+            note: payload.note || null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+
+        eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, {
+          id: stockId,
+          account: accountUsername,
+          source: "order_mavn_import",
+          orderId: createdOrder.id,
+          orderCode: createdOrder.id_order,
+        });
+      } catch (err) {
+        console.error("[OrderService] Lỗi tự động lưu kho cho đơn MAVN:", err);
+      }
+    }
+
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
     const statusLabel = getOrderStatusLabel(createdOrder.status);
     const summary = `Tạo mới đơn hàng #${createdOrder.id_order} cho khách "${createdOrder.customer}" với tổng tiền ${formatMoney(createdOrder.price)} [Trạng thái: ${statusLabel}]`;

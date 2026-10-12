@@ -405,9 +405,6 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                 <h4 className="text-sm font-bold text-white tracking-tight">
                                   Chi tiết tài khoản kho
                                 </h4>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-                                  <span>{availableCount}/{services.length} slots sẵn sàng</span>
-                                </span>
                               </div>
                               <p
                                 className="max-w-full truncate text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-1"
@@ -418,16 +415,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                             </div>
 
                             <div className="flex items-center gap-2">
-                              {/* THU GỌN BUTTON */}
-                              <button
-                                type="button"
-                                onClick={() => onToggleExpand(Number(account.id))}
-                                className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                                title="Thu gọn chi tiết"
-                              >
-                                <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
-                                <span>Thu gọn</span>
-                              </button>
+
 
                               {/* SAO CHÉP TẤT CẢ BUTTON */}
                               <button
@@ -764,18 +752,9 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       <span className="text-xs font-bold text-white">
                         Chi tiết
                       </span>
-                      <span className="text-[10px] text-indigo-300 bg-indigo-500/15 px-2 py-0.5 rounded-full border border-indigo-500/30">
-                        {availableCount}/{services.length} slot
-                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => onToggleExpand(Number(account.id))}
-                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-slate-300"
-                      >
-                        Thu gọn
-                      </button>
+
                       <button
                         type="button"
                         onClick={() =>

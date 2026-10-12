@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle } from "lucide-react";
+import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive } from "lucide-react";
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
@@ -151,6 +151,51 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Section: Lưu kho toggle (Only for import mode) */}
+          {isImportMode && (
+            <div className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-b from-cyan-950/20 to-transparent p-4 backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+                    <Archive className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white tracking-wide">
+                      Lưu vào Kho Hàng
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      {formData.save_to_warehouse !== false
+                        ? "Lưu thông tin tài khoản và slot vào hệ thống kho hàng."
+                        : "Chỉ tạo đơn nhập hàng bình thường (Không lưu vào kho)."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-cyan-950/40 border border-cyan-500/20 rounded-xl px-3 py-1.5">
+                  <span className="text-[11px] font-semibold text-cyan-200/80">Lưu kho:</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        save_to_warehouse: formData.save_to_warehouse === false ? true : false,
+                      })
+                    }
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,214,0.5)]" : "bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        formData.save_to_warehouse !== false ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Section 2: Catalog Product & Supplier Selection */}
           <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">

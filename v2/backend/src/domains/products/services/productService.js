@@ -568,21 +568,22 @@ const getPackageProducts = async () => {
   const query = `
     SELECT
       pp.id,
-      pp.package_id,
+      pp.product_name_id,
+      pn.name AS product_name,
       p.package_name AS category,
-      COALESCE(ps.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
+      COALESCE(acc.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
+      storage_acc.account_username AS storage_account_info,
       COALESCE(pp.supplier, 'Mavryk') AS supplier,
       COALESCE(pp.cost, 0) AS cost_price,
       COALESCE(pp.slot, 2) AS total_slots,
-      pp.match,
-      pp.stock_id,
-      pp.storage_id,
       pp.storage_total,
-      pp.stock_service_id
+      pp.match_rule
     FROM ${TABLES.PACKAGE_PRODUCT} pp
-    LEFT JOIN ${TABLES.PRODUCT} p ON p.id = pp.package_id
-    LEFT JOIN ${TABLES.PRODUCT_STOCKS} ps ON CAST(ps.id AS text) = CAST(pp.stock_id AS text)
-    ORDER BY p.package_name ASC, pp.id DESC;
+    LEFT JOIN warehouse.product_names pn ON pn.id = pp.product_name_id
+    LEFT JOIN ${TABLES.PRODUCT} p ON p.id = pn.product_id
+    LEFT JOIN warehouse.accounts acc ON acc.id = pp.account_id
+    LEFT JOIN warehouse.accounts storage_acc ON storage_acc.id = pp.storage_account_id
+    ORDER BY pp.id DESC;
   `;
 
   const result = await db.raw(query);
@@ -616,16 +617,18 @@ const getPackageProducts = async () => {
 
     return {
       id: r.id,
-      package_id: r.package_id,
+      productName: r.product_name || "",
       category: r.category || "Khác",
-      name: r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`,
+      name: r.product_name || (r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`),
       accountInfo: r.account_info,
+      storageAccountInfo: r.storage_account_info || null,
+      storageTotal: r.storage_total || null,
       usedSlots,
       totalSlots,
       supplier: r.supplier,
       costPrice: parseFloat(r.cost_price || 0),
       expiredAt: "2026-12-31",
-      note: r.match ? `Match: ${r.match}` : "",
+      note: r.match_rule ? `Match: ${r.match_rule}` : "",
       status: usedSlots >= totalSlots ? "expired" : usedSlots > 0 ? "warning" : "active",
       slotAssignments,
     };

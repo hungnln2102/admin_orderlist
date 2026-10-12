@@ -1,10 +1,11 @@
 import React from "react";
 import { Archive, X } from "lucide-react";
-import { WarehouseAccountFormData } from "../types";
+import { WarehouseAccountFormData, ServiceNameCategoryItem } from "../types";
 
 interface WarehouseCreateModalProps {
   open: boolean;
   formData: WarehouseAccountFormData;
+  catalogItems?: ServiceNameCategoryItem[];
   onClose: () => void;
   onFormChange: (data: WarehouseAccountFormData) => void;
   onSubmit: () => void;
@@ -13,6 +14,7 @@ interface WarehouseCreateModalProps {
 export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
   open,
   formData,
+  catalogItems = [],
   onClose,
   onFormChange,
   onSubmit,
@@ -51,13 +53,31 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
             <label className="block text-xs font-medium text-slate-300 mb-1">Loại Dịch Vụ (*)</label>
             <select
               value={formData.serviceName}
-              onChange={(e) => onFormChange({ ...formData, serviceName: e.target.value })}
+              onChange={(e) => {
+                const selectedName = e.target.value;
+                const foundCat = catalogItems.find((c) => c.name === selectedName);
+                onFormChange({
+                  ...formData,
+                  serviceName: selectedName,
+                  category: foundCat ? foundCat.category : selectedName,
+                });
+              }}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500"
             >
-              <option value="Adobe All Apps 12M Slot">Adobe All Apps 12M Slot</option>
-              <option value="Canva Pro Team Slot">Canva Pro Team Slot</option>
-              <option value="Netflix Premium 4K Slot">Netflix Premium 4K Slot</option>
-              <option value="ChatGPT Plus Shared Slot">ChatGPT Plus Shared Slot</option>
+              {catalogItems.length > 0 ? (
+                catalogItems.map((item) => (
+                  <option key={item.id} value={item.name}>
+                    {item.name} {item.category ? `(${item.category})` : ""}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="Adobe All Apps 12M Slot">Adobe All Apps 12M Slot</option>
+                  <option value="Canva Pro Team Slot">Canva Pro Team Slot</option>
+                  <option value="Netflix Premium 4K Slot">Netflix Premium 4K Slot</option>
+                  <option value="ChatGPT Plus Shared Slot">ChatGPT Plus Shared Slot</option>
+                </>
+              )}
             </select>
           </div>
 

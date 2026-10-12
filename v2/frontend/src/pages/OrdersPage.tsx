@@ -255,6 +255,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         customer: "Mavryk",
         order_date: today,
         expired_at: nextYear,
+        save_to_warehouse: true,
       });
     } else {
       setFormData({

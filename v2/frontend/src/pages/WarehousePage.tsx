@@ -215,7 +215,16 @@ export const WarehousePage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setIsAccountModalOpen(true)}
+            onClick={() => {
+              if (catalog.length > 0) {
+                setAccountForm((prev) => ({
+                  ...prev,
+                  serviceName: catalog[0].name,
+                  category: catalog[0].category || catalog[0].name,
+                }));
+              }
+              setIsAccountModalOpen(true);
+            }}
             className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -358,6 +367,7 @@ export const WarehousePage: React.FC = () => {
       <WarehouseCreateModal
         open={isAccountModalOpen}
         formData={accountForm}
+        catalogItems={catalog}
         onClose={() => setIsAccountModalOpen(false)}
         onFormChange={setAccountForm}
         onSubmit={async () => {
