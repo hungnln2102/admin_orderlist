@@ -251,27 +251,9 @@ export const AppRoutes: React.FC = () => {
 
       {/* 5. Hệ thống & Ví */}
       <Route path="/system-config" element={<SystemPage />} />
-      <Route
-        path="/shop-bank-accounts"
-        element={
-          <GenericPage
-            title="Tài Khoản Shop Bank"
-            category="Hệ thống & Ví"
-            description="Cấu hình tài khoản ngân hàng nhận tiền chuyển khoản tự động"
-            columns={[
-              { key: "bankName", label: "Ngân hàng" },
-              { key: "accountNumber", label: "Số tài khoản" },
-              { key: "accountName", label: "Chủ tài khoản" },
-              { key: "status", label: "Mặc định" },
-            ]}
-            sampleData={[
-              { bankName: "MB Bank", accountNumber: "0378304963", accountName: "MAVRYK STORE", status: "Đang nhận Sepay QR" },
-            ]}
-          />
-        }
-      />
-      <Route path="/payment-accounts" element={<PaymentWalletsPage />} />
-      <Route path="/usdt-wallets" element={<Navigate to="/payment-accounts" replace />} />
+      <Route path="/shop-bank-accounts" element={<PaymentWalletsPage />} />
+      <Route path="/payment-accounts" element={<Navigate to="/shop-bank-accounts" replace />} />
+      <Route path="/usdt-wallets" element={<Navigate to="/shop-bank-accounts" replace />} />
       <Route
         path="/ip-whitelist"
         element={

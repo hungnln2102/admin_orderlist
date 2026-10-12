@@ -30,73 +30,8 @@ function registerTelegramSubscriber() {
     }
   });
 
-  // 3. Lắng nghe Order Paid -> Gửi Biến Động Tháng (với delta đầy đủ)
-  eventBus.on(eventTypes.ORDER_PAID, async (data) => {
-    try {
-      console.log(`[TelegramSubscriber] Nhận sự kiện ORDER_PAID cho đơn #${data.id_order}`);
-      const rev = Number(data.amount || data.price || 0);
-      const cost = Number(data.cost || 0);
-      const prof = rev - cost;
-      await financeNotifier.notifyFinanceMonthlyDelta({
-        revenueDelta: rev,
-        importDelta: cost,
-        profitDelta: prof,
-        bankBalanceDelta: rev,
-        context: `webhook.orderPaid:${data.id_order}`,
-      });
-    } catch (err) {
-      console.error("[TelegramSubscriber] Lỗi khi xử lý ORDER_PAID finance delta:", err.message);
-    }
-  });
-
-  // 4. Lắng nghe Order Renewed -> Gửi Biến Động Tháng
-  eventBus.on(eventTypes.ORDER_RENEWED, async (data) => {
-    try {
-      console.log(`[TelegramSubscriber] Nhận sự kiện ORDER_RENEWED cho đơn #${data.id_order}`);
-      const rev = Number(data.price || data.amount || 0);
-      const cost = Number(data.cost || 0);
-      const prof = rev - cost;
-      await financeNotifier.notifyFinanceMonthlyDelta({
-        revenueDelta: rev,
-        profitDelta: prof,
-        bankBalanceDelta: rev,
-        context: `renewal.orderRenewed:${data.id_order}`,
-      });
-    } catch (err) {
-      console.error("[TelegramSubscriber] Lỗi khi xử lý ORDER_RENEWED finance delta:", err.message);
-    }
-  });
-
-
-
-  // 6. Lắng nghe Order Canceled / Refunded -> Gửi Biến Động Tháng
-  eventBus.on(eventTypes.ORDER_CANCELED_REFUNDED, async (data) => {
-    try {
-      const refund = Number(data.refundAmount || data.price || 0);
-      await financeNotifier.notifyFinanceMonthlyDelta({
-        refundDelta: refund,
-        revenueDelta: -refund,
-        profitDelta: -refund,
-        bankBalanceDelta: -refund,
-        context: `order.canceledRefunded:${data.orderCode || data.id_order}`,
-      });
-    } catch (err) {
-      console.error("[TelegramSubscriber] Lỗi khi xử lý ORDER_CANCELED_REFUNDED finance delta:", err.message);
-    }
-  });
-
-  // 6b. Lắng nghe Supplier Debt Paid -> Gửi Biến Động Tháng
-  eventBus.on(eventTypes.SUPPLIER_DEBT_PAID, async (data) => {
-    try {
-      const amount = Number(data.amount || 0);
-      await financeNotifier.notifyFinanceMonthlyDelta({
-        bankBalanceDelta: -amount,
-        context: data.summary || `Thanh toán công nợ NCC ${data.supplier_name}: ${amount} đ`,
-      });
-    } catch (err) {
-      console.error("[TelegramSubscriber] Lỗi khi xử lý SUPPLIER_DEBT_PAID finance delta:", err.message);
-    }
-  });
+  // Lưu ý: Các sự kiện biến động tài chính (ORDER_PAID, ORDER_RENEWED, ORDER_CANCELED_REFUNDED, SUPPLIER_DEBT_PAID)
+  // được quản lý và phát thông báo tập trung tại dailySummaryService sau khi đã ghi nhận hoàn tất vào CSDL.
 
   // 7. Lắng nghe Event Thay Đổi Cấu Hình Hệ Thống
   eventBus.on(eventTypes.SYSTEM_CONFIG_UPDATED, async (configData) => {

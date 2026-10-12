@@ -764,7 +764,7 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
     };
 
     let newExpiredAt = null;
-    if (isRenewal && !order.expired_at) {
+    if (isRenewal) {
       newExpiredAt = calculateNewExpiry(order.expired_at, daysToAdd);
       updateFields.expired_at = newExpiredAt;
     }

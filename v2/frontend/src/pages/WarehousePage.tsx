@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   RefreshCw,
   Plus,
   Download,
   Key,
   Package,
-  Layers,
   AlertTriangle,
   ShieldCheck,
   Sparkles,
@@ -26,168 +25,6 @@ import {
   CatalogCreateModal,
 } from "@/features/warehouse";
 
-const SAMPLE_WAREHOUSE_ACCOUNTS: WarehouseAccountItem[] = [
-  {
-    id: 101,
-    account: "adobe_master_team01@mavrykstore.com",
-    created_at: "10/09/2026",
-    updated_at: "28/09/2026",
-    services: [
-      {
-        id: 1,
-        display_name: "Adobe All Apps 12M Slot 01",
-        category: "Thiết Kế Đồ Họa",
-        password: "AdobePass2026!#",
-        backup_email: "backup_adobe01@gmail.com",
-        two_fa: "JBSWY3DPEHPK3PXP",
-        expires_at: "15/10/2027",
-        note: "Đã cấp cho khách MAV1029",
-        status: "IN_USE",
-      },
-      {
-        id: 2,
-        display_name: "Adobe All Apps 12M Slot 02",
-        category: "Thiết Kế Đồ Họa",
-        password: "AdobePass2026!#",
-        backup_email: "backup_adobe01@gmail.com",
-        two_fa: "JBSWY3DPEHPK3PXP",
-        expires_at: "15/10/2027",
-        note: "Slot sẵn sàng giao khách lẻ",
-        status: "AVAILABLE",
-      },
-      {
-        id: 3,
-        display_name: "Adobe All Apps 12M Slot 03",
-        category: "Thiết Kế Đồ Họa",
-        password: "AdobePass2026!#",
-        backup_email: "backup_adobe01@gmail.com",
-        two_fa: "JBSWY3DPEHPK3PXP",
-        expires_at: "15/10/2027",
-        note: "Slot sẵn sàng giao khách lẻ",
-        status: "AVAILABLE",
-      },
-      {
-        id: 4,
-        display_name: "Adobe All Apps 12M Slot 04",
-        category: "Thiết Kế Đồ Họa",
-        password: "AdobePass2026!#",
-        backup_email: "backup_adobe01@gmail.com",
-        two_fa: "JBSWY3DPEHPK3PXP",
-        expires_at: "15/10/2027",
-        note: "Đã giữ chỗ đơn MAV9921",
-        status: "RESERVED",
-      },
-    ],
-  },
-  {
-    id: 102,
-    account: "canva_team_pro_pro02@mavrykstore.com",
-    created_at: "12/08/2026",
-    updated_at: "27/09/2026",
-    services: [
-      {
-        id: 5,
-        display_name: "Canva Pro Team Slot 01",
-        category: "Thiết Kế Đồ Họa",
-        password: "CanvaSecret998$",
-        backup_email: "mavryk_canva_backup@gmail.com",
-        two_fa: "HXDM54321QWERTY",
-        expires_at: "20/12/2026",
-        note: "Slot tài khoản Edu PRO",
-        status: "AVAILABLE",
-      },
-      {
-        id: 6,
-        display_name: "Canva Pro Team Slot 02",
-        category: "Thiết Kế Đồ Họa",
-        password: "CanvaSecret998$",
-        backup_email: "mavryk_canva_backup@gmail.com",
-        two_fa: "HXDM54321QWERTY",
-        expires_at: "20/12/2026",
-        note: "Slot tài khoản Edu PRO",
-        status: "AVAILABLE",
-      },
-    ],
-  },
-  {
-    id: 103,
-    account: "netflix_premium_4k_family01@gmail.com",
-    created_at: "01/09/2026",
-    updated_at: "25/09/2026",
-    services: [
-      {
-        id: 7,
-        display_name: "Netflix Premium 4K - Slot #1 (PIN: 1234)",
-        category: "Giải Trí & Phim",
-        password: "NetFlixPass888@",
-        backup_email: "netflix_recov@gmail.com",
-        two_fa: "NFX2FA99881122",
-        expires_at: "01/10/2026",
-        note: "Sắp hết hạn 3 ngày tới!",
-        status: "EXPIRED",
-      },
-      {
-        id: 8,
-        display_name: "Netflix Premium 4K - Slot #2 (PIN: 5678)",
-        category: "Giải Trí & Phim",
-        password: "NetFlixPass888@",
-        backup_email: "netflix_recov@gmail.com",
-        two_fa: "NFX2FA99881122",
-        expires_at: "15/11/2026",
-        note: "Đã gán đơn MAV8812",
-        status: "IN_USE",
-      },
-    ],
-  },
-  {
-    id: 104,
-    account: "chatgpt_plus_shared_v04@mavrykstore.com",
-    created_at: "18/09/2026",
-    updated_at: "28/09/2026",
-    services: [
-      {
-        id: 9,
-        display_name: "ChatGPT Plus Shared - Slot 1",
-        category: "Trí Tuệ Nhân Tạo AI",
-        password: "OpenAiPassword2026",
-        backup_email: "openai_backup04@gmail.com",
-        two_fa: "AIKEY887766554433",
-        expires_at: "18/10/2026",
-        note: "Tài khoản OpenAI Plus chính chủ",
-        status: "AVAILABLE",
-      },
-    ],
-  },
-  {
-    id: 105,
-    account: "spotify_family_us05@mavrykstore.com",
-    created_at: "05/07/2026",
-    updated_at: "20/09/2026",
-    services: [
-      {
-        id: 10,
-        display_name: "Spotify Premium Family Slot 01",
-        category: "Âm Nhạc",
-        password: "SpotifyPass999",
-        backup_email: "spot_backup@gmail.com",
-        two_fa: "SPOT2FA77665544",
-        expires_at: "05/07/2027",
-        note: "Nâng cấp qua invite link",
-        status: "AVAILABLE",
-      },
-    ],
-  },
-];
-
-const SAMPLE_SERVICE_CATALOG: ServiceNameCategoryItem[] = [
-  { id: 1, name: "Adobe All Apps Slot", category: "Thiết Kế Đồ Họa", inStockSlots: 45, reservedSlots: 2, status: "ACTIVE" },
-  { id: 2, name: "Canva Pro Team Slot", category: "Thiết Kế Đồ Họa", inStockSlots: 120, reservedSlots: 5, status: "ACTIVE" },
-  { id: 3, name: "Netflix Premium 4K Slot", category: "Giải Trí & Phim", inStockSlots: 8, reservedSlots: 4, status: "LOW_STOCK" },
-  { id: 4, name: "ChatGPT Plus Shared Slot", category: "Trí Tuệ Nhân Tạo AI", inStockSlots: 15, reservedSlots: 1, status: "ACTIVE" },
-  { id: 5, name: "Spotify Premium Family Slot", category: "Âm Nhạc", inStockSlots: 30, reservedSlots: 0, status: "ACTIVE" },
-  { id: 6, name: "Office 365 E5 License Key", category: "Văn Phòng & Phần Mềm", inStockSlots: 0, reservedSlots: 0, status: "OUT_OF_STOCK" },
-];
-
 export const WarehousePage: React.FC = () => {
   const notification = useNotification();
 
@@ -195,9 +32,14 @@ export const WarehousePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [expandedAccountIds, setExpandedAccountIds] = useState<number[]>([101, 102]);
+  const [expandedAccountIds, setExpandedAccountIds] = useState<number[]>([]);
   const [showPasswordMap, setShowPasswordMap] = useState<Record<number, boolean>>({});
   const [copiedKeyMap, setCopiedKeyMap] = useState<Record<string, boolean>>({});
+
+  // Dynamic state from PostgreSQL
+  const [accounts, setAccounts] = useState<WarehouseAccountItem[]>([]);
+  const [catalog, setCatalog] = useState<ServiceNameCategoryItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Modals
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -206,8 +48,8 @@ export const WarehousePage: React.FC = () => {
   // Form states
   const [accountForm, setAccountForm] = useState<WarehouseAccountFormData>({
     account: "",
-    serviceName: "Adobe All Apps 12M Slot",
-    category: "Thiết Kế Đồ Họa",
+    serviceName: "Youtube Premium",
+    category: "Youtube Premium",
     password: "",
     backupEmail: "",
     twoFa: "",
@@ -217,12 +59,46 @@ export const WarehousePage: React.FC = () => {
 
   const [catalogForm, setCatalogForm] = useState<CatalogFormData>({
     name: "",
-    category: "Thiết Kế Đồ Họa",
+    category: "Giải Trí & Video",
   });
 
+  const hasAutoExpandedRef = useRef(false);
+
+  // Load live data from API
+  const loadWarehouseData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [accRes, catRes] = await Promise.all([
+        fetch("/api/warehouse"),
+        fetch("/api/warehouse/catalog"),
+      ]);
+
+      if (accRes.ok) {
+        const accData: WarehouseAccountItem[] = await accRes.json();
+        setAccounts(Array.isArray(accData) ? accData : []);
+      }
+      if (catRes.ok) {
+        const catData: ServiceNameCategoryItem[] = await catRes.json();
+        setCatalog(Array.isArray(catData) ? catData : []);
+      }
+    } catch (err) {
+      console.error("Error loading warehouse data:", err);
+      notification.error("Không thể kết nối đến cơ sở dữ liệu kho hàng.");
+    } finally {
+      setLoading(false);
+    }
+  }, [notification]);
+
+  useEffect(() => {
+    loadWarehouseData();
+  }, [loadWarehouseData]);
+
   const toggleExpand = (id: number) => {
+    const numericId = Number(id);
     setExpandedAccountIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.map(Number).includes(numericId)
+        ? prev.filter((i) => Number(i) !== numericId)
+        : [...prev, numericId]
     );
   };
 
@@ -241,7 +117,7 @@ export const WarehousePage: React.FC = () => {
 
   // Filtered accounts
   const filteredAccounts = useMemo(() => {
-    return SAMPLE_WAREHOUSE_ACCOUNTS.filter((acc) => {
+    return accounts.filter((acc) => {
       const matchSearch =
         searchTerm === "" ||
         acc.account.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -253,30 +129,47 @@ export const WarehousePage: React.FC = () => {
 
       const matchCategory =
         categoryFilter === "all" ||
-        acc.services.some((s) => s.category === categoryFilter);
+        acc.services.some((s) => s.category === categoryFilter || s.display_name === categoryFilter);
 
       const matchStatus =
         statusFilter === "all" ||
         (statusFilter === "AVAILABLE" && acc.services.some((s) => s.status === "AVAILABLE")) ||
-        (statusFilter === "EXPIRED" && acc.services.some((s) => s.status === "EXPIRED")) ||
-        (statusFilter === "RESERVED" && acc.services.some((s) => s.status === "RESERVED"));
+        (statusFilter === "EXPIRED" && acc.services.some((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE")) ||
+        (statusFilter === "RESERVED" && acc.services.some((s) => s.status === "RESERVED" || s.status === "IN_USE"));
 
       return matchSearch && matchCategory && matchStatus;
     });
-  }, [searchTerm, categoryFilter, statusFilter]);
+  }, [accounts, searchTerm, categoryFilter, statusFilter]);
 
-  // Statistics calculation
-  const totalAccounts = SAMPLE_WAREHOUSE_ACCOUNTS.length;
-  const totalAvailableSlots = SAMPLE_WAREHOUSE_ACCOUNTS.reduce(
+  // Available categories list for filter
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    catalog.forEach((c) => {
+      if (c.name) set.add(c.name);
+    });
+    accounts.forEach((a) => {
+      (a.services || []).forEach((s) => {
+        if (s.display_name) set.add(s.display_name);
+        else if (s.category) set.add(s.category);
+      });
+    });
+    return Array.from(set).sort();
+  }, [catalog, accounts]);
+
+  // Statistics calculation from live database
+  const totalAccounts = accounts.length;
+  const totalAvailableSlots = accounts.reduce(
     (acc, item) => acc + item.services.filter((s) => s.status === "AVAILABLE").length,
     0
   );
-  const totalReservedSlots = SAMPLE_WAREHOUSE_ACCOUNTS.reduce(
-    (acc, item) => acc + item.services.filter((s) => s.status === "IN_USE" || s.status === "RESERVED").length,
+  const totalReservedSlots = accounts.reduce(
+    (acc, item) =>
+      acc + item.services.filter((s) => s.status === "IN_USE" || s.status === "RESERVED").length,
     0
   );
-  const totalExpiredSlots = SAMPLE_WAREHOUSE_ACCOUNTS.reduce(
-    (acc, item) => acc + item.services.filter((s) => s.status === "EXPIRED").length,
+  const totalExpiredSlots = accounts.reduce(
+    (acc, item) =>
+      acc + item.services.filter((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE").length,
     0
   );
 
@@ -289,7 +182,7 @@ export const WarehousePage: React.FC = () => {
             <span>NGUỒN HÀNG & KHO</span>
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 font-normal">
-              Hệ thống V2 Active
+              PostgreSQL Connected
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
@@ -302,10 +195,14 @@ export const WarehousePage: React.FC = () => {
 
         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
           <button
-            onClick={() => notification.info("Đã làm mới dữ liệu danh mục kho!", "Làm mới kho")}
-            className="p-2 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900/80 border border-slate-700/60 hover:border-slate-600 text-slate-300 text-xs sm:text-sm font-medium transition-all hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+            onClick={async () => {
+              await loadWarehouseData();
+              notification.info("Đã làm mới dữ liệu danh mục kho!", "Làm mới kho");
+            }}
+            disabled={loading}
+            className="p-2 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900/80 border border-slate-700/60 hover:border-slate-600 text-slate-300 text-xs sm:text-sm font-medium transition-all hover:bg-slate-800 flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw className="w-4 h-4 text-slate-400" />
+            <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Làm mới</span>
           </button>
 
@@ -343,7 +240,7 @@ export const WarehousePage: React.FC = () => {
           </div>
           <div className="mt-2 text-xs text-emerald-400 font-medium flex items-center gap-1">
             <Sparkles className="w-3 h-3" />
-            <span>+4 tài khoản thêm tuần này</span>
+            <span>Đồng bộ từ Database</span>
           </div>
         </div>
 
@@ -413,7 +310,8 @@ export const WarehousePage: React.FC = () => {
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         accountCount={filteredAccounts.length}
-        catalogCount={SAMPLE_SERVICE_CATALOG.length}
+        catalogCount={catalog.length}
+        availableCategories={availableCategories}
       />
 
       {/* TAB 1: ACCOUNTS TABLE */}
@@ -431,7 +329,16 @@ export const WarehousePage: React.FC = () => {
             notification.confirm({
               title: "Xóa tài khoản kho?",
               message: `Bạn có chắc muốn xóa tài khoản ${acc.account}? các slot bên trong sẽ bị gỡ bỏ!`,
-              onConfirm: () => notification.success("Đã xóa tài khoản kho"),
+              onConfirm: async () => {
+                try {
+                  const res = await fetch(`/api/warehouse/${acc.id}`, { method: "DELETE" });
+                  if (!res.ok) throw new Error("Lỗi xóa tài khoản");
+                  notification.success("Đã xóa tài khoản kho thành công!");
+                  await loadWarehouseData();
+                } catch (err: any) {
+                  notification.error(err.message || "Không thể xóa tài khoản");
+                }
+              },
             })
           }
           onAddSlot={(acc) => notification.info(`Thêm slot mới cho tài khoản ${acc.account}`)}
@@ -441,7 +348,7 @@ export const WarehousePage: React.FC = () => {
       {/* TAB 2: CATALOG GRID */}
       {activeTab === "catalog" && (
         <WarehouseCatalogGrid
-          catalogItems={SAMPLE_SERVICE_CATALOG}
+          catalogItems={catalog}
           onOpenCreateCatalog={() => setIsCatalogModalOpen(true)}
           onEditCatalog={(cat) => notification.info(`Chỉnh sửa dịch vụ ${cat.name}`)}
         />
@@ -453,9 +360,23 @@ export const WarehousePage: React.FC = () => {
         formData={accountForm}
         onClose={() => setIsAccountModalOpen(false)}
         onFormChange={setAccountForm}
-        onSubmit={() => {
-          notification.success("Đã tạo mới tài khoản kho thành công!", "Tạo tài khoản");
-          setIsAccountModalOpen(false);
+        onSubmit={async () => {
+          try {
+            const res = await fetch("/api/warehouse", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(accountForm),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || "Lỗi tạo tài khoản kho");
+            }
+            notification.success("Đã tạo mới tài khoản kho thành công!", "Tạo tài khoản");
+            setIsAccountModalOpen(false);
+            await loadWarehouseData();
+          } catch (err: any) {
+            notification.error(err.message || "Tạo tài khoản kho thất bại");
+          }
         }}
       />
 
@@ -465,9 +386,23 @@ export const WarehousePage: React.FC = () => {
         formData={catalogForm}
         onClose={() => setIsCatalogModalOpen(false)}
         onFormChange={setCatalogForm}
-        onSubmit={() => {
-          notification.success("Đã thêm dịch vụ vào danh mục thành công!", "Tạo dịch vụ");
-          setIsCatalogModalOpen(false);
+        onSubmit={async () => {
+          try {
+            const res = await fetch("/api/warehouse/catalog", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(catalogForm),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || "Lỗi tạo dịch vụ danh mục");
+            }
+            notification.success("Đã thêm dịch vụ vào danh mục thành công!", "Tạo dịch vụ");
+            setIsCatalogModalOpen(false);
+            await loadWarehouseData();
+          } catch (err: any) {
+            notification.error(err.message || "Tạo dịch vụ thất bại");
+          }
         }}
       />
     </div>

@@ -1,5 +1,9 @@
 const knex = require("knex");
+const pg = require("pg");
 const { DATABASE_URL } = require("@/config/env");
+
+// Chuẩn hóa kiểu DATE (PostgreSQL OID 1082) -> Giữ nguyên chuỗi "YYYY-MM-DD", triệt tiêu lỗi lệch ngày của JS Date
+pg.types.setTypeParser(1082, (val) => val);
 
 const searchPath = [
   "public",
@@ -29,6 +33,12 @@ const db = knex({
     max: 20,
     acquireTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
+    afterCreate: (conn, done) => {
+      // Cố định múi giờ UTC+7 (Asia/Ho_Chi_Minh) trên mọi connection của PostgreSQL
+      conn.query("SET timezone = 'Asia/Ho_Chi_Minh';", (err) => {
+        done(err, conn);
+      });
+    },
   },
 });
 

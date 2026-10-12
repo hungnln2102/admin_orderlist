@@ -1,14 +1,23 @@
 const { db, TABLES } = require("@/db");
-const { enqueueMessage } = require("@/domains/notifications/telegram/core/telegramClient");
-const { TELEGRAM_FINANCE_TOPIC_ID, SEND_FINANCE_DELTA_NOTIFICATION, TELEGRAM_CHAT_ID } = require("@/domains/notifications/telegram/core/constants");
+const telegramClient = require("@/domains/notifications/telegram/core/telegramClient");
+const systemConfigService = require("@/domains/system/services/systemConfigService");
+const { TELEGRAM_FINANCE_TOPIC_ID, TELEGRAM_CHAT_ID } = require("@/domains/notifications/telegram/core/constants");
+
+function isFinanceNotificationEnabled() {
+  const enabled = systemConfigService.get("SEND_FINANCE_DELTA_NOTIFICATION");
+  if (enabled !== null && String(enabled).toLowerCase() === "false") {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Gửi thông báo biến động số dư nội bộ
  */
 function notifyFinanceDelta(messageHtml) {
-  if (!SEND_FINANCE_DELTA_NOTIFICATION) return;
+  if (!isFinanceNotificationEnabled()) return;
 
-  enqueueMessage({
+  telegramClient.enqueueMessage({
     chat_id: TELEGRAM_CHAT_ID,
     message_thread_id: TELEGRAM_FINANCE_TOPIC_ID,
     text: messageHtml,
@@ -18,8 +27,14 @@ function notifyFinanceDelta(messageHtml) {
 
 const buildFlowLine = (label, afterVal, deltaVal) => {
   const delta = Math.round(Number(deltaVal || 0));
-  const after = Math.round(Number(afterVal || 0));
-  const before = after - delta;
+  let after = Math.round(Number(afterVal || 0));
+  let before = after - delta;
+
+  // Phòng vệ: Nếu afterVal trong CSDL bằng 0 mà delta > 0 (DB chưa kịp cập nhật hoặc afterVal là trước biến động)
+  if (before < 0 && delta > 0 && after === 0) {
+    before = 0;
+    after = delta;
+  }
 
   const formatVnd = (n) => Math.round(n).toLocaleString("vi-VN");
   const formatSigned = (n) => {
@@ -48,7 +63,7 @@ async function notifyFinanceMonthlyDelta({
   bankBalanceDelta = 0,
   context = "",
 }) {
-  if (!SEND_FINANCE_DELTA_NOTIFICATION) return;
+  if (!isFinanceNotificationEnabled()) return;
 
   try {
     const finalMonthKey = monthKey || new Date().toISOString().slice(0, 7);

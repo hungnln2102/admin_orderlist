@@ -7,7 +7,7 @@ export interface WarehouseServiceSlot {
   two_fa?: string;
   expires_at?: string;
   note?: string;
-  status: "AVAILABLE" | "IN_USE" | "EXPIRED" | "RESERVED";
+  status: "AVAILABLE" | "IN_USE" | "EXPIRED" | "RESERVED" | "UNAVAILABLE";
 }
 
 export interface WarehouseAccountItem {

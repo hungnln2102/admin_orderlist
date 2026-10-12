@@ -5,12 +5,14 @@
 
 const { db, TABLES } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
+const { financeNotifier } = require("@/domains/notifications/telegram");
+const { getVietnamDateString, getVietnamMonthString } = require("@/utils/time");
 
 /**
- * Hàm tích lũy số liệu vào daily_revenue_summary theo ngày (Event-driven)
+ * Hàm tích lũy số liệu vào daily_revenue_summary theo ngày (Event-driven, chuẩn UTC+7)
  */
 async function accumulateDailySummary(dateStr, fields = {}) {
-  const date = dateStr ? String(dateStr).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const date = getVietnamDateString(dateStr);
 
   const existing = await db(TABLES.DAILY_REVENUE_SUMMARY)
     .where("summary_date", date)
@@ -46,63 +48,111 @@ async function accumulateDailySummary(dateStr, fields = {}) {
 
 /**
  * Đăng ký lắng nghe EventBus để cập nhật real-time vào daily_revenue_summary
+ * và phát thông báo Telegram đồng bộ sau khi đã ghi dữ liệu vào CSDL.
  */
 function registerDailySummaryListeners() {
   // 1. Đơn hàng thanh toán thành công hoặc gia hạn thành công -> Cộng doanh thu + 1 đơn
   eventBus.on(EVENTS.ORDER_PAID, async (data) => {
-    const amount = Number(data.amount || data.price || data.gross_selling_price || 0);
-    const cost = Number(data.cost || 0);
-    const rawDate = data.order_date || data.transactionDate || data.updated_at || new Date();
-    const dateStr = new Date(rawDate).toISOString().slice(0, 10);
-    console.log(`📊 [DailySummary] Nhận ORDER_PAID: +${amount} ₫ doanh thu, +${cost} ₫ chi phí, +1 đơn (Ngày: ${dateStr})`);
-    await accumulateDailySummary(dateStr, {
-      earned_revenue: amount,
-      total_shop_cost: cost,
-      dashboard_orders_count: 1,
-    });
+    try {
+      const amount = Number(data.amount || data.price || data.gross_selling_price || 0);
+      const cost = Number(data.cost || 0);
+      const dateStr = getVietnamDateString(data.order_date || data.transactionDate || data.updated_at);
+      const isRenewal = Boolean(data.isRenewal);
+      console.log(`📊 [DailySummary] Nhận ORDER_PAID (${isRenewal ? "Gia hạn" : "Đơn mới"}): +${amount} ₫ doanh thu, +${cost} ₫ chi phí, +1 đơn (Ngày: ${dateStr})`);
+
+      await accumulateDailySummary(dateStr, {
+        earned_revenue: amount,
+        total_shop_cost: cost,
+        dashboard_orders_count: 1,
+      });
+
+      // Sau khi DB đã cập nhật xong -> Bắn thông báo Telegram Biến Động Tháng
+      const isWebhook = data.action === "WEBHOOK_PAYMENT_MATCH";
+      const context = isWebhook
+        ? (isRenewal ? `webhook.orderRenewed:${data.id_order}` : `webhook.orderPaid:${data.id_order}`)
+        : (isRenewal ? `renewal.orderRenewed:${data.id_order}` : `order.completed:${data.id_order}`);
+      const bankDelta = isWebhook ? amount : 0;
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey: getVietnamMonthString(dateStr),
+        revenueDelta: amount,
+        importDelta: cost,
+        profitDelta: amount - cost,
+        bankBalanceDelta: bankDelta,
+        context,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý ORDER_PAID:", err.message);
+    }
   });
 
+  // 2. Event gia hạn đơn hàng (ORDER_RENEWED)
+  // Doanh thu, chi phí và số lượng đơn của đơn gia hạn đã được hạch toán đầy đủ tại ORDER_PAID.
+  // Listener ở đây chỉ log thông tin vòng đời gia hạn, tránh cộng trùng lặp số lượng đơn.
   eventBus.on(EVENTS.ORDER_RENEWED, async (data) => {
-    const amount = Number(data.price || data.amount || data.gross_selling_price || 0);
-    const dateStr = String(data.transactionDate || data.updated_at || new Date().toISOString()).slice(0, 10);
-    console.log(`📊 [DailySummary] Nhận ORDER_RENEWED: +${amount} ₫ doanh thu gia hạn, +1 đơn (Ngày: ${dateStr})`);
-    await accumulateDailySummary(dateStr, {
-      earned_revenue: amount,
-      dashboard_orders_count: 1,
-    });
+    console.log(`🔄 [DailySummary] Nhận ORDER_RENEWED: đơn #${data.id_order} gia hạn +${data.daysAdded} ngày (Hết hạn mới: ${data.newExpiredAt})`);
   });
 
-
-
+  // 3. Thanh toán công nợ NCC -> Tăng chi phí nhập hàng
   eventBus.on(EVENTS.SUPPLIER_DEBT_PAID, async (data) => {
-    const amount = Number(data.amount || 0);
-    const date = new Date().toISOString().slice(0, 10);
-    console.log(`📊 [DailySummary] Nhận SUPPLIER_DEBT_PAID: +${amount} ₫ tiền thanh toán NCC`);
-    await accumulateDailySummary(date, {
-      total_shop_cost: amount,
-    });
+    try {
+      const amount = Number(data.amount || 0);
+      const date = getVietnamDateString();
+      console.log(`📊 [DailySummary] Nhận SUPPLIER_DEBT_PAID: +${amount} ₫ tiền thanh toán NCC (Ngày: ${date})`);
+
+      await accumulateDailySummary(date, {
+        total_shop_cost: amount,
+      });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey: getVietnamMonthString(date),
+        importDelta: amount,
+        bankBalanceDelta: -amount,
+        context: data.summary || `Thanh toán công nợ NCC ${data.supplier_name}: ${amount} đ`,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý SUPPLIER_DEBT_PAID:", err.message);
+    }
   });
 
-  // 3. Tiền hoàn / Đơn hủy -> Cộng hoàn tiền + 1 đơn hủy
+  // 4. Tiền hoàn / Đơn hủy -> Cộng hoàn tiền + 1 đơn hủy
   eventBus.on(EVENTS.ORDER_CANCELED_REFUNDED, async (data) => {
-    const refundAmount = Number(data.refund || data.amount || 0);
-    const date = new Date().toISOString().slice(0, 10);
-    console.log(`📊 [DailySummary] Nhận ORDER_CANCELED_REFUNDED: +${refundAmount} ₫ hoàn tiền, +1 đơn hủy`);
-    await accumulateDailySummary(date, {
-      revenue_reversed: refundAmount,
-      dashboard_canceled_count: 1,
-    });
+    try {
+      const refundAmount = Number(data.refund || data.refundAmount || data.amount || 0);
+      const date = getVietnamDateString();
+      console.log(`📊 [DailySummary] Nhận ORDER_CANCELED_REFUNDED: +${refundAmount} ₫ hoàn tiền, +1 đơn hủy (Ngày: ${date})`);
+
+      await accumulateDailySummary(date, {
+        revenue_reversed: refundAmount,
+        dashboard_canceled_count: 1,
+      });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey: getVietnamMonthString(date),
+        refundDelta: refundAmount,
+        revenueDelta: -refundAmount,
+        profitDelta: -refundAmount,
+        bankBalanceDelta: 0,
+        context: `order.canceledRefunded:${data.orderCode || data.id_order}`,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý ORDER_CANCELED_REFUNDED:", err.message);
+    }
   });
 
   eventBus.on(EVENTS.ORDER_PENDING_REFUND, async (data) => {
-    const date = new Date().toISOString().slice(0, 10);
-    console.log(`📊 [DailySummary] Nhận ORDER_PENDING_REFUND: +1 đơn hủy`);
-    await accumulateDailySummary(date, {
-      dashboard_canceled_count: 1,
-    });
+    try {
+      const date = getVietnamDateString();
+      console.log(`📊 [DailySummary] Nhận ORDER_PENDING_REFUND: +1 đơn hủy`);
+      await accumulateDailySummary(date, {
+        dashboard_canceled_count: 1,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý ORDER_PENDING_REFUND:", err.message);
+    }
   });
 
-  console.log("✅ [DailySummary] Event-driven listeners registered successfully.");
+  console.log("✅ [DailySummary] Event-driven listeners registered successfully (UTC+7).");
 }
 
 module.exports = {

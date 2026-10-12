@@ -288,6 +288,241 @@ async function getUsdtExchangeRate() {
   }
 }
 
+// --- FINANCIAL ACCOUNT CREDIT & DEBIT (WEBHOOK MONEY IN / OUT) ---
+
+async function resolveFinancialAccount(trxContext, { accountNumber = null, accountId = null } = {}) {
+  const queryDb = trxContext || db;
+
+  if (accountId) {
+    const acc = await queryDb(BANK_TABLE)
+      .where({ id: Number(accountId), is_deleted: false })
+      .first();
+    if (acc) return acc;
+  }
+
+  const cleanAccNum = String(accountNumber || "").replace(/\s+/g, "").trim();
+  if (cleanAccNum) {
+    const acc = await queryDb(BANK_TABLE)
+      .whereRaw("REPLACE(account_number, ' ', '') = ?", [cleanAccNum])
+      .where("is_deleted", false)
+      .first();
+    if (acc) return acc;
+  }
+
+  // Fallback 1: Tài khoản ngân hàng mặc định đang hoạt động
+  const defaultAcc = await queryDb(BANK_TABLE)
+    .where({ is_default: true, is_active: true, is_deleted: false })
+    .first();
+  if (defaultAcc) return defaultAcc;
+
+  // Fallback 2: Bất kỳ tài khoản ngân hàng nào đang active
+  const anyActiveBank = await queryDb(BANK_TABLE)
+    .where({ is_active: true, is_deleted: false })
+    .first();
+  if (anyActiveBank) return anyActiveBank;
+
+  // Fallback 3: Bất kỳ tài khoản nào trong hệ thống
+  return await queryDb(BANK_TABLE)
+    .where({ is_deleted: false })
+    .first();
+}
+
+/**
+ * Cộng tiền vào tài khoản ngân hàng hoặc ví (khi nhận Webhook tiền vào)
+ */
+async function creditFinancialAccount(trxContext, {
+  accountNumber = null,
+  accountId = null,
+  amount,
+  sourceKind = "payment_receipt",
+  sourceId = null,
+  note = null,
+}) {
+  const numAmount = toNumber(amount);
+  if (numAmount <= 0) return { skipped: true, reason: "invalid_amount" };
+
+  const execute = async (trx) => {
+    const account = await resolveFinancialAccount(trx, { accountNumber, accountId });
+    if (!account) {
+      console.warn("[WalletService] Không tìm thấy tài khoản ngân hàng/ví để cộng tiền Webhook.");
+      return { skipped: true, reason: "no_account_found" };
+    }
+
+    // Khóa hàng FOR UPDATE để tránh race-condition
+    const lockedAccount = await trx(BANK_TABLE)
+      .where({ id: account.id })
+      .forUpdate()
+      .first();
+
+    // Chống ghi trùng qua sổ cái (Idempotency)
+    if (sourceKind && sourceId) {
+      const existingLedger = await trx(BANK_LEDGER_TABLE)
+        .where({
+          source_kind: String(sourceKind),
+          source_id: String(sourceId),
+        })
+        .first();
+
+      if (existingLedger) {
+        return {
+          skipped: true,
+          reason: "duplicate",
+          ledgerId: existingLedger.id,
+          balanceAfter: Number(lockedAccount.balance),
+        };
+      }
+    }
+
+    const currentBalance = toNumber(lockedAccount.balance);
+    const currentReceived = toNumber(lockedAccount.total_received);
+    const newBalance = currentBalance + numAmount;
+    const newReceived = currentReceived + numAmount;
+
+    await trx(BANK_TABLE)
+      .where({ id: lockedAccount.id })
+      .update({
+        balance: newBalance,
+        total_received: newReceived,
+        updated_at: trx.fn.now(),
+      });
+
+    let ledgerId = null;
+    try {
+      const [insertedLedger] = await trx(BANK_LEDGER_TABLE)
+        .insert({
+          financial_account_id: lockedAccount.id,
+          entry_type: "receipt_in",
+          amount: numAmount,
+          signed_amount: numAmount,
+          balance_after: newBalance,
+          source_kind: String(sourceKind),
+          source_id: sourceId ? String(sourceId) : null,
+          note: note || `Webhook tiền vào: +${numAmount} ₫`,
+        })
+        .returning("id");
+      ledgerId = insertedLedger?.id || insertedLedger;
+    } catch (e) {
+      console.warn("[WalletService] Bỏ qua lỗi ghi sổ cái:", e.message);
+    }
+
+    console.log(
+      `💰 [WalletService] Đã cộng +${numAmount.toLocaleString("vi-VN")} ₫ vào TK #${lockedAccount.id} (${lockedAccount.account_number || lockedAccount.label}). Số dư mới: ${newBalance.toLocaleString("vi-VN")} ₫`
+    );
+
+    return {
+      success: true,
+      accountId: lockedAccount.id,
+      ledgerId,
+      amount: numAmount,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    };
+  };
+
+  if (trxContext) {
+    return await execute(trxContext);
+  }
+  return await withTransaction(execute);
+}
+
+/**
+ * Trừ tiền khỏi tài khoản ngân hàng hoặc ví (khi nhận Webhook tiền ra)
+ */
+async function debitFinancialAccount(trxContext, {
+  accountNumber = null,
+  accountId = null,
+  amount,
+  sourceKind = "payment_receipt",
+  sourceId = null,
+  note = null,
+}) {
+  const numAmount = toNumber(amount);
+  if (numAmount <= 0) return { skipped: true, reason: "invalid_amount" };
+
+  const execute = async (trx) => {
+    const account = await resolveFinancialAccount(trx, { accountNumber, accountId });
+    if (!account) {
+      console.warn("[WalletService] Không tìm thấy tài khoản ngân hàng/ví để trừ tiền Webhook.");
+      return { skipped: true, reason: "no_account_found" };
+    }
+
+    // Khóa hàng FOR UPDATE để tránh race-condition
+    const lockedAccount = await trx(BANK_TABLE)
+      .where({ id: account.id })
+      .forUpdate()
+      .first();
+
+    // Chống ghi trùng qua sổ cái (Idempotency)
+    if (sourceKind && sourceId) {
+      const existingLedger = await trx(BANK_LEDGER_TABLE)
+        .where({
+          source_kind: String(sourceKind),
+          source_id: String(sourceId),
+        })
+        .first();
+
+      if (existingLedger) {
+        return {
+          skipped: true,
+          reason: "duplicate",
+          ledgerId: existingLedger.id,
+          balanceAfter: Number(lockedAccount.balance),
+        };
+      }
+    }
+
+    const currentBalance = toNumber(lockedAccount.balance);
+    const currentWithdrawn = toNumber(lockedAccount.total_withdrawn);
+    const newBalance = currentBalance - numAmount;
+    const newWithdrawn = currentWithdrawn + numAmount;
+
+    await trx(BANK_TABLE)
+      .where({ id: lockedAccount.id })
+      .update({
+        balance: newBalance,
+        total_withdrawn: newWithdrawn,
+        updated_at: trx.fn.now(),
+      });
+
+    let ledgerId = null;
+    try {
+      const [insertedLedger] = await trx(BANK_LEDGER_TABLE)
+        .insert({
+          financial_account_id: lockedAccount.id,
+          entry_type: "receipt_out",
+          amount: numAmount,
+          signed_amount: -numAmount,
+          balance_after: newBalance,
+          source_kind: String(sourceKind),
+          source_id: sourceId ? String(sourceId) : null,
+          note: note || `Webhook tiền ra: -${numAmount} ₫`,
+        })
+        .returning("id");
+      ledgerId = insertedLedger?.id || insertedLedger;
+    } catch (e) {
+      console.warn("[WalletService] Bỏ qua lỗi ghi sổ cái:", e.message);
+    }
+
+    console.log(
+      `💸 [WalletService] Đã trừ -${numAmount.toLocaleString("vi-VN")} ₫ từ TK #${lockedAccount.id} (${lockedAccount.account_number || lockedAccount.label}). Số dư mới: ${newBalance.toLocaleString("vi-VN")} ₫`
+    );
+
+    return {
+      success: true,
+      accountId: lockedAccount.id,
+      ledgerId,
+      amount: numAmount,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    };
+  };
+
+  if (trxContext) {
+    return await execute(trxContext);
+  }
+  return await withTransaction(execute);
+}
+
 module.exports = {
   listBankAccounts,
   createBankAccount,
@@ -302,4 +537,7 @@ module.exports = {
   deleteUsdtWallet,
   recordUsdtWithdrawal,
   getUsdtExchangeRate,
+  resolveFinancialAccount,
+  creditFinancialAccount,
+  debitFinancialAccount,
 };

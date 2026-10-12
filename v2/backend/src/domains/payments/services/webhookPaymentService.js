@@ -16,6 +16,7 @@ const { db, TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processCompleteOrder } = require("@/domains/orders/services/orderService");
+const { creditFinancialAccount, debitFinancialAccount } = require("@/domains/wallets/services/walletService");
 
 // Các trạng thái đơn hàng hợp lệ cần thanh toán
 const PAYABLE_STATUSES = [
@@ -93,8 +94,16 @@ async function processPaymentWebhook(payload = {}) {
 
     const receiptId = typeof receiptIdRes === "object" ? receiptIdRes.id : receiptIdRes;
 
-    // 3. Tiền ra (OUT) — Lưu Biên lai rồi dừng
+    // 3. Tiền ra (OUT) — Trừ tiền tài khoản/ví, lưu Biên lai rồi dừng
     if (isOutbound) {
+      await debitFinancialAccount(trx, {
+        accountNumber: payload.accountNumber || payload.receiver || null,
+        amount: transferAmount,
+        sourceKind: "payment_receipt",
+        sourceId: receiptId,
+        note: noteContent || `Webhook Tiền ra #${receiptId}`,
+      });
+
       return {
         success: true,
         matched: false,
@@ -105,7 +114,16 @@ async function processPaymentWebhook(payload = {}) {
       };
     }
 
-    // 4. Tiền vào (IN) — Tìm đơn hàng phù hợp theo SỐ TIỀN THỰC CHUYỂN (Chính xác đến từng đồng nhờ slot suffix)
+    // 4. Tiền vào (IN) — Cộng tiền tài khoản/ví ngay khi nhận Webhook
+    await creditFinancialAccount(trx, {
+      accountNumber: payload.accountNumber || payload.receiver || null,
+      amount: transferAmount,
+      sourceKind: "payment_receipt",
+      sourceId: receiptId,
+      note: noteContent || `Webhook Tiền vào #${receiptId}`,
+    });
+
+    // 5. Tìm đơn hàng phù hợp theo SỐ TIỀN THỰC CHUYỂN (Chính xác đến từng đồng nhờ slot suffix)
     const matchedOrder = await getOrderTable(trx)
       .where((builder) => {
         builder.where("price", transferAmount).orWhere("gross_selling_price", transferAmount);

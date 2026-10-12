@@ -34,6 +34,36 @@ async function clearAllData() {
   } catch (e) { console.log("⚠️ dashboard_monthly_summary:", e.message); }
 
   try {
+    await db.raw('TRUNCATE TABLE billing.payment_receipt_batch CASCADE;');
+    console.log("✅ Đã xóa sạch payment_receipt_batch");
+  } catch (e) { console.log("⚠️ payment_receipt_batch:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE billing.payment_receipt_batch_item CASCADE;');
+    console.log("✅ Đã xóa sạch payment_receipt_batch_item");
+  } catch (e) { console.log("⚠️ payment_receipt_batch_item:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE billing.payment_receipt_financial_audit_log CASCADE;');
+    console.log("✅ Đã xóa sạch payment_receipt_financial_audit_log");
+  } catch (e) { console.log("⚠️ payment_receipt_financial_audit_log:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE billing.refund_credit_notes CASCADE;');
+    console.log("✅ Đã xóa sạch refund_credit_notes");
+  } catch (e) { console.log("⚠️ refund_credit_notes:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE billing.refund_credit_applications CASCADE;');
+    console.log("✅ Đã xóa sạch refund_credit_applications");
+  } catch (e) { console.log("⚠️ refund_credit_applications:", e.message); }
+
+  try {
+    await db.raw('TRUNCATE TABLE business.supplier_order_cost_log CASCADE;');
+    console.log("✅ Đã xóa sạch supplier_order_cost_log");
+  } catch (e) { console.log("⚠️ supplier_order_cost_log:", e.message); }
+
+  try {
     await db.raw('TRUNCATE TABLE system_automation.domain_event_store CASCADE;');
     console.log("✅ Đã xóa sạch domain_event_store");
   } catch (e) { console.log("⚠️ domain_event_store:", e.message); }

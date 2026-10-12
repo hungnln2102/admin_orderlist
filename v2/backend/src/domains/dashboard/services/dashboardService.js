@@ -1,5 +1,4 @@
 const { db, TABLES } = require("@/db");
-const { ORDER_STATUS } = require("@/constants/orderStatus");
 
 /**
  * Trả về dải thời gian và thông số bộ lọc
@@ -67,20 +66,21 @@ function parseDateRange({ period = "month", month, year, startDate, endDate }) {
 }
 
 /**
- * Thống kê trực tiếp từ CSDL order_list theo dải ngày order_date
- */
-/**
- * Thống kê từ bảng daily_revenue_summary theo dải ngày summary_date
+ * Thống kê từ bảng tổng hợp daily_revenue_summary theo dải ngày
  */
 async function getOrderStatsForRange(start, end) {
+  const startDateStr = start.toISOString().slice(0, 10);
+  const endDateStr = end.toISOString().slice(0, 10);
+
   const rawStats = await db(TABLES.DAILY_REVENUE_SUMMARY)
-    .whereBetween("summary_date", [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)])
+    .whereBetween("summary_date", [startDateStr, endDateStr])
     .select(
       db.raw("COALESCE(SUM(dashboard_orders_count), 0)::integer as total_orders"),
       db.raw("COALESCE(SUM(dashboard_canceled_count), 0)::integer as canceled_orders"),
       db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as total_revenue"),
       db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost"),
-      db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as total_refund")
+      db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as total_refund"),
+      db.raw("COALESCE(SUM(earned_revenue - total_shop_cost - revenue_reversed), 0)::numeric as total_profit")
     )
     .first();
 
@@ -89,18 +89,18 @@ async function getOrderStatsForRange(start, end) {
   const totalRevenue = parseFloat(rawStats?.total_revenue || 0);
   const totalCost = parseFloat(rawStats?.total_cost || 0);
   const totalRefund = parseFloat(rawStats?.total_refund || 0);
-  const totalProfit = totalRevenue - totalCost - totalRefund;
+  const totalProfit = parseFloat(rawStats?.total_profit || 0);
 
   return { totalOrders, canceledOrders, totalRevenue, totalCost, totalRefund, totalProfit };
 }
 
 /**
- * Tính toán báo cáo tổng quan Dashboard từ bảng daily_revenue_summary
+ * Tính toán báo cáo tổng quan Dashboard (Trích xuất từ bảng chuẩn daily_revenue_summary)
  */
 async function getDashboardSummary(params = {}) {
   const { start, end, prevStart, prevEnd, bucketMode, targetYear, period } = parseDateRange(params);
 
-  // 1. Thống kê kỳ hiện tại & kỳ so sánh từ daily_revenue_summary
+  // 1. Thống kê kỳ hiện tại & kỳ so sánh trực tiếp từ daily_revenue_summary
   const currentStats = await getOrderStatsForRange(start, end);
   const prevStats = await getOrderStatsForRange(prevStart, prevEnd);
 
@@ -120,6 +120,7 @@ async function getDashboardSummary(params = {}) {
   let chartSubtitle = "Xu hướng biến động";
 
   if (bucketMode === "hour") {
+    // Với mốc xem trong ngày (24 giờ), phân rã chi tiết theo khung giờ từ order_list để đảm bảo realtime
     chartSubtitle = "Xu hướng biến động theo 24 giờ";
     const hourRows = await db(TABLES.ORDER_LIST)
       .whereBetween("order_date", [start.toISOString(), end.toISOString()])
@@ -163,29 +164,31 @@ async function getDashboardSummary(params = {}) {
     }
   } else if (bucketMode === "day") {
     chartSubtitle = period === "month" ? "Xu hướng biến động từng ngày trong tháng" : "Xu hướng biến động theo ngày";
+    const startDateStr = start.toISOString().slice(0, 10);
+    const endDateStr = end.toISOString().slice(0, 10);
+
     const dayRows = await db(TABLES.DAILY_REVENUE_SUMMARY)
-      .whereBetween("summary_date", [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)])
+      .whereBetween("summary_date", [startDateStr, endDateStr])
       .select(
         db.raw("TO_CHAR(summary_date, 'YYYY-MM-DD') as day_key"),
         db.raw("COALESCE(dashboard_orders_count, 0)::integer as orders"),
         db.raw("COALESCE(dashboard_canceled_count, 0)::integer as canceled"),
         db.raw("COALESCE(earned_revenue, 0)::numeric as revenue"),
         db.raw("COALESCE(total_shop_cost, 0)::numeric as cost"),
-        db.raw("COALESCE(revenue_reversed, 0)::numeric as refund")
+        db.raw("COALESCE(revenue_reversed, 0)::numeric as refund"),
+        db.raw("COALESCE(earned_revenue - total_shop_cost - revenue_reversed, 0)::numeric as profit")
       )
       .orderBy("summary_date", "asc");
 
     const dayMap = new Map();
     dayRows.forEach((r) => {
-      const rev = parseFloat(r.revenue || 0);
-      const cst = parseFloat(r.cost || 0);
-      const ref = parseFloat(r.refund || 0);
       dayMap.set(r.day_key, {
         orders: parseInt(r.orders || 0, 10),
         canceled: parseInt(r.canceled || 0, 10),
-        revenue: rev,
-        cost: cst,
-        profit: rev - cst - ref,
+        revenue: parseFloat(r.revenue || 0),
+        cost: parseFloat(r.cost || 0),
+        refund: parseFloat(r.refund || 0),
+        profit: parseFloat(r.profit || 0),
       });
     });
 
@@ -203,7 +206,7 @@ async function getDashboardSummary(params = {}) {
       const monthNum = String(curr.getUTCMonth() + 1).padStart(2, "0");
       const label = period === "month" || isSameMonth ? dayNum : `${dayNum}/${monthNum}`;
 
-      const d = dayMap.get(dayKey) || { orders: 0, canceled: 0, revenue: 0, cost: 0, profit: 0 };
+      const d = dayMap.get(dayKey) || { orders: 0, canceled: 0, revenue: 0, cost: 0, refund: 0, profit: 0 };
       daysList.push({
         label,
         dayNum,
@@ -226,33 +229,31 @@ async function getDashboardSummary(params = {}) {
     });
   } else {
     chartSubtitle = "Xu hướng biến động 12 Tháng";
-    const yearStart = new Date(Date.UTC(targetYear, 0, 1, 0, 0, 0));
-    const yearEnd = new Date(Date.UTC(targetYear, 11, 31, 23, 59, 59, 999));
+    const yearStartStr = `${targetYear}-01-01`;
+    const yearEndStr = `${targetYear}-12-31`;
 
-    const monthlyRows = await db(TABLES.ORDER_LIST)
-      .whereBetween("order_date", [yearStart.toISOString(), yearEnd.toISOString()])
+    const monthlyRows = await db(TABLES.DAILY_REVENUE_SUMMARY)
+      .whereBetween("summary_date", [yearStartStr, yearEndStr])
       .select(
-        db.raw("EXTRACT(MONTH FROM order_date::timestamp)::integer as month_num"),
-        db.raw("COUNT(*)::integer as orders"),
-        db.raw("COUNT(*) FILTER (WHERE status = 'CANCELED')::integer as canceled"),
-        db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN price ELSE 0 END), 0)::numeric as revenue"),
-        db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN cost ELSE 0 END), 0)::numeric as cost"),
-        db.raw("COALESCE(SUM(refund), 0)::numeric as refund")
+        db.raw("EXTRACT(MONTH FROM summary_date)::integer as month_num"),
+        db.raw("COALESCE(SUM(dashboard_orders_count), 0)::integer as orders"),
+        db.raw("COALESCE(SUM(dashboard_canceled_count), 0)::integer as canceled"),
+        db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as revenue"),
+        db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as cost"),
+        db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as refund"),
+        db.raw("COALESCE(SUM(earned_revenue - total_shop_cost - revenue_reversed), 0)::numeric as profit")
       )
       .groupBy("month_num")
       .orderBy("month_num", "asc");
 
     const monthlyMap = new Map();
     monthlyRows.forEach((r) => {
-      const rev = parseFloat(r.revenue || 0);
-      const cst = parseFloat(r.cost || 0);
-      const ref = parseFloat(r.refund || 0);
       monthlyMap.set(r.month_num, {
         orders: parseInt(r.orders || 0, 10),
         canceled: parseInt(r.canceled || 0, 10),
-        revenue: rev,
-        cost: cst,
-        profit: rev - cst - ref,
+        revenue: parseFloat(r.revenue || 0),
+        cost: parseFloat(r.cost || 0),
+        profit: parseFloat(r.profit || 0),
       });
     });
 

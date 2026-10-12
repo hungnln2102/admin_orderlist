@@ -26,8 +26,10 @@ function isRenewalOrder(status) {
   );
 }
 
+const { addDaysVietnam } = require("@/utils/time");
+
 /**
- * Tính ngày hết hạn mới khi gia hạn đơn hàng.
+ * Tính ngày hết hạn mới khi gia hạn đơn hàng theo chuẩn giờ Việt Nam (UTC+7).
  * Nếu đơn chưa hết hạn (expiredAt > now), cộng thêm từ ngày hết hạn cũ.
  * Nếu đã hết hạn hoặc không có, cộng từ ngày hiện tại.
  * @param {string|Date|null} currentExpiredAt - Ngày hết hạn hiện tại
@@ -35,18 +37,7 @@ function isRenewalOrder(status) {
  * @returns {string} - Ngày hết hạn mới (YYYY-MM-DD)
  */
 function calculateNewExpiry(currentExpiredAt, daysToAdd) {
-  const now = new Date();
-  let baseExpiry = now;
-
-  if (currentExpiredAt) {
-    const parsed = new Date(currentExpiredAt);
-    if (!isNaN(parsed.getTime()) && parsed > now) {
-      baseExpiry = parsed;
-    }
-  }
-
-  const expiryDate = new Date(baseExpiry.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-  return expiryDate.toISOString().split("T")[0];
+  return addDaysVietnam(currentExpiredAt, daysToAdd);
 }
 
 /**
