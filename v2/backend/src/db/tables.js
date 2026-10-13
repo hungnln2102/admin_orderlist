@@ -180,6 +180,17 @@ const COLS = {
     CREATED_AT: "created_at",
     PROCESSED_AT: "processed_at",
   },
+  PRODUCT_NAMES: {
+    ID: "id",
+    NAME: "name",
+    PRODUCT_ID: "product_id",
+    PACKAGE_NOTE: "package_note",
+    SERVICE_NOTE: "service_note",
+    IS_PACKAGE: "is_package",
+    REQUIRES_STORAGE: "requires_storage",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
 };
 
 module.exports = {

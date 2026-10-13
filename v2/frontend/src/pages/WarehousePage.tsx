@@ -15,6 +15,8 @@ import {
 import { useNotification } from "@/shared/context/NotificationContext";
 import {
   WarehouseAccountItem,
+  WarehouseServiceSlot,
+  WarehouseSlotEditFormData,
   ServiceNameCategoryItem,
   WarehouseAccountFormData,
   CatalogFormData,
@@ -22,7 +24,9 @@ import {
   WarehouseAccountsTable,
   WarehouseCatalogGrid,
   WarehouseCreateModal,
+  WarehouseEditSlotModal,
   CatalogCreateModal,
+  CatalogDeleteModal,
 } from "@/features/warehouse";
 
 export const WarehousePage: React.FC = () => {
@@ -44,6 +48,13 @@ export const WarehousePage: React.FC = () => {
   // Modals
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [deletingCatalogItem, setDeletingCatalogItem] = useState<ServiceNameCategoryItem | null>(null);
+  const [isDeletingCatalog, setIsDeletingCatalog] = useState(false);
+  const [editingSlotData, setEditingSlotData] = useState<{
+    account: WarehouseAccountItem;
+    slot: WarehouseServiceSlot;
+  } | null>(null);
+  const [isUpdatingSlot, setIsUpdatingSlot] = useState(false);
 
   // Form states
   const [accountForm, setAccountForm] = useState<WarehouseAccountFormData>({
@@ -172,6 +183,83 @@ export const WarehousePage: React.FC = () => {
       acc + item.services.filter((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE").length,
     0
   );
+
+  const handleConfirmDeleteCatalog = async () => {
+    if (!deletingCatalogItem) return;
+    setIsDeletingCatalog(true);
+    try {
+      const res = await fetch(`/api/warehouse/catalog/${deletingCatalogItem.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể xóa dịch vụ kho");
+      }
+      notification.success(
+        data.message || `Đã xóa dịch vụ "${deletingCatalogItem.name}" khỏi danh mục kho thành công!`,
+        "Xóa Dịch Vụ Kho"
+      );
+      setDeletingCatalogItem(null);
+      await loadWarehouseData();
+    } catch (err: any) {
+      console.error("Lỗi xóa dịch vụ kho:", err);
+      notification.error(err.message || "Xóa dịch vụ kho thất bại", "Lỗi Xóa Dịch Vụ");
+    } finally {
+      setIsDeletingCatalog(false);
+    }
+  };
+
+  const handleOpenBrowser = async (account: WarehouseAccountItem, service: any) => {
+    try {
+      notification.info(`Đang mở Chrome với Profile riêng cho ${account.account}...`, "Đăng Nhập Kho");
+      const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceName: service.display_name || service.category,
+          slotId: service.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể mở trình duyệt cho tài khoản này.");
+      }
+      notification.success(
+        data.message || `Đã mở cửa sổ Chrome riêng biệt cho tài khoản ${account.account}!`,
+        "Mở Trình Duyệt Thành Công"
+      );
+    } catch (err: any) {
+      console.error("Lỗi mở trình duyệt:", err);
+      notification.error(err.message || "Lỗi mở trình duyệt", "Đăng Nhập Thất Bại");
+    }
+  };
+
+  const handleUpdateSlot = async (formData: WarehouseSlotEditFormData) => {
+    if (!editingSlotData) return;
+    setIsUpdatingSlot(true);
+    try {
+      const res = await fetch(`/api/warehouse/services/${editingSlotData.slot.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể cập nhật thông tin dịch vụ.");
+      }
+      notification.success(
+        `Đã cập nhật dịch vụ ${formData.serviceName} (${formData.accountUsername}) thành công!`,
+        "Cập nhật thành công"
+      );
+      setEditingSlotData(null);
+      await loadWarehouseData();
+    } catch (err: any) {
+      console.error("Lỗi cập nhật slot kho:", err);
+      notification.error(err.message || "Cập nhật dịch vụ kho thất bại", "Lỗi Cập Nhật");
+    } finally {
+      setIsUpdatingSlot(false);
+    }
+  };
 
   return (
     <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto">
@@ -333,7 +421,14 @@ export const WarehousePage: React.FC = () => {
           onToggleExpand={toggleExpand}
           onToggleShowPassword={toggleShowPassword}
           onCopy={copyToClipboard}
-          onEditAccount={(acc) => notification.info(`Chỉnh sửa tài khoản kho ${acc.account}`)}
+          onEditAccount={(acc) => {
+            if (acc.services && acc.services.length > 0) {
+              setEditingSlotData({ account: acc, slot: acc.services[0] });
+            } else {
+              notification.info(`Chỉnh sửa tài khoản kho ${acc.account}`);
+            }
+          }}
+          onEditSlot={(acc, srv) => setEditingSlotData({ account: acc, slot: srv })}
           onDeleteAccount={(acc) =>
             notification.confirm({
               title: "Xóa tài khoản kho?",
@@ -350,7 +445,7 @@ export const WarehousePage: React.FC = () => {
               },
             })
           }
-          onAddSlot={(acc) => notification.info(`Thêm slot mới cho tài khoản ${acc.account}`)}
+          onOpenBrowser={handleOpenBrowser}
         />
       )}
 
@@ -360,6 +455,7 @@ export const WarehousePage: React.FC = () => {
           catalogItems={catalog}
           onOpenCreateCatalog={() => setIsCatalogModalOpen(true)}
           onEditCatalog={(cat) => notification.info(`Chỉnh sửa dịch vụ ${cat.name}`)}
+          onDeleteCatalog={(cat) => setDeletingCatalogItem(cat)}
         />
       )}
 
@@ -414,6 +510,24 @@ export const WarehousePage: React.FC = () => {
             notification.error(err.message || "Tạo dịch vụ thất bại");
           }
         }}
+      />
+
+      {/* MODAL DELETE CATALOG */}
+      <CatalogDeleteModal
+        item={deletingCatalogItem}
+        onClose={() => setDeletingCatalogItem(null)}
+        onConfirmDelete={handleConfirmDeleteCatalog}
+        submitting={isDeletingCatalog}
+      />
+
+      {/* MODAL EDIT SLOT */}
+      <WarehouseEditSlotModal
+        open={!!editingSlotData}
+        account={editingSlotData?.account || null}
+        slot={editingSlotData?.slot || null}
+        isSubmitting={isUpdatingSlot}
+        onClose={() => setEditingSlotData(null)}
+        onSubmit={handleUpdateSlot}
       />
     </div>
   );

@@ -4,4 +4,5 @@ export * from "./components/PackageFilterBar";
 export * from "./components/PackageTable";
 export * from "./components/PackageCreateEditModal";
 export * from "./components/CategoryModal";
+export * from "./components/CategoryDeleteModal";
 export * from "./components/PackageDetailModal";

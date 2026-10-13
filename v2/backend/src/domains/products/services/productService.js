@@ -553,31 +553,25 @@ const deleteSupplierCost = async (supplierCostId) => {
 };
 
 /**
- * Service lấy danh sách Kho Gói Sản Phẩm từ bảng product.package_product
- * Kết hợp với product.product (Lớp gói cha) và product.product_stocks (Thông tin tài khoản/email)
+ * Service lấy danh sách Kho Gói Sản Phẩm từ bảng warehouse.package_products
+ * Kết hợp với warehouse.product_names và warehouse.accounts (Tài khoản gốc & Tài khoản liên kết)
  */
 const getPackageProducts = async () => {
-  await db.raw(`
-    CREATE TABLE IF NOT EXISTS business.product_stocks (
-      id SERIAL PRIMARY KEY,
-      account_username VARCHAR(255),
-      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-  `).catch(() => {});
-
   const query = `
     SELECT
       pp.id,
       pp.product_name_id,
       pn.name AS product_name,
-      p.package_name AS category,
+      COALESCE(pn.name, p.package_name, 'Khác') AS category,
+      pn.requires_storage AS category_requires_storage,
       COALESCE(acc.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
       storage_acc.account_username AS storage_account_info,
       COALESCE(pp.supplier, 'Mavryk') AS supplier,
       COALESCE(pp.cost, 0) AS cost_price,
       COALESCE(pp.slot, 2) AS total_slots,
       pp.storage_total,
-      pp.match_rule
+      pp.match_rule,
+      pp.package_note
     FROM ${TABLES.PACKAGE_PRODUCT} pp
     LEFT JOIN warehouse.product_names pn ON pn.id = pp.product_name_id
     LEFT JOIN ${TABLES.PRODUCT} p ON p.id = pn.product_id
@@ -598,11 +592,21 @@ const getPackageProducts = async () => {
   const ordersList = ordersRes.rows || [];
 
   return rows.map((r) => {
-    const matchingOrders = ordersList.filter(
-      (o) =>
-        (o.information_order && r.account_info && o.information_order.toLowerCase().includes(r.account_info.toLowerCase())) ||
-        (o.slot && r.account_info && o.slot.toLowerCase().includes(r.account_info.toLowerCase()))
-    );
+    const matchRule = (r.match_rule || "information").toLowerCase();
+    const matchingOrders = ordersList.filter((o) => {
+      if (!r.account_info) return false;
+      const targetUser = r.account_info.toLowerCase();
+      if (matchRule === "slot") {
+        return Boolean(o.slot && o.slot.toLowerCase().includes(targetUser));
+      }
+      if (matchRule === "both") {
+        return Boolean(
+          (o.information_order && o.information_order.toLowerCase().includes(targetUser)) ||
+          (o.slot && o.slot.toLowerCase().includes(targetUser))
+        );
+      }
+      return Boolean(o.information_order && o.information_order.toLowerCase().includes(targetUser));
+    });
 
     const totalSlots = parseInt(r.total_slots || 2, 10);
     const usedSlots = Math.min(totalSlots, matchingOrders.length);
@@ -618,7 +622,8 @@ const getPackageProducts = async () => {
     return {
       id: r.id,
       productName: r.product_name || "",
-      category: r.category || "Khác",
+      category: r.category || r.product_name || "Khác",
+      requiresStorage: Boolean(r.category_requires_storage),
       name: r.product_name || (r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`),
       accountInfo: r.account_info,
       storageAccountInfo: r.storage_account_info || null,
@@ -628,17 +633,462 @@ const getPackageProducts = async () => {
       supplier: r.supplier,
       costPrice: parseFloat(r.cost_price || 0),
       expiredAt: "2026-12-31",
-      note: r.match_rule ? `Match: ${r.match_rule}` : "",
+      note: r.package_note || "",
+      matchRule: r.match_rule || "information",
       status: usedSlots >= totalSlots ? "expired" : usedSlots > 0 ? "warning" : "active",
       slotAssignments,
     };
   });
+};
 
+/**
+ * Lấy danh mục các Loại Gói từ warehouse.product_names (lọc is_package = true)
+ * Bao gồm cờ requires_storage (Sử dụng tài khoản dung lượng liên kết)
+ */
+const getPackageCategories = async () => {
+  let categories = await db(TABLES.PRODUCT_NAMES)
+    .where("is_package", true)
+    .orderBy("id", "asc");
+
+  // Nếu DB chưa có bản ghi nào đánh dấu is_package = true, tự động đảm bảo 6 loại gói mặc định
+  if (!categories || categories.length === 0) {
+    const defaultPackages = [
+      { name: "Adobe", requiresStorage: true },
+      { name: "Canva", requiresStorage: true },
+      { name: "Gemini", requiresStorage: false },
+      { name: "GoogleOne", requiresStorage: true },
+      { name: "Netflix", requiresStorage: false },
+      { name: "Youtube", requiresStorage: false },
+    ];
+    for (const pkg of defaultPackages) {
+      const existing = await db(TABLES.PRODUCT_NAMES)
+        .whereRaw("LOWER(name) = ?", [pkg.name.toLowerCase()])
+        .first();
+
+      if (existing) {
+        await db(TABLES.PRODUCT_NAMES)
+          .where("id", existing.id)
+          .update({ is_package: true, requires_storage: pkg.requiresStorage });
+      } else {
+        await db(TABLES.PRODUCT_NAMES).insert({
+          name: pkg.name,
+          is_package: true,
+          requires_storage: pkg.requiresStorage,
+        });
+      }
+    }
+
+    categories = await db(TABLES.PRODUCT_NAMES)
+      .where("is_package", true)
+      .orderBy("id", "asc");
+  }
+
+  return categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    isPackage: Boolean(c.is_package),
+    requiresStorage: Boolean(c.requires_storage),
+  }));
+};
+
+/**
+ * Tạo mới hoặc cập nhật Loại Gói (đánh dấu is_package = true & requires_storage)
+ */
+const createPackageCategory = async ({ name, requiresStorage = false }) => {
+  const trimmedName = (name || "").trim();
+  if (!trimmedName) {
+    throw new Error("Tên loại gói không được để trống!");
+  }
+
+  const existing = await db(TABLES.PRODUCT_NAMES)
+    .whereRaw("LOWER(name) = ?", [trimmedName.toLowerCase()])
+    .first();
+
+  if (existing) {
+    const [updated] = await db(TABLES.PRODUCT_NAMES)
+      .where("id", existing.id)
+      .update({
+        is_package: true,
+        requires_storage: Boolean(requiresStorage),
+        updated_at: db.fn.now(),
+      })
+      .returning("*");
+
+    const result = {
+      id: updated.id,
+      name: updated.name,
+      isPackage: Boolean(updated.is_package),
+      requiresStorage: Boolean(updated.requires_storage),
+    };
+    eventBus.emit(EVENTS.PACKAGE_CATEGORY_CREATED, result);
+    return result;
+  }
+
+  const [inserted] = await db(TABLES.PRODUCT_NAMES)
+    .insert({
+      name: trimmedName,
+      is_package: true,
+      requires_storage: Boolean(requiresStorage),
+    })
+    .returning("*");
+
+  const result = {
+    id: inserted.id,
+    name: inserted.name,
+    isPackage: Boolean(inserted.is_package),
+    requiresStorage: Boolean(inserted.requires_storage),
+  };
+  eventBus.emit(EVENTS.PACKAGE_CATEGORY_CREATED, result);
+  return result;
+};
+
+/**
+ * Cập nhật tên Loại Gói và cờ requires_storage trong warehouse.product_names
+ */
+const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
+  const trimmedNew = (newName || oldName || "").trim();
+  const trimmedOld = (oldName || "").trim();
+  if (!trimmedNew) throw new Error("Tên loại gói mới không được để trống!");
+  if (!trimmedOld) throw new Error("Tên loại gói cũ không hợp lệ!");
+
+  const existing = await db(TABLES.PRODUCT_NAMES)
+    .whereRaw("LOWER(name) = ?", [trimmedOld.toLowerCase()])
+    .first();
+
+  if (!existing) {
+    throw new Error(`Không tìm thấy loại gói '${trimmedOld}'`);
+  }
+
+  const updateFields = {
+    name: trimmedNew,
+    is_package: true,
+    updated_at: db.fn.now(),
+  };
+  if (requiresStorage !== undefined) {
+    updateFields.requires_storage = Boolean(requiresStorage);
+  }
+
+  const [updated] = await db(TABLES.PRODUCT_NAMES)
+    .where("id", existing.id)
+    .update(updateFields)
+    .returning("*");
+
+  const result = {
+    id: updated.id,
+    name: updated.name,
+    isPackage: Boolean(updated.is_package),
+    requiresStorage: Boolean(updated.requires_storage),
+  };
+  eventBus.emit(EVENTS.PACKAGE_CATEGORY_UPDATED, result);
+  return result;
+};
+
+/**
+ * Xóa mềm Loại Gói (đặt is_package = false)
+ */
+const deletePackageCategory = async (nameOrId) => {
+  if (!nameOrId) throw new Error("ID hoặc Tên loại gói không được để trống!");
+
+  let query = db(TABLES.PRODUCT_NAMES);
+  if (!isNaN(Number(nameOrId))) {
+    query = query.where("id", Number(nameOrId));
+  } else {
+    query = query.whereRaw("LOWER(name) = ?", [String(nameOrId).trim().toLowerCase()]);
+  }
+
+  const existing = await query.first();
+  if (!existing) {
+    throw new Error(`Không tìm thấy loại gói '${nameOrId}'!`);
+  }
+
+  const [updated] = await db(TABLES.PRODUCT_NAMES)
+    .where("id", existing.id)
+    .update({
+      is_package: false,
+      updated_at: db.fn.now(),
+    })
+    .returning("*");
+
+  const result = {
+    success: true,
+    id: updated.id,
+    name: updated.name,
+    isPackage: false,
+  };
+
+  eventBus.emit(EVENTS.PACKAGE_CATEGORY_DELETED, result);
+
+  return result;
+};
+
+/**
+ * Helper tìm hoặc tạo tài khoản kho trong warehouse.accounts
+ */
+const findOrCreateAccount = async (accountUsername) => {
+  const trimmed = (accountUsername || "").trim();
+  if (!trimmed) return null;
+
+  const existing = await db(TABLES.PRODUCT_KEYS)
+    .whereRaw("LOWER(account_username) = ?", [trimmed.toLowerCase()])
+    .first();
+
+  if (existing) return existing;
+
+  const [created] = await db(TABLES.PRODUCT_KEYS)
+    .insert({
+      account_username: trimmed,
+      created_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    })
+    .returning("*");
+
+  return created;
+};
+
+/**
+ * Thêm mới Gói Sản Phẩm (Kho Gói Sản Phẩm)
+ * Hỗ trợ tài khoản gốc (account_id) và tài khoản liên kết (storage_account_id / storage_total)
+ */
+const createPackageProduct = async (payload) => {
+  const {
+    name,
+    category,
+    accountInfo,
+    accountUsername,
+    storageAccountInfo,
+    storageAccountUsername,
+    storageTotal,
+    supplier = "Mavryk",
+    costPrice = 0,
+    totalSlots = 2,
+    note = "",
+  } = payload;
+
+  const mainAccUser = accountUsername || accountInfo;
+  if (!mainAccUser || !mainAccUser.trim()) {
+    throw new Error("Thông tin tài khoản gốc không được để trống!");
+  }
+
+  const catName = (category || name || "").trim();
+  if (!catName) {
+    throw new Error("Loại gói sản phẩm không được để trống!");
+  }
+
+  // 1. Tìm hoặc tạo product_name_id trong warehouse.product_names
+  let pnRecord = await db(TABLES.PRODUCT_NAMES)
+    .whereRaw("LOWER(name) = ?", [catName.toLowerCase()])
+    .first();
+
+  if (!pnRecord) {
+    const [createdPn] = await db(TABLES.PRODUCT_NAMES)
+      .insert({
+        name: catName,
+        is_package: true,
+        requires_storage: Boolean(storageAccountUsername || storageAccountInfo),
+      })
+      .returning("*");
+    pnRecord = createdPn;
+  }
+
+  // 2. Tìm hoặc tạo Tài khoản gốc trong warehouse.accounts
+  const mainAccount = await findOrCreateAccount(mainAccUser);
+
+  // 3. Tìm hoặc tạo Tài khoản dung lượng/liên kết (nếu có)
+  const storageAccUser = storageAccountUsername || storageAccountInfo;
+  let storageAccount = null;
+  if (storageAccUser && storageAccUser.trim()) {
+    storageAccount = await findOrCreateAccount(storageAccUser);
+  }
+
+  // 4. Insert vào warehouse.package_products
+  const [inserted] = await db(TABLES.PACKAGE_PRODUCT)
+    .insert({
+      product_name_id: pnRecord.id,
+      account_id: mainAccount.id,
+      supplier: supplier || "Mavryk",
+      cost: parseFloat(costPrice || 0),
+      slot: parseInt(totalSlots || 2, 10),
+      package_note: note || null,
+      storage_account_id: storageAccount ? storageAccount.id : null,
+      storage_total: storageTotal || null,
+      match_rule: payload.matchRule || "information",
+      created_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    })
+    .returning("*");
+
+  const resultItem = {
+    id: inserted.id,
+    productName: pnRecord.name,
+    category: pnRecord.name,
+    requiresStorage: Boolean(pnRecord.requires_storage),
+    name: name || pnRecord.name,
+    accountInfo: mainAccount.account_username,
+    storageAccountInfo: storageAccount ? storageAccount.account_username : null,
+    storageTotal: inserted.storage_total || null,
+    usedSlots: 0,
+    totalSlots: inserted.slot,
+    supplier: inserted.supplier,
+    costPrice: parseFloat(inserted.cost || 0),
+    expiredAt: "2026-12-31",
+    note: inserted.package_note || "",
+    matchRule: inserted.match_rule || "information",
+    status: "active",
+    slotAssignments: [],
+  };
+
+  eventBus.emit(EVENTS.PACKAGE_PRODUCT_CREATED, resultItem);
+  return resultItem;
+};
+
+/**
+ * Cập nhật Gói Sản Phẩm trong warehouse.package_products
+ */
+const updatePackageProduct = async (id, payload) => {
+  const pkgId = parseInt(id, 10);
+  if (!pkgId) throw new Error("ID gói không hợp lệ!");
+
+  const existing = await db(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
+  if (!existing) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
+
+  const {
+    name,
+    category,
+    accountInfo,
+    accountUsername,
+    storageAccountInfo,
+    storageAccountUsername,
+    storageTotal,
+    matchRule,
+    supplier,
+    costPrice,
+    totalSlots,
+    note,
+  } = payload;
+
+  const updateFields = {
+    updated_at: db.fn.now(),
+  };
+
+  let targetPnRecord = null;
+  if (category) {
+    targetPnRecord = await db(TABLES.PRODUCT_NAMES)
+      .whereRaw("LOWER(name) = ?", [category.trim().toLowerCase()])
+      .first();
+    if (!targetPnRecord) {
+      const [created] = await db(TABLES.PRODUCT_NAMES)
+        .insert({ name: category.trim(), is_package: true })
+        .returning("*");
+      targetPnRecord = created;
+    }
+    updateFields.product_name_id = targetPnRecord.id;
+  }
+
+  const mainAccUser = accountUsername || accountInfo;
+  if (mainAccUser && mainAccUser.trim()) {
+    const mainAcc = await findOrCreateAccount(mainAccUser);
+    updateFields.account_id = mainAcc.id;
+  }
+
+  const storageAccUser = storageAccountUsername !== undefined ? storageAccountUsername : storageAccountInfo;
+  if (storageAccUser !== undefined) {
+    if (storageAccUser && storageAccUser.trim()) {
+      const storageAcc = await findOrCreateAccount(storageAccUser);
+      updateFields.storage_account_id = storageAcc.id;
+    } else {
+      updateFields.storage_account_id = null;
+    }
+  }
+
+  if (storageTotal !== undefined) updateFields.storage_total = storageTotal || null;
+  if (matchRule !== undefined) updateFields.match_rule = matchRule || "information";
+  if (supplier !== undefined) updateFields.supplier = supplier;
+  if (costPrice !== undefined) updateFields.cost = parseFloat(costPrice || 0);
+  if (totalSlots !== undefined) updateFields.slot = parseInt(totalSlots || 2, 10);
+  if (note !== undefined) updateFields.package_note = note;
+
+  const [updated] = await db(TABLES.PACKAGE_PRODUCT)
+    .where("id", pkgId)
+    .update(updateFields)
+    .returning("*");
+
+  const mainAcc = await db(TABLES.PRODUCT_KEYS).where("id", updated.account_id).first();
+  const storageAcc = updated.storage_account_id
+    ? await db(TABLES.PRODUCT_KEYS).where("id", updated.storage_account_id).first()
+    : null;
+  const pn = await db(TABLES.PRODUCT_NAMES).where("id", updated.product_name_id).first();
+
+  const resultItem = {
+    id: updated.id,
+    productName: pn ? pn.name : "",
+    category: pn ? pn.name : category || "Khác",
+    requiresStorage: Boolean(pn?.requires_storage),
+    name: name || (pn ? pn.name : `Gói #${updated.id}`),
+    accountInfo: mainAcc ? mainAcc.account_username : "",
+    storageAccountInfo: storageAcc ? storageAcc.account_username : null,
+    storageTotal: updated.storage_total || null,
+    usedSlots: payload.usedSlots !== undefined ? payload.usedSlots : 0,
+    totalSlots: updated.slot,
+    supplier: updated.supplier,
+    costPrice: parseFloat(updated.cost || 0),
+    expiredAt: payload.expiredAt || "2026-12-31",
+    note: updated.package_note || "",
+    matchRule: updated.match_rule || "information",
+    status: (payload.usedSlots || 0) >= updated.slot ? "expired" : "active",
+  };
+
+  eventBus.emit(EVENTS.PACKAGE_PRODUCT_UPDATED, resultItem);
+  return resultItem;
+};
+
+/**
+ * Xóa Gói Sản Phẩm khỏi warehouse.package_products
+ */
+const deletePackageProduct = async (id) => {
+  const pkgId = parseInt(id, 10);
+  if (!pkgId) throw new Error("ID gói không hợp lệ!");
+
+  const existing = await db(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
+  if (!existing) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
+
+  await db(TABLES.PACKAGE_PRODUCT).where("id", pkgId).del();
+
+  const result = {
+    success: true,
+    id: pkgId,
+  };
+
+  eventBus.emit(EVENTS.PACKAGE_PRODUCT_DELETED, result);
+  return result;
+};
+
+/**
+ * Lấy toàn bộ danh sách tên sản phẩm trong bảng Master Catalog (warehouse.product_names)
+ */
+const getAllCatalogProductNames = async () => {
+  const list = await db(TABLES.PRODUCT_NAMES)
+    .select("id", "name", "is_package", "login_url")
+    .orderBy("name", "asc");
+
+  return list.map((item) => ({
+    id: item.id,
+    name: item.name,
+    isPackage: Boolean(item.is_package),
+    loginUrl: item.login_url || null,
+  }));
 };
 
 module.exports = {
   getProductPrices,
   getPackageProducts,
+  getPackageCategories,
+  getAllCatalogProductNames,
+  createPackageCategory,
+  updatePackageCategory,
+  deletePackageCategory,
+  createPackageProduct,
+  updatePackageProduct,
+  deletePackageProduct,
   getSuppliersForVariant,
   getAllSuppliersList,
   createProduct,

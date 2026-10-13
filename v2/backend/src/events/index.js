@@ -13,6 +13,7 @@ function registerAllSubscribers() {
   const { registerWebhookEventSubscribers } = require("./subscribers/webhookSubscriber");
   const { registerRefundEventSubscribers } = require("./subscribers/refundSubscriber");
   const { registerTelegramSubscriber } = require("./subscribers/telegramSubscriber");
+  const { registerWarehouseEventSubscribers } = require("./subscribers/warehouseSubscriber");
   const { registerDailySummaryListeners } = require("@/domains/dashboard/services/dailySummaryService");
 
   registerOrderEventSubscribers();
@@ -21,6 +22,7 @@ function registerAllSubscribers() {
   registerWebhookEventSubscribers();
   registerRefundEventSubscribers();
   registerTelegramSubscriber();
+  registerWarehouseEventSubscribers();
   registerDailySummaryListeners();
 }
 

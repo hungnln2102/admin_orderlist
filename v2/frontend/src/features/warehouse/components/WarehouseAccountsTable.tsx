@@ -15,8 +15,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Calendar,
+  LogIn,
 } from "lucide-react";
-import { WarehouseAccountItem } from "../types";
+import { WarehouseAccountItem, WarehouseServiceSlot } from "../types";
 import {
   format2FAChunks,
   formatWarehouseAccountForCopy,
@@ -33,8 +34,9 @@ interface WarehouseAccountsTableProps {
   onToggleShowPassword: (serviceId: number) => void;
   onCopy: (text: string, label: string, keyId: string) => void;
   onEditAccount: (acc: WarehouseAccountItem) => void;
+  onEditSlot?: (account: WarehouseAccountItem, slot: WarehouseServiceSlot) => void;
   onDeleteAccount: (acc: WarehouseAccountItem) => void;
-  onAddSlot: (acc: WarehouseAccountItem) => void;
+  onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
 }
 
 interface CopyableFieldProps {
@@ -132,7 +134,9 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
   onToggleShowPassword,
   onCopy,
   onEditAccount,
+  onEditSlot,
   onDeleteAccount,
+  onOpenBrowser,
 }) => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -248,7 +252,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                 </button>
               </th>
               <th className="text-center">Tài khoản Email</th>
-              <th className="text-right pr-6">Thao tác</th>
+              <th className="text-right pr-6">Chi tiết</th>
             </tr>
           </thead>
           <tbody>
@@ -348,7 +352,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       </div>
                     </td>
 
-                    {/* COL 3: ACTIONS & EXPAND CHEVRON */}
+                    {/* COL 3: EXPAND CHEVRON */}
                     <td
                       className={`px-4 py-3.5 border-y border-r last:rounded-r-2xl pr-6 text-right transition-colors ${
                         isExpanded
@@ -356,31 +360,9 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                           : "bg-slate-900/80 border-white/5 group-hover/row:bg-slate-800/60"
                       }`}
                     >
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditAccount(account);
-                          }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-90 transition-all cursor-pointer"
-                          title="Chỉnh sửa tài khoản"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteAccount(account);
-                          }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all cursor-pointer"
-                          title="Xóa tài khoản"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center justify-end">
                         <div
-                          className={`ml-1 flex h-8 w-8 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-slate-400 transition-transform duration-200 ${
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-slate-400 transition-transform duration-200 ${
                             isExpanded ? "rotate-180 text-indigo-400 bg-indigo-500/10 border-indigo-500/20" : ""
                           }`}
                         >
@@ -456,6 +438,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                   <th className="px-4 py-3 font-semibold">Hạn sử dụng</th>
                                   <th className="px-4 py-3 font-semibold text-center">Trạng thái</th>
                                   <th className="px-4 py-3 font-semibold">Ghi chú</th>
+                                  <th className="px-4 py-3 font-semibold text-center">Thao tác</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-white/5 font-medium">
@@ -624,6 +607,51 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                       >
                                         {srv.note || "—"}
                                       </td>
+
+                                      {/* 8. THAO TÁC */}
+                                      <td className="px-4 py-3.5 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          {onOpenBrowser && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                onOpenBrowser(account, srv);
+                                              }}
+                                              className="flex h-7 w-7 items-center justify-center rounded-xl border border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 hover:border-blue-500/50 active:scale-90 transition-all cursor-pointer group/btn"
+                                              title={`Mở Chrome với Profile riêng biệt để đăng nhập ${srv.display_name || srv.category}`}
+                                            >
+                                              <LogIn className="w-3.5 h-3.5 text-blue-300 group-hover/btn:scale-110 transition-transform" />
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (onEditSlot) {
+                                                onEditSlot(account, srv);
+                                              } else {
+                                                onEditAccount(account);
+                                              }
+                                            }}
+                                            className="flex h-7 w-7 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-90 transition-all cursor-pointer"
+                                            title="Chỉnh sửa thông tin tài khoản"
+                                          >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onDeleteAccount(account);
+                                            }}
+                                            className="flex h-7 w-7 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all cursor-pointer"
+                                            title="Xóa tài khoản kho"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
                                     </tr>
                                   );
                                 })}
@@ -698,26 +726,13 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                     })}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditAccount(account);
-                      }}
-                      className="p-1 rounded-lg text-amber-400 hover:bg-amber-500/10"
+                    <div
+                      className={`flex h-7 w-7 items-center justify-center rounded-lg border border-white/5 bg-white/5 text-slate-400 transition-transform duration-200 ${
+                        isExpanded ? "rotate-180 text-indigo-400 bg-indigo-500/10 border-indigo-500/20" : ""
+                      }`}
                     >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteAccount(account);
-                      }}
-                      className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/10"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </div>
                   </div>
                 </div>
 
@@ -787,22 +802,63 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                           key={srv.id || idx}
                           className="rounded-xl border border-white/5 bg-slate-950/70 p-3 space-y-2 text-xs"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-white flex items-center gap-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-white flex items-center gap-1.5 truncate">
                               <span
-                                className={`w-2 h-2 rounded-full ${brand.dotClass}`}
+                                className={`w-2 h-2 rounded-full shrink-0 ${brand.dotClass}`}
                               />
-                              {srv.display_name || srv.category}
+                              <span className="truncate">{srv.display_name || srv.category}</span>
                             </span>
-                            <span
-                              className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                                isAvailable
-                                  ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                                  : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
-                              }`}
-                            >
-                              {isAvailable ? "TỒN KHO" : "ĐANG SỬ DỤNG"}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                  isAvailable
+                                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                    : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                                }`}
+                              >
+                                {isAvailable ? "TỒN KHO" : "ĐANG SỬ DỤNG"}
+                              </span>
+                              {onOpenBrowser && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenBrowser(account, srv);
+                                  }}
+                                  className="flex h-6 w-6 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 active:scale-90 transition-all cursor-pointer"
+                                  title={`Mở Chrome với Profile riêng để đăng nhập ${srv.display_name || srv.category}`}
+                                >
+                                  <LogIn className="w-3 h-3 text-blue-300" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onEditSlot) {
+                                    onEditSlot(account, srv);
+                                  } else {
+                                    onEditAccount(account);
+                                  }
+                                }}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-90 transition-all cursor-pointer"
+                                title="Chỉnh sửa tài khoản"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteAccount(account);
+                                }}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all cursor-pointer"
+                                title="Xóa tài khoản"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
 
                           {srv.password && (

@@ -69,7 +69,73 @@ function registerProductEventSubscribers() {
     });
   });
 
-  console.log("✅ [EventBus] Đăng ký thành công Product & Supplier Cost Event Subscribers");
+  // 7. Lắng nghe event PACKAGE_CATEGORY_CREATED
+  eventBus.on(EVENTS.PACKAGE_CATEGORY_CREATED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận PACKAGE_CATEGORY_CREATED:`, data.name);
+    await recordEvent({
+      eventName: EVENTS.PACKAGE_CATEGORY_CREATED,
+      aggregateType: "PACKAGE_CATEGORY",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 8. Lắng nghe event PACKAGE_CATEGORY_UPDATED
+  eventBus.on(EVENTS.PACKAGE_CATEGORY_UPDATED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận PACKAGE_CATEGORY_UPDATED:`, data.name);
+    await recordEvent({
+      eventName: EVENTS.PACKAGE_CATEGORY_UPDATED,
+      aggregateType: "PACKAGE_CATEGORY",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 9. Lắng nghe event PACKAGE_CATEGORY_DELETED
+  eventBus.on(EVENTS.PACKAGE_CATEGORY_DELETED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận PACKAGE_CATEGORY_DELETED:`, data.name);
+    await recordEvent({
+      eventName: EVENTS.PACKAGE_CATEGORY_DELETED,
+      aggregateType: "PACKAGE_CATEGORY",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 10. Lắng nghe event PACKAGE_PRODUCT_CREATED
+  eventBus.on(EVENTS.PACKAGE_PRODUCT_CREATED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận PACKAGE_PRODUCT_CREATED (Package #${data.id}):`, data.name || data.accountInfo);
+    await recordEvent({
+      eventName: EVENTS.PACKAGE_PRODUCT_CREATED,
+      aggregateType: "PACKAGE_PRODUCT",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 11. Lắng nghe event PACKAGE_PRODUCT_UPDATED
+  eventBus.on(EVENTS.PACKAGE_PRODUCT_UPDATED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận PACKAGE_PRODUCT_UPDATED (Package #${data.id}):`, data.name || data.accountInfo);
+    await recordEvent({
+      eventName: EVENTS.PACKAGE_PRODUCT_UPDATED,
+      aggregateType: "PACKAGE_PRODUCT",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  // 12. Lắng nghe event PACKAGE_PRODUCT_DELETED
+  eventBus.on(EVENTS.PACKAGE_PRODUCT_DELETED, async (data) => {
+    console.log(`📌 [EventBus] Tiếp nhận PACKAGE_PRODUCT_DELETED (Package #${data.id})`);
+    await recordEvent({
+      eventName: EVENTS.PACKAGE_PRODUCT_DELETED,
+      aggregateType: "PACKAGE_PRODUCT",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
+  console.log("✅ [EventBus] Đăng ký thành công Product & Package Event Subscribers");
 }
 
 module.exports = {

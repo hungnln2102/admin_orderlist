@@ -61,6 +61,22 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
               <option value="Văn Phòng & Phần Mềm">Văn Phòng & Phần Mềm</option>
             </select>
           </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              URL Trang Đăng Nhập (Tùy chọn)
+            </label>
+            <input
+              type="text"
+              placeholder="Ví dụ: https://accounts.google.com, https://netflix.com/login..."
+              value={formData.loginUrl || ""}
+              onChange={(e) => onFormChange({ ...formData, loginUrl: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 text-xs"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              💡 Dùng để tự động mở trang web với Profile Chrome riêng biệt cho từng tài khoản.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">

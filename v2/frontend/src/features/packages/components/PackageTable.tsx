@@ -65,7 +65,11 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                 <td colSpan={8} className="py-16 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Package className="w-9 h-9 text-slate-600 stroke-[1.5]" />
-                    <span className="text-sm font-medium">Không tìm thấy gói nào thuộc loại "{selectedCategory}"</span>
+                    <span className="text-sm font-medium">
+                      {selectedCategory
+                        ? `Không tìm thấy gói nào thuộc loại "${selectedCategory}"`
+                        : "Không tìm thấy gói nào phù hợp với bộ lọc"}
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -97,7 +101,27 @@ export const PackageTable: React.FC<PackageTableProps> = ({
 
                       {/* Thông tin gói / Email */}
                       <td className="py-3.5 px-4 font-mono text-slate-300">
-                        {item.accountInfo}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-sans font-bold tracking-wider">
+                              GỐC
+                            </span>
+                            <span className="truncate max-w-[260px]">{item.accountInfo}</span>
+                          </div>
+                          {item.storageAccountInfo && (
+                            <div className="flex items-center gap-1.5 text-xs text-amber-300/90">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-sans font-bold tracking-wider">
+                                LIÊN KẾT
+                              </span>
+                              <span className="truncate max-w-[200px]">{item.storageAccountInfo}</span>
+                              {item.storageTotal && (
+                                <span className="text-[10px] text-cyan-300 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 font-sans">
+                                  {item.storageTotal}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* Số lượng + Slot Progress bar */}
@@ -266,7 +290,11 @@ export const PackageTable: React.FC<PackageTableProps> = ({
         ) : filteredItems.length === 0 ? (
           <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
             <Package className="w-9 h-9 text-slate-600 stroke-[1.5]" />
-            <span className="text-sm font-medium">Không tìm thấy gói nào thuộc loại "{selectedCategory}"</span>
+            <span className="text-sm font-medium">
+              {selectedCategory
+                ? `Không tìm thấy gói nào thuộc loại "${selectedCategory}"`
+                : "Không tìm thấy gói nào phù hợp với bộ lọc"}
+            </span>
           </div>
         ) : (
           filteredItems.map((item) => {
@@ -295,8 +323,26 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                   </div>
                 </div>
                 
-                <div className="font-mono text-slate-300 text-xs">
-                  {item.accountInfo}
+                <div className="font-mono text-slate-300 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-sans font-bold">
+                      GỐC
+                    </span>
+                    <span className="truncate">{item.accountInfo}</span>
+                  </div>
+                  {item.storageAccountInfo && (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-300/90">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-sans font-bold">
+                        LIÊN KẾT
+                      </span>
+                      <span className="truncate">{item.storageAccountInfo}</span>
+                      {item.storageTotal && (
+                        <span className="text-[10px] text-cyan-300 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 font-sans">
+                          {item.storageTotal}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">

@@ -22,6 +22,89 @@ const getPackageProducts = async (_req, res) => {
   }
 };
 
+const getPackageCategories = async (_req, res) => {
+  try {
+    const data = await productService.getPackageCategories();
+    res.json({ data });
+  } catch (error) {
+    console.error("Lỗi getPackageCategories:", error);
+    res.status(500).json({ error: error.message || "Không thể lấy danh mục loại gói" });
+  }
+};
+
+const getAllCatalogProductNames = async (_req, res) => {
+  try {
+    const data = await productService.getAllCatalogProductNames();
+    res.json({ data });
+  } catch (error) {
+    console.error("Lỗi getAllCatalogProductNames:", error);
+    res.status(500).json({ error: error.message || "Không thể lấy danh sách tên sản phẩm Master Catalog" });
+  }
+};
+
+const createPackageCategory = async (req, res) => {
+  try {
+    const result = await productService.createPackageCategory(req.body);
+    res.status(201).json({ message: "Tạo loại gói thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi createPackageCategory:", error);
+    res.status(400).json({ error: error.message || "Không thể tạo loại gói" });
+  }
+};
+
+const updatePackageCategory = async (req, res) => {
+  try {
+    const result = await productService.updatePackageCategory(req.body);
+    res.json({ message: "Cập nhật loại gói thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi updatePackageCategory:", error);
+    res.status(400).json({ error: error.message || "Không thể cập nhật loại gói" });
+  }
+};
+
+const deletePackageCategory = async (req, res) => {
+  try {
+    const { name } = req.params;
+    const result = await productService.deletePackageCategory(name);
+    res.json({ message: "Xóa loại gói thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi deletePackageCategory:", error);
+    res.status(400).json({ error: error.message || "Không thể xóa loại gói" });
+  }
+};
+
+const createPackageProduct = async (req, res) => {
+  try {
+    const result = await productService.createPackageProduct(req.body);
+    res.status(201).json({ message: "Thêm gói sản phẩm thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi createPackageProduct:", error);
+    res.status(400).json({ error: error.message || "Không thể thêm gói sản phẩm" });
+  }
+};
+
+const updatePackageProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await productService.updatePackageProduct(id, req.body);
+    res.json({ message: "Cập nhật gói sản phẩm thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi updatePackageProduct:", error);
+    res.status(400).json({ error: error.message || "Không thể cập nhật gói sản phẩm" });
+  }
+};
+
+const deletePackageProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await productService.deletePackageProduct(id);
+    res.json({ message: "Xóa gói sản phẩm thành công", data: result });
+  } catch (error) {
+    console.error("Lỗi deletePackageProduct:", error);
+    res.status(400).json({ error: error.message || "Không thể xóa gói sản phẩm" });
+  }
+};
+
 
 const getSuppliersForVariant = async (req, res) => {
   try {
@@ -114,6 +197,14 @@ const deleteSupplierCost = async (req, res) => {
 module.exports = {
   getProductPrices,
   getPackageProducts,
+  getPackageCategories,
+  getAllCatalogProductNames,
+  createPackageCategory,
+  updatePackageCategory,
+  deletePackageCategory,
+  createPackageProduct,
+  updatePackageProduct,
+  deletePackageProduct,
   getSuppliersForVariant,
   getAllSuppliersList,
   createProduct,

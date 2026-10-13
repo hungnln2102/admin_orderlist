@@ -189,15 +189,17 @@ Trang **Kho Hàng** quản lý chi tiết từng tài khoản kho Master và cá
 
 ---
 
-## 6. QUẢN LÝ LOẠI GÓI (PHÂN LOẠI THEO THƯƠNG HIỆU) - `PackageManagementPage`
+## 6. QUẢN LÝ LOẠI GÓI (KHO GÓI SẢN PHẨM & THƯƠNG HIỆU) - `PackageManagementPage`
 
-Trang **Quản Lý Loại Gói** nhóm các sản phẩm theo thương hiệu (Adobe, Canva, Gemini, Netflix, Spotify...).
+Trang **Quản Lý Loại Gói** gom nhóm và kiểm soát toàn bộ số lượng gói tài khoản đa slot theo từng thương hiệu/danh mục (Adobe, Canva, Gemini, GoogleOne, Netflix, Youtube, Spotify...).
 
-### 6.1. Thẻ Tóm Tắt Thương Hiệu (`PackageCategoryCards`)
+### 6.1. Thẻ Tóm Tắt Thương Hiệu (`PackageCategoryCards`) - Đồng Bộ Dữ Liệu Thực
+- **Nguồn Dữ Liệu Danh Mục Động:** Toàn bộ danh sách thẻ loại gói được nạp trực tiếp từ bảng cơ sở dữ liệu danh mục sản phẩm (bảng `warehouse.product_names` với điều kiện đánh dấu `is_package = true`), hoàn toàn không còn dữ liệu tĩnh hay hardcode.
 - **Nút Bấm Chọn Thẻ Thương Hiệu (Adobe, Canva...):** Bấm vào thẻ để lọc danh sách gói bên dưới theo thương hiệu đó.
 - **Nút `Xem Danh Sách` (Icon Con mắt trên thẻ):** Chọn xem các gói thuộc loại đó.
-- **Nút `Chỉnh Sửa Loại Gói` (Icon Cây bút trên thẻ):** Mở modal đổi tên thương hiệu/loại gói (`CategoryModal`).
-- **Nút `Tạo Loại Gói` (Góc trên):** Mở modal tạo thêm thương hiệu loại gói mới.
+- **Nút `Chỉnh Sửa Loại Gói` (Icon Cây bút trên thẻ):** Mở modal đổi tên thương hiệu/loại gói (`CategoryModal`). Thao tác này lập tức cập nhật tên loại gói trực tiếp trong cơ sở dữ liệu.
+- **Nút `Xóa Loại Gói` (Icon Thùng rác đỏ trên thẻ):** Bấm để gỡ loại gói khỏi giao diện Kho Gói. Hệ thống tự động đổi trạng thái cờ `is_package = false` trong cơ sở dữ liệu (xóa mềm), đồng thời phát sinh sự kiện Domain Event `PACKAGE_CATEGORY_DELETED` để ghi log bảo toàn an toàn dữ liệu.
+- **Nút `Tạo Loại Gói` (Góc trên):** Mở modal tạo thêm thương hiệu loại gói mới. Khi tạo thành công, loại gói mới được lưu thẳng vào cơ sở dữ liệu và tự động kích hoạt cờ `is_package = true`.
 
 ### 6.2. Bảng Dữ Liệu Gói & Lưới Vị Trí Slot (`PackageTable`)
 - **Nút Mở Rộng Dòng (Click vào tên gói):** Mở Lưới vị trí Slot (Grid Slots).
@@ -287,9 +289,10 @@ Trang **Cấu Hình Hệ Thống** giúp chủ shop và người quản trị li
 | **Wallets** | `WalletDeleteModal` | Xác nhận xóa tài khoản thanh toán/ví. *Nút: Xóa Tài Khoản, Hủy Bỏ.* |
 | **Warehouse**| `WarehouseCreateModal` | Thêm tài khoản kho Master mới. *Nút: Lưu Tài Khoản, Hủy Bỏ.* |
 | **Warehouse**| `CatalogCreateModal` | Thêm danh mục tên dịch vụ kho mới. *Nút: Thêm Dịch Vụ, Hủy Bỏ.* |
-| **Packages** | `CategoryModal` | Tạo/sửa thương hiệu loại gói. *Nút: Lưu Loại Gói, Hủy.* |
-| **Packages** | `PackageCreateEditModal`| Thêm/sửa gói sản phẩm & dung lượng slot. *Nút: Lưu Gói Sản Phẩm, Hủy.* |
-| **Packages** | `PackageDetailModal` | Xem thông tin chi tiết gói. *Nút: Đóng.* |
+| **Warehouse**| `WarehouseEditSlotModal`| Chỉnh sửa mật khẩu, email backup, 2FA secret, ngày hết hạn, trạng thái slot dịch vụ kho. *Nút: Lưu Thay Đổi, Hủy Bỏ.* |
+| **Packages** | `CategoryModal` | Tạo/sửa thương hiệu loại gói; cấu hình bật/tắt cờ `Sử dụng tài khoản dung lượng / liên kết (Storage Account)`. *Nút: Lưu Loại Gói, Hủy.* |
+| **Packages** | `PackageCreateEditModal`| Thêm/sửa gói sản phẩm hỗ trợ 2 khối tách biệt: Block 1: Tài khoản gốc (Stock Account) & Block 2: Tài khoản dung lượng / liên kết (Storage Account + GB), tự động gợi ý tài khoản kho. *Nút: Lưu Gói Sản Phẩm, Hủy.* |
+| **Packages** | `PackageDetailModal` | Xem thông tin chi tiết gói & tài khoản liên kết. *Nút: Đóng.* |
 | **Invoices** | `AllocateReceiptModal` | Phân bổ số dư biên lai & gán mã đơn/hạng mục chi phí/khách tip. *Nút: Chọn 4 Loại Phân Bổ (Đơn khách, Khách tip, NCC, Chi phí vận hành), Set 50%/100%, Xác Nhận Phân Bổ, Hủy Bỏ.* |
 | **System** | `SystemPage` | Cấu hình động thông số vận hành & Telegram. *Nút: Lưu từng tham số, Nút gạt Bật/Tắt Telegram, Nút gạt Sepay Auto Match, Tải lại cấu hình, Lọc nhật ký thông báo.* |
 

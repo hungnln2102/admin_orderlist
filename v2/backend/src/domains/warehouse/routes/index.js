@@ -9,5 +9,8 @@ router.delete("/:id", controller.deleteWarehouseAccount);
 
 router.get("/catalog", controller.getCatalogItems);
 router.post("/catalog", controller.createCatalogItem);
+router.delete("/catalog/:id", controller.deleteCatalogItem);
+router.post("/accounts/:id/open-browser", controller.openAccountBrowser);
+router.put("/services/:id", controller.updateWarehouseServiceSlot);
 
 module.exports = router;

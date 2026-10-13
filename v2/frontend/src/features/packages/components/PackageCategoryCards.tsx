@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, Edit2 } from "lucide-react";
+import { Eye, Edit2, Trash2 } from "lucide-react";
 import { CategorySummary } from "../types";
 
 const CATEGORY_ACCENTS = [
@@ -16,6 +16,7 @@ interface PackageCategoryCardsProps {
   selectedCategory: string;
   onSelectCategory: (name: string) => void;
   onEditCategory: (name: string) => void;
+  onDeleteCategory: (name: string) => void;
 }
 
 export const PackageCategoryCards: React.FC<PackageCategoryCardsProps> = ({
@@ -23,6 +24,7 @@ export const PackageCategoryCards: React.FC<PackageCategoryCardsProps> = ({
   selectedCategory,
   onSelectCategory,
   onEditCategory,
+  onDeleteCategory,
 }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -34,6 +36,7 @@ export const PackageCategoryCards: React.FC<PackageCategoryCardsProps> = ({
           <div
             key={cat.name}
             onClick={() => onSelectCategory(cat.name)}
+            title={isSelected ? "Đang chọn (Bấm để bỏ chọn / xem tất cả)" : `Bấm để lọc theo loại gói ${cat.name}`}
             className={`relative group rounded-2xl border transition-all duration-300 p-5 cursor-pointer backdrop-blur-xl overflow-hidden ${
               isSelected
                 ? `bg-slate-900/90 ${accent.border} ring-2 ring-cyan-500/40 shadow-xl shadow-cyan-950/40`
@@ -43,19 +46,25 @@ export const PackageCategoryCards: React.FC<PackageCategoryCardsProps> = ({
             {/* Background Ambient Glow */}
             <div className={`absolute -right-10 -top-10 w-28 h-28 rounded-full blur-2xl opacity-20 ${accent.glow}`} />
 
-            <div className="flex items-center justify-between mb-4 relative z-10">
-              <div>
+            <div className="flex items-center justify-between mb-4 relative z-10 min-w-0 gap-2">
+              <div className="min-w-0 flex-1 pr-1">
                 <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-slate-400">LOẠI GÓI</span>
-                <h3 className="text-lg font-bold text-white tracking-wide mt-0.5">{cat.name}</h3>
+                <h3 className="text-lg font-bold text-white tracking-wide mt-0.5 truncate block" title={cat.name}>
+                  {cat.name}
+                </h3>
               </div>
-              <div className="flex items-center gap-1.5 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-1.5 bg-slate-950/60 p-1 rounded-xl border border-slate-800 shrink-0">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelectCategory(cat.name);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                  title="Xem danh sách"
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isSelected
+                      ? "text-cyan-300 bg-cyan-500/20"
+                      : "text-slate-400 hover:text-cyan-300 hover:bg-slate-800"
+                  }`}
+                  title={isSelected ? "Bỏ chọn loại gói này" : "Lọc danh sách theo loại gói này"}
                 >
                   <Eye className="w-3.5 h-3.5" />
                 </button>
@@ -68,6 +77,16 @@ export const PackageCategoryCards: React.FC<PackageCategoryCardsProps> = ({
                   title="Chỉnh sửa loại gói"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteCategory(cat.name);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                  title="Xóa loại gói"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

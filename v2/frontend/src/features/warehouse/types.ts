@@ -1,3 +1,10 @@
+export type WarehouseSlotStatus =
+  | "AVAILABLE"
+  | "IN_USE"
+  | "EXPIRED"
+  | "RESERVED"
+  | "UNAVAILABLE";
+
 export interface WarehouseServiceSlot {
   id: number;
   display_name: string;
@@ -6,8 +13,20 @@ export interface WarehouseServiceSlot {
   backup_email?: string;
   two_fa?: string;
   expires_at?: string;
+  raw_expires_at?: string;
   note?: string;
-  status: "AVAILABLE" | "IN_USE" | "EXPIRED" | "RESERVED" | "UNAVAILABLE";
+  status: WarehouseSlotStatus;
+}
+
+export interface WarehouseSlotEditFormData {
+  accountUsername: string;
+  serviceName: string;
+  password: string;
+  backupEmail: string;
+  twoFa: string;
+  expiresAt: string;
+  status: WarehouseSlotStatus;
+  note: string;
 }
 
 export interface WarehouseAccountItem {
@@ -22,6 +41,7 @@ export interface ServiceNameCategoryItem {
   id: number;
   name: string;
   category: string;
+  loginUrl?: string | null;
   inStockSlots: number;
   reservedSlots: number;
   status: "ACTIVE" | "LOW_STOCK" | "OUT_OF_STOCK";
@@ -41,4 +61,5 @@ export interface WarehouseAccountFormData {
 export interface CatalogFormData {
   name: string;
   category: string;
+  loginUrl?: string;
 }

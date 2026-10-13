@@ -50,10 +50,43 @@ const createCatalogItem = async (req, res) => {
   }
 };
 
+const deleteCatalogItem = async (req, res) => {
+  try {
+    const result = await warehouseService.deleteCatalogItem(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] deleteCatalogItem error:", err);
+    return res.status(400).json({ error: err.message || "Không thể xóa dịch vụ kho." });
+  }
+};
+
+const openAccountBrowser = async (req, res) => {
+  try {
+    const result = await warehouseService.openAccountBrowser(req.params.id, req.body);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] openAccountBrowser error:", err);
+    return res.status(400).json({ error: err.message || "Không thể mở trình duyệt cho tài khoản kho." });
+  }
+};
+
+const updateWarehouseServiceSlot = async (req, res) => {
+  try {
+    const result = await warehouseService.updateWarehouseServiceSlot(req.params.id, req.body);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] updateWarehouseServiceSlot error:", err);
+    return res.status(400).json({ error: err.message || "Không thể cập nhật dịch vụ kho." });
+  }
+};
+
 module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
   deleteWarehouseAccount,
+  updateWarehouseServiceSlot,
   getCatalogItems,
   createCatalogItem,
+  deleteCatalogItem,
+  openAccountBrowser,
 };

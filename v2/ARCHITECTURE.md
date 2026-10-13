@@ -77,6 +77,7 @@ flowchart TB
         DB_Business["business schema<br/>(orders, customers, products)"]
         DB_Billing["billing schema<br/>(payment_receipt, payment_receipt_allocations, shop_bank_accounts, usdt_wallets)"]
         DB_Finance["finance schema<br/>(credit_notes, supplier_debts, withdrawals)"]
+        DB_Warehouse["warehouse schema<br/>(product_names, accounts, account_slots, package_products)"]
         DB_Automation["system_automation schema<br/>(event_logs, cron_schedules)"]
     end
 
@@ -281,4 +282,9 @@ erDiagram
 2. **Quản Lý Sự Kiện Bất Đồng Bộ (Event Bus Pattern):**
    - Backend sử dụng Event Bus để phân tách luồng xử lý: Tạo đơn hàng không trực tiếp khóa luồng xử lý kho mà thông qua sự kiện `ORDER_CREATED` và `ORDER_CANCELLED`.
 3. **Đa Schema Database (PostgreSQL Multi-Schema):**
-   - Đảm bảo tính bảo mật và mở rộng theo chuẩn Doanh nghiệp: Phân chia rõ ràng giữa dữ liệu `admin`, nghiệp vụ kinh doanh `business`, hóa đơn cổng thanh toán `billing`, và tài chính ví `finance`.
+   - Đảm bảo tính bảo mật và mở rộng theo chuẩn Doanh nghiệp: Phân chia rõ ràng giữa dữ liệu `admin`, nghiệp vụ kinh doanh `business`, hóa đơn cổng thanh toán `billing`, tài chính ví `finance`, và quản lý kho vận `warehouse`.
+4. **Kiến Trúc Kho Gói Đa Tài Khoản (Dual Storage Account Inventory):**
+   - Quản lý gói sản phẩm (`warehouse.package_products`) hỗ trợ đồng thời **Tài khoản gốc (Stock Account)** và **Tài khoản dung lượng / liên kết (Storage Account)** kết nối trực tiếp với bảng `warehouse.accounts` (`account_id` và `storage_account_id`).
+   - Danh mục Master Catalog (`warehouse.product_names`) tích hợp cờ `requires_storage` cho phép bật/tắt linh hoạt mô hình 2 tài khoản theo từng sản phẩm (Canva, Google One, Adobe Cloud).
+   - Tích hợp phát Domain Events (`PACKAGE_PRODUCT_CREATED / UPDATED / DELETED`) lưu vết kiểm toán audit log vào `system_automation.domain_event_store`.
+

@@ -5,18 +5,23 @@ import {
   PackageItem,
   CategorySummary,
   PackageFormData,
+  PackageCategory,
   PackageCategoryCards,
   PackageFilterBar,
   PackageTable,
   PackageCreateEditModal,
   CategoryModal,
+  CategoryDeleteModal,
   PackageDetailModal,
 } from "./index";
 
 export const PackageManagementPage: React.FC = () => {
   const notify = useNotification();
-  const [categories, setCategories] = useState<string[]>(["Adobe", "Canva", "Gemini", "GoogleOne", "Netflix", "Youtube"]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("Adobe");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoriesList, setCategoriesList] = useState<PackageCategory[]>([]);
+  const [catalogNames, setCatalogNames] = useState<string[]>([]);
+  const [warehouseAccounts, setWarehouseAccounts] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [loading, setLoading] = useState<boolean>(true);
@@ -25,6 +30,10 @@ export const PackageManagementPage: React.FC = () => {
   // Modals
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
   const [newCategoryName, setNewCategoryName] = useState<string>("");
+  const [categoryRequiresStorage, setCategoryRequiresStorage] = useState<boolean>(false);
+  const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState<boolean>(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<PackageItem | null>(null);
   const [viewingItem, setViewingItem] = useState<PackageItem | null>(null);
@@ -35,37 +44,63 @@ export const PackageManagementPage: React.FC = () => {
   // Item Form State
   const [itemFormData, setItemFormData] = useState<PackageFormData>({
     name: "",
+    category: "",
     accountInfo: "",
-    usedSlots: 1,
+    storageAccountInfo: "",
+    storageTotal: "",
     totalSlots: 2,
     supplier: "Mavryk",
     costPrice: 95000,
     expiredAt: "2026-12-31",
     note: "",
+    matchRule: "information",
   });
 
-  // Load Data from Backend APIs (trực tiếp từ product.package_product)
+  // Load Data from Backend APIs (trực tiếp từ warehouse.product_names và warehouse.package_products)
   const fetchPackageData = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/products/packages");
-      const json = await res.json().catch(() => ({ data: [] }));
-      const list: PackageItem[] = json.data || [];
+      const [pkgRes, catRes, catalogRes, whRes] = await Promise.all([
+        fetch("/api/products/packages"),
+        fetch("/api/products/packages/categories"),
+        fetch("/api/products/packages/catalog-names"),
+        fetch("/api/warehouse"),
+      ]);
 
-      // Extract unique categories from actual package_product items
-      const catSet = new Set<string>();
+      const pkgJson = await pkgRes.json().catch(() => ({ data: [] }));
+      const catJson = await catRes.json().catch(() => ({ data: [] }));
+      const catalogJson = await catalogRes.json().catch(() => ({ data: [] }));
+      const whJson = await whRes.json().catch(() => []);
+
+      const list: PackageItem[] = pkgJson.data || [];
+      const dbCategories: PackageCategory[] = catJson.data || [];
+      const allMasterProducts: { id: number; name: string }[] = catalogJson.data || [];
+      const rawWhList = Array.isArray(whJson) ? whJson : (whJson.data || []);
+      const whAccounts: string[] = rawWhList.map((w: any) => w.account).filter(Boolean);
+
+      // Extract unique categories from dbCategories (primary từ warehouse.product_names)
+      const catNames = dbCategories.map((c) => c.name);
       list.forEach((item) => {
-        if (item.category) catSet.add(item.category);
+        if (item.category && !catNames.includes(item.category)) {
+          catNames.push(item.category);
+        }
       });
 
-      const catList = Array.from(catSet);
-      if (catList.length > 0) {
-        setCategories(catList);
-        if (!catList.includes(selectedCategory)) {
-          setSelectedCategory(catList[0]);
-        }
-      }
+      // Combine accounts for auto-suggestions
+      const combinedAccounts = Array.from(
+        new Set([
+          ...whAccounts,
+          ...list.map((i) => i.accountInfo).filter(Boolean),
+          ...list.map((i) => i.storageAccountInfo).filter(Boolean) as string[],
+        ])
+      );
 
+      const allNames = allMasterProducts.map((p) => p.name);
+      setCatalogNames(allNames);
+      setCategories(catNames);
+      setCategoriesList(dbCategories);
+      setWarehouseAccounts(combinedAccounts);
+      setSelectedCategory((prev) => (catNames.includes(prev) ? prev : ""));
       setPackageItems(list);
     } catch (err) {
       console.error("Lỗi nạp dữ liệu kho gói:", err);
@@ -86,18 +121,22 @@ export const PackageManagementPage: React.FC = () => {
       const total = catItems.length;
       const low = catItems.filter((i) => i.status === "warning" || (i.totalSlots - i.usedSlots) <= 1).length;
       const out = catItems.filter((i) => i.status === "expired" || i.usedSlots >= i.totalSlots).length;
-      return { name: cat, total, low, out };
+      const catObj = categoriesList.find((c) => c.name.toLowerCase() === cat.toLowerCase());
+      return { name: cat, total, low, out, requiresStorage: catObj?.requiresStorage };
     });
-  }, [categories, packageItems]);
+  }, [categories, categoriesList, packageItems]);
 
   // Filtered items for current active category & search/status
   const filteredItems = useMemo(() => {
     return packageItems.filter((item) => {
-      const matchCat = item.category.toLowerCase() === selectedCategory.toLowerCase();
+      const matchCat =
+        !selectedCategory ||
+        item.category.toLowerCase() === selectedCategory.toLowerCase();
       const matchSearch =
         searchQuery.trim() === "" ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.accountInfo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.storageAccountInfo && item.storageAccountInfo.toLowerCase().includes(searchQuery.toLowerCase())) ||
         item.supplier.toLowerCase().includes(searchQuery.toLowerCase());
 
       let matchStatus = true;
@@ -110,29 +149,96 @@ export const PackageManagementPage: React.FC = () => {
   }, [packageItems, selectedCategory, searchQuery, statusFilter]);
 
   // Handlers
-  const handleAddCategory = () => {
+  const handleSaveCategory = async () => {
     if (!newCategoryName.trim()) return;
     const name = newCategoryName.trim();
-    if (!categories.includes(name)) {
-      setCategories([...categories, name]);
+    try {
+      if (editingCategoryName && editingCategoryName.toLowerCase() !== name.toLowerCase()) {
+        const res = await fetch("/api/products/packages/categories", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            oldName: editingCategoryName,
+            newName: name,
+            requiresStorage: categoryRequiresStorage,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Không thể cập nhật loại gói");
+        notify.success(`Đã đổi tên loại gói thành: ${name}`, "Cập Nhật Loại Gói");
+      } else {
+        const res = await fetch("/api/products/packages/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            requiresStorage: categoryRequiresStorage,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Không thể tạo loại gói");
+        notify.success(`Đã lưu loại gói: ${name}`, "Lưu Loại Gói");
+      }
+      setNewCategoryName("");
+      setEditingCategoryName(null);
+      setCategoryRequiresStorage(false);
+      setIsCategoryModalOpen(false);
+      await fetchPackageData();
       setSelectedCategory(name);
-      notify.success(`Đã tạo loại gói mới: ${name}`, "Tạo Loại Gói");
+    } catch (err: any) {
+      console.error("Lỗi lưu loại gói:", err);
+      notify.error(err.message || "Lưu loại gói thất bại", "Lỗi");
     }
-    setNewCategoryName("");
-    setIsCategoryModalOpen(false);
+  };
+
+  const handleDeleteCategory = (categoryName: string) => {
+    setDeletingCategory(categoryName);
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!deletingCategory) return;
+    const catNameToDelete = deletingCategory;
+    setIsDeletingCategory(true);
+    try {
+      const res = await fetch(`/api/products/packages/categories/${encodeURIComponent(catNameToDelete)}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Không thể xóa loại gói");
+      }
+      notify.success(`Đã xóa loại gói "${catNameToDelete}" khỏi kho`, "Xóa Loại Gói");
+      setDeletingCategory(null);
+      await fetchPackageData();
+      if (selectedCategory.toLowerCase() === catNameToDelete.toLowerCase()) {
+        const remaining = categories.filter((c) => c.toLowerCase() !== catNameToDelete.toLowerCase());
+        setSelectedCategory(remaining[0] || "");
+      }
+    } catch (err: any) {
+      console.error("Lỗi xóa loại gói:", err);
+      notify.error(err.message || "Xóa loại gói thất bại", "Lỗi");
+    } finally {
+      setIsDeletingCategory(false);
+    }
   };
 
   const handleOpenAddItem = () => {
     setEditingItem(null);
+    const targetCat = selectedCategory || (categoriesList[0]?.name || "Adobe");
+    const matchedCat = categoriesList.find((c) => c.name.toLowerCase() === targetCat.toLowerCase());
+
     setItemFormData({
-      name: selectedCategory,
+      name: targetCat,
+      category: targetCat,
       accountInfo: "",
-      usedSlots: 0,
+      storageAccountInfo: "",
+      storageTotal: matchedCat?.requiresStorage ? "2000 GB" : "",
       totalSlots: 2,
       supplier: "Mavryk",
       costPrice: 95000,
       expiredAt: new Date(Date.now() + 365 * 86400000).toISOString().split("T")[0],
       note: "",
+      matchRule: "information",
     });
     setIsItemModalOpen(true);
   };
@@ -141,56 +247,80 @@ export const PackageManagementPage: React.FC = () => {
     setEditingItem(item);
     setItemFormData({
       name: item.name,
+      category: item.category,
       accountInfo: item.accountInfo,
-      usedSlots: item.usedSlots,
+      storageAccountInfo: item.storageAccountInfo || "",
+      storageTotal: item.storageTotal || "",
       totalSlots: item.totalSlots,
       supplier: item.supplier,
       costPrice: item.costPrice,
       expiredAt: item.expiredAt,
       note: item.note,
+      matchRule: item.matchRule || "information",
     });
     setIsItemModalOpen(true);
   };
 
-  const handleSaveItem = (e: React.FormEvent) => {
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setPackageItems((prev) =>
-        prev.map((i) =>
-          i.id === editingItem.id
-            ? {
-                ...i,
-                ...itemFormData,
-                category: selectedCategory,
-                status: itemFormData.usedSlots >= itemFormData.totalSlots ? "expired" : "active",
-              }
-            : i
-        )
-      );
-      notify.success("Đã cập nhật thông tin gói!", "Cập Nhật");
-    } else {
-      const newItem: PackageItem = {
-        id: Date.now(),
-        category: selectedCategory,
-        name: itemFormData.name || selectedCategory,
-        accountInfo: itemFormData.accountInfo || "user@gmail.com",
-        usedSlots: itemFormData.usedSlots,
+    try {
+      const payload = {
+        name: itemFormData.name,
+        category: itemFormData.category || selectedCategory || (categoriesList[0]?.name || ""),
+        accountInfo: itemFormData.accountInfo,
+        accountUsername: itemFormData.accountInfo,
+        storageAccountInfo: itemFormData.storageAccountInfo,
+        storageAccountUsername: itemFormData.storageAccountInfo,
+        storageTotal: itemFormData.storageTotal,
         totalSlots: itemFormData.totalSlots,
         supplier: itemFormData.supplier,
         costPrice: itemFormData.costPrice,
         expiredAt: itemFormData.expiredAt,
         note: itemFormData.note,
-        status: itemFormData.usedSlots >= itemFormData.totalSlots ? "expired" : "active",
+        matchRule: itemFormData.matchRule || "information",
       };
-      setPackageItems((prev) => [newItem, ...prev]);
-      notify.success("Đã thêm gói sản phẩm mới vào kho!", "Thêm Gói Mới");
+
+      if (editingItem) {
+        const res = await fetch(`/api/products/packages/${editingItem.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Không thể cập nhật gói sản phẩm");
+        notify.success("Đã cập nhật thông tin gói thành công!", "Cập Nhật");
+      } else {
+        const res = await fetch("/api/products/packages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Không thể thêm gói sản phẩm mới");
+        notify.success("Đã thêm gói sản phẩm mới vào kho!", "Thêm Gói Mới");
+      }
+
+      setIsItemModalOpen(false);
+      await fetchPackageData();
+    } catch (err: any) {
+      console.error("Lỗi lưu gói sản phẩm:", err);
+      notify.error(err.message || "Lưu gói thất bại", "Lỗi");
     }
-    setIsItemModalOpen(false);
   };
 
-  const handleDeleteItem = (id: number) => {
-    setPackageItems((prev) => prev.filter((i) => i.id !== id));
-    notify.success("Đã xóa gói khỏi danh sách", "Xóa Gói");
+  const handleDeleteItem = async (id: number) => {
+    try {
+      const res = await fetch(`/api/products/packages/${id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Không thể xóa gói");
+      notify.success("Đã xóa gói khỏi kho thành công!", "Xóa Gói");
+      await fetchPackageData();
+    } catch (err: any) {
+      console.error("Lỗi xóa gói:", err);
+      notify.error(err.message || "Xóa gói thất bại", "Lỗi");
+    }
   };
 
   return (
@@ -207,7 +337,12 @@ export const PackageManagementPage: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1 pl-9">Manage and organize your product categories & slot inventory</p>
         </div>
         <button
-          onClick={() => setIsCategoryModalOpen(true)}
+          onClick={() => {
+            setEditingCategoryName(null);
+            setNewCategoryName("");
+            setCategoryRequiresStorage(false);
+            setIsCategoryModalOpen(true);
+          }}
           className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
@@ -219,11 +354,17 @@ export const PackageManagementPage: React.FC = () => {
       <PackageCategoryCards
         categorySummaries={categorySummaries}
         selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        onEditCategory={(name) => {
-          setIsCategoryModalOpen(true);
-          setNewCategoryName(name);
+        onSelectCategory={(name) => {
+          setSelectedCategory((prev) => (prev.toLowerCase() === name.toLowerCase() ? "" : name));
         }}
+        onEditCategory={(name) => {
+          const matchedCat = categoriesList.find((c) => c.name.toLowerCase() === name.toLowerCase());
+          setEditingCategoryName(name);
+          setNewCategoryName(name);
+          setCategoryRequiresStorage(Boolean(matchedCat?.requiresStorage));
+          setIsCategoryModalOpen(true);
+        }}
+        onDeleteCategory={handleDeleteCategory}
       />
 
       {/* ── Toolbar & Filters ── */}
@@ -240,9 +381,23 @@ export const PackageManagementPage: React.FC = () => {
       {/* Active Indicator */}
       <div className="text-xs text-slate-400 px-1 flex items-center gap-2">
         <span>Đang xem:</span>
-        <span className="font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md">
-          {selectedCategory}
-        </span>
+        {selectedCategory ? (
+          <span className="inline-flex items-center gap-1.5 font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md">
+            <span>{selectedCategory}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedCategory("")}
+              className="text-cyan-400/60 hover:text-cyan-200 transition-colors cursor-pointer text-sm font-bold leading-none"
+              title="Bỏ chọn để xem tất cả gói"
+            >
+              ×
+            </button>
+          </span>
+        ) : (
+          <span className="font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded-md">
+            Tất cả loại gói
+          </span>
+        )}
         <span className="text-slate-600">({filteredItems.length} gói)</span>
       </div>
 
@@ -262,9 +417,25 @@ export const PackageManagementPage: React.FC = () => {
       <CategoryModal
         open={isCategoryModalOpen}
         categoryName={newCategoryName}
-        onClose={() => setIsCategoryModalOpen(false)}
+        catalogNames={catalogNames}
+        isEditing={Boolean(editingCategoryName)}
+        requiresStorage={categoryRequiresStorage}
+        onRequiresStorageChange={setCategoryRequiresStorage}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setEditingCategoryName(null);
+          setCategoryRequiresStorage(false);
+        }}
         onNameChange={setNewCategoryName}
-        onSubmit={handleAddCategory}
+        onSubmit={handleSaveCategory}
+      />
+
+      {/* ── Modal 1.1: Confirm Delete Category ── */}
+      <CategoryDeleteModal
+        categoryName={deletingCategory}
+        onClose={() => setDeletingCategory(null)}
+        onConfirmDelete={handleConfirmDeleteCategory}
+        submitting={isDeletingCategory}
       />
 
       {/* ── Modal 2: Create/Edit Package Item ── */}
@@ -272,6 +443,8 @@ export const PackageManagementPage: React.FC = () => {
         open={isItemModalOpen}
         editingItem={editingItem}
         selectedCategory={selectedCategory}
+        categoriesList={categoriesList}
+        warehouseAccounts={warehouseAccounts}
         formData={itemFormData}
         onClose={() => setIsItemModalOpen(false)}
         onFormChange={setItemFormData}
