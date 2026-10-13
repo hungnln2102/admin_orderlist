@@ -42,6 +42,7 @@ export interface ServiceNameCategoryItem {
   name: string;
   category: string;
   loginUrl?: string | null;
+  totalSlots?: number;
   inStockSlots: number;
   reservedSlots: number;
   status: "ACTIVE" | "LOW_STOCK" | "OUT_OF_STOCK";

@@ -75,6 +75,20 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   // Form states
   const [formData, setFormData] = useState<OrderFormData>(DEFAULT_FORM_DATA);
   const [isCustomPriceMode, setIsCustomPriceMode] = useState<boolean>(false);
+  const [packageProductsList, setPackageProductsList] = useState<any[]>([]);
+  const [packageCategoriesList, setPackageCategoriesList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/products/packages")
+      .then((res) => res.json())
+      .then((data) => setPackageProductsList(data.data || []))
+      .catch(() => {});
+
+    fetch("/api/products/packages/categories")
+      .then((res) => res.json())
+      .then((data) => setPackageCategoriesList(data.data || data || []))
+      .catch(() => {});
+  }, []);
 
   const handleMarkPaid = async (order: Order) => {
     try {
@@ -149,16 +163,19 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         if (!prev.customer || prev.customer === "Khách Hàng" || prev.customer === "test") {
           updated.customer = "Mavryk";
         }
-      } else if (!isEditModalOpen) {
-        updated.status = ORDER_STATUS.UNPAID;
-      }
-
-      if (selectedProductId) {
-        const prod = productsCatalog.find((p) => p.id === selectedProductId);
-        if (prod) {
-          const resolvedPrice = isGift ? 0 : resolvePriceByPrefix(prod, prefixVal);
-          updated.price = resolvedPrice;
-          updated.gross_selling_price = resolvedPrice;
+        updated.price = prev.cost || 0;
+        updated.gross_selling_price = prev.cost || 0;
+      } else {
+        if (!isEditModalOpen) {
+          updated.status = ORDER_STATUS.UNPAID;
+        }
+        if (selectedProductId) {
+          const prod = productsCatalog.find((p) => p.id === selectedProductId);
+          if (prod) {
+            const resolvedPrice = isGift ? 0 : resolvePriceByPrefix(prod, prefixVal);
+            updated.price = resolvedPrice;
+            updated.gross_selling_price = resolvedPrice;
+          }
         }
       }
 
@@ -179,7 +196,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
     setSelectedProductId(prod.id);
     const prefix = formData.order_prefix || ORDER_PREFIX.MAVC;
-    const sellingPrice = resolvePriceByPrefix(prod, prefix);
+    const isImport = prefix.startsWith(ORDER_PREFIX.MAVN);
+    const sellingPrice = isImport ? 0 : resolvePriceByPrefix(prod, prefix);
 
     await fetchSuppliersForProduct(prod.id);
 
@@ -201,8 +219,17 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   };
 
   const handleSupplierChange = (supplierVal: string) => {
+    const prefix = formData.order_prefix || ORDER_PREFIX.MAVC;
+    const isImport = prefix.startsWith(ORDER_PREFIX.MAVN);
+
     if (!supplierVal) {
-      setFormData((prev) => ({ ...prev, supply_id: "", cost: 0 }));
+      setFormData((prev) => ({
+        ...prev,
+        supply_id: "",
+        cost: 0,
+        price: isImport ? 0 : prev.price,
+        gross_selling_price: isImport ? 0 : prev.gross_selling_price,
+      }));
       return;
     }
 
@@ -216,6 +243,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         ...prev,
         supply_id: foundInProduct.supplier_name || foundInProduct.ncc_name || supplierVal,
         cost: costVal,
+        price: isImport ? costVal : prev.price,
+        gross_selling_price: isImport ? costVal : prev.gross_selling_price,
       }));
     } else {
       const foundInAll = allSuppliersCatalog.find(
@@ -326,6 +355,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isImportTab = activeTab === "import" || formData.order_prefix === ORDER_PREFIX.MAVN;
     if (!selectedProductId && !formData.id_product) {
       notify.error("Vui lòng chọn sản phẩm từ catalog", "Thiếu Thông Tin");
       return;
@@ -334,16 +364,24 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       notify.error("Vui lòng chọn nhà cung cấp (NCC)", "Thiếu Thông Tin");
       return;
     }
+    if (!isImportTab && (!formData.customer || !formData.customer.trim())) {
+      notify.error("Vui lòng nhập tên khách hàng", "Thiếu Thông Tin");
+      return;
+    }
+    if (!formData.information_order || !formData.information_order.trim()) {
+      notify.error("Vui lòng nhập thông tin sản phẩm", "Thiếu Thông Tin");
+      return;
+    }
     try {
-      const prefix = formData.order_prefix || ORDER_PREFIX.MAVC;
-      const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const generatedCode = `${prefix}${randomCode}`;
+      const prefix = isImportTab ? ORDER_PREFIX.MAVN : (formData.order_prefix || ORDER_PREFIX.MAVC);
+      const generatedCode = isImportTab ? undefined : `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
       const payload = {
         ...formData,
+        order_prefix: prefix,
         id_order: generatedCode,
-        status: prefix === ORDER_PREFIX.MAVN ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID,
-        customer: prefix === ORDER_PREFIX.MAVN && (!formData.customer || formData.customer === "Khách Hàng") ? "Mavryk" : (formData.customer || "Khách Hàng"),
+        status: isImportTab ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID,
+        customer: isImportTab ? "Mavryk" : (formData.customer || "Khách Hàng"),
       };
 
       const res = await fetch("/api/orders", {
@@ -376,6 +414,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     }
     if (!formData.supply_id) {
       notify.error("Vui lòng chọn nhà cung cấp (NCC)", "Thiếu Thông Tin");
+      return;
+    }
+    if (!formData.customer || !formData.customer.trim()) {
+      notify.error("Vui lòng nhập tên khách hàng", "Thiếu Thông Tin");
+      return;
+    }
+    if (!formData.information_order || !formData.information_order.trim()) {
+      notify.error("Vui lòng nhập thông tin sản phẩm", "Thiếu Thông Tin");
       return;
     }
     if (!selectedOrder) return;
@@ -504,25 +550,46 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       />
 
       {/* Create Order Modal */}
-      <OrderCreateEditModal
-        isOpen={isCreateModalOpen}
-        isEdit={false}
-        isImportTab={activeTab === "import"}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={handleCreateSubmit}
-        formData={formData}
-        setFormData={setFormData}
-        productsCatalog={productsCatalog}
-        allSuppliersCatalog={allSuppliersCatalog}
-        productSuppliersCatalog={productSuppliersCatalog}
-        loadingSuppliers={loadingSuppliers}
-        selectedProductId={selectedProductId}
-        onProductChange={handleProductChange}
-        onSupplierChange={handleSupplierChange}
-        onPrefixChange={handlePrefixChange}
-        isCustomPriceMode={isCustomPriceMode}
-        setIsCustomPriceMode={setIsCustomPriceMode}
-      />
+      {(() => {
+        const selectedProduct = productsCatalog.find((p) => p.id === selectedProductId);
+        const selectedProductName = selectedProduct ? (selectedProduct.san_pham || "").trim().toLowerCase() : "";
+        const hasPackage = selectedProductName
+          ? packageProductsList.some((pkg) => {
+              const pkgName = (pkg.product_name || "").trim().toLowerCase();
+              return pkgName === selectedProductName || selectedProductName.includes(pkgName) || pkgName.includes(selectedProductName);
+            })
+          : true;
+
+        const matchedCategory = packageCategoriesList.find((cat) => {
+          const catName = (cat.name || "").trim().toLowerCase();
+          return selectedProductName === catName || selectedProductName.includes(catName) || catName.includes(selectedProductName);
+        });
+        const requiresStorage = matchedCategory ? Boolean(matchedCategory.requiresStorage) : false;
+
+        return (
+          <OrderCreateEditModal
+            isOpen={isCreateModalOpen}
+            isEdit={false}
+            isImportTab={activeTab === "import"}
+            onClose={() => setIsCreateModalOpen(false)}
+            onSubmit={handleCreateSubmit}
+            formData={formData}
+            setFormData={setFormData}
+            productsCatalog={productsCatalog}
+            allSuppliersCatalog={allSuppliersCatalog}
+            productSuppliersCatalog={productSuppliersCatalog}
+            loadingSuppliers={loadingSuppliers}
+            selectedProductId={selectedProductId}
+            onProductChange={handleProductChange}
+            onSupplierChange={handleSupplierChange}
+            onPrefixChange={handlePrefixChange}
+            isCustomPriceMode={isCustomPriceMode}
+            setIsCustomPriceMode={setIsCustomPriceMode}
+            hasPackage={hasPackage}
+            requiresStorage={requiresStorage}
+          />
+        );
+      })()}
 
       {/* Edit Order Modal */}
       <OrderCreateEditModal

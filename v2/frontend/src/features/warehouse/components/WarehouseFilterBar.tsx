@@ -42,7 +42,7 @@ export const WarehouseFilterBar: React.FC<WarehouseFilterBarProps> = ({
             }`}
           >
             <Archive className="w-4 h-4 text-blue-400" />
-            <span>Tài Khoản Kho & Slot Key</span>
+            <span>Tài Khoản Kho</span>
             <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/20 text-blue-300 font-medium">
               {accountCount}
             </span>

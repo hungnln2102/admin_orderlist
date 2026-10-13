@@ -35,7 +35,8 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {catalogItems.map((cat) => {
-          const isEmptyStock = (cat.inStockSlots || 0) === 0 && (cat.reservedSlots || 0) === 0;
+          const total = cat.totalSlots ?? ((cat.inStockSlots || 0) + (cat.reservedSlots || 0));
+          const isEmptyStock = total === 0;
 
           return (
             <div
@@ -76,12 +77,12 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
 
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
                 <div className="p-2.5 rounded-xl bg-slate-950/60">
-                  <span className="text-slate-400 block text-[11px]">TỒN KHO SLOT</span>
-                  <span className="text-sm sm:text-base font-bold text-emerald-400">{cat.inStockSlots} Slots</span>
+                  <span className="text-slate-400 block text-[11px]">TỔNG SỐ LƯỢNG</span>
+                  <span className="text-sm sm:text-base font-bold text-blue-400">{total} Tài khoản</span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-950/60">
-                  <span className="text-slate-400 block text-[11px]">ĐÃ GIỮ CHỖ</span>
-                  <span className="text-sm sm:text-base font-bold text-indigo-400">{cat.reservedSlots} Slots</span>
+                  <span className="text-slate-400 block text-[11px]">CHƯA SỬ DỤNG</span>
+                  <span className="text-sm sm:text-base font-bold text-emerald-400">{cat.inStockSlots} Tài khoản</span>
                 </div>
               </div>
 
@@ -99,7 +100,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                   ) : (
                     <button
                       disabled
-                      title={`Không thể xóa: Kho vẫn còn ${cat.inStockSlots} slot tồn kho và ${cat.reservedSlots} slot giữ chỗ. Kho phải trống hoàn toàn (0 slot) mới có thể xóa.`}
+                      title={`Không thể xóa: Kho vẫn còn ${total} slot. Kho phải trống hoàn toàn (0 slot) mới có thể xóa.`}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/40 text-slate-600 border border-slate-800/60 transition-all cursor-not-allowed opacity-50"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -56,6 +56,11 @@ export interface OrderFormData {
   expired_at: string;
   order_prefix: string;
   save_to_warehouse?: boolean;
+  save_to_package?: boolean;
+  package_slots?: number;
+  package_match_rule?: string;
+  storage_account_username?: string;
+  storage_total?: string;
 }
 
 export const DEFAULT_FORM_DATA: OrderFormData = {
@@ -76,6 +81,9 @@ export const DEFAULT_FORM_DATA: OrderFormData = {
   expired_at: "",
   order_prefix: ORDER_PREFIX.MAVC,
   save_to_warehouse: true,
+  save_to_package: true,
+  package_slots: 2,
+  package_match_rule: "information",
 };
 
 export interface CatalogProduct {

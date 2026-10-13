@@ -4,7 +4,6 @@ import {
   Receipt,
   ShoppingCart,
   CreditCard,
-  Users,
   RefreshCw,
   Package,
   Layers,
@@ -13,13 +12,11 @@ import {
   Key,
   ShieldCheck,
   Gift,
-  Coins,
   Building2,
   PackagePlus,
   Boxes,
   Warehouse,
   Landmark,
-  Wallet,
   Shield,
   Sliders,
   Tv,
@@ -49,7 +46,6 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Tổng quan", path: "/dashboard", icon: LayoutDashboard },
       { name: "Traffic & Analytics", path: "/traffic", icon: BarChart3 },
-      { name: "Tính Thuế Hộ Kinh Doanh", path: "/tax", icon: Receipt },
     ],
   },
   {
@@ -70,12 +66,9 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
   {
     groupName: "Hệ thống Website",
     items: [
-      { name: "Khách hàng & CTV", path: "/customer-list", icon: Users },
       { name: "Thông tin Sản phẩm", path: "/product-info", icon: Layers },
       { name: "Cấu hình Form Đơn", path: "/form-info", icon: FileText },
       { name: "Active Keys", path: "/active-keys", icon: Key },
-      { name: "Mã Giảm Giá", path: "/promo-codes", icon: ShieldCheck },
-      { name: "Nạp MCoin", path: "/add-mcoin", icon: Coins },
     ],
   },
   {
@@ -83,7 +76,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Nhà cung cấp", path: "/sources", icon: Building2 },
       { name: "Nhập ngoài luồng", path: "/external-imports", icon: PackagePlus },
-      { name: "Kho hàng & Mã Key", path: "/warehouse", icon: Warehouse },
+      { name: "Kho Hàng", path: "/warehouse", icon: Warehouse },
     ],
   },
   {
@@ -91,7 +84,6 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Cấu hình Hệ thống", path: "/system-config", icon: Settings },
       { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
-      { name: "Tài khoản & Ví USDT", path: "/payment-accounts", icon: Wallet },
       { name: "IP Whitelist", path: "/ip-whitelist", icon: Shield },
       { name: "Cấu hình API bên thứ 3", path: "/external-api-config", icon: Sliders },
       { name: "Renew Adobe Admin", path: "/renew-adobe-admin", icon: RefreshCw },

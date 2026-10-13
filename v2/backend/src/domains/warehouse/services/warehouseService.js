@@ -231,6 +231,7 @@ const listCatalogItems = async () => {
       name: p.name,
       category: p.name,
       loginUrl: p.login_url || null,
+      totalSlots: stats.total,
       inStockSlots: stats.inStock,
       reservedSlots: stats.reserved,
       status,

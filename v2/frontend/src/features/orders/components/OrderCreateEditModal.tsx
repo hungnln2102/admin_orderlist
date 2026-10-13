@@ -26,6 +26,8 @@ interface OrderCreateEditModalProps {
   onPrefixChange?: (prefixVal: string) => void;
   isCustomPriceMode: boolean;
   setIsCustomPriceMode: (val: boolean) => void;
+  hasPackage?: boolean;
+  requiresStorage?: boolean;
 }
 
 export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
@@ -46,6 +48,8 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
   onPrefixChange,
   isCustomPriceMode,
   setIsCustomPriceMode,
+  hasPackage = true,
+  requiresStorage = false,
 }) => {
   if (!isOpen) return null;
 
@@ -90,109 +94,211 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
 
         {/* Modal Body / Form */}
         <form onSubmit={onSubmit} className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4 text-xs">
-          {/* Section 1: Customer Information & Order Type */}
-          <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
-            <div className="font-bold text-cyan-400 text-[11px] uppercase tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {isImportMode ? "Thông Tin Đơn Nhập Hàng" : "Thông Tin Khách Hàng & Loại Đơn"}</span>
-              <span className={`text-[10.5px] font-mono font-bold px-2 py-0.5 rounded border ${isImportMode ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-cyan-300 bg-cyan-500/10 border-cyan-500/20"}`}>
-                Mã: {currentPrefix}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-slate-400 mb-1 font-medium">Loại Mã Đơn (Prefix) *</label>
-                <select
-                  value={currentPrefix}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (onPrefixChange) {
-                      onPrefixChange(val);
-                    } else {
-                      setFormData({ ...formData, order_prefix: val });
-                    }
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-cyan-300 font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
-                >
-                  {isImportMode ? (
-                    <option value={ORDER_PREFIX.MAVN}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVN].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVN].shortLabel}</option>
-                  ) : (
-                    <>
-                      <option value={ORDER_PREFIX.MAVC}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].shortLabel}</option>
-                      <option value={ORDER_PREFIX.MAVL}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].shortLabel}</option>
-                      <option value={ORDER_PREFIX.MAVK}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].shortLabel}</option>
-                      <option value={ORDER_PREFIX.MAVS}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].shortLabel}</option>
-                      <option value={ORDER_PREFIX.MAVT}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].shortLabel} (0đ)</option>
-                    </>
-                  )}
-                </select>
+          {/* Section 1: Customer Information & Order Type (Only for non-import mode) */}
+          {!isImportMode && (
+            <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
+              <div className="font-bold text-cyan-400 text-[11px] uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Thông Tin Khách Hàng & Loại Đơn</span>
+                <span className="text-[10.5px] font-mono font-bold px-2 py-0.5 rounded border text-cyan-300 bg-cyan-500/10 border-cyan-500/20">
+                  Mã: {currentPrefix}
+                </span>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-medium">Loại Mã Đơn (Prefix) *</label>
+                  <select
+                    value={currentPrefix}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (onPrefixChange) {
+                        onPrefixChange(val);
+                      } else {
+                        setFormData({ ...formData, order_prefix: val });
+                      }
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-cyan-300 font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value={ORDER_PREFIX.MAVC}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].shortLabel}</option>
+                    <option value={ORDER_PREFIX.MAVL}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].shortLabel}</option>
+                    <option value={ORDER_PREFIX.MAVK}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].shortLabel}</option>
+                    <option value={ORDER_PREFIX.MAVS}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].shortLabel}</option>
+                    <option value={ORDER_PREFIX.MAVT}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].shortLabel} (0đ)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1 font-medium">Tên Khách Hàng *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: Nguyễn Văn A"
-                  value={formData.customer}
-                  onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-medium">Tên Khách Hàng *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                    value={formData.customer}
+                    onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1 font-medium">SĐT / Zalo / Facebook</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: 0987654321"
-                  value={formData.contact}
-                  onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
-                />
+                <div>
+                  <label className="block text-slate-400 mb-1 font-medium">SĐT / Zalo / Facebook</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: 0987654321"
+                    value={formData.contact}
+                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Section: Lưu kho toggle (Only for import mode) */}
           {isImportMode && (
-            <div className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-b from-cyan-950/20 to-transparent p-4 backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
-                    <Archive className="w-4 h-4" />
+            <div className="space-y-3">
+              <div className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-b from-cyan-950/20 to-transparent p-4 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+                      <Archive className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white tracking-wide">
+                        Lưu vào Kho Hàng
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        {formData.save_to_warehouse !== false
+                          ? "Lưu thông tin tài khoản và slot vào hệ thống kho hàng."
+                          : "Chỉ tạo đơn nhập hàng bình thường (Không lưu vào kho)."}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white tracking-wide">
-                      Lưu vào Kho Hàng
-                    </h4>
-                    <p className="text-[11px] text-slate-400">
-                      {formData.save_to_warehouse !== false
-                        ? "Lưu thông tin tài khoản và slot vào hệ thống kho hàng."
-                        : "Chỉ tạo đơn nhập hàng bình thường (Không lưu vào kho)."}
-                    </p>
+
+                  <div className="flex items-center gap-2 bg-cyan-950/40 border border-cyan-500/20 rounded-xl px-3 py-1.5">
+                    <span className="text-[11px] font-semibold text-cyan-200/80">Lưu kho:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          save_to_warehouse: formData.save_to_warehouse === false ? true : false,
+                        })
+                      }
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,214,0.5)]" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          formData.save_to_warehouse !== false ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Lưu Gói Sản Phẩm toggle & Sub-form */}
+              <div className="relative overflow-hidden rounded-xl border border-purple-500/20 bg-gradient-to-b from-purple-950/20 to-transparent p-4 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300">
+                      <Archive className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white tracking-wide">
+                        Lưu Gói Sản Phẩm
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        {formData.save_to_package !== false
+                          ? "Tự động đồng bộ / tạo gói sản phẩm trong kho gói."
+                          : "Bỏ qua lưu kho gói sản phẩm."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-purple-950/40 border border-purple-500/20 rounded-xl px-3 py-1.5">
+                    <span className="text-[11px] font-semibold text-purple-200/80">Lưu Gói:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          save_to_package: formData.save_to_package === false ? true : false,
+                        })
+                      }
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formData.save_to_package !== false ? "bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          formData.save_to_package !== false ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-cyan-950/40 border border-cyan-500/20 rounded-xl px-3 py-1.5">
-                  <span className="text-[11px] font-semibold text-cyan-200/80">Lưu kho:</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({
-                        ...formData,
-                        save_to_warehouse: formData.save_to_warehouse === false ? true : false,
-                      })
-                    }
-                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,214,0.5)]" : "bg-slate-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        formData.save_to_warehouse !== false ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+                {formData.save_to_package !== false && hasPackage === false && (
+                  <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-3">
+                    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2 rounded-xl text-[11px] flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>Sản phẩm này chưa có Gói Sản Phẩm chính trong kho. Vui lòng cấu hình thông tin tạo gói bên dưới:</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-medium">Số Slot Gói (Tổng slot) *</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={formData.package_slots || 2}
+                          onChange={(e) => setFormData({ ...formData, package_slots: parseInt(e.target.value) || 2 })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-medium">Quy Tắc Khớp Đơn *</label>
+                        <select
+                          value={formData.package_match_rule || "information"}
+                          onChange={(e) => setFormData({ ...formData, package_match_rule: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                        >
+                          <option value="information">Khớp theo Thông Tin SP</option>
+                          <option value="slot">Khớp theo Tài khoản / Slot</option>
+                          <option value="both">Khớp cả hai (Information & Slot)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {requiresStorage && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-400 mb-1 font-medium">Tài khoản liên kết (Storage Account)</label>
+                          <input
+                            type="text"
+                            placeholder="Ví dụ: storage@gmail.com"
+                            value={formData.storage_account_username || ""}
+                            onChange={(e) => setFormData({ ...formData, storage_account_username: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-400 mb-1 font-medium">Dung lượng tổng (Storage Total)</label>
+                          <input
+                            type="text"
+                            placeholder="Ví dụ: 200GB, 2TB"
+                            value={formData.storage_total || ""}
+                            onChange={(e) => setFormData({ ...formData, storage_total: e.target.value })}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -345,7 +451,9 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             </button>
             <button
               type="submit"
-              className={`px-5 py-2 text-slate-950 rounded-xl font-bold transition-all shadow-lg cursor-pointer ${
+              disabled={!selectedProductId && !formData.id_product || !formData.supply_id}
+              title={(!selectedProductId && !formData.id_product) ? "Vui lòng chọn sản phẩm" : !formData.supply_id ? "Vui lòng chọn nhà cung cấp" : ""}
+              className={`px-5 py-2 text-slate-950 rounded-xl font-bold transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 isEdit
                   ? "bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 shadow-amber-500/20"
                   : "bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 shadow-cyan-500/20"

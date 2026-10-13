@@ -274,7 +274,7 @@ export const WarehousePage: React.FC = () => {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Kho Hàng & Tồn Kho Key
+            Kho Hàng
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Theo dõi chi tiết tài khoản kho, slot bản quyền, chìa khóa 2FA và cảnh báo tự động

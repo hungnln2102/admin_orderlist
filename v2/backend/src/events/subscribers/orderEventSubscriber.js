@@ -70,10 +70,10 @@ async function syncWarehouseExpiryOnRenewal(data) {
       stockId = newStock.id;
     }
 
-    // 3. Check if stock_service exists for this stock_id and name_id
+    // 3. Check if stock_service exists for this account_id and name_id
     const existingService = await db(TABLES.STOCK_SERVICES)
       .where({
-        stock_id: stockId,
+        account_id: stockId,
         name_id: nameId,
       })
       .first();
@@ -89,7 +89,7 @@ async function syncWarehouseExpiryOnRenewal(data) {
       console.log(`✅ [WarehouseSync] Đã cập nhật và tái liên kết hạn kho cho tài khoản "${accountUsername}" - dịch vụ "${productName}" thành ${newExpiredAt}`);
     } else {
       await db(TABLES.STOCK_SERVICES).insert({
-        stock_id: stockId,
+        account_id: stockId,
         name_id: nameId,
         password_encrypted: order.slot || null,
         backup_email: "",
