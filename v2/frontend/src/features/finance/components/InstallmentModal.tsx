@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Installment } from "../types";
-import { X, Save, Calendar, DollarSign, Clock, Hash } from "lucide-react";
+import { X, Save, Calendar, Clock, Hash } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -9,6 +9,13 @@ interface Props {
   editingItem?: Installment | null;
 }
 
+const formatAmountInput = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits).toLocaleString("vi-VN") : "";
+};
+
+const parseAmountInput = (value: string) => Number(value.replace(/\D/g, ""));
+
 export const InstallmentModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -16,7 +23,8 @@ export const InstallmentModal: React.FC<Props> = ({
   editingItem,
 }) => {
   const [name, setName] = useState("");
-  const [monthlyAmount, setMonthlyAmount] = useState<number | "">("");
+  const [monthlyAmount, setMonthlyAmount] = useState("");
+  const amountInputRef = useRef<HTMLInputElement>(null);
   const [totalPeriods, setTotalPeriods] = useState<number | "">(12);
   const [startPeriod, setStartPeriod] = useState("");
   const [dueDay, setDueDay] = useState<number>(15);
@@ -27,7 +35,7 @@ export const InstallmentModal: React.FC<Props> = ({
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
-      setMonthlyAmount(editingItem.monthlyAmount);
+      setMonthlyAmount(formatAmountInput(String(editingItem.monthlyAmount)));
       setTotalPeriods(editingItem.totalPeriods);
       setStartPeriod(editingItem.startPeriod);
       setDueDay(editingItem.dueDay || 15);
@@ -47,9 +55,30 @@ export const InstallmentModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
+  const handleMonthlyAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = event.target.value;
+    const caretPosition = event.target.selectionStart ?? rawValue.length;
+    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
+    const formattedValue = formatAmountInput(rawValue);
+
+    setMonthlyAmount(formattedValue);
+    requestAnimationFrame(() => {
+      const input = amountInputRef.current;
+      if (!input) return;
+      let nextCaret = 0;
+      let digitCount = 0;
+      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
+        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
+        nextCaret += 1;
+      }
+      input.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !monthlyAmount || !totalPeriods || !startPeriod) {
+    const monthlyAmountValue = parseAmountInput(monthlyAmount);
+    if (!name.trim() || monthlyAmountValue < 1000 || !totalPeriods || !startPeriod) {
       alert("Vui lòng điền đầy đủ thông tin khoản trả góp");
       return;
     }
@@ -58,7 +87,7 @@ export const InstallmentModal: React.FC<Props> = ({
       setSubmitting(true);
       await onSave({
         name: name.trim(),
-        monthlyAmount: Number(monthlyAmount),
+        monthlyAmount: monthlyAmountValue,
         totalPeriods: Number(totalPeriods),
         startPeriod,
         dueDay: Number(dueDay),
@@ -117,15 +146,15 @@ export const InstallmentModal: React.FC<Props> = ({
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  placeholder="3000000"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="3.000.000"
                   value={monthlyAmount}
-                  onChange={(e) => setMonthlyAmount(e.target.value ? Number(e.target.value) : "")}
+                  onChange={(e) => setMonthlyAmount(formatAmountInput(e.target.value))}
                   required
-                  min="1000"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 pl-9 font-mono"
                 />
-                <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <span className="absolute left-3 top-2.5 text-sm text-slate-500">₫</span>
               </div>
             </div>
 

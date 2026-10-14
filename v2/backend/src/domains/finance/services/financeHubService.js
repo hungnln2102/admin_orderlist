@@ -14,6 +14,105 @@ const toNumber = (val) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const PROFIT_FREQUENCIES = new Set(["DAILY", "MONTHLY", "YEARLY"]);
+const PROFIT_DESTINATIONS = new Set(["REINVEST", "CASH_BANK", "SHOP_BALANCE", "OTHER"]);
+const DEBT_REPAYMENT_FREQUENCIES = new Set(["DAILY", "MONTHLY"]);
+
+function normalizeProfitConfig({ type, profitEnabled, profitFrequency, annualInterestRate, profitDestination, profitAccountId, profitCreditTime }) {
+  if (!profitEnabled) {
+    return {
+      profit_enabled: false,
+      profit_frequency: null,
+      annual_interest_rate: null,
+      profit_destination: null,
+      profit_account_id: null,
+      profit_credit_time: null,
+    };
+  }
+
+  if (type !== "SAVINGS") {
+    throw new Error("Chỉ quỹ tích lũy / tiết kiệm mới được cấu hình sinh lời");
+  }
+
+  const frequency = profitFrequency || "MONTHLY";
+  if (!PROFIT_FREQUENCIES.has(frequency)) {
+    throw new Error("Chu kỳ sinh lời không hợp lệ");
+  }
+
+  const rate = Number(annualInterestRate);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error("Lãi suất năm phải lớn hơn 0");
+  }
+
+  const destination = profitDestination || "REINVEST";
+  if (!PROFIT_DESTINATIONS.has(destination)) {
+    throw new Error("Nơi nhận tiền sinh lời không hợp lệ");
+  }
+
+  const accountId = ["CASH_BANK", "SHOP_BALANCE"].includes(destination)
+    ? Number(profitAccountId)
+    : null;
+  if (["CASH_BANK", "SHOP_BALANCE"].includes(destination) && (!Number.isInteger(accountId) || accountId <= 0)) {
+    throw new Error("Vui lòng chọn tài khoản nhận tiền sinh lời");
+  }
+
+  const creditTime = profitCreditTime || "07:00";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(creditTime)) {
+    throw new Error("Giờ cộng lãi không hợp lệ");
+  }
+
+  return {
+    profit_enabled: true,
+    profit_frequency: frequency,
+    annual_interest_rate: rate,
+    profit_destination: destination,
+    profit_account_id: accountId,
+    profit_credit_time: creditTime,
+  };
+}
+
+async function validateProfitAccount(profitConfig) {
+  if (!profitConfig.profit_account_id) return;
+
+  const account = await db(TABLES.FINANCIAL_ACCOUNTS)
+    .where({ id: profitConfig.profit_account_id, is_active: true, is_deleted: false })
+    .first();
+
+  if (!account || (profitConfig.profit_destination === "CASH_BANK" && account.account_type !== "bank")) {
+    throw new Error("Tài khoản nhận tiền sinh lời không tồn tại hoặc không còn hoạt động");
+  }
+}
+
+function normalizeDebtConfig({ type, debtInterestEnabled, debtAnnualInterestRate, debtDueDay, debtEndDate, debtRepaymentFrequency }) {
+  const isDebt = type === "DEBT_PAYABLE" || type === "DEBT_RECEIVABLE";
+  if (!isDebt || !debtInterestEnabled) {
+    return {
+      debt_interest_enabled: false,
+      debt_annual_interest_rate: null,
+      debt_due_day: null,
+      debt_end_date: null,
+      debt_repayment_frequency: null,
+    };
+  }
+
+  const annualRate = Number(debtAnnualInterestRate);
+  const dueDay = Number(debtDueDay);
+  const repaymentFrequency = debtRepaymentFrequency || "MONTHLY";
+  const endDate = debtEndDate instanceof Date ? debtEndDate.toISOString().slice(0, 10) : String(debtEndDate || "").slice(0, 10);
+  if (!Number.isFinite(annualRate) || annualRate <= 0) throw new Error("Lãi suất nợ phải lớn hơn 0");
+  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) throw new Error("Ngày đến hạn phải từ 1 đến 31");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error("Vui lòng chọn ngày hết hạn nợ");
+  if (!DEBT_REPAYMENT_FREQUENCIES.has(repaymentFrequency)) throw new Error("Chu kỳ quy đổi nợ không hợp lệ");
+
+  return {
+    debt_interest_enabled: true,
+    debt_annual_interest_rate: annualRate,
+    debt_due_day: dueDay,
+    debt_end_date: endDate,
+    debt_repayment_frequency: repaymentFrequency,
+  };
+}
+
 /**
  * Tính toán trạng thái kỳ của một khoản trả góp tại một tháng mục tiêu YYYY-MM
  * @param {Object} item - Bản ghi installments
@@ -63,6 +162,18 @@ function calculateInstallmentState(item, targetMonth) {
       remainingDebt: 0,
     };
   }
+}
+
+function calculatePersonalDebtMonthlyPayment(item) {
+  if (item.type !== "DEBT_PAYABLE" || !item.debt_end_date) return 0;
+
+  const endDate = new Date(`${String(item.debt_end_date).slice(0, 10)}T23:59:59`);
+  const remainingDays = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
+  const remainingMonths = Math.max(1, Math.ceil(remainingDays / 30.44));
+  const annualRate = Boolean(item.debt_interest_enabled) ? toNumber(item.debt_annual_interest_rate) : 0;
+  const estimatedTotal = toNumber(item.amount) + (toNumber(item.amount) * annualRate / 100 * remainingDays / 365);
+  const dailyPayment = estimatedTotal / remainingDays;
+  return item.debt_repayment_frequency === "DAILY" ? dailyPayment * 30.44 : estimatedTotal / remainingMonths;
 }
 
 /**
@@ -130,6 +241,15 @@ async function getFinanceSummary(targetMonth) {
     };
   });
 
+  const personalDebtRows = await db(TABLES.PERSONAL_ASSETS)
+    .where("type", "DEBT_PAYABLE")
+    .select("type", "amount", "debt_interest_enabled", "debt_annual_interest_rate", "debt_end_date", "debt_repayment_frequency");
+  const personalDebtMonthlyTotal = personalDebtRows.reduce((sum, item) => sum + calculatePersonalDebtMonthlyPayment(item), 0);
+  const scheduledInstallmentsMonthlyTotal = installmentRows
+    .filter((item) => Boolean(item.is_active) && item.status !== "COMPLETED")
+    .reduce((sum, item) => sum + toNumber(item.monthly_amount), 0);
+  const monthlyDebtBurden = scheduledInstallmentsMonthlyTotal + personalDebtMonthlyTotal;
+
   // 3. Doanh thu & Lợi nhuận gộp từ đơn hàng Shop trong tháng
   const [y, m] = currentMonthStr.split("-").map(Number);
   const lastDay = new Date(y, m, 0).getDate();
@@ -153,7 +273,7 @@ async function getFinanceSummary(targetMonth) {
   const shopGrossProfit = shopRevenue - shopCogs;
 
   // 4. Động cơ Điểm Hòa Vốn (Break-even Engine)
-  const breakEvenTarget = activeFixedCostsTotal + installmentsInMonthTotal;
+  const breakEvenTarget = activeFixedCostsTotal + monthlyDebtBurden;
   const initialDeficit = -breakEvenTarget; // Lợi nhuận khởi điểm âm đầu tháng
   const netProfit = shopGrossProfit - breakEvenTarget; // Lợi nhuận ròng thực tế
 
@@ -276,6 +396,17 @@ async function getFinanceSummary(targetMonth) {
     type: r.type,
     amount: toNumber(r.amount),
     note: r.note || "",
+    profitEnabled: Boolean(r.profit_enabled),
+    profitFrequency: r.profit_frequency || null,
+    annualInterestRate: toNumber(r.annual_interest_rate),
+    profitDestination: r.profit_destination || null,
+    profitAccountId: r.profit_account_id ? Number(r.profit_account_id) : null,
+    profitCreditTime: r.profit_credit_time || null,
+    debtInterestEnabled: Boolean(r.debt_interest_enabled),
+    debtAnnualInterestRate: toNumber(r.debt_annual_interest_rate),
+    debtDueDay: r.debt_due_day ? Number(r.debt_due_day) : null,
+    debtEndDate: r.debt_end_date || null,
+    debtRepaymentFrequency: r.debt_repayment_frequency || null,
     updatedAt: r.updated_at,
   }));
 
@@ -339,6 +470,9 @@ async function getFinanceSummary(targetMonth) {
       isBreakEvenPassed: shopGrossProfit >= breakEvenTarget,
       activeFixedCostsTotal,
       installmentsInMonthTotal,
+      scheduledInstallmentsMonthlyTotal,
+      personalDebtMonthlyTotal,
+      monthlyDebtBurden,
     },
     dailyBreakEven,
     netWorth: {
@@ -391,6 +525,7 @@ async function updateFixedCost(id, payload) {
   if (payload.category !== undefined) updateData.category = payload.category;
   if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
   if (payload.note !== undefined) updateData.note = payload.note;
+
 
   const [updated] = await db(TABLES.FIXED_COSTS)
     .where("id", id)
@@ -451,6 +586,7 @@ async function updateInstallment(id, payload) {
   if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
   if (payload.note !== undefined) updateData.note = payload.note;
 
+
   const [updated] = await db(TABLES.INSTALLMENTS)
     .where("id", id)
     .update(updateData)
@@ -476,12 +612,34 @@ async function deleteInstallment(id) {
 
 // --- CRUD PERSONAL ASSETS ---
 async function createPersonalAsset(payload) {
+  const type = payload.type || "SAVINGS";
+  const profitConfig = normalizeProfitConfig({
+    type,
+    profitEnabled: Boolean(payload.profitEnabled),
+    profitFrequency: payload.profitFrequency,
+    annualInterestRate: payload.annualInterestRate,
+    profitDestination: payload.profitDestination,
+    profitAccountId: payload.profitAccountId,
+    profitCreditTime: payload.profitCreditTime,
+  });
+  await validateProfitAccount(profitConfig);
+  const debtConfig = normalizeDebtConfig({
+    type,
+    debtInterestEnabled: Boolean(payload.debtInterestEnabled),
+    debtAnnualInterestRate: payload.debtAnnualInterestRate,
+    debtDueDay: payload.debtDueDay,
+    debtEndDate: payload.debtEndDate,
+    debtRepaymentFrequency: payload.debtRepaymentFrequency,
+  });
+
   const [created] = await db(TABLES.PERSONAL_ASSETS)
     .insert({
       name: payload.name,
-      type: payload.type || "SAVINGS",
+      type,
       amount: toNumber(payload.amount),
       note: payload.note || "",
+      ...profitConfig,
+      ...debtConfig,
     })
     .returning("*");
 
@@ -491,15 +649,54 @@ async function createPersonalAsset(payload) {
     type: created.type,
     amount: toNumber(created.amount),
     note: created.note || "",
+    profitEnabled: Boolean(created.profit_enabled),
+    profitFrequency: created.profit_frequency || null,
+    annualInterestRate: toNumber(created.annual_interest_rate),
+    profitDestination: created.profit_destination || null,
+    profitAccountId: created.profit_account_id ? Number(created.profit_account_id) : null,
+    profitCreditTime: created.profit_credit_time || null,
+    debtInterestEnabled: Boolean(created.debt_interest_enabled),
+    debtAnnualInterestRate: toNumber(created.debt_annual_interest_rate),
+    debtDueDay: created.debt_due_day ? Number(created.debt_due_day) : null,
+    debtEndDate: created.debt_end_date || null,
+    debtRepaymentFrequency: created.debt_repayment_frequency || null,
   };
 }
 
 async function updatePersonalAsset(id, payload) {
+  const existing = await db(TABLES.PERSONAL_ASSETS).where("id", id).first();
+  if (!existing) return null;
+
+  const type = payload.type !== undefined ? payload.type : existing.type;
+  const profitEnabled = payload.profitEnabled !== undefined
+    ? Boolean(payload.profitEnabled)
+    : Boolean(existing.profit_enabled);
+  const profitConfig = normalizeProfitConfig({
+    type,
+    profitEnabled,
+    profitFrequency: payload.profitFrequency !== undefined ? payload.profitFrequency : existing.profit_frequency,
+    annualInterestRate: payload.annualInterestRate !== undefined ? payload.annualInterestRate : existing.annual_interest_rate,
+    profitDestination: payload.profitDestination !== undefined ? payload.profitDestination : existing.profit_destination,
+    profitAccountId: payload.profitAccountId !== undefined ? payload.profitAccountId : existing.profit_account_id,
+    profitCreditTime: payload.profitCreditTime !== undefined ? payload.profitCreditTime : existing.profit_credit_time,
+  });
+  await validateProfitAccount(profitConfig);
+  const debtConfig = normalizeDebtConfig({
+    type,
+    debtInterestEnabled: payload.debtInterestEnabled !== undefined ? Boolean(payload.debtInterestEnabled) : Boolean(existing.debt_interest_enabled),
+    debtAnnualInterestRate: payload.debtAnnualInterestRate !== undefined ? payload.debtAnnualInterestRate : existing.debt_annual_interest_rate,
+    debtDueDay: payload.debtDueDay !== undefined ? payload.debtDueDay : existing.debt_due_day,
+    debtEndDate: payload.debtEndDate !== undefined ? payload.debtEndDate : existing.debt_end_date,
+    debtRepaymentFrequency: payload.debtRepaymentFrequency !== undefined ? payload.debtRepaymentFrequency : existing.debt_repayment_frequency,
+  });
+
   const updateData = { updated_at: db.fn.now() };
   if (payload.name !== undefined) updateData.name = payload.name;
-  if (payload.type !== undefined) updateData.type = payload.type;
+  if (payload.type !== undefined) updateData.type = type;
   if (payload.amount !== undefined) updateData.amount = toNumber(payload.amount);
   if (payload.note !== undefined) updateData.note = payload.note;
+  Object.assign(updateData, profitConfig);
+  Object.assign(updateData, debtConfig);
 
   const [updated] = await db(TABLES.PERSONAL_ASSETS)
     .where("id", id)
@@ -513,6 +710,17 @@ async function updatePersonalAsset(id, payload) {
     type: updated.type,
     amount: toNumber(updated.amount),
     note: updated.note || "",
+    profitEnabled: Boolean(updated.profit_enabled),
+    profitFrequency: updated.profit_frequency || null,
+    annualInterestRate: toNumber(updated.annual_interest_rate),
+    profitDestination: updated.profit_destination || null,
+    profitAccountId: updated.profit_account_id ? Number(updated.profit_account_id) : null,
+    profitCreditTime: updated.profit_credit_time || null,
+    debtInterestEnabled: Boolean(updated.debt_interest_enabled),
+    debtAnnualInterestRate: toNumber(updated.debt_annual_interest_rate),
+    debtDueDay: updated.debt_due_day ? Number(updated.debt_due_day) : null,
+    debtEndDate: updated.debt_end_date || null,
+    debtRepaymentFrequency: updated.debt_repayment_frequency || null,
   };
 }
 

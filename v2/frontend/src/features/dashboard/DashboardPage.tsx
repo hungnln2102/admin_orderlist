@@ -31,6 +31,8 @@ interface DashboardData {
     totalCost: number;
     totalRefund: number;
     totalProfit: number;
+    grossProfit: number;
+    financeCosts: number;
     ordersGrowth: number;
     canceledGrowth: number;
     revenueGrowth: number;
@@ -107,6 +109,8 @@ export const DashboardPage: React.FC = () => {
     totalCost: 0,
     totalRefund: 0,
     totalProfit: 0,
+    grossProfit: 0,
+    financeCosts: 0,
     ordersGrowth: 0,
     canceledGrowth: 0,
     revenueGrowth: 0,
@@ -354,7 +358,7 @@ export const DashboardPage: React.FC = () => {
         <StatCard
           title="Tổng Lợi Nhuận"
           value={formatVND(summary.totalProfit)}
-          subtitle={`Biên lợi nhuận ${summary.profitMargin}%`}
+          subtitle={`Sau chi phí tài chính · Biên ${summary.profitMargin}%`}
           icon={TrendingUp}
           trend={{
             value: `${Math.abs(summary.profitGrowth)}%`,

@@ -34,6 +34,12 @@ export interface Installment {
   createdAt?: string;
 }
 
+export type ProfitFrequency = "DAILY" | "MONTHLY" | "YEARLY";
+
+export type ProfitDestination = "REINVEST" | "CASH_BANK" | "SHOP_BALANCE" | "OTHER";
+
+export type DebtRepaymentFrequency = "DAILY" | "MONTHLY";
+
 export type PersonalAssetType =
   | "SAVINGS"
   | "CASH_BANK"
@@ -47,6 +53,17 @@ export interface PersonalAsset {
   type: PersonalAssetType;
   amount: number;
   note?: string;
+  profitEnabled?: boolean;
+  profitFrequency?: ProfitFrequency | null;
+  annualInterestRate?: number;
+  profitDestination?: ProfitDestination | null;
+  profitAccountId?: number | null;
+  profitCreditTime?: string | null;
+  debtInterestEnabled?: boolean;
+  debtAnnualInterestRate?: number;
+  debtDueDay?: number | null;
+  debtEndDate?: string | null;
+  debtRepaymentFrequency?: DebtRepaymentFrequency | null;
   updatedAt?: string;
 }
 
@@ -63,6 +80,8 @@ export interface BreakEvenMetrics {
   isBreakEvenPassed: boolean;
   activeFixedCostsTotal: number;
   installmentsInMonthTotal: number;
+  personalDebtMonthlyTotal: number;
+  monthlyDebtBurden: number;
 }
 
 export interface NetWorthBreakdown {

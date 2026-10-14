@@ -94,6 +94,47 @@ async function getOrderStatsForRange(start, end) {
   return { totalOrders, canceledOrders, totalRevenue, totalCost, totalRefund, totalProfit };
 }
 
+function getMonthKeysInRange(start, end) {
+  const keys = [];
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+  const lastMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+
+  while (cursor <= lastMonth) {
+    keys.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return keys;
+}
+
+function isInstallmentActiveInMonth(item, monthKey) {
+  if (!item.is_active || item.status === "COMPLETED") return false;
+
+  const [startYear, startMonth] = String(item.start_period).split("-").map(Number);
+  const [targetYear, targetMonth] = monthKey.split("-").map(Number);
+  const monthDiff = (targetYear - startYear) * 12 + targetMonth - startMonth;
+  return monthDiff >= 0 && monthDiff < Number(item.total_periods || 0);
+}
+
+async function getFinanceCostsForRange(start, end) {
+  const [fixedCostRow, installmentRows] = await Promise.all([
+    db(TABLES.FIXED_COSTS)
+      .where("is_active", true)
+      .sum({ total: "amount" })
+      .first(),
+    db(TABLES.INSTALLMENTS)
+      .select("monthly_amount", "total_periods", "start_period", "status", "is_active"),
+  ]);
+
+  const monthlyFixedCosts = Number(fixedCostRow?.total || 0);
+  return getMonthKeysInRange(start, end).reduce((total, monthKey) => {
+    const monthlyInstallments = installmentRows
+      .filter((item) => isInstallmentActiveInMonth(item, monthKey))
+      .reduce((sum, item) => sum + Number(item.monthly_amount || 0), 0);
+    return total + monthlyFixedCosts + monthlyInstallments;
+  }, 0);
+}
+
 /**
  * Tính toán báo cáo tổng quan Dashboard (Trích xuất từ bảng chuẩn daily_revenue_summary)
  */
@@ -103,15 +144,19 @@ async function getDashboardSummary(params = {}) {
   // 1. Thống kê kỳ hiện tại & kỳ so sánh trực tiếp từ daily_revenue_summary
   const currentStats = await getOrderStatsForRange(start, end);
   const prevStats = await getOrderStatsForRange(prevStart, prevEnd);
+  const currentFinanceCosts = await getFinanceCostsForRange(start, end);
+  const previousFinanceCosts = await getFinanceCostsForRange(prevStart, prevEnd);
 
-  const { totalOrders, canceledOrders, totalRevenue, totalCost, totalRefund, totalProfit } = currentStats;
-  const { totalOrders: prevOrders, canceledOrders: prevCanceled, totalRevenue: prevRevenue, totalCost: prevCost, totalRefund: prevRefund, totalProfit: prevProfit } = prevStats;
+  const { totalOrders, canceledOrders, totalRevenue, totalCost, totalRefund, totalProfit: grossProfit } = currentStats;
+  const { totalOrders: prevOrders, canceledOrders: prevCanceled, totalRevenue: prevRevenue, totalCost: prevCost, totalRefund: prevRefund, totalProfit: previousGrossProfit } = prevStats;
+  const totalProfit = grossProfit - currentFinanceCosts;
+  const previousProfit = previousGrossProfit - previousFinanceCosts;
 
   // Tính phần trăm tăng trưởng
   const ordersGrowth = prevOrders > 0 ? (((totalOrders - prevOrders) / prevOrders) * 100).toFixed(1) : totalOrders > 0 ? "100" : "0";
   const canceledGrowth = prevCanceled > 0 ? (((canceledOrders - prevCanceled) / prevCanceled) * 100).toFixed(1) : canceledOrders > 0 ? "100" : "0";
   const revenueGrowth = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : totalRevenue > 0 ? "100" : "0";
-  const profitGrowth = prevProfit > 0 ? (((totalProfit - prevProfit) / prevProfit) * 100).toFixed(1) : totalProfit > 0 ? "100" : "0";
+  const profitGrowth = previousProfit !== 0 ? (((totalProfit - previousProfit) / Math.abs(previousProfit)) * 100).toFixed(1) : totalProfit !== 0 ? "100" : "0";
   const costGrowth = prevCost > 0 ? (((totalCost - prevCost) / prevCost) * 100).toFixed(1) : totalCost > 0 ? "100" : "0";
   const refundGrowth = prevRefund > 0 ? (((totalRefund - prevRefund) / prevRefund) * 100).toFixed(1) : totalRefund > 0 ? "100" : "0";
 
@@ -278,6 +323,8 @@ async function getDashboardSummary(params = {}) {
       totalCost,
       totalRefund,
       totalProfit,
+      grossProfit,
+      financeCosts: currentFinanceCosts,
       ordersGrowth: parseFloat(ordersGrowth),
       canceledGrowth: parseFloat(canceledGrowth),
       revenueGrowth: parseFloat(revenueGrowth),

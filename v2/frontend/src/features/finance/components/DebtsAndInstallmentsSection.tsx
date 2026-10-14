@@ -1,17 +1,7 @@
 import React, { useState } from "react";
 import { Installment, PersonalAsset } from "../types";
 import { formatVND } from "@/shared/utils";
-import {
-  CreditCard,
-  Clock,
-  Building2,
-  Plus,
-  Edit2,
-  Trash2,
-  ExternalLink,
-  CheckCircle2,
-  AlertCircle
-} from "lucide-react";
+import { Building2, CheckCircle2, Clock3, CreditCard, Edit2, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { InstallmentModal } from "./InstallmentModal";
 import { PersonalAssetsModal } from "./PersonalAssetsModal";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +11,7 @@ interface Props {
   personalDebts: PersonalAsset[];
   supplierDebtTotal: number;
   totalInstallmentsRemainingDebt: number;
+  monthlyDebtBurden: number;
   onAddInstallment: (payload: any) => Promise<void>;
   onEditInstallment: (id: number, payload: any) => Promise<void>;
   onDeleteInstallment: (id: number) => Promise<void>;
@@ -29,11 +20,23 @@ interface Props {
   onDeletePersonalDebt: (id: number) => Promise<void>;
 }
 
+const getDebtSchedule = (item: PersonalAsset) => {
+  if (!item.debtEndDate) return null;
+  const remainingDays = Math.max(1, Math.ceil((new Date(`${item.debtEndDate}T23:59:59`).getTime() - Date.now()) / 86400000));
+  const remainingMonths = Math.max(1, Math.ceil(remainingDays / 30.44));
+  const rate = item.debtInterestEnabled ? Number(item.debtAnnualInterestRate || 0) : 0;
+  const estimatedTotal = item.amount + (item.amount * rate / 100 * remainingDays / 365);
+  const dailyAmount = estimatedTotal / remainingDays;
+  const monthlyAmount = item.debtRepaymentFrequency === "DAILY" ? dailyAmount * 30.44 : estimatedTotal / remainingMonths;
+  return { remainingDays, remainingMonths, monthlyAmount };
+};
+
 export const DebtsAndInstallmentsSection: React.FC<Props> = ({
   installments,
   personalDebts,
   supplierDebtTotal,
   totalInstallmentsRemainingDebt,
+  monthlyDebtBurden,
   onAddInstallment,
   onEditInstallment,
   onDeleteInstallment,
@@ -42,351 +45,29 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
   onDeletePersonalDebt,
 }) => {
   const navigate = useNavigate();
-
-  // Modal states for Installment
   const [installmentModalOpen, setInstallmentModalOpen] = useState(false);
   const [editingInstallment, setEditingInstallment] = useState<Installment | null>(null);
-
-  // Modal states for Personal Debt
   const [debtModalOpen, setDebtModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<PersonalAsset | null>(null);
-
-  const debtsPayableList = personalDebts.filter((d) => d.type === "DEBT_PAYABLE");
-  const debtsReceivableList = personalDebts.filter((d) => d.type === "DEBT_RECEIVABLE");
-
-  const personalDebtTotal = debtsPayableList.reduce((sum, d) => sum + d.amount, 0);
-  const totalAllLiabilities =
-    totalInstallmentsRemainingDebt + supplierDebtTotal + personalDebtTotal;
-
-  // Handlers for Installment Modal
-  const handleOpenAddInstallment = () => {
-    setEditingInstallment(null);
-    setInstallmentModalOpen(true);
-  };
-
-  const handleOpenEditInstallment = (item: Installment) => {
-    setEditingInstallment(item);
-    setInstallmentModalOpen(true);
-  };
-
-  const handleSaveInstallment = async (payload: any) => {
-    if (editingInstallment) {
-      await onEditInstallment(editingInstallment.id, payload);
-    } else {
-      await onAddInstallment(payload);
-    }
-  };
-
-  // Handlers for Personal Debt Modal
-  const handleOpenAddDebt = () => {
-    setEditingDebt(null);
-    setDebtModalOpen(true);
-  };
-
-  const handleOpenEditDebt = (item: PersonalAsset) => {
-    setEditingDebt(item);
-    setDebtModalOpen(true);
-  };
-
-  const handleSaveDebt = async (payload: any) => {
-    if (editingDebt) {
-      await onEditPersonalDebt(editingDebt.id, payload);
-    } else {
-      await onAddPersonalDebt(payload);
-    }
-  };
+  const debtsPayableList = personalDebts.filter((item) => item.type === "DEBT_PAYABLE");
+  const debtsReceivableList = personalDebts.filter((item) => item.type === "DEBT_RECEIVABLE");
+  const totalPersonalDebt = debtsPayableList.reduce((sum, item) => sum + item.amount, 0);
+  const totalAllLiabilities = totalInstallmentsRemainingDebt + supplierDebtTotal + totalPersonalDebt;
+  const openInstallment = (item: Installment | null = null) => { setEditingInstallment(item); setInstallmentModalOpen(true); };
+  const openDebt = (item: PersonalAsset | null = null) => { setEditingDebt(item); setDebtModalOpen(true); };
+  const saveInstallment = async (payload: any) => editingInstallment ? onEditInstallment(editingInstallment.id, payload) : onAddInstallment(payload);
+  const saveDebt = async (payload: any) => editingDebt ? onEditPersonalDebt(editingDebt.id, payload) : onAddPersonalDebt(payload);
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner: Tổng Hợp Nghĩa Vụ Nợ */}
-      <div className="bg-gradient-to-r from-rose-950/40 via-slate-900 to-amber-950/30 p-4 sm:p-5 rounded-2xl border border-rose-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-2">
-          <span className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            <CreditCard className="w-5 h-5" />
-          </span>
-          <h3 className="text-base sm:text-lg font-black text-white">
-            Toàn Bộ Khoản Nợ & Nghĩa Vụ Trả Góp
-          </h3>
-        </div>
-        <div className="text-left sm:text-right">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-            Tổng nợ & dư nợ còn lại
-          </span>
-          <span className="text-xl sm:text-2xl font-mono font-black text-rose-300">
-            {formatVND(totalAllLiabilities)}
-          </span>
-        </div>
-      </div>
+    <div className="space-y-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-[#0b1422] px-4 py-3"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-400/10 text-rose-300"><CreditCard className="h-4 w-4" /></div><div><h3 className="text-sm font-semibold text-white">Nợ & nghĩa vụ tài chính</h3><p className="mt-0.5 text-[11px] text-slate-500">Các khoản cần theo dõi và thanh toán</p></div></div><div className="text-right"><div className="text-[10px] uppercase tracking-wider text-slate-500">Chi phí phải gánh / tháng</div><div className="font-mono text-sm font-semibold text-rose-300">{formatVND(monthlyDebtBurden)}</div><div className="text-[10px] text-slate-500">Tổng dư nợ: {formatVND(totalAllLiabilities)}</div></div></header>
 
-      {/* KHỐI 1: CÁC KHOẢN TRẢ GÓP THEO KỲ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-400" />
-            1. Các Khoản Mua Sắm Trả Góp
-          </h4>
-          <button
-            onClick={handleOpenAddInstallment}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Thêm Khoản Trả Góp
-          </button>
-        </div>
+      <section className="overflow-hidden rounded-xl border border-slate-800 bg-[#0b1422]"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium text-white"><Clock3 className="h-4 w-4 text-amber-300" /> Trả góp theo kỳ <span className="text-xs font-normal text-slate-500">{installments.length} khoản</span></div><button type="button" onClick={() => openInstallment()} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/[0.06] px-2.5 py-1.5 text-[11px] font-medium text-amber-200 transition-colors hover:bg-amber-400/[0.12]"><Plus className="h-3.5 w-3.5" /> Thêm khoản</button></div>{installments.length === 0 ? <div className="flex items-center gap-3 px-4 py-4 text-xs text-slate-500"><Clock3 className="h-5 w-5 text-slate-600" /><span>Chưa có khoản trả góp. Thêm một khoản để bắt đầu theo dõi.</span></div> : <div className="divide-y divide-slate-800/80">{installments.map((item) => { const completed = item.status === "COMPLETED"; const percent = Math.min(100, Math.round((item.currentPeriod / Math.max(1, item.totalPeriods)) * 100)); return <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-900/70"><div className="min-w-[180px] flex-1"><div className="flex items-center gap-2"><span className={`text-sm font-medium ${completed ? "text-slate-500 line-through" : "text-slate-200"}`}>{item.name}</span>{completed && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />}</div><div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500"><span>Đến kỳ {item.currentPeriod}/{item.totalPeriods}</span><span className="h-1 w-20 overflow-hidden rounded-full bg-slate-800"><span className="block h-full rounded-full bg-amber-300/70" style={{ width: `${percent}%` }} /></span></div></div><div className="font-mono text-sm text-amber-200">{formatVND(item.monthlyAmount)}<span className="ml-1 text-[10px] text-slate-500">/ tháng</span></div><div className="flex items-center gap-1"><button type="button" aria-label={`Sửa ${item.name}`} onClick={() => openInstallment(item)} className="cursor-pointer rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-cyan-300"><Edit2 className="h-3.5 w-3.5" /></button><button type="button" aria-label={`Xóa ${item.name}`} onClick={() => { if (confirm(`Xóa khoản trả góp "${item.name}"?`)) onDeleteInstallment(item.id); }} className="cursor-pointer rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button></div></div>; })}</div>}</section>
 
-        {installments.length === 0 ? (
-          <div className="p-8 text-center border border-dashed border-slate-800 rounded-2xl space-y-2 bg-slate-900/30">
-            <Clock className="w-8 h-8 text-slate-600 mx-auto" />
-            <div className="text-xs font-semibold text-slate-400">
-              Chưa có khoản mua trả góp nào
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Bấm "Thêm Khoản Trả Góp" để đưa các khoản mua xe, máy tính, điện thoại vào theo dõi.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {installments.map((item) => {
-              const isCompleted = item.status === "COMPLETED";
-              const percentPeriod = Math.min(
-                100,
-                Math.round((item.currentPeriod / item.totalPeriods) * 100)
-              );
+      <div className="grid gap-3"><section className="overflow-hidden rounded-xl border border-slate-800 bg-[#0b1422]"><div className="flex items-center justify-between border-b border-slate-800 px-4 py-3"><div className="flex items-center gap-2 text-sm font-medium text-white"><CreditCard className="h-4 w-4 text-violet-300" /> Nợ cá nhân</div><button type="button" onClick={() => openDebt()} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/25 bg-violet-400/[0.06] px-2.5 py-1.5 text-[11px] font-medium text-violet-200 transition-colors hover:bg-violet-400/[0.12]"><Plus className="h-3.5 w-3.5" /> Thêm nợ</button></div>{debtsPayableList.length === 0 && debtsReceivableList.length === 0 ? <div className="px-4 py-4 text-xs text-slate-500">Chưa có khoản nợ cá nhân ngoài shop.</div> : <div className="divide-y divide-slate-800/80">{[...debtsPayableList.map((item) => ({ ...item, tone: "rose", label: "Phải trả" })), ...debtsReceivableList.map((item) => ({ ...item, tone: "cyan", label: "Phải thu" }))].map((item) => { const schedule = getDebtSchedule(item); return <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5"><div className="min-w-0"><div className="truncate text-sm text-slate-200">{item.name}</div><div className={`text-[10px] ${item.tone === "rose" ? "text-rose-300" : "text-cyan-300"}`}>{item.label}</div>{schedule && <div className="mt-1 text-[10px] text-slate-500">Đóng/tháng {formatVND(schedule.monthlyAmount)} · Còn {schedule.remainingMonths} tháng</div>}</div><div className="flex items-center gap-1"><span className={`font-mono text-xs ${item.tone === "rose" ? "text-rose-300" : "text-cyan-300"}`}>{formatVND(item.amount)}</span><button type="button" aria-label={`Sửa ${item.name}`} onClick={() => openDebt(item)} className="cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-slate-800 hover:text-cyan-300"><Edit2 className="h-3.5 w-3.5" /></button><button type="button" aria-label={`Xóa ${item.name}`} onClick={() => { if (confirm(`Xóa mục "${item.name}"?`)) onDeletePersonalDebt(item.id); }} className="cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-slate-800 hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button></div></div>; })}</div>}</section></div>
 
-              return (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col justify-between ${
-                    isCompleted
-                      ? "bg-slate-900/40 border-slate-800/60 opacity-60"
-                      : "bg-slate-900/90 border-slate-800 hover:border-amber-500/40 shadow-lg"
-                  }`}
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <h5 className="font-bold text-white text-sm leading-tight truncate" title={item.name}>
-                        {item.name}
-                      </h5>
-                      {isCompleted ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 shrink-0">
-                          <CheckCircle2 className="w-3 h-3" /> ĐÃ HẾT KỲ
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20 shrink-0">
-                          KỲ {item.currentPeriod} / {item.totalPeriods}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-500 block">Số tiền/tháng</span>
-                        <span className="font-mono font-extrabold text-amber-300">{formatVND(item.monthlyAmount)}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] uppercase font-bold text-slate-500 block">Đến hạn</span>
-                        <span className="font-mono text-slate-300">Ngày {item.dueDay}/tháng</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>Tiến độ: {percentPeriod}%</span>
-                        <span>{isCompleted ? "Tất toán 100%" : `Còn ${item.remainingPeriods} kỳ`}</span>
-                      </div>
-                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isCompleted ? "bg-emerald-400" : "bg-amber-400"
-                          }`}
-                          style={{ width: `${percentPeriod}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>Dư nợ còn lại:</span>
-                      <span className="font-mono font-bold text-slate-200">{formatVND(item.remainingDebt)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-1 pt-3 mt-2 border-t border-slate-800/80">
-                    <button
-                      onClick={() => handleOpenEditInstallment(item)}
-                      className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                      title="Sửa thông tin"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Bạn có chắc muốn xóa khoản trả góp "${item.name}"?`)) {
-                          onDeleteInstallment(item.id);
-                        }
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                      title="Xóa khoản trả góp"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* KHỐI 2 & 3: NỢ NHÀ CUNG CẤP & SỔ NỢ CÁ NHÂN */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-        {/* Khối 2: Nợ Nhà Cung Cấp */}
-        <div className="space-y-3">
-          <div className="border-b border-slate-800 pb-2">
-            <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-rose-400" />
-              2. Nợ Nhà Cung Cấp
-            </h4>
-          </div>
-
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">Công Nợ NCC</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                  ĐỒNG BỘ ĐƠN HÀNG
-                </span>
-              </div>
-              <div className="text-right flex items-center gap-2">
-                <span className="font-mono font-black text-rose-400 text-lg">
-                  {formatVND(supplierDebtTotal)}
-                </span>
-                <button
-                  onClick={() => navigate("/sources")}
-                  className="p-2 text-slate-400 hover:text-cyan-300 rounded-xl hover:bg-slate-800 transition-colors"
-                  title="Mở trang Đối Soát Nhà Cung Cấp"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Khối 3: Sổ Nợ Cá Nhân */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-purple-400" />
-              3. Nợ Cá Nhân Ngoài Shop
-            </h4>
-            <button
-              onClick={handleOpenAddDebt}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Thêm Nợ Cá Nhân
-            </button>
-          </div>
-
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl divide-y divide-slate-800/70 overflow-hidden shadow-lg">
-            {debtsPayableList.length === 0 && debtsReceivableList.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                Không có khoản nợ cá nhân nào ngoài shop. Bấm "Thêm Nợ Cá Nhân" để bổ sung.
-              </div>
-            ) : (
-              <>
-                {debtsPayableList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">{item.name}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                          NỢ PHẢI TRẢ
-                        </span>
-                      </div>
-                      {item.note && <p className="text-xs text-slate-400 italic">{item.note}</p>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-rose-400 text-sm">
-                        {formatVND(item.amount)}
-                      </span>
-                      <button
-                        onClick={() => handleOpenEditDebt(item)}
-                        className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-slate-800 transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Xóa khoản nợ "${item.name}"?`)) onDeletePersonalDebt(item.id);
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {debtsReceivableList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">{item.name}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                          CHO VAY (PHẢI THU)
-                        </span>
-                      </div>
-                      {item.note && <p className="text-xs text-slate-400 italic">{item.note}</p>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-cyan-300 text-sm">
-                        {formatVND(item.amount)}
-                      </span>
-                      <button
-                        onClick={() => handleOpenEditDebt(item)}
-                        className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-slate-800 transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Xóa mục "${item.name}"?`)) onDeletePersonalDebt(item.id);
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Modals */}
-      <InstallmentModal
-        isOpen={installmentModalOpen}
-        onClose={() => setInstallmentModalOpen(false)}
-        onSave={handleSaveInstallment}
-        editingItem={editingInstallment}
-      />
-
-      <PersonalAssetsModal
-        isOpen={debtModalOpen}
-        onClose={() => setDebtModalOpen(false)}
-        onSave={handleSaveDebt}
-        editingItem={editingDebt}
-        defaultType="DEBT_PAYABLE"
-      />
+      <InstallmentModal isOpen={installmentModalOpen} onClose={() => setInstallmentModalOpen(false)} onSave={saveInstallment} editingItem={editingInstallment} />
+      <PersonalAssetsModal isOpen={debtModalOpen} onClose={() => setDebtModalOpen(false)} onSave={saveDebt} editingItem={editingDebt} defaultType="DEBT_PAYABLE" />
     </div>
   );
 };

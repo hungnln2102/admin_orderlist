@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FixedCost, FixedCostCategory } from "../types";
-import { X, Save, DollarSign, Home, Tag } from "lucide-react";
+import { X, Save, Home, Tag } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -9,6 +9,13 @@ interface Props {
   editingItem?: FixedCost | null;
 }
 
+const formatAmountInput = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits).toLocaleString("vi-VN") : "";
+};
+
+const parseAmountInput = (value: string) => Number(value.replace(/\D/g, ""));
+
 export const FixedCostModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -16,7 +23,8 @@ export const FixedCostModal: React.FC<Props> = ({
   editingItem,
 }) => {
   const [name, setName] = useState("");
-  const [amount, setAmount] = useState<number | "">("");
+  const [amount, setAmount] = useState("");
+  const amountInputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<FixedCostCategory>("LIVING");
   const [note, setNote] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -25,7 +33,7 @@ export const FixedCostModal: React.FC<Props> = ({
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
-      setAmount(editingItem.amount);
+      setAmount(formatAmountInput(String(editingItem.amount)));
       setCategory(editingItem.category || "LIVING");
       setNote(editingItem.note || "");
       setIsActive(editingItem.isActive);
@@ -40,9 +48,30 @@ export const FixedCostModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
+  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = event.target.value;
+    const caretPosition = event.target.selectionStart ?? rawValue.length;
+    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
+    const formattedValue = formatAmountInput(rawValue);
+
+    setAmount(formattedValue);
+    requestAnimationFrame(() => {
+      const input = amountInputRef.current;
+      if (!input) return;
+      let nextCaret = 0;
+      let digitCount = 0;
+      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
+        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
+        nextCaret += 1;
+      }
+      input.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !amount) {
+    const amountValue = parseAmountInput(amount);
+    if (!name.trim() || amountValue < 1000) {
       alert("Vui lòng điền tên và số tiền chi phí");
       return;
     }
@@ -51,7 +80,7 @@ export const FixedCostModal: React.FC<Props> = ({
       setSubmitting(true);
       await onSave({
         name: name.trim(),
-        amount: Number(amount),
+        amount: amountValue,
         category,
         note: note.trim(),
         isActive,
@@ -108,15 +137,16 @@ export const FixedCostModal: React.FC<Props> = ({
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  placeholder="5000000"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="5.000.000"
+                  ref={amountInputRef}
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : "")}
+                  onChange={handleAmountChange}
                   required
-                  min="1000"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400 pl-9 font-mono"
                 />
-                <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <span className="absolute left-3 top-2.5 text-sm text-slate-500">₫</span>
               </div>
             </div>
 

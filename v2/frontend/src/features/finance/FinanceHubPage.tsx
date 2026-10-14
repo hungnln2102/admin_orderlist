@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { FinanceSummaryData } from "./types";
 import { NetWorthCards } from "./components/NetWorthCards";
-import { SmartForecastBreakEvenSection } from "./components/SmartForecastBreakEvenSection";
+import { FinanceOverviewPanel } from "./components/FinanceOverviewPanel";
 import { DebtsAndInstallmentsSection } from "./components/DebtsAndInstallmentsSection";
 import { FixedCostList } from "./components/FixedCostList";
 import { SavingsAndAssetsSection } from "./components/SavingsAndAssetsSection";
@@ -130,20 +130,20 @@ export const FinanceHubPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in duration-300">
+    <div className="space-y-4 pb-8 animate-in fade-in duration-300">
       {/* Top Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-5 rounded-2xl border border-slate-800 backdrop-blur-xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-3 sm:p-4 rounded-xl border border-slate-800 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
             <Coins className="w-5 h-5" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
             Trung Tâm Quản Trị Tài Chính
           </h1>
         </div>
 
         {/* Month Selector & Refresh Button */}
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start md:self-auto">
           <div className="relative flex items-center">
             <input
               type="month"
@@ -181,28 +181,26 @@ export const FinanceHubPage: React.FC = () => {
 
       {/* Main Content */}
       {data && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Section 1: KPI Cards Tài Sản Ròng */}
           <NetWorthCards metrics={data.netWorth} />
 
-          {/* Section 2: Trợ Lý Dự Báo Dòng Tiền & Điểm Hòa Vốn (Smart Forecast Command Section) */}
-          {data.dailyBreakEven && (
-            <SmartForecastBreakEvenSection
-              breakEven={data.breakEven}
-              dailyBreakEven={data.dailyBreakEven}
-              month={data.month}
-            />
-          )}
+          <FinanceOverviewPanel
+            breakEven={data.breakEven}
+            dailyBreakEven={data.dailyBreakEven}
+            netWorth={data.netWorth}
+            month={data.month}
+          />
 
           {/* Section 3: Navigation Tabs */}
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+          <div className="space-y-3 pt-0">
+            <div className="flex items-center gap-1 border-b border-slate-800 pb-2 overflow-x-auto">
               <button
                 onClick={() => setActiveTab("DEBTS_INSTALLMENTS")}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "DEBTS_INSTALLMENTS"
-                    ? "bg-rose-500/10 text-rose-300 border border-rose-500/30 shadow-lg shadow-rose-950/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                    ? "bg-slate-800 text-white border border-slate-700 shadow-none"
+                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-900"
                 }`}
               >
                 <CreditCard className="w-4 h-4 text-rose-400" />
@@ -211,10 +209,10 @@ export const FinanceHubPage: React.FC = () => {
 
               <button
                 onClick={() => setActiveTab("FIXED_COSTS")}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "FIXED_COSTS"
-                    ? "bg-amber-500/10 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-950/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                    ? "bg-slate-800 text-white border border-slate-700 shadow-none"
+                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-900"
                 }`}
               >
                 <Home className="w-4 h-4 text-amber-400" />
@@ -223,10 +221,10 @@ export const FinanceHubPage: React.FC = () => {
 
               <button
                 onClick={() => setActiveTab("SAVINGS_ASSETS")}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "SAVINGS_ASSETS"
-                    ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-950/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                    ? "bg-slate-800 text-white border border-slate-700 shadow-none"
+                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-900"
                 }`}
               >
                 <Wallet className="w-4 h-4 text-emerald-400" />
@@ -235,13 +233,14 @@ export const FinanceHubPage: React.FC = () => {
             </div>
 
             {/* Tab Views */}
-            <div className="pt-2">
+            <div className="pt-1">
               {activeTab === "DEBTS_INSTALLMENTS" && (
                 <DebtsAndInstallmentsSection
                   installments={data.installments}
                   personalDebts={data.personalAssets}
                   supplierDebtTotal={data.netWorth.breakdown.supplierDebtTotal}
                   totalInstallmentsRemainingDebt={data.netWorth.breakdown.totalInstallmentsRemainingDebt}
+                  monthlyDebtBurden={data.breakEven.monthlyDebtBurden}
                   onAddInstallment={handleAddInstallment}
                   onEditInstallment={handleEditInstallment}
                   onDeleteInstallment={handleDeleteInstallment}

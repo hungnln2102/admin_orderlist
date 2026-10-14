@@ -145,6 +145,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                       </span>
                     </div>
                     {item.note && <p className="text-xs text-slate-400 italic">{item.note}</p>}
+                    {item.profitEnabled && <p className="text-[10px] text-purple-300">Sinh lời {item.annualInterestRate || 0}%/năm · {item.profitFrequency === "DAILY" ? "ngày" : item.profitFrequency === "YEARLY" ? "năm" : "tháng"}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-emerald-300 text-sm">
