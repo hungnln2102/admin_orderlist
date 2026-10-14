@@ -163,8 +163,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         if (!prev.customer || prev.customer === "Khách Hàng" || prev.customer === "test") {
           updated.customer = "Mavryk";
         }
-        updated.price = prev.cost || 0;
-        updated.gross_selling_price = prev.cost || 0;
+        updated.price = 0;
+        updated.gross_selling_price = 0;
       } else {
         if (!isEditModalOpen) {
           updated.status = ORDER_STATUS.UNPAID;
@@ -374,7 +374,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     }
     try {
       const prefix = isImportTab ? ORDER_PREFIX.MAVN : (formData.order_prefix || ORDER_PREFIX.MAVC);
-      const generatedCode = isImportTab ? undefined : `${prefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const generatedCode = `${prefix}${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
       const payload = {
         ...formData,

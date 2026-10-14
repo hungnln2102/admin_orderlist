@@ -52,6 +52,9 @@ const TABLES = {
   DAILY_REVENUE_SUMMARY: formatTable(SCHEMAS.DASHBOARD, "daily_revenue_summary"),
   SYSTEM_CONFIGS: formatTable(SCHEMAS.SYSTEM, "system_configs"),
   NOTIFICATION_LOGS: formatTable(SCHEMAS.SYSTEM, "notification_logs"),
+  FIXED_COSTS: formatTable(SCHEMAS.FINANCE, "fixed_costs"),
+  INSTALLMENTS: formatTable(SCHEMAS.FINANCE, "installments"),
+  PERSONAL_ASSETS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
 };
 
 const COLS = {

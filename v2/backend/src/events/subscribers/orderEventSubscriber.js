@@ -193,7 +193,31 @@ function registerOrderEventSubscribers() {
     });
   });
 
-  console.log("✅ [EventBus] Đăng ký thành công Order Event Subscribers (CREATED, UPDATED, DELETED, PAID, RENEWED, PENDING_REFUND, EXPIRED)");
+  // Lắng nghe sự kiện Tạo đơn nhập hàng
+  eventBus.on(EVENTS.ORDER_IMPORT_CREATED, async (data) => {
+    console.log(`📦 [EventSubscriber] Tiếp nhận event ORDER_IMPORT_CREATED cho đơn #${data.orderId} (${data.id_order})`);
+    await recordEvent({
+      eventName: EVENTS.ORDER_IMPORT_CREATED,
+      aggregateType: "ORDER",
+      aggregateId: data.orderId || data.id_order,
+      payload: data,
+      status: "PROCESSED",
+    });
+  });
+
+  // Lắng nghe sự kiện Hủy/Xóa đơn nhập hàng
+  eventBus.on(EVENTS.ORDER_IMPORT_CANCELED, async (data) => {
+    console.log(`📦 [EventSubscriber] Tiếp nhận event ORDER_IMPORT_CANCELED cho đơn #${data.orderId} (${data.id_order})`);
+    await recordEvent({
+      eventName: EVENTS.ORDER_IMPORT_CANCELED,
+      aggregateType: "ORDER",
+      aggregateId: data.orderId || data.id_order,
+      payload: data,
+      status: "PROCESSED",
+    });
+  });
+
+  console.log("✅ [EventBus] Đăng ký thành công Order Event Subscribers (CREATED, UPDATED, DELETED, PAID, RENEWED, PENDING_REFUND, EXPIRED, IMPORT_CREATED, IMPORT_CANCELED)");
 }
 
 module.exports = { registerOrderEventSubscribers };

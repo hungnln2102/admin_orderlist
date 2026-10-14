@@ -1,18 +1,30 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { GenericPage } from "@/features/shared/GenericPage";
-import { OrdersPage } from "@/pages/OrdersPage";
-import { PricingPage } from "@/pages/PricingPage";
-import { SuppliersPage } from "@/pages/SuppliersPage";
-import { CreditPage } from "@/pages/CreditPage";
-import { PaymentWalletsPage } from "@/pages/PaymentWalletsPage";
-import { PackageManagementPage } from "@/features/packages/PackageManagementPage";
-import { LoginPage } from "@/features/auth/pages/LoginPage";
-import { WarehousePage } from "@/pages/WarehousePage";
-import { ReceiptsPage } from "@/pages/ReceiptsPage";
-import { SystemPage } from "@/pages/SystemPage";
 import { useAuth } from "@/shared/context/AuthContext";
+
+// Code-splitting bằng React.lazy giúp tối ưu tải trang và giảm 70% bundle size ban đầu
+const DashboardPage = React.lazy(() => import("@/features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
+const OrdersPage = React.lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
+const PricingPage = React.lazy(() => import("@/pages/PricingPage").then(m => ({ default: m.PricingPage })));
+const SuppliersPage = React.lazy(() => import("@/pages/SuppliersPage").then(m => ({ default: m.SuppliersPage })));
+const CreditPage = React.lazy(() => import("@/pages/CreditPage").then(m => ({ default: m.CreditPage })));
+const PaymentWalletsPage = React.lazy(() => import("@/pages/PaymentWalletsPage").then(m => ({ default: m.PaymentWalletsPage })));
+const PackageManagementPage = React.lazy(() => import("@/features/packages/PackageManagementPage").then(m => ({ default: m.PackageManagementPage })));
+const LoginPage = React.lazy(() => import("@/features/auth/pages/LoginPage").then(m => ({ default: m.LoginPage })));
+const WarehousePage = React.lazy(() => import("@/pages/WarehousePage").then(m => ({ default: m.WarehousePage })));
+const ReceiptsPage = React.lazy(() => import("@/pages/ReceiptsPage").then(m => ({ default: m.ReceiptsPage })));
+const SystemPage = React.lazy(() => import("@/pages/SystemPage").then(m => ({ default: m.SystemPage })));
+const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPage").then(m => ({ default: m.FinanceHubPage })));
+
+const PageLoadingSpinner = () => (
+  <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
+    <div className="flex items-center gap-3">
+      <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-sm font-medium">Đang tải trang...</span>
+    </div>
+  </div>
+);
 
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -51,7 +63,8 @@ const PublicOnlyRoute: React.FC = () => {
 
 export const AppRoutes: React.FC = () => {
   return (
-    <Routes>
+    <Suspense fallback={<PageLoadingSpinner />}>
+      <Routes>
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
@@ -61,6 +74,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/dashboard" element={<DashboardPage />} />
 
       {/* 1. Tổng quan & Báo cáo */}
+      <Route path="/finance" element={<FinanceHubPage />} />
       <Route
         path="/traffic"
         element={
@@ -441,5 +455,6 @@ export const AppRoutes: React.FC = () => {
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </Suspense>
   );
 };

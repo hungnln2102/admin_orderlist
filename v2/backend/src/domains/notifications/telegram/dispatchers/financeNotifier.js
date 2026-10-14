@@ -30,8 +30,8 @@ const buildFlowLine = (label, afterVal, deltaVal) => {
   let after = Math.round(Number(afterVal || 0));
   let before = after - delta;
 
-  // Phòng vệ: Nếu afterVal trong CSDL bằng 0 mà delta > 0 (DB chưa kịp cập nhật hoặc afterVal là trước biến động)
-  if (before < 0 && delta > 0 && after === 0) {
+  // Phòng vệ: Nếu afterVal trong CSDL bằng 0 mà delta > 0 (áp dụng cho các chỉ số không âm như Doanh thu, Nhập hàng, Hoàn tiền)
+  if (!label.includes("Lợi nhuận") && before < 0 && delta > 0 && after === 0) {
     before = 0;
     after = delta;
   }
@@ -55,7 +55,7 @@ const buildFlowLine = (label, afterVal, deltaVal) => {
 async function notifyFinanceMonthlyDelta({
   monthKey,
   revenueDelta = 0,
-  profitDelta = 0,
+  profitDelta = null,
   importDelta = 0,
   refundDelta = 0,
   taxDelta = 0,
@@ -85,8 +85,10 @@ async function notifyFinanceMonthlyDelta({
     const totalTax = 0;
     const totalOffFlow = 0;
 
-    // Tính toán lại delta lợi nhuận chính xác dựa trên delta doanh thu và nhập hàng nếu không truyền sẵn
-    const effectiveProfitDelta = revenueDelta - importDelta - refundDelta;
+    // Sử dụng profitDelta nếu được truyền sẵn, ngược lại tính toán theo delta doanh thu, nhập hàng và hoàn tiền
+    const effectiveProfitDelta = profitDelta !== null && profitDelta !== undefined
+      ? Number(profitDelta)
+      : (revenueDelta - importDelta - refundDelta);
 
     // 2. Tổng số dư bank shop hiện tại
     const bankRows = await db(TABLES.SHOP_BANK_ACCOUNTS)

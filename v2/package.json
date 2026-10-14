@@ -8,8 +8,5 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
-  },
-  "dependencies": {
-    "express-session": "^1.19.0"
   }
 }

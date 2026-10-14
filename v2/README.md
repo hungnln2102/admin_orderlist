@@ -52,7 +52,7 @@ Khi bấm nút **"Tạo Đơn Hàng Mới"** (Màu xanh dương ở góc trên),
    - **`MAVK`** (Đơn Khuyến Mãi): Tự động điền **Giá Giảm Giá/Khuyến Mãi**. Trạng thái: *Chưa thanh toán*.
    - **`MAVS`** (Đơn Học Sinh/Sinh Viên): Tự động điền **Giá Ưu Đãi HSSV**. Trạng thái: *Chưa thanh toán*.
    - **`MAVT`** (Đơn Quà Tặng/Tri Thức): Tự động điền **0 ₫**. Trạng thái: *Chưa thanh toán*.
-   - **`MAVN`** (Đơn Nhập Kho): Tự động điền **Giá Gốc Nhập**, Tự điền Khách hàng = "Mavryk", Trạng thái = **`Đã Thanh Toán`**.
+   - **`MAVN`** (Đơn Nhập Kho): Nhập **Giá Vốn Nhập**, Giá Bán Khách = 0 ₫, Tự điền Khách hàng = "Mavryk", Trạng thái = **`Đã Thanh Toán`**. Tự động trừ lợi nhuận đúng số tiền nhập, tự động ghi nhận log chi phí & công nợ Nhà Cung Cấp (`supplier_order_cost_log`). Khi xóa đơn nhập hàng: tự động cộng hoàn lại lợi nhuận theo giá trị còn lại và dọn dẹp sạch log NCC tương ứng.
 2. **Dropdown `Sản Phẩm`:** Tự động nạp danh sách gói sản phẩm. Khi chọn sản phẩm:
    - Tự động nhảy giá bán tương ứng với Loại Mã Đơn.
    - Tự đọc thời hạn gói (VD: 12 tháng, 6 tháng) ➔ **Tự cộng số ngày vào Ngày Mua để ra Ngày Hết Hạn chính xác**.
@@ -63,10 +63,10 @@ Khi bấm nút **"Tạo Đơn Hàng Mới"** (Màu xanh dương ở góc trên),
 6. **Ô Nhập `Vị Trí Slot / Thông Tin Tài Khoản`:** Điền email/slot bàn giao cho khách.
 7. **Nút `Hủy Bỏ`:** Đóng cửa sổ nhập đơn không lưu.
 8. **Nút `Xác Nhận Tạo Đơn`:**
-   - Tự động sinh mã đơn không trùng (VD: `MAVC98A2F1`).
+   - Tự động sinh mã đơn chuẩn quy tắc: Tiền tố 4 ký tự + 5 ký tự ngẫu nhiên (VD: `MAVC9VBWE`, `MAVN8FA2K`).
    - Tự động lưu thông tin khách mới vào danh bạ nếu là khách hàng mới.
-   - Tự động tính Tiền lời = `Giá bán - Giá nhập`.
-   - Tự động phát sự kiện cập nhật kho và **TỰ ĐỘNG BẬT CỬA SỔ VIETQR THU TIỀN**.
+   - Tự động tính Tiền lời = `Giá bán - Giá nhập` (đối với đơn bán cho khách).
+   - Tự động phát sự kiện cập nhật kho và **TỰ ĐỘNG BẬT CỬA SỔ VIETQR THU TIỀN** (đối với đơn chưa thanh toán).
 
 ---
 
@@ -89,13 +89,34 @@ Khi bấm nút **"Tạo Đơn Hàng Mới"** (Màu xanh dương ở góc trên),
 
 ---
 
-### 1.6. Quy Trình Hủy / Xóa Đơn Hàng (`OrderDeleteModal`)
-Khi bạn bấm nút **"Xác Nhận Hủy Đơn"**, hệ thống tự động thực hiện 4 bước:
-1. Đổi trạng thái đơn thành **Đã Hủy**.
+### 1.6. Quy Trình Hủy / Xóa Đơn Khách Hàng (`OrderDeleteModal`)
+Khi bạn bấm nút **"Xác Nhận Hủy Đơn"** cho đơn bán của khách hàng (`MAVC`, `MAVL`, `MAVK`...):
+1. Đổi trạng thái đơn thành **Đã Hủy** (nằm trong tab `canceled`).
 2. **Tự động tính số tiền hoàn trả theo số ngày chưa dùng (Pro-rata):**
    $$\text{Tiền Hoàn} = \text{Giá Bán} \times \left(\frac{\text{Ngày Hết Hạn} - \text{Ngày Hiện Tại}}{\text{Tổng Số Ngày Gói}}\right)$$
 3. **Thu Hồi Tài Khoản/Key Trong Kho:** Trả vị trí tài khoản/slot key bản quyền về trạng thái **Sẵn Hàng (AVAILABLE)** để bạn bán tiếp cho khách khác.
 4. **Nạp Tiền Vào Ví Credit Của Khách:** Tự động nạp số tiền hoàn lại vào Ví Credit của khách để trừ dần cho các đơn mua sau.
+
+---
+
+### 1.7. Quy Trình Vận Hành & Tài Chính Đơn Nhập Hàng (`MAVN`)
+Đơn nhập hàng là các đợt mua sỉ hoặc nhập tài khoản từ Nhà Cung Cấp về kho shop (mã mang tiền tố `MAVN...`, khách hàng là "Mavryk"). Hệ thống có cơ chế tài chính và vòng đời hoàn toàn tách biệt:
+
+- **Khi Tạo Đơn Nhập Hàng Thành Công:**
+  - Tiền nhập được lưu vào trường **Giá Vốn Nhập (`cost`)**, **Giá Bán (`price`) = 0 ₫** (vì đây là đơn nhập hàng, không phải doanh thu bán khách).
+  - Hệ thống tự động ghi nhận vào **Chi phí nhập hàng** trong ngày.
+  - **Lợi nhuận của shop trừ đúng bằng số tiền nhập hàng**.
+  - Bot Telegram gửi thông báo Biến Động Tháng: `📦 Nhập hàng tháng: +tiền_nhập` và `💰 Lợi nhuận tháng: -tiền_nhập`.
+
+- **Khi Hủy / Xóa Đơn Nhập Hàng Thành Công:**
+  - Hệ thống tự động tính **Số tiền còn lại của đơn hàng** theo thời hạn chưa dùng (khấu hao pro-rata):
+    $$\text{Số Tiền Còn Lại} = \text{round}\left(\frac{\text{Giá Nhập}}{\text{Tổng Số Ngày Gói}} \times \max(0, \text{Ngày Hết Hạn} - \text{Hôm Nay})\right)$$
+    *(Nếu đơn vừa tạo trong ngày thì số tiền còn lại bằng đúng 100% tiền nhập).*
+  - **Lợi nhuận của shop được cộng lại đúng với số tiền còn lại của đơn hàng đó**.
+  - **Chi phí nhập hàng giảm đi đúng số tiền còn lại**.
+  - Bot Telegram gửi thông báo Biến Động Tháng: `📦 Nhập hàng tháng: -số_tiền_còn_lại` và `💰 Lợi nhuận tháng: +số_tiền_còn_lại`.
+  - **Xóa Dứt Điểm (Hard Delete):** Đơn nhập hàng bị xóa hoàn toàn khỏi danh sách, **tuyệt đối không chuyển sang tab Hoàn Tiền** của khách hàng.
+  - **Không Tạo Phiếu Hoàn Tiền / Log Credit:** Bỏ qua hoàn toàn việc sinh Credit Note hay log credit hoàn tiền (tránh làm sai lệch công nợ khách hàng).
 
 ---
 
@@ -206,6 +227,7 @@ Trang **Quản Lý Loại Gói** gom nhóm và kiểm soát toàn bộ số lư�
 - **Lưới Vị Trí Slot (Grid Slots):** Hiển thị trực quan từng ô Slot 1, Slot 2, Slot 3... 
   - Nếu Slot đã bán: Hiển thị tên khách, SĐT, Mã đơn hàng (`MAVC...`) và chữ **ĐÃ DÙNG**.
   - Nếu Slot chưa bán: Hiển thị màu xanh lá và chữ **AVAILABLE** (Sẵn sàng bán).
+  - **Quy tắc khớp slot:** Chỉ các đơn bán hàng cho khách (`MAVC`, `MAVL`, `MAVK`, `MAVS`, `MAVT`) mới được khớp chiếm slot; đơn nhập hàng (`MAVN...`) tuyệt đối không bị chiếm slot.
 - **Nút `Sửa Thông Tin Gói` (Icon Cây bút):** Mở modal sửa Tên gói, Email tài khoản, Số slot đã dùng, Tổng số slot, Giá nhập, NCC, Ngày hết hạn (`PackageCreateEditModal`).
 - **Nút `Xem Chi Tiết` (Icon Con mắt):** Mở modal xem thông tin tóm tắt gói (`PackageDetailModal`).
 - **Nút `Xóa Gói` (Icon Thùng rác):** Xóa gói khỏi kho.
@@ -271,6 +293,42 @@ Trang **Cấu Hình Hệ Thống** giúp chủ shop và người quản trị li
 
 ---
 
+## 8. TRANG TÀI CHÍNH TOÀN DIỆN & ĐỘNG CƠ ĐIỂM HÒA VỐN - `FinanceHubPage` (`/finance`)
+
+Trang **Tài Chính** là trung tâm hợp nhất toàn bộ bức tranh tài chính của chủ shop (kết hợp tài chính cá nhân và tài chính shop):
+
+### 8.1. Động Cơ Điểm Hòa Vốn Tháng (Break-even Engine)
+- **Cơ chế Khởi đầu âm:** Vào ngày 1 đầu mỗi tháng, lợi nhuận luôn luôn bắt đầu từ con số **ÂM** bằng đúng tổng chi phí cố định (tiền nhà, tiền ăn, mạng...) cộng với tiền trả góp trong kỳ.
+- **Thanh Hành Trình Hòa Vốn & Sinh Lời (Visual Journey Bar):**
+  - Mốc bên trái: Lợi nhuận khởi điểm âm (VD: `-8.000.000 ₫`).
+  - Mốc trung tâm: **0 ₫ (HÒA VỐN)**.
+  - Vùng bên phải: **VÙNG LÃI RÒNG** (Xanh Emerald neon).
+  - Khi bán được đơn hàng `PAID`, tiền lãi gộp sẽ kéo dần thanh tiến độ về mốc 0 ₫. Vượt qua 0 ₫ là bắt đầu có lãi ròng thực sự để tích lũy.
+
+### 8.2. Bộ 4 Thẻ KPI Tài Sản Ròng (Net Worth Cards)
+- **Tài Sản Ròng (Net Worth):** Tổng tài sản (ví shop, tiền gửi, tiết kiệm, vàng) trừ đi toàn bộ nợ (nợ NCC, nợ cá nhân, dư nợ trả góp).
+- **Tổng Tài Sản & Tích Lũy:** Tiền khả dụng trong các tài khoản Shop Bank, ví USDT, tiền tiết kiệm và đầu tư.
+- **Tổng Nợ Còn Lại:** Tổng hợp tự động nợ NCC chưa thanh toán từ đơn nhập hàng `MAVN` + nợ cá nhân + toàn bộ dư nợ các kỳ trả góp còn lại.
+- **Cơ Cấu Tài Chính:** Tỷ lệ Nợ / Tài sản giúp cảnh báo an toàn tài chính.
+
+### 8.3. Tab 1: Nợ & Trả Góp (Nợ NCC + Trả Góp Theo Kỳ + Nợ Cá Nhân)
+- **Hợp nhất toàn bộ nghĩa vụ nợ:** Gom các khoản trả góp mua sắm định kỳ, nợ Nhà cung cấp tiền hàng, và nợ cá nhân vay mượn bên ngoài vào cùng một nơi.
+- **Trả góp theo kỳ:** Nhận diện kỳ hiện tại (VD: Kỳ 5/12), tự kết thúc khi hết số kỳ và biến mất khỏi chi phí tháng sau.
+- **Nợ NCC:** Đồng bộ tự động từ đơn hàng MAVN chưa thanh toán kèm nút chuyển nhanh tới trang NCC.
+- **Nợ cá nhân:** Quản lý các khoản vay ngoài hoặc người khác nợ mình.
+- Nút bấm: *Thêm Khoản Trả Góp, Thêm Nợ Cá Nhân, Sửa, Xóa.*
+
+### 8.4. Tab 2: Chi Phí Cố Định
+- Khai báo tiền thuê nhà, điện nước, ăn uống, phí phần mềm lặp lại mỗi tháng.
+- Nút gạt *Đang áp dụng / Đang tắt* để bật/tắt nhanh chi phí mà không cần xóa.
+- Nút bấm: *Thêm Chi Phí, Sửa, Xóa.*
+
+### 8.5. Tab 3: Quỹ Tích Lũy & Tài Sản
+- **Tài sản & của cải để dành:** Tách riêng chuyên biệt để theo dõi tiền tiết kiệm, quỹ khẩn cấp, vàng, tiền mặt và số dư khả dụng trong ví Shop Bank & USDT.
+- Nút bấm: *Thêm Quỹ Tích Lũy, Sửa, Xóa.*
+
+---
+
 ## 📝 TỔNG HỢP DANH MỤC CÁC MODAL & CỬA SỔ NỔI TRONG HỆ THỐNG
 
 | Trang | Tên Cửa Sổ Modal | Chức Năng & Các Nút Bấm Chính |
@@ -295,7 +353,11 @@ Trang **Cấu Hình Hệ Thống** giúp chủ shop và người quản trị li
 | **Packages** | `PackageDetailModal` | Xem thông tin chi tiết gói & tài khoản liên kết. *Nút: Đóng.* |
 | **Invoices** | `AllocateReceiptModal` | Phân bổ số dư biên lai & gán mã đơn/hạng mục chi phí/khách tip. *Nút: Chọn 4 Loại Phân Bổ (Đơn khách, Khách tip, NCC, Chi phí vận hành), Set 50%/100%, Xác Nhận Phân Bổ, Hủy Bỏ.* |
 | **System** | `SystemPage` | Cấu hình động thông số vận hành & Telegram. *Nút: Lưu từng tham số, Nút gạt Bật/Tắt Telegram, Nút gạt Sepay Auto Match, Tải lại cấu hình, Lọc nhật ký thông báo.* |
+| **Finance** | `InstallmentModal` | Thêm/sửa khoản trả góp theo kỳ. *Nút: Nhập số tiền/tháng, số kỳ, tháng bắt đầu, ngày đến hạn, Lưu, Hủy.* |
+| **Finance** | `FixedCostModal` | Thêm/sửa chi phí cố định. *Nút: Nhập tên chi phí, số tiền, phân loại, Lưu, Hủy.* |
+| **Finance** | `PersonalAssetsModal` | Thêm/sửa tài sản tích lũy & nợ cá nhân. *Nút: Chọn loại tài sản/nợ, nhập số tiền, Lưu, Hủy.* |
 
 ---
 *Tài liệu danh mục tính năng & nút bấm này là chuẩn vận hành chính thức của Admin Store V2.*
 *Bản đồ cấu trúc cơ sở dữ liệu chi tiết xem tại [v2/DATABASE_SCHEMA.md](file:///e:/Project/admin_store/admin_orderlist/v2/DATABASE_SCHEMA.md).*
+

@@ -130,13 +130,59 @@ function registerDailySummaryListeners() {
       await financeNotifier.notifyFinanceMonthlyDelta({
         monthKey: getVietnamMonthString(date),
         refundDelta: refundAmount,
-        revenueDelta: -refundAmount,
+        revenueDelta: 0,
         profitDelta: -refundAmount,
         bankBalanceDelta: 0,
         context: `order.canceledRefunded:${data.orderCode || data.id_order}`,
       });
     } catch (err) {
       console.error("[DailySummary] Lỗi xử lý ORDER_CANCELED_REFUNDED:", err.message);
+    }
+  });
+
+  // 5. Đơn nhập hàng mới thành công -> Tăng chi phí nhập hàng, giảm lợi nhuận đúng bằng số tiền nhập
+  eventBus.on(EVENTS.ORDER_IMPORT_CREATED, async (data) => {
+    try {
+      const cost = Number(data.cost || data.amount || 0);
+      if (cost <= 0) return;
+      const date = getVietnamDateString(data.order_date || data.created_at);
+      console.log(`📦 [DailySummary] Nhận ORDER_IMPORT_CREATED: +${cost} ₫ chi phí nhập hàng (Đơn #${data.id_order}, Ngày: ${date})`);
+
+      await accumulateDailySummary(date, {
+        total_shop_cost: cost,
+      });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey: getVietnamMonthString(date),
+        importDelta: cost,
+        profitDelta: -cost,
+        context: `order.importCreated:${data.id_order || data.orderCode}`,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý ORDER_IMPORT_CREATED:", err.message);
+    }
+  });
+
+  // 6. Hủy / Xóa đơn nhập hàng thành công -> Giảm chi phí nhập hàng, cộng lại lợi nhuận đúng bằng số tiền còn lại
+  eventBus.on(EVENTS.ORDER_IMPORT_CANCELED, async (data) => {
+    try {
+      const remainingAmount = Number(data.remainingAmount ?? data.amount ?? data.cost ?? 0);
+      if (remainingAmount <= 0) return;
+      const date = getVietnamDateString();
+      console.log(`📦 [DailySummary] Nhận ORDER_IMPORT_CANCELED: -${remainingAmount} ₫ chi phí nhập hoàn trả (Đơn #${data.id_order}, Ngày: ${date})`);
+
+      await accumulateDailySummary(date, {
+        total_shop_cost: -remainingAmount,
+      });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey: getVietnamMonthString(date),
+        importDelta: -remainingAmount,
+        profitDelta: remainingAmount,
+        context: `order.importCanceled:${data.id_order || data.orderCode}`,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý ORDER_IMPORT_CANCELED:", err.message);
     }
   });
 

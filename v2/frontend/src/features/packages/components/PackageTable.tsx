@@ -131,9 +131,6 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                             <span className="text-white font-mono">
                               {item.usedSlots} / {item.totalSlots} Vị trí
                             </span>
-                            <span className={`text-[10px] uppercase font-bold ${availSlots === 0 ? "text-rose-400" : "text-emerald-400"}`}>
-                              TRỐNG: {availSlots}
-                            </span>
                           </div>
                           {/* Progress bar */}
                           <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
@@ -349,9 +346,6 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                   <div className="flex items-center justify-between text-[11px] font-bold">
                     <span className="text-white font-mono">
                       {item.usedSlots} / {item.totalSlots} Vị trí
-                    </span>
-                    <span className={`text-[10px] uppercase font-bold ${availSlots === 0 ? "text-rose-400" : "text-emerald-400"}`}>
-                      TRỐNG: {availSlots}
                     </span>
                   </div>
                   {/* Progress bar */}

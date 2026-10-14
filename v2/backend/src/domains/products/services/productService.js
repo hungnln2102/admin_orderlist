@@ -582,19 +582,42 @@ const getPackageProducts = async () => {
 
   const result = await db.raw(query);
   const rows = result.rows || [];
+  if (rows.length === 0) return [];
 
-  const ordersQuery = `
-    SELECT id, information_order, slot, status, expired_at, cost, supply_id
-    FROM ${TABLES.ORDER_LIST}
-    WHERE status NOT IN ('${ORDER_STATUS.CANCELED}', 'Đã Xóa')
-  `;
-  const ordersRes = await db.raw(ordersQuery);
-  const ordersList = ordersRes.rows || [];
+  // Lọc chỉ các từ khóa tài khoản thực sự tồn tại trong danh sách gói để truy vấn có mục tiêu
+  const targetAccounts = Array.from(
+    new Set(
+      rows
+        .map((r) => r.account_info && String(r.account_info).trim().toLowerCase())
+        .filter((acc) => Boolean(acc) && !acc.startsWith("tài khoản kho #"))
+    )
+  );
+
+  let ordersList = [];
+  if (targetAccounts.length > 0) {
+    ordersList = await db(TABLES.ORDER_LIST)
+      .select("id", "id_order", "customer", "contact", "information_order", "slot", "status", "expired_at", "cost", "supply_id")
+      .whereNotIn("status", [ORDER_STATUS.CANCELED, ORDER_STATUS.REFUNDED, "Đã Xóa", "Đã Hủy", "Hoàn Tiền"])
+      .whereNot("id_order", "ilike", "MAVN%")
+      .whereRaw("LOWER(COALESCE(customer, '')) != 'mavryk'")
+      .where((builder) => {
+        targetAccounts.forEach((acc) => {
+          builder.orWhereILike("information_order", `%${acc}%`);
+          builder.orWhereILike("slot", `%${acc}%`);
+        });
+      });
+  }
 
   return rows.map((r) => {
     const matchRule = (r.match_rule || "information").toLowerCase();
     const matchingOrders = ordersList.filter((o) => {
       if (!r.account_info) return false;
+
+      // Tuyệt đối không khớp đơn nhập hàng MAVN hoặc khách Mavryk vào slot bán cho khách
+      const idOrder = String(o.id_order || "").toUpperCase();
+      if (idOrder.startsWith("MAVN")) return false;
+      if (String(o.customer || "").trim().toLowerCase() === "mavryk") return false;
+
       const targetUser = r.account_info.toLowerCase();
       if (matchRule === "slot") {
         return Boolean(o.slot && o.slot.toLowerCase().includes(targetUser));

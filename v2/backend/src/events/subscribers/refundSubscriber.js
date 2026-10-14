@@ -17,6 +17,17 @@ function registerRefundEventSubscribers() {
 
       const safeOrderId = orderId || order?.id;
       const safeOrderCode = orderCode || order?.id_order || "ORDER";
+
+      // Đơn nhập hàng (MAVN... hoặc khách là Mavryk) là đơn nội bộ, tuyệt đối không tạo credit note hoàn tiền
+      const isMavn = Boolean(
+        String(safeOrderCode).toUpperCase().startsWith("MAVN") ||
+        (order?.customer && String(order.customer).trim().toLowerCase() === "mavryk")
+      );
+      if (isMavn) {
+        console.log(`💳 [RefundSubscriber] Bỏ qua tạo credit note cho đơn nhập hàng #${safeOrderCode}`);
+        return;
+      }
+
       const creditCode = `RFC-${safeOrderCode}-${safeOrderId}`;
 
       const payload = {

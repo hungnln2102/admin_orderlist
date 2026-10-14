@@ -35,15 +35,44 @@ async function getDefaultShopBank(trx) {
 }
 
 /**
- * Trích xuất mã đơn ngẫu nhiên kiểu MAV...
+ * Tính số tiền còn lại của đơn hàng dựa trên thời gian sử dụng
  */
-function generateOrderCode() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+function calculateOrderRemainingValue(order) {
+  if (!order) return 0;
+  const cost = Number(order.cost || order.price || 0);
+  if (cost <= 0) return 0;
+  if (!order.expired_at) return cost;
+
+  const expiry = new Date(order.expired_at);
+  if (isNaN(expiry.getTime())) return cost;
+  expiry.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffTime = expiry.getTime() - today.getTime();
+  const remainingDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+  if (remainingDays <= 0) return 0;
+
+  const totalDays = Math.max(Number(order.days || 365), 1);
+  return Math.min(cost, Math.max(0, Math.round((cost / totalDays) * remainingDays)));
+}
+
+const VALID_ORDER_PREFIXES = ["MAVC", "MAVL", "MAVN", "MAVK", "MAVS", "MAVT"];
+
+/**
+ * Trích xuất mã đơn ngẫu nhiên chuẩn tiền tố (MAVN, MAVC, MAVL...)
+ */
+function generateOrderCode(prefix = "MAVC") {
+  const normalizedPrefix = VALID_ORDER_PREFIXES.includes(String(prefix || "").toUpperCase())
+    ? String(prefix).toUpperCase()
+    : "MAVC";
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let random = "";
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     random += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return `MAV${random}`;
+  return `${normalizedPrefix}${random}`;
 }
 
 function applyCanceledFilter(builder) {
@@ -227,11 +256,10 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     .limit(limit)
     .offset(offset);
 
-  const ordersWithSupplier = await Promise.all(orders.map((o) => attachSupplierInfo(o)));
-  const ordersWithQr = await Promise.all(ordersWithSupplier.map((o) => attachVietQrToOrder(o)));
+  const enrichedOrders = await attachBatchSupplierAndQrInfo(orders);
 
   return {
-    data: ordersWithQr,
+    data: enrichedOrders,
     pagination: {
       total,
       page: Number(page),
@@ -255,6 +283,109 @@ async function resolveSupplyId(trx, supplyInput) {
     .first();
   if (foundByName) return foundByName.id;
   return null;
+}
+
+/**
+ * Tối ưu hóa truy vấn hàng loạt (Batch Loader): Nạp toàn bộ thông tin NCC và VietQR 
+ * cho danh sách đơn hàng chỉ bằng 1-2 queries (Loại bỏ triệt để lỗi N+1 Query).
+ */
+async function attachBatchSupplierAndQrInfo(orders, trx) {
+  if (!orders || orders.length === 0) return [];
+  const queryDb = trx || db;
+
+  // 1. Gom các đơn chưa có supply_id để truy vấn bảng log chi phí NCC trong 1 query duy nhất
+  const ordersWithoutSupplyId = orders.filter((o) => !o.supply_id).map((o) => o.id);
+  const logSupplyMap = new Map();
+  if (ordersWithoutSupplyId.length > 0) {
+    const logs = await queryDb(TABLES.SUPPLIER_ORDER_COST_LOG)
+      .whereIn("order_list_id", ordersWithoutSupplyId)
+      .select("order_list_id", "supply_id");
+    for (const l of logs) {
+      if (l.order_list_id && l.supply_id) {
+        logSupplyMap.set(l.order_list_id, l.supply_id);
+      }
+    }
+  }
+
+  // 2. Gom danh sách tất cả unique supply_ids cần nạp
+  const neededSupplyIds = new Set();
+  for (const o of orders) {
+    const sId = o.supply_id || logSupplyMap.get(o.id);
+    if (sId) {
+      const num = Number(sId);
+      if (!isNaN(num) && num > 0) neededSupplyIds.add(num);
+    }
+  }
+
+  // 3. Truy vấn nạp danh sách NCC trong 1 query duy nhất
+  const supplierMap = new Map();
+  if (neededSupplyIds.size > 0) {
+    const suppliers = await queryDb(TABLES.SUPPLIER)
+      .whereIn("id", Array.from(neededSupplyIds))
+      .select("id", COLS.SUPPLIER.SUPPLIER_NAME, "number_bank", "bin_bank", "account_holder");
+    for (const s of suppliers) {
+      supplierMap.set(s.id, s);
+    }
+  }
+
+  // 4. Lấy tài khoản ngân hàng mặc định của shop (đã có in-memory cache)
+  const defaultBank = await getDefaultShopBank(trx);
+  let defaultShopBankInfo = null;
+  if (defaultBank) {
+    const accNum = defaultBank.account_number || defaultBank.accountNumber;
+    const bin = defaultBank.bank_bin || defaultBank.bankBin || defaultBank.bank_short_code || defaultBank.bankShortCode || "MB";
+    const accName = defaultBank.account_holder || defaultBank.accountHolder || "";
+    if (accNum) {
+      defaultShopBankInfo = {
+        bin,
+        accNum,
+        accName,
+        bankName: defaultBank.bank_display_name || defaultBank.bankShortCode || bin,
+      };
+    }
+  }
+
+  // 5. Gắn thông tin hoàn toàn in-memory (0 extra queries)
+  return orders.map((order) => {
+    const resolvedSupplyId = order.supply_id || logSupplyMap.get(order.id) || null;
+    const numSupplyId = Number(resolvedSupplyId);
+    const supplier = !isNaN(numSupplyId) ? supplierMap.get(numSupplyId) : null;
+    const supplierName = supplier ? (supplier[COLS.SUPPLIER.SUPPLIER_NAME] || "") : "";
+
+    const enriched = {
+      ...order,
+      supply_id: resolvedSupplyId,
+      supplier_name: supplierName,
+    };
+
+    const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") || 
+      (Number(order.cost || 0) > 0 && String(order.status || "").toLowerCase().includes("nhập hàng"));
+
+    if (isImport && supplier && (supplier.number_bank || supplier.numberBank)) {
+      const bin = supplier.bin_bank || supplier.binBank || "970422";
+      const accNum = supplier.number_bank || supplier.numberBank;
+      const accName = supplier.account_holder || supplier.accountHolder || supplier.supplier_name || "";
+      const amount = Math.round(Number(order.cost || order.price || 0));
+      enriched.vietqr_url = `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`;
+      enriched.bank_info = {
+        bank_name: supplier.bin_bank || bin,
+        account_number: accNum,
+        account_holder: accName,
+        type: "supplier",
+      };
+    } else if (defaultShopBankInfo) {
+      const amount = Math.round(Number(order.price || 0));
+      enriched.vietqr_url = `https://img.vietqr.io/image/${defaultShopBankInfo.bin}-${defaultShopBankInfo.accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(defaultShopBankInfo.accName)}`;
+      enriched.bank_info = {
+        bank_name: defaultShopBankInfo.bankName,
+        account_number: defaultShopBankInfo.accNum,
+        account_holder: defaultShopBankInfo.accName,
+        type: "shop",
+      };
+    }
+
+    return enriched;
+  });
 }
 
 async function attachSupplierInfo(order, trx) {
@@ -364,9 +495,12 @@ async function getOrderById(id) {
  */
 async function createOrder(payload) {
   return await withTransaction(async (trx) => {
-    const id_order = payload.id_order || generateOrderCode();
+    const rawPrefix = String(payload.order_prefix || "").trim().toUpperCase();
+    const isMavn = rawPrefix === "MAVN" || String(payload.id_order || "").toUpperCase().startsWith("MAVN");
+    const effectivePrefix = isMavn ? "MAVN" : (VALID_ORDER_PREFIXES.includes(rawPrefix) ? rawPrefix : "MAVC");
+    const id_order = payload.id_order || generateOrderCode(effectivePrefix);
     const rawPrice = Number(payload.price || 0);
-    const status = payload.status || ORDER_STATUS.UNPAID;
+    const status = payload.status || (isMavn ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID);
 
     let finalPrice = rawPrice;
     if (status === ORDER_STATUS.UNPAID || status === ORDER_STATUS.RENEW_REQUIRED) {
@@ -376,12 +510,19 @@ async function createOrder(payload) {
       }
     }
 
-    const customerVal = payload.customer || "Khách hàng";
+    const customerVal = payload.customer || (isMavn ? "Mavryk" : "Khách hàng");
     const isMavryk = isCustomerMavryk(customerVal);
     const rawCost = Number(payload.cost || 0);
-    const finalCost = isMavryk ? 0 : rawCost;
 
-    const isPaid = status === ORDER_STATUS.PAID || String(id_order).toUpperCase().startsWith("MAVN");
+    let finalCost = 0;
+    if (isMavn) {
+      finalCost = Number(payload.cost || payload.price || 0);
+      finalPrice = 0;
+    } else {
+      finalCost = isMavryk ? 0 : rawCost;
+    }
+
+    const isPaid = status === ORDER_STATUS.PAID || isMavn || String(id_order).toUpperCase().startsWith("MAVN");
     const newOrderData = {
       id_order,
       customer: customerVal,
@@ -389,9 +530,9 @@ async function createOrder(payload) {
       information_order: payload.information_order || "",
       slot: payload.slot || "",
       price: finalPrice,
-      gross_selling_price: payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice,
+      gross_selling_price: isMavn ? 0 : (payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice),
       cost: finalCost,
-      status: status,
+      status: isMavn ? ORDER_STATUS.PAID : status,
       was_paid: isPaid,
       payment_method: payload.payment_method || "bank",
       note: payload.note || "",
@@ -421,9 +562,11 @@ async function createOrder(payload) {
       .insert(newOrderData)
       .returning("*");
 
-    if (String(id_order).toUpperCase().startsWith("MAVN")) {
+    const shouldSyncWarehouseOrPackage = isMavn || String(id_order).toUpperCase().startsWith("MAVN") || payload.save_to_package === true || payload.save_to_warehouse === true;
+    if (shouldSyncWarehouseOrPackage) {
       try {
         const isSaveToWarehouse = payload.save_to_warehouse !== false;
+        const isSaveToPackage = payload.save_to_package !== false;
         const accountUsername = payload.information_order 
           ? String(payload.information_order).trim().toLowerCase()
           : (payload.slot ? (payload.slot.split('|')[0] || payload.customer).trim().toLowerCase() : String(payload.customer || "mavryk").trim().toLowerCase());
@@ -455,25 +598,21 @@ async function createOrder(payload) {
           .first();
 
         let nameId = pName?.id;
-        if (!nameId) {
-          if (isSaveToWarehouse) {
-            const [insertedP] = await trx(TABLES.PRODUCT_NAMES)
-              .insert({ name: productName.trim() })
-              .returning("id");
-            nameId = insertedP.id || insertedP;
-          } else {
-            // Không lưu kho và sản phẩm chưa có trong danh mục kho -> bỏ qua
-            return;
-          }
+        if (!nameId && (isSaveToWarehouse || isSaveToPackage)) {
+          const [insertedP] = await trx(TABLES.PRODUCT_NAMES)
+            .insert({ name: productName.trim() })
+            .returning("id");
+          nameId = insertedP.id || insertedP;
         }
 
-        let stock = await trx(TABLES.PRODUCT_KEYS)
-          .whereRaw("LOWER(account_username) = ?", [accountUsername])
-          .first();
+        let stockId = null;
+        if (accountUsername) {
+          let stock = await trx(TABLES.PRODUCT_KEYS)
+            .whereRaw("LOWER(account_username) = ?", [accountUsername])
+            .first();
 
-        let stockId = stock?.id;
-        if (!stockId) {
-          if (isSaveToWarehouse) {
+          stockId = stock?.id;
+          if (!stockId && (isSaveToWarehouse || isSaveToPackage)) {
             const [newStock] = await trx(TABLES.PRODUCT_KEYS)
               .insert({
                 account_username: accountUsername,
@@ -481,33 +620,30 @@ async function createOrder(payload) {
               })
               .returning("*");
             stockId = newStock.id;
-          } else {
-            // Tài khoản chưa có trong kho và không lưu kho -> bỏ qua
-            return;
           }
         }
 
-        const existingService = await trx(TABLES.STOCK_SERVICES)
-          .where({
-            account_id: stockId,
-            name_id: nameId,
-          })
-          .first();
+        if (stockId && nameId && isSaveToWarehouse) {
+          const existingService = await trx(TABLES.STOCK_SERVICES)
+            .where({
+              account_id: stockId,
+              name_id: nameId,
+            })
+            .first();
 
-        if (existingService) {
-          // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
-          await trx(TABLES.STOCK_SERVICES)
-            .where({ id: existingService.id })
-            .update({
-              password_encrypted: payload.slot || existingService.password_encrypted,
-              expires_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expires_at,
-              status: "AVAILABLE",
-              note: payload.note || existingService.note,
-              updated_at: new Date(),
-            });
-          console.log(`✅ [WarehouseSync] Đã đồng bộ dữ liệu mới cho tài khoản "${accountUsername}" từ đơn MAVN`);
-        } else {
-          if (isSaveToWarehouse) {
+          if (existingService) {
+            // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
+            await trx(TABLES.STOCK_SERVICES)
+              .where({ id: existingService.id })
+              .update({
+                password_encrypted: payload.slot || existingService.password_encrypted,
+                expires_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expires_at,
+                status: "AVAILABLE",
+                note: payload.note || existingService.note,
+                updated_at: new Date(),
+              });
+            console.log(`✅ [WarehouseSync] Đã đồng bộ dữ liệu mới cho tài khoản "${accountUsername}" từ đơn ${id_order}`);
+          } else {
             // Chưa có trong kho nhưng bật lưu kho -> tạo mới
             await trx(TABLES.STOCK_SERVICES).insert({
               account_id: stockId,
@@ -521,21 +657,20 @@ async function createOrder(payload) {
               created_at: new Date(),
               updated_at: new Date(),
             });
-          } else {
-            // Chưa có trong kho và không lưu kho -> bỏ qua
           }
         }
 
-        eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, {
-          id: stockId,
-          account: accountUsername,
-          source: "order_mavn_import",
-          orderId: createdOrder.id,
-          orderCode: createdOrder.id_order,
-        });
+        if (stockId) {
+          eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, {
+            id: stockId,
+            account: accountUsername,
+            source: "order_sync",
+            orderId: createdOrder.id,
+            orderCode: createdOrder.id_order,
+          });
+        }
 
         // 4. Check & Sync Package Product (warehouse.package_products)
-        const isSaveToPackage = payload.save_to_package !== false;
         if (isSaveToPackage && stockId && nameId) {
           const existingPackage = await trx(TABLES.PACKAGE_PRODUCT)
             .where({
@@ -564,10 +699,16 @@ async function createOrder(payload) {
               }
             }
 
+            let supplierName = payload.supply_id || "Mavryk";
+            if (typeof supplierName === "number" || !isNaN(Number(supplierName))) {
+              const sup = await trx(TABLES.SUPPLIER).where("id", Number(supplierName)).first();
+              if (sup) supplierName = sup.supplier_name || sup.ncc_name || supplierName;
+            }
+
             await trx(TABLES.PACKAGE_PRODUCT).insert({
               product_name_id: nameId,
               account_id: stockId,
-              supplier: payload.supply_id || "Mavryk",
+              supplier: supplierName,
               cost: Number(payload.cost || 0),
               slot: Number(payload.package_slots || 2),
               match_rule: payload.package_match_rule || "information",
@@ -583,7 +724,51 @@ async function createOrder(payload) {
           }
         }
       } catch (err) {
-        console.error("[OrderService] Lỗi tự động lưu/đồng bộ kho cho đơn MAVN:", err);
+        console.error("[OrderService] Lỗi tự động lưu/đồng bộ kho/gói:", err);
+      }
+    }
+
+
+    // 5. Tự động ghi nhận log chi phí NCC cho đơn nhập hàng (MAVN)
+    const importCost = Number(createdOrder.cost || 0);
+    if (isMavn && importCost > 0) {
+      let supplyId = createdOrder.supply_id ? Number(createdOrder.supply_id) : null;
+      if (!supplyId) {
+        const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();
+        supplyId = defaultSupplier ? defaultSupplier.id : 1;
+      }
+
+      let isSupplierMavryk = false;
+      if (supplyId) {
+        const sup = await trx(TABLES.SUPPLIER).where({ id: supplyId }).first();
+        if (sup && String(sup.supplier_name || "").trim().toLowerCase() === "mavryk") {
+          isSupplierMavryk = true;
+        }
+      }
+
+      if (!isSupplierMavryk) {
+        const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+          .where({ order_list_id: createdOrder.id })
+          .first();
+
+        if (!existingLog) {
+          await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+            order_list_id: createdOrder.id,
+            supply_id: supplyId,
+            id_order: createdOrder.id_order,
+            import_cost: importCost,
+            ncc_payment_status: 'Chưa Thanh Toán',
+            logged_at: db.fn.now(),
+          });
+
+          eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+            cost: importCost,
+            supplier_id: supplyId,
+            order_id: createdOrder.id,
+            id_order: createdOrder.id_order,
+            summary: `Thêm chi phí nhập hàng cho đơn #${createdOrder.id_order}: ${importCost} ₫`,
+          });
+        }
       }
     }
 
@@ -598,6 +783,18 @@ async function createOrder(payload) {
       summary,
       action: "CREATE",
     });
+
+    if (isMavn && Number(createdOrder.cost) > 0) {
+      eventBus.emit(EVENTS.ORDER_IMPORT_CREATED, {
+        orderId: createdOrder.id,
+        id_order: createdOrder.id_order,
+        orderCode: createdOrder.id_order,
+        cost: Number(createdOrder.cost),
+        order_date: createdOrder.order_date,
+        created_at: createdOrder.created_at,
+        customer: createdOrder.customer,
+      });
+    }
 
     return await attachVietQrToOrder(createdOrder, trx);
   });
@@ -635,13 +832,23 @@ async function updateOrder(id, payload) {
         updateFields.id_product = null;
       }
     }
-    if (payload.price !== undefined) updateFields.price = Number(payload.price);
-    if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
-    
-    if (isMavryk) {
-      updateFields.cost = 0;
-    } else if (payload.cost !== undefined) {
-      updateFields.cost = Number(payload.cost);
+    const isMavn = Boolean(
+      (existingOrder.id_order && String(existingOrder.id_order).startsWith("MAVN")) ||
+      (targetCustomer && isCustomerMavryk(targetCustomer))
+    );
+
+    if (isMavn) {
+      if (payload.cost !== undefined) {
+        updateFields.cost = Number(payload.cost);
+      } else if (payload.price !== undefined && (!existingOrder.cost || Number(existingOrder.cost) === 0)) {
+        updateFields.cost = Number(payload.price);
+      }
+      updateFields.price = 0;
+      updateFields.gross_selling_price = 0;
+    } else {
+      if (payload.price !== undefined) updateFields.price = Number(payload.price);
+      if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
+      if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
     }
 
     if (payload.status !== undefined) {
@@ -739,6 +946,24 @@ async function updateOrder(id, payload) {
     // Phát event Domain: ORDER_UPDATED
     eventBus.emit(EVENTS.ORDER_UPDATED, updatePayload);
 
+    if (isMavn && updateFields.status === ORDER_STATUS.CANCELED && existingOrder.status !== ORDER_STATUS.CANCELED) {
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+        .where({ order_list_id: existingOrder.id })
+        .update({ ncc_payment_status: 'Đã Hủy' });
+
+      const remainingAmount = calculateOrderRemainingValue(existingOrder);
+      if (remainingAmount > 0) {
+        eventBus.emit(EVENTS.ORDER_IMPORT_CANCELED, {
+          orderId: existingOrder.id,
+          id_order: existingOrder.id_order,
+          orderCode: existingOrder.id_order,
+          remainingAmount,
+          cost: Number(existingOrder.cost || existingOrder.price || 0),
+          customer: existingOrder.customer,
+        });
+      }
+    }
+
     return await attachVietQrToOrder(updatedOrder, trx);
   });
 }
@@ -811,8 +1036,44 @@ async function deleteOrder(id) {
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
     const todayYMD = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Chỉ đơn Đã Thanh Toán (PAID) khi xóa mới chuyển sang Đã Hủy (CANCELED) để nằm trong tab Hoàn Tiền.
-    // Các đơn chưa thanh toán hoặc trạng thái khác khi xóa sẽ XÓA VĨNH VIỄN (Hard Delete).
+    const isMavn = Boolean(
+      (existingOrder.id_order && String(existingOrder.id_order).startsWith("MAVN")) ||
+      (existingOrder.customer && isCustomerMavryk(existingOrder.customer))
+    );
+
+    // Xử lý riêng cho Đơn Nhập Hàng (MAVN... / Mavryk)
+    if (isMavn) {
+      const remainingAmount = calculateOrderRemainingValue(existingOrder);
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).where({ order_list_id: Number(id) }).del();
+      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
+
+      const summary = `Đã xóa đơn nhập hàng #${existingOrder.id_order} (${formatMoney(existingOrder.cost || existingOrder.price || 0)}), hoàn trả lợi nhuận: ${formatMoney(remainingAmount)}`;
+
+      eventBus.emit(EVENTS.ORDER_DELETED, {
+        orderId: existingOrder.id,
+        id_order: existingOrder.id_order,
+        customer: existingOrder.customer,
+        price: 0,
+        cost: existingOrder.cost,
+        deletedOrder: existingOrder,
+        summary,
+        action: "HARD_DELETE_IMPORT",
+      });
+
+      if (remainingAmount > 0) {
+        eventBus.emit(EVENTS.ORDER_IMPORT_CANCELED, {
+          orderId: existingOrder.id,
+          id_order: existingOrder.id_order,
+          orderCode: existingOrder.id_order,
+          remainingAmount,
+          cost: Number(existingOrder.cost || existingOrder.price || 0),
+          customer: existingOrder.customer,
+        });
+      }
+
+      return { success: true, action: "deleted", message: summary };
+    }
+
     const isPaidOrder = status === ORDER_STATUS.PAID;
 
     if (!isPaidOrder) {

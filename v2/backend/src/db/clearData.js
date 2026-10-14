@@ -7,6 +7,10 @@ require("module-alias/register");
 const { db } = require("./index");
 
 async function clearAllData() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_DB_TRUNCATE !== "true") {
+    console.error("🛑 [ClearData] Bị chặn: Tuyệt đối không được chạy truncate database trên môi trường PRODUCTION!");
+    process.exit(1);
+  }
   console.log("🧹 [ClearData] Bắt đầu xóa sạch dữ liệu local để test luồng mới...");
   try {
     await db.raw('TRUNCATE TABLE business.order_list CASCADE;');

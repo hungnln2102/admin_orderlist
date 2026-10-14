@@ -158,6 +158,23 @@ sequenceDiagram
         API-->>API: Giữ trạng thái UNALLOCATED (Biên lai nằm ở Tab Chưa được liệt kê)
     end
     end
+
+    rect rgb(30, 27, 75)
+    note over User, QR: 4. LUỒNG ĐƠN NHẬP HÀNG & TÀI CHÍNH (IMPORT ORDER: MAVN)
+    User->>UI: Tạo đơn nhập hàng (Tiền tố MAVN, Khách Mavryk, Nhập giá vốn)
+    UI->>API: POST /api/orders (cost = Số tiền nhập, price = 0)
+    API->>DB: INSERT business.orders (status = 'PAID', cost, price = 0)
+    API->>Event: Emit Event 'ORDER_IMPORT_CREATED'
+    Event->>DB: UPDATE finance.daily_revenue_summary (+total_shop_cost)
+    Event-->>User: Telegram Bot thông báo: Nhập hàng (+tiền) & Lợi nhuận (-tiền)
+    User->>UI: Bấm nút "Hủy / Xóa Đơn Nhập Hàng"
+    UI->>API: DELETE /api/orders/:id
+    API->>API: Tính Số tiền còn lại: cost * (remaining_days / total_days)
+    API->>DB: DELETE FROM business.orders (Hard Delete)
+    API->>Event: Emit Event 'ORDER_IMPORT_CANCELED' (Bỏ qua Credit Note)
+    Event->>DB: UPDATE finance.daily_revenue_summary (-total_shop_cost)
+    Event-->>User: Telegram Bot thông báo: Nhập hàng (-tiền) & Lợi nhuận (+tiền hoàn trả)
+    end
 ```
 
 ---

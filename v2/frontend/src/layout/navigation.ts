@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   BarChart3,
+  DollarSign,
   Receipt,
   ShoppingCart,
   CreditCard,
@@ -45,6 +46,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     groupName: "Tổng quan & Báo cáo",
     items: [
       { name: "Tổng quan", path: "/dashboard", icon: LayoutDashboard },
+      { name: "Tài Chính", path: "/finance", icon: DollarSign },
       { name: "Traffic & Analytics", path: "/traffic", icon: BarChart3 },
     ],
   },
