@@ -1,8 +1,22 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DebtRepaymentFrequency, PersonalAsset, PersonalAssetType, ProfitDestination, ProfitFrequency } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
-import { formatVND } from "@/shared/utils";
-import { Calendar, Info, Save, Sparkles, Wallet, X } from "lucide-react";
+import {
+  Calendar,
+  Clock3,
+  Coins,
+  CreditCard,
+  Info,
+  Percent,
+  Receipt,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+  X,
+  Zap,
+} from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -47,6 +61,7 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   defaultType = "SAVINGS",
 }) => {
   const notify = useNotification();
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -147,6 +162,32 @@ export const PersonalAssetsModal: React.FC<Props> = ({
     };
   }, [isOpen, profitEnabled]);
 
+  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = event.target.value;
+    const caretPosition = event.target.selectionStart ?? rawValue.length;
+    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
+    const formattedValue = formatAmountInput(rawValue);
+
+    setAmount(formattedValue);
+    requestAnimationFrame(() => {
+      const input = amountInputRef.current;
+      if (!input) return;
+      let nextCaret = 0;
+      let digitCount = 0;
+      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
+        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
+        nextCaret += 1;
+      }
+      input.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
+
+  const setQuickDuration = (months: number) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + months);
+    setDebtEndDate(d.toISOString().slice(0, 10));
+  };
+
   const amountValue = parseAmountInput(amount);
   const annualRateValue = Number(annualInterestRate) || 0;
   const annualProfit = useMemo(() => (amountValue * annualRateValue) / 100, [amountValue, annualRateValue]);
@@ -166,11 +207,62 @@ export const PersonalAssetsModal: React.FC<Props> = ({
     : 0;
   const estimatedDebtTotal = amountValue + debtInterestAmount;
   const debtDailyPayment = Math.ceil(estimatedDebtTotal / debtRemainingDays);
-  // Nguyên tắc an toàn: Thà dôi dư chứ không để thiếu hụt nợ khi tới hạn
   const debtMonthlyPayment = Math.max(
     Math.ceil(debtDailyPayment * 30.44),
     Math.ceil(estimatedDebtTotal / debtRemainingMonths)
   );
+
+  // Dynamic Theme Styling
+  const theme = useMemo(() => {
+    if (type === "DEBT_PAYABLE") {
+      return {
+        title: editingItem ? "Sửa Khoản Nợ Phải Trả" : "Thêm Khoản Nợ Phải Trả",
+        icon: <Receipt className="h-5 w-5" />,
+        badgeBg: "bg-rose-500/10 text-rose-300 border-rose-500/20",
+        accentText: "text-rose-400",
+        submitBtn: "bg-rose-600 hover:bg-rose-500 shadow-rose-600/25",
+        focusBorder: "focus:border-rose-400",
+      };
+    }
+    if (type === "DEBT_RECEIVABLE") {
+      return {
+        title: editingItem ? "Sửa Khoản Cho Vay (Phải Thu)" : "Thêm Khoản Cho Vay (Phải Thu)",
+        icon: <TrendingUp className="h-5 w-5" />,
+        badgeBg: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+        accentText: "text-emerald-400",
+        submitBtn: "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/25",
+        focusBorder: "focus:border-emerald-400",
+      };
+    }
+    if (type === "CASH_BANK") {
+      return {
+        title: editingItem ? "Sửa Ví / Ngân Hàng Cá Nhân" : "Thêm Ví / Ngân Hàng Cá Nhân",
+        icon: <Wallet className="h-5 w-5" />,
+        badgeBg: "bg-cyan-500/10 text-cyan-300 border-cyan-500/20",
+        accentText: "text-cyan-400",
+        submitBtn: "bg-cyan-600 hover:bg-cyan-500 shadow-cyan-600/25",
+        focusBorder: "focus:border-cyan-400",
+      };
+    }
+    if (type === "GOLD_INVESTMENT") {
+      return {
+        title: editingItem ? "Sửa Vàng / Tài Sản Đầu Tư" : "Thêm Vàng / Tài Sản Đầu Tư",
+        icon: <Coins className="h-5 w-5" />,
+        badgeBg: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+        accentText: "text-amber-400",
+        submitBtn: "bg-amber-600 hover:bg-amber-500 shadow-amber-600/25",
+        focusBorder: "focus:border-amber-400",
+      };
+    }
+    return {
+      title: editingItem ? "Sửa Sổ Tiết Kiệm / Quỹ Tích Lũy" : "Thêm Sổ Tiết Kiệm / Quỹ Tích Lũy",
+      icon: <Sparkles className="h-5 w-5" />,
+      badgeBg: "bg-purple-500/10 text-purple-300 border-purple-500/20",
+      accentText: "text-purple-400",
+      submitBtn: "bg-purple-600 hover:bg-purple-500 shadow-purple-600/25",
+      focusBorder: "focus:border-purple-400",
+    };
+  }, [type, editingItem]);
 
   if (!isOpen) return null;
 
@@ -225,368 +317,522 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-md">
-      <div className="my-4 w-full max-w-lg overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 sm:p-4 md:p-6 backdrop-blur-md">
+      <div className="my-auto flex flex-col w-full max-w-lg md:max-w-4xl max-h-[92vh] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl transition-all duration-300">
+        {/* Sticky Header */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-900/95">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
-              <Wallet className="h-5 w-5" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${theme.badgeBg}`}>
+              {theme.icon}
             </div>
-            <h3 className="text-lg font-bold text-white">
-              {editingItem
-                ? `Sửa ${type === "CASH_BANK" ? "Ví Cá Nhân" : type === "SAVINGS" ? "Sổ Tiết Kiệm" : "Bản Ghi Tài Chính"}`
-                : type === "CASH_BANK"
-                ? "Thêm Ví / Ngân Hàng Cá Nhân"
-                : type === "SAVINGS"
-                ? "Thêm Sổ Tiết Kiệm / Quỹ Tích Lũy"
-                : type === "GOLD_INVESTMENT"
-                ? "Thêm Vàng / Tài Sản Đầu Tư"
-                : "Thêm Mục Tài Sản / Nợ Cá Nhân"}
-            </h3>
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">{theme.title}</h3>
+              <p className="text-[11px] text-slate-400">Quản trị và định mức nghĩa vụ / tài sản cá nhân</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="cursor-pointer rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 p-5 max-h-[80vh] overflow-y-auto">
-          {/* 1. Category */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-300">Loại mục tài chính</label>
-            <select
-              value={type}
-              onChange={(event) => setType(event.target.value as PersonalAssetType)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-white focus:border-purple-400 focus:outline-none cursor-pointer"
-            >
-              <option value="CASH_BANK">Tiền mặt / Tài khoản cá nhân (Tài sản)</option>
-              <option value="SAVINGS">Quỹ Tích Lũy / Tiết kiệm (Tài sản)</option>
-              <option value="GOLD_INVESTMENT">Vàng / Đầu tư / Crypto (Tài sản)</option>
-              <option value="DEBT_PAYABLE">Nợ cá nhân phải trả (Nợ phải trả)</option>
-              <option value="DEBT_RECEIVABLE">Khoản cho vay (Phải thu)</option>
-            </select>
-            {type === "CASH_BANK" && (
-              <p className="mt-1.5 text-[11px] text-cyan-300 bg-cyan-950/40 border border-cyan-500/20 rounded-lg p-2 flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
-                <span>Ví/ngân hàng cá nhân này lưu độc lập, không bị trộn lẫn vào số dư Shop Bank kinh doanh.</span>
-              </p>
-            )}
-          </div>
+        {/* Scrollable Form Body (2-Column Grid on Desktop) */}
+        <form id="personal-asset-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            {/* ════════════════════════════════════════════════════════════════
+                CỘT TRÁI (md:col-span-7): FORM NHẬP LIỆU THÔNG TIN
+                ════════════════════════════════════════════════════════════════ */}
+            <div className="md:col-span-7 space-y-4">
+              {/* 1. Category Selector */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-300">Phân loại danh mục</label>
+                <select
+                  value={type}
+                  onChange={(event) => setType(event.target.value as PersonalAssetType)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-slate-700 cursor-pointer"
+                >
+                  <option value="DEBT_PAYABLE">🔴 Nợ cá nhân phải trả (Nợ phải trả)</option>
+                  <option value="DEBT_RECEIVABLE">🟢 Khoản cho vay (Phải thu cá nhân)</option>
+                  <option value="SAVINGS">🟣 Quỹ Tích Lũy / Tiết kiệm (Tài sản sinh lời)</option>
+                  <option value="CASH_BANK">🔵 Tiền mặt / Tài khoản cá nhân (Tài sản thanh khoản)</option>
+                  <option value="GOLD_INVESTMENT">🟡 Vàng / Đầu tư / Crypto (Tài sản đầu tư)</option>
+                </select>
+                {type === "CASH_BANK" && (
+                  <p className="mt-1.5 text-[11px] text-cyan-300 bg-cyan-950/40 border border-cyan-500/20 rounded-lg p-2.5 flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+                    <span>Ví/ngân hàng này được theo dõi độc lập, không trộn lẫn vào số dư Shop Bank kinh doanh.</span>
+                  </p>
+                )}
+              </div>
 
-          {/* 2. Name */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-300">
-              Tên tài sản / Khoản nợ <span className="text-rose-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={
-                type === "CASH_BANK"
-                  ? "VD: Techcombank cá nhân, Ví Momo, Tiền mặt két..."
-                  : type === "SAVINGS"
-                  ? "VD: Sổ BIDV 6 tháng, Quỹ khẩn cấp..."
-                  : type === "GOLD_INVESTMENT"
-                  ? "VD: 2 chỉ vàng nhẫn SJC..."
-                  : "VD: Tên tài sản / khoản nợ..."
-              }
-              required
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-purple-400 focus:outline-none"
-            />
-          </div>
+              {/* 2. Name & Amount (2-column Subgrid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                    Tên khoản / Nhãn ghi chú <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={
+                      type === "DEBT_PAYABLE"
+                        ? "VD: Nợ anh Nam, Ngân hàng..."
+                        : type === "DEBT_RECEIVABLE"
+                        ? "VD: Cho Tuấn mượn, Tiền cọc..."
+                        : type === "CASH_BANK"
+                        ? "VD: Techcombank cá nhân, Ví Momo..."
+                        : type === "SAVINGS"
+                        ? "VD: Sổ BIDV 6 tháng..."
+                        : "VD: 2 chỉ vàng nhẫn SJC..."
+                    }
+                    required
+                    className={`w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs sm:text-sm text-white ${theme.focusBorder} focus:outline-none`}
+                  />
+                </div>
 
-          {/* 3. Amount */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-300">
-              Số tiền (₫) <span className="text-rose-400">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-sm text-slate-500 font-mono">₫</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={amount}
-                onChange={(event) => setAmount(formatAmountInput(event.target.value))}
-                placeholder="25.000.000"
-                required
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-4 font-mono text-sm font-bold text-white focus:border-purple-400 focus:outline-none"
-              />
-            </div>
-          </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                    Số tiền (₫) <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 text-sm text-slate-500 font-mono font-bold">₫</span>
+                    <input
+                      ref={amountInputRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={amount}
+                      onChange={handleAmountChange}
+                      placeholder="0"
+                      required
+                      className={`w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-8 pr-3.5 font-mono text-sm font-bold text-white ${theme.focusBorder} focus:outline-none`}
+                    />
+                  </div>
+                </div>
+              </div>
 
-          {/* 4. Yield asset settings (SAVINGS) */}
-          {isYieldAsset && (
-            <div className="space-y-3 rounded-xl border border-purple-400/20 bg-purple-400/[0.04] p-4">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={profitEnabled}
-                  onChange={(event) => setProfitEnabled(event.target.checked)}
-                  className="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-purple-500 focus:ring-0"
-                />
-                Quỹ này có sinh lời
-              </label>
-
-              {profitEnabled && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+              {/* 3. Debt Specific Inputs */}
+              {isDebtAsset && (
+                <div className="space-y-3.5 rounded-2xl border border-rose-500/20 bg-rose-500/[0.03] p-4">
+                  {/* Due day & End date */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-1.5 block text-[11px] text-slate-400">Cách nhận lãi</label>
-                      <select
-                        value={profitFrequency}
-                        onChange={(event) => setProfitFrequency(event.target.value as ProfitFrequency)}
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
-                      >
-                        <option value="DAILY">Theo ngày</option>
-                        <option value="MONTHLY">Theo tháng</option>
-                        <option value="YEARLY">Theo năm</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-[11px] text-slate-400">Lãi suất (%/năm)</label>
+                      <label className="mb-1.5 block text-xs text-slate-300 font-medium">Hạn thanh toán hàng tháng</label>
                       <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs text-slate-500">Ngày</span>
                         <input
                           type="number"
-                          min="0"
-                          step="0.01"
-                          value={annualInterestRate}
-                          onChange={(event) => setAnnualInterestRate(event.target.value)}
-                          placeholder="5.50"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 pr-10 font-mono text-xs text-white focus:border-purple-400 focus:outline-none"
+                          min="1"
+                          max="31"
+                          value={debtDueDay}
+                          onChange={(event) => setDebtDueDay(event.target.value)}
+                          className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-12 pr-3 text-xs font-mono font-bold text-white focus:border-rose-400 focus:outline-none"
                         />
-                        <span className="absolute right-3 top-2 text-xs text-slate-500">%</span>
+                        <span className="absolute right-3 top-2.5 text-[11px] text-slate-500">mỗi tháng</span>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1.5 block text-[11px] text-slate-400">Lãi chuyển về đâu?</label>
-                      <select
-                        value={profitDestination}
-                        onChange={(event) => {
-                          setProfitDestination(event.target.value as ProfitDestination);
-                          setProfitAccountId("");
-                        }}
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
-                      >
-                        {Object.entries(profitDestinationLabels).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
 
                     <div>
-                      <label className="mb-1.5 block text-[11px] text-slate-400">Giờ cộng lãi mỗi lần</label>
+                      <label className="mb-1.5 block text-xs text-slate-300 font-medium">Ngày dự kiến tất toán</label>
                       <input
-                        type="time"
-                        value={profitCreditTime}
-                        onChange={(event) => setProfitCreditTime(event.target.value)}
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-purple-400 focus:outline-none"
+                        type="date"
+                        value={debtEndDate}
+                        onChange={(event) => setDebtEndDate(event.target.value)}
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none cursor-pointer"
                       />
                     </div>
                   </div>
 
-                  {["CASH_BANK", "SHOP_BALANCE"].includes(profitDestination) && (
-                    <div>
-                      <label className="mb-1.5 block text-[11px] text-slate-400">
-                        Chọn tài khoản nhận lãi <span className="text-rose-400">*</span>
-                      </label>
-                      <select
-                        value={profitAccountId}
-                        onChange={(event) => setProfitAccountId(event.target.value)}
-                        disabled={loadingProfitAccounts}
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
+                  {/* Quick Preset Duration Chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-1">Kỳ hạn nhanh:</span>
+                    {[
+                      { label: "3 Tháng", months: 3 },
+                      { label: "6 Tháng", months: 6 },
+                      { label: "1 Năm", months: 12 },
+                      { label: "2 Năm", months: 24 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.months}
+                        type="button"
+                        onClick={() => setQuickDuration(preset.months)}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all cursor-pointer active:scale-95"
                       >
-                        <option value="">
-                          {loadingProfitAccounts ? "Đang tải tài khoản..." : "Chọn tài khoản cụ thể"}
-                        </option>
-                        {profitAccounts
-                          .filter((account) => profitDestination === "SHOP_BALANCE" || account.kind === "bank")
-                          .map((account) => (
-                            <option key={`${account.kind}-${account.id}`} value={account.id}>
-                              {account.label}
-                              {account.detail ? ` · ${account.detail}` : ""}
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Interest Rate Toggle (iOS Style Switch) */}
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-1.5 rounded-lg ${debtInterestEnabled ? "bg-rose-500/20 text-rose-300" : "bg-slate-800 text-slate-400"}`}>
+                          <Percent className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-slate-200 block">Khoản nợ có tính lãi suất</span>
+                          <span className="text-[10px] text-slate-400">Tự động cộng dồn lãi vào tổng nghĩa vụ trả</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={debtInterestEnabled}
+                        onClick={() => setDebtInterestEnabled(!debtInterestEnabled)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          debtInterestEnabled ? "bg-rose-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            debtInterestEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {debtInterestEnabled && (
+                      <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3 animate-in fade-in duration-200">
+                        <label className="text-xs text-slate-400 shrink-0">Lãi suất (% / năm):</label>
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={debtAnnualInterestRate}
+                            onChange={(event) => setDebtAnnualInterestRate(event.target.value)}
+                            placeholder="12.00"
+                            className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 pr-8 font-mono text-xs font-bold text-white focus:border-rose-400 focus:outline-none"
+                          />
+                          <span className="absolute right-2.5 top-1.5 text-xs text-slate-500">%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Repayment Cycle */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-300">
+                      Chu kỳ rút tiền thanh toán
+                    </label>
+                    <select
+                      value={debtRepaymentFrequency}
+                      onChange={(event) => setDebtRepaymentFrequency(event.target.value as DebtRepaymentFrequency)}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none cursor-pointer"
+                    >
+                      <option value="MONTHLY">🗓️ Đóng định kỳ hàng tháng (Đến ngày {debtDueDay || 15} mới trả)</option>
+                      <option value="DAILY">⚡ Rút tiền trả hàng ngày (Bốc bát họ / Trả nợ theo ngày)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Yield Asset Inputs (SAVINGS) */}
+              {isYieldAsset && (
+                <div className="space-y-3.5 rounded-2xl border border-purple-500/20 bg-purple-500/[0.03] p-4">
+                  {/* Profit Switch Toggle */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg ${profitEnabled ? "bg-purple-500/20 text-purple-300" : "bg-slate-800 text-slate-400"}`}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-slate-200 block">Quỹ này có sinh lời định kỳ</span>
+                        <span className="text-[10px] text-slate-400">Lãi suất gửi tiết kiệm hoặc lợi nhuận tích lũy</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={profitEnabled}
+                      onClick={() => setProfitEnabled(!profitEnabled)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        profitEnabled ? "bg-purple-500" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          profitEnabled ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {profitEnabled && (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1.5 block text-[11px] text-slate-400">Kỳ nhận lãi</label>
+                          <select
+                            value={profitFrequency}
+                            onChange={(event) => setProfitFrequency(event.target.value as ProfitFrequency)}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
+                          >
+                            <option value="DAILY">Theo ngày</option>
+                            <option value="MONTHLY">Theo tháng</option>
+                            <option value="YEARLY">Theo năm</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-[11px] text-slate-400">Lãi suất (% / năm)</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={annualInterestRate}
+                              onChange={(event) => setAnnualInterestRate(event.target.value)}
+                              placeholder="5.50"
+                              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 pr-8 font-mono text-xs font-bold text-white focus:border-purple-400 focus:outline-none"
+                            />
+                            <span className="absolute right-2.5 top-2 text-xs text-slate-500">%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1.5 block text-[11px] text-slate-400">Lãi chuyển về đâu?</label>
+                          <select
+                            value={profitDestination}
+                            onChange={(event) => {
+                              setProfitDestination(event.target.value as ProfitDestination);
+                              setProfitAccountId("");
+                            }}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
+                          >
+                            {Object.entries(profitDestinationLabels).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-[11px] text-slate-400">Giờ ghi nhận lãi</label>
+                          <input
+                            type="time"
+                            value={profitCreditTime}
+                            onChange={(event) => setProfitCreditTime(event.target.value)}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-purple-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {["CASH_BANK", "SHOP_BALANCE"].includes(profitDestination) && (
+                        <div>
+                          <label className="mb-1.5 block text-[11px] text-slate-400">
+                            Chọn tài khoản nhận lãi <span className="text-rose-400">*</span>
+                          </label>
+                          <select
+                            value={profitAccountId}
+                            onChange={(event) => setProfitAccountId(event.target.value)}
+                            disabled={loadingProfitAccounts}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
+                          >
+                            <option value="">
+                              {loadingProfitAccounts ? "Đang tải tài khoản..." : "Chọn tài khoản cụ thể"}
                             </option>
-                          ))}
-                      </select>
-                      {!loadingProfitAccounts &&
-                        profitAccounts.filter((account) => profitDestination === "SHOP_BALANCE" || account.kind === "bank")
-                          .length === 0 && (
-                          <p className="mt-1 text-[10px] text-amber-300">
-                            Chưa có tài khoản đang hoạt động để nhận lãi.
-                          </p>
-                        )}
+                            {profitAccounts
+                              .filter((account) => profitDestination === "SHOP_BALANCE" || account.kind === "bank")
+                              .map((account) => (
+                                <option key={`${account.kind}-${account.id}`} value={account.id}>
+                                  {account.label}
+                                  {account.detail ? ` · ${account.detail}` : ""}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   )}
-
-                  <div className="flex items-center justify-between rounded-lg bg-slate-950/60 px-3 py-2 text-xs">
-                    <span className="text-slate-500">Dự kiến nhận {periodLabel}</span>
-                    <span className="font-mono font-semibold text-purple-200">
-                      {periodProfit.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 5. Debt asset settings (DEBT_PAYABLE & DEBT_RECEIVABLE) */}
-          {isDebtAsset && (
-            <div className="space-y-3.5 rounded-xl border border-rose-400/20 bg-rose-400/[0.04] p-4">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={debtInterestEnabled}
-                  onChange={(event) => setDebtInterestEnabled(event.target.checked)}
-                  className="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-950 text-rose-500 focus:ring-0"
-                />
-                Khoản nợ này có tính lãi
-              </label>
-
-              {/* Due day & End date */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1.5 block text-[11px] text-slate-400">Ngày đến hạn mỗi tháng</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={debtDueDay}
-                    onChange={(event) => setDebtDueDay(event.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[11px] text-slate-400">Ngày hết hạn nợ</label>
-                  <input
-                    type="date"
-                    value={debtEndDate}
-                    onChange={(event) => setDebtEndDate(event.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Interest rate if enabled */}
-              {debtInterestEnabled && (
-                <div>
-                  <label className="mb-1.5 block text-[11px] text-slate-400">Lãi suất nợ (%/năm)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={debtAnnualInterestRate}
-                      onChange={(event) => setDebtAnnualInterestRate(event.target.value)}
-                      placeholder="12.00"
-                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 pr-10 font-mono text-xs text-white focus:border-rose-400 focus:outline-none"
-                    />
-                    <span className="absolute right-3 top-2 text-xs text-slate-500">%</span>
-                  </div>
                 </div>
               )}
 
-              {/* Repayment Cycle */}
+              {/* 5. Note Field */}
               <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-slate-300">
-                  Hình thức thanh toán cho chủ nợ
-                </label>
-                <select
-                  value={debtRepaymentFrequency}
-                  onChange={(event) => setDebtRepaymentFrequency(event.target.value as DebtRepaymentFrequency)}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none cursor-pointer"
-                >
-                  <option value="MONTHLY">🗓️ Đóng định kỳ hàng tháng (Đến ngày {debtDueDay || 15} mới trả)</option>
-                  <option value="DAILY">⚡ Rút tiền trả hàng ngày (Bốc bát họ / Trả nợ ngày)</option>
-                </select>
-              </div>
-
-              {/* SMART DAILY ACCRUAL PREVIEW CARD */}
-              <div className="rounded-xl border border-rose-500/30 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-purple-950/30 p-3.5 space-y-3 shadow-inner">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                    Tích Lũy Dự Phòng Theo Ngày (Smart Accrual)
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/15 text-purple-200 border border-purple-500/30">
-                    Còn {debtRemainingDays} ngày (~{debtRemainingMonths} tháng)
-                  </span>
-                </div>
-
-                {/* 2 Big Numbers */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
-                    <span className="text-[10px] text-slate-400 block font-medium">Định mức gánh nợ / ngày</span>
-                    <span className="text-base sm:text-lg font-black font-mono text-amber-300 block mt-0.5">
-                      ~{debtDailyPayment.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫
-                    </span>
-                    <span className="text-[9px] text-slate-500">Mỗi ngày Shop tự động gánh</span>
-                  </div>
-
-                  <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
-                    <span className="text-[10px] text-slate-400 block font-medium">Tổng gom đóng mỗi tháng</span>
-                    <span className="text-base sm:text-lg font-black font-mono text-rose-300 block mt-0.5">
-                      {debtMonthlyPayment.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫
-                    </span>
-                    <span className="text-[9px] text-slate-500">Hạn ngày {debtDueDay || 15} hàng tháng</span>
-                  </div>
-                </div>
-
-                {/* Visual Explanation Box */}
-                <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-200 space-y-1.5 leading-relaxed">
-                  <div className="flex items-start gap-1.5">
-                    <span className="text-purple-400 font-bold shrink-0">💡 Cách vận hành:</span>
-                    <span>
-                      Mỗi ngày Động Cơ Hòa Vốn sẽ cộng <strong>{debtDailyPayment.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫</strong> vào chỉ tiêu bán hàng hôm nay của Shop.
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-1.5 text-slate-300 text-[10px] border-t border-purple-500/15 pt-1.5">
-                    <span className="text-amber-400 font-bold shrink-0">🔄 Cơ chế gối đầu:</span>
-                    <span>
-                      Nếu hôm nay đơn hàng chưa đủ bù, số thiếu sẽ <strong>tự động dồn sang mục tiêu ngày mai</strong>. Đảm bảo đúng ngày {debtDueDay || 15} bạn luôn gom đủ {debtMonthlyPayment.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫ trả nợ nhẹ nhàng, không lo bị hụt tiền.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Total projected debt */}
-                <div className="flex items-center justify-between text-xs pt-1 px-1">
-                  <span className="text-slate-400">
-                    {debtInterestEnabled ? "Tổng gốc + lãi dự kiến" : "Tổng nợ gốc cần trả"}:
-                  </span>
-                  <span className="font-mono font-bold text-white">
-                    {estimatedDebtTotal.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫
-                  </span>
-                </div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-300">Ghi chú bổ sung</label>
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  placeholder="Ghi chú thêm thông tin đối tác, điều khoản hợp đồng..."
+                  rows={2}
+                  className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-slate-600 focus:outline-none placeholder:text-slate-600"
+                />
               </div>
             </div>
-          )}
 
-          {/* 6. Note */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-300">Ghi chú thêm</label>
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="Ghi chú thêm thông tin thỏa thuận..."
-              rows={2}
-              className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-purple-400 focus:outline-none"
-            />
+            {/* ════════════════════════════════════════════════════════════════
+                CỘT PHẢI (md:col-span-5): LIVE HUD PREVIEW DASHBOARD
+                ════════════════════════════════════════════════════════════════ */}
+            <div className="md:col-span-5 flex flex-col h-full space-y-4">
+              {isDebtAsset ? (
+                /* SMART DAILY ACCRUAL HUD FOR DEBTS */
+                <div className="rounded-2xl border border-rose-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-rose-950/20 p-4 sm:p-5 space-y-4 shadow-xl">
+                  {/* HUD Top Badge */}
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-rose-400 animate-pulse" />
+                      Smart Accrual HUD
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-rose-500/15 text-rose-200 border border-rose-500/30">
+                      Còn {debtRemainingDays} ngày (~{debtRemainingMonths} tháng)
+                    </span>
+                  </div>
+
+                  {/* 2 Big Visual Stats */}
+                  <div className="space-y-3">
+                    <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                        <span className="font-medium">Định mức gánh nợ / ngày</span>
+                        <span className="text-[10px] text-amber-400 font-bold px-1.5 py-0.2 rounded bg-amber-400/10">Shop tự bù</span>
+                      </div>
+                      <span className={`text-xl font-black font-mono block ${amountValue > 0 ? "text-amber-300" : "text-slate-500"}`}>
+                        {amountValue > 0 ? `~${debtDailyPayment.toLocaleString("vi-VN")} ₫` : "— ₫"}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Tự động cộng dồn vào chỉ tiêu bán hàng mỗi ngày</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                        <span className="font-medium">Tổng gom đóng mỗi tháng</span>
+                        <span className="text-[10px] text-rose-400 font-bold px-1.5 py-0.2 rounded bg-rose-400/10">Hạn ngày {debtDueDay || 15}</span>
+                      </div>
+                      <span className={`text-xl font-black font-mono block ${amountValue > 0 ? "text-rose-300" : "text-slate-500"}`}>
+                        {amountValue > 0 ? `${debtMonthlyPayment.toLocaleString("vi-VN")} ₫` : "— ₫"}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Khoản tiền cần tích lũy sẵn sàng trước kỳ thanh toán</span>
+                    </div>
+                  </div>
+
+                  {/* Mechanism Box */}
+                  <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-2 leading-relaxed">
+                    <div className="flex items-start gap-2">
+                      <span className="text-amber-400 font-bold shrink-0">💡 Cơ chế:</span>
+                      <span>
+                        Động Cơ Hòa Vốn cộng dồn <strong>{amountValue > 0 ? `${debtDailyPayment.toLocaleString("vi-VN")} ₫` : "tiền nợ"}</strong> vào mục tiêu đơn hàng mỗi ngày.
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2 text-[11px] text-slate-400 border-t border-slate-800/70 pt-2">
+                      <span className="text-purple-400 font-bold shrink-0">🔄 Gối đầu:</span>
+                      <span>
+                        Hôm nay chưa đủ sẽ tự dồn sang hôm sau, bảo đảm gom đủ tiền trước ngày {debtDueDay || 15} mà không lo bị hụt vốn đột ngột.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Projected Total Obligation */}
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-slate-300 block font-medium">
+                        {debtInterestEnabled ? "Tổng gốc + lãi cần trả:" : "Tổng nợ gốc cần trả:"}
+                      </span>
+                      {debtInterestEnabled && amountValue > 0 && (
+                        <span className="text-[10px] text-rose-300">
+                          (Lãi: +{Math.round(debtInterestAmount).toLocaleString("vi-VN")} ₫)
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono font-black text-white text-base sm:text-lg">
+                      {amountValue > 0 ? `${estimatedDebtTotal.toLocaleString("vi-VN")} ₫` : "0 ₫"}
+                    </span>
+                  </div>
+                </div>
+              ) : isYieldAsset ? (
+                /* YIELD & PROFIT HUD FOR SAVINGS */
+                <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/20 p-4 sm:p-5 space-y-4 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+                      Dự Tính Sinh Lời Quỹ
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-purple-500/15 text-purple-200 border border-purple-500/30">
+                      {profitEnabled ? `Lãi ${annualRateValue}% / năm` : "Chưa bật lãi"}
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-1">
+                    <span className="text-xs text-slate-400 block font-medium">Ước tính sinh lời mỗi {periodLabel}</span>
+                    <span className={`text-2xl font-black font-mono block ${amountValue > 0 && profitEnabled ? "text-purple-300" : "text-slate-500"}`}>
+                      {amountValue > 0 && profitEnabled ? `+${periodProfit.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫` : "0 ₫"}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block">
+                      Ước tính cả năm: {amountValue > 0 && profitEnabled ? `+${annualProfit.toLocaleString("vi-VN", { maximumFractionDigits: 0 })} ₫` : "0 ₫"}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-2 leading-relaxed">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Hình thức nhận lãi:</span>
+                      <span className="font-semibold text-white">{profitDestinationLabels[profitDestination]}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-800/70 pt-2">
+                      <span className="text-slate-400">Giờ ghi nhận:</span>
+                      <span className="font-mono text-purple-300">{profitCreditTime} hàng ngày</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 shrink-0 text-purple-400" />
+                    <span>Lợi nhuận từ quỹ này sẽ tự động gia tăng vào Tài sản ròng (Net Worth) của bạn.</span>
+                  </div>
+                </div>
+              ) : (
+                /* LIQUIDITY / INVESTMENT ASSET CARD */
+                <div className={`rounded-2xl border p-4 sm:p-5 space-y-4 shadow-xl ${
+                  type === "CASH_BANK"
+                    ? "border-cyan-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/20"
+                    : "border-amber-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/20"
+                }`}>
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${theme.accentText}`}>
+                      {theme.icon}
+                      {type === "CASH_BANK" ? "Tài Sản Thanh Khoản" : "Tài Sản Đầu Tư Tích Trữ"}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${theme.badgeBg}`}>
+                      {type === "CASH_BANK" ? "Tiền mặt / Bank" : "Vàng / Crypto"}
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-1">
+                    <span className="text-xs text-slate-400 block font-medium">Giá trị tài sản ghi nhận</span>
+                    <span className={`text-2xl font-black font-mono block ${amountValue > 0 ? "text-white" : "text-slate-500"}`}>
+                      {amountValue > 0 ? `${amountValue.toLocaleString("vi-VN")} ₫` : "0 ₫"}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block">Được bảo vệ độc lập, không bị trộn lẫn vào số dư Shop</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-2 leading-relaxed">
+                    <div className="flex items-start gap-2">
+                      <Zap className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <span>
+                        Mục này đóng vai trò như đệm an toàn tài chính cá nhân, giúp Master nắm rõ tổng tài sản thực tế bất kỳ lúc nào.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </form>
+
+        {/* Sticky Action Footer */}
+        <div className="shrink-0 flex items-center justify-between border-t border-slate-800 bg-slate-950/80 px-6 py-3.5 backdrop-blur-md">
+          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
+            <span>Giá trị ghi nhận:</span>
+            <span className="font-mono font-bold text-white">
+              {amountValue > 0 ? `${amountValue.toLocaleString("vi-VN")} ₫` : "0 ₫"}
+            </span>
           </div>
 
-          {/* 7. Action Buttons */}
-          <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+          <div className="flex items-center gap-3 ml-auto">
             <button
               type="button"
               onClick={onClose}
@@ -596,14 +842,15 @@ export const PersonalAssetsModal: React.FC<Props> = ({
             </button>
             <button
               type="submit"
+              form="personal-asset-form"
               disabled={submitting}
-              className="flex cursor-pointer items-center gap-2 rounded-xl bg-purple-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/20 hover:bg-purple-400 disabled:opacity-50 transition-all"
+              className={`flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all disabled:opacity-50 ${theme.submitBtn}`}
             >
               <Save className="h-4 w-4" />
               {submitting ? "Đang lưu..." : editingItem ? "Cập nhật" : "Lưu vào sổ"}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
