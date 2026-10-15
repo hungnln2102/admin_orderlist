@@ -169,11 +169,12 @@ function calculatePersonalDebtMonthlyPayment(item) {
 
   const endDate = new Date(`${String(item.debt_end_date).slice(0, 10)}T23:59:59`);
   const remainingDays = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
-  const remainingMonths = Math.max(1, Math.ceil(remainingDays / 30.44));
+  const remainingMonths = Math.max(1, Math.floor(remainingDays / 30.4375) || 1);
   const annualRate = Boolean(item.debt_interest_enabled) ? toNumber(item.debt_annual_interest_rate) : 0;
   const estimatedTotal = toNumber(item.amount) + (toNumber(item.amount) * annualRate / 100 * remainingDays / 365);
-  const dailyPayment = estimatedTotal / remainingDays;
-  return item.debt_repayment_frequency === "DAILY" ? dailyPayment * 30.44 : estimatedTotal / remainingMonths;
+  const dailyPayment = Math.ceil(estimatedTotal / remainingDays);
+  // Nguyên tắc an toàn: Thà dôi dư chứ không để thiếu hụt nợ khi tới hạn
+  return Math.max(Math.ceil(dailyPayment * 30.44), Math.ceil(estimatedTotal / remainingMonths));
 }
 
 /**
@@ -440,7 +441,7 @@ async function getFinanceSummary(targetMonth) {
     .first();
   const supplierDebtTotal = toNumber(supplierDebtLog?.total_debt || 0);
 
-  // Tổng hợp Tài sản ròng
+  // Tổng hợp Tài sản ròng (Không tính Nợ NCC vào Hub này vì giá vốn đã được trừ khi tính Lãi gộp đơn hàng)
   const totalAssets =
     shopBalanceTotal +
     personalSavingsTotal +
@@ -449,7 +450,6 @@ async function getFinanceSummary(targetMonth) {
     personalDebtReceivableTotal;
 
   const totalLiabilities =
-    supplierDebtTotal +
     personalDebtPayableTotal +
     totalInstallmentsRemainingDebt;
 

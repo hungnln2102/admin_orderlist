@@ -8,12 +8,14 @@ import { SavingsAndAssetsSection } from "./components/SavingsAndAssetsSection";
 import {
   Calendar,
   RefreshCw,
-  Clock,
-  Home,
-  Wallet,
   Coins,
   CreditCard,
-  AlertCircle
+  Home,
+  Wallet,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 export const FinanceHubPage: React.FC = () => {
@@ -32,8 +34,17 @@ export const FinanceHubPage: React.FC = () => {
       setLoading(true);
       setError(null);
       const res = await fetch(`/api/finance/summary?month=${targetMonth}`);
+      if (!res.ok) {
+        const text = await res.text();
+        try {
+          const parsed = JSON.parse(text);
+          throw new Error(parsed.message || `Lỗi máy chủ (${res.status})`);
+        } catch {
+          throw new Error(`Máy chủ phản hồi lỗi (${res.status}). Vui lòng kiểm tra lại dịch vụ backend.`);
+        }
+      }
       const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         throw new Error(json.message || "Không thể tải dữ liệu tài chính");
       }
       setData(json.data);
@@ -47,6 +58,30 @@ export const FinanceHubPage: React.FC = () => {
   useEffect(() => {
     fetchData(month);
   }, [month, fetchData]);
+
+  // Month navigation helpers
+  const handlePrevMonth = () => {
+    const [y, m] = month.split("-").map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    setMonth(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = month.split("-").map(Number);
+    const nextDate = new Date(y, m, 1);
+    setMonth(`${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const handleCurrentMonth = () => {
+    const now = new Date();
+    setMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const isCurrentMonth = (() => {
+    const now = new Date();
+    const curStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    return month === curStr;
+  })();
 
   // Handlers for Fixed Costs
   const handleAddFixedCost = async (payload: any) => {
@@ -130,32 +165,78 @@ export const FinanceHubPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 pb-8 animate-in fade-in duration-300">
-      {/* Top Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-3 sm:p-4 rounded-xl border border-slate-800 backdrop-blur-xl">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            <Coins className="w-5 h-5" />
+    <div className="space-y-5 pb-12 animate-in fade-in duration-300">
+      {/* 1. TOP HEADER & MONTH COMMAND BAR */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 p-4 sm:p-5 rounded-2xl border border-slate-800 backdrop-blur-2xl shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30 shadow-lg shadow-cyan-500/10">
+            <Coins className="w-6 h-6" />
           </div>
-          <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-            Trung Tâm Quản Trị Tài Chính
-          </h1>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                FINANCIAL COMMAND CENTER
+              </span>
+              {data && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  data.breakEven.isBreakEvenPassed 
+                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" 
+                    : "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                }`}>
+                  {data.breakEven.isBreakEvenPassed ? "HÒA VỐN ĐÃ ĐẠT" : "ĐANG BÙ THÂM HỤT"}
+                </span>
+              )}
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1">
+              Trung Tâm Quản Trị Tài Chính
+            </h1>
+          </div>
         </div>
 
-        {/* Month Selector & Refresh Button */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <div className="relative flex items-center">
+        {/* Month Selector & Controls */}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          {/* Quick jump to current month */}
+          {!isCurrentMonth && (
+            <button
+              onClick={handleCurrentMonth}
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all cursor-pointer shadow-sm"
+              title="Về tháng hiện tại"
+            >
+              Tháng Hiện Tại
+            </button>
+          )}
+
+          {/* Stepper < Month > */}
+          <div className="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-1 shadow-inner">
+            <button
+              onClick={handlePrevMonth}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Tháng trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
             <input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-cyan-400 cursor-pointer shadow-inner"
+              className="bg-transparent border-0 px-2.5 py-1 text-xs sm:text-sm text-white font-mono font-bold focus:outline-none cursor-pointer text-center"
             />
+
+            <button
+              onClick={handleNextMonth}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Tháng sau"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
+
+          {/* Refresh button */}
           <button
             onClick={() => fetchData(month)}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700/60 disabled:opacity-50"
+            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700/60 disabled:opacity-50 shadow-sm"
             title="Làm mới dữ liệu"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-cyan-400" : ""}`} />
@@ -165,7 +246,7 @@ export const FinanceHubPage: React.FC = () => {
 
       {/* Error Alert */}
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-2">
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -173,18 +254,19 @@ export const FinanceHubPage: React.FC = () => {
 
       {/* Loading Skeleton */}
       {loading && !data && (
-        <div className="p-16 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Đang tổng hợp dữ liệu tài chính toàn diện...</span>
+        <div className="p-20 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+          <div className="w-9 h-9 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-semibold">Đang tổng hợp dữ liệu tài chính toàn diện...</span>
         </div>
       )}
 
       {/* Main Content */}
       {data && (
-        <div className="space-y-4">
-          {/* Section 1: KPI Cards Tài Sản Ròng */}
+        <div className="space-y-6">
+          {/* Section 1: KPI Cards Tài Sản Ròng & Sức Khỏe */}
           <NetWorthCards metrics={data.netWorth} />
 
+          {/* Section 2: Master Break-even Engine Hero Panel */}
           <FinanceOverviewPanel
             breakEven={data.breakEven}
             dailyBreakEven={data.dailyBreakEven}
@@ -192,43 +274,55 @@ export const FinanceHubPage: React.FC = () => {
             month={data.month}
           />
 
-          {/* Section 3: Navigation Tabs */}
-          <div className="space-y-3 pt-0">
-            <div className="flex items-center gap-1 border-b border-slate-800 pb-2 overflow-x-auto">
+          {/* Section 3: Detailed Management Navigation Tabs */}
+          <div className="space-y-4 pt-2">
+            {/* Pill Tab Switcher */}
+            <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl overflow-x-auto">
               <button
                 onClick={() => setActiveTab("DEBTS_INSTALLMENTS")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "DEBTS_INSTALLMENTS"
-                    ? "bg-slate-800 text-white border border-slate-700 shadow-none"
-                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-900"
+                    ? "bg-gradient-to-r from-rose-500/20 to-amber-500/20 text-white border border-rose-500/40 shadow-lg shadow-rose-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                 }`}
               >
                 <CreditCard className="w-4 h-4 text-rose-400" />
-                Nợ & Trả Góp ({data.installments.length + data.personalAssets.filter(a => a.type === "DEBT_PAYABLE").length})
+                <span>Nợ & Trả Góp</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">
+                  {data.installments.length + data.personalAssets.filter((a) => a.type === "DEBT_PAYABLE").length}
+                </span>
               </button>
 
               <button
                 onClick={() => setActiveTab("FIXED_COSTS")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "FIXED_COSTS"
-                    ? "bg-slate-800 text-white border border-slate-700 shadow-none"
-                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-900"
+                    ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-white border border-amber-500/40 shadow-lg shadow-amber-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                 }`}
               >
                 <Home className="w-4 h-4 text-amber-400" />
-                Chi Phí Cố Định ({data.fixedCosts.length})
+                <span>Chi Phí Cố Định</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">
+                  {data.fixedCosts.length}
+                </span>
               </button>
 
               <button
                 onClick={() => setActiveTab("SAVINGS_ASSETS")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "SAVINGS_ASSETS"
-                    ? "bg-slate-800 text-white border border-slate-700 shadow-none"
-                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-900"
+                    ? "bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-white border border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
                 }`}
               >
                 <Wallet className="w-4 h-4 text-emerald-400" />
-                Quỹ Tích Lũy & Tài Sản ({data.personalAssets.filter(a => a.type === "SAVINGS" || a.type === "CASH_BANK" || a.type === "GOLD_INVESTMENT").length})
+                <span>Quỹ Tích Lũy & Tài Sản</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">
+                  {data.personalAssets.filter(
+                    (a) => a.type === "SAVINGS" || a.type === "CASH_BANK" || a.type === "GOLD_INVESTMENT"
+                  ).length}
+                </span>
               </button>
             </div>
 
@@ -238,9 +332,8 @@ export const FinanceHubPage: React.FC = () => {
                 <DebtsAndInstallmentsSection
                   installments={data.installments}
                   personalDebts={data.personalAssets}
-                  supplierDebtTotal={data.netWorth.breakdown.supplierDebtTotal}
                   totalInstallmentsRemainingDebt={data.netWorth.breakdown.totalInstallmentsRemainingDebt}
-                  monthlyDebtBurden={data.breakEven.monthlyDebtBurden}
+                  monthlyDebtBurden={data.breakEven.monthlyDebtBurden ?? 0}
                   onAddInstallment={handleAddInstallment}
                   onEditInstallment={handleEditInstallment}
                   onDeleteInstallment={handleDeleteInstallment}

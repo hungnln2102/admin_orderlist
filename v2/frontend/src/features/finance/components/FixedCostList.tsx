@@ -1,7 +1,22 @@
-import React, { useState } from "react";
-import { FixedCost } from "../types";
+import React, { useState, useMemo } from "react";
+import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
-import { Plus, Edit2, Trash2, Home, CheckCircle2, XCircle } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
+import { FixedCost, FixedCostCategory } from "../types";
+import {
+  CheckCircle2,
+  DollarSign,
+  Edit2,
+  Filter,
+  Home,
+  Plus,
+  Power,
+  Server,
+  Sparkles,
+  Tag,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { FixedCostModal } from "./FixedCostModal";
 
 interface Props {
@@ -17,8 +32,10 @@ export const FixedCostList: React.FC<Props> = ({
   onEdit,
   onDelete,
 }) => {
+  const notify = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<FixedCost | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<"ALL" | FixedCostCategory>("ALL");
 
   const handleOpenAdd = () => {
     setEditingItem(null);
@@ -31,61 +48,157 @@ export const FixedCostList: React.FC<Props> = ({
   };
 
   const handleSave = async (payload: any) => {
-    if (editingItem) {
-      await onEdit(editingItem.id, payload);
-    } else {
-      await onAdd(payload);
+    try {
+      if (editingItem) {
+        await onEdit(editingItem.id, payload);
+        notify.success(`Đã cập nhật chi phí "${payload.name || editingItem.name}"`);
+      } else {
+        await onAdd(payload);
+        notify.success(`Đã thêm chi phí "${payload.name}"`);
+      }
+    } catch (err: any) {
+      notify.error(err.message || "Lỗi lưu chi phí");
     }
   };
 
   const handleToggleActive = async (item: FixedCost) => {
-    await onEdit(item.id, { isActive: !item.isActive });
+    try {
+      await onEdit(item.id, { isActive: !item.isActive });
+      notify.info(
+        `Đã ${!item.isActive ? "bật" : "tắt"} chi phí "${item.name}" trong tính toán hòa vốn`
+      );
+    } catch (err: any) {
+      notify.error(err.message || "Lỗi cập nhật trạng thái");
+    }
   };
 
-  const totalActive = items
-    .filter((i) => i.isActive)
-    .reduce((sum, i) => sum + i.amount, 0);
+  const confirmDelete = (item: FixedCost) => {
+    notify.confirm({
+      title: "Xác Nhận Xóa Chi Phí Cố Định",
+      message: `Bạn có chắc muốn xóa chi phí "${item.name}" (${formatVND(item.amount)}/tháng)? Thao tác này sẽ cập nhật lại điểm hòa vốn.`,
+      confirmText: "Xóa Ngay",
+      cancelText: "Hủy",
+      onConfirm: async () => {
+        try {
+          await onDelete(item.id);
+          notify.success(`Đã xóa chi phí "${item.name}"`);
+        } catch (err: any) {
+          notify.error(err.message || "Xóa thất bại");
+        }
+      },
+    });
+  };
+
+  const totalActive = useMemo(() => {
+    return items
+      .filter((i) => i.isActive)
+      .reduce((sum, i) => sum + i.amount, 0);
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    if (selectedCategory === "ALL") return items;
+    return items.filter((i) => i.category === selectedCategory);
+  }, [items, selectedCategory]);
+
+  const categoryBadgeMap: Record<FixedCostCategory, { label: string; color: string }> = {
+    LIVING: { label: "Sinh hoạt gia đình", color: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+    SHOP_OPERATIONS: { label: "Vận hành Shop", color: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" },
+    SOFTWARE: { label: "Phần mềm / Dịch vụ", color: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+    OTHER: { label: "Khoản chi khác", color: "bg-slate-500/15 text-slate-300 border-slate-500/30" },
+  };
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <Home className="w-4 h-4 text-rose-400" />
-          Chi Phí Cố Định Hàng Tháng
-        </h3>
+      {/* 1. Header Banner */}
+      <GlassCard className="!p-5 bg-gradient-to-r from-amber-950/40 via-slate-900 to-rose-950/30 border-amber-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="text-[10px] uppercase font-bold text-slate-500 block">
+          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Home className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Chi Phí Cố Định Hàng Tháng</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Tiền nhà, điện nước, internet, sinh hoạt và phí phần mềm tính vào điểm hòa vốn
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 self-start sm:self-auto">
+          <div className="text-left sm:text-right">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
               Tổng áp dụng tháng
             </span>
-            <span className="text-sm font-mono font-extrabold text-rose-300">
+            <span className="text-xl sm:text-2xl font-black font-mono text-amber-300">
               {formatVND(totalActive)}
             </span>
           </div>
           <button
             onClick={handleOpenAdd}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-amber-500/10"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             Thêm Chi Phí
           </button>
         </div>
+      </GlassCard>
+
+      {/* 2. Category Filters */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <button
+          onClick={() => setSelectedCategory("ALL")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            selectedCategory === "ALL"
+              ? "bg-slate-800 text-white border border-slate-700 shadow-sm"
+              : "text-slate-400 hover:text-white hover:bg-slate-900/60"
+          }`}
+        >
+          Tất cả ({items.length})
+        </button>
+        <button
+          onClick={() => setSelectedCategory("LIVING")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            selectedCategory === "LIVING"
+              ? "bg-purple-500/20 text-purple-200 border border-purple-500/40"
+              : "text-slate-400 hover:text-white hover:bg-slate-900/60"
+          }`}
+        >
+          Sinh hoạt ({items.filter((i) => i.category === "LIVING").length})
+        </button>
+        <button
+          onClick={() => setSelectedCategory("SHOP_OPERATIONS")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            selectedCategory === "SHOP_OPERATIONS"
+              ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40"
+              : "text-slate-400 hover:text-white hover:bg-slate-900/60"
+          }`}
+        >
+          Vận hành Shop ({items.filter((i) => i.category === "SHOP_OPERATIONS").length})
+        </button>
+        <button
+          onClick={() => setSelectedCategory("SOFTWARE")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            selectedCategory === "SOFTWARE"
+              ? "bg-blue-500/20 text-blue-200 border border-blue-500/40"
+              : "text-slate-400 hover:text-white hover:bg-slate-900/60"
+          }`}
+        >
+          Phần mềm ({items.filter((i) => i.category === "SOFTWARE").length})
+        </button>
       </div>
 
-      {/* Table / List */}
-      {items.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl space-y-3 bg-slate-900/40">
+      {/* 3. Items List / Table */}
+      {filteredItems.length === 0 ? (
+        <GlassCard className="!p-12 text-center border border-dashed border-slate-800 rounded-2xl space-y-3 bg-slate-950/40">
           <Home className="w-10 h-10 text-slate-600 mx-auto" />
-          <div className="text-sm font-semibold text-slate-400">
-            Chưa có chi phí cố định nào
+          <div className="text-sm font-semibold text-slate-300">
+            Không có khoản chi phí cố định nào
           </div>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Bấm "Thêm Chi Phí" để khai báo tiền thuê nhà, ăn ở, internet nhằm tự động tính vào điểm hòa vốn tháng.
+            Bấm "Thêm Chi Phí" để khai báo các khoản chi định kỳ lặp lại mỗi tháng nhằm tự động trừ vào lợi nhuận shop.
           </p>
-        </div>
+        </GlassCard>
       ) : (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <GlassCard className="!p-0 bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-300">
               <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-800">
@@ -93,77 +206,87 @@ export const FixedCostList: React.FC<Props> = ({
                   <th className="py-3.5 px-4">Khoản Chi</th>
                   <th className="py-3.5 px-4">Phân Loại</th>
                   <th className="py-3.5 px-4 text-right">Số Tiền / Tháng</th>
-                  <th className="py-3.5 px-4 text-center">Trạng Thái</th>
+                  <th className="py-3.5 px-4 text-center">Trạng Thái Tính Hòa Vốn</th>
                   <th className="py-3.5 px-4">Ghi Chú</th>
                   <th className="py-3.5 px-4 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      !item.isActive ? "opacity-50" : ""
-                    }`}
-                  >
-                    <td className="py-3.5 px-4 font-bold text-white">
-                      {item.name}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-semibold text-purple-300">
-                      {item.category === "LIVING"
-                        ? "Sinh hoạt gia đình"
-                        : item.category === "SHOP_OPERATIONS"
-                        ? "Vận hành Shop"
-                        : item.category === "SOFTWARE"
-                        ? "Phần mềm / Dịch vụ"
-                        : "Khác"}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-300">
-                      {formatVND(item.amount)}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <button
-                        onClick={() => handleToggleActive(item)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase border transition-all cursor-pointer ${
-                          item.isActive
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-slate-800 text-slate-400 border-slate-700"
-                        }`}
-                      >
-                        {item.isActive ? "Đang áp dụng" : "Đang tắt"}
-                      </button>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-slate-400 truncate max-w-[200px]">
-                      {item.note || "—"}
-                    </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1">
+                {filteredItems.map((item) => {
+                  const categoryMeta = categoryBadgeMap[item.category] || categoryBadgeMap.OTHER;
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`hover:bg-slate-800/40 transition-colors ${
+                        !item.isActive ? "opacity-50" : ""
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 font-bold text-white">
+                        <div className="flex items-center gap-2">
+                          <span>{item.name}</span>
+                          {!item.isActive && (
+                            <span className="text-[10px] font-normal text-slate-500">(Tạm bỏ qua)</span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${categoryMeta.color}`}>
+                          {categoryMeta.label}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-300 text-sm">
+                        {formatVND(item.amount)}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
                         <button
-                          onClick={() => handleOpenEdit(item)}
-                          className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                          title="Sửa chi phí"
+                          type="button"
+                          onClick={() => handleToggleActive(item)}
+                          className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm ${
+                            item.isActive
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
+                              : "bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-700"
+                          }`}
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Power className={`w-3 h-3 ${item.isActive ? "text-emerald-400" : "text-slate-500"}`} />
+                          {item.isActive ? "ĐANG ÁP DỤNG" : "ĐÃ TẮT"}
                         </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Bạn có chắc muốn xóa chi phí "${item.name}"?`)) {
-                              onDelete(item.id);
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                          title="Xóa chi phí"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-xs text-slate-400 truncate max-w-[200px]">
+                        {item.note || "—"}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(item)}
+                            className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            title="Sửa chi phí"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => confirmDelete(item)}
+                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            title="Xóa chi phí"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {/* Modal Add/Edit */}

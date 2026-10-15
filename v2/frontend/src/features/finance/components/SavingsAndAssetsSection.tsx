@@ -1,7 +1,21 @@
 import React, { useState } from "react";
-import { PersonalAsset } from "../types";
+import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
-import { Wallet, Landmark, Plus, Edit2, Trash2, ExternalLink, Sparkles } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
+import { PersonalAsset, PersonalAssetType } from "../types";
+import {
+  Coins,
+  CreditCard,
+  Edit2,
+  ExternalLink,
+  Landmark,
+  PiggyBank,
+  Plus,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import { PersonalAssetsModal } from "./PersonalAssetsModal";
 import { useNavigate } from "react-router-dom";
 
@@ -21,156 +35,324 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   onDelete,
 }) => {
   const navigate = useNavigate();
+  const notify = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PersonalAsset | null>(null);
+  const [modalDefaultType, setModalDefaultType] = useState<PersonalAssetType>("CASH_BANK");
+  const [assetFilter, setAssetFilter] = useState<"ALL" | "CASH_BANK" | "SAVINGS_INVEST">("ALL");
 
   const savingsList = assets.filter(
     (a) => a.type === "SAVINGS" || a.type === "CASH_BANK" || a.type === "GOLD_INVESTMENT"
   );
 
+  const walletItems = savingsList.filter((a) => a.type === "CASH_BANK");
+  const savingsItems = savingsList.filter((a) => a.type === "SAVINGS" || a.type === "GOLD_INVESTMENT");
+
+  const walletTotal = walletItems.reduce((sum, a) => sum + a.amount, 0);
+  const savingsTotal = savingsItems.reduce((sum, a) => sum + a.amount, 0);
   const personalSavingsTotal = savingsList.reduce((sum, a) => sum + a.amount, 0);
   const totalAllAssets = shopBalanceTotal + personalSavingsTotal;
 
-  const handleOpenAdd = () => {
+  const displayedList =
+    assetFilter === "CASH_BANK"
+      ? walletItems
+      : assetFilter === "SAVINGS_INVEST"
+      ? savingsItems
+      : savingsList;
+
+  const handleOpenAdd = (type: PersonalAssetType) => {
     setEditingItem(null);
+    setModalDefaultType(type);
     setModalOpen(true);
   };
 
   const handleOpenEdit = (item: PersonalAsset) => {
     setEditingItem(item);
+    setModalDefaultType(item.type);
     setModalOpen(true);
   };
 
   const handleSave = async (payload: any) => {
-    if (editingItem) {
-      await onEdit(editingItem.id, payload);
-    } else {
-      await onAdd(payload);
+    try {
+      if (editingItem) {
+        await onEdit(editingItem.id, payload);
+        notify.success(`Đã cập nhật mục "${payload.name || editingItem.name}"`);
+      } else {
+        await onAdd(payload);
+        notify.success(`Đã thêm mục "${payload.name}"`);
+      }
+    } catch (err: any) {
+      notify.error(err.message || "Lỗi lưu tài sản");
     }
+  };
+
+  const confirmDelete = (item: PersonalAsset) => {
+    const isWallet = item.type === "CASH_BANK";
+    notify.confirm({
+      title: isWallet ? "Xác Nhận Xóa Ví Cá Nhân" : "Xác Nhận Xóa Quỹ Tích Lũy",
+      message: `Bạn có chắc muốn xóa "${item.name}" (${formatVND(item.amount)})?`,
+      confirmText: "Xóa Ngay",
+      cancelText: "Hủy",
+      onConfirm: async () => {
+        try {
+          await onDelete(item.id);
+          notify.success(`Đã xóa "${item.name}"`);
+        } catch (err: any) {
+          notify.error(err.message || "Xóa thất bại");
+        }
+      },
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Top Banner: Tổng Hợp Tài Sản & Tích Lũy */}
-      <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/30 p-4 sm:p-5 rounded-2xl border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-2">
-          <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Wallet className="w-5 h-5" />
-          </span>
-          <h3 className="text-base sm:text-lg font-black text-white">
-            Quỹ Tích Lũy & Tài Sản
-          </h3>
+      {/* 1. Top Banner: Tổng Hợp Tài Sản & Tích Lũy */}
+      <GlassCard className="!p-5 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/30 border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Wallet className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Quỹ Tích Lũy & Tài Sản</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Tổng hợp nguồn vốn tự do từ số dư Shop và các ví, tài khoản cá nhân, sổ tiết kiệm
+            </p>
+          </div>
         </div>
+
         <div className="text-left sm:text-right">
           <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
             Tổng tài sản tích lũy
           </span>
-          <span className="text-xl sm:text-2xl font-mono font-black text-emerald-300">
+          <span className="text-xl sm:text-2xl font-black font-mono text-emerald-300">
             {formatVND(totalAllAssets)}
           </span>
         </div>
-      </div>
+      </GlassCard>
 
-      {/* Grid: 2 Cột - Ví Shop & Tích Lũy Cá Nhân */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* 2. Grid: 2 Cột - Ví Shop & Tích Lũy Cá Nhân */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Khối 1: Số Dư Các Ví Shop Bank & USDT */}
-        <div className="space-y-3">
-          <div className="border-b border-slate-800 pb-2">
-            <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-cyan-400" />
-              1. Ví Shop Bank & USDT
-            </h4>
+        <GlassCard className="!p-5 bg-slate-900/90 border-slate-800 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-cyan-400" />
+              <h4 className="text-base font-bold text-white">1. Ví Shop Bank & USDT</h4>
+            </div>
+
+            <button
+              onClick={() => navigate("/shop-bank-accounts")}
+              className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>Quản lý ví Shop</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg">
-            <div className="flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+            <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-white">Số Dư Toàn Shop</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
                   TỰ ĐỘNG SHOP
                 </span>
               </div>
-              <div className="text-right flex items-center gap-2">
-                <span className="font-mono font-black text-cyan-300 text-lg">
-                  {formatVND(shopBalanceTotal)}
-                </span>
-                <button
-                  onClick={() => navigate("/payment-wallets")}
-                  className="p-2 text-slate-400 hover:text-cyan-300 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Quản lý tài khoản Shop Bank"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </button>
-              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Kết nối real-time từ số dư các tài khoản ngân hàng và ví USDT của Shop
+              </p>
+            </div>
+
+            <div className="text-right">
+              <span className="font-mono font-black text-cyan-300 text-xl block">
+                {formatVND(shopBalanceTotal)}
+              </span>
             </div>
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Khối 2: Quỹ Tích Lũy Cá Nhân */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-              2. Sổ Tiết Kiệm & Quỹ Tích Lũy Cá Nhân
-            </h4>
-            <button
-              onClick={handleOpenAdd}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Thêm Quỹ Tích Lũy
-            </button>
-          </div>
-
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl divide-y divide-slate-800/70 overflow-hidden shadow-lg">
-            {savingsList.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                Chưa có sổ tiết kiệm hay quỹ tích lũy cá nhân nào. Bấm "Thêm Quỹ Tích Lũy" để tạo hũ để dành.
+        {/* Khối 2: Ví & Tích Lũy Cá Nhân */}
+        <GlassCard className="!p-5 bg-slate-900/90 border-slate-800 rounded-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+              <div>
+                <h4 className="text-base font-bold text-white">
+                  2. Ví & Tích Lũy Cá Nhân ({savingsList.length})
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Ví tiền cá nhân: <span className="font-mono font-bold text-cyan-300">{formatVND(walletTotal)}</span> · Tiết kiệm: <span className="font-mono font-bold text-emerald-300">{formatVND(savingsTotal)}</span>
+                </p>
               </div>
-            ) : (
-              savingsList.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3.5 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">{item.name}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                        {item.type === "SAVINGS"
-                          ? "Tiết Kiệm"
-                          : item.type === "CASH_BANK"
-                          ? "Tiền Mặt/Bank"
-                          : "Vàng/Đầu tư"}
-                      </span>
-                    </div>
-                    {item.note && <p className="text-xs text-slate-400 italic">{item.note}</p>}
-                    {item.profitEnabled && <p className="text-[10px] text-purple-300">Sinh lời {item.annualInterestRate || 0}%/năm · {item.profitFrequency === "DAILY" ? "ngày" : item.profitFrequency === "YEARLY" ? "năm" : "tháng"}</p>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-emerald-300 text-sm">
-                      {formatVND(item.amount)}
-                    </span>
-                    <button
-                      onClick={() => handleOpenEdit(item)}
-                      className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Xóa mục tích lũy "${item.name}"?`)) onDelete(item.id);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+            </div>
+
+            {/* Cặp nút hành động: Thêm Ví Cá Nhân vs Thêm Sổ Tiết Kiệm */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenAdd("CASH_BANK")}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                title="Thêm ví tiền mặt hoặc tài khoản ngân hàng cá nhân riêng"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>+ Ví Cá Nhân</span>
+              </button>
+
+              <button
+                onClick={() => handleOpenAdd("SAVINGS")}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                title="Thêm sổ tiết kiệm hoặc tài sản đầu tư có sinh lời"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Sổ Tiết Kiệm</span>
+              </button>
+            </div>
           </div>
-        </div>
+
+          {/* Sub-tabs / Bộ lọc phân loại */}
+          {savingsList.length > 0 && (
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs">
+              <button
+                type="button"
+                onClick={() => setAssetFilter("ALL")}
+                className={`flex-1 py-1 px-2 rounded-lg font-medium transition-colors cursor-pointer text-center ${
+                  assetFilter === "ALL"
+                    ? "bg-slate-800 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Tất cả ({savingsList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssetFilter("CASH_BANK")}
+                className={`flex-1 py-1 px-2 rounded-lg font-medium transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  assetFilter === "CASH_BANK"
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                    : "text-slate-400 hover:text-cyan-300"
+                }`}
+              >
+                <CreditCard className="w-3 h-3" />
+                <span>Ví Cá Nhân ({walletItems.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssetFilter("SAVINGS_INVEST")}
+                className={`flex-1 py-1 px-2 rounded-lg font-medium transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  assetFilter === "SAVINGS_INVEST"
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "text-slate-400 hover:text-emerald-300"
+                }`}
+              >
+                <PiggyBank className="w-3 h-3" />
+                <span>Sổ Tiết Kiệm ({savingsItems.length})</span>
+              </button>
+            </div>
+          )}
+
+          {displayedList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl space-y-1">
+              {savingsList.length === 0 ? (
+                <>
+                  <p className="font-semibold text-slate-400">Chưa có ví cá nhân hay sổ tiết kiệm nào.</p>
+                  <p>Bấm <strong className="text-cyan-300">+ Ví Cá Nhân</strong> để ghi nhận ví riêng, hoặc <strong className="text-emerald-300">+ Sổ Tiết Kiệm</strong> để tạo hũ để dành.</p>
+                </>
+              ) : assetFilter === "CASH_BANK" ? (
+                <>
+                  <p className="font-semibold text-slate-400">Chưa có ví hay tài khoản cá nhân nào.</p>
+                  <p>Bấm <strong className="text-cyan-300">+ Ví Cá Nhân</strong> để thêm tài khoản ngân hàng hoặc ví riêng của bạn.</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-slate-400">Chưa có sổ tiết kiệm hay tài sản đầu tư nào.</p>
+                  <p>Bấm <strong className="text-emerald-300">+ Sổ Tiết Kiệm</strong> để thêm sổ tích lũy.</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/80 max-h-80 overflow-y-auto pr-1">
+              {displayedList.map((item) => {
+                const isWallet = item.type === "CASH_BANK";
+                const isSavings = item.type === "SAVINGS";
+                return (
+                  <div
+                    key={item.id}
+                    className="py-3 flex items-center justify-between hover:bg-slate-800/20 transition-colors rounded-lg px-2"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        {isWallet ? (
+                          <div className="p-1 rounded-md bg-cyan-500/10 text-cyan-400">
+                            <CreditCard className="w-3.5 h-3.5" />
+                          </div>
+                        ) : isSavings ? (
+                          <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400">
+                            <PiggyBank className="w-3.5 h-3.5" />
+                          </div>
+                        ) : (
+                          <div className="p-1 rounded-md bg-amber-500/10 text-amber-400">
+                            <Coins className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                        <span className="text-sm font-bold text-white">{item.name}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            isWallet
+                              ? "bg-cyan-500/10 text-cyan-300 border-cyan-500/20"
+                              : isSavings
+                              ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                          }`}
+                        >
+                          {isWallet
+                            ? "Ví Cá Nhân"
+                            : isSavings
+                            ? "Sổ Tiết Kiệm"
+                            : "Vàng / Đầu Tư"}
+                        </span>
+                      </div>
+                      {item.note && <p className="text-xs text-slate-400 italic">{item.note}</p>}
+                      {item.profitEnabled && (
+                        <p className="text-[11px] text-purple-300 font-mono">
+                          Sinh lời {item.annualInterestRate || 0}%/năm ·{" "}
+                          {item.profitFrequency === "DAILY"
+                            ? "Theo ngày"
+                            : item.profitFrequency === "YEARLY"
+                            ? "Theo năm"
+                            : "Theo tháng"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`font-mono font-bold text-sm ${
+                          isWallet ? "text-cyan-300" : "text-emerald-300"
+                        }`}
+                      >
+                        {formatVND(item.amount)}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(item)}
+                          className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Chỉnh sửa"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => confirmDelete(item)}
+                          className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Xóa"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </GlassCard>
       </div>
 
       {/* Modal */}
@@ -179,7 +361,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         editingItem={editingItem}
-        defaultType="SAVINGS"
+        defaultType={modalDefaultType}
       />
     </div>
   );
