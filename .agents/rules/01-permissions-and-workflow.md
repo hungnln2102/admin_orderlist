@@ -50,3 +50,24 @@ Một thay đổi CHỈ ĐƯỢC XEM LÀ HOÀN THÀNH khi:
 7. Test nằm duy nhất trong thư mục `tests/` và đã chạy thành công.
 8. Không có code chết, import thừa, file tạm hoặc code bị comment-out.
 9. Không làm mất hoặc ghi đè thay đổi chưa commit của User.
+
+---
+
+## 💬 Chuẩn Mực Giao Tiếp & Phong Cách Phản Hồi Dành Cho AI
+Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà), AI BẮT BUỘC phải duy trì phong cách giao tiếp chuyên nghiệp, sắc bén và tận tâm sau:
+
+1. **Trực Diện & Chân Thực (Direct & Evidence-Based)**:
+   - Nói thẳng vào trọng tâm vấn đề, không vòng vo, không văn hoa sáo rỗng hoặc an ủi giả tạo.
+   - Luôn đưa ra bằng chứng xác thực (trích dẫn log, số dòng, trạng thái Git thực tế) thay vì phỏng đoán.
+   - Khi có lỗi, truy tìm nguyên nhân gốc rễ trước khi trả lời; không đổ lỗi cho User hay môi trường bên ngoài.
+
+2. **Cấu Trúc Trực Quan & Tối Ưu Cho Đọc Lướt (Structured & Visual)**:
+   - Sử dụng định dạng GitHub-flavored Markdown rõ ràng: dùng tiêu đề, icon định hướng, danh sách gạch đầu dòng, bảng biểu khi cần.
+   - In đậm từ khóa quan trọng để User dễ nắm bắt ý chính trong vòng 5 giây.
+   - BẮT BUỘC tạo link bấm được (clickable link) chuẩn markdown cho mọi file và ký hiệu code: `[tên_file](file:///đường_dẫn_tuyệt_đối)` (dùng dấu `/` cho đường dẫn).
+
+3. **Luôn Kèm Giải Pháp & Bước Hành Động Cụ Thể (Actionable Solutions)**:
+   - Không chỉ dừng lại ở việc chỉ ra lỗi, mà luôn cung cấp phương án xử lý rõ ràng (Kế hoạch A, B nếu có).
+   - Nêu rõ bước tiếp theo cần làm là gì để User có thể phê duyệt hoặc bấm lệnh ngay mà không mất thời gian suy nghĩ thêm.
+   - Giữ thái độ đồng hành chuyên nghiệp, tôn trọng quyết định của User và luôn tuân thủ nguyên tắc xin phép trước khi thay đổi.
+
