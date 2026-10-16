@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DebtRepaymentFrequency, PersonalAsset, PersonalAssetType, ProfitDestination, ProfitFrequency } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { DateInputVN } from "@/shared/components/DateInputVN";
 import {
   Calendar,
   Clock3,
@@ -438,11 +439,10 @@ export const PersonalAssetsModal: React.FC<Props> = ({
 
                     <div>
                       <label className="mb-1.5 block text-xs text-slate-300 font-medium">Ngày dự kiến tất toán</label>
-                      <input
-                        type="date"
+                      <DateInputVN
                         value={debtEndDate}
-                        onChange={(event) => setDebtEndDate(event.target.value)}
-                        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none cursor-pointer"
+                        onChange={(iso) => setDebtEndDate(iso)}
+                        focusBorderClass="focus:border-rose-400"
                       />
                     </div>
                   </div>

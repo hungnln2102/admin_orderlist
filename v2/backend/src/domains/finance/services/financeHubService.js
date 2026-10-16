@@ -139,8 +139,8 @@ function calculateInstallmentState(item, targetMonth) {
       remainingDebt: totalPeriods * monthlyAmount,
     };
   } else if (currentPeriod <= totalPeriods) {
-    // Đang trong kỳ trả góp
-    const remainingPeriods = totalPeriods - currentPeriod;
+    // Đang trong kỳ trả góp: Số kỳ còn phải trả bao gồm cả kỳ hiện tại chưa tất toán
+    const remainingPeriods = totalPeriods - currentPeriod + 1;
     return {
       isEffective: item.is_active !== false,
       status: "ACTIVE",

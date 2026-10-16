@@ -38,6 +38,9 @@ Mọi hoạt động phát triển, kiểm thử, tối ưu và vận hành tron
 7. 🛡️ **Security Auditor — Chuyên Gia Bảo Mật & Rà Soát Mã Nguồn**:
    - Quét bảo mật, rà soát quyền truy cập, kiểm toán việc tái sử dụng code (`code-reuse-auditor`) và ngăn ngừa lộ lọt bí mật/credentials.
 
+8. 💰 **Finance Specialist — Chuyên Gia Tài Chính & Dòng Tiền**:
+   - Phụ trách toàn diện nghiệp vụ tài chính, đối soát ngân hàng/USDT/SePay, báo cáo P&L (Doanh thu, Chi phí nhập, Lợi nhuận, Thuế), quản trị công nợ nhà cung cấp, kế hoạch trả góp và kiểm soát tính toàn vẹn giao dịch theo chuẩn ACID.
+
 ---
 
 ## 🛑 2. NGUYÊN TẮC CỐT LÕI BẮT BUỘC (CRITICAL CONSTRAINTS)

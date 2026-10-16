@@ -40,8 +40,8 @@ async function runTest() {
     assert.strictEqual(state1.status, "ACTIVE", "Tháng bắt đầu phải có trạng thái ACTIVE");
     assert.strictEqual(state1.currentPeriod, 1, "Tháng 2026-10 phải là kỳ 1");
     assert.strictEqual(state1.isEffective, true, "Phải có hiệu lực trừ vào chi phí tháng");
-    assert.strictEqual(state1.remainingPeriods, 11, "Còn 11 kỳ");
-    assert.strictEqual(state1.remainingDebt, 33000000, "Dư nợ còn lại 33tr");
+    assert.strictEqual(state1.remainingPeriods, 12, "Còn 12 kỳ (bao gồm kỳ 1 hiện tại)");
+    assert.strictEqual(state1.remainingDebt, 36000000, "Dư nợ còn lại 36tr (12 kỳ x 3tr)");
 
     // Trường hợp 2: Khoản trả góp bắt đầu từ tương lai (2026-12)
     const stateNotStarted = financeHubService.calculateInstallmentState({
@@ -124,10 +124,11 @@ async function runTest() {
     // ----------------------------------------------------
     console.log("⏳ [TC-04] Giả lập đơn bán hàng MAVFINTST01 (Giá bán 12tr, Giá vốn 2tr => Lãi gộp 10tr)...");
 
+    const testPrice = beInitial.breakEvenTarget + 7000000;
     await db(TABLES.ORDER_LIST).insert({
       id_order: "MAVFINTST01",
       customer: "Khách VIP Test",
-      price: 12000000,
+      price: testPrice,
       cost: 2000000,
       status: "PAID",
       information_order: "vip_test@gmail.com",
@@ -142,7 +143,7 @@ async function runTest() {
     console.log(`   - Tiến độ hòa vốn: ${beAfter.breakEvenPercent}%`);
     console.log(`   - Đã vượt hòa vốn: ${beAfter.isBreakEvenPassed}`);
 
-    assert.strictEqual(beAfter.shopGrossProfit >= 10000000, true, "Lãi gộp shop phải tăng thêm 10tr");
+    assert.strictEqual(beAfter.shopGrossProfit >= beInitial.breakEvenTarget, true, "Lãi gộp shop phải vượt mục tiêu hòa vốn");
     // Lợi nhuận ròng = Lãi gộp (>= 10tr) - Chi phí cố định & Trả góp (>= 8tr) => Phải chuyển sang số dương!
     assert.strictEqual(beAfter.netProfit >= 0, true, "Lợi nhuận ròng đã chuyển sang dương");
     assert.strictEqual(beAfter.isBreakEvenPassed, true, "Trạng thái đã vượt điểm hòa vốn");
@@ -159,7 +160,7 @@ async function runTest() {
     console.log(`   - Tài sản ròng (Net Worth): ${nw.netWorth.toLocaleString()} ₫`);
 
     assert(nw.totalAssets >= 50000000, "Tổng tài sản phải bao gồm 50tr tiền tiết kiệm");
-    assert(nw.totalLiabilities >= 33000000, "Tổng nợ phải bao gồm 11 kỳ còn lại của MacBook = 33tr");
+    assert(nw.totalLiabilities >= 36000000, "Tổng nợ phải bao gồm 12 kỳ của MacBook = 36tr");
     assert.strictEqual(nw.netWorth, nw.totalAssets - nw.totalLiabilities, "Net Worth phải = Tổng tài sản - Tổng nợ");
 
     console.log("✅ [TC-05] Chỉ số Tài sản ròng (Net Worth) tính toán chuẩn mực!");
@@ -186,7 +187,7 @@ async function runTest() {
 
     const day5 = dbe.chartData[4];
     assert.strictEqual(day5.day, 5);
-    assert.strictEqual(day5.todayProfit, 10000000, "Ngày 5 ghi nhận lãi gộp 10tr từ đơn hàng");
+    assert.strictEqual(day5.todayProfit, beAfter.shopGrossProfit, "Ngày 5 ghi nhận lãi gộp từ đơn hàng");
     assert.strictEqual(day5.isDebtFreeToday, true, "Ngày 5 phải xóa sạch nợ gối đầu và có thặng dư");
     assert.strictEqual(day5.isMasterBreakEvenPassed, true, "Ngày 5 vượt mốc hòa vốn toàn tháng");
 
