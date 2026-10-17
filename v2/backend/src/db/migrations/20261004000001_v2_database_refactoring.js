@@ -16,6 +16,19 @@ const schemaSystem = process.env.DB_SCHEMA_SYSTEM || process.env.DB_SCHEMA_RENEW
  * @returns { Promise<void> }
  */
 exports.up = async function (knex) {
+  // Ensure required schemas exist
+  await knex.raw(`
+    CREATE SCHEMA IF NOT EXISTS billing;
+    CREATE SCHEMA IF NOT EXISTS orders;
+    CREATE SCHEMA IF NOT EXISTS business;
+    CREATE SCHEMA IF NOT EXISTS product;
+    CREATE SCHEMA IF NOT EXISTS partner;
+    CREATE SCHEMA IF NOT EXISTS finance;
+    CREATE SCHEMA IF NOT EXISTS admin;
+    CREATE SCHEMA IF NOT EXISTS warehouse;
+    CREATE SCHEMA IF NOT EXISTS system_automation;
+  `);
+
   // ==========================================
   // 1. REFACTOR ORDER STATUSES & INDEX
   // ==========================================
@@ -41,6 +54,32 @@ exports.up = async function (knex) {
   // ==========================================
   // 2. PAYMENT RECEIPT ALLOCATIONS & RESTRUCTURING
   // ==========================================
+  const hasBillingReceipt = await knex.schema.withSchema("billing").hasTable("payment_receipt");
+  if (!hasBillingReceipt) {
+    const hasReceiptTable = await knex.schema.withSchema("receipt").hasTable("payment_receipt");
+    if (hasReceiptTable) {
+      await knex.raw(`
+        CREATE TABLE billing.payment_receipt AS TABLE receipt.payment_receipt;
+        ALTER TABLE billing.payment_receipt ADD PRIMARY KEY (id);
+      `);
+    } else {
+      await knex.raw(`
+        CREATE TABLE IF NOT EXISTS billing.payment_receipt (
+          id BIGSERIAL PRIMARY KEY,
+          id_order VARCHAR(100),
+          payment_date TIMESTAMPTZ,
+          amount NUMERIC(15, 2),
+          receiver VARCHAR(255),
+          note TEXT,
+          sender VARCHAR(255),
+          sepay_transaction_id VARCHAR(100),
+          reference_code VARCHAR(100),
+          transfer_type VARCHAR(50),
+          gateway VARCHAR(100)
+        );
+      `);
+    }
+  }
   await knex.raw(`
     ALTER TABLE ${schemaReceipt}.payment_receipt 
       ADD COLUMN IF NOT EXISTS unallocated_amount NUMERIC(15, 2) DEFAULT 0,

@@ -12,7 +12,7 @@ exports.up = async function (knex) {
     WHERE status IN ('PAID', 'REFUND_PENDING', 'REFUNDED')
        OR id_order ILIKE 'MAVN%'
        OR id IN (
-         SELECT order_list_id FROM ${schemaOrders}.supplier_order_cost_log WHERE order_list_id IS NOT NULL
+         SELECT order_list_id FROM partner.supplier_order_cost_log WHERE order_list_id IS NOT NULL
        );
   `);
 };

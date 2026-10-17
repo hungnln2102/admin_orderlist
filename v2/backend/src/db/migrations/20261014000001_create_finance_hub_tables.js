@@ -13,6 +13,29 @@ exports.up = async function (knex) {
   // Đảm bảo schema finance tồn tại
   await knex.raw(`CREATE SCHEMA IF NOT EXISTS ${schemaFinance};`);
 
+  // 0. finance.financial_accounts
+  await knex.raw(`
+    CREATE TABLE IF NOT EXISTS ${schemaFinance}.financial_accounts (
+      id integer NOT NULL PRIMARY KEY,
+      account_type varchar(20) NOT NULL DEFAULT 'bank',
+      label text,
+      account_number text NOT NULL,
+      account_holder text,
+      bank_bin text,
+      bank_short_code text,
+      bank_display_name text,
+      qr_note_prefix text,
+      is_default boolean DEFAULT false,
+      is_active boolean DEFAULT true,
+      total_withdrawn numeric(15,2) DEFAULT 0,
+      total_received numeric(15,2) DEFAULT 0,
+      balance numeric(15,2) DEFAULT 0,
+      is_deleted boolean DEFAULT false,
+      created_at timestamp with time zone DEFAULT NOW(),
+      updated_at timestamp with time zone DEFAULT NOW()
+    );
+  `);
+
   // 1. finance.fixed_costs: Chi phí sinh hoạt & vận hành cố định mỗi tháng
   await knex.raw(`
     CREATE TABLE IF NOT EXISTS ${schemaFinance}.fixed_costs (

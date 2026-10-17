@@ -11,7 +11,7 @@ const SCHEMAS = {
   PRODUCT: process.env.DB_SCHEMA_PRODUCT || process.env.SCHEMA_PRODUCT || "business",
   ORDERS: process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "business",
   RECEIPT: process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "billing",
-  ADMIN: process.env.DB_SCHEMA_ADMIN || process.env.SCHEMA_ADMIN || "finance",
+  ADMIN: process.env.DB_SCHEMA_ADMIN || process.env.SCHEMA_ADMIN || "admin",
   FINANCE: process.env.DB_SCHEMA_FINANCE || process.env.SCHEMA_FINANCE || "finance",
   DASHBOARD: process.env.DB_SCHEMA_DASHBOARD || "finance",
   SYSTEM: process.env.DB_SCHEMA_SYSTEM || process.env.DB_SCHEMA_RENEW_ADOBE || "system_automation",

@@ -443,7 +443,6 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
                                 fill={p.netVal >= 0 ? "#10b981" : "#f43f5e"}
                                 stroke={isSelected ? "#ffffff" : isToday ? "#fbbf24" : "#091122"}
                                 strokeWidth={isSelected ? 2.5 : 1.5}
-                                className="transition-all duration-150 group-hover:scale-125"
                               />
                             )}
                           </g>
@@ -470,54 +469,6 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
                 </div>
               );
             })()}
-
-            {/* Selected Day Inspector */}
-            {selectedDay && (
-              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-bold text-sm">
-                    N{selectedDay.day}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>Chi tiết Ngày {selectedDay.day}</span>
-                      <span className="text-[10px] font-mono text-slate-400">{selectedDay.dateStr}</span>
-                      {selectedDay.day === currentDay && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                          HÔM NAY
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {selectedDay.isFuture ? (
-                        "Ngày trong tương lai (Dự kiến)"
-                      ) : (
-                        <span>
-                          <strong className="text-white">{selectedDay.ordersCount} đơn</strong> · Doanh thu <strong className="text-slate-300 font-mono">{formatVND(selectedDay.dailyRevenue)}</strong>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs font-mono self-end sm:self-auto">
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-500 uppercase block">Cần đạt</span>
-                    <span className="text-amber-300 font-semibold">{formatVND(selectedDay.todayRequired)}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-500 uppercase block">Lãi gộp</span>
-                    <span className="text-cyan-300 font-semibold">{formatVND(selectedDay.todayProfit)}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-500 uppercase block">Số dư cuối</span>
-                    <span className={`font-semibold ${selectedDay.rollingBalance >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
-                      {selectedDay.rollingBalance >= 0 ? "+" : ""}{formatVND(selectedDay.rollingBalance)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
           </GlassCard>
         </div>
 
