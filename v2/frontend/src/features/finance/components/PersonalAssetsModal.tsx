@@ -135,12 +135,15 @@ export const PersonalAssetsModal: React.FC<Props> = ({
         if (cancelled) return;
         const banks = (bankData.items || [])
           .filter((item: any) => item.isActive)
-          .map((item: any) => ({
-            id: Number(item.id),
-            kind: "bank" as const,
-            label: item.label || item.bankDisplayName || "Tài khoản ngân hàng",
-            detail: [item.bankDisplayName, item.accountNumber].filter(Boolean).join(" · "),
-          }));
+          .map((item: any) => {
+            const scopePrefix = item.accountScope === "PERSONAL" ? "💳 [Cá nhân]" : "🏢 [Shop]";
+            return {
+              id: Number(item.id),
+              kind: "bank" as const,
+              label: `${scopePrefix} ${item.label || item.bankDisplayName || "Tài khoản ngân hàng"}`,
+              detail: [item.bankDisplayName, item.accountNumber].filter(Boolean).join(" · "),
+            };
+          });
         const wallets = (usdtData.items || [])
           .filter((item: any) => item.isActive)
           .map((item: any) => ({
@@ -359,15 +362,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                   <option value="DEBT_PAYABLE">🔴 Nợ cá nhân phải trả (Nợ phải trả)</option>
                   <option value="DEBT_RECEIVABLE">🟢 Khoản cho vay (Phải thu cá nhân)</option>
                   <option value="SAVINGS">🟣 Quỹ Tích Lũy / Tiết kiệm (Tài sản sinh lời)</option>
-                  <option value="CASH_BANK">🔵 Tiền mặt / Tài khoản cá nhân (Tài sản thanh khoản)</option>
                   <option value="GOLD_INVESTMENT">🟡 Vàng / Đầu tư / Crypto (Tài sản đầu tư)</option>
                 </select>
-                {type === "CASH_BANK" && (
-                  <p className="mt-1.5 text-[11px] text-cyan-300 bg-cyan-950/40 border border-cyan-500/20 rounded-lg p-2.5 flex items-center gap-2">
-                    <Info className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
-                    <span>Ví/ngân hàng này được theo dõi độc lập, không trộn lẫn vào số dư Shop Bank kinh doanh.</span>
-                  </p>
-                )}
               </div>
 
               {/* 2. Name & Amount (2-column Subgrid) */}

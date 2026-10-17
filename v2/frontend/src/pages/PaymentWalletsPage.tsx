@@ -158,6 +158,7 @@ export const PaymentWalletsPage: React.FC = () => {
       label: "",
       walletAddress: "",
       network: "TRC20",
+      accountScope: "SHOP",
       isDefault: false,
       isActive: true,
     });
@@ -179,6 +180,7 @@ export const PaymentWalletsPage: React.FC = () => {
         label: bank.label || "",
         walletAddress: "",
         network: "TRC20",
+        accountScope: bank.accountScope || "SHOP",
         isDefault: bank.isDefault,
         isActive: bank.isActive,
       });

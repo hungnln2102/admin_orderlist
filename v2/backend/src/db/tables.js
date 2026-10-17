@@ -55,6 +55,7 @@ const TABLES = {
   FIXED_COSTS: formatTable(SCHEMAS.FINANCE, "fixed_costs"),
   INSTALLMENTS: formatTable(SCHEMAS.FINANCE, "installments"),
   PERSONAL_ASSETS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
+  DEBT_PAYMENT_LOGS: formatTable(SCHEMAS.FINANCE, "debt_payment_logs"),
 };
 
 const COLS = {

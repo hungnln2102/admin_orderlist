@@ -264,7 +264,7 @@ export const FinanceHubPage: React.FC = () => {
       {data && (
         <div className="space-y-6">
           {/* Section 1: KPI Cards Tài Sản Ròng & Sức Khỏe */}
-          <NetWorthCards metrics={data.netWorth} />
+          <NetWorthCards metrics={data.netWorth} breakEven={data.breakEven} />
 
           {/* Section 2: Master Break-even Engine Hero Panel */}
           <FinanceOverviewPanel

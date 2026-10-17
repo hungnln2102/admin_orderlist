@@ -27,6 +27,7 @@ async function listBankAccounts() {
       "bank_short_code as bankShortCode",
       "bank_display_name as bankDisplayName",
       "qr_note_prefix as qrNotePrefix",
+      "account_scope as accountScope",
       "is_default as isDefault",
       "is_active as isActive",
       "total_withdrawn as totalWithdrawn",
@@ -44,6 +45,7 @@ async function listBankAccounts() {
   return rows.map((r) => ({
     ...r,
     id: Number(r.id),
+    accountScope: r.accountScope || "SHOP",
     totalWithdrawn: toNumber(r.totalWithdrawn),
     totalReceived: toNumber(r.totalReceived),
     balanceRemaining: toNumber(r.balanceRemaining),
@@ -68,6 +70,7 @@ async function createBankAccount(payload) {
         bank_short_code: payload.bankShortCode || null,
         bank_display_name: payload.bankDisplayName || null,
         qr_note_prefix: payload.qrNotePrefix || null,
+        account_scope: payload.accountScope || "SHOP",
         is_default: Boolean(payload.isDefault),
         is_active: payload.isActive !== undefined ? Boolean(payload.isActive) : true,
         total_withdrawn: 0,
@@ -95,6 +98,7 @@ async function updateBankAccount(id, payload) {
     if (payload.bankShortCode !== undefined) updateData.bank_short_code = payload.bankShortCode;
     if (payload.bankDisplayName !== undefined) updateData.bank_display_name = payload.bankDisplayName;
     if (payload.qrNotePrefix !== undefined) updateData.qr_note_prefix = payload.qrNotePrefix;
+    if (payload.accountScope !== undefined) updateData.account_scope = payload.accountScope;
     if (payload.isDefault !== undefined) updateData.is_default = Boolean(payload.isDefault);
     if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
 

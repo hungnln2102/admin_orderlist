@@ -11,11 +11,14 @@ import {
   Edit2,
   Flame,
   Plus,
+  PlusCircle,
   Trash2,
   TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { InstallmentModal } from "./InstallmentModal";
 import { PersonalAssetsModal } from "./PersonalAssetsModal";
+import { DebtPaymentModal } from "./DebtPaymentModal";
 
 interface Props {
   installments: Installment[];
@@ -68,6 +71,56 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
 
   const [debtModalOpen, setDebtModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<PersonalAsset | null>(null);
+
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [payingInstallment, setPayingInstallment] = useState<Installment | null>(null);
+
+  const openPaymentModal = (item: Installment) => {
+    setPayingInstallment(item);
+    setPaymentModalOpen(true);
+  };
+
+  const handleConfirmPayment = async (_mode: string, payload: { financialAccountId?: number; amount: number; periodMonth?: string; note: string }) => {
+    if (!payingInstallment) return;
+    const res = await fetch(`/api/finance/installments/${payingInstallment.id}/pay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Lỗi thanh toán");
+    }
+    notify.success(`Đã thanh toán thành công kỳ ${payload.periodMonth || ""} cho "${payingInstallment.name}"`);
+    window.location.reload();
+  };
+
+  const [debtActionModalOpen, setDebtActionModalOpen] = useState(false);
+  const [activeDebtItem, setActiveDebtItem] = useState<PersonalAsset | null>(null);
+
+  const openDebtAction = (item: PersonalAsset) => {
+    setActiveDebtItem(item);
+    setDebtActionModalOpen(true);
+  };
+
+  const handleConfirmDebtAction = async (mode: "INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW", payload: { financialAccountId?: number; amount: number; note: string }) => {
+    if (!activeDebtItem) return;
+    const endpoint = mode === "DEBT_PAY"
+      ? `/api/finance/personal-assets/${activeDebtItem.id}/pay`
+      : `/api/finance/personal-assets/${activeDebtItem.id}/borrow`;
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Lỗi thao tác nợ cá nhân");
+    }
+    notify.success(mode === "DEBT_PAY" ? `Đã trả bớt nợ cho "${activeDebtItem.name}"` : `Đã ghi nhận phát sinh thêm nợ cho "${activeDebtItem.name}"`);
+    window.location.reload();
+  };
 
   const debtsPayableList = personalDebts.filter((item) => item.type === "DEBT_PAYABLE");
   const debtsReceivableList = personalDebts.filter((item) => item.type === "DEBT_RECEIVABLE");
@@ -148,39 +201,24 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Overview Bar */}
-      <GlassCard className="!p-5 bg-gradient-to-r from-rose-950/40 via-slate-900 to-amber-950/30 border-rose-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            <CreditCard className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Nợ & Nghĩa Vụ Tài Chính</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Theo dõi các hợp đồng trả góp mua sắm và các khoản nợ vay cá nhân chi trả từ lợi nhuận Shop
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6 self-start sm:self-auto">
-          <div className="text-left sm:text-right">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Áp lực đóng nợ / tháng
-            </span>
-            <span className="text-xl sm:text-2xl font-black font-mono text-rose-300">
-              {formatVND(monthlyDebtBurden)}
-            </span>
-          </div>
-          <div className="text-left sm:text-right border-l border-slate-800 pl-6">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Tổng dư nợ còn lại
-            </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-white">
-              {formatVND(totalAllLiabilities)}
-            </span>
-          </div>
-        </div>
-      </GlassCard>
+      {/* 1. Contextual Stat Cards for Debts & Installments */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <GlassCard className="!p-4 bg-gradient-to-br from-rose-950/40 via-slate-900 to-slate-950 border-rose-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Áp Lực Đóng Nợ / Tháng</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-rose-300 mt-1 block">{formatVND(monthlyDebtBurden)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Trả góp kỳ này + Nợ cá nhân</span>
+        </GlassCard>
+        <GlassCard className="!p-4 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Dư Nợ Trả Góp</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-1 block">{formatVND(totalInstallmentsRemainingDebt)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">{installments.length} hợp đồng mua sắm theo kỳ</span>
+        </GlassCard>
+        <GlassCard className="!p-4 bg-gradient-to-br from-violet-950/40 via-slate-900 to-slate-950 border-violet-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sổ Nợ Cá Nhân Phải Trả</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-violet-300 mt-1 block">{formatVND(totalPersonalDebt)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">{debtsPayableList.length} khoản vay mượn ngoài</span>
+        </GlassCard>
+      </div>
 
       {/* 2. Section: Trả Góp Theo Kỳ */}
       <GlassCard className="!p-5 bg-slate-900/90 border-slate-800 rounded-2xl space-y-4">
@@ -303,6 +341,17 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
                         />
                       </div>
                     </div>
+
+                    {!isCompleted && (
+                      <button
+                        type="button"
+                        onClick={() => openPaymentModal(item)}
+                        className="mt-3.5 w-full py-2 px-3 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Thanh Toán Kỳ Này
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -370,28 +419,40 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className={`text-sm font-bold font-mono ${
-                      item.isPayable ? "text-rose-300" : "text-cyan-300"
-                    }`}>
-                      {formatVND(item.amount)}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openDebt(item)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer"
-                        title="Chỉnh sửa"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => confirmDeleteDebt(item)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                        title="Xóa"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold font-mono ${
+                        item.isPayable ? "text-rose-300" : "text-cyan-300"
+                      }`}>
+                        {formatVND(item.amount)}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {item.isPayable && (
+                          <button
+                            type="button"
+                            onClick={() => openDebtAction(item)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Giao dịch nợ (Trả nợ / Vay thêm)"
+                          >
+                            <Wallet className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openDebt(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Chỉnh sửa"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => confirmDeleteDebt(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Xóa"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -414,6 +475,20 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
         onSave={saveDebt}
         editingItem={editingDebt}
         defaultType="DEBT_PAYABLE"
+      />
+      <DebtPaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onConfirm={handleConfirmPayment}
+        item={payingInstallment}
+        defaultMode="INSTALLMENT"
+      />
+      <DebtPaymentModal
+        isOpen={debtActionModalOpen}
+        onClose={() => setDebtActionModalOpen(false)}
+        onConfirm={handleConfirmDebtAction}
+        item={activeDebtItem}
+        defaultMode="DEBT_PAY"
       />
     </div>
   );

@@ -7,7 +7,9 @@
  * 4. Tài sản ròng & Nợ cá nhân + Nợ NCC (Net Worth Engine)
  */
 
-const { db, TABLES } = require("@/db");
+const { db, TABLES, withTransaction } = require("@/db");
+const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
+const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
 
 const toNumber = (val) => {
   const n = Number(val);
@@ -610,6 +612,53 @@ async function deleteInstallment(id) {
   return await db(TABLES.INSTALLMENTS).where("id", id).del();
 }
 
+async function payInstallment(id, payload) {
+  const { financialAccountId, receiptId, amount, periodMonth, note } = payload;
+  const numAmount = toNumber(amount);
+  if (numAmount <= 0) throw new Error("Số tiền thanh toán phải lớn hơn 0");
+  if (!financialAccountId && !receiptId) throw new Error("Vui lòng chọn tài khoản thanh khoản hoặc biên lai ngân hàng");
+  if (!periodMonth) throw new Error("Vui lòng chỉ định kỳ tháng thanh toán (YYYY-MM)");
+
+  return await withTransaction(async (trx) => {
+    const installment = await trx(TABLES.INSTALLMENTS).where("id", id).first();
+    if (!installment) throw new Error("Không tìm thấy hợp đồng trả góp");
+
+    const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .where({ target_type: "INSTALLMENT", target_id: id, period_month: periodMonth })
+      .first();
+
+    if (existingLog) {
+      throw new Error(`Kỳ ${periodMonth} của khoản trả góp "${installment.name}" đã được thanh toán trước đó, không thể thanh toán trùng lặp!`);
+    }
+
+    if (receiptId) {
+      await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `INSTALLMENT_${id}`, note || `Thanh toán trả góp "${installment.name}" kỳ ${periodMonth}`);
+    } else {
+      await debitFinancialAccount(trx, {
+        accountId: Number(financialAccountId),
+        amount: numAmount,
+        sourceKind: "installment_payment",
+        sourceId: `${id}_${periodMonth}`,
+        note: note || `Thanh toán trả góp "${installment.name}" kỳ ${periodMonth}`,
+      });
+    }
+
+    const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .insert({
+        target_type: "INSTALLMENT",
+        target_id: id,
+        period_month: periodMonth,
+        financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+        amount: numAmount,
+        payment_date: new Date().toISOString().slice(0, 10),
+        note: note || `Thanh toán kỳ ${periodMonth}`,
+      })
+      .returning("*");
+
+    return { success: true, logId: Number(createdLog.id) };
+  });
+}
+
 // --- CRUD PERSONAL ASSETS ---
 async function createPersonalAsset(payload) {
   const type = payload.type || "SAVINGS";
@@ -728,6 +777,128 @@ async function deletePersonalAsset(id) {
   return await db(TABLES.PERSONAL_ASSETS).where("id", id).del();
 }
 
+async function payPersonalAsset(id, payload) {
+  const { financialAccountId, receiptId, amount, note } = payload;
+  const numAmount = toNumber(amount);
+  if (numAmount <= 0) throw new Error("Số tiền trả nợ phải lớn hơn 0");
+  if (!financialAccountId && !receiptId) throw new Error("Vui lòng chọn tài khoản thanh khoản hoặc biên lai ngân hàng để trả nợ");
+
+  return await withTransaction(async (trx) => {
+    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).first();
+    if (!asset) throw new Error("Không tìm thấy mục nợ");
+
+    const currentAmount = toNumber(asset.amount);
+    const newAmount = Math.max(0, currentAmount - numAmount);
+
+    if (receiptId) {
+      await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `PERSONAL_DEBT_PAY_${id}`, note || `Trả bớt nợ "${asset.name}"`);
+    } else {
+      await debitFinancialAccount(trx, {
+        accountId: Number(financialAccountId),
+        amount: numAmount,
+        sourceKind: "personal_debt_repayment",
+        sourceId: `${id}_${Date.now()}`,
+        note: note || `Trả bớt nợ "${asset.name}"`,
+      });
+    }
+
+    await trx(TABLES.PERSONAL_ASSETS)
+      .where("id", id)
+      .update({ amount: newAmount, updated_at: trx.fn.now() });
+
+    const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .insert({
+        target_type: "PERSONAL_DEBT",
+        target_id: id,
+        financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+        amount: numAmount,
+        payment_date: new Date().toISOString().slice(0, 10),
+        note: note || `Trả bớt nợ`,
+      })
+      .returning("*");
+
+    return { success: true, newAmount, logId: Number(createdLog.id) };
+  });
+}
+
+async function borrowPersonalAsset(id, payload) {
+  const { financialAccountId, receiptId, amount, note } = payload;
+  const numAmount = toNumber(amount);
+  if (numAmount <= 0) throw new Error("Số tiền vay thêm phải lớn hơn 0");
+
+  return await withTransaction(async (trx) => {
+    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).first();
+    if (!asset) throw new Error("Không tìm thấy mục nợ");
+
+    const currentAmount = toNumber(asset.amount);
+    const newAmount = currentAmount + numAmount;
+
+    if (receiptId) {
+      await allocateReceiptInTrx(trx, receiptId, numAmount, "OTHER_INCOME", `PERSONAL_DEBT_BORROW_${id}`, note || `Vay thêm / Phát sinh nợ "${asset.name}"`);
+    } else if (financialAccountId) {
+      const { creditFinancialAccount } = require("@/domains/wallets/services/walletService");
+      await creditFinancialAccount(trx, {
+        accountId: Number(financialAccountId),
+        amount: numAmount,
+        sourceKind: "personal_debt_borrow",
+        sourceId: `${id}_${Date.now()}`,
+        note: note || `Vay thêm "${asset.name}"`,
+      });
+    }
+
+    await trx(TABLES.PERSONAL_ASSETS)
+      .where("id", id)
+      .update({ amount: newAmount, updated_at: trx.fn.now() });
+
+    await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+      target_type: "PERSONAL_DEBT_BORROW",
+      target_id: id,
+      financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+      amount: numAmount,
+      payment_date: new Date().toISOString().slice(0, 10),
+      note: note || `Vay thêm / Phát sinh nợ`,
+    });
+
+    return { success: true, newAmount };
+  });
+}
+
+async function allocateReceiptInTrx(trx, receiptId, allocAmount, allocType, targetCode, note) {
+  const receipt = await trx(TABLES.PAYMENT_RECEIPT).where({ id: Number(receiptId) }).first();
+  if (!receipt) throw new Error("Không tìm thấy biên lai thanh toán");
+  const currentUnallocated = Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount);
+  if (allocAmount > currentUnallocated) {
+    throw new Error(`Số tiền phân bổ vượt quá số dư khả dụng của biên lai (${currentUnallocated.toLocaleString("vi-VN")} ₫)`);
+  }
+  const newUnallocated = currentUnallocated - allocAmount;
+  const newStatus = newUnallocated <= 0 ? "FULLY_ALLOCATED" : "PARTIALLY_ALLOCATED";
+
+  await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).insert({
+    receipt_id: receipt.id,
+    allocation_type: allocType,
+    target_code: targetCode ? String(targetCode) : null,
+    amount: allocAmount,
+    remaining_balance: newUnallocated,
+    note: note || null,
+    created_by: "ADMIN",
+  });
+
+  await trx(TABLES.PAYMENT_RECEIPT)
+    .where({ id: receipt.id })
+    .update({
+      unallocated_amount: newUnallocated,
+      status: newStatus,
+    });
+}
+
+async function getUnallocatedReceipts() {
+  return await db(TABLES.PAYMENT_RECEIPT)
+    .where("status", "!=", "FULLY_ALLOCATED")
+    .whereRaw("COALESCE(unallocated_amount, amount) > 0")
+    .orderBy("id", "desc")
+    .limit(50);
+}
+
 module.exports = {
   calculateInstallmentState,
   getFinanceSummary,
@@ -737,7 +908,11 @@ module.exports = {
   createInstallment,
   updateInstallment,
   deleteInstallment,
+  payInstallment,
   createPersonalAsset,
   updatePersonalAsset,
   deletePersonalAsset,
+  payPersonalAsset,
+  borrowPersonalAsset,
+  getUnallocatedReceipts,
 };

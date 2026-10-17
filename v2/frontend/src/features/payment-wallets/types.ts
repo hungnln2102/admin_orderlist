@@ -9,6 +9,7 @@ export interface BankAccountItem {
   bankBin?: string | null;
   bankShortCode?: string | null;
   qrNotePrefix?: string | null;
+  accountScope?: "SHOP" | "PERSONAL";
   isDefault: boolean;
   isActive: boolean;
   totalReceived: number;
@@ -38,6 +39,7 @@ export interface WalletFormData {
   label: string;
   walletAddress: string;
   network: string;
+  accountScope: "SHOP" | "PERSONAL";
   isDefault: boolean;
   isActive: boolean;
 }

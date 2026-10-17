@@ -15,6 +15,15 @@ async function getSummary(req, res, next) {
   }
 }
 
+async function getUnallocatedReceipts(req, res, next) {
+  try {
+    const items = await financeHubService.getUnallocatedReceipts();
+    return res.json({ success: true, items });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // --- FIXED COSTS ---
 async function createFixedCost(req, res, next) {
   try {
@@ -81,6 +90,16 @@ async function deleteInstallment(req, res, next) {
   }
 }
 
+async function payInstallment(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const result = await financeHubService.payInstallment(id, req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // --- PERSONAL ASSETS ---
 async function createPersonalAsset(req, res, next) {
   try {
@@ -114,15 +133,39 @@ async function deletePersonalAsset(req, res, next) {
   }
 }
 
+async function payPersonalAsset(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const result = await financeHubService.payPersonalAsset(id, req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function borrowPersonalAsset(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const result = await financeHubService.borrowPersonalAsset(id, req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getSummary,
+  getUnallocatedReceipts,
   createFixedCost,
   updateFixedCost,
   deleteFixedCost,
   createInstallment,
   updateInstallment,
   deleteInstallment,
+  payInstallment,
   createPersonalAsset,
   updatePersonalAsset,
   deletePersonalAsset,
+  payPersonalAsset,
+  borrowPersonalAsset,
 };

@@ -61,7 +61,18 @@ export const BankAccountsTable: React.FC<BankAccountsTableProps> = ({
                       {index + 1}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-mono font-bold text-cyan-300 text-sm">{item.accountNumber}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-cyan-300 text-sm">{item.accountNumber}</span>
+                        {item.accountScope === "PERSONAL" ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                            💳 Cá nhân
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                            🏢 Shop
+                          </span>
+                        )}
+                      </div>
                       <div className="text-slate-200 font-semibold mt-0.5">{item.accountHolder}</div>
                       {item.label && <div className="text-[11px] text-cyan-400/70 mt-0.5">{item.label}</div>}
                     </td>

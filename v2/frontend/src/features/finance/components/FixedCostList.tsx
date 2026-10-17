@@ -109,28 +109,20 @@ export const FixedCostList: React.FC<Props> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Header Banner */}
-      <GlassCard className="!p-5 bg-gradient-to-r from-amber-950/40 via-slate-900 to-rose-950/30 border-amber-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Home className="w-6 h-6" />
-          </div>
+      {/* 1. Contextual Stat Cards for Fixed Costs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <GlassCard className="!p-4 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Chi Phí Cố Định / Tháng</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-1 block">{formatVND(totalActive)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Trừ trực tiếp vào điểm hòa vốn tháng</span>
+        </GlassCard>
+        <GlassCard className="!p-4 bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-950 border-blue-500/20 rounded-2xl flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-white">Chi Phí Cố Định Hàng Tháng</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Tiền nhà, điện nước, internet, sinh hoạt và phí phần mềm tính vào điểm hòa vốn
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 self-start sm:self-auto">
-          <div className="text-left sm:text-right">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-              Tổng áp dụng tháng
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Khoản Chi Đang Áp Dụng</span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-cyan-300 mt-1 block">
+              {items.filter(i => i.isActive).length} / {items.length} khoản
             </span>
-            <span className="text-xl sm:text-2xl font-black font-mono text-amber-300">
-              {formatVND(totalActive)}
-            </span>
+            <span className="text-[11px] text-slate-500 mt-1 block">Sinh hoạt, Vận hành, Phần mềm</span>
           </div>
           <button
             onClick={handleOpenAdd}
@@ -139,8 +131,8 @@ export const FixedCostList: React.FC<Props> = ({
             <Plus className="w-4 h-4" />
             Thêm Chi Phí
           </button>
-        </div>
-      </GlassCard>
+        </GlassCard>
+      </div>
 
       {/* 2. Category Filters */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

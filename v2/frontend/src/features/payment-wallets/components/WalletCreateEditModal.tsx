@@ -122,6 +122,18 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Phạm Vi Tài Khoản</label>
+                <select
+                  value={formData.accountScope || "SHOP"}
+                  onChange={(e) => onFormChange({ ...formData, accountScope: e.target.value as "SHOP" | "PERSONAL" })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
+                >
+                  <option value="SHOP">🏢 Tài khoản kinh doanh Shop (Nhận tiền, thanh toán đơn)</option>
+                  <option value="PERSONAL">💳 Tài khoản / Ngân hàng cá nhân (Cash Bank / Thanh khoản)</option>
+                </select>
+              </div>
             </>
           ) : (
             <>

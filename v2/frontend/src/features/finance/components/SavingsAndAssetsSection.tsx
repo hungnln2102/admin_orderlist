@@ -17,6 +17,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { PersonalAssetsModal } from "./PersonalAssetsModal";
+import { PersonalBankAccountModal } from "./PersonalBankAccountModal";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -37,8 +38,9 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   const navigate = useNavigate();
   const notify = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
+  const [bankModalOpen, setBankModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PersonalAsset | null>(null);
-  const [modalDefaultType, setModalDefaultType] = useState<PersonalAssetType>("CASH_BANK");
+  const [modalDefaultType, setModalDefaultType] = useState<PersonalAssetType>("SAVINGS");
   const [assetFilter, setAssetFilter] = useState<"ALL" | "CASH_BANK" | "SAVINGS_INVEST">("ALL");
 
   const savingsList = assets.filter(
@@ -106,29 +108,24 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. Top Banner: Tổng Hợp Tài Sản & Tích Lũy */}
-      <GlassCard className="!p-5 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/30 border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Wallet className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Quỹ Tích Lũy & Tài Sản</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Tổng hợp nguồn vốn tự do từ số dư Shop và các ví, tài khoản cá nhân, sổ tiết kiệm
-            </p>
-          </div>
-        </div>
-
-        <div className="text-left sm:text-right">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-            Tổng tài sản tích lũy
-          </span>
-          <span className="text-xl sm:text-2xl font-black font-mono text-emerald-300">
-            {formatVND(totalAllAssets)}
-          </span>
-        </div>
-      </GlassCard>
+      {/* 1. Contextual Stat Cards for Savings & Assets */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <GlassCard className="!p-4 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tài Sản Tích Lũy</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-emerald-300 mt-1 block">{formatVND(totalAllAssets)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Ví Shop + Tiết kiệm & ví cá nhân</span>
+        </GlassCard>
+        <GlassCard className="!p-4 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border-cyan-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Số Dư Ví Shop (Bank & USDT)</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-cyan-300 mt-1 block">{formatVND(shopBalanceTotal)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Đồng bộ tự động từ hệ thống</span>
+        </GlassCard>
+        <GlassCard className="!p-4 bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-950 border-blue-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tích Lũy & Tiết Kiệm Cá Nhân</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-teal-300 mt-1 block">{formatVND(personalSavingsTotal)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">{savingsList.length} tài khoản / sổ tích lũy</span>
+        </GlassCard>
+      </div>
 
       {/* 2. Grid: 2 Cột - Ví Shop & Tích Lũy Cá Nhân */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -188,9 +185,9 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
             {/* Cặp nút hành động: Thêm Ví Cá Nhân vs Thêm Sổ Tiết Kiệm */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => handleOpenAdd("CASH_BANK")}
+                onClick={() => setBankModalOpen(true)}
                 className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                title="Thêm ví tiền mặt hoặc tài khoản ngân hàng cá nhân riêng"
+                title="Thêm tài khoản ngân hàng hoặc ví cá nhân riêng"
               >
                 <CreditCard className="w-3.5 h-3.5" />
                 <span>+ Ví Cá Nhân</span>
@@ -355,13 +352,19 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
         </GlassCard>
       </div>
 
-      {/* Modal */}
+      {/* Modals */}
       <PersonalAssetsModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         editingItem={editingItem}
         defaultType={modalDefaultType}
+      />
+
+      <PersonalBankAccountModal
+        isOpen={bankModalOpen}
+        onClose={() => setBankModalOpen(false)}
+        onSuccess={() => window.location.reload()}
       />
     </div>
   );
