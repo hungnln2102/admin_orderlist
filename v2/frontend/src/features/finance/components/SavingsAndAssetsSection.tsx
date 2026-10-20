@@ -4,6 +4,7 @@ import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { PersonalAsset, PersonalAssetType } from "../types";
 import {
+  Building2,
   Coins,
   CreditCard,
   Edit2,
@@ -23,14 +24,18 @@ import { useNavigate } from "react-router-dom";
 interface Props {
   assets: PersonalAsset[];
   shopBalanceTotal: number;
+  shopBankAccounts?: any[];
+  usdtWallets?: any[];
   onAdd: (payload: any) => Promise<void>;
   onEdit: (id: number, payload: any) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
+  onDelete: (item: any) => Promise<void>;
 }
 
 export const SavingsAndAssetsSection: React.FC<Props> = ({
   assets,
   shopBalanceTotal,
+  shopBankAccounts = [],
+  usdtWallets = [],
   onAdd,
   onEdit,
   onDelete,
@@ -40,6 +45,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [bankModalOpen, setBankModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PersonalAsset | null>(null);
+  const [editingBankItem, setEditingBankItem] = useState<any | null>(null);
   const [modalDefaultType, setModalDefaultType] = useState<PersonalAssetType>("SAVINGS");
   const [assetFilter, setAssetFilter] = useState<"ALL" | "CASH_BANK" | "SAVINGS_INVEST">("ALL");
 
@@ -68,10 +74,20 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
     setModalOpen(true);
   };
 
+  const handleOpenAddBank = () => {
+    setEditingBankItem(null);
+    setBankModalOpen(true);
+  };
+
   const handleOpenEdit = (item: PersonalAsset) => {
-    setEditingItem(item);
-    setModalDefaultType(item.type);
-    setModalOpen(true);
+    if (item.type === "CASH_BANK") {
+      setEditingBankItem(item);
+      setBankModalOpen(true);
+    } else {
+      setEditingItem(item);
+      setModalDefaultType(item.type);
+      setModalOpen(true);
+    }
   };
 
   const handleSave = async (payload: any) => {
@@ -91,13 +107,13 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   const confirmDelete = (item: PersonalAsset) => {
     const isWallet = item.type === "CASH_BANK";
     notify.confirm({
-      title: isWallet ? "Xác Nhận Xóa Ví Cá Nhân" : "Xác Nhận Xóa Quỹ Tích Lũy",
+      title: isWallet ? "Xác Nhận Xóa Tài Khoản Cá Nhân" : "Xác Nhận Xóa Quỹ Tích Lũy",
       message: `Bạn có chắc muốn xóa "${item.name}" (${formatVND(item.amount)})?`,
       confirmText: "Xóa Ngay",
       cancelText: "Hủy",
       onConfirm: async () => {
         try {
-          await onDelete(item.id);
+          await onDelete(item);
           notify.success(`Đã xóa "${item.name}"`);
         } catch (err: any) {
           notify.error(err.message || "Xóa thất bại");
@@ -113,7 +129,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
         <GlassCard className="!p-4 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-500/20 rounded-2xl flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tài Sản Tích Lũy</span>
           <span className="text-xl sm:text-2xl font-black font-mono text-emerald-300 mt-1 block">{formatVND(totalAllAssets)}</span>
-          <span className="text-[11px] text-slate-500 mt-1 block">Ví Shop + Tiết kiệm & ví cá nhân</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Ví Shop + Tiết kiệm & tài khoản cá nhân</span>
         </GlassCard>
         <GlassCard className="!p-4 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border-cyan-500/20 rounded-2xl flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Số Dư Ví Shop (Bank & USDT)</span>
@@ -134,7 +150,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <Landmark className="w-5 h-5 text-cyan-400" />
-              <h4 className="text-base font-bold text-white">1. Ví Shop Bank & USDT</h4>
+              <h4 className="text-base font-bold text-white">1. Ví Shop Bank & USDT ({shopBankAccounts.length + usdtWallets.length})</h4>
             </div>
 
             <button
@@ -146,24 +162,67 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
             </button>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">Số Dư Toàn Shop</span>
+                <span className="text-sm font-bold text-white">Tổng Số Dư Shop</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
                   TỰ ĐỘNG SHOP
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Kết nối real-time từ số dư các tài khoản ngân hàng và ví USDT của Shop
+              <p className="text-xs text-slate-500 mt-0.5">
+                {shopBankAccounts.length} ngân hàng kinh doanh · {usdtWallets.length} ví USDT
               </p>
             </div>
 
             <div className="text-right">
-              <span className="font-mono font-black text-cyan-300 text-xl block">
+              <span className="font-mono font-black text-cyan-300 text-lg block">
                 {formatVND(shopBalanceTotal)}
               </span>
             </div>
+          </div>
+
+          {/* List of Shop Bank Accounts & USDT Wallets */}
+          <div className="divide-y divide-slate-800/80 max-h-72 overflow-y-auto pr-1 space-y-1">
+            {shopBankAccounts.map((acc) => (
+              <div key={`shop_bank_${acc.id}`} className="py-2.5 flex items-center justify-between hover:bg-slate-800/20 transition-colors rounded-lg px-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{acc.bankDisplayName || acc.label}</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Shop Bank</span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">{acc.accountNumber} {acc.accountHolder ? `· ${acc.accountHolder}` : ""}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-cyan-300 text-sm block">{formatVND(acc.balance)}</span>
+                </div>
+              </div>
+            ))}
+
+            {usdtWallets.map((wallet) => (
+              <div key={`shop_usdt_${wallet.id}`} className="py-2.5 flex items-center justify-between hover:bg-slate-800/20 transition-colors rounded-lg px-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                    <Wallet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{wallet.label || "Ví USDT"}</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">{wallet.network || "USDT"}</span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono truncate max-w-[200px] sm:max-w-[280px] block" title={wallet.walletAddress}>{wallet.walletAddress}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-purple-300 text-sm block">{Number(wallet.balance || 0).toLocaleString("en-US")} USDT</span>
+                </div>
+              </div>
+            ))}
           </div>
         </GlassCard>
 
@@ -174,10 +233,10 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
               <Sparkles className="w-5 h-5 text-emerald-400" />
               <div>
                 <h4 className="text-base font-bold text-white">
-                  2. Ví & Tích Lũy Cá Nhân ({savingsList.length})
+                  2. Tài Khoản & Tích Lũy Cá Nhân ({savingsList.length})
                 </h4>
                 <p className="text-[11px] text-slate-400">
-                  Ví tiền cá nhân: <span className="font-mono font-bold text-cyan-300">{formatVND(walletTotal)}</span> · Tiết kiệm: <span className="font-mono font-bold text-emerald-300">{formatVND(savingsTotal)}</span>
+                  Tài khoản cá nhân: <span className="font-mono font-bold text-cyan-300">{formatVND(walletTotal)}</span> · Tiết kiệm: <span className="font-mono font-bold text-emerald-300">{formatVND(savingsTotal)}</span>
                 </p>
               </div>
             </div>
@@ -185,12 +244,12 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
             {/* Cặp nút hành động: Thêm Ví Cá Nhân vs Thêm Sổ Tiết Kiệm */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setBankModalOpen(true)}
+                onClick={handleOpenAddBank}
                 className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                title="Thêm tài khoản ngân hàng hoặc ví cá nhân riêng"
+                title="Thêm tài khoản ngân hàng cá nhân"
               >
                 <CreditCard className="w-3.5 h-3.5" />
-                <span>+ Ví Cá Nhân</span>
+                <span>+ Tài Khoản Cá Nhân</span>
               </button>
 
               <button
@@ -228,7 +287,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                 }`}
               >
                 <CreditCard className="w-3 h-3" />
-                <span>Ví Cá Nhân ({walletItems.length})</span>
+                <span>Tài Khoản Cá Nhân ({walletItems.length})</span>
               </button>
               <button
                 type="button"
@@ -249,13 +308,13 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
             <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl space-y-1">
               {savingsList.length === 0 ? (
                 <>
-                  <p className="font-semibold text-slate-400">Chưa có ví cá nhân hay sổ tiết kiệm nào.</p>
-                  <p>Bấm <strong className="text-cyan-300">+ Ví Cá Nhân</strong> để ghi nhận ví riêng, hoặc <strong className="text-emerald-300">+ Sổ Tiết Kiệm</strong> để tạo hũ để dành.</p>
+                  <p className="font-semibold text-slate-400">Chưa có tài khoản cá nhân hay sổ tiết kiệm nào.</p>
+                  <p>Bấm <strong className="text-cyan-300">+ Tài Khoản Cá Nhân</strong> để ghi nhận tài khoản riêng, hoặc <strong className="text-emerald-300">+ Sổ Tiết Kiệm</strong> để tạo hũ để dành.</p>
                 </>
               ) : assetFilter === "CASH_BANK" ? (
                 <>
-                  <p className="font-semibold text-slate-400">Chưa có ví hay tài khoản cá nhân nào.</p>
-                  <p>Bấm <strong className="text-cyan-300">+ Ví Cá Nhân</strong> để thêm tài khoản ngân hàng hoặc ví riêng của bạn.</p>
+                  <p className="font-semibold text-slate-400">Chưa có tài khoản cá nhân nào.</p>
+                  <p>Bấm <strong className="text-cyan-300">+ Tài Khoản Cá Nhân</strong> để thêm tài khoản ngân hàng của bạn.</p>
                 </>
               ) : (
                 <>
@@ -289,7 +348,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                             <Coins className="w-3.5 h-3.5" />
                           </div>
                         )}
-                        <span className="text-sm font-bold text-white">{item.name}</span>
+                        <span className="text-sm font-bold text-white truncate max-w-[280px] sm:max-w-[420px]" title={item.name}>{item.name}</span>
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                             isWallet
@@ -300,7 +359,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                           }`}
                         >
                           {isWallet
-                            ? "Ví Cá Nhân"
+                            ? "Tài Khoản Cá Nhân"
                             : isSavings
                             ? "Sổ Tiết Kiệm"
                             : "Vàng / Đầu Tư"}
@@ -363,8 +422,12 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
 
       <PersonalBankAccountModal
         isOpen={bankModalOpen}
-        onClose={() => setBankModalOpen(false)}
+        onClose={() => {
+          setBankModalOpen(false);
+          setEditingBankItem(null);
+        }}
         onSuccess={() => window.location.reload()}
+        editingItem={editingBankItem}
       />
     </div>
   );

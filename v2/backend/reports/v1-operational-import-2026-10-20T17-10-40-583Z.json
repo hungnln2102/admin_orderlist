@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-10-20T17:10:40.582Z",
+  "source_database": "mydtbmav_v1_restore",
+  "target_database": "mydtbmav_v2_import",
+  "mode": "dry-run",
+  "reset_target": false,
+  "source_counts": {
+    "suppliers": 48,
+    "products": 62,
+    "variants": 229,
+    "variantPrices": 582,
+    "supplierCosts": 276,
+    "orders": 1115,
+    "supplierLogs": 399,
+    "accounts": 65,
+    "slots": 67,
+    "productNames": 13,
+    "packages": 45
+  },
+  "imported_counts": {},
+  "exceptions": {
+    "skipped_supplier_costs": [],
+    "normalized_order_slots": [],
+    "unmapped_package_accounts": [],
+    "unmapped_package_slots": []
+  },
+  "package_catalog": {
+    "created": [],
+    "reused": []
+  },
+  "validation": {}
+}

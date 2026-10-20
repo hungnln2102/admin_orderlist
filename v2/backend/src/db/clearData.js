@@ -33,11 +33,6 @@ async function clearAllData() {
   } catch (e) { console.log("⚠️ daily_revenue_summary:", e.message); }
 
   try {
-    await db.raw('TRUNCATE TABLE finance.dashboard_monthly_summary CASCADE;');
-    console.log("✅ Đã xóa sạch dashboard_monthly_summary");
-  } catch (e) { console.log("⚠️ dashboard_monthly_summary:", e.message); }
-
-  try {
     await db.raw('TRUNCATE TABLE billing.payment_receipt_batch CASCADE;');
     console.log("✅ Đã xóa sạch payment_receipt_batch");
   } catch (e) { console.log("⚠️ payment_receipt_batch:", e.message); }

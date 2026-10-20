@@ -105,6 +105,13 @@ Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà)
 
 ---
 
+### Nguyên Tắc 6: Quy Trình Thiết Kế Artifact-First & Thảo Luận Lặp (Iterative Design Artifacts)
+- **Khi Master đưa ra vấn đề/ý tưởng mới (chưa có lệnh thực hiện)**: Thư ký Quy Hoạch (Lead Planner) bắt buộc phải tạo ngay một **Artifact Markdown độc lập** (phương án thiết kế, phân tích kiến trúc).
+- **Trong suốt quá trình thảo luận**: Mọi ý kiến góp ý, điều chỉnh hay bổ sung từ Master đều phải được **cập nhật liên tục, trực tiếp vào chính file Artifact đó** để làm nguồn sự thật chung.
+- **Khi có lệnh thực thi ("báo thực hiện")**: Đội ngũ Agent mới tiến hành thi công và triển khai dựa chính xác trên nội dung đã được chốt trong file Artifact đó. Nghiêm cấm tự ý code khi chưa có artifact thiết kế hoặc chưa được Master chốt.
+
+---
+
 ## 🎯 3. TIÊU CHUẨN HOÀN THÀNH (DEFINITION OF DONE)
 
 Một nhiệm vụ CHỈ ĐƯỢC XEM LÀ HOÀN THÀNH khi:

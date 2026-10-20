@@ -60,6 +60,7 @@ export interface PersonalAsset {
   profitAccountId?: number | null;
   profitCreditTime?: string | null;
   debtInterestEnabled?: boolean;
+  debtInterestFrequency?: "DAILY" | "MONTHLY" | null;
   debtAnnualInterestRate?: number;
   debtDueDay?: number | null;
   debtEndDate?: string | null;

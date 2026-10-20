@@ -77,6 +77,7 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   const [profitAccounts, setProfitAccounts] = useState<ProfitAccountOption[]>([]);
   const [loadingProfitAccounts, setLoadingProfitAccounts] = useState(false);
   const [debtInterestEnabled, setDebtInterestEnabled] = useState(false);
+  const [debtInterestFrequency, setDebtInterestFrequency] = useState<"DAILY" | "MONTHLY">("DAILY");
   const [debtAnnualInterestRate, setDebtAnnualInterestRate] = useState("");
   const [debtDueDay, setDebtDueDay] = useState("15");
   const [debtEndDate, setDebtEndDate] = useState(defaultDebtEndDate);
@@ -99,6 +100,7 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setProfitAccountId(editingItem.profitAccountId ? String(editingItem.profitAccountId) : "");
       setProfitCreditTime(editingItem.profitCreditTime || "07:00");
       setDebtInterestEnabled(Boolean(editingItem.debtInterestEnabled));
+      setDebtInterestFrequency(editingItem.debtInterestFrequency || "DAILY");
       setDebtAnnualInterestRate(editingItem.debtAnnualInterestRate ? String(editingItem.debtAnnualInterestRate) : "");
       setDebtDueDay(editingItem.debtDueDay ? String(editingItem.debtDueDay) : "15");
       setDebtEndDate(editingItem.debtEndDate || defaultDebtEndDate());
@@ -115,6 +117,7 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setProfitAccountId("");
       setProfitCreditTime("07:00");
       setDebtInterestEnabled(false);
+      setDebtInterestFrequency("DAILY");
       setDebtAnnualInterestRate("");
       setDebtDueDay("15");
       setDebtEndDate(defaultDebtEndDate());
@@ -307,6 +310,7 @@ export const PersonalAssetsModal: React.FC<Props> = ({
         profitAccountId: isYieldAsset && profitEnabled && profitAccountId ? Number(profitAccountId) : null,
         profitCreditTime: isYieldAsset && profitEnabled ? profitCreditTime : null,
         debtInterestEnabled: isDebtAsset && debtInterestEnabled,
+        debtInterestFrequency: isDebtAsset && debtInterestEnabled ? debtInterestFrequency : null,
         debtAnnualInterestRate: isDebtAsset && debtInterestEnabled ? debtRateValue : null,
         debtDueDay: isDebtAsset ? Number(debtDueDay) : null,
         debtEndDate: isDebtAsset ? debtEndDate : null,
@@ -493,19 +497,53 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                     </div>
 
                     {debtInterestEnabled && (
-                      <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3 animate-in fade-in duration-200">
-                        <label className="text-xs text-slate-400 shrink-0">Lãi suất (% / năm):</label>
-                        <div className="relative flex-1">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={debtAnnualInterestRate}
-                            onChange={(event) => setDebtAnnualInterestRate(event.target.value)}
-                            placeholder="12.00"
-                            className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 pr-8 font-mono text-xs font-bold text-white focus:border-rose-400 focus:outline-none"
-                          />
-                          <span className="absolute right-2.5 top-1.5 text-xs text-slate-500">%</span>
+                      <div className="pt-2 border-t border-slate-800/60 space-y-3 animate-in fade-in duration-200">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-slate-300">
+                            Chu kỳ tính lãi suất
+                          </label>
+                          <select
+                            value={debtInterestFrequency}
+                            onChange={(event) => setDebtInterestFrequency(event.target.value as "DAILY" | "MONTHLY")}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none cursor-pointer"
+                          >
+                            <option value="DAILY">⚡ Lãi theo ngày (Chạy lúc 18:00 hàng ngày)</option>
+                            <option value="MONTHLY">🗓️ Lãi theo tháng (Chạy định kỳ hàng tháng)</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs text-slate-400 shrink-0">Lãi suất (% / năm):</label>
+                          <div className="relative flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={debtAnnualInterestRate}
+                              onChange={(event) => setDebtAnnualInterestRate(event.target.value)}
+                              placeholder="12.00"
+                              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 pr-8 font-mono text-xs font-bold text-white focus:border-rose-400 focus:outline-none"
+                            />
+                            <span className="absolute right-2.5 top-1.5 text-xs text-slate-500">%</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-200 leading-relaxed space-y-1">
+                          <div className="font-bold flex items-center gap-1.5 text-rose-300">
+                            <Info className="w-3.5 h-3.5 shrink-0" />
+                            <span>{debtInterestFrequency === "DAILY" ? "Cơ Chế Lãi Theo Ngày (18:00 Chiều):" : "Cơ Chế Lãi Theo Tháng:"}</span>
+                          </div>
+                          <p>
+                            {debtInterestFrequency === "DAILY" ? (
+                              <>
+                                Hằng ngày vào lúc <strong>18:00</strong>, hệ thống tính tiền lãi (`Dư nợ × Lãi suất / 365`). Tiền lãi được tích lũy treo và <strong>không cộng dồn vào gốc ngay</strong>, mà được giữ nguyên để chốt cộng tổng vào <strong>ngày đáo hạn (ngày {debtDueDay || 25})</strong>.
+                              </>
+                            ) : (
+                              <>
+                                Hàng tháng, hệ thống tính tiền lãi (`Dư nợ × Lãi suất / 12`). Tiền lãi được tích lũy và cộng dồn vào tổng dư nợ khi đến kỳ hạn thanh toán.
+                              </>
+                            )}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -764,16 +802,22 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                     </span>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-2 leading-relaxed">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Hình thức nhận lãi:</span>
-                      <span className="font-semibold text-white">{profitDestinationLabels[profitDestination]}</span>
+                  {profitEnabled ? (
+                    <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-2 leading-relaxed">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Hình thức nhận lãi:</span>
+                        <span className="font-semibold text-white">{profitDestinationLabels[profitDestination]}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-slate-800/70 pt-2">
+                        <span className="text-slate-400">Giờ ghi nhận:</span>
+                        <span className="font-mono text-purple-300">{profitCreditTime} hàng ngày</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-800/70 pt-2">
-                      <span className="text-slate-400">Giờ ghi nhận:</span>
-                      <span className="font-mono text-purple-300">{profitCreditTime} hàng ngày</span>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-400 italic text-center">
+                      Quỹ này hiện không bật sinh lời định kỳ. Chỉ ghi nhận số dư gốc tích lũy.
                     </div>
-                  </div>
+                  )}
 
                   <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 shrink-0 text-purple-400" />

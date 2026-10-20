@@ -26,6 +26,7 @@ interface Props {
   supplierDebtTotal?: number;
   totalInstallmentsRemainingDebt: number;
   monthlyDebtBurden?: number;
+  dailyBurden?: number;
   onAddInstallment: (payload: any) => Promise<void>;
   onEditInstallment: (id: number, payload: any) => Promise<void>;
   onDeleteInstallment: (id: number) => Promise<void>;
@@ -57,6 +58,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
   personalDebts,
   totalInstallmentsRemainingDebt,
   monthlyDebtBurden = 0,
+  dailyBurden = 0,
   onAddInstallment,
   onEditInstallment,
   onDeleteInstallment,
@@ -203,20 +205,20 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
     <div className="space-y-6">
       {/* 1. Contextual Stat Cards for Debts & Installments */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <GlassCard className="!p-4 bg-gradient-to-br from-rose-950/40 via-slate-900 to-slate-950 border-rose-500/20 rounded-2xl flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Áp Lực Đóng Nợ / Tháng</span>
-          <span className="text-xl sm:text-2xl font-black font-mono text-rose-300 mt-1 block">{formatVND(monthlyDebtBurden)}</span>
-          <span className="text-[11px] text-slate-500 mt-1 block">Trả góp kỳ này + Nợ cá nhân</span>
-        </GlassCard>
         <GlassCard className="!p-4 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/20 rounded-2xl flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Dư Nợ Trả Góp</span>
-          <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-1 block">{formatVND(totalInstallmentsRemainingDebt)}</span>
-          <span className="text-[11px] text-slate-500 mt-1 block">{installments.length} hợp đồng mua sắm theo kỳ</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tiền Ngày Hôm Đó Cần Trả</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-1 block">{formatVND(dailyBurden)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Định mức ngày + Nợ gối đầu từ hôm trước</span>
+        </GlassCard>
+        <GlassCard className="!p-4 bg-gradient-to-br from-rose-950/40 via-slate-900 to-slate-950 border-rose-500/20 rounded-2xl flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tiền Cần Trả Trong Tháng</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-rose-300 mt-1 block">{formatVND(monthlyDebtBurden)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Định mức trả góp & nợ cá nhân tháng này</span>
         </GlassCard>
         <GlassCard className="!p-4 bg-gradient-to-br from-violet-950/40 via-slate-900 to-slate-950 border-violet-500/20 rounded-2xl flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sổ Nợ Cá Nhân Phải Trả</span>
-          <span className="text-xl sm:text-2xl font-black font-mono text-violet-300 mt-1 block">{formatVND(totalPersonalDebt)}</span>
-          <span className="text-[11px] text-slate-500 mt-1 block">{debtsPayableList.length} khoản vay mượn ngoài</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tiền Cần Trả (Tổng Dư Nợ)</span>
+          <span className="text-xl sm:text-2xl font-black font-mono text-violet-300 mt-1 block">{formatVND(totalAllLiabilities)}</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Tổng dư nợ trả góp + Nợ cá nhân phải trả</span>
         </GlassCard>
       </div>
 

@@ -56,6 +56,29 @@ async function listBankAccounts() {
 
 async function createBankAccount(payload) {
   return withTransaction(async (trx) => {
+    const accountNumber = String(payload.accountNumber || "").trim();
+    const bankShortCode = payload.bankShortCode || null;
+    const bankBin = payload.bankBin || null;
+
+    if (accountNumber) {
+      let query = trx(BANK_TABLE)
+        .where("account_type", "bank")
+        .where("is_deleted", false)
+        .where("account_number", accountNumber);
+
+      if (bankShortCode) {
+        query = query.where("bank_short_code", bankShortCode);
+      } else if (bankBin) {
+        query = query.where("bank_bin", bankBin);
+      }
+
+      const existing = await query.first();
+      if (existing) {
+        const bankName = existing.bank_display_name || existing.bank_short_code || "ngân hàng này";
+        throw new Error(`Số tài khoản "${accountNumber}" đã tồn tại tại ${bankName}! Vui lòng kiểm tra lại.`);
+      }
+    }
+
     if (payload.isDefault) {
       await trx(BANK_TABLE).where("account_type", "bank").update({ is_default: false });
     }
@@ -64,10 +87,10 @@ async function createBankAccount(payload) {
       .insert({
         account_type: "bank",
         label: payload.label || null,
-        account_number: String(payload.accountNumber || "").trim(),
+        account_number: accountNumber,
         account_holder: String(payload.accountHolder || "").trim(),
-        bank_bin: payload.bankBin || null,
-        bank_short_code: payload.bankShortCode || null,
+        bank_bin: bankBin,
+        bank_short_code: bankShortCode,
         bank_display_name: payload.bankDisplayName || null,
         qr_note_prefix: payload.qrNotePrefix || null,
         account_scope: payload.accountScope || "SHOP",
@@ -75,7 +98,7 @@ async function createBankAccount(payload) {
         is_active: payload.isActive !== undefined ? Boolean(payload.isActive) : true,
         total_withdrawn: 0,
         total_received: 0,
-        balance: 0,
+        balance: toNumber(payload.balance),
         is_deleted: false,
       })
       .returning("id");
@@ -85,9 +108,39 @@ async function createBankAccount(payload) {
 }
 
 async function updateBankAccount(id, payload) {
+  const numericId = Number(id);
   return withTransaction(async (trx) => {
+    if (payload.accountNumber !== undefined || payload.bankShortCode !== undefined || payload.bankBin !== undefined) {
+      const currentAcc = await trx(BANK_TABLE).where("id", numericId).first();
+      if (currentAcc) {
+        const accountNumber = payload.accountNumber !== undefined ? String(payload.accountNumber || "").trim() : currentAcc.account_number;
+        const bankShortCode = payload.bankShortCode !== undefined ? payload.bankShortCode : currentAcc.bank_short_code;
+        const bankBin = payload.bankBin !== undefined ? payload.bankBin : currentAcc.bank_bin;
+
+        if (accountNumber) {
+          let query = trx(BANK_TABLE)
+            .where("account_type", "bank")
+            .where("is_deleted", false)
+            .whereNot("id", numericId)
+            .where("account_number", accountNumber);
+
+          if (bankShortCode) {
+            query = query.where("bank_short_code", bankShortCode);
+          } else if (bankBin) {
+            query = query.where("bank_bin", bankBin);
+          }
+
+          const existing = await query.first();
+          if (existing) {
+            const bankName = existing.bank_display_name || existing.bank_short_code || "ngân hàng này";
+            throw new Error(`Số tài khoản "${accountNumber}" đã tồn tại tại ${bankName}! Vui lòng kiểm tra lại.`);
+          }
+        }
+      }
+    }
+
     if (payload.isDefault) {
-      await trx(BANK_TABLE).where("account_type", "bank").whereNot("id", id).update({ is_default: false });
+      await trx(BANK_TABLE).where("account_type", "bank").whereNot("id", numericId).update({ is_default: false });
     }
 
     const updateData = { updated_at: trx.fn.now() };
@@ -101,8 +154,9 @@ async function updateBankAccount(id, payload) {
     if (payload.accountScope !== undefined) updateData.account_scope = payload.accountScope;
     if (payload.isDefault !== undefined) updateData.is_default = Boolean(payload.isDefault);
     if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
+    if (payload.balance !== undefined) updateData.balance = toNumber(payload.balance);
 
-    await trx(BANK_TABLE).where("account_type", "bank").where("id", id).update(updateData);
+    await trx(BANK_TABLE).where("account_type", "bank").where("id", numericId).update(updateData);
     return { success: true };
   });
 }
@@ -253,7 +307,12 @@ async function recordUsdtWithdrawal(id, amount, note = "") {
     const wallet = await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).first();
     if (!wallet) throw new Error("Không tìm thấy ví USDT");
 
-    const newBalance = toNumber(wallet.balance) - numAmount;
+    const currentBalance = toNumber(wallet.balance);
+    if (currentBalance < numAmount) {
+      throw new Error(`Số dư ví không đủ (Hiện có: ${currentBalance.toLocaleString("en-US")} USDT, muốn rút: ${numAmount.toLocaleString("en-US")} USDT). Ví không thể âm!`);
+    }
+
+    const newBalance = currentBalance - numAmount;
     const newWithdrawn = toNumber(wallet.total_withdrawn) + numAmount;
 
     await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).update({
@@ -476,8 +535,11 @@ async function debitFinancialAccount(trxContext, {
     }
 
     const currentBalance = toNumber(lockedAccount.balance);
-    const currentWithdrawn = toNumber(lockedAccount.total_withdrawn);
     const newBalance = currentBalance - numAmount;
+    if (newBalance < 0) {
+      throw new Error(`Số dư tài khoản không đủ (Hiện có: ${currentBalance.toLocaleString("vi-VN")} ₫, muốn trừ: ${numAmount.toLocaleString("vi-VN")} ₫). Ví/Tài khoản không thể âm!`);
+    }
+    const currentWithdrawn = toNumber(lockedAccount.total_withdrawn);
     const newWithdrawn = currentWithdrawn + numAmount;
 
     await trx(BANK_TABLE)

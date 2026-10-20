@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Building2, XCircle, Loader2 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 
@@ -6,6 +6,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editingItem?: any | null;
 }
 
 const POPULAR_BANKS = [
@@ -30,7 +31,7 @@ const formatAmountInput = (value: string) => {
 
 const parseAmountInput = (value: string) => Number(value.replace(/\D/g, "")) || 0;
 
-export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
+export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, editingItem }) => {
   const notify = useNotification();
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -46,18 +47,31 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
 
   useEffect(() => {
     if (isOpen) {
-      setFormData({
-        accountNumber: "",
-        accountHolder: "",
-        bankDisplayName: "MBBank (Ngân hàng Quân Đội)",
-        bankShortCode: "MB",
-        bankBin: "970422",
-        qrNotePrefix: "PERS",
-        label: "Tài khoản cá nhân",
-        balance: "",
-      });
+      if (editingItem) {
+        setFormData({
+          accountNumber: editingItem.accountNumber || editingItem.account_number || "",
+          accountHolder: editingItem.accountHolder || editingItem.account_holder || "",
+          bankDisplayName: editingItem.bankDisplayName || editingItem.bank_display_name || "MBBank (Ngân hàng Quân Đội)",
+          bankShortCode: editingItem.bankShortCode || editingItem.bank_short_code || "MB",
+          bankBin: editingItem.bankBin || editingItem.bank_bin || "970422",
+          qrNotePrefix: editingItem.qrNotePrefix || editingItem.qr_note_prefix || "PERS",
+          label: editingItem.label || editingItem.name || "Tài khoản cá nhân",
+          balance: formatAmountInput(String(editingItem.amount !== undefined ? editingItem.amount : (editingItem.balance !== undefined ? editingItem.balance : 0))),
+        });
+      } else {
+        setFormData({
+          accountNumber: "",
+          accountHolder: "",
+          bankDisplayName: "MBBank (Ngân hàng Quân Đội)",
+          bankShortCode: "MB",
+          bankBin: "970422",
+          qrNotePrefix: "PERS",
+          label: "Tài khoản cá nhân",
+          balance: "",
+        });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, editingItem]);
 
   if (!isOpen) return null;
 
@@ -83,8 +97,12 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch("/api/wallets/shop-bank-accounts", {
-        method: "POST",
+      const targetId = editingItem ? (editingItem.bankAccountId || (editingItem.id > 100000 ? editingItem.id - 1000000 : editingItem.id)) : null;
+      const url = editingItem ? `/api/wallets/shop-bank-accounts/${targetId}` : "/api/wallets/shop-bank-accounts";
+      const method = editingItem ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
@@ -95,9 +113,9 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Không thể tạo tài khoản ngân hàng cá nhân.");
+      if (!res.ok) throw new Error(data.message || data.error || "Không thể lưu tài khoản ngân hàng cá nhân.");
 
-      notify.success("Đã thêm tài khoản ngân hàng cá nhân thành công!", "Thành Công");
+      notify.success(editingItem ? "Đã cập nhật tài khoản cá nhân thành công!" : "Đã thêm tài khoản ngân hàng cá nhân thành công!", "Thành Công");
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -113,7 +131,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <Building2 className="w-5 h-5 text-cyan-400" />
-            Thêm Tài Khoản Ngân Hàng / Ví Cá Nhân
+            {editingItem ? "Chỉnh Sửa Tài Khoản Cá Nhân" : "Thêm Tài Khoản Ngân Hàng Cá Nhân"}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white cursor-pointer">
             <XCircle className="w-5 h-5" />
@@ -163,7 +181,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Số Dư Ban Đầu (₫) *</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Số Dư / Số Tiền (₫) *</label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-xs text-slate-500 font-mono">₫</span>
                 <input
@@ -203,7 +221,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
               className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 text-white hover:bg-cyan-500 transition-colors shadow-lg shadow-cyan-600/30 flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Lưu Tài Khoản Cá Nhân</span>
+              <span>{editingItem ? "Cập Nhật Tài Khoản" : "Lưu Tài Khoản Cá Nhân"}</span>
             </button>
           </div>
         </form>

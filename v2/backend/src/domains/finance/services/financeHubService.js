@@ -85,11 +85,12 @@ async function validateProfitAccount(profitConfig) {
   }
 }
 
-function normalizeDebtConfig({ type, debtInterestEnabled, debtAnnualInterestRate, debtDueDay, debtEndDate, debtRepaymentFrequency }) {
+function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency, debtAnnualInterestRate, debtDueDay, debtEndDate, debtRepaymentFrequency }) {
   const isDebt = type === "DEBT_PAYABLE" || type === "DEBT_RECEIVABLE";
   if (!isDebt || !debtInterestEnabled) {
     return {
       debt_interest_enabled: false,
+      debt_interest_frequency: null,
       debt_annual_interest_rate: null,
       debt_due_day: null,
       debt_end_date: null,
@@ -99,15 +100,18 @@ function normalizeDebtConfig({ type, debtInterestEnabled, debtAnnualInterestRate
 
   const annualRate = Number(debtAnnualInterestRate);
   const dueDay = Number(debtDueDay);
+  const interestFrequency = debtInterestFrequency || "DAILY";
   const repaymentFrequency = debtRepaymentFrequency || "MONTHLY";
   const endDate = debtEndDate instanceof Date ? debtEndDate.toISOString().slice(0, 10) : String(debtEndDate || "").slice(0, 10);
   if (!Number.isFinite(annualRate) || annualRate <= 0) throw new Error("Lãi suất nợ phải lớn hơn 0");
+  if (!["DAILY", "MONTHLY"].includes(interestFrequency)) throw new Error("Chu kỳ tính lãi không hợp lệ");
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) throw new Error("Ngày đến hạn phải từ 1 đến 31");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error("Vui lòng chọn ngày hết hạn nợ");
   if (!DEBT_REPAYMENT_FREQUENCIES.has(repaymentFrequency)) throw new Error("Chu kỳ quy đổi nợ không hợp lệ");
 
   return {
     debt_interest_enabled: true,
+    debt_interest_frequency: interestFrequency,
     debt_annual_interest_rate: annualRate,
     debt_due_day: dueDay,
     debt_end_date: endDate,
@@ -167,13 +171,18 @@ function calculateInstallmentState(item, targetMonth) {
 }
 
 function calculatePersonalDebtMonthlyPayment(item) {
-  if (item.type !== "DEBT_PAYABLE" || !item.debt_end_date) return 0;
+  if (item.type !== "DEBT_PAYABLE") return 0;
+  const amount = toNumber(item.amount);
+  if (amount <= 0) return 0;
+  if (!item.debt_end_date) {
+    return Math.ceil(amount / 12);
+  }
 
   const endDate = new Date(`${String(item.debt_end_date).slice(0, 10)}T23:59:59`);
   const remainingDays = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
   const remainingMonths = Math.max(1, Math.floor(remainingDays / 30.4375) || 1);
   const annualRate = Boolean(item.debt_interest_enabled) ? toNumber(item.debt_annual_interest_rate) : 0;
-  const estimatedTotal = toNumber(item.amount) + (toNumber(item.amount) * annualRate / 100 * remainingDays / 365);
+  const estimatedTotal = amount + (amount * annualRate / 100 * remainingDays / 365);
   const dailyPayment = Math.ceil(estimatedTotal / remainingDays);
   // Nguyên tắc an toàn: Thà dôi dư chứ không để thiếu hụt nợ khi tới hạn
   return Math.max(Math.ceil(dailyPayment * 30.44), Math.ceil(estimatedTotal / remainingMonths));
@@ -182,9 +191,42 @@ function calculatePersonalDebtMonthlyPayment(item) {
 /**
  * Tổng hợp toàn bộ bức tranh tài chính tháng (Break-even + Net worth + Cashflow)
  */
-async function getFinanceSummary(targetMonth) {
+async function getFinanceSummary(targetMonth, startDate, endDate, period = "month") {
   const now = new Date();
-  const currentMonthStr = targetMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  let startDateStr, endDateStr, currentMonthStr;
+
+  if (period === "week") {
+    const endD = new Date();
+    const startD = new Date();
+    startD.setDate(endD.getDate() - 6);
+    startDateStr = startD.toISOString().slice(0, 10);
+    endDateStr = endD.toISOString().slice(0, 10);
+    currentMonthStr = endDateStr.slice(0, 7);
+  } else if (period === "year") {
+    const year = targetMonth ? targetMonth.slice(0, 4) : String(now.getFullYear());
+    startDateStr = `${year}-01-01`;
+    endDateStr = `${year}-12-31`;
+    currentMonthStr = `${year}-12`;
+  } else if (period === "custom" && startDate && endDate) {
+    startDateStr = startDate;
+    endDateStr = endDate;
+    currentMonthStr = endDate.slice(0, 7);
+  } else {
+    currentMonthStr = targetMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const [y, m] = currentMonthStr.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    startDateStr = `${currentMonthStr}-01`;
+    endDateStr = `${currentMonthStr}-${String(lastDay).padStart(2, "0")}`;
+  }
+
+  const startIso = `${startDateStr} 00:00:00+07`;
+  const endIso = `${endDateStr} 23:59:59+07`;
+
+  const startDObj = new Date(startDateStr);
+  const endDObj = new Date(endDateStr);
+  const diffTime = Math.abs(endDObj.getTime() - startDObj.getTime());
+  const daysInMonth = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
   // 1. Chi phí cố định (Fixed costs)
   const fixedCostRows = await db(TABLES.FIXED_COSTS)
@@ -253,26 +295,19 @@ async function getFinanceSummary(targetMonth) {
     .reduce((sum, item) => sum + toNumber(item.monthly_amount), 0);
   const monthlyDebtBurden = scheduledInstallmentsMonthlyTotal + personalDebtMonthlyTotal;
 
-  // 3. Doanh thu & Lợi nhuận gộp từ đơn hàng Shop trong tháng
-  const [y, m] = currentMonthStr.split("-").map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  const startIso = `${currentMonthStr}-01 00:00:00+07`;
-  const endIso = `${currentMonthStr}-${String(lastDay).padStart(2, "0")} 23:59:59+07`;
-
-  const orderStats = await db(TABLES.ORDER_LIST)
-    .whereRaw("created_at >= ? AND created_at <= ?", [startIso, endIso])
-    .where("status", "PAID")
-    .whereNot("id_order", "ilike", "MAVN%") // Chỉ tính đơn bán hàng cho khách
+  // 3. Doanh thu & Lợi nhuận gộp từ đơn hàng Shop trong khoảng thời gian
+  const summaryStats = await db(TABLES.DAILY_REVENUE_SUMMARY)
+    .whereRaw("summary_date >= ? AND summary_date <= ?", [startDateStr, endDateStr])
     .select(
-      db.raw("COUNT(*)::int as count"),
-      db.raw("COALESCE(SUM(price), 0)::numeric as total_revenue"),
-      db.raw("COALESCE(SUM(cost), 0)::numeric as total_cost")
+      db.raw("COALESCE(SUM(dashboard_orders_count), 0)::int as count"),
+      db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as total_revenue"),
+      db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost")
     )
     .first();
 
-  const shopOrdersCount = Number(orderStats?.count || 0);
-  const shopRevenue = toNumber(orderStats?.total_revenue || 0);
-  const shopCogs = toNumber(orderStats?.total_cost || 0);
+  const shopOrdersCount = Number(summaryStats?.count || 0);
+  const shopRevenue = toNumber(summaryStats?.total_revenue || 0);
+  const shopCogs = toNumber(summaryStats?.total_cost || 0);
   const shopGrossProfit = shopRevenue - shopCogs;
 
   // 4. Động cơ Điểm Hòa Vốn (Break-even Engine)
@@ -286,20 +321,16 @@ async function getFinanceSummary(targetMonth) {
   const remainingToBreakEven = Math.max(0, breakEvenTarget - shopGrossProfit);
 
   // 5. Động cơ Nợ Gối Đầu Theo Ngày & Đường Cong Hòa Vốn (Daily Rolling Deficit & Break-Even Curve)
-  const daysInMonth = lastDay;
   const dailyBurden = daysInMonth > 0 ? Math.round(breakEvenTarget / daysInMonth) : 0;
 
-  const dailyRows = await db(TABLES.ORDER_LIST)
-    .whereRaw("created_at >= ? AND created_at <= ?", [startIso, endIso])
-    .where("status", "PAID")
-    .whereNot("id_order", "ilike", "MAVN%")
+  const dailyRows = await db(TABLES.DAILY_REVENUE_SUMMARY)
+    .whereRaw("summary_date >= ? AND summary_date <= ?", [startDateStr, endDateStr])
     .select(
-      db.raw("TO_CHAR(created_at, 'YYYY-MM-DD') as day_str"),
-      db.raw("COUNT(*)::int as count"),
-      db.raw("COALESCE(SUM(price), 0)::numeric as daily_revenue"),
-      db.raw("COALESCE(SUM(cost), 0)::numeric as daily_cost")
-    )
-    .groupBy(db.raw("TO_CHAR(created_at, 'YYYY-MM-DD')"));
+      db.raw("TO_CHAR(summary_date, 'YYYY-MM-DD') as day_str"),
+      db.raw("COALESCE(dashboard_orders_count, 0)::int as count"),
+      db.raw("COALESCE(earned_revenue, 0)::numeric as daily_revenue"),
+      db.raw("COALESCE(total_shop_cost, 0)::numeric as daily_cost")
+    );
 
   const dailyMap = new Map();
   dailyRows.forEach((r) => {
@@ -319,6 +350,147 @@ async function getFinanceSummary(targetMonth) {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+
+  // Lấy toàn bộ tài sản cá nhân & phân loại để tính baseNetWorth và netWorth
+  const personalAssetRows = await db(TABLES.PERSONAL_ASSETS)
+    .select("*")
+    .orderBy("id", "asc");
+
+  const mappedPersonalAssets = personalAssetRows.map((r) => ({
+    id: Number(r.id),
+    name: r.name,
+    type: r.type,
+    amount: toNumber(r.amount),
+    note: r.note || "",
+    profitEnabled: Boolean(r.profit_enabled),
+    profitFrequency: r.profit_frequency || null,
+    annualInterestRate: toNumber(r.annual_interest_rate),
+    profitDestination: r.profit_destination || null,
+    profitAccountId: r.profit_account_id ? Number(r.profit_account_id) : null,
+    profitCreditTime: r.profit_credit_time || null,
+    debtInterestEnabled: Boolean(r.debt_interest_enabled),
+    debtAnnualInterestRate: toNumber(r.debt_annual_interest_rate),
+    debtDueDay: r.debt_due_day ? Number(r.debt_due_day) : null,
+    debtEndDate: r.debt_end_date || null,
+    debtRepaymentFrequency: r.debt_repayment_frequency || null,
+    updatedAt: r.updated_at,
+    accountScope: r.account_scope || "PERSONAL",
+  }));
+
+  const personalBankRows = await db(TABLES.SHOP_BANK_ACCOUNTS)
+    .where("account_type", "bank")
+    .where("account_scope", "PERSONAL")
+    .where("is_deleted", false)
+    .where("is_active", true)
+    .orderBy("id", "asc");
+
+  const personalBankAssets = personalBankRows.map((r) => ({
+    id: 1000000 + Number(r.id),
+    name: `${r.bank_display_name || "Ngân hàng"} (${r.account_number}) - ${r.label || "Tài khoản cá nhân"}`,
+    type: "CASH_BANK",
+    amount: toNumber(r.balance),
+    note: r.account_holder ? `Chủ TK: ${r.account_holder}` : "",
+    accountNumber: r.account_number || "",
+    accountHolder: r.account_holder || "",
+    bankDisplayName: r.bank_display_name || "",
+    bankShortCode: r.bank_short_code || "",
+    bankBin: r.bank_bin || "",
+    qrNotePrefix: r.qr_note_prefix || "",
+    label: r.label || "",
+    profitEnabled: false,
+    profitFrequency: null,
+    annualInterestRate: 0,
+    profitDestination: null,
+    profitAccountId: null,
+    profitCreditTime: null,
+    debtInterestEnabled: false,
+    debtAnnualInterestRate: 0,
+    debtDueDay: null,
+    debtEndDate: null,
+    debtRepaymentFrequency: null,
+    updatedAt: r.updated_at,
+    accountScope: "PERSONAL",
+    bankAccountId: Number(r.id),
+  }));
+
+  const personalAssets = [...mappedPersonalAssets, ...personalBankAssets];
+
+  const shopBankRows = await db(TABLES.SHOP_BANK_ACCOUNTS)
+    .where("account_type", "bank")
+    .where("account_scope", "SHOP")
+    .where("is_deleted", false)
+    .orderBy("id", "asc");
+
+  const shopBankAccounts = shopBankRows.map((r) => ({
+    id: Number(r.id),
+    label: r.label || r.bank_display_name || "Ngân hàng Shop",
+    accountNumber: r.account_number,
+    accountHolder: r.account_holder,
+    bankDisplayName: r.bank_display_name,
+    bankShortCode: r.bank_short_code,
+    balance: toNumber(r.balance),
+    isActive: Boolean(r.is_active),
+    isDefault: Boolean(r.is_default),
+  }));
+
+  const usdtWalletRows = await db(TABLES.USDT_WALLETS)
+    .where("account_type", "usdt")
+    .where("is_deleted", false)
+    .orderBy("id", "asc");
+
+  const usdtWallets = usdtWalletRows.map((r) => ({
+    id: Number(r.id),
+    label: r.label || "Ví USDT",
+    walletAddress: r.account_number,
+    network: r.bank_short_code,
+    balance: toNumber(r.balance),
+    isActive: Boolean(r.is_active),
+    isDefault: Boolean(r.is_default),
+  }));
+
+  let personalSavingsTotal = 0;
+  let personalCashBankTotal = 0;
+  let personalInvestmentsTotal = 0;
+  let personalDebtReceivableTotal = 0; // Người khác nợ mình
+  let personalDebtPayableTotal = 0; // Mình nợ người khác
+
+  personalAssets.forEach((a) => {
+    if (a.type === "SAVINGS") personalSavingsTotal += a.amount;
+    else if (a.type === "CASH_BANK") personalCashBankTotal += a.amount;
+    else if (a.type === "GOLD_INVESTMENT") personalInvestmentsTotal += a.amount;
+    else if (a.type === "DEBT_RECEIVABLE") personalDebtReceivableTotal += a.amount;
+    else if (a.type === "DEBT_PAYABLE") personalDebtPayableTotal += a.amount;
+  });
+
+  const shopWallets = await db(TABLES.FINANCIAL_ACCOUNTS)
+    .where("is_deleted", false)
+    .where("is_active", true)
+    .whereNot("account_scope", "PERSONAL")
+    .select(db.raw("COALESCE(SUM(balance), 0)::numeric as total_balance"))
+    .first();
+  const shopBalanceTotal = toNumber(shopWallets?.total_balance || 0);
+
+  const supplierDebtLog = await db(TABLES.SUPPLIER_ORDER_COST_LOG)
+    .where("ncc_payment_status", "Chưa Thanh Toán")
+    .select(db.raw("COALESCE(SUM(import_cost), 0)::numeric as total_debt"))
+    .first();
+  const supplierDebtTotal = toNumber(supplierDebtLog?.total_debt || 0);
+
+  const totalShopAssets = shopBalanceTotal;
+  const grandTotalAssets = shopBalanceTotal + personalSavingsTotal + personalCashBankTotal + personalInvestmentsTotal + personalDebtReceivableTotal;
+
+  const shopLiabilities =
+    totalInstallmentsRemainingDebt +
+    supplierDebtTotal;
+
+  const totalLiabilities =
+    totalInstallmentsRemainingDebt +
+    personalDebtPayableTotal +
+    supplierDebtTotal;
+
+  const netWorthBase = totalShopAssets - shopLiabilities;
+  const monthlyObligations = monthlyDebtBurden + activeFixedCostsTotal;
+  const baseNetWorth = netWorthBase;
 
   let cumulativeProfit = 0;
   let rollingBalance = 0; // Số dư nợ gối đầu: âm nghĩa là nợ đọng, dương nghĩa là thặng dư
@@ -342,6 +514,8 @@ async function getFinanceSummary(targetMonth) {
     // Cập nhật rolling balance: nhận lãi hôm nay trừ đi định mức ngày hôm nay
     rollingBalance += (todayProfit - dailyBurden);
 
+    const dayNetWorth = netWorthBase + cumulativeProfit;
+
     if (!breakEvenDay && cumulativeProfit >= breakEvenTarget && breakEvenTarget > 0) {
       breakEvenDay = d;
     }
@@ -363,6 +537,7 @@ async function getFinanceSummary(targetMonth) {
       rollingBalance,
       isDebtFreeToday: rollingBalance >= 0,
       cumulativeProfit,
+      dayNetWorth,
       cumulativeDeficit: Math.min(0, cumulativeProfit - breakEvenTarget),
       isMasterBreakEvenPassed: cumulativeProfit >= breakEvenTarget,
       isFuture,
@@ -388,74 +563,8 @@ async function getFinanceSummary(targetMonth) {
     chartData,
   };
 
-  // 6. Tài sản & Nợ (Net Worth Engine)
-  const personalAssetRows = await db(TABLES.PERSONAL_ASSETS)
-    .select("*")
-    .orderBy("id", "asc");
-
-  const personalAssets = personalAssetRows.map((r) => ({
-    id: Number(r.id),
-    name: r.name,
-    type: r.type,
-    amount: toNumber(r.amount),
-    note: r.note || "",
-    profitEnabled: Boolean(r.profit_enabled),
-    profitFrequency: r.profit_frequency || null,
-    annualInterestRate: toNumber(r.annual_interest_rate),
-    profitDestination: r.profit_destination || null,
-    profitAccountId: r.profit_account_id ? Number(r.profit_account_id) : null,
-    profitCreditTime: r.profit_credit_time || null,
-    debtInterestEnabled: Boolean(r.debt_interest_enabled),
-    debtAnnualInterestRate: toNumber(r.debt_annual_interest_rate),
-    debtDueDay: r.debt_due_day ? Number(r.debt_due_day) : null,
-    debtEndDate: r.debt_end_date || null,
-    debtRepaymentFrequency: r.debt_repayment_frequency || null,
-    updatedAt: r.updated_at,
-  }));
-
-  // Phân loại tài sản
-  let personalSavingsTotal = 0;
-  let personalCashBankTotal = 0;
-  let personalInvestmentsTotal = 0;
-  let personalDebtReceivableTotal = 0; // Người khác nợ mình
-  let personalDebtPayableTotal = 0; // Mình nợ người khác
-
-  personalAssets.forEach((a) => {
-    if (a.type === "SAVINGS") personalSavingsTotal += a.amount;
-    else if (a.type === "CASH_BANK") personalCashBankTotal += a.amount;
-    else if (a.type === "GOLD_INVESTMENT") personalInvestmentsTotal += a.amount;
-    else if (a.type === "DEBT_RECEIVABLE") personalDebtReceivableTotal += a.amount;
-    else if (a.type === "DEBT_PAYABLE") personalDebtPayableTotal += a.amount;
-  });
-
-  // Số dư tài khoản Shop Bank & ví USDT
-  const shopWallets = await db(TABLES.FINANCIAL_ACCOUNTS)
-    .where("is_deleted", false)
-    .where("is_active", true)
-    .select(db.raw("COALESCE(SUM(balance), 0)::numeric as total_balance"))
-    .first();
-  const shopBalanceTotal = toNumber(shopWallets?.total_balance || 0);
-
-  // Nợ Nhà Cung Cấp chưa trả từ partner.supplier_order_cost_log
-  const supplierDebtLog = await db(TABLES.SUPPLIER_ORDER_COST_LOG)
-    .where("ncc_payment_status", "Chưa Thanh Toán")
-    .select(db.raw("COALESCE(SUM(import_cost), 0)::numeric as total_debt"))
-    .first();
-  const supplierDebtTotal = toNumber(supplierDebtLog?.total_debt || 0);
-
-  // Tổng hợp Tài sản ròng (Không tính Nợ NCC vào Hub này vì giá vốn đã được trừ khi tính Lãi gộp đơn hàng)
-  const totalAssets =
-    shopBalanceTotal +
-    personalSavingsTotal +
-    personalCashBankTotal +
-    personalInvestmentsTotal +
-    personalDebtReceivableTotal;
-
-  const totalLiabilities =
-    personalDebtPayableTotal +
-    totalInstallmentsRemainingDebt;
-
-  const netWorth = totalAssets - totalLiabilities;
+  // 6. Tài sản & Nợ (Net Worth Engine) - Đã tính toán ở trên
+  const netWorth = netWorthBase + (todayPoint?.cumulativeProfit ?? chartData[chartData.length - 1]?.cumulativeProfit ?? 0);
 
   return {
     month: currentMonthStr,
@@ -479,7 +588,7 @@ async function getFinanceSummary(targetMonth) {
     dailyBreakEven,
     netWorth: {
       netWorth,
-      totalAssets,
+      totalAssets: grandTotalAssets,
       totalLiabilities,
       breakdown: {
         shopBalanceTotal,
@@ -495,6 +604,8 @@ async function getFinanceSummary(targetMonth) {
     fixedCosts,
     installments,
     personalAssets,
+    shopBankAccounts,
+    usdtWallets,
   };
 }
 
@@ -675,6 +786,7 @@ async function createPersonalAsset(payload) {
   const debtConfig = normalizeDebtConfig({
     type,
     debtInterestEnabled: Boolean(payload.debtInterestEnabled),
+    debtInterestFrequency: payload.debtInterestFrequency,
     debtAnnualInterestRate: payload.debtAnnualInterestRate,
     debtDueDay: payload.debtDueDay,
     debtEndDate: payload.debtEndDate,
@@ -705,6 +817,7 @@ async function createPersonalAsset(payload) {
     profitAccountId: created.profit_account_id ? Number(created.profit_account_id) : null,
     profitCreditTime: created.profit_credit_time || null,
     debtInterestEnabled: Boolean(created.debt_interest_enabled),
+    debtInterestFrequency: created.debt_interest_frequency || null,
     debtAnnualInterestRate: toNumber(created.debt_annual_interest_rate),
     debtDueDay: created.debt_due_day ? Number(created.debt_due_day) : null,
     debtEndDate: created.debt_end_date || null,
@@ -733,6 +846,7 @@ async function updatePersonalAsset(id, payload) {
   const debtConfig = normalizeDebtConfig({
     type,
     debtInterestEnabled: payload.debtInterestEnabled !== undefined ? Boolean(payload.debtInterestEnabled) : Boolean(existing.debt_interest_enabled),
+    debtInterestFrequency: payload.debtInterestFrequency !== undefined ? payload.debtInterestFrequency : existing.debt_interest_frequency,
     debtAnnualInterestRate: payload.debtAnnualInterestRate !== undefined ? payload.debtAnnualInterestRate : existing.debt_annual_interest_rate,
     debtDueDay: payload.debtDueDay !== undefined ? payload.debtDueDay : existing.debt_due_day,
     debtEndDate: payload.debtEndDate !== undefined ? payload.debtEndDate : existing.debt_end_date,
@@ -766,6 +880,7 @@ async function updatePersonalAsset(id, payload) {
     profitAccountId: updated.profit_account_id ? Number(updated.profit_account_id) : null,
     profitCreditTime: updated.profit_credit_time || null,
     debtInterestEnabled: Boolean(updated.debt_interest_enabled),
+    debtInterestFrequency: updated.debt_interest_frequency || null,
     debtAnnualInterestRate: toNumber(updated.debt_annual_interest_rate),
     debtDueDay: updated.debt_due_day ? Number(updated.debt_due_day) : null,
     debtEndDate: updated.debt_end_date || null,

@@ -75,6 +75,7 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
   };
 
   const [selectedDay, setSelectedDay] = useState<DailyBreakEvenPoint | null>(() => todayPoint as DailyBreakEvenPoint);
+  const [hoveredPoint, setHoveredPoint] = useState<any | null>(null);
 
   // Month label format: Tháng 10/2026
   const monthLabel = useMemo(() => {
@@ -117,10 +118,20 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  Đường Cong Lãi / Lỗ & Hành Trình Vượt Hòa Vốn
+                  Đường Cong Dòng Tiền & Ngày Hòa Vốn
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Quỹ đạo dòng tiền lũy kế thực tế qua từng ngày so với đường Mốc 0 ₫
+                <p className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
+                  <span>Quỹ đạo tích lũy từ âm đến dương so với mốc 0 ₫</span>
+                  {dailyBreakEven.breakEvenDay ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-emerald-400" />
+                      Ngày {dailyBreakEven.breakEvenDay}: Ngày hòa vốn chính thức
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      ⏳ Đang tích lũy tiến tới hòa vốn
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -128,15 +139,11 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
               <div className="flex flex-wrap items-center gap-3 text-[11px] font-medium">
                 <span className="flex items-center gap-1.5 text-emerald-300 font-bold">
                   <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-                  Vùng LÃI (Thặng dư)
+                  Thặng dư (Lãi)
                 </span>
                 <span className="flex items-center gap-1.5 text-rose-300 font-bold">
                   <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 shadow-sm shadow-rose-400/50" />
-                  Vùng LỖ (Thâm hụt)
-                </span>
-                <span className="flex items-center gap-1.5 text-amber-300 font-bold">
-                  <span className="w-3 h-0.5 border-t-2 border-dashed border-amber-400" />
-                  Mốc 0 ₫ (Hòa vốn)
+                  Thâm hụt (Âm)
                 </span>
               </div>
             </div>
@@ -156,18 +163,28 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
               const daysCount = dailyBreakEven.daysInMonth || 31;
               const target = breakEven.breakEvenTarget || 1;
 
-              // Lợi nhuận ròng lũy kế tại mỗi ngày: netVal = cumulativeProfit - breakEvenTarget
+              // Sử dụng dayNetWorth làm netVal để vẽ duy nhất 1 đường tài sản ròng
               const pointsWithNet = chartPoints.map((item) => ({
                 ...item,
-                netVal: item.cumulativeProfit - target,
+                netVal: Number(item.cumulativeProfit || 0) - target,
               }));
 
               // Biên độ đối xứng để mốc 0 ₫ luôn ở chính giữa
               const maxAbs = Math.max(
-                target,
-                ...pointsWithNet.map((p) => Math.abs(p.netVal)),
-                1000000
+                1000000,
+                ...pointsWithNet.map((p) => Math.abs(p.netVal))
               ) * 1.25;
+
+              // Helper format trục Y ngắn gọn
+              const formatAxisVND = (val: number) => {
+                if (val === 0) return "0 ₫";
+                const abs = Math.abs(val);
+                const sign = val > 0 ? "+" : "-";
+                if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(1)} Tỷ`;
+                if (abs >= 1e6) return `${sign}${Math.round(abs / 1e6)} Tr`;
+                if (abs >= 1e3) return `${sign}${Math.round(abs / 1e3)}k`;
+                return `${sign}${abs} ₫`;
+              };
 
               // Tọa độ ánh xạ (X, Y)
               const mapped = pointsWithNet.map((item) => {
@@ -200,7 +217,40 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
               const todayNode = mapped.find((p) => p.day === currentDay);
 
               return (
-                <div className="relative pt-1 pb-1">
+                <div 
+                  className="relative pt-1 pb-1"
+                  onMouseLeave={() => setHoveredPoint(null)}
+                >
+                  {/* Tooltip Popup kiểu Binance khi hover */}
+                  {hoveredPoint && (
+                    <div 
+                      className="absolute z-45 pointer-events-none bg-slate-950/95 border border-cyan-500/50 shadow-2xl rounded-xl p-3 font-mono text-xs space-y-1.5 backdrop-blur-xl transition-all"
+                      style={{
+                        left: `${Math.min(Math.max(hoveredPoint.x - 70, 20), svgWidth - 160)}px`,
+                        top: hoveredPoint.y < 130 ? `${hoveredPoint.y + 16}px` : `${hoveredPoint.y - 115}px`,
+                      }}
+                    >
+                      <div className="text-slate-400 text-[10px] flex items-center justify-between border-b border-slate-800/80 pb-1">
+                        <span>📅 Ngày {hoveredPoint.day} ({hoveredPoint.dateStr})</span>
+                        <span className="text-cyan-400 font-bold">TÀI SẢN RÒNG</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">Số dư / Tài sản ròng:</span>
+                        <span className={`text-sm font-black ${hoveredPoint.netVal >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                          {formatVND(hoveredPoint.netVal)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1 text-[10px] border-t border-slate-800/60">
+                        <div>
+                          <span className="text-slate-500">Đơn hàng:</span> <strong className="text-white">{hoveredPoint.ordersCount}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Lãi ngày:</span> <strong className={hoveredPoint.todayProfit >= 0 ? "text-emerald-400" : "text-rose-400"}>{formatVND(hoveredPoint.todayProfit)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="w-full overflow-x-auto overflow-y-hidden">
                     <svg
                       viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -243,7 +293,7 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
                         </filter>
                       </defs>
 
-                      {/* 1. TRỤC TUNG (Y AXIS) & 2 NHÃN CHỮ TAY LÃI / LỖ CỦA MASTER */}
+                      {/* 1. TRỤC TUNG (Y AXIS) & CÁC BỤC SỐ TỪ ÂM ĐẾN DƯƠNG */}
                       <line
                         x1={padLeft}
                         y1={padTop - 5}
@@ -254,67 +304,42 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
                         opacity="0.7"
                       />
 
-                      {/* Nhãn LÃI ở góc trên trục tung */}
-                      <g className="font-mono select-none">
-                        <rect
-                          x="10"
-                          y={padTop + 2}
-                          width="46"
-                          height="22"
-                          rx="6"
-                          fill="#10b981"
-                          fillOpacity="0.18"
-                          stroke="#10b981"
-                          strokeOpacity="0.4"
-                        />
-                        <text
-                          x="33"
-                          y={padTop + 17}
-                          textAnchor="middle"
-                          fill="#34d399"
-                          fontSize="11.5"
-                          fontWeight="900"
-                          letterSpacing="0.5"
-                        >
-                          ▲ LÃI
-                        </text>
+                      {/* Các bục số tọa độ trục Y từ dương xuống âm */}
+                      {(() => {
+                        const ticks = [maxAbs, maxAbs / 2, 0, -maxAbs / 2, -maxAbs];
+                        return ticks.map((val, idx) => {
+                          const y = zeroY - (val / maxAbs) * (plotH / 2);
+                          const isZero = val === 0;
+                          return (
+                            <g key={idx}>
+                              {/* Đường lưới ngang */}
+                              <line
+                                x1={padLeft}
+                                y1={y}
+                                x2={svgWidth - padRight}
+                                y2={y}
+                                stroke={isZero ? "#f59e0b" : "#334155"}
+                                strokeWidth={isZero ? 1.8 : 1}
+                                strokeDasharray={isZero ? "5 4" : "2 2"}
+                                opacity={isZero ? 0.85 : 0.3}
+                              />
+                              {/* Nhãn số tiền trên trục Y */}
+                              <text
+                                x={padLeft - 8}
+                                y={y + 3.5}
+                                textAnchor="end"
+                                fontSize="9.5"
+                                fontFamily="monospace"
+                                fontWeight={isZero ? "800" : "600"}
+                                fill={isZero ? "#fbbf24" : val > 0 ? "#34d399" : "#fb7185"}
+                              >
+                                {formatAxisVND(val)}
+                              </text>
+                            </g>
+                          );
+                        });
+                      })()}
 
-                        {/* Nhãn LỖ ở góc dưới trục tung */}
-                        <rect
-                          x="10"
-                          y={svgHeight - padBottom - 24}
-                          width="46"
-                          height="22"
-                          rx="6"
-                          fill="#f43f5e"
-                          fillOpacity="0.18"
-                          stroke="#f43f5e"
-                          strokeOpacity="0.4"
-                        />
-                        <text
-                          x="33"
-                          y={svgHeight - padBottom - 9}
-                          textAnchor="middle"
-                          fill="#fb7185"
-                          fontSize="11.5"
-                          fontWeight="900"
-                          letterSpacing="0.5"
-                        >
-                          ▼ LỖ
-                        </text>
-                      </g>
-
-                      {/* 2. TRỤC HOÀNH: ĐƯỜNG KẺ NGANG MỐC 0 ₫ (HÒA VỐN) */}
-                      <line
-                        x1={padLeft}
-                        y1={zeroY}
-                        x2={svgWidth - padRight}
-                        y2={zeroY}
-                        stroke="#f59e0b"
-                        strokeWidth="1.8"
-                        strokeDasharray="5 4"
-                        opacity="0.85"
-                      />
                       {/* Badge định danh mốc 0 ₫ */}
                       <g transform={`translate(${padLeft + 6}, ${zeroY - 7})`}>
                         <rect
@@ -389,6 +414,7 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
 
                       {/* 5. CÁC ĐIỂM NGÀY TƯƠNG TÁC (INTERACTIVE DAY NODES) */}
                       {mapped.map((p) => {
+                        const isHovered = hoveredPoint?.day === p.day;
                         const isSelected = selectedDay?.day === p.day;
                         const isToday = p.day === currentDay;
 
@@ -396,19 +422,20 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
                           <g
                             key={p.day}
                             className="cursor-pointer group"
+                            onMouseEnter={() => setHoveredPoint(p)}
                             onClick={() => setSelectedDay(p)}
                           >
-                            {/* Đường dóng dọc khi chọn */}
-                            {isSelected && (
+                            {/* Đường dóng dọc khi hover hoặc chọn */}
+                            {(isHovered || isSelected) && (
                               <line
                                 x1={p.x}
                                 y1={padTop}
                                 x2={p.x}
                                 y2={svgHeight - padBottom}
                                 stroke="#22d3ee"
-                                strokeWidth="1.2"
+                                strokeWidth="1.3"
                                 strokeDasharray="3 3"
-                                opacity="0.85"
+                                opacity="0.9"
                               />
                             )}
 

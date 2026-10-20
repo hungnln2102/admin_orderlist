@@ -5,6 +5,7 @@ import { FinanceOverviewPanel } from "./components/FinanceOverviewPanel";
 import { DebtsAndInstallmentsSection } from "./components/DebtsAndInstallmentsSection";
 import { FixedCostList } from "./components/FixedCostList";
 import { SavingsAndAssetsSection } from "./components/SavingsAndAssetsSection";
+import { DateRangePicker } from "@/shared/components/DateRangePicker";
 import {
   Calendar,
   RefreshCw,
@@ -19,9 +20,19 @@ import {
 } from "lucide-react";
 
 export const FinanceHubPage: React.FC = () => {
+  const [period, setPeriod] = useState<"week" | "month" | "year" | "custom">("month");
   const [month, setMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [year, setYear] = useState<string>(() => String(new Date().getFullYear()));
+  const [startDate, setStartDate] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
   });
 
   const [activeTab, setActiveTab] = useState<"DEBTS_INSTALLMENTS" | "FIXED_COSTS" | "SAVINGS_ASSETS">("DEBTS_INSTALLMENTS");
@@ -29,11 +40,21 @@ export const FinanceHubPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async (targetMonth: string) => {
+  const fetchData = useCallback(async (targetMonth: string, activePeriod: string, activeYear: string, start: string, end: string) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/finance/summary?month=${targetMonth}`);
+      const params = new URLSearchParams();
+      params.set("period", activePeriod);
+      if (activePeriod === "month") {
+        params.set("month", targetMonth);
+      } else if (activePeriod === "year") {
+        params.set("month", `${activeYear}-12`);
+      } else if (activePeriod === "custom") {
+        if (start) params.set("startDate", start);
+        if (end) params.set("endDate", end);
+      }
+      const res = await fetch(`/api/finance/summary?${params.toString()}`);
       if (!res.ok) {
         const text = await res.text();
         try {
@@ -56,8 +77,8 @@ export const FinanceHubPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchData(month);
-  }, [month, fetchData]);
+    fetchData(month, period, year, startDate, endDate);
+  }, [month, period, year, startDate, endDate, fetchData]);
 
   // Month navigation helpers
   const handlePrevMonth = () => {
@@ -149,19 +170,31 @@ export const FinanceHubPage: React.FC = () => {
   };
 
   const handleEditPersonalAsset = async (id: number, payload: any) => {
-    const res = await fetch(`/api/finance/personal-assets/${id}`, {
+    const isBankAccount = payload.bankAccountId || id >= 1000000 || payload.accountScope === "PERSONAL";
+    const targetId = payload.bankAccountId || (id >= 1000000 ? id - 1000000 : id);
+    const endpoint = isBankAccount
+      ? `/api/wallets/shop-bank-accounts/${targetId}`
+      : `/api/finance/personal-assets/${targetId}`;
+
+    const res = await fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error("Cập nhật tài sản thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
-  const handleDeletePersonalAsset = async (id: number) => {
-    const res = await fetch(`/api/finance/personal-assets/${id}`, { method: "DELETE" });
+  const handleDeletePersonalAsset = async (item: any) => {
+    const isBankAccount = item.bankAccountId || item.id >= 1000000 || item.accountScope === "PERSONAL";
+    const targetId = item.bankAccountId || (item.id >= 1000000 ? item.id - 1000000 : item.id);
+    const endpoint = isBankAccount
+      ? `/api/wallets/shop-bank-accounts/${targetId}`
+      : `/api/finance/personal-assets/${item.id}`;
+
+    const res = await fetch(endpoint, { method: "DELETE" });
     if (!res.ok) throw new Error("Xóa tài sản thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   return (
@@ -193,48 +226,111 @@ export const FinanceHubPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Month Selector & Controls */}
+        {/* Period Tabs & Stepper / Selectors */}
         <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {/* Quick jump to current month */}
-          {!isCurrentMonth && (
-            <button
-              onClick={handleCurrentMonth}
-              className="px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all cursor-pointer shadow-sm"
-              title="Về tháng hiện tại"
-            >
-              Tháng Hiện Tại
-            </button>
+          {/* Period Selector Tabs: Tuần | Tháng | Năm | Tùy Chỉnh */}
+          <div className="flex items-center bg-slate-950/90 p-1 rounded-xl border border-slate-800 shadow-inner">
+            {(
+              [
+                { key: "week", label: "Tuần" },
+                { key: "month", label: "Tháng" },
+                { key: "year", label: "Năm" },
+                { key: "custom", label: "Tùy Chỉnh" },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setPeriod(item.key)}
+                className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 select-none cursor-pointer ${
+                  period === item.key
+                    ? "bg-cyan-500 text-white font-bold shadow-md shadow-cyan-500/25"
+                    : "text-slate-400 hover:text-slate-200 font-medium"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {period === "week" && (
+            <div className="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-cyan-300 font-mono font-bold">
+              📅 7 Ngày Gần Nhất (Tuần Này)
+            </div>
           )}
 
-          {/* Stepper < Month > */}
-          <div className="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-1 shadow-inner">
-            <button
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Tháng trước"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="bg-transparent border-0 px-2.5 py-1 text-xs sm:text-sm text-white font-mono font-bold focus:outline-none cursor-pointer text-center"
+          {period === "custom" && (
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(start, end) => {
+                setStartDate(start);
+                setEndDate(end);
+              }}
             />
+          )}
 
-            <button
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Tháng sau"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          {period === "month" && (
+            <div className="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-1 shadow-inner">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Tháng trước"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="bg-transparent border-0 px-2.5 py-1 text-xs sm:text-sm text-white font-mono font-bold focus:outline-none cursor-pointer text-center"
+              />
+
+              <button
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Tháng sau"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {period === "year" && (
+            <div className="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-1 shadow-inner">
+              <button
+                onClick={() => setYear(String(Number(year) - 1))}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Năm trước"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="bg-transparent border-0 px-3 py-1 text-xs sm:text-sm text-cyan-300 font-mono font-bold focus:outline-none cursor-pointer text-center"
+              >
+                {["2024", "2025", "2026", "2027", "2028"].map((y) => (
+                  <option key={y} value={y} className="bg-slate-900 text-white">
+                    Năm {y}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setYear(String(Number(year) + 1))}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Năm sau"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Refresh button */}
           <button
-            onClick={() => fetchData(month)}
+            onClick={() => fetchData(month, period, year)}
             disabled={loading}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700/60 disabled:opacity-50 shadow-sm"
             title="Làm mới dữ liệu"
@@ -334,6 +430,7 @@ export const FinanceHubPage: React.FC = () => {
                   personalDebts={data.personalAssets}
                   totalInstallmentsRemainingDebt={data.netWorth.breakdown.totalInstallmentsRemainingDebt}
                   monthlyDebtBurden={data.breakEven.monthlyDebtBurden ?? 0}
+                  dailyBurden={data.dailyBreakEven?.dailyBurden ?? 0}
                   onAddInstallment={handleAddInstallment}
                   onEditInstallment={handleEditInstallment}
                   onDeleteInstallment={handleDeleteInstallment}
@@ -356,6 +453,8 @@ export const FinanceHubPage: React.FC = () => {
                 <SavingsAndAssetsSection
                   assets={data.personalAssets}
                   shopBalanceTotal={data.netWorth.breakdown.shopBalanceTotal}
+                  shopBankAccounts={data.shopBankAccounts}
+                  usdtWallets={data.usdtWallets}
                   onAdd={handleAddPersonalAsset}
                   onEdit={handleEditPersonalAsset}
                   onDelete={handleDeletePersonalAsset}

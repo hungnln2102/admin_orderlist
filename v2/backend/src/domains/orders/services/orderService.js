@@ -210,14 +210,14 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
       COALESCE(SUM(
         CASE 
           WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
-          THEN ROUND((price::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at - CURRENT_DATE), 0))
+          THEN ROUND((price::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
           ELSE 0 
         END
       ), 0)::numeric as "totalRemainingValue",
       COALESCE(SUM(
         CASE 
           WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
-          THEN ROUND((cost::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at - CURRENT_DATE), 0))
+          THEN ROUND((cost::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
           ELSE 0 
         END
       ), 0)::numeric as "supplierRemainingValue"

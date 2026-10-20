@@ -562,7 +562,7 @@ const getPackageProducts = async () => {
       pp.id,
       pp.product_name_id,
       pn.name AS product_name,
-      COALESCE(pn.name, p.package_name, 'Khác') AS category,
+      COALESCE(pn.name, 'Kh?c') AS category,
       pn.requires_storage AS category_requires_storage,
       COALESCE(acc.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
       storage_acc.account_username AS storage_account_info,
@@ -573,10 +573,9 @@ const getPackageProducts = async () => {
       pp.match_rule,
       pp.package_note
     FROM ${TABLES.PACKAGE_PRODUCT} pp
-    LEFT JOIN warehouse.product_names pn ON pn.id = pp.product_name_id
-    LEFT JOIN ${TABLES.PRODUCT} p ON p.id = pn.product_id
-    LEFT JOIN warehouse.accounts acc ON acc.id = pp.account_id
-    LEFT JOIN warehouse.accounts storage_acc ON storage_acc.id = pp.storage_account_id
+    LEFT JOIN ${TABLES.PRODUCT_NAMES} pn ON pn.id = pp.product_name_id
+    LEFT JOIN ${TABLES.PRODUCT_KEYS} acc ON acc.id = pp.account_id
+    LEFT JOIN ${TABLES.PRODUCT_KEYS} storage_acc ON storage_acc.id = pp.storage_account_id
     ORDER BY pp.id DESC;
   `;
 
@@ -603,7 +602,7 @@ const getPackageProducts = async () => {
       .where((builder) => {
         targetAccounts.forEach((acc) => {
           builder.orWhereILike("information_order", `%${acc}%`);
-          builder.orWhereILike("slot", `%${acc}%`);
+          builder.orWhereRaw("CAST(slot AS TEXT) ILIKE ?", [`%${acc}%`]);
         });
       });
   }
@@ -620,12 +619,12 @@ const getPackageProducts = async () => {
 
       const targetUser = r.account_info.toLowerCase();
       if (matchRule === "slot") {
-        return Boolean(o.slot && o.slot.toLowerCase().includes(targetUser));
+        return Boolean(o.slot && String(o.slot).toLowerCase().includes(targetUser));
       }
       if (matchRule === "both") {
         return Boolean(
           (o.information_order && o.information_order.toLowerCase().includes(targetUser)) ||
-          (o.slot && o.slot.toLowerCase().includes(targetUser))
+          (o.slot && String(o.slot).toLowerCase().includes(targetUser))
         );
       }
       return Boolean(o.information_order && o.information_order.toLowerCase().includes(targetUser));

@@ -20,7 +20,7 @@ async function createBankAccount(req, res) {
     return res.status(201).json(result);
   } catch (err) {
     console.error("[wallets] createBankAccount failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể tạo tài khoản ngân hàng." });
+    return res.status(400).json({ message: err.message || "Không thể tạo tài khoản ngân hàng.", error: err.message });
   }
 }
 

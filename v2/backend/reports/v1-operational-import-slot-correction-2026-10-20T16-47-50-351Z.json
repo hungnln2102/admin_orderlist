@@ -1,0 +1,109 @@
+{
+  "generated_at": "2026-10-20T16:47:50.350Z",
+  "source_database": "mydtbmav_v1_restore",
+  "target_database": "mydtbmav_v2_import",
+  "corrected_slot_exception_report": {
+    "count": 12,
+    "source_rows": [
+      {
+        "id": 252,
+        "slot": "7568424901335467026"
+      },
+      {
+        "id": 412,
+        "slot": "7148535138438169601"
+      },
+      {
+        "id": 453,
+        "slot": "7578387574923691026"
+      },
+      {
+        "id": 509,
+        "slot": "7585300250329433096"
+      },
+      {
+        "id": 523,
+        "slot": "7592372968090403861"
+      },
+      {
+        "id": 612,
+        "slot": "7600270727413859349"
+      },
+      {
+        "id": 613,
+        "slot": "7603346258685871117"
+      },
+      {
+        "id": 652,
+        "slot": "7446102842232898566"
+      },
+      {
+        "id": 683,
+        "slot": "7447013873842045969"
+      },
+      {
+        "id": 865,
+        "slot": "7602770256956654613"
+      },
+      {
+        "id": 928,
+        "slot": "7615273290521920520"
+      },
+      {
+        "id": 942,
+        "slot": "7605988522684744724"
+      }
+    ],
+    "target_rows": [
+      {
+        "id": "252",
+        "slot": 1
+      },
+      {
+        "id": "412",
+        "slot": 1
+      },
+      {
+        "id": "453",
+        "slot": 1
+      },
+      {
+        "id": "509",
+        "slot": 1
+      },
+      {
+        "id": "523",
+        "slot": 1
+      },
+      {
+        "id": "612",
+        "slot": 1
+      },
+      {
+        "id": "613",
+        "slot": 1
+      },
+      {
+        "id": "652",
+        "slot": 1
+      },
+      {
+        "id": "683",
+        "slot": 1
+      },
+      {
+        "id": "865",
+        "slot": 1
+      },
+      {
+        "id": "928",
+        "slot": 1
+      },
+      {
+        "id": "942",
+        "slot": 1
+      }
+    ],
+    "rule": "Only 19-digit slot identifiers are normalized to 1. Numeric representations such as 1.00 are not exceptions."
+  }
+}

@@ -3,6 +3,7 @@ const { updateOrderStatusTask } = require("./tasks/updateOrderStatusTask");
 const { notifyZeroDaysTask } = require("./tasks/notifyZeroDaysTask");
 const { notifyFourDaysTask } = require("./tasks/notifyFourDaysTask");
 const { finalizeDailySummaryTask } = require("./tasks/finalizeDailySummaryTask");
+const { creditSavingsProfitTask } = require("./tasks/creditSavingsProfitTask");
 
 const TIMEZONE = "Asia/Ho_Chi_Minh";
 
@@ -35,7 +36,21 @@ cron.schedule(
   { scheduled: true, timezone: TIMEZONE }
 );
 
-// 3. Cron 23:55 hàng ngày - Chốt số liệu doanh thu / đơn hàng cuối ngày
+// 3. Cron hàng giờ (0 * * * *) - Rà soát và cộng lãi tự động cho các sổ tiết kiệm đến giờ ghi nhận
+cron.schedule(
+  "0 * * * *",
+  async () => {
+    console.log("[Scheduler] 🕒 Cron hàng giờ được kích hoạt (Quét sinh lời tiết kiệm)");
+    try {
+      await creditSavingsProfitTask("cron_hourly");
+    } catch (err) {
+      console.error("[Scheduler] Lỗi trong Cron quét sinh lời:", err.message);
+    }
+  },
+  { scheduled: true, timezone: TIMEZONE }
+);
+
+// 4. Cron 23:55 hàng ngày - Chốt số liệu doanh thu / đơn hàng cuối ngày
 cron.schedule(
   "55 23 * * *",
   async () => {
@@ -53,6 +68,7 @@ console.log(`=================================`);
 console.log(`⏰ Cron Scheduler V2 initialized:`);
 console.log(` - Cron 00:00 (0h): Cập nhật trạng thái đơn & Thông báo 0 ngày`);
 console.log(` - Cron 07:00 (7h): Thông báo nhắc gia hạn đơn 4 ngày`);
+console.log(` - Cron Hàng Giờ (0 * * * *): Tự động sinh lời & cộng lãi đa sổ tiết kiệm`);
 console.log(` - Cron 23:55: Chốt số liệu thống kê doanh thu cuối ngày`);
 console.log(` - Timezone: ${TIMEZONE}`);
 console.log(`=================================`);
@@ -62,4 +78,5 @@ module.exports = {
   notifyZeroDaysTask,
   notifyFourDaysTask,
   finalizeDailySummaryTask,
+  creditSavingsProfitTask,
 };

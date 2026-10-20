@@ -40,7 +40,7 @@ export const NetWorthCards: React.FC<Props> = ({ metrics, breakEven }) => {
 
         <div className="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
           <span className="text-[11px] font-medium text-slate-400">
-            Tài sản thực hữu
+            Tài khoản Shop - (Nợ + Chi phí)
           </span>
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${isNetPositive ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-rose-500/15 text-rose-300 border-rose-500/30"}`}>
             {isNetPositive ? <ArrowUpRight className="w-3 h-3 text-emerald-400" /> : <ArrowDownRight className="w-3 h-3 text-rose-400" />}
@@ -49,71 +49,7 @@ export const NetWorthCards: React.FC<Props> = ({ metrics, breakEven }) => {
         </div>
       </GlassCard>
 
-      {/* 2. Tổng Tài Sản Tích Lũy */}
-      <GlassCard
-        glow="cyan"
-        className="group relative overflow-hidden !p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 border-slate-800/80 bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-black/90 backdrop-blur-3xl rounded-2xl flex flex-col justify-between"
-      >
-        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-cyan-500 to-blue-500 opacity-80 group-hover:opacity-100 transition-opacity" />
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-              Tổng Tài Sản
-            </span>
-            <div className="p-2 rounded-xl border backdrop-blur-2xl shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 bg-sky-500/20 text-sky-400 border-sky-500/40 shadow-sky-500/20">
-              <Wallet className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="my-1.5">
-            <div className="text-2xl sm:text-[28px] font-black tracking-tight leading-none text-white font-mono">
-              {formatVND(metrics.totalAssets)}
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
-          <span className="text-[11px] text-slate-400">
-            Ví shop: <span className="font-mono text-cyan-300 font-semibold">{formatVND(breakdown.shopBalanceTotal)}</span>
-          </span>
-          <span className="text-[10px] text-slate-500">
-            + Tích lũy
-          </span>
-        </div>
-      </GlassCard>
-
-      {/* 3. Tổng Nghĩa Vụ Nợ */}
-      <GlassCard
-        glow="rose"
-        className="group relative overflow-hidden !p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-rose-500/10 border-slate-800/80 bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-black/90 backdrop-blur-3xl rounded-2xl flex flex-col justify-between"
-      >
-        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-rose-500 to-pink-500 opacity-80 group-hover:opacity-100 transition-opacity" />
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-              Tổng Nghĩa Vụ Nợ
-            </span>
-            <div className="p-2 rounded-xl border backdrop-blur-2xl shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-rose-500/20">
-              <CreditCard className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="my-1.5">
-            <div className="text-2xl sm:text-[28px] font-black tracking-tight leading-none text-rose-300 font-mono">
-              {formatVND(metrics.totalLiabilities)}
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
-          <span className="text-[11px] text-slate-400">
-            Dư nợ trả góp: <span className="font-mono text-rose-300 font-semibold">{formatVND(breakdown.totalInstallmentsRemainingDebt)}</span>
-          </span>
-          <span className="text-[10px] text-slate-500">
-            + Nợ cá nhân
-          </span>
-        </div>
-      </GlassCard>
-
-      {/* 4. Lợi Nhuận Ròng (Net Profit) - Thay thế Tỷ lệ đòn bẩy */}
+      {/* 2. Lợi Nhuận Ròng (Net Profit) */}
       <GlassCard
         glow={isProfitPositive ? "emerald" : "rose"}
         className="group relative overflow-hidden !p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/10 border-slate-800/80 bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-black/90 backdrop-blur-3xl rounded-2xl flex flex-col justify-between"
@@ -142,6 +78,64 @@ export const NetWorthCards: React.FC<Props> = ({ metrics, breakEven }) => {
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${breakEven.isBreakEvenPassed ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-amber-500/15 text-amber-300 border-amber-500/30"}`}>
             {breakEven.isBreakEvenPassed ? <Zap className="w-3 h-3 text-emerald-400" /> : <ArrowDownRight className="w-3 h-3 text-amber-400" />}
             {breakEven.isBreakEvenPassed ? "Sinh lãi" : `${Math.round(breakEven.breakEvenPercent)}%`}
+          </span>
+        </div>
+      </GlassCard>
+
+      {/* 3. Tổng Tài Sản Tích Lũy */}
+      <GlassCard
+        glow="cyan"
+        className="group relative overflow-hidden !p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 border-slate-800/80 bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-black/90 backdrop-blur-3xl rounded-2xl flex flex-col justify-between"
+      >
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-cyan-500 to-blue-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+              Tổng Tài Sản
+            </span>
+            <div className="p-2 rounded-xl border backdrop-blur-2xl shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 bg-sky-500/20 text-sky-400 border-sky-500/40 shadow-sky-500/20">
+              <Wallet className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="my-1.5">
+            <div className="text-2xl sm:text-[28px] font-black tracking-tight leading-none text-white font-mono">
+              {formatVND(metrics.totalAssets)}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
+          <span className="text-[11px] text-slate-400">
+            Ví Shop + Tiết kiệm & tài khoản cá nhân
+          </span>
+        </div>
+      </GlassCard>
+
+      {/* 4. Tổng Nghĩa Vụ Nợ */}
+      <GlassCard
+        glow="rose"
+        className="group relative overflow-hidden !p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-rose-500/10 border-slate-800/80 bg-gradient-to-br from-slate-900/90 via-slate-950/80 to-black/90 backdrop-blur-3xl rounded-2xl flex flex-col justify-between"
+      >
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-rose-500 to-pink-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+              Tổng Nghĩa Vụ Nợ
+            </span>
+            <div className="p-2 rounded-xl border backdrop-blur-2xl shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-rose-500/20">
+              <CreditCard className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="my-1.5">
+            <div className="text-2xl sm:text-[28px] font-black tracking-tight leading-none text-rose-300 font-mono">
+              {formatVND(metrics.totalLiabilities)}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
+          <span className="text-[11px] text-slate-400">
+            Dư nợ trả góp + Nợ cá nhân phải trả
           </span>
         </div>
       </GlassCard>

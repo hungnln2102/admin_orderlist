@@ -7,8 +7,8 @@ const financeHubService = require("../services/financeHubService");
 // --- SUMMARY ---
 async function getSummary(req, res, next) {
   try {
-    const { month } = req.query;
-    const summary = await financeHubService.getFinanceSummary(month);
+    const { month, startDate, endDate, period } = req.query;
+    const summary = await financeHubService.getFinanceSummary(month, startDate, endDate, period);
     return res.json({ success: true, data: summary });
   } catch (error) {
     next(error);

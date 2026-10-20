@@ -44,7 +44,7 @@ const listWarehouseAccounts = async () => {
       "ss.password",
       "ss.backup_email",
       "ss.two_fa",
-      "ss.expires_at",
+      "ss.expired_at as expires_at",
       "ss.status",
       "ss.service_note as note",
       "ss.created_at",
@@ -155,7 +155,7 @@ const createWarehouseAccount = async (payload) => {
             password: slot.password || existingService.password,
             backup_email: slot.backup_email || existingService.backup_email,
             two_fa: slot.two_fa || existingService.two_fa,
-            expires_at: slot.expires_at ? new Date(slot.expires_at) : existingService.expires_at,
+            expired_at: slot.expires_at ? new Date(slot.expires_at) : existingService.expired_at,
             status: slot.status || existingService.status || "AVAILABLE",
             service_note: slot.note || existingService.service_note,
             updated_at: now,
@@ -167,7 +167,7 @@ const createWarehouseAccount = async (payload) => {
           password: slot.password || null,
           backup_email: slot.backup_email || null,
           two_fa: slot.two_fa || null,
-          expires_at: slot.expires_at ? new Date(slot.expires_at) : null,
+          expired_at: slot.expires_at ? new Date(slot.expires_at) : null,
           status: slot.status || "AVAILABLE",
           service_note: slot.note || null,
           created_at: now,
@@ -421,16 +421,16 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
 
     if (expiresAt !== undefined) {
       if (!expiresAt || !String(expiresAt).trim()) {
-        updateData.expires_at = null;
+        updateData.expired_at = null;
       } else {
         const s = String(expiresAt).trim();
         const dmyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
         if (dmyMatch) {
           const [, day, month, year] = dmyMatch;
-          updateData.expires_at = new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00.000Z`);
+          updateData.expired_at = new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00.000Z`);
         } else {
           const d = new Date(s);
-          updateData.expires_at = isNaN(d.getTime()) ? null : d;
+          updateData.expired_at = isNaN(d.getTime()) ? null : d;
         }
       }
     }
@@ -460,7 +460,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
         "ss.password",
         "ss.backup_email",
         "ss.two_fa",
-        "ss.expires_at",
+        "ss.expired_at as expires_at",
         "ss.status",
         "ss.service_note as note",
         "ss.updated_at"

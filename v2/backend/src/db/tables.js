@@ -15,6 +15,7 @@ const SCHEMAS = {
   FINANCE: process.env.DB_SCHEMA_FINANCE || process.env.SCHEMA_FINANCE || "finance",
   DASHBOARD: process.env.DB_SCHEMA_DASHBOARD || "finance",
   SYSTEM: process.env.DB_SCHEMA_SYSTEM || process.env.DB_SCHEMA_RENEW_ADOBE || "system_automation",
+  WAREHOUSE: process.env.DB_SCHEMA_WAREHOUSE || process.env.SCHEMA_WAREHOUSE || "warehouse",
 };
 
 /**
@@ -30,11 +31,11 @@ const TABLES = {
   VARIANT: formatTable(SCHEMAS.PRODUCT, "variant"),
   VARIANT_PRICE: formatTable(SCHEMAS.PRODUCT, "variant_price"),
   PRODUCT: formatTable(SCHEMAS.PRODUCT, "product"),
-  PACKAGE_PRODUCT: formatTable("warehouse", "package_products"),
+  PACKAGE_PRODUCT: formatTable(SCHEMAS.WAREHOUSE, "package_products"),
   PRODUCT_STOCKS: formatTable(SCHEMAS.PRODUCT, "product_stocks"),
-  PRODUCT_KEYS: formatTable("warehouse", "accounts"),
-  STOCK_SERVICES: formatTable("warehouse", "account_slots"),
-  PRODUCT_NAMES: formatTable("warehouse", "product_names"),
+  PRODUCT_KEYS: formatTable(SCHEMAS.WAREHOUSE, "accounts"),
+  STOCK_SERVICES: formatTable(SCHEMAS.WAREHOUSE, "account_slots"),
+  PRODUCT_NAMES: formatTable(SCHEMAS.WAREHOUSE, "product_names"),
   ORDER_LIST: formatTable(SCHEMAS.ORDERS, "order_list"),
   PAYMENT_RECEIPT: formatTable(SCHEMAS.RECEIPT, "payment_receipt"),
   PAYMENT_RECEIPT_ALLOCATIONS: formatTable(SCHEMAS.RECEIPT, "payment_receipt_allocations"),
@@ -48,7 +49,6 @@ const TABLES = {
   SHOP_BANK_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
   USDT_WALLET_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
   FINANCIAL_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "financial_account_ledger"),
-  DASHBOARD_MONTHLY_SUMMARY: formatTable(SCHEMAS.DASHBOARD, "dashboard_monthly_summary"),
   DAILY_REVENUE_SUMMARY: formatTable(SCHEMAS.DASHBOARD, "daily_revenue_summary"),
   SYSTEM_CONFIGS: formatTable(SCHEMAS.SYSTEM, "system_configs"),
   NOTIFICATION_LOGS: formatTable(SCHEMAS.SYSTEM, "notification_logs"),
