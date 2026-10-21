@@ -68,6 +68,7 @@ app.use("/api/system", require("@/domains/system/routes"));
 app.use("/api/dashboard", require("@/domains/dashboard/routes"));
 app.use("/api/warehouse", require("@/domains/warehouse/routes"));
 app.use("/api/finance", require("@/domains/finance/routes/financeHubRoutes"));
+app.use("/api/traffic", require("@/domains/traffic/routes/trafficRoutes"));
 
 app.listen(PORT, () => {
   console.log(`=================================`);

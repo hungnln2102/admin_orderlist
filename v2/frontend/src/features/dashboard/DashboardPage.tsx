@@ -16,6 +16,8 @@ import { useNavigate } from "react-router-dom";
 
 interface ChartPoint {
   label: string;
+  fullDate?: string;
+  dateKey?: string;
   orders: number;
   canceled: number;
   revenue: number;
@@ -125,9 +127,7 @@ export const DashboardPage: React.FC = () => {
   // SVG scaling max values
   const financialMaxVal = useMemo(() => {
     if (!chartData.length) return 100;
-    const max = Math.max(
-      ...chartData.map((d) => Math.max(d.revenue, d.cost, Math.abs(d.profit)))
-    );
+    const max = Math.max(...chartData.map((d) => d.revenue));
     return max > 0 ? max * 1.15 : 100;
   }, [chartData]);
 
@@ -197,6 +197,28 @@ export const DashboardPage: React.FC = () => {
         setPinnedOrderIdx((prev) => (prev === index ? null : index));
       }
     }
+  };
+
+  // Helper định dạng mốc thời gian hiển thị đầy đủ ngày/tháng/năm trong Tooltip
+  const formatPointDate = (point: ChartPoint): string => {
+    if (point.fullDate) return point.fullDate;
+    if (point.dateKey) {
+      const datePart = point.dateKey.split("T")[0];
+      const parts = datePart.split("-");
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      if (parts.length === 2) return `Tháng ${parts[1]}/${parts[0]}`;
+    }
+    if (period === "month") {
+      const parts = (selectedMonth || "").split("-");
+      if (parts.length === 2) {
+        return `${point.label.padStart(2, "0")}/${parts[1]}/${parts[0]}`;
+      }
+      return `Ngày ${point.label}`;
+    }
+    if (period === "year") {
+      return `Tháng ${point.label.replace(/\D/g, "")}/${selectedYear}`;
+    }
+    return point.label;
   };
 
   // Helper xác định mốc nhãn được hiển thị theo yêu cầu (1, 5, 10, 15, 20, 25, 30/31 cho tháng; toàn bộ cho năm/ngày)
@@ -454,17 +476,10 @@ export const DashboardPage: React.FC = () => {
             {/* Dynamic Chart Legend */}
             {activeChartTab === "financial" ? (
               <div className="flex items-center gap-3 text-[11px]">
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                  <span className="text-slate-300">Doanh thu</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                  <span className="text-slate-300">Lợi nhuận</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                  <span className="text-slate-300">Chi phí</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50" />
+                  <span className="text-cyan-300 font-bold">Đường Doanh Thu</span>
+                  <span className="text-slate-400 text-[10px] italic">(Hover để xem Chi phí & Lợi nhuận)</span>
                 </div>
               </div>
             ) : (
@@ -539,8 +554,6 @@ export const DashboardPage: React.FC = () => {
                         <>
                           <path d={getSmoothAreaPath(revPts, 175)} fill="url(#revenueGrad)" />
                           <path d={getSmoothPath(revPts)} fill="none" stroke="#22d3ee" strokeWidth="3" strokeLinecap="round" />
-                          <path d={getSmoothPath(profPts)} fill="none" stroke="#c084fc" strokeWidth="3" strokeLinecap="round" />
-                          <path d={getSmoothPath(costPts)} fill="none" stroke="#fb7185" strokeWidth="2.5" strokeDasharray="4 4" strokeLinecap="round" />
 
                           {activeFinancialIdx !== null && (
                             <line
@@ -558,18 +571,14 @@ export const DashboardPage: React.FC = () => {
                           {chartData.map((d, i) => {
                             const x = getX(i);
                             const revY = revPts[i].y;
-                            const profY = profPts[i].y;
-                            const costY = costPts[i].y;
                             const isActive = activeFinancialIdx === i;
-                            const isShowText = chartData.length <= 15 || i % 3 === 0 || isActive;
 
                             return (
                               <g key={i}>
                                 {isActive && (
                                   <>
-                                    <circle cx={x} cy={revY} r="6" fill="#22d3ee" stroke="#0f172a" strokeWidth="2" />
-                                    <circle cx={x} cy={profY} r="6" fill="#c084fc" stroke="#0f172a" strokeWidth="2" />
-                                    <circle cx={x} cy={costY} r="5" fill="#fb7185" stroke="#0f172a" strokeWidth="1.5" />
+                                    <circle cx={x} cy={revY} r="10" fill="#22d3ee" opacity="0.25" />
+                                    <circle cx={x} cy={revY} r="6" fill="#22d3ee" stroke="#0f172a" strokeWidth="2.5" />
                                   </>
                                 )}
                               </g>
@@ -588,7 +597,7 @@ export const DashboardPage: React.FC = () => {
                       }`}
                     >
                       <p className="font-bold text-slate-200 border-b border-slate-800 pb-1.5 mb-2 flex items-center justify-between">
-                        <span>Mốc: {period === "month" ? `Ngày ${chartData[activeFinancialIdx].label}` : chartData[activeFinancialIdx].label}</span>
+                        <span>Mốc: {formatPointDate(chartData[activeFinancialIdx])}</span>
                         <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
                       </p>
                       <div className="space-y-1.5 font-mono text-[11px]">
@@ -705,7 +714,7 @@ export const DashboardPage: React.FC = () => {
                       }`}
                     >
                       <p className="font-bold text-slate-200 border-b border-slate-800 pb-1.5 mb-2 flex items-center justify-between">
-                        <span>Mốc: {period === "month" ? `Ngày ${chartData[activeOrderIdx].label}` : chartData[activeOrderIdx].label}</span>
+                        <span>Mốc: {formatPointDate(chartData[activeOrderIdx])}</span>
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                       </p>
                       <div className="space-y-1.5 font-mono text-[11px]">

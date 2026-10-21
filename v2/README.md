@@ -198,6 +198,8 @@ Trang **Kho Hàng** quản lý chi tiết từng tài khoản kho Master và cá
 - **Dropdown `Danh mục` & `Trạng thái`:** Lọc kho theo nhóm dịch vụ hoặc trạng thái (*Có Slot Sẵn*, *Đã Giữ Chỗ*, *Hết Hạn*).
 
 ### 5.2. Bảng Tài Khoản Kho (`WarehouseAccountsTable`) & Nút Bấm
+
+- **Mở trình duyệt tài khoản:** V2 dùng Chromium do Playwright quản lý và giữ một profile riêng tại `v2/backend/browser_profiles/account_<id>` cho từng tài khoản kho. Ở local đặt `WAREHOUSE_BROWSER_HEADLESS=false` để hiện cửa sổ; trên server/Docker đặt `WAREHOUSE_BROWSER_HEADLESS=true`. Cài browser một lần sau khi cài dependency: `cd v2/backend && npx playwright install chromium`.
 - **Nút `ChevronDown / ChevronUp` (Bấm vào dòng tài khoản):** Đóng/mở danh sách các Slot key con bên trong tài khoản kho Master.
 - **Nút `Sao Chép Email Kho` (Icon Copy):** Chép nhanh email đăng nhập Master.
 - **Nút `Sửa Tài Khoản` (Icon Cây bút):** Mở modal sửa email/thông tin tài khoản kho.

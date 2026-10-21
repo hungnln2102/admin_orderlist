@@ -194,12 +194,18 @@ async function getDashboardSummary(params = {}) {
       });
     });
 
+    const targetDayStr = start.toISOString().slice(0, 10);
+    const [tY, tM, tD] = targetDayStr.split("-");
+    const formattedDay = `${tD}/${tM}/${tY}`;
+
     // 12 mốc giờ (mỗi mốc gộp 2 giờ: 0h-1h, 2h-3h, ..., 22h-23h) -> Đúng 12 điểm
     for (let h = 0; h < 24; h += 2) {
       const d1 = hourMap.get(h) || { orders: 0, canceled: 0, revenue: 0, cost: 0, profit: 0 };
       const d2 = hourMap.get(h + 1) || { orders: 0, canceled: 0, revenue: 0, cost: 0, profit: 0 };
       chartData.push({
         label: `${h}h`,
+        fullDate: `${String(h).padStart(2, "0")}h00 - ${String(h + 1).padStart(2, "0")}h59 (${formattedDay})`,
+        dateKey: `${targetDayStr}T${String(h).padStart(2, "0")}:00:00`,
         orders: d1.orders + d2.orders,
         canceled: d1.canceled + d2.canceled,
         revenue: d1.revenue + d2.revenue,
@@ -244,16 +250,29 @@ async function getDashboardSummary(params = {}) {
     endNorm.setUTCHours(23, 59, 59, 999);
 
     const isSameMonth = start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear();
+    const isMultiYear = start.getUTCFullYear() !== end.getUTCFullYear();
 
     while (curr <= endNorm) {
       const dayKey = curr.toISOString().slice(0, 10);
       const dayNum = String(curr.getUTCDate()).padStart(2, "0");
       const monthNum = String(curr.getUTCMonth() + 1).padStart(2, "0");
-      const label = period === "month" || isSameMonth ? dayNum : `${dayNum}/${monthNum}`;
+      const yearNum = String(curr.getUTCFullYear());
+      const fullDate = `${dayNum}/${monthNum}/${yearNum}`;
+
+      let label = dayNum;
+      if (period === "month" || isSameMonth) {
+        label = dayNum;
+      } else if (isMultiYear) {
+        label = `${dayNum}/${monthNum}/${yearNum.slice(2)}`;
+      } else {
+        label = `${dayNum}/${monthNum}`;
+      }
 
       const d = dayMap.get(dayKey) || { orders: 0, canceled: 0, revenue: 0, cost: 0, refund: 0, profit: 0 };
       daysList.push({
         label,
+        fullDate,
+        dateKey: dayKey,
         dayNum,
         ...d,
       });
@@ -261,10 +280,12 @@ async function getDashboardSummary(params = {}) {
       curr.setUTCDate(curr.getUTCDate() + 1);
     }
 
-    // Trả về đầy đủ tất cả các ngày trong tháng (VD: 30 ngày)
+    // Trả về đầy đủ tất cả các ngày trong kỳ
     daysList.forEach((item) => {
       chartData.push({
         label: item.label,
+        fullDate: item.fullDate,
+        dateKey: item.dateKey,
         orders: item.orders,
         canceled: item.canceled,
         revenue: item.revenue,
@@ -306,6 +327,8 @@ async function getDashboardSummary(params = {}) {
       const d = monthlyMap.get(m) || { orders: 0, canceled: 0, revenue: 0, cost: 0, profit: 0 };
       chartData.push({
         label: `T${m}`,
+        fullDate: `Tháng ${m}/${targetYear}`,
+        dateKey: `${targetYear}-${String(m).padStart(2, "0")}`,
         orders: d.orders,
         canceled: d.canceled,
         revenue: d.revenue,

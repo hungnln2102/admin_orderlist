@@ -1,33 +1,35 @@
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { chromium } = require("playwright");
 const eventBus = require("@/events/eventBus");
 const EVENTS = require("@/events/eventTypes");
 
-/**
- * Tìm đường dẫn file thực thi Chrome hoặc Chromium / Edge trên máy Windows
- */
-const findBrowserExecutable = () => {
-  const candidates = [
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    path.join(process.env.LOCALAPPDATA || "", "Google\\Chrome\\Application\\chrome.exe"),
-    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  ];
+const activeContexts = new Map();
+const launchingContexts = new Map();
 
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
+const parseBoolean = (raw, fallback) => {
+  if (raw == null || String(raw).trim() === "") return fallback;
+  return !["false", "0", "no", "off"].includes(String(raw).trim().toLowerCase());
+};
 
-  // Mặc định gọi "chrome" nếu có trong PATH hệ thống
-  return "chrome";
+const getLaunchConfig = () => {
+  const rawTimeout = Number.parseInt(process.env.WAREHOUSE_BROWSER_TIMEOUT_MS || "", 10);
+
+  return {
+    headless: parseBoolean(process.env.WAREHOUSE_BROWSER_HEADLESS, false),
+    executablePath: process.env.WAREHOUSE_BROWSER_EXECUTABLE_PATH || undefined,
+    timeout: Number.isFinite(rawTimeout) && rawTimeout >= 5_000 ? rawTimeout : 30_000,
+  };
 };
 
 /**
- * Phân giải URL đăng nhập với fallback nhận biết tự động
+ * Giữ tương thích với module gọi cũ. Playwright tự quản lý Chromium khi
+ * WAREHOUSE_BROWSER_EXECUTABLE_PATH không được cấu hình.
+ */
+const findBrowserExecutable = () => process.env.WAREHOUSE_BROWSER_EXECUTABLE_PATH || null;
+
+/**
+ * Phân giải URL đăng nhập với fallback nhận biết tự động.
  */
 const resolveLoginUrl = (serviceName = "", customUrl = null) => {
   if (customUrl && typeof customUrl === "string" && customUrl.trim().startsWith("http")) {
@@ -38,64 +40,70 @@ const resolveLoginUrl = (serviceName = "", customUrl = null) => {
   if (normalized.includes("youtube") || normalized.includes("google") || normalized.includes("mail")) {
     return "https://accounts.google.com";
   }
-  if (normalized.includes("netflix")) {
-    return "https://www.netflix.com/login";
-  }
-  if (normalized.includes("adobe")) {
-    return "https://account.adobe.com";
-  }
-  if (normalized.includes("canva")) {
-    return "https://www.canva.com/login";
-  }
-  if (normalized.includes("gemini")) {
-    return "https://gemini.google.com";
-  }
-  if (normalized.includes("spotify")) {
-    return "https://accounts.spotify.com/login";
-  }
+  if (normalized.includes("netflix")) return "https://www.netflix.com/login";
+  if (normalized.includes("adobe")) return "https://account.adobe.com";
+  if (normalized.includes("canva")) return "https://www.canva.com/login";
+  if (normalized.includes("gemini")) return "https://gemini.google.com";
+  if (normalized.includes("spotify")) return "https://accounts.spotify.com/login";
   if (normalized.includes("microsoft") || normalized.includes("office")) {
     return "https://login.microsoftonline.com";
   }
-  if (normalized.includes("chatgpt") || normalized.includes("openai")) {
-    return "https://chatgpt.com/auth/login";
-  }
+  if (normalized.includes("chatgpt") || normalized.includes("openai")) return "https://chatgpt.com/auth/login";
 
   return "https://www.google.com";
 };
 
+const getOrLaunchContext = async (accountId, profileDir) => {
+  const key = String(accountId);
+  const existing = activeContexts.get(key);
+  if (existing) return { context: existing, created: false };
+
+  const launching = launchingContexts.get(key);
+  if (launching) return { context: await launching, created: false };
+
+  const { headless, executablePath, timeout } = getLaunchConfig();
+  const contextPromise = chromium
+    .launchPersistentContext(profileDir, {
+      headless,
+      executablePath,
+      timeout,
+      args: ["--no-first-run", "--no-default-browser-check"],
+    })
+    .then((context) => {
+      activeContexts.set(key, context);
+      context.once("close", () => activeContexts.delete(key));
+      return context;
+    });
+
+  launchingContexts.set(key, contextPromise);
+  try {
+    return { context: await contextPromise, created: true };
+  } finally {
+    launchingContexts.delete(key);
+  }
+};
+
 /**
- * Khởi chạy trình duyệt với Profile độc lập cho từng tài khoản
+ * Khởi chạy Chromium Playwright với profile độc lập cho từng tài khoản.
  */
 const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, customUrl }) => {
-  if (!accountId) {
-    throw new Error("ID tài khoản không được để trống!");
-  }
+  if (!accountId) throw new Error("ID tài khoản không được để trống!");
 
-  const browserPath = findBrowserExecutable();
   const targetUrl = resolveLoginUrl(serviceName, customUrl);
-
-  // Thư mục lưu profile riêng biệt cho từng tài khoản
   const baseProfileDir = path.resolve(process.cwd(), "browser_profiles");
   const accountProfileDir = path.join(baseProfileDir, `account_${accountId}`);
+  fs.mkdirSync(accountProfileDir, { recursive: true });
 
-  if (!fs.existsSync(accountProfileDir)) {
-    fs.mkdirSync(accountProfileDir, { recursive: true });
+  const { context, created } = await getOrLaunchContext(accountId, accountProfileDir);
+  const page = context.pages()[0] || await context.newPage();
+  const { timeout, executablePath } = getLaunchConfig();
+  try {
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout });
+  } catch (error) {
+    if (created) await context.close();
+    throw error;
   }
-
-  const args = [
-    `--user-data-dir=${accountProfileDir}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    targetUrl,
-  ];
-
-  const child = spawn(browserPath, args, {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: false,
-  });
-
-  child.unref();
+  await page.bringToFront();
 
   const payload = {
     accountId,
@@ -103,7 +111,7 @@ const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, c
     serviceName: serviceName || "General",
     targetUrl,
     profileDir: accountProfileDir,
-    browserExecutable: path.basename(browserPath),
+    browserExecutable: executablePath ? path.basename(executablePath) : "playwright-chromium",
     openedAt: new Date().toISOString(),
   };
 
@@ -111,7 +119,7 @@ const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, c
 
   return {
     success: true,
-    message: `Đã mở trình duyệt (Profile riêng: account_${accountId}) cho tài khoản ${accountUsername || accountId}!`,
+    message: `Đã mở Chromium Playwright (Profile riêng: account_${accountId}) cho tài khoản ${accountUsername || accountId}!`,
     data: payload,
   };
 };

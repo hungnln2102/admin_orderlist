@@ -16,6 +16,7 @@ const WarehousePage = React.lazy(() => import("@/pages/WarehousePage").then(m =>
 const ReceiptsPage = React.lazy(() => import("@/pages/ReceiptsPage").then(m => ({ default: m.ReceiptsPage })));
 const SystemPage = React.lazy(() => import("@/pages/SystemPage").then(m => ({ default: m.SystemPage })));
 const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPage").then(m => ({ default: m.FinanceHubPage })));
+const TrafficPage = React.lazy(() => import("@/features/traffic/TrafficPage").then(m => ({ default: m.TrafficPage })));
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -75,27 +76,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* 1. Tổng quan & Báo cáo */}
       <Route path="/finance" element={<FinanceHubPage />} />
-      <Route
-        path="/traffic"
-        element={
-          <GenericPage
-            title="Traffic & Phân Tích Lượt Truy Cập"
-            category="Tổng quan & Báo cáo"
-            description="Theo dõi truy cập trang web và nguồn lưu lượng"
-            columns={[
-              { key: "date", label: "Ngày" },
-              { key: "views", label: "Lượt xem" },
-              { key: "users", label: "Người dùng" },
-              { key: "source", label: "Nguồn chính" },
-            ]}
-            sampleData={[
-              { date: "19/09/2026", views: "14,520", users: "3,120", source: "Google Search" },
-              { date: "18/09/2026", views: "12,980", users: "2,840", source: "Direct QR" },
-              { date: "17/09/2026", views: "15,800", users: "3,450", source: "Facebook Ads" },
-            ]}
-          />
-        }
-      />
+      <Route path="/traffic" element={<TrafficPage />} />
       <Route
         path="/tax"
         element={

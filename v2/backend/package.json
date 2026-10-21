@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node -r module-alias/register src/server.js",
     "dev": "nodemon -r module-alias/register src/server.js",
-    "migrate": "knex migrate:latest"
+    "migrate": "knex migrate:latest",
+    "playwright:install": "playwright install chromium"
   },
   "_moduleAliases": {
     "@": "src"
@@ -21,7 +22,8 @@
     "knex": "^3.1.0",
     "module-alias": "^2.2.3",
     "node-cron": "^4.6.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "playwright": "^1.64.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
