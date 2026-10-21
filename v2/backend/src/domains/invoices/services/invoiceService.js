@@ -5,7 +5,7 @@
  *   - allocateReceipt(): Phân bổ số dư biên lai bằng tay (gán mã đơn, chi phí, credit...).
  *     → Dùng chung processOrderPayment (cập nhật trạng thái đơn, cộng ngày gia hạn, phát EventBus).
  */
-const { db, TABLES } = require("@/db");
+const { db, TABLES, withTransaction } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
@@ -183,25 +183,44 @@ async function allocateReceipt(receiptId, payload) {
     throw new Error("Số tiền phân bổ phải lớn hơn 0 ₫.");
   }
 
-  const receipt = await getReceiptTable().where({ id }).first();
-  if (!receipt) {
-    throw new Error("Không tìm thấy biên lai thanh toán.");
-  }
+  return withTransaction(async (trx) => {
+    const receipt = await trx(TABLES.PAYMENT_RECEIPT)
+      .where({ id })
+      .forUpdate()
+      .first();
+    if (!receipt) {
+      throw new Error("Không tìm thấy biên lai thanh toán.");
+    }
 
-  const currentUnallocated = Number(receipt.unallocated_amount || receipt.amount || 0);
-  if (allocAmount > currentUnallocated) {
-    throw new Error(`Số tiền phân bổ (${allocAmount.toLocaleString("vi-VN")} ₫) vượt quá số dư khả dụng (${currentUnallocated.toLocaleString("vi-VN")} ₫).`);
-  }
+    const currentUnallocated = Number(receipt.unallocated_amount ?? receipt.amount ?? 0);
+    if (allocAmount > currentUnallocated) {
+      throw new Error(`Số tiền phân bổ (${allocAmount.toLocaleString("vi-VN")} ₫) vượt quá số dư khả dụng (${currentUnallocated.toLocaleString("vi-VN")} ₫).`);
+    }
 
-  const newUnallocated = currentUnallocated - allocAmount;
-  const newStatus = newUnallocated <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.PARTIALLY_ALLOCATED;
+    const newUnallocated = currentUnallocated - allocAmount;
+    const newStatus = newUnallocated <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.PARTIALLY_ALLOCATED;
+    const resolvedAllocType = allocation_type || ALLOCATION_TYPE.ORDER;
+    const code = target_code ? target_code.trim() : null;
 
-  return await db.transaction(async (trx) => {
+    let order = null;
+    if (resolvedAllocType === ALLOCATION_TYPE.ORDER) {
+      if (!code) throw new Error("Mã đơn hàng là bắt buộc khi phân bổ loại ORDER.");
+
+      order = await trx(TABLES.ORDER_LIST)
+        .where({ id_order: code })
+        .forUpdate()
+        .first();
+      if (!order) throw new Error(`Không tìm thấy đơn hàng ${code}.`);
+      if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
+        throw new Error(`Đơn hàng ${code} đang ở trạng thái ${order.status}, không thể phân bổ thanh toán.`);
+      }
+    }
+
     // 1. Thêm bản ghi phân bổ
     const [allocId] = await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).insert({
       receipt_id: id,
-      allocation_type: allocation_type || ALLOCATION_TYPE.ORDER,
-      target_code: target_code ? target_code.trim() : null,
+      allocation_type: resolvedAllocType,
+      target_code: code,
       amount: allocAmount,
       remaining_balance: newUnallocated,
       note: note ? note.trim() : null,
@@ -218,17 +237,11 @@ async function allocateReceipt(receiptId, payload) {
 
     // 3. Nếu gán cho Đơn hàng (ORDER): Cập nhật trạng thái đơn + gia hạn + phát EventBus
     let orderResult = null;
-    const resolvedAllocType = allocation_type || ALLOCATION_TYPE.ORDER;
-    if (resolvedAllocType === ALLOCATION_TYPE.ORDER && target_code) {
-      const code = target_code.trim();
-      const order = await trx(TABLES.ORDER_LIST).where({ id_order: code }).first();
-
-      if (order) {
-        orderResult = await processOrderPayment(trx, order, allocAmount, {
-          receiptId: id,
-          action: "ADMIN_MANUAL_ALLOCATE",
-        });
-      }
+    if (order) {
+      orderResult = await processOrderPayment(trx, order, allocAmount, {
+        receiptId: id,
+        action: "ADMIN_MANUAL_ALLOCATE",
+      });
     }
 
     return {

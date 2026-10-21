@@ -1,5 +1,9 @@
 const { db, TABLES } = require("@/db");
 
+if (process.env.NODE_ENV === "production") {
+  throw new Error("fix_negative_balances.js cannot run in production.");
+}
+
 async function fixBalances() {
   try {
     console.log("Fixing negative balances...");

@@ -1,4 +1,5 @@
 const supplierService = require("../services/supplierService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getOverview = async (req, res) => {
   try {
@@ -7,7 +8,7 @@ const getOverview = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi getOverview:", error);
-    res.status(500).json({ error: error.message || "Không thể lấy danh sách Bảng tổng NCC" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể lấy danh sách Bảng tổng NCC") });
   }
 };
 
@@ -23,7 +24,7 @@ const getCostLogs = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi getCostLogs:", error);
-    res.status(500).json({ error: error.message || "Không thể lấy danh sách Chi phí NCC" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể lấy danh sách Chi phí NCC") });
   }
 };
 
@@ -40,7 +41,7 @@ const getCostLogsForSupplier = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi getCostLogsForSupplier:", error);
-    res.status(500).json({ error: error.message || "Không thể lấy lịch sử đơn NCC" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể lấy lịch sử đơn NCC") });
   }
 };
 
@@ -51,7 +52,7 @@ const getSupplierDetail = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi getSupplierDetail:", error);
-    res.status(500).json({ error: error.message || "Không thể lấy chi tiết Nhà cung cấp" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể lấy chi tiết Nhà cung cấp") });
   }
 };
 
@@ -62,7 +63,7 @@ const payDebt = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi payDebt:", error);
-    res.status(500).json({ error: error.message || "Không thể thanh toán công nợ" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể thanh toán công nợ") });
   }
 };
 
@@ -73,7 +74,7 @@ const toggleStatus = async (req, res) => {
     res.json({ message: "Đã cập nhật trạng thái NCC", data: result });
   } catch (error) {
     console.error("Lỗi toggleStatus:", error);
-    res.status(500).json({ error: error.message || "Cập nhật trạng thái thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Cập nhật trạng thái thất bại") });
   }
 };
 
@@ -83,7 +84,7 @@ const createSupplier = async (req, res) => {
     res.status(201).json({ message: "Tạo Nhà cung cấp thành công", data: result });
   } catch (error) {
     console.error("Lỗi createSupplier:", error);
-    res.status(500).json({ error: error.message || "Tạo Nhà cung cấp thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Tạo Nhà cung cấp thất bại") });
   }
 };
 
@@ -94,7 +95,7 @@ const updateSupplier = async (req, res) => {
     res.json({ message: "Cập nhật Nhà cung cấp thành công", data: result });
   } catch (error) {
     console.error("Lỗi updateSupplier:", error);
-    res.status(500).json({ error: error.message || "Cập nhật Nhà cung cấp thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Cập nhật Nhà cung cấp thất bại") });
   }
 };
 
@@ -105,7 +106,7 @@ const deleteSupplier = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi deleteSupplier:", error);
-    res.status(500).json({ error: error.message || "Xóa Nhà cung cấp thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Xóa Nhà cung cấp thất bại") });
   }
 };
 

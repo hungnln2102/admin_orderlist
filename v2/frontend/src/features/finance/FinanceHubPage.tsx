@@ -57,20 +57,20 @@ export const FinanceHubPage: React.FC = () => {
       const res = await fetch(`/api/finance/summary?${params.toString()}`);
       if (!res.ok) {
         const text = await res.text();
+        let errorMessage = `Máy chủ phản hồi lỗi (${res.status}). Vui lòng kiểm tra lại dịch vụ backend.`;
         try {
           const parsed = JSON.parse(text);
-          throw new Error(parsed.message || `Lỗi máy chủ (${res.status})`);
-        } catch {
-          throw new Error(`Máy chủ phản hồi lỗi (${res.status}). Vui lòng kiểm tra lại dịch vụ backend.`);
-        }
+          errorMessage = parsed.message || errorMessage;
+        } catch {}
+        throw new Error(errorMessage);
       }
       const json = await res.json();
       if (!json.success) {
         throw new Error(json.message || "Không thể tải dữ liệu tài chính");
       }
       setData(json.data);
-    } catch (err: any) {
-      setError(err.message || "Lỗi kết nối API");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Lỗi kết nối API");
     } finally {
       setLoading(false);
     }
@@ -112,7 +112,7 @@ export const FinanceHubPage: React.FC = () => {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error("Thêm chi phí thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   const handleEditFixedCost = async (id: number, payload: any) => {
@@ -122,13 +122,13 @@ export const FinanceHubPage: React.FC = () => {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error("Cập nhật chi phí thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   const handleDeleteFixedCost = async (id: number) => {
     const res = await fetch(`/api/finance/fixed-costs/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Xóa chi phí thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   // Handlers for Installments
@@ -139,7 +139,7 @@ export const FinanceHubPage: React.FC = () => {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error("Thêm khoản trả góp thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   const handleEditInstallment = async (id: number, payload: any) => {
@@ -149,13 +149,13 @@ export const FinanceHubPage: React.FC = () => {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error("Cập nhật trả góp thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   const handleDeleteInstallment = async (id: number) => {
     const res = await fetch(`/api/finance/installments/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Xóa trả góp thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   // Handlers for Personal Assets
@@ -166,7 +166,7 @@ export const FinanceHubPage: React.FC = () => {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error("Thêm tài sản thất bại");
-    await fetchData(month);
+    await fetchData(month, period, year, startDate, endDate);
   };
 
   const handleEditPersonalAsset = async (id: number, payload: any) => {
@@ -330,7 +330,7 @@ export const FinanceHubPage: React.FC = () => {
 
           {/* Refresh button */}
           <button
-            onClick={() => fetchData(month, period, year)}
+            onClick={() => fetchData(month, period, year, startDate, endDate)}
             disabled={loading}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700/60 disabled:opacity-50 shadow-sm"
             title="Làm mới dữ liệu"

@@ -134,6 +134,28 @@ export interface DailyBreakEvenStats {
   chartData: DailyBreakEvenPoint[];
 }
 
+export interface ShopBankAccount {
+  id: number;
+  label: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  bankDisplayName?: string;
+  bankShortCode?: string;
+  balance: number;
+  isActive: boolean;
+  isDefault: boolean;
+}
+
+export interface UsdtWallet {
+  id: number;
+  label: string;
+  walletAddress?: string;
+  network?: string;
+  balance: number;
+  isActive: boolean;
+  isDefault: boolean;
+}
+
 export interface FinanceSummaryData {
   month: string;
   breakEven: BreakEvenMetrics;
@@ -142,4 +164,6 @@ export interface FinanceSummaryData {
   fixedCosts: FixedCost[];
   installments: Installment[];
   personalAssets: PersonalAsset[];
+  shopBankAccounts: ShopBankAccount[];
+  usdtWallets: UsdtWallet[];
 }

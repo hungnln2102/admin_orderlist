@@ -12,7 +12,7 @@
  *     c. NẾU KHỚP: Ghi phân bổ, cập nhật đơn hàng sang PAID (+ cộng ngày nếu gia hạn), bắn EventBus.
  *     d. KHÔNG KHỚP: Giữ Biên lai ở UNALLOCATED.
  */
-const { db, TABLES } = require("@/db");
+const { db, TABLES, withTransaction } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processCompleteOrder } = require("@/domains/orders/services/orderService");
@@ -55,6 +55,14 @@ async function processPaymentWebhook(payload = {}) {
   const gateway = payload.gateway || payload.bankBrandName || "SEPAY";
   const noteContent = payload.content || payload.transactionContent || payload.note || "";
   const paymentDate = payload.transactionDate || payload.payment_date || new Date().toISOString().split("T")[0];
+  const toDuplicateResult = (receipt) => ({
+    success: true,
+    duplicate: true,
+    receiptId: receipt.id,
+    matched: receipt.status === RECEIPT_STATUS.FULLY_ALLOCATED,
+    amount: transferAmount,
+    status: receipt.status,
+  });
 
   // 1. Kiểm tra trùng lặp (Idempotency check)
   if (numSepayTxId) {
@@ -63,18 +71,12 @@ async function processPaymentWebhook(payload = {}) {
       .first();
 
     if (existing) {
-      return {
-        success: true,
-        duplicate: true,
-        receiptId: existing.id,
-        matched: existing.status === RECEIPT_STATUS.FULLY_ALLOCATED,
-        amount: transferAmount,
-        status: existing.status,
-      };
+      return toDuplicateResult(existing);
     }
   }
 
-  return await db.transaction(async (trx) => {
+  try {
+    return await withTransaction(async (trx) => {
     // 2. Tạo Biên lai mới — Luôn bắt đầu ở UNALLOCATED
     const [receiptIdRes] = await getReceiptTable(trx)
       .insert({
@@ -130,6 +132,8 @@ async function processPaymentWebhook(payload = {}) {
       })
       .whereIn("status", PAYABLE_STATUSES)
       .orderBy("id", "desc")
+      .forUpdate()
+      .skipLocked()
       .first();
 
     // KHÔNG KHỚP ĐƠN NÀO — Giữ Biên lai ở UNALLOCATED
@@ -175,7 +179,14 @@ async function processPaymentWebhook(payload = {}) {
       newStatus: updatedOrder.status,
       isRenewal,
     };
-  });
+    });
+  } catch (error) {
+    if (numSepayTxId && error?.code === "23505") {
+      const existing = await getReceiptTable().where("sepay_transaction_id", numSepayTxId).first();
+      if (existing) return toDuplicateResult(existing);
+    }
+    throw error;
+  }
 }
 
 module.exports = { processPaymentWebhook };

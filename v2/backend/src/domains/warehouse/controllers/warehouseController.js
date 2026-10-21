@@ -1,4 +1,5 @@
 const warehouseService = require("../services/warehouseService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getWarehouseAccounts = async (req, res) => {
   try {
@@ -6,7 +7,7 @@ const getWarehouseAccounts = async (req, res) => {
     return res.json(data);
   } catch (err) {
     console.error("[WarehouseController] getWarehouseAccounts error:", err);
-    return res.status(500).json({ error: err.message || "Không thể tải danh sách tài khoản kho." });
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải danh sách tài khoản kho.") });
   }
 };
 
@@ -16,7 +17,7 @@ const createWarehouseAccount = async (req, res) => {
     return res.status(201).json(result);
   } catch (err) {
     console.error("[WarehouseController] createWarehouseAccount error:", err);
-    return res.status(400).json({ error: err.message || "Không thể tạo tài khoản kho." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể tạo tài khoản kho.") });
   }
 };
 
@@ -26,7 +27,7 @@ const deleteWarehouseAccount = async (req, res) => {
     return res.json(result);
   } catch (err) {
     console.error("[WarehouseController] deleteWarehouseAccount error:", err);
-    return res.status(400).json({ error: err.message || "Không thể xóa tài khoản kho." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa tài khoản kho.") });
   }
 };
 
@@ -36,7 +37,7 @@ const getCatalogItems = async (req, res) => {
     return res.json(data);
   } catch (err) {
     console.error("[WarehouseController] getCatalogItems error:", err);
-    return res.status(500).json({ error: err.message || "Không thể tải danh mục dịch vụ." });
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải danh mục dịch vụ.") });
   }
 };
 
@@ -46,7 +47,7 @@ const createCatalogItem = async (req, res) => {
     return res.status(201).json(result);
   } catch (err) {
     console.error("[WarehouseController] createCatalogItem error:", err);
-    return res.status(400).json({ error: err.message || "Không thể tạo dịch vụ danh mục." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể tạo dịch vụ danh mục.") });
   }
 };
 
@@ -56,17 +57,20 @@ const deleteCatalogItem = async (req, res) => {
     return res.json(result);
   } catch (err) {
     console.error("[WarehouseController] deleteCatalogItem error:", err);
-    return res.status(400).json({ error: err.message || "Không thể xóa dịch vụ kho." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa dịch vụ kho.") });
   }
 };
 
 const openAccountBrowser = async (req, res) => {
   try {
-    const result = await warehouseService.openAccountBrowser(req.params.id, req.body);
+    const result = await warehouseService.openAccountBrowser(req.params.id, {
+      ...(req.body || {}),
+      userAgent: req.get("User-Agent") || "",
+    });
     return res.json(result);
   } catch (err) {
     console.error("[WarehouseController] openAccountBrowser error:", err);
-    return res.status(400).json({ error: err.message || "Không thể mở trình duyệt cho tài khoản kho." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể mở trình duyệt cho tài khoản kho.") });
   }
 };
 
@@ -76,7 +80,7 @@ const updateWarehouseServiceSlot = async (req, res) => {
     return res.json(result);
   } catch (err) {
     console.error("[WarehouseController] updateWarehouseServiceSlot error:", err);
-    return res.status(400).json({ error: err.message || "Không thể cập nhật dịch vụ kho." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật dịch vụ kho.") });
   }
 };
 

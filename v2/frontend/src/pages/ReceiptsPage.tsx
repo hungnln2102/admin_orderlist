@@ -402,6 +402,13 @@ export const ReceiptsPage: React.FC = () => {
                           </span>
                         );
                       }
+                      if (receipt.allocation_type === "EXTERNAL_IMPORT") {
+                        return (
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-sm font-medium">
+                            Nhập Ngoài Luồng {receipt.id_order ? `(${receipt.id_order})` : ''}
+                          </span>
+                        );
+                      }
                       if (receipt.allocation_type === "OPERATIONAL_EXPENSE") {
                         return (
                           <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-300 border border-purple-500/20 shadow-sm font-medium">
@@ -409,13 +416,7 @@ export const ReceiptsPage: React.FC = () => {
                           </span>
                         );
                       }
-                      if (receipt.allocation_type === "SUPPLIER") {
-                        return (
-                          <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-sm font-medium">
-                            Thanh Toán NCC
-                          </span>
-                        );
-                      }
+
                       if (!isOut) {
                         return (
                           <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 shadow-sm font-medium">

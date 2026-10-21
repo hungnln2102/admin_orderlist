@@ -47,6 +47,8 @@ const listWarehouseAccounts = async () => {
       "ss.expired_at as expires_at",
       "ss.status",
       "ss.service_note as note",
+      "ss.session_is_authenticated",
+      "ss.session_checked_at",
       "ss.created_at",
       "ss.updated_at"
     )
@@ -70,6 +72,8 @@ const listWarehouseAccounts = async () => {
       raw_expires_at: srv.expires_at ? new Date(srv.expires_at).toISOString().split("T")[0] : "",
       status: srv.status === "UNAVAILABLE" ? "IN_USE" : (srv.status || "AVAILABLE"),
       note: srv.note || "",
+      is_authenticated: srv.session_is_authenticated === true,
+      session_checked_at: srv.session_checked_at ? new Date(srv.session_checked_at).toISOString() : null,
     });
   });
 
@@ -334,7 +338,7 @@ const deleteCatalogItem = async (id) => {
 /**
  * Mở trình duyệt Profile độc lập cho tài khoản kho
  */
-const openAccountBrowser = async (accountId, { serviceName, slotId } = {}) => {
+const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } = {}) => {
   if (!accountId) {
     throw new Error("ID tài khoản kho không được để trống!");
   }
@@ -348,9 +352,13 @@ const openAccountBrowser = async (accountId, { serviceName, slotId } = {}) => {
   let resolvedServiceName = serviceName || "";
 
   // 1. Nếu có slotId, truy vấn để lấy login_url từ warehouse.product_names
+  let verifiedSlotId = null;
   if (slotId) {
-    const slot = await db(TABLES.STOCK_SERVICES).where("id", slotId).first();
+    const slot = await db(TABLES.STOCK_SERVICES)
+      .where({ id: slotId, account_id: account.id })
+      .first();
     if (slot && slot.name_id) {
+      verifiedSlotId = slot.id;
       const pName = await db(TABLES.PRODUCT_NAMES).where("id", slot.name_id).first();
       if (pName) {
         customUrl = pName.login_url;
@@ -369,12 +377,25 @@ const openAccountBrowser = async (accountId, { serviceName, slotId } = {}) => {
     }
   }
 
-  return await browserLauncherService.launchAccountBrowser({
+  const launchResult = await browserLauncherService.launchAccountBrowser({
     accountId: account.id,
     accountUsername: account.account_username,
     serviceName: resolvedServiceName,
     customUrl,
+    userAgent,
   });
+
+  if (verifiedSlotId) {
+    await db(TABLES.STOCK_SERVICES)
+      .where("id", verifiedSlotId)
+      .update({
+        session_is_authenticated: launchResult.data?.hasAuthenticatedSession === true,
+        session_checked_at: new Date(),
+        updated_at: new Date(),
+      });
+  }
+
+  return launchResult;
 };
 
 /**

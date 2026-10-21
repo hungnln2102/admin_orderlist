@@ -55,6 +55,10 @@ function calculateNewExpiry(currentExpiredAt, daysToAdd) {
 async function processOrderPayment(trx, order, amount, options = {}) {
   const { receiptId, action = "PAYMENT_RECEIVED" } = options;
 
+  if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
+    throw new Error(`Đơn hàng ${order.id_order} đang ở trạng thái ${order.status}, không thể ghi nhận thanh toán.`);
+  }
+
   const isRenewal = isRenewalOrder(order.status);
   const daysToAdd = Number(order.days || 365);
 
@@ -75,30 +79,30 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     .update(updateFields)
     .returning("*");
 
-  // Phát EventBus: ORDER_PAID
-  eventBus.emit(EVENTS.ORDER_PAID, {
-    orderId: updatedOrder.id,
-    id_order: updatedOrder.id_order,
-    customer: updatedOrder.customer,
-    amount,
-    status: updatedOrder.status,
-    receiptId,
-    isRenewal,
-    action,
-  });
-
-  // Phát EventBus: ORDER_RENEWED (nếu là gia hạn)
-  if (isRenewal) {
-    eventBus.emit(EVENTS.ORDER_RENEWED, {
+  trx.afterCommit(() => {
+    eventBus.emit(EVENTS.ORDER_PAID, {
       orderId: updatedOrder.id,
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
-      daysAdded: daysToAdd,
-      newExpiredAt: updatedOrder.expired_at,
+      amount,
+      status: updatedOrder.status,
       receiptId,
+      isRenewal,
       action,
     });
-  }
+
+    if (isRenewal) {
+      eventBus.emit(EVENTS.ORDER_RENEWED, {
+        orderId: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+        customer: updatedOrder.customer,
+        daysAdded: daysToAdd,
+        newExpiredAt: updatedOrder.expired_at,
+        receiptId,
+        action,
+      });
+    }
+  });
 
   return { updatedOrder, isRenewal, newExpiredAt };
 }

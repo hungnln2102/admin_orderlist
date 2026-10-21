@@ -199,7 +199,7 @@ Trang **Kho Hàng** quản lý chi tiết từng tài khoản kho Master và cá
 
 ### 5.2. Bảng Tài Khoản Kho (`WarehouseAccountsTable`) & Nút Bấm
 
-- **Mở trình duyệt tài khoản:** V2 dùng Chromium do Playwright quản lý và giữ một profile riêng tại `v2/backend/browser_profiles/account_<id>` cho từng tài khoản kho. Ở local đặt `WAREHOUSE_BROWSER_HEADLESS=false` để hiện cửa sổ; trên server/Docker đặt `WAREHOUSE_BROWSER_HEADLESS=true`. Cài browser một lần sau khi cài dependency: `cd v2/backend && npx playwright install chromium`.
+- **Mở trình duyệt tài khoản:** V2 mở trình duyệt thật đã cài trên máy chạy backend để người dùng tự đăng nhập. Trình duyệt được chọn theo User-Agent của người dùng (Edge → Microsoft Edge, Chrome → Google Chrome, còn lại mặc định Edge), hoặc cố định bằng `WAREHOUSE_BROWSER_CHANNEL=msedge|chrome|chromium`. Nếu trình duyệt ưu tiên chưa cài, hệ thống tự thử Edge → Chrome → Chromium của Playwright. Mỗi tài khoản kho có profile riêng tại `v2/backend/browser_profiles/<channel>/account_<id>`, cookie đăng nhập được lưu lại trong profile này. Chức năng cần backend chạy trực tiếp trên máy có màn hình (không chạy trong Docker) và `WAREHOUSE_BROWSER_HEADLESS=false`. Chỉ cần `npx playwright install chromium` khi máy không có Edge/Chrome.
 - **Nút `ChevronDown / ChevronUp` (Bấm vào dòng tài khoản):** Đóng/mở danh sách các Slot key con bên trong tài khoản kho Master.
 - **Nút `Sao Chép Email Kho` (Icon Copy):** Chép nhanh email đăng nhập Master.
 - **Nút `Sửa Tài Khoản` (Icon Cây bút):** Mở modal sửa email/thông tin tài khoản kho.

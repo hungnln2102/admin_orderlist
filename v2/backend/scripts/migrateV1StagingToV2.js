@@ -7,7 +7,9 @@ const knex = require('knex');
 const DB_HOST = process.env.DB_HOST || '127.0.0.1';
 const DB_PORT = process.env.DB_PORT || 5432;
 const DB_USER = process.env.DB_USER || 'admin';
-const DB_PASS = process.env.DB_PASS || 'ZAQ!xsw21122';
+const DB_PASS = process.env.DB_PASS;
+
+if (!DB_PASS) throw new Error('DB_PASS is required.');
 
 const v1Db = knex({
   client: 'pg',

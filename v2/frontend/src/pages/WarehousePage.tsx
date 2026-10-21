@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Info,
   Archive,
+  CheckCircle2,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import {
@@ -39,6 +40,7 @@ export const WarehousePage: React.FC = () => {
   const [expandedAccountIds, setExpandedAccountIds] = useState<number[]>([]);
   const [showPasswordMap, setShowPasswordMap] = useState<Record<number, boolean>>({});
   const [copiedKeyMap, setCopiedKeyMap] = useState<Record<string, boolean>>({});
+  const [loggedSlotsMap, setLoggedSlotsMap] = useState<Record<number, boolean>>({});
 
   // Dynamic state from PostgreSQL
   const [accounts, setAccounts] = useState<WarehouseAccountItem[]>([]);
@@ -86,7 +88,15 @@ export const WarehousePage: React.FC = () => {
 
       if (accRes.ok) {
         const accData: WarehouseAccountItem[] = await accRes.json();
-        setAccounts(Array.isArray(accData) ? accData : []);
+        const nextAccounts = Array.isArray(accData) ? accData : [];
+        setAccounts(nextAccounts);
+        setLoggedSlotsMap(
+          Object.fromEntries(
+            nextAccounts.flatMap((account) =>
+              account.services.map((service) => [service.id, service.is_authenticated === true])
+            )
+          )
+        );
       }
       if (catRes.ok) {
         const catData: ServiceNameCategoryItem[] = await catRes.json();
@@ -146,7 +156,7 @@ export const WarehousePage: React.FC = () => {
         statusFilter === "all" ||
         (statusFilter === "AVAILABLE" && acc.services.some((s) => s.status === "AVAILABLE")) ||
         (statusFilter === "EXPIRED" && acc.services.some((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE")) ||
-        (statusFilter === "RESERVED" && acc.services.some((s) => s.status === "RESERVED" || s.status === "IN_USE"));
+        (statusFilter === "RESERVED" && acc.services.some((s) => s.status === "IN_USE" || s.status === "RESERVED"));
 
       return matchSearch && matchCategory && matchStatus;
     });
@@ -211,7 +221,7 @@ export const WarehousePage: React.FC = () => {
 
   const handleOpenBrowser = async (account: WarehouseAccountItem, service: any) => {
     try {
-      notification.info(`Đang mở Chrome với Profile riêng cho ${account.account}...`, "Đăng Nhập Kho");
+      notification.info(`Đang mở trình duyệt với Profile riêng cho ${account.account}...`, "Đăng Nhập Kho");
       const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -220,14 +230,26 @@ export const WarehousePage: React.FC = () => {
           slotId: service.id,
         }),
       });
-      const data = await res.json();
+      const responseBody = await res.text();
+      let data: { error?: string; message?: string; data?: { hasAuthenticatedSession?: boolean } } = {};
+      try {
+        data = responseBody ? JSON.parse(responseBody) : {};
+      } catch {
+        throw new Error("Backend vừa ngắt kết nối hoặc trả về phản hồi không hợp lệ. Hãy kiểm tra terminal backend.");
+      }
       if (!res.ok) {
         throw new Error(data.error || "Không thể mở trình duyệt cho tài khoản này.");
       }
-      notification.success(
-        data.message || `Đã mở cửa sổ Chrome riêng biệt cho tài khoản ${account.account}!`,
-        "Mở Trình Duyệt Thành Công"
-      );
+      const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
+      setLoggedSlotsMap((previous) => ({ ...previous, [service.id]: hasAuthenticatedSession }));
+      if (hasAuthenticatedSession) {
+        notification.success("Đã xác minh cookie phiên và trang đích không còn yêu cầu đăng nhập.", "Đã Đăng Nhập");
+      } else {
+        notification.info(
+          "Profile chưa có phiên đăng nhập hợp lệ. Hãy đăng nhập trong cửa sổ vừa mở, sau đó bấm lại nút này để xác minh.",
+          "Chưa Xác Minh Đăng Nhập"
+        );
+      }
     } catch (err: any) {
       console.error("Lỗi mở trình duyệt:", err);
       notification.error(err.message || "Lỗi mở trình duyệt", "Đăng Nhập Thất Bại");
@@ -245,131 +267,108 @@ export const WarehousePage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Không thể cập nhật thông tin dịch vụ.");
+        throw new Error(data.error || "Không thể cập nhật slot dịch vụ");
       }
-      notification.success(
-        `Đã cập nhật dịch vụ ${formData.serviceName} (${formData.accountUsername}) thành công!`,
-        "Cập nhật thành công"
-      );
+      notification.success("Cập nhật thông tin slot thành công!");
       setEditingSlotData(null);
       await loadWarehouseData();
     } catch (err: any) {
-      console.error("Lỗi cập nhật slot kho:", err);
-      notification.error(err.message || "Cập nhật dịch vụ kho thất bại", "Lỗi Cập Nhật");
+      console.error("Lỗi cập nhật slot:", err);
+      notification.error(err.message || "Lỗi cập nhật slot");
     } finally {
       setIsUpdatingSlot(false);
     }
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-6 max-w-[1650px] mx-auto">
-      {/* PAGE HEADER BANNER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 sm:p-6 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-cyan-400 uppercase mb-1">
-            <span>NGUỒN HÀNG & KHO</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 font-normal">
-              PostgreSQL Connected
-            </span>
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto animate-fadeIn">
+      {/* HEADER PAGE */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/40 border border-slate-800/80 p-5 rounded-3xl backdrop-blur-xl shadow-2xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-lg shadow-cyan-950/50">
+              <Key className="w-5 h-5" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+              QUẢN TRỊ KHO TÀI KHOẢN & KEY BẢN QUYỀN
+            </h1>
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Kho Hàng
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Theo dõi chi tiết tài khoản kho, slot bản quyền, chìa khóa 2FA và cảnh báo tự động
+          <p className="text-xs text-slate-400">
+            Quản lý kho tài khoản Adobe, Canva, ChatGPT, Netflix... với cơ chế Isolated Chrome Profile tự động đăng nhập.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={async () => {
-              await loadWarehouseData();
-              notification.info("Đã làm mới dữ liệu danh mục kho!", "Làm mới kho");
-            }}
+            type="button"
+            onClick={loadWarehouseData}
             disabled={loading}
-            className="p-2 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900/80 border border-slate-700/60 hover:border-slate-600 text-slate-300 text-xs sm:text-sm font-medium transition-all hover:bg-slate-800 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Làm mới</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+            <span>Làm Mới</span>
           </button>
 
           <button
-            onClick={() => notification.success("Đã xuất file kho hàng ra Excel!", "Xuất dữ liệu")}
-            className="p-2 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900/80 border border-slate-700/60 hover:border-slate-600 text-slate-300 text-xs sm:text-sm font-medium transition-all hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline">Xuất Excel</span>
-          </button>
-
-          <button
-            onClick={() => {
-              if (catalog.length > 0) {
-                setAccountForm((prev) => ({
-                  ...prev,
-                  serviceName: catalog[0].name,
-                  category: catalog[0].category || catalog[0].name,
-                }));
-              }
-              setIsAccountModalOpen(true);
-            }}
-            className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 cursor-pointer"
+            type="button"
+            onClick={() => setIsAccountModalOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/50 transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Tạo Mới Kho</span>
+            <span>Thêm Tài Khoản Kho</span>
           </button>
         </div>
       </div>
 
-      {/* STATS OVERVIEW CARDS */}
+      {/* STATISTICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1 */}
-        <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-blue-500/40 transition-all">
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-cyan-500/40 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">TỔNG TÀI KHOẢN KHO</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+            <span className="text-xs font-medium text-slate-400">TỔNG TÀI KHOẢN GỐC</span>
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
               <Archive className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl lg:text-3xl font-bold text-white tracking-tight">{totalAccounts}</span>
-            <span className="text-xs text-slate-400">Tài khoản</span>
+            <span className="text-xs text-slate-400">tài khoản</span>
           </div>
-          <div className="mt-2 text-xs text-emerald-400 font-medium flex items-center gap-1">
-            <Sparkles className="w-3 h-3" />
-            <span>Đồng bộ từ Database</span>
+          <div className="mt-2 text-xs text-cyan-400/80 font-medium flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Đang lưu trữ an toàn</span>
           </div>
         </div>
 
         {/* Card 2 */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-emerald-500/40 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">SLOTS SẴN HÀNG</span>
+            <span className="text-xs font-medium text-slate-400">SLOT SẴN SÀNG (TỒN KHO)</span>
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-              <Package className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl lg:text-3xl font-bold text-emerald-400 tracking-tight">{totalAvailableSlots}</span>
-            <span className="text-xs text-slate-400">Slots</span>
+            <span className="text-xs text-slate-400">slot trống</span>
           </div>
-          <div className="mt-2 text-xs text-emerald-400/80 font-medium flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Sẵn sàng giao cho khách</span>
+          <div className="mt-2 text-xs text-emerald-300/80 font-medium flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Sẵn sàng gán cho khách</span>
           </div>
         </div>
 
         {/* Card 3 */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-indigo-500/40 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">ĐÃ GIỮ CHỖ / ĐÃ BÁN</span>
+            <span className="text-xs font-medium text-slate-400">SLOT ĐANG SỬ DỤNG</span>
             <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
-              <Key className="w-4 h-4" />
+              <Package className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl lg:text-3xl font-bold text-indigo-400 tracking-tight">{totalReservedSlots}</span>
-            <span className="text-xs text-slate-400">Slots</span>
+            <span className="text-xs text-slate-400">slot</span>
           </div>
           <div className="mt-2 text-xs text-indigo-300/80 font-medium flex items-center gap-1">
             <Info className="w-3.5 h-3.5" />
@@ -446,6 +445,8 @@ export const WarehousePage: React.FC = () => {
             })
           }
           onOpenBrowser={handleOpenBrowser}
+          loggedSlotsMap={loggedSlotsMap}
+          onVerifySession={handleOpenBrowser}
         />
       )}
 

@@ -3,13 +3,12 @@ import {
   X,
   Link2,
   ShoppingCart,
-  Truck,
   Building2,
-  CreditCard,
   CheckCircle2,
   AlertCircle,
   Receipt,
   Gift,
+  PackagePlus,
 } from "lucide-react";
 
 interface InvoiceReceipt {
@@ -35,7 +34,7 @@ interface AllocateReceiptModalProps {
   onSuccess: () => void;
 }
 
-type AllocationType = "ORDER" | "SUPPLIER" | "OPERATIONAL_EXPENSE" | "OTHER_INCOME";
+type AllocationType = "ORDER" | "OPERATIONAL_EXPENSE" | "OTHER_INCOME" | "EXTERNAL_IMPORT";
 
 export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   receipt,
@@ -47,6 +46,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   const [targetCode, setTargetCode] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState<string>("");
+  const [importId, setImportId] = useState<string>("");
+  const [supplierName, setSupplierName] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,21 +59,30 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     if (receipt) {
       const avail = Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount);
       setAmount(String(avail));
+      const isOut = receipt.transfer_type === "out";
 
-      // Tự đọc mã đơn từ note nếu có pattern MAVC / MAVL / MAVS / MAVK / MAVN
-      if (receipt.note) {
-        const match = receipt.note.match(/MAV[CLKSNT]\w+/i);
-        if (match) {
-          setTargetCode(match[0].toUpperCase());
-          setAllocationType(match[0].toUpperCase().startsWith("MAVN") ? "SUPPLIER" : "ORDER");
+      if (isOut) {
+        setAllocationType("OPERATIONAL_EXPENSE");
+        setImportId(`IMP-${Math.floor(100 + Math.random() * 900)}`);
+        setSupplierName(receipt.sender || "");
+        setTargetCode("");
+      } else {
+        setAllocationType("ORDER");
+        setImportId("");
+        setSupplierName("");
+        if (receipt.note) {
+          const match = receipt.note.match(/MAV[CLKS]\w+/i);
+          if (match) {
+            setTargetCode(match[0].toUpperCase());
+          } else {
+            setTargetCode("");
+            if (/tip|tang|cho thêm|cho them/i.test(receipt.note)) {
+              setAllocationType("OTHER_INCOME");
+            }
+          }
         } else {
           setTargetCode("");
-          if (receipt.transfer_type === "in" && /tip|tang|cho thêm|cho them/i.test(receipt.note)) {
-            setAllocationType("OTHER_INCOME");
-          }
         }
-      } else {
-        setTargetCode("");
       }
 
       setNote("");
@@ -100,22 +110,35 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       return;
     }
 
-    if ((allocationType === "ORDER" || allocationType === "SUPPLIER") && !targetCode.trim()) {
-      setError("Vui lòng nhập Mã đơn hàng hoặc Mã đợt nhập.");
+    if (allocationType === "ORDER" && !targetCode.trim()) {
+      setError("Vui lòng nhập Mã đơn hàng.");
+      return;
+    }
+
+    if (allocationType === "EXTERNAL_IMPORT" && (!importId.trim() || !supplierName.trim())) {
+      setError("Vui lòng nhập Mã đơn nhập và Tên Nhà Cung Cấp / Nguồn hàng.");
       return;
     }
 
     setLoading(true);
 
     try {
+      const finalNote = allocationType === "EXTERNAL_IMPORT"
+        ? `[${supplierName.trim()}] ${note.trim()}`
+        : (note.trim() || (allocationType === "OTHER_INCOME" ? "Khách tip / tặng thêm" : ""));
+
+      const finalTargetCode = allocationType === "EXTERNAL_IMPORT"
+        ? importId.trim()
+        : (allocationType === "ORDER" ? targetCode.trim() : null);
+
       const res = await fetch(`/api/invoices/${receipt.id}/allocate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           allocation_type: allocationType,
-          target_code: targetCode.trim(),
+          target_code: finalTargetCode,
           amount: allocAmount,
-          note: note.trim() || (allocationType === "OTHER_INCOME" ? "Khách tip / tặng thêm" : ""),
+          note: finalNote,
         }),
       });
 
@@ -141,6 +164,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     setAmount(String(Math.floor(availableAmount / 2)));
   };
 
+  const isOut = receipt.transfer_type === "out";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
       <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -152,7 +177,9 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-wide">PHÂN BỔ BẢN GHI & GÁN MÃ ĐƠN</h2>
-              <p className="text-xs text-slate-400">Gán biên lai ngân hàng cho đơn hàng, chi phí hoặc tip khách tặng</p>
+              <p className="text-xs text-slate-400">
+                {isOut ? "Phân bổ biên lai tiền ra (Chi phí / Nhập ngoài luồng)" : "Gán biên lai tiền vào (Đơn hàng / Tip khách)"}
+              </p>
             </div>
           </div>
           <button
@@ -179,11 +206,11 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
 
             <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-800/60">
               <div>
-                <span className="text-[11px] text-slate-500 block">Số tiền nhận gốc</span>
+                <span className="text-[11px] text-slate-500 block">Số tiền gốc</span>
                 <span className="font-mono font-bold text-slate-200">{formatCurrency(receipt.amount)}</span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-500 block">Số dư khả dụng chưa gán</span>
+                <span className="text-[11px] text-slate-500 block">Số dư khả dụng</span>
                 <span className="font-mono font-bold text-emerald-400">{formatCurrency(availableAmount)}</span>
               </div>
             </div>
@@ -205,101 +232,144 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
             </div>
           )}
 
-          {/* Allocation Type Selector (5 Options) */}
+          {/* Allocation Type Selector (Categorized by transfer_type) */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-2">LOẠI MỤC ĐÍCH PHÂN BỔ</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-300">LOẠI MỤC ĐÍCH PHÂN BỔ</label>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isOut ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'}`}>
+                {isOut ? 'TIỀN RA NGÂN HÀNG' : 'TIỀN VÀO NGÂN HÀNG'}
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-2.5">
-              {/* ORDER */}
-              <button
-                type="button"
-                onClick={() => setAllocationType("ORDER")}
-                className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
-                  allocationType === "ORDER"
-                    ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-950/40"
-                    : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                }`}
-              >
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
-                  <ShoppingCart className="w-4 h-4 text-cyan-400" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-200">Đơn Khách Hàng</div>
-                  <div className="text-[10px] text-slate-400">Gán mã #MAVC, #MAVL</div>
-                </div>
-              </button>
+              {isOut ? (
+                <>
+                  {/* OPERATIONAL_EXPENSE */}
+                  <button
+                    type="button"
+                    onClick={() => setAllocationType("OPERATIONAL_EXPENSE")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                      allocationType === "OPERATIONAL_EXPENSE"
+                        ? "bg-purple-500/10 border-purple-500/40 text-purple-300 shadow-md shadow-purple-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                      <Building2 className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Chi Phí Vận Hành</div>
+                      <div className="text-[10px] text-slate-400">Server, ăn uống, chi ngoài</div>
+                    </div>
+                  </button>
 
-              {/* OTHER_INCOME (Khách Tip / Tặng Thêm) */}
-              <button
-                type="button"
-                onClick={() => setAllocationType("OTHER_INCOME")}
-                className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
-                  allocationType === "OTHER_INCOME"
-                    ? "bg-pink-500/10 border-pink-500/40 text-pink-300 shadow-md shadow-pink-950/40"
-                    : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                }`}
-              >
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
-                  <Gift className="w-4 h-4 text-pink-400" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-200">Khách Tip / Tặng Thêm</div>
-                  <div className="text-[10px] text-slate-400">Thu ngoài luồng đơn</div>
-                </div>
-              </button>
+                  {/* EXTERNAL_IMPORT (Nhập Ngoài Luồng) */}
+                  <button
+                    type="button"
+                    onClick={() => setAllocationType("EXTERNAL_IMPORT")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                      allocationType === "EXTERNAL_IMPORT"
+                        ? "bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md shadow-amber-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                      <PackagePlus className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Nhập Ngoài Luồng</div>
+                      <div className="text-[10px] text-slate-400">Mua nguồn, NCC ngoài</div>
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* ORDER */}
+                  <button
+                    type="button"
+                    onClick={() => setAllocationType("ORDER")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                      allocationType === "ORDER"
+                        ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                      <ShoppingCart className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Đơn Khách Hàng</div>
+                      <div className="text-[10px] text-slate-400">Gán mã #MAVC, #MAVL</div>
+                    </div>
+                  </button>
 
-              {/* SUPPLIER */}
-              <button
-                type="button"
-                onClick={() => setAllocationType("SUPPLIER")}
-                className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
-                  allocationType === "SUPPLIER"
-                    ? "bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md shadow-amber-950/40"
-                    : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                }`}
-              >
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
-                  <Truck className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-200">Thanh Toán NCC</div>
-                  <div className="text-[10px] text-slate-400">Gán đợt nhập #MAVN</div>
-                </div>
-              </button>
-
-              {/* OPERATIONAL_EXPENSE */}
-              <button
-                type="button"
-                onClick={() => setAllocationType("OPERATIONAL_EXPENSE")}
-                className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
-                  allocationType === "OPERATIONAL_EXPENSE"
-                    ? "bg-purple-500/10 border-purple-500/40 text-purple-300 shadow-md shadow-purple-950/40"
-                    : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
-                }`}
-              >
-                <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
-                  <Building2 className="w-4 h-4 text-purple-400" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-200">Chi Phí Vận Hành</div>
-                  <div className="text-[10px] text-slate-400">Server, ăn uống, chi ngoài</div>
-                </div>
-              </button>
+                  {/* OTHER_INCOME */}
+                  <button
+                    type="button"
+                    onClick={() => setAllocationType("OTHER_INCOME")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                      allocationType === "OTHER_INCOME"
+                        ? "bg-pink-500/10 border-pink-500/40 text-pink-300 shadow-md shadow-pink-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                      <Gift className="w-4 h-4 text-pink-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Khách Tip / Tặng Thêm</div>
+                      <div className="text-[10px] text-slate-400">Thu ngoài luồng đơn</div>
+                    </div>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Target Code Field (For ORDER or SUPPLIER) */}
-          {(allocationType === "ORDER" || allocationType === "SUPPLIER") && (
+          {/* Target Code Field (For ORDER) */}
+          {allocationType === "ORDER" && (
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                {allocationType === "ORDER" ? "MÃ ĐƠN HÀNG KÍCH HOẠT *" : "MÃ ĐỢT NHẬP HÀNG (NCC) *"}
+                MÃ ĐƠN HÀNG KÍCH HOẠT *
               </label>
               <input
                 type="text"
                 value={targetCode}
                 onChange={(e) => setTargetCode(e.target.value.toUpperCase())}
-                placeholder={allocationType === "ORDER" ? "Nhập mã đơn (VD: MAVC98A2F1)" : "Nhập mã đợt nhập (VD: MAVN1234)"}
+                placeholder="Nhập mã đơn (VD: MAVC98A2F1)"
                 className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-cyan-300 font-mono font-bold placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm uppercase transition-all"
               />
+            </div>
+          )}
+
+          {/* EXTERNAL_IMPORT Fields (For Nhập Ngoài Luồng) */}
+          {allocationType === "EXTERNAL_IMPORT" && (
+            <div className="p-4 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-3">
+              <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <PackagePlus className="w-4 h-4" />
+                Thông Tin Nhập Nguồn Ngoài Luồng
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">MÃ ĐƠN NHẬP *</label>
+                  <input
+                    type="text"
+                    value={importId}
+                    onChange={(e) => setImportId(e.target.value.toUpperCase())}
+                    placeholder="VD: IMP-882"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-amber-300 font-mono font-bold text-xs uppercase focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">NHÀ CUNG CẤP / NGUỒN *</label>
+                  <input
+                    type="text"
+                    value={supplierName}
+                    onChange={(e) => setSupplierName(e.target.value)}
+                    placeholder="VD: Adobe Global"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
             </div>
           )}
 

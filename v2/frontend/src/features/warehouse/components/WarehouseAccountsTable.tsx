@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Calendar,
   LogIn,
+  UserCheck,
 } from "lucide-react";
 import { WarehouseAccountItem, WarehouseServiceSlot } from "../types";
 import {
@@ -37,6 +38,8 @@ interface WarehouseAccountsTableProps {
   onEditSlot?: (account: WarehouseAccountItem, slot: WarehouseServiceSlot) => void;
   onDeleteAccount: (acc: WarehouseAccountItem) => void;
   onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
+  loggedSlotsMap?: Record<number, boolean>;
+  onVerifySession?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
 }
 
 interface CopyableFieldProps {
@@ -137,6 +140,8 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
   onEditSlot,
   onDeleteAccount,
   onOpenBrowser,
+  loggedSlotsMap,
+  onVerifySession,
 }) => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -611,19 +616,34 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                       {/* 8. THAO TÁC */}
                                       <td className="px-4 py-3.5 text-center">
                                         <div className="flex items-center justify-center gap-1.5">
-                                          {onOpenBrowser && (
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                onOpenBrowser(account, srv);
-                                              }}
-                                              className="flex h-7 w-7 items-center justify-center rounded-xl border border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 hover:border-blue-500/50 active:scale-90 transition-all cursor-pointer group/btn"
-                                              title={`Mở Chrome với Profile riêng biệt để đăng nhập ${srv.display_name || srv.category}`}
-                                            >
-                                              <LogIn className="w-3.5 h-3.5 text-blue-300 group-hover/btn:scale-110 transition-transform" />
-                                            </button>
-                                          )}
+                                          {onOpenBrowser && (() => {
+                                            const isLoggedIn = loggedSlotsMap ? loggedSlotsMap[srv.id] : false;
+                                            return (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (onVerifySession) {
+                                                    onVerifySession(account, srv);
+                                                  } else {
+                                                    onOpenBrowser(account, srv);
+                                                  }
+                                                }}
+                                                className={`flex h-7 w-7 items-center justify-center rounded-xl border transition-all cursor-pointer group/btn ${
+                                                  isLoggedIn
+                                                    ? "border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 hover:border-emerald-500/50"
+                                                    : "border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 hover:border-blue-500/50"
+                                                }`}
+                                                title={isLoggedIn ? "Phiên đăng nhập đã được xác minh (bấm để kiểm tra lại)" : `Mở profile và kiểm tra phiên đăng nhập ${srv.display_name || srv.category}`}
+                                              >
+                                                {isLoggedIn ? (
+                                                  <UserCheck className="w-3.5 h-3.5 text-emerald-300 group-hover/btn:scale-110 transition-transform" />
+                                                ) : (
+                                                  <LogIn className="w-3.5 h-3.5 text-blue-300 group-hover/btn:scale-110 transition-transform" />
+                                                )}
+                                              </button>
+                                            );
+                                          })()}
                                           <button
                                             type="button"
                                             onClick={(e) => {
@@ -819,19 +839,34 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                               >
                                 {isAvailable ? "TỒN KHO" : "ĐANG SỬ DỤNG"}
                               </span>
-                              {onOpenBrowser && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenBrowser(account, srv);
-                                  }}
-                                  className="flex h-6 w-6 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 active:scale-90 transition-all cursor-pointer"
-                                  title={`Mở Chrome với Profile riêng để đăng nhập ${srv.display_name || srv.category}`}
-                                >
-                                  <LogIn className="w-3 h-3 text-blue-300" />
-                                </button>
-                              )}
+                              {onOpenBrowser && (() => {
+                                const isLoggedIn = loggedSlotsMap ? loggedSlotsMap[srv.id] : false;
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (onVerifySession) {
+                                        onVerifySession(account, srv);
+                                      } else {
+                                        onOpenBrowser(account, srv);
+                                      }
+                                    }}
+                                    className={`flex h-6 w-6 items-center justify-center rounded-lg border transition-all cursor-pointer ${
+                                      isLoggedIn
+                                        ? "border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+                                        : "border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                                    }`}
+                                    title={isLoggedIn ? "Phiên đăng nhập đã được xác minh (bấm để kiểm tra lại)" : `Mở profile và kiểm tra phiên đăng nhập ${srv.display_name || srv.category}`}
+                                  >
+                                    {isLoggedIn ? (
+                                      <UserCheck className="w-3 h-3 text-emerald-300" />
+                                    ) : (
+                                      <LogIn className="w-3 h-3 text-blue-300" />
+                                    )}
+                                  </button>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 onClick={(e) => {

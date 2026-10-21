@@ -3,8 +3,10 @@
  * Tạo sẵn dòng log/bản ghi mới cho ngày mới vào lúc 23:55 (hoặc đảm bảo có bản ghi cho ngày hiện tại).
  */
 const { db, TABLES } = require("@/db");
+const { withAdvisoryLock } = require("../withAdvisoryLock");
 
 async function finalizeDailySummaryTask(triggeredBy = "cron_2355") {
+  return withAdvisoryLock("finalize_daily_summary", async () => {
   console.log(`[Scheduler] 🕒 Bắt đầu chạy task chuẩn bị dòng thống kê cho ngày mới (${triggeredBy})...`);
   try {
     // Lấy ngày hiện tại theo giờ VN (+7)
@@ -29,7 +31,9 @@ async function finalizeDailySummaryTask(triggeredBy = "cron_2355") {
     }
   } catch (err) {
     console.error(`❌ [DailySummary] Lỗi khởi tạo dòng ngày mới:`, err.message);
+    throw err;
   }
+  });
 }
 
 module.exports = { finalizeDailySummaryTask };

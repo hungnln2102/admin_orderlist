@@ -1,4 +1,5 @@
 const { getTrafficStatsService } = require("../services/trafficService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 /**
  * Controller lấy số liệu Traffic & Analytics
@@ -20,7 +21,7 @@ const getTrafficStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Không thể lấy dữ liệu phân tích truy cập",
-      error: error.message,
+      error: getClientErrorMessage(error, "Không thể lấy dữ liệu phân tích truy cập"),
     });
   }
 };

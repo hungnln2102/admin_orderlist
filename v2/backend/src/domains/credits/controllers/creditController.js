@@ -3,6 +3,7 @@
  * Controller cho domain Credits — Nhật Ký Tín Dụng & Refund Credit
  */
 const creditService = require("../services/creditService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getCreditNotes = async (req, res) => {
   try {
@@ -16,7 +17,7 @@ const getCreditNotes = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Lỗi getCreditNotes:", error);
-    res.status(500).json({ error: error.message || "Không thể tải danh sách credit." });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể tải danh sách credit.") });
   }
 };
 

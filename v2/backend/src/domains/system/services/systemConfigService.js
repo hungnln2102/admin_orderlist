@@ -31,6 +31,37 @@ const parseValue = (value, dataType) => {
   }
 };
 
+const validateValue = (key, rawValue, dataType) => {
+  if (rawValue === null || rawValue === undefined || typeof rawValue === "object") {
+    throw new Error(`Giá trị cấu hình ${key} không hợp lệ.`);
+  }
+  const value = String(rawValue).trim();
+  switch (dataType) {
+    case 'NUMBER':
+      if (value === "" || !Number.isFinite(Number(value))) {
+        throw new Error(`Cấu hình ${key} phải là số hợp lệ.`);
+      }
+      break;
+    case 'BOOLEAN':
+      if (!['true', 'false', '1', '0'].includes(value)) {
+        throw new Error(`Cấu hình ${key} chỉ nhận giá trị true/false.`);
+      }
+      break;
+    case 'JSON':
+      try {
+        JSON.parse(value);
+      } catch (e) {
+        throw new Error(`Cấu hình ${key} phải là JSON hợp lệ.`);
+      }
+      break;
+    default:
+      if (value.length > 2000) {
+        throw new Error(`Cấu hình ${key} vượt quá 2000 ký tự.`);
+      }
+  }
+  return value;
+};
+
 /**
  * 1. Khởi tạo Cache từ Database (Chạy 1 lần lúc boot server)
  */
@@ -64,6 +95,12 @@ const get = (key, defaultValue = null) => {
   return defaultValue;
 };
 
+const getInteger = (key, defaultValue, min, max) => {
+  const value = Number(get(key, defaultValue));
+  if (!Number.isInteger(value) || value < min || value > max) return defaultValue;
+  return value;
+};
+
 /**
  * 3. Cập nhật cấu hình vào Database và đồng bộ lại Cache
  * @param {string} key - Tên cấu hình
@@ -76,13 +113,14 @@ const set = async (key, rawValue, updatedBy = 'ADMIN') => {
     throw new Error(`Cấu hình ${key} không tồn tại trong hệ thống.`);
   }
 
+  const normalizedValue = validateValue(key, rawValue, existing.data_type);
   const oldValueParsed = parseValue(existing.config_value, existing.data_type);
-  const newValueParsed = parseValue(rawValue, existing.data_type);
+  const newValueParsed = parseValue(normalizedValue, existing.data_type);
 
   await db(TABLES.SYSTEM_CONFIGS)
     .where({ config_key: key })
     .update({
-      config_value: String(rawValue),
+      config_value: normalizedValue,
       updated_at: db.fn.now(),
       updated_by: updatedBy
     });
@@ -128,6 +166,8 @@ const getAllConfigs = async () => {
  * 5. Lấy danh sách lịch sử thông báo (Notification Logs)
  */
 const getNotificationLogs = async ({ page = 1, limit = 50, status, channel } = {}) => {
+  page = Math.max(1, parseInt(page, 10) || 1);
+  limit = Math.max(1, Math.min(100, parseInt(limit, 10) || 50));
   const query = db(TABLES.NOTIFICATION_LOGS);
 
   if (status) {
@@ -160,6 +200,7 @@ const getNotificationLogs = async ({ page = 1, limit = 50, status, channel } = {
 module.exports = {
   initCache,
   get,
+  getInteger,
   set,
   getAllConfigs,
   getNotificationLogs

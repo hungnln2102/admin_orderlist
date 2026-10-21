@@ -66,14 +66,6 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    groupName: "Hệ thống Website",
-    items: [
-      { name: "Thông tin Sản phẩm", path: "/product-info", icon: Layers },
-      { name: "Cấu hình Form Đơn", path: "/form-info", icon: FileText },
-      { name: "Active Keys", path: "/active-keys", icon: Key },
-    ],
-  },
-  {
     groupName: "Nguồn hàng & Kho",
     items: [
       { name: "Nhà cung cấp", path: "/sources", icon: Building2 },
@@ -101,6 +93,14 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
       { name: "Tạo / Sửa Bài viết", path: "/content/create", icon: PenTool },
       { name: "Danh mục Bài viết", path: "/content/categories", icon: FolderKanban },
       { name: "Banners Quảng cáo", path: "/content/banners", icon: Image },
+    ],
+  },
+  {
+    groupName: "Hệ thống Website",
+    items: [
+      { name: "Thông tin Sản phẩm", path: "/product-info", icon: Layers },
+      { name: "Cấu hình Form Đơn", path: "/form-info", icon: FileText },
+      { name: "Active Keys", path: "/active-keys", icon: Key },
     ],
   },
 ];

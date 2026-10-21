@@ -3,6 +3,7 @@
  * Express Controller xử lý các request cho Bank Accounts & USDT Wallets
  */
 const walletService = require("../services/walletService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 async function getBankAccounts(_req, res) {
   try {
@@ -10,7 +11,7 @@ async function getBankAccounts(_req, res) {
     return res.json({ items });
   } catch (err) {
     console.error("[wallets] getBankAccounts failed:", err);
-    return res.status(500).json({ error: err.message || "Không thể tải danh sách tài khoản ngân hàng." });
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải danh sách tài khoản ngân hàng.") });
   }
 }
 
@@ -20,7 +21,10 @@ async function createBankAccount(req, res) {
     return res.status(201).json(result);
   } catch (err) {
     console.error("[wallets] createBankAccount failed:", err);
-    return res.status(400).json({ message: err.message || "Không thể tạo tài khoản ngân hàng.", error: err.message });
+    return res.status(400).json({
+      message: getClientErrorMessage(err, "Không thể tạo tài khoản ngân hàng."),
+      error: getClientErrorMessage(err, "Không thể tạo tài khoản ngân hàng."),
+    });
   }
 }
 
@@ -30,7 +34,7 @@ async function updateBankAccount(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] updateBankAccount failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể cập nhật tài khoản ngân hàng." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật tài khoản ngân hàng.") });
   }
 }
 
@@ -40,7 +44,7 @@ async function setDefaultBankAccount(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] setDefaultBankAccount failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể đặt tài khoản mặc định." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể đặt tài khoản mặc định.") });
   }
 }
 
@@ -50,7 +54,7 @@ async function deleteBankAccount(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] deleteBankAccount failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể xóa tài khoản." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa tài khoản.") });
   }
 }
 
@@ -61,7 +65,7 @@ async function recordBankWithdrawal(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] recordBankWithdrawal failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể thực hiện rút tiền." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể thực hiện rút tiền.") });
   }
 }
 
@@ -73,7 +77,7 @@ async function getUsdtWallets(_req, res) {
     return res.json({ items });
   } catch (err) {
     console.error("[wallets] getUsdtWallets failed:", err);
-    return res.status(500).json({ error: err.message || "Không thể tải danh sách ví USDT." });
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải danh sách ví USDT.") });
   }
 }
 
@@ -83,7 +87,7 @@ async function createUsdtWallet(req, res) {
     return res.status(201).json(result);
   } catch (err) {
     console.error("[wallets] createUsdtWallet failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể tạo ví USDT." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể tạo ví USDT.") });
   }
 }
 
@@ -93,7 +97,7 @@ async function updateUsdtWallet(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] updateUsdtWallet failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể cập nhật ví USDT." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật ví USDT.") });
   }
 }
 
@@ -103,7 +107,7 @@ async function setDefaultUsdtWallet(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] setDefaultUsdtWallet failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể đặt ví USDT mặc định." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể đặt ví USDT mặc định.") });
   }
 }
 
@@ -113,7 +117,7 @@ async function deleteUsdtWallet(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] deleteUsdtWallet failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể xóa ví USDT." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa ví USDT.") });
   }
 }
 
@@ -124,7 +128,7 @@ async function recordUsdtWithdrawal(req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] recordUsdtWithdrawal failed:", err);
-    return res.status(400).json({ error: err.message || "Không thể ghi nhận rút USDT." });
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể ghi nhận rút USDT.") });
   }
 }
 
@@ -134,7 +138,7 @@ async function getUsdtExchangeRate(_req, res) {
     return res.json(result);
   } catch (err) {
     console.error("[wallets] getUsdtExchangeRate failed:", err);
-    return res.status(500).json({ error: err.message || "Không thể lấy tỷ giá USDT." });
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể lấy tỷ giá USDT.") });
   }
 }
 

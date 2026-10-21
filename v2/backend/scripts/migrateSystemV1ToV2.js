@@ -5,9 +5,11 @@
 require('dotenv').config();
 const knex = require('knex');
 
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
+
 const db = knex({
   client: 'pg',
-  connection: process.env.DATABASE_URL || 'postgresql://admin:ZAQ!xsw21122@127.0.0.1:5432/mydtbmav',
+  connection: process.env.DATABASE_URL,
 });
 
 async function runETL() {

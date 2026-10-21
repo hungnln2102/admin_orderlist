@@ -13,6 +13,21 @@ interface WalletCreateEditModalProps {
   onSubmit: (e: React.FormEvent) => void;
 }
 
+const POPULAR_BANKS = [
+  { name: "MBBank (Ngân hàng Quân Đội)", shortCode: "MB", bin: "970422" },
+  { name: "Techcombank (TCB)", shortCode: "TCB", bin: "970407" },
+  { name: "Vietcombank (VCB)", shortCode: "VCB", bin: "970436" },
+  { name: "ACB (Á Châu)", shortCode: "ACB", bin: "970416" },
+  { name: "VPBank (VPB)", shortCode: "VPB", bin: "970432" },
+  { name: "TPBank (Tiên Phong)", shortCode: "TPB", bin: "970423" },
+  { name: "BIDV (Đầu tư và Phát triển)", shortCode: "BIDV", bin: "970418" },
+  { name: "Sacombank", shortCode: "STB", bin: "970403" },
+  { name: "VietinBank", shortCode: "CTG", bin: "970415" },
+  { name: "Agribank (Nông nghiệp)", shortCode: "AGR", bin: "970405" },
+  { name: "Momo (Ví điện tử)", shortCode: "MOMO", bin: "MOMO" },
+  { name: "ZaloPay (Ví điện tử)", shortCode: "ZLP", bin: "ZLP" },
+];
+
 export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
   open,
   activeTab,
@@ -24,6 +39,19 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
   onSubmit,
 }) => {
   if (!open) return null;
+
+  const handleBankSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedName = e.target.value;
+    const found = POPULAR_BANKS.find((b) => b.name === selectedName);
+    if (found) {
+      onFormChange({
+        ...formData,
+        bankDisplayName: found.name,
+        bankShortCode: found.shortCode,
+        bankBin: found.bin,
+      });
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -66,50 +94,19 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Tên Ngân Hàng</label>
-                  <input
-                    type="text"
-                    placeholder="VD: MBBank"
-                    value={formData.bankDisplayName}
-                    onChange={(e) => onFormChange({ ...formData, bankDisplayName: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Mã Ngân Hàng (Short Code)</label>
-                  <input
-                    type="text"
-                    placeholder="VD: MB"
-                    value={formData.bankShortCode}
-                    onChange={(e) => onFormChange({ ...formData, bankShortCode: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Mã BIN Ngân Hàng</label>
-                  <input
-                    type="text"
-                    placeholder="VD: 970422"
-                    value={formData.bankBin}
-                    onChange={(e) => onFormChange({ ...formData, bankBin: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Tiền tố ghi chú QR</label>
-                  <input
-                    type="text"
-                    placeholder="VD: MAV"
-                    value={formData.qrNotePrefix}
-                    onChange={(e) => onFormChange({ ...formData, qrNotePrefix: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
+                <select
+                  value={formData.bankDisplayName}
+                  onChange={handleBankSelect}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+                >
+                  {POPULAR_BANKS.map((b) => (
+                    <option key={b.shortCode} value={b.name}>
+                      {b.name} ({b.shortCode})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

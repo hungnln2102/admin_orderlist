@@ -1,4 +1,5 @@
 const productService = require("../services/productService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getProductPrices = async (req, res) => {
   try {
@@ -28,7 +29,7 @@ const getPackageCategories = async (_req, res) => {
     res.json({ data });
   } catch (error) {
     console.error("Lỗi getPackageCategories:", error);
-    res.status(500).json({ error: error.message || "Không thể lấy danh mục loại gói" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể lấy danh mục loại gói") });
   }
 };
 
@@ -38,7 +39,7 @@ const getAllCatalogProductNames = async (_req, res) => {
     res.json({ data });
   } catch (error) {
     console.error("Lỗi getAllCatalogProductNames:", error);
-    res.status(500).json({ error: error.message || "Không thể lấy danh sách tên sản phẩm Master Catalog" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể lấy danh sách tên sản phẩm Master Catalog") });
   }
 };
 
@@ -48,7 +49,7 @@ const createPackageCategory = async (req, res) => {
     res.status(201).json({ message: "Tạo loại gói thành công", data: result });
   } catch (error) {
     console.error("Lỗi createPackageCategory:", error);
-    res.status(400).json({ error: error.message || "Không thể tạo loại gói" });
+    res.status(400).json({ error: getClientErrorMessage(error, "Không thể tạo loại gói") });
   }
 };
 
@@ -58,7 +59,7 @@ const updatePackageCategory = async (req, res) => {
     res.json({ message: "Cập nhật loại gói thành công", data: result });
   } catch (error) {
     console.error("Lỗi updatePackageCategory:", error);
-    res.status(400).json({ error: error.message || "Không thể cập nhật loại gói" });
+    res.status(400).json({ error: getClientErrorMessage(error, "Không thể cập nhật loại gói") });
   }
 };
 
@@ -69,7 +70,7 @@ const deletePackageCategory = async (req, res) => {
     res.json({ message: "Xóa loại gói thành công", data: result });
   } catch (error) {
     console.error("Lỗi deletePackageCategory:", error);
-    res.status(400).json({ error: error.message || "Không thể xóa loại gói" });
+    res.status(400).json({ error: getClientErrorMessage(error, "Không thể xóa loại gói") });
   }
 };
 
@@ -79,7 +80,7 @@ const createPackageProduct = async (req, res) => {
     res.status(201).json({ message: "Thêm gói sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi createPackageProduct:", error);
-    res.status(400).json({ error: error.message || "Không thể thêm gói sản phẩm" });
+    res.status(400).json({ error: getClientErrorMessage(error, "Không thể thêm gói sản phẩm") });
   }
 };
 
@@ -90,7 +91,7 @@ const updatePackageProduct = async (req, res) => {
     res.json({ message: "Cập nhật gói sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi updatePackageProduct:", error);
-    res.status(400).json({ error: error.message || "Không thể cập nhật gói sản phẩm" });
+    res.status(400).json({ error: getClientErrorMessage(error, "Không thể cập nhật gói sản phẩm") });
   }
 };
 
@@ -101,7 +102,7 @@ const deletePackageProduct = async (req, res) => {
     res.json({ message: "Xóa gói sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi deletePackageProduct:", error);
-    res.status(400).json({ error: error.message || "Không thể xóa gói sản phẩm" });
+    res.status(400).json({ error: getClientErrorMessage(error, "Không thể xóa gói sản phẩm") });
   }
 };
 
@@ -133,7 +134,7 @@ const createProduct = async (req, res) => {
     res.status(201).json({ message: "Tạo sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi createProduct:", error);
-    res.status(500).json({ error: error.message || "Tạo sản phẩm thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Tạo sản phẩm thất bại") });
   }
 };
 
@@ -144,7 +145,7 @@ const updateProduct = async (req, res) => {
     res.json({ message: "Cập nhật sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi updateProduct:", error);
-    res.status(500).json({ error: error.message || "Cập nhật sản phẩm thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Cập nhật sản phẩm thất bại") });
   }
 };
 
@@ -155,7 +156,7 @@ const deleteProduct = async (req, res) => {
     res.json({ message: "Xóa sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi deleteProduct:", error);
-    res.status(500).json({ error: error.message || "Xóa sản phẩm thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Xóa sản phẩm thất bại") });
   }
 };
 
@@ -167,7 +168,7 @@ const addSupplierCost = async (req, res) => {
     res.status(201).json({ message: "Thêm nguồn NCC thành công", data: result });
   } catch (error) {
     console.error("Lỗi addSupplierCost:", error);
-    res.status(500).json({ error: error.message || "Thêm nguồn NCC thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Thêm nguồn NCC thất bại") });
   }
 };
 
@@ -179,7 +180,7 @@ const updateSupplierCost = async (req, res) => {
     res.json({ message: "Cập nhật giá nguồn NCC thành công", data: result });
   } catch (error) {
     console.error("Lỗi updateSupplierCost:", error);
-    res.status(500).json({ error: error.message || "Cập nhật giá nguồn NCC thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Cập nhật giá nguồn NCC thất bại") });
   }
 };
 
@@ -190,7 +191,7 @@ const deleteSupplierCost = async (req, res) => {
     res.json({ message: "Xóa nguồn NCC thành công", data: result });
   } catch (error) {
     console.error("Lỗi deleteSupplierCost:", error);
-    res.status(500).json({ error: error.message || "Xóa nguồn NCC thất bại" });
+    res.status(500).json({ error: getClientErrorMessage(error, "Xóa nguồn NCC thất bại") });
   }
 };
 

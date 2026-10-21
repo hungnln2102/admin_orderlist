@@ -7,6 +7,10 @@ require("module-alias/register");
 const { db } = require("../src/db");
 const path = require("path");
 
+if (process.env.NODE_ENV === "production") {
+  throw new Error("resetDatabase.js cannot run in production.");
+}
+
 async function resetDatabase() {
   console.log("🧹 [ResetDB] Bắt đầu xóa sạch toàn bộ schemas và tables trong database...");
 

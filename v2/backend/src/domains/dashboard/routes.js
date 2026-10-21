@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const dashboardService = require("./services/dashboardService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 /**
  * GET /api/dashboard/summary
@@ -24,7 +25,7 @@ router.get("/summary", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Không thể tải dữ liệu báo cáo dashboard",
-      error: err.message,
+      error: getClientErrorMessage(err, "Không thể tải dữ liệu báo cáo dashboard"),
     });
   }
 });

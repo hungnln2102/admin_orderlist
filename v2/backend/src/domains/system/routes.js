@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const systemConfigService = require("./services/systemConfigService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 // GET /api/system/configs - Lấy toàn bộ cấu hình hệ thống
 router.get("/configs", async (req, res) => {
@@ -19,8 +20,7 @@ router.put("/configs/:key", async (req, res) => {
     const { key } = req.params;
     const { value } = req.body;
     
-    // Giả sử có req.user.username sau khi qua middleware Auth
-    const updatedBy = req.user?.username || "ADMIN"; 
+    const updatedBy = req.session?.user?.username || "ADMIN";
 
     if (value === undefined || value === null) {
       return res.status(400).json({ error: "Thiếu giá trị 'value' cần cập nhật." });
@@ -30,7 +30,7 @@ router.put("/configs/:key", async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error(`[System API] Lỗi cập nhật cấu hình ${req.params.key}:`, err);
-    res.status(400).json({ error: err.message || "Không thể cập nhật cấu hình." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật cấu hình.") });
   }
 });
 

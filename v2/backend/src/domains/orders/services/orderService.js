@@ -6,6 +6,13 @@ const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
+const emitOrderEvent = (trx, eventName, payload) => {
+  if (typeof trx?.afterCommit === "function") {
+    trx.afterCommit(() => eventBus.emit(eventName, payload));
+    return;
+  }
+  eventBus.emit(eventName, payload);
+};
 
 const isCustomerMavryk = (c) => String(c || "").trim().toLowerCase() === "mavryk";
 
@@ -37,9 +44,9 @@ async function getDefaultShopBank(trx) {
 /**
  * Tính số tiền còn lại của đơn hàng dựa trên thời gian sử dụng
  */
-function calculateOrderRemainingValue(order) {
+function calculateOrderRemainingValue(order, baseAmount) {
   if (!order) return 0;
-  const cost = Number(order.cost || order.price || 0);
+  const cost = baseAmount != null ? Number(baseAmount) || 0 : Number(order.cost || order.price || 0);
   if (cost <= 0) return 0;
   if (!order.expired_at) return cost;
 
@@ -56,6 +63,30 @@ function calculateOrderRemainingValue(order) {
 
   const totalDays = Math.max(Number(order.days || 365), 1);
   return Math.min(cost, Math.max(0, Math.round((cost / totalDays) * remainingDays)));
+}
+
+async function createRefundCreditNoteForCanceledOrder(trx, order, refundAmount, canceledAt) {
+  if (!refundAmount || refundAmount <= 0) return;
+  if (String(order.id_order || "").toUpperCase().startsWith("MAVN") || isCustomerMavryk(order.customer)) return;
+
+  const creditCode = `RFC-${order.id_order || "ORDER"}-${order.id}`;
+  await trx(TABLES.REFUND_CREDIT_NOTES)
+    .insert({
+      credit_code: creditCode,
+      source_order_list_id: order.id,
+      source_order_code: order.id_order,
+      customer_name: order.customer || "Khách hàng",
+      customer_contact: order.contact || "",
+      refund_amount: refundAmount,
+      available_amount: refundAmount,
+      status: "OPEN",
+      note: `Tự động tạo credit khi hủy đơn #${order.id_order} vào ngày ${canceledAt}`,
+      source_kind: "ORDER_REFUND",
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now(),
+    })
+    .onConflict("credit_code")
+    .ignore();
 }
 
 const VALID_ORDER_PREFIXES = ["MAVC", "MAVL", "MAVN", "MAVK", "MAVS", "MAVT"];
@@ -108,7 +139,9 @@ function applyActiveFilter(builder) {
  * Lấy danh sách đơn hàng có phân trang, lọc theo tab & tìm kiếm (Tối ưu SQL Aggregation)
  */
 async function getOrders({ page = 1, limit = 20, search = "", status = "", tab = "" } = {}) {
-  const offset = (Number(page) - 1) * Number(limit);
+  page = Math.max(1, parseInt(page, 10) || 1);
+  limit = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+  const offset = (page - 1) * limit;
 
   // 1. Tính toán tabCounts song song trên toàn bộ cơ sở dữ liệu (Tối ưu Promise.all)
   const [[canceledRes], [expiredRes], [importRes], [activeRes]] = await Promise.all([
@@ -661,7 +694,7 @@ async function createOrder(payload) {
         }
 
         if (stockId) {
-          eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, {
+          emitOrderEvent(trx, EVENTS.WAREHOUSE_STOCK_CREATED, {
             id: stockId,
             account: accountUsername,
             source: "order_sync",
@@ -761,7 +794,7 @@ async function createOrder(payload) {
             logged_at: db.fn.now(),
           });
 
-          eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+          emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
             cost: importCost,
             supplier_id: supplyId,
             order_id: createdOrder.id,
@@ -777,7 +810,7 @@ async function createOrder(payload) {
     const summary = `Tạo mới đơn hàng #${createdOrder.id_order} cho khách "${createdOrder.customer}" với tổng tiền ${formatMoney(createdOrder.price)} [Trạng thái: ${statusLabel}]`;
 
     // Phát event Domain: ORDER_CREATED
-    eventBus.emit(EVENTS.ORDER_CREATED, {
+    emitOrderEvent(trx, EVENTS.ORDER_CREATED, {
       ...createdOrder,
       orderId: createdOrder.id,
       summary,
@@ -785,7 +818,7 @@ async function createOrder(payload) {
     });
 
     if (isMavn && Number(createdOrder.cost) > 0) {
-      eventBus.emit(EVENTS.ORDER_IMPORT_CREATED, {
+      emitOrderEvent(trx, EVENTS.ORDER_IMPORT_CREATED, {
         orderId: createdOrder.id,
         id_order: createdOrder.id_order,
         orderCode: createdOrder.id_order,
@@ -944,7 +977,7 @@ async function updateOrder(id, payload) {
     };
 
     // Phát event Domain: ORDER_UPDATED
-    eventBus.emit(EVENTS.ORDER_UPDATED, updatePayload);
+    emitOrderEvent(trx, EVENTS.ORDER_UPDATED, updatePayload);
 
     if (isMavn && updateFields.status === ORDER_STATUS.CANCELED && existingOrder.status !== ORDER_STATUS.CANCELED) {
       await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
@@ -953,7 +986,7 @@ async function updateOrder(id, payload) {
 
       const remainingAmount = calculateOrderRemainingValue(existingOrder);
       if (remainingAmount > 0) {
-        eventBus.emit(EVENTS.ORDER_IMPORT_CANCELED, {
+        emitOrderEvent(trx, EVENTS.ORDER_IMPORT_CANCELED, {
           orderId: existingOrder.id,
           id_order: existingOrder.id_order,
           orderCode: existingOrder.id_order,
@@ -1006,7 +1039,7 @@ async function renewOrder(id, payload = {}) {
     const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "${getOrderStatusLabel(ORDER_STATUS.RENEW_REQUIRED)}", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
 
     // Phát event Domain: ORDER_UPDATED với action RENEWAL_REQUESTED
-    eventBus.emit(EVENTS.ORDER_UPDATED, {
+    emitOrderEvent(trx, EVENTS.ORDER_UPDATED, {
       orderId: updatedOrder.id,
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
@@ -1027,12 +1060,15 @@ async function renewOrder(id, payload = {}) {
  */
 async function deleteOrder(id) {
   return await withTransaction(async (trx) => {
-    const existingOrder = await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).first();
+    const existingOrder = await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).forUpdate().first();
     if (!existingOrder) {
       throw new Error("Không tìm thấy đơn hàng cần xóa.");
     }
 
     const status = existingOrder.status;
+    if (status === ORDER_STATUS.CANCELED) {
+      throw new Error("Đơn hàng đã hủy không thể bị xóa vĩnh viễn.");
+    }
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
     const todayYMD = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split("T")[0];
 
@@ -1049,7 +1085,7 @@ async function deleteOrder(id) {
 
       const summary = `Đã xóa đơn nhập hàng #${existingOrder.id_order} (${formatMoney(existingOrder.cost || existingOrder.price || 0)}), hoàn trả lợi nhuận: ${formatMoney(remainingAmount)}`;
 
-      eventBus.emit(EVENTS.ORDER_DELETED, {
+      emitOrderEvent(trx, EVENTS.ORDER_DELETED, {
         orderId: existingOrder.id,
         id_order: existingOrder.id_order,
         customer: existingOrder.customer,
@@ -1061,7 +1097,7 @@ async function deleteOrder(id) {
       });
 
       if (remainingAmount > 0) {
-        eventBus.emit(EVENTS.ORDER_IMPORT_CANCELED, {
+        emitOrderEvent(trx, EVENTS.ORDER_IMPORT_CANCELED, {
           orderId: existingOrder.id,
           id_order: existingOrder.id_order,
           orderCode: existingOrder.id_order,
@@ -1079,7 +1115,7 @@ async function deleteOrder(id) {
     if (!isPaidOrder) {
       await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
       const summary = `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
-      eventBus.emit(EVENTS.ORDER_DELETED, {
+      emitOrderEvent(trx, EVENTS.ORDER_DELETED, {
         orderId: existingOrder.id,
         id_order: existingOrder.id_order,
         customer: existingOrder.customer,
@@ -1097,13 +1133,16 @@ async function deleteOrder(id) {
       canceled_at: existingOrder.canceled_at || todayYMD,
     });
 
-    const summary = `Đã hủy đơn hàng đã thanh toán #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
+    const refundAmount = calculateOrderRemainingValue(existingOrder, Number(existingOrder.price || 0));
+    await createRefundCreditNoteForCanceledOrder(trx, existingOrder, refundAmount, todayYMD);
 
-    eventBus.emit(EVENTS.ORDER_CANCELED_REFUNDED, {
+    const summary = `Đã hủy đơn hàng đã thanh toán #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)}), hoàn credit theo ngày còn lại: ${formatMoney(refundAmount)}`;
+
+    emitOrderEvent(trx, EVENTS.ORDER_CANCELED_REFUNDED, {
       orderId: existingOrder.id,
       orderCode: existingOrder.id_order,
       order: existingOrder,
-      refundAmount: Number(existingOrder.price || 0),
+      refundAmount,
       canceledAt: todayYMD,
       summary,
       action: "ORDER_CANCELED",
@@ -1158,7 +1197,7 @@ async function processOrderToProcessing(id) {
         logged_at: db.fn.now(),
       });
 
-      eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+      emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
         cost: importCost,
         supplier_id: updatedOrder.supply_id,
         summary: `Thêm chi phí nhập hàng cho đơn #${updatedOrder.id_order}: ${importCost} ₫`,
@@ -1166,7 +1205,7 @@ async function processOrderToProcessing(id) {
     }
 
     const summary = `Đơn hàng #${updatedOrder.id_order} đã chuyển sang Đang Xử Lý. Đã ghi nhận chi phí nhập hàng.`;
-    eventBus.emit(EVENTS.ORDER_UPDATED, {
+    emitOrderEvent(trx, EVENTS.ORDER_UPDATED, {
       orderId: updatedOrder.id,
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
@@ -1203,7 +1242,7 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
 
     const payAmount = amount != null ? Number(amount) : Number(updatedOrder.price || 0);
 
-    eventBus.emit(EVENTS.ORDER_PAID, {
+    emitOrderEvent(trx, EVENTS.ORDER_PAID, {
       orderId: updatedOrder.id,
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
@@ -1217,7 +1256,7 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
     });
 
     if (isRenewal) {
-      eventBus.emit(EVENTS.ORDER_RENEWED, {
+      emitOrderEvent(trx, EVENTS.ORDER_RENEWED, {
         orderId: updatedOrder.id,
         id_order: updatedOrder.id_order,
         customer: updatedOrder.customer,
@@ -1241,14 +1280,26 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
 
 async function payOrderWithCredit(id, creditNoteId) {
   return await withTransaction(async (trx) => {
-    const order = await getOrderTable(trx).where({ id: Number(id) }).first();
+    const order = await getOrderTable(trx).where({ id: Number(id) }).forUpdate().first();
     if (!order) throw new Error("Không tìm thấy đơn hàng.");
 
-    const creditNote = await trx(TABLES.REFUND_CREDIT_NOTES).where({ id: Number(creditNoteId) }).first();
+    const creditNote = await trx(TABLES.REFUND_CREDIT_NOTES).where({ id: Number(creditNoteId) }).forUpdate().first();
     if (!creditNote) throw new Error("Không tìm thấy mã credit.");
 
     const orderPrice = Number(order.price || 0);
     const availableAmount = Number(creditNote.available_amount || 0);
+
+    if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
+      throw new Error("Chỉ đơn chưa thanh toán hoặc cần gia hạn mới có thể thanh toán bằng credit.");
+    }
+
+    if (!['OPEN', 'PARTIALLY_APPLIED'].includes(creditNote.status)) {
+      throw new Error("Credit không còn hiệu lực để thanh toán.");
+    }
+
+    if (orderPrice <= 0) {
+      throw new Error("Số tiền đơn hàng phải lớn hơn 0 để thanh toán bằng credit.");
+    }
 
     if (availableAmount < orderPrice) {
       throw new Error(`Số dư credit (${availableAmount.toLocaleString()} ₫) không đủ thanh toán đơn hàng (${orderPrice.toLocaleString()} ₫).`);
@@ -1308,7 +1359,7 @@ async function payOrderWithCredit(id, creditNoteId) {
         logged_at: db.fn.now(),
       });
 
-      eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+      emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
         cost: importCost,
         supplier_id: updatedOrder.supply_id,
         summary: `Thêm chi phí nhập hàng cho đơn #${updatedOrder.id_order} thanh toán bằng credit: ${importCost} ₫`,
@@ -1329,4 +1380,5 @@ module.exports = {
   processOrderToProcessing,
   processCompleteOrder,
   payOrderWithCredit,
+  calculateOrderRemainingValue,
 };

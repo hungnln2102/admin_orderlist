@@ -7,6 +7,8 @@
     "start": "node -r module-alias/register src/server.js",
     "dev": "nodemon -r module-alias/register src/server.js",
     "migrate": "knex migrate:latest",
+    "test": "node --test tests/unit/*.test.js",
+    "test:integration": "node tests/run-integration.js",
     "playwright:install": "playwright install chromium"
   },
   "_moduleAliases": {
@@ -14,6 +16,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

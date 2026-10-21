@@ -1,9 +1,13 @@
 require("dotenv").config();
 
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL là bắt buộc để chạy migration V2.");
+}
+
 module.exports = {
   development: {
     client: "pg",
-    connection: process.env.DATABASE_URL || "postgresql://admin:ZAQ!xsw21122@127.0.0.1:5432/mydtbmav",
+    connection: process.env.DATABASE_URL,
     searchPath: ["public", "orders", "admin", "partner", "product"],
     migrations: {
       directory: "./src/db/migrations",

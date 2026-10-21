@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const invoiceService = require("./services/invoiceService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 // GET /api/invoices - Lấy danh sách biên lai thanh toán
 router.get("/", async (req, res) => {
@@ -21,7 +22,7 @@ router.post("/:id/allocate", async (req, res) => {
     res.json({ success: true, message: "Phân bổ biên lai thành công!", data: result });
   } catch (err) {
     console.error("[Invoices API] Lỗi phân bổ biên lai:", err);
-    res.status(400).json({ error: err.message || "Lỗi phân bổ biên lai." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Lỗi phân bổ biên lai.") });
   }
 });
 

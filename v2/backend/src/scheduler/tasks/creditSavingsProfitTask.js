@@ -1,98 +1,140 @@
-/**
- * creditSavingsProfitTask.js
- * Động cơ tự động sinh lời đa sổ tiết kiệm:
- * Quét các quỹ tiết kiệm/tích lũy có bật sinh lời, tính toán và tự động cộng tiền vào tài khoản nhận lãi (hoặc tái đầu tư) đúng giờ.
- */
 const { db, TABLES, withTransaction } = require("@/db");
 const { creditFinancialAccount } = require("@/domains/wallets/services/walletService");
+const { getVietnamDateString, getVietnamMonthString, VIETNAM_TZ } = require("@/utils/time");
+const { withAdvisoryLock } = require("../withAdvisoryLock");
 
-const toNumber = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+const toNumber = (value) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
-async function creditSavingsProfitTask(triggerSource = "cron_hourly") {
-  console.log(`[CreditSavingsProfitTask] 🚀 Bắt đầu quét sinh lời tự động cho các sổ tiết kiệm (${triggerSource})...`);
-  
-  const now = new Date();
-  const currentHour = String(now.getHours()).padStart(2, "0");
-  const currentMinute = String(now.getMinutes()).padStart(2, "0");
-  const currentTimeStr = `${currentHour}:${currentMinute}`;
-  const todayStr = now.toISOString().slice(0, 10);
-  const currentMonthStr = todayStr.slice(0, 7);
+const getVietnamTimeString = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: VIETNAM_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 
-  try {
-    // 1. Lấy tất cả các tài sản tiết kiệm bật sinh lời
-    const savingsAssets = await db(TABLES.PERSONAL_ASSETS)
-      .where("type", "SAVINGS")
+  return `${values.hour}:${values.minute}`;
+};
+
+const getProfitPeriod = (frequency, date = new Date()) => {
+  const vietnamDate = getVietnamDateString(date);
+  if (frequency === "DAILY") return vietnamDate;
+  if (frequency === "MONTHLY") return getVietnamMonthString(date);
+  if (frequency === "YEARLY") return vietnamDate.slice(0, 4);
+  throw new Error(`Chu kỳ sinh lãi không hợp lệ: ${frequency}`);
+};
+
+const toMinutesOfDay = (timeString) => {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(timeString || "").trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+const isCreditTimeReached = (creditTime, currentTime) => {
+  const creditMinutes = toMinutesOfDay(creditTime || "07:00");
+  const currentMinutes = toMinutesOfDay(currentTime);
+  if (creditMinutes == null || currentMinutes == null) return false;
+  return currentMinutes >= creditMinutes;
+};
+
+const calculateProfitAmount = (principal, annualRate, frequency) => {
+  const annualProfit = principal * (annualRate / 100);
+  if (frequency === "DAILY") return annualProfit / 365;
+  if (frequency === "MONTHLY") return annualProfit / 12;
+  if (frequency === "YEARLY") return annualProfit;
+  throw new Error(`Chu kỳ sinh lãi không hợp lệ: ${frequency}`);
+};
+
+async function creditSavingsProfitTask(triggerSource = "cron_minutely", now = new Date()) {
+  return withAdvisoryLock("credit_savings_profit", async () => {
+    const currentTime = getVietnamTimeString(now);
+    const savingsAssets = await db(TABLES.PERSONAL_SAVINGS)
       .where("profit_enabled", true)
-      .where("annual_interest_rate", ">", 0);
+      .where("annual_interest_rate", ">", 0)
+      .select("id", "profit_credit_time", "profit_frequency", "profit_last_credited_period");
 
     let creditedCount = 0;
 
     for (const asset of savingsAssets) {
-      const creditTime = asset.profit_credit_time || "07:00";
-      const targetHour = creditTime.slice(0, 2);
-      
-      // So khớp giờ hiện tại với giờ ghi nhận của sổ (so sánh theo giờ HH:00 hoặc chênh lệch trong khoảng giờ)
-      if (targetHour !== currentHour) {
+      if (!isCreditTimeReached(asset.profit_credit_time, currentTime)) continue;
+      let period;
+      try {
+        period = getProfitPeriod(asset.profit_frequency || "MONTHLY", now);
+      } catch (err) {
+        console.error(`[CreditSavingsProfitTask] Bỏ qua sổ #${asset.id}: ${err.message}`);
         continue;
       }
+      if (asset.profit_last_credited_period === period) continue;
 
-      const frequency = asset.profit_frequency || "MONTHLY";
-      const principal = toNumber(asset.amount);
-      const annualRate = toNumber(asset.annual_interest_rate);
+      const credited = await withTransaction(async (trx) => {
+        const lockedAsset = await trx(TABLES.PERSONAL_SAVINGS)
+          .where({ id: asset.id })
+          .forUpdate()
+          .first();
+        if (!lockedAsset || !lockedAsset.profit_enabled) return false;
 
-      if (principal <= 0 || annualRate <= 0) continue;
+        const frequency = lockedAsset.profit_frequency || "MONTHLY";
+        const period = getProfitPeriod(frequency, now);
+        if (lockedAsset.profit_last_credited_period === period) return false;
 
-      // Tính số tiền lãi theo kỳ
-      let profitAmount = 0;
-      if (frequency === "DAILY") {
-        profitAmount = (principal * (annualRate / 100)) / 365;
-      } else if (frequency === "MONTHLY") {
-        profitAmount = (principal * (annualRate / 100)) / 12;
-      } else if (frequency === "YEARLY") {
-        profitAmount = (principal * (annualRate / 100)) / 365; // Hoặc chia theo năm tùy logic, ở đây chuẩn hóa tính theo ngày/tháng
-      }
+        const principal = toNumber(lockedAsset.amount);
+        const annualRate = toNumber(lockedAsset.annual_interest_rate);
+        const profitAmount = calculateProfitAmount(principal, annualRate, frequency);
+        const roundedProfit = Math.round(profitAmount * 100) / 100;
+        if (principal <= 0 || annualRate <= 0 || roundedProfit <= 0) return false;
 
-      if (profitAmount <= 0) continue;
-      const roundedProfit = Math.round(profitAmount * 100) / 100;
+        const destination = lockedAsset.profit_destination || "REINVEST";
+        const accountId = lockedAsset.profit_account_id;
 
-      // Kiểm tra Idempotency (tránh cộng 2 lần trong cùng ngày cho DAILY hoặc cùng tháng cho MONTHLY)
-      // Chúng ta có thể kiểm tra qua bảng log hoặc note / ledger gần nhất
-      const destination = asset.profit_destination || "REINVEST";
-      const accountId = asset.profit_profit_account_id || asset.profit_account_id;
+        if (["CASH_BANK", "SHOP_BALANCE"].includes(destination)) {
+          if (!accountId) throw new Error(`Sổ tiết kiệm #${lockedAsset.id} chưa chọn tài khoản nhận lãi.`);
 
-      await withTransaction(async (trx) => {
-        if (["CASH_BANK", "SHOP_BALANCE"].includes(destination) && accountId) {
-          // Cộng tiền vào tài khoản ngân hàng đích
-          await creditFinancialAccount(trx, {
+          const creditResult = await creditFinancialAccount(trx, {
             accountId: Number(accountId),
             amount: roundedProfit,
             sourceKind: "savings_profit_credit",
-            sourceId: `${asset.id}_${frequency === "DAILY" ? todayStr : currentMonthStr}`,
-            note: `[Lãi tự động] ${asset.name} (+${roundedProfit.toLocaleString("vi-VN")} ₫)`,
+            sourceId: `${lockedAsset.id}_${period}`,
+            note: `[Lãi tự động] ${lockedAsset.name} (+${roundedProfit.toLocaleString("vi-VN")} ₫)`,
           });
-          console.log(`✅ [CreditSavingsProfitTask] Đã chuyển ${roundedProfit} ₫ lãi từ sổ "${asset.name}" về tài khoản #${accountId}`);
+          if (creditResult.skipped && creditResult.reason !== "duplicate") return false;
         } else if (destination === "REINVEST") {
-          // Tái đầu tư cộng dồn vào gốc
-          const newPrincipal = principal + roundedProfit;
-          await trx(TABLES.PERSONAL_ASSETS)
-            .where("id", asset.id)
-            .update({
-              amount: newPrincipal,
-              updated_at: trx.fn.now(),
-            });
-          console.log(`✅ [CreditSavingsProfitTask] Đã tái đầu tư cộng dồn ${roundedProfit} ₫ vào gốc sổ "${asset.name}". Gốc mới: ${newPrincipal}`);
+          await trx(TABLES.PERSONAL_SAVINGS)
+            .where({ id: lockedAsset.id })
+            .update({ amount: principal + roundedProfit });
+        } else {
+          throw new Error(`Nơi nhận lãi không hợp lệ: ${destination}`);
         }
-        creditedCount++;
+
+        await trx(TABLES.PERSONAL_SAVINGS)
+          .where({ id: lockedAsset.id })
+          .update({
+            profit_last_credited_period: period,
+            updated_at: trx.fn.now(),
+          });
+
+        console.log(`[CreditSavingsProfitTask] Đã ghi nhận ${roundedProfit.toLocaleString("vi-VN")} ₫ cho sổ "${lockedAsset.name}" (${frequency}, ${period}).`);
+        return true;
       });
+
+      if (credited) creditedCount += 1;
     }
 
-    console.log(`[CreditSavingsProfitTask] 🏁 Hoàn tất quét. Đã xử lý sinh lời cho ${creditedCount} sổ tiết kiệm.`);
-  } catch (err) {
-    console.error(`❌ [CreditSavingsProfitTask] Lỗi thực thi sinh lời:`, err.message);
-  }
+    console.log(`[CreditSavingsProfitTask] Hoàn tất (${triggerSource}): ${creditedCount} sổ được ghi lãi lúc ${currentTime} giờ Việt Nam.`);
+    return { success: true, creditedCount, currentTime };
+  });
 }
 
-module.exports = { creditSavingsProfitTask };
+module.exports = {
+  calculateProfitAmount,
+  creditSavingsProfitTask,
+  getProfitPeriod,
+  getVietnamTimeString,
+  isCreditTimeReached,
+};

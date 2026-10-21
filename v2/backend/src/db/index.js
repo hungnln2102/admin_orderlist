@@ -46,12 +46,23 @@ const db = knex({
 
 const withTransaction = async (handler) => {
   const trx = await db.transaction();
+  const afterCommitCallbacks = [];
+  let committed = false;
+  trx.afterCommit = (callback) => afterCommitCallbacks.push(callback);
   try {
     const result = await handler(trx);
     await trx.commit();
+    committed = true;
+    for (const callback of afterCommitCallbacks) {
+      try {
+        await callback();
+      } catch (callbackError) {
+        console.error("[DB] afterCommit callback failed:", callbackError);
+      }
+    }
     return result;
   } catch (err) {
-    await trx.rollback();
+    if (!committed) await trx.rollback();
     throw err;
   }
 };

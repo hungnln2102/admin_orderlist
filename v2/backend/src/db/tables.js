@@ -43,6 +43,7 @@ const TABLES = {
   REFUND_CREDIT_APPLICATIONS: formatTable(SCHEMAS.RECEIPT, "refund_credit_applications"),
   DOMAIN_EVENT_STORE: formatTable(SCHEMAS.SYSTEM, "domain_event_store"),
   USERS: formatTable(SCHEMAS.ADMIN, "users"),
+  USER_SESSIONS: formatTable(SCHEMAS.ADMIN, "user_sessions"),
   SHOP_BANK_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
   USDT_WALLETS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
   FINANCIAL_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "financial_accounts"),
@@ -55,6 +56,7 @@ const TABLES = {
   FIXED_COSTS: formatTable(SCHEMAS.FINANCE, "fixed_costs"),
   INSTALLMENTS: formatTable(SCHEMAS.FINANCE, "installments"),
   PERSONAL_ASSETS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
+  PERSONAL_SAVINGS: formatTable(SCHEMAS.FINANCE, "personal_savings"),
   DEBT_PAYMENT_LOGS: formatTable(SCHEMAS.FINANCE, "debt_payment_logs"),
 };
 
@@ -65,6 +67,11 @@ const COLS = {
     PASSWORD_HASH: "passwordhash",
     ROLE: "role",
     CREATED_AT: "createdat",
+  },
+  USER_SESSIONS: {
+    SID: "sid",
+    SESS: "sess",
+    EXPIRE: "expire",
   },
   SUPPLIER: {
     ID: "id",

@@ -38,11 +38,11 @@ cron.schedule(
 
 // 3. Cron hàng giờ (0 * * * *) - Rà soát và cộng lãi tự động cho các sổ tiết kiệm đến giờ ghi nhận
 cron.schedule(
-  "0 * * * *",
+  "* * * * *",
   async () => {
     console.log("[Scheduler] 🕒 Cron hàng giờ được kích hoạt (Quét sinh lời tiết kiệm)");
     try {
-      await creditSavingsProfitTask("cron_hourly");
+      await creditSavingsProfitTask("cron_minutely");
     } catch (err) {
       console.error("[Scheduler] Lỗi trong Cron quét sinh lời:", err.message);
     }

@@ -17,6 +17,7 @@ const ReceiptsPage = React.lazy(() => import("@/pages/ReceiptsPage").then(m => (
 const SystemPage = React.lazy(() => import("@/pages/SystemPage").then(m => ({ default: m.SystemPage })));
 const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPage").then(m => ({ default: m.FinanceHubPage })));
 const TrafficPage = React.lazy(() => import("@/features/traffic/TrafficPage").then(m => ({ default: m.TrafficPage })));
+const ExternalImportsPage = React.lazy(() => import("@/pages/ExternalImportsPage").then(m => ({ default: m.ExternalImportsPage })));
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -222,25 +223,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* 4. Nguồn hàng & Kho */}
       <Route path="/sources" element={<SuppliersPage />} />
-      <Route
-        path="/external-imports"
-        element={
-          <GenericPage
-            title="Nhập Nguồn Hàng Ngoài Luồng"
-            category="Nguồn hàng & Kho"
-            description="Ghi nhận chi phí nhập hàng không qua đơn đặt tự động"
-            columns={[
-              { key: "importId", label: "Mã Đơn Nhập" },
-              { key: "supplier", label: "Nhà cung cấp" },
-              { key: "amount", label: "Số tiền" },
-              { key: "note", label: "Ghi chú" },
-            ]}
-            sampleData={[
-              { importId: "IMP-992", supplier: "Supplier Adobe Global", amount: "4.000.000 ₫", note: "Nhập 10 gói Adobe All Apps" },
-            ]}
-          />
-        }
-      />
+      <Route path="/external-imports" element={<ExternalImportsPage />} />
       <Route path="/invoices" element={<ReceiptsPage />} />
       <Route path="/warehouse" element={<WarehousePage />} />
 

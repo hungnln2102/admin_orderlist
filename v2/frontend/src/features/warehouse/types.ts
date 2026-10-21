@@ -15,6 +15,8 @@ export interface WarehouseServiceSlot {
   expires_at?: string;
   raw_expires_at?: string;
   note?: string;
+  is_authenticated?: boolean;
+  session_checked_at?: string | null;
   status: WarehouseSlotStatus;
 }
 

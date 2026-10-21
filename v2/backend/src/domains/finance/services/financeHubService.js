@@ -10,6 +10,7 @@
 const { db, TABLES, withTransaction } = require("@/db");
 const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
+const { eventBus, EVENTS, recordEvent } = require("@/events");
 
 const toNumber = (val) => {
   const n = Number(val);
@@ -610,6 +611,16 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
 }
 
 // --- CRUD FIXED COSTS ---
+const publishFixedCostMutation = (action, id, name) => {
+  eventBus.emit(EVENTS.FINANCE_FIXED_COST_MUTATED, { action, id, name });
+  recordEvent({
+    eventName: EVENTS.FINANCE_FIXED_COST_MUTATED,
+    aggregateType: "FIXED_COST",
+    aggregateId: id,
+    payload: { action, id, name },
+  }).catch((err) => console.error("[FinanceHub] Unable to record fixed cost event:", err.message));
+};
+
 async function createFixedCost(payload) {
   const [created] = await db(TABLES.FIXED_COSTS)
     .insert({
@@ -620,6 +631,8 @@ async function createFixedCost(payload) {
       note: payload.note || "",
     })
     .returning("*");
+
+  publishFixedCostMutation("CREATE", Number(created.id), created.name);
 
   return {
     id: Number(created.id),
@@ -646,6 +659,9 @@ async function updateFixedCost(id, payload) {
     .returning("*");
 
   if (!updated) return null;
+
+  publishFixedCostMutation("UPDATE", Number(updated.id), updated.name);
+
   return {
     id: Number(updated.id),
     name: updated.name,
@@ -657,7 +673,9 @@ async function updateFixedCost(id, payload) {
 }
 
 async function deleteFixedCost(id) {
-  return await db(TABLES.FIXED_COSTS).where("id", id).del();
+  const res = await db(TABLES.FIXED_COSTS).where("id", id).del();
+  if (res > 0) publishFixedCostMutation("DELETE", Number(id));
+  return res;
 }
 
 // --- CRUD INSTALLMENTS ---
@@ -979,9 +997,12 @@ async function borrowPersonalAsset(id, payload) {
 }
 
 async function allocateReceiptInTrx(trx, receiptId, allocAmount, allocType, targetCode, note) {
-  const receipt = await trx(TABLES.PAYMENT_RECEIPT).where({ id: Number(receiptId) }).first();
+  const receipt = await trx(TABLES.PAYMENT_RECEIPT)
+    .where({ id: Number(receiptId) })
+    .forUpdate()
+    .first();
   if (!receipt) throw new Error("Không tìm thấy biên lai thanh toán");
-  const currentUnallocated = Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount);
+  const currentUnallocated = Number(receipt.unallocated_amount ?? receipt.amount ?? 0);
   if (allocAmount > currentUnallocated) {
     throw new Error(`Số tiền phân bổ vượt quá số dư khả dụng của biên lai (${currentUnallocated.toLocaleString("vi-VN")} ₫)`);
   }

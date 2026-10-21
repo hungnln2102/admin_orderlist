@@ -6,10 +6,6 @@ const dotenv = require("dotenv");
 const envPaths = [
   path.resolve(__dirname, "../../.env.local"),
   path.resolve(__dirname, "../../.env"),
-  path.resolve(__dirname, "../../../backend/.env.local"),
-  path.resolve(__dirname, "../../../backend/.env"),
-  path.resolve(__dirname, "../../../.env.local"),
-  path.resolve(__dirname, "../../../.env"),
 ];
 
 for (const envPath of envPaths) {
@@ -22,8 +18,11 @@ const PORT = process.env.PORT || 3002;
 const DATABASE_URL =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
-  process.env.PG_URL ||
-  "postgresql://postgres:postgres@localhost:5432/admin_store";
+  process.env.PG_URL;
+
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL, POSTGRES_URL hoặc PG_URL là bắt buộc cho V2.");
+}
 
 module.exports = {
   PORT,

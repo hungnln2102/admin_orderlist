@@ -1,21 +1,17 @@
 const { eventBus, EVENTS, recordEvent } = require("@/events");
+const { processPaymentWebhook } = require("@/domains/payments/services/webhookPaymentService");
 
-/**
- * Webhook Service: Xử lý webhook đầu vào, phân loại giao dịch Tiền vào / Tiền ra
- * và phát sự kiện tương ứng vào EventBus.
- */
 async function handleIncomingWebhook(payload = {}) {
   const rawAmount = payload.transferAmount ?? payload.amount ?? payload.accumulatedAmount ?? 0;
   const amount = Math.abs(Number(rawAmount) || 0);
-
   const rawTransferType = String(
     payload.transferType || payload.transfer_type || (Number(rawAmount) < 0 ? "out" : "in")
   ).toLowerCase();
-
   const isOutbound = rawTransferType === "out" || Number(rawAmount) < 0;
   const eventType = isOutbound ? EVENTS.WEBHOOK_MONEY_OUT : EVENTS.WEBHOOK_MONEY_IN;
 
   const eventData = {
+    id: payload.id || payload.sepay_transaction_id || payload.transactionId || null,
     amount,
     transferType: isOutbound ? "out" : "in",
     content: payload.content || payload.transactionContent || "",
@@ -26,28 +22,20 @@ async function handleIncomingWebhook(payload = {}) {
     rawPayload: payload,
   };
 
-  console.log(
-    `🔔 [WebhookDomain] Nhận webhook ${eventData.transferType.toUpperCase()}: ${new Intl.NumberFormat("vi-VN").format(amount)} ₫ (${eventData.gateway})`
-  );
+  const payment = await processPaymentWebhook(eventData);
 
-  // 1. Ghi nhận sự kiện vào Event Store
-  await recordEvent({
+  if (payment.success && !payment.duplicate) {
+    eventBus.emit(eventType, { ...eventData, payment });
+  }
+
+  recordEvent({
     eventName: eventType,
     aggregateType: "WEBHOOK",
     aggregateId: eventData.referenceCode || eventData.accountNumber || "UNKNOWN",
-    payload: eventData,
-  });
+    payload: { ...eventData, payment },
+  }).catch((error) => console.error("[WebhookDomain] Unable to record event:", error));
 
-  // 2. Bắn sự kiện sang EventBus cho các subscriber lắng nghe
-  eventBus.emit(eventType, eventData);
-
-  return {
-    success: true,
-    eventType,
-    data: eventData,
-  };
+  return { success: true, eventType, data: eventData, payment };
 }
 
-module.exports = {
-  handleIncomingWebhook,
-};
+module.exports = { handleIncomingWebhook };

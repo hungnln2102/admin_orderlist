@@ -305,3 +305,23 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 2. Response JSON không đổi (kể cả mã lỗi thông thường).
 3. `npm run lint` (backend) pass.
 4. Smoke tay hoặc test tự động liên quan pass.
+
+## Vá bảo mật V2 — 2026-10-21
+
+- [x] **SECURITY-V2-01** Bảo vệ toàn bộ API V2 bằng session; chỉ `POST /api/auth/login` và webhook được miễn kiểm tra phiên.
+- [x] **SECURITY-V2-02** Bắt buộc API key SePay, xử lý webhook đồng bộ, truyền `payload.id` và bắt xung đột unique để chống ghi trùng.
+- [x] **SECURITY-V2-03** Khóa đơn/credit khi thanh toán credit, chặn xóa cứng đơn `CANCELED`, sửa tải lại Finance Hub và build TypeScript.
+- [x] **SECURITY-V2-04** Xóa fallback mật khẩu DB, cô lập cấu hình `.env` V2 và chặn script phá dữ liệu ở production.
+- [x] **SECURITY-V2-05** Khôi phục Telegram tiền vào sau khi commit webhook; healthcheck được giữ public; xóa webhook subscriber thừa.
+- [x] **SECURITY-V2-06** Phát event order sau commit, tạo credit note trong transaction hủy đơn và khóa dòng khi webhook khớp đơn.
+- [x] **SECURITY-V2-07** Khóa các cron có ghi dữ liệu bằng PostgreSQL transaction advisory lock để không chạy trùng giữa nhiều process.
+- [x] **SECURITY-V2-08** Chặn URL mở browser kho ngoài allowlist HTTPS; thêm `npm test` không ghi DB và `test:integration` bắt buộc `TEST_DATABASE_URL` có tên database chứa `test`.
+- [x] **SECURITY-V2-09** Khóa biên lai và đơn khi phân bổ thủ công, chỉ cho phép thanh toán đơn `UNPAID`/`RENEW_REQUIRED`, phát event sau commit và cách ly lỗi callback sau commit.
+- [x] **SECURITY-V2-10** Sửa cộng lãi tiết kiệm theo phút/giờ Việt Nam và chu kỳ `DAILY`/`MONTHLY`/`YEARLY`; lưu marker kỳ đã cộng trên `finance.personal_savings` qua migration V2.
+- [x] **SECURITY-V2-11** Chuyển profile browser kho ra ngoài thư mục backend để `nodemon` không restart và làm đóng browser; giữ cửa sổ mở khi tự điều hướng lỗi, di trú profile cũ lần đầu và xử lý response rỗng ở UI.
+- [x] **SECURITY-V2-12** Browser kho mở cửa sổ nhỏ mặc định `760×640`, thay vì maximize; cho phép cấu hình bằng biến môi trường.
+- [x] **SECURITY-V2-13** Add admin.user_sessions migration for connect-pg-simple; applied and live-verified in the V2 sandbox database.
+- [x] **FIX-V2-01** Restore warehouse rendering by importing CheckCircle2 and wiring login-state props; frontend build and live auth session flow pass.
+- [x] **FIX-V2-02** Warehouse login icon now follows a verified session cookie from the account profile; remove click-only local state toggle and add configurable exact cookie names.
+- [x] **FIX-V2-03** Adobe icon validation now requires non-empty `idg_token` and no visible login form; live profile `110` correctly remains logged out while Adobe Sign in is displayed.
+- [x] **FIX-V2-04** Persist trạng thái xác minh phiên browser kho trong warehouse.account_slots; icon đăng nhập được khôi phục từ API sau F5 và mỗi lần bấm vẫn kiểm tra profile thực.

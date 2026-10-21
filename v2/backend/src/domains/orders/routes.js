@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const orderService = require("./services/orderService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
 // GET /api/orders - Lấy danh sách đơn hàng
 router.get("/", async (req, res) => {
@@ -35,7 +36,7 @@ router.post("/", async (req, res) => {
     res.status(201).json(created);
   } catch (err) {
     console.error("[Orders API] Lỗi tạo đơn hàng mới:", err);
-    res.status(400).json({ error: err.message || "Không thể tạo đơn hàng mới." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể tạo đơn hàng mới.") });
   }
 });
 
@@ -46,7 +47,7 @@ router.put("/:id", async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error("[Orders API] Lỗi cập nhật đơn hàng:", err);
-    res.status(400).json({ error: err.message || "Không thể cập nhật đơn hàng." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật đơn hàng.") });
   }
 });
 
@@ -57,7 +58,7 @@ router.post("/:id/renew", async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error("[Orders API] Lỗi gia hạn đơn hàng:", err);
-    res.status(400).json({ error: err.message || "Không thể thực hiện gia hạn đơn hàng." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể thực hiện gia hạn đơn hàng.") });
   }
 });
 
@@ -68,7 +69,7 @@ router.post("/:id/process", async (req, res) => {
     res.json({ success: true, data: updated });
   } catch (err) {
     console.error("[Orders API] Lỗi chuyển đơn sang Đang Xử Lý:", err);
-    res.status(400).json({ error: err.message || "Không thể chuyển đơn sang Đang Xử Lý." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể chuyển đơn sang Đang Xử Lý.") });
   }
 });
 
@@ -81,7 +82,7 @@ router.post("/:id/complete", async (req, res) => {
     res.json({ success: true, data: updatedOrder });
   } catch (err) {
     console.error("[Orders API] Lỗi hoàn thành đơn hàng:", err);
-    res.status(400).json({ error: err.message || "Không thể hoàn thành đơn hàng." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể hoàn thành đơn hàng.") });
   }
 });
 
@@ -96,7 +97,7 @@ router.post("/:id/pay-credit", async (req, res) => {
     res.json({ success: true, data: updated });
   } catch (err) {
     console.error("[Orders API] Lỗi thanh toán bằng credit:", err);
-    res.status(400).json({ error: err.message || "Không thể thanh toán bằng credit." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể thanh toán bằng credit.") });
   }
 });
 
@@ -107,7 +108,7 @@ router.delete("/:id", async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("[Orders API] Lỗi xóa đơn hàng:", err);
-    res.status(400).json({ error: err.message || "Không thể xóa đơn hàng." });
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa đơn hàng.") });
   }
 });
 
