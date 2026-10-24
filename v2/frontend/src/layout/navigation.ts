@@ -15,6 +15,7 @@ import {
   Warehouse,
   Landmark,
   Shield,
+  ShieldCheck,
   Sliders,
   Tv,
   Newspaper,
@@ -72,6 +73,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     groupName: "Hệ thống & Ví",
     items: [
       { name: "Cấu hình Hệ thống", path: "/system-config", icon: Settings },
+      { name: "Nhật ký Hoạt động", path: "/system-logs", icon: ShieldCheck },
       { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
       { name: "Cấu hình API bên thứ 3", path: "/external-api-config", icon: Sliders },
       { name: "Quản trị Netflix", path: "/netflix", icon: Tv },

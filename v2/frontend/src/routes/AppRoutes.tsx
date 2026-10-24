@@ -18,6 +18,7 @@ const SystemPage = React.lazy(() => import("@/pages/SystemPage").then(m => ({ de
 const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPage").then(m => ({ default: m.FinanceHubPage })));
 const TrafficPage = React.lazy(() => import("@/features/traffic/TrafficPage").then(m => ({ default: m.TrafficPage })));
 const ExternalImportsPage = React.lazy(() => import("@/pages/ExternalImportsPage").then(m => ({ default: m.ExternalImportsPage })));
+const SystemLogsPage = React.lazy(() => import("@/pages/SystemLogsPage").then(m => ({ default: m.SystemLogsPage })));
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -201,6 +202,7 @@ export const AppRoutes: React.FC = () => {
           />
         }
       />
+      <Route path="/system-logs" element={<SystemLogsPage />} />
       <Route
         path="/promo-codes"
         element={

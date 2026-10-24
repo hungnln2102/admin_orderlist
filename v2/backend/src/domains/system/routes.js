@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const systemConfigService = require("./services/systemConfigService");
 const cronJobService = require("./services/cronJobService");
+const systemLogService = require("./services/systemLogService");
 const scheduler = require("@/scheduler");
 const { getClientErrorMessage } = require("@/utils/clientError");
 
@@ -90,6 +91,42 @@ router.get("/cron-jobs/:id/logs", async (req, res) => {
     res.json(await cronJobService.listLogs(req.params.id));
   } catch (err) {
     res.status(404).json({ error: getClientErrorMessage(err, "Không tìm thấy lịch sử tác vụ.") });
+  }
+});
+
+// GET /api/system/audit-logs - Lấy danh sách nhật ký hoạt động hệ thống
+router.get("/audit-logs", async (req, res) => {
+  try {
+    const result = await systemLogService.getAuditLogs(req.query);
+    res.json(result);
+  } catch (err) {
+    console.error("[System Audit API] Lỗi lấy danh sách nhật ký:", err);
+    res.status(500).json({ error: "Lỗi hệ thống khi tải nhật ký hoạt động." });
+  }
+});
+
+// GET /api/system/audit-logs/stats - Lấy thống kê nhật ký
+router.get("/audit-logs/stats", async (req, res) => {
+  try {
+    const stats = await systemLogService.getAuditLogStats();
+    res.json(stats);
+  } catch (err) {
+    console.error("[System Audit API] Lỗi lấy thống kê nhật ký:", err);
+    res.status(500).json({ error: "Lỗi hệ thống khi tải thống kê nhật ký." });
+  }
+});
+
+// GET /api/system/audit-logs/:id - Lấy chi tiết 1 bản ghi nhật ký
+router.get("/audit-logs/:id", async (req, res) => {
+  try {
+    const log = await systemLogService.getAuditLogById(req.params.id);
+    if (!log) {
+      return res.status(404).json({ error: "Không tìm thấy bản ghi nhật ký." });
+    }
+    res.json(log);
+  } catch (err) {
+    console.error("[System Audit API] Lỗi lấy chi tiết nhật ký:", err);
+    res.status(500).json({ error: "Lỗi hệ thống khi tải chi tiết nhật ký." });
   }
 });
 

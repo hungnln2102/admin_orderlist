@@ -337,6 +337,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                     selectedSupplierName={formData.supply_id}
                     onSelectSupplier={onSupplierChange}
                     loadingSuppliers={loadingSuppliers}
+                    disabled={!selectedProductId && !formData.id_product}
                   />
                 )}
               </div>

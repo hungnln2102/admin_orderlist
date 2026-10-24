@@ -39,7 +39,7 @@ exports.up = async function (knex) {
       information_order TEXT,
       customer VARCHAR(255),
       contact VARCHAR(255),
-      slot INT DEFAULT 1,
+      slot VARCHAR(255),
       order_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       days INT DEFAULT 30,
       expired_at TIMESTAMPTZ,

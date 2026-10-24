@@ -4,9 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const knex = require('knex');
 
-const EXPECTED_TARGET_DATABASE = 'mydtbmav_v2_import';
+const EXPECTED_TARGET_DATABASES = ['mydtbmav', 'mydtbmav_v2_import'];
 const applyChanges = process.argv.includes('--apply');
 const resetTarget = process.argv.includes('--reset-target');
+
+const { TABLES } = require('../src/db');
 
 const SOURCE = {
   suppliers: 'business.supplier',
@@ -23,10 +25,17 @@ const SOURCE = {
 };
 
 const TARGET = {
-  ...SOURCE,
-  accounts: 'warehouse.accounts',
-  slots: 'warehouse.account_slots',
-  packages: 'warehouse.package_products',
+  suppliers: TABLES.SUPPLIER,
+  products: TABLES.PRODUCT,
+  variants: TABLES.VARIANT,
+  variantPrices: TABLES.VARIANT_PRICE,
+  supplierCosts: TABLES.SUPPLIER_COST,
+  orders: TABLES.ORDER_LIST,
+  supplierLogs: TABLES.SUPPLIER_ORDER_COST_LOG,
+  accounts: TABLES.PRODUCT_KEYS,
+  slots: TABLES.STOCK_SERVICES,
+  productNames: TABLES.PRODUCT_NAMES,
+  packages: TABLES.PACKAGE_PRODUCT,
 };
 
 const STATUS_MAP = new Map([
@@ -54,8 +63,8 @@ function connectionUrl(envName, fallbackDatabase) {
 
 function assertSafeTarget(url) {
   const name = databaseName(url);
-  if (name !== EXPECTED_TARGET_DATABASE && process.env.ALLOW_UNSAFE_TARGET !== '1') {
-    throw new Error(`Refusing write target ${name}; expected ${EXPECTED_TARGET_DATABASE}.`);
+  if (!EXPECTED_TARGET_DATABASES.includes(name) && process.env.ALLOW_UNSAFE_TARGET !== '1') {
+    throw new Error(`Refusing write target ${name}; expected one of ${EXPECTED_TARGET_DATABASES.join(', ')}.`);
   }
 }
 
@@ -271,15 +280,15 @@ async function validateTarget(sourceDb, targetDb, report) {
     admin_users: await count('admin.users'),
   };
   const checks = {
-    supplier_cost_missing_variant: 'SELECT COUNT(*)::int AS count FROM business.supplier_cost sc LEFT JOIN business.variant v ON v.id = sc.variant_id WHERE v.id IS NULL',
-    supplier_cost_missing_supplier: 'SELECT COUNT(*)::int AS count FROM business.supplier_cost sc LEFT JOIN business.supplier s ON s.id = sc.supplier_id WHERE s.id IS NULL',
-    supplier_log_missing_order: 'SELECT COUNT(*)::int AS count FROM business.supplier_order_cost_log l LEFT JOIN business.order_list o ON o.id = l.order_list_id WHERE l.order_list_id IS NOT NULL AND o.id IS NULL',
-    supplier_log_missing_supplier: 'SELECT COUNT(*)::int AS count FROM business.supplier_order_cost_log l LEFT JOIN business.supplier s ON s.id = l.supply_id WHERE l.supply_id IS NOT NULL AND s.id IS NULL',
-    slot_missing_account: 'SELECT COUNT(*)::int AS count FROM warehouse.account_slots s LEFT JOIN warehouse.accounts a ON a.id = s.account_id WHERE s.account_id IS NOT NULL AND a.id IS NULL',
-    slot_missing_name: 'SELECT COUNT(*)::int AS count FROM warehouse.account_slots s LEFT JOIN warehouse.product_names n ON n.id = s.name_id WHERE s.name_id IS NOT NULL AND n.id IS NULL',
-    package_missing_account: 'SELECT COUNT(*)::int AS count FROM warehouse.package_products p LEFT JOIN warehouse.accounts a ON a.id = p.account_id WHERE p.account_id IS NOT NULL AND a.id IS NULL',
-    package_missing_storage: 'SELECT COUNT(*)::int AS count FROM warehouse.package_products p LEFT JOIN warehouse.accounts a ON a.id = p.storage_account_id WHERE p.storage_account_id IS NOT NULL AND a.id IS NULL',
-    package_missing_name: 'SELECT COUNT(*)::int AS count FROM warehouse.package_products p LEFT JOIN warehouse.product_names n ON n.id = p.product_name_id WHERE p.product_name_id IS NOT NULL AND n.id IS NULL',
+    supplier_cost_missing_variant: `SELECT COUNT(*)::int AS count FROM ${TARGET.supplierCosts} sc LEFT JOIN ${TARGET.variants} v ON v.id = sc.variant_id WHERE v.id IS NULL`,
+    supplier_cost_missing_supplier: `SELECT COUNT(*)::int AS count FROM ${TARGET.supplierCosts} sc LEFT JOIN ${TARGET.suppliers} s ON s.id = sc.supplier_id WHERE s.id IS NULL`,
+    supplier_log_missing_order: `SELECT COUNT(*)::int AS count FROM ${TARGET.supplierLogs} l LEFT JOIN ${TARGET.orders} o ON o.id = l.order_list_id WHERE l.order_list_id IS NOT NULL AND o.id IS NULL`,
+    supplier_log_missing_supplier: `SELECT COUNT(*)::int AS count FROM ${TARGET.supplierLogs} l LEFT JOIN ${TARGET.suppliers} s ON s.id = l.supply_id WHERE l.supply_id IS NOT NULL AND s.id IS NULL`,
+    slot_missing_account: `SELECT COUNT(*)::int AS count FROM ${TARGET.slots} s LEFT JOIN ${TARGET.accounts} a ON a.id = s.account_id WHERE s.account_id IS NOT NULL AND a.id IS NULL`,
+    slot_missing_name: `SELECT COUNT(*)::int AS count FROM ${TARGET.slots} s LEFT JOIN ${TARGET.productNames} n ON n.id = s.name_id WHERE s.name_id IS NOT NULL AND n.id IS NULL`,
+    package_missing_account: `SELECT COUNT(*)::int AS count FROM ${TARGET.packages} p LEFT JOIN ${TARGET.accounts} a ON a.id = p.account_id WHERE p.account_id IS NOT NULL AND a.id IS NULL`,
+    package_missing_storage: `SELECT COUNT(*)::int AS count FROM ${TARGET.packages} p LEFT JOIN ${TARGET.accounts} a ON a.id = p.storage_account_id WHERE p.storage_account_id IS NOT NULL AND a.id IS NULL`,
+    package_missing_name: `SELECT COUNT(*)::int AS count FROM ${TARGET.packages} p LEFT JOIN ${TARGET.productNames} n ON n.id = p.product_name_id WHERE p.product_name_id IS NOT NULL AND n.id IS NULL`,
   };
   report.validation.integrity = {};
   for (const [name, sql] of Object.entries(checks)) report.validation.integrity[name] = Number((await targetDb.raw(sql)).rows[0].count);

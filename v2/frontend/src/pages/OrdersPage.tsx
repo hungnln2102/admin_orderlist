@@ -187,11 +187,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     if (!productIdVal) {
       setSelectedProductId(null);
       setProductSuppliersCatalog([]);
+      setFormData((prev) => ({ ...prev, id_product: "", supply_id: "", cost: 0 }));
       return;
     }
 
     const pId = Number(productIdVal);
-    const prod = productsCatalog.find((p) => p.id === pId);
+    const prod = productsCatalog.find(
+      (p) => p.id === pId || String(p.id) === String(productIdVal) || p.san_pham === productIdVal
+    );
     if (!prod) return;
 
     setSelectedProductId(prod.id);
