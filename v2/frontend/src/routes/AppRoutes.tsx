@@ -184,6 +184,24 @@ export const AppRoutes: React.FC = () => {
         }
       />
       <Route
+        path="/ip-whitelist"
+        element={
+          <GenericPage
+            title="IP Whitelist Quản Trị"
+            category="Hệ thống Website"
+            description="Cấu hình địa chỉ IP được phép truy cập trang Admin"
+            columns={[
+              { key: "ipAddress", label: "Địa chỉ IP" },
+              { key: "description", label: "Ghi chú" },
+              { key: "status", label: "Trạng thái" },
+            ]}
+            sampleData={[
+              { ipAddress: "180.93.43.169", description: "VPS Server Master", status: "Cho phép" },
+            ]}
+          />
+        }
+      />
+      <Route
         path="/promo-codes"
         element={
           <GenericPage
@@ -233,24 +251,6 @@ export const AppRoutes: React.FC = () => {
       <Route path="/payment-accounts" element={<Navigate to="/shop-bank-accounts" replace />} />
       <Route path="/usdt-wallets" element={<Navigate to="/shop-bank-accounts" replace />} />
       <Route
-        path="/ip-whitelist"
-        element={
-          <GenericPage
-            title="IP Whitelist Quản Trị"
-            category="Hệ thống & Ví"
-            description="Cấu hình địa chỉ IP được phép truy cập trang Admin"
-            columns={[
-              { key: "ipAddress", label: "Địa chỉ IP" },
-              { key: "description", label: "Ghi chú" },
-              { key: "status", label: "Trạng thái" },
-            ]}
-            sampleData={[
-              { ipAddress: "180.93.43.169", description: "VPS Server Master", status: "Cho phép" },
-            ]}
-          />
-        }
-      />
-      <Route
         path="/external-api-config"
         element={
           <GenericPage
@@ -265,59 +265,6 @@ export const AppRoutes: React.FC = () => {
             sampleData={[
               { service: "Sepay Auto Webhook", apiKey: "sepay_sec_*******", status: "Đã kết nối" },
               { service: "Telegram Bot Notify", apiKey: "bot_token_*******", status: "Đã kết nối" },
-            ]}
-          />
-        }
-      />
-      <Route
-        path="/renew-adobe-admin"
-        element={
-          <GenericPage
-            title="Renew Adobe Admin Console"
-            category="Hệ thống & Ví"
-            description="Quản trị hệ thống gia hạn Adobe tự động"
-            columns={[
-              { key: "teamName", label: "Tên Team Adobe" },
-              { key: "adminEmail", label: "Email Admin" },
-              { key: "slotsUsed", label: "Slots đã dùng" },
-            ]}
-            sampleData={[
-              { teamName: "Mavryk Adobe Team #1", adminEmail: "admin@mavrykpremium.com", slotsUsed: "48 / 50 Slots" },
-            ]}
-          />
-        }
-      />
-      <Route
-        path="/renew-adobe-system-logs"
-        element={
-          <GenericPage
-            title="Renew System Logs"
-            category="Hệ thống & Ví"
-            description="Nhật ký chi tiết các tác vụ gia hạn tự động"
-            columns={[
-              { key: "time", label: "Thời gian" },
-              { key: "level", label: "Mức độ" },
-              { key: "message", label: "Nội dung Log" },
-            ]}
-            sampleData={[
-              { time: "19/09/2026 18:30:00", level: "INFO", message: "Gia hạn thành công user phamthilananh@gmail.com" },
-            ]}
-          />
-        }
-      />
-      <Route
-        path="/renew-adobe-check"
-        element={
-          <GenericPage
-            title="Renew Profile Check Desk"
-            category="Hệ thống & Ví"
-            description="Kiểm tra trạng thái profile tài khoản Adobe"
-            columns={[
-              { key: "email", label: "Email tài khoản" },
-              { key: "status", label: "Trạng thái Profile" },
-            ]}
-            sampleData={[
-              { email: "user1@gmail.com", status: "Active Premium" },
             ]}
           />
         }

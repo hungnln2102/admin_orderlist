@@ -5,17 +5,13 @@ import {
   Receipt,
   ShoppingCart,
   CreditCard,
-  RefreshCw,
   Package,
   Layers,
   FileText,
   Tag,
   Key,
-  ShieldCheck,
-  Gift,
   Building2,
   PackagePlus,
-  Boxes,
   Warehouse,
   Landmark,
   Shield,
@@ -25,7 +21,6 @@ import {
   PenTool,
   FolderKanban,
   Image,
-  Logs,
   Settings
 } from "lucide-react";
 
@@ -78,11 +73,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Cấu hình Hệ thống", path: "/system-config", icon: Settings },
       { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
-      { name: "IP Whitelist", path: "/ip-whitelist", icon: Shield },
       { name: "Cấu hình API bên thứ 3", path: "/external-api-config", icon: Sliders },
-      { name: "Renew Adobe Admin", path: "/renew-adobe-admin", icon: RefreshCw },
-      { name: "Renew System Logs", path: "/renew-adobe-system-logs", icon: Logs },
-      { name: "Renew Adobe Check", path: "/renew-adobe-check", icon: ShieldCheck },
       { name: "Quản trị Netflix", path: "/netflix", icon: Tv },
     ],
   },
@@ -101,6 +92,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
       { name: "Thông tin Sản phẩm", path: "/product-info", icon: Layers },
       { name: "Cấu hình Form Đơn", path: "/form-info", icon: FileText },
       { name: "Active Keys", path: "/active-keys", icon: Key },
+      { name: "IP Whitelist", path: "/ip-whitelist", icon: Shield },
     ],
   },
 ];

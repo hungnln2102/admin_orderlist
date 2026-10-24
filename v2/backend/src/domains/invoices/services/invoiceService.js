@@ -25,21 +25,20 @@ function applyOrdersTabFilter(builder) {
 
 function applyOtherTabFilter(builder) {
   builder.where((b) => {
-    b.where(`${TABLES.PAYMENT_RECEIPT}.transfer_type`, "out")
-      .orWhereExists(function () {
-        this.select(db.raw("1"))
-          .from(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
-          .whereRaw(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.receipt_id = ${TABLES.PAYMENT_RECEIPT}.id`)
-          .where(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type`, "!=", ALLOCATION_TYPE.ORDER);
-      });
+    b.where((b2) => {
+      b2.where(`${TABLES.PAYMENT_RECEIPT}.transfer_type`, "out")
+        .where(`${TABLES.PAYMENT_RECEIPT}.status`, "!=", RECEIPT_STATUS.UNALLOCATED);
+    }).orWhereExists(function () {
+      this.select(db.raw("1"))
+        .from(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
+        .whereRaw(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.receipt_id = ${TABLES.PAYMENT_RECEIPT}.id`)
+        .where(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type`, "!=", ALLOCATION_TYPE.ORDER);
+    });
   });
 }
 
 function applyUnlistedTabFilter(builder) {
-  builder.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.UNALLOCATED)
-    .where((b) => {
-      b.whereNull(`${TABLES.PAYMENT_RECEIPT}.transfer_type`).orWhere(`${TABLES.PAYMENT_RECEIPT}.transfer_type`, "!=", "out");
-    });
+  builder.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.UNALLOCATED);
 }
 
 // ────────────── getInvoices ──────────────

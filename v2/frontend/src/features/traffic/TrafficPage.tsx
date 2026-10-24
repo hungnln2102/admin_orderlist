@@ -278,9 +278,9 @@ export const TrafficPage: React.FC = () => {
   // Helper tính tọa độ SVG cho biểu đồ đường cong
   const chartPoints = data?.trafficData || [];
   const maxVal = useMemo(() => {
-    if (!chartPoints.length) return 100;
+    if (!chartPoints.length) return 5;
     const max = Math.max(...chartPoints.map((d) => Math.max(d.pageviews, d.visitors)));
-    return max > 0 ? max * 1.15 : 100;
+    return max > 0 ? Math.max(5, Math.ceil(max * 1.25)) : 5;
   }, [chartPoints]);
 
   const svgWidth = 1000;
@@ -491,7 +491,9 @@ export const TrafficPage: React.FC = () => {
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <span>Biến Động Lưu Lượng Theo Thời Gian</span>
-                <span className="text-[11px] font-mono text-slate-400 font-normal">({chartPoints.length} mốc ngày)</span>
+                <span className="text-[11px] font-mono text-slate-400 font-normal">
+                  ({days === 1 ? "24 mốc giờ" : `${chartPoints.length} mốc ngày`})
+                </span>
               </h2>
               <p className="text-xs text-slate-400">So sánh tương quan giữa Lượt xem trang (Pageviews) và Khách truy cập (Visitors)</p>
             </div>
@@ -582,7 +584,10 @@ export const TrafficPage: React.FC = () => {
                 })}
               </svg>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm">Đang tải dữ liệu biểu đồ...</div>
+              <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2">
+                <BarChart3 className="w-8 h-8 text-slate-600" />
+                <span>Chưa phát sinh lượt truy cập trong khoảng thời gian này</span>
+              </div>
             )}
 
             {/* Hover Tooltip Box */}

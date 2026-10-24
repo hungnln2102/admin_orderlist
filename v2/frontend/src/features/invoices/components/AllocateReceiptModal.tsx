@@ -55,6 +55,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     ? Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount)
     : 0;
 
+  const generateRandomImportId = () => `IMP-${Math.floor(100 + Math.random() * 900)}`;
+
   useEffect(() => {
     if (receipt) {
       const avail = Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount);
@@ -63,7 +65,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
 
       if (isOut) {
         setAllocationType("OPERATIONAL_EXPENSE");
-        setImportId(`IMP-${Math.floor(100 + Math.random() * 900)}`);
+        setImportId(generateRandomImportId());
         setSupplierName(receipt.sender || "");
         setTargetCode("");
       } else {
@@ -115,8 +117,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       return;
     }
 
-    if (allocationType === "EXTERNAL_IMPORT" && (!importId.trim() || !supplierName.trim())) {
-      setError("Vui lòng nhập Mã đơn nhập và Tên Nhà Cung Cấp / Nguồn hàng.");
+    if (allocationType === "EXTERNAL_IMPORT" && !supplierName.trim()) {
+      setError("Vui lòng nhập Tên Nhà Cung Cấp / Nguồn hàng.");
       return;
     }
 
@@ -128,7 +130,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         : (note.trim() || (allocationType === "OTHER_INCOME" ? "Khách tip / tặng thêm" : ""));
 
       const finalTargetCode = allocationType === "EXTERNAL_IMPORT"
-        ? importId.trim()
+        ? (importId.trim() || generateRandomImportId())
         : (allocationType === "ORDER" ? targetCode.trim() : null);
 
       const res = await fetch(`/api/invoices/${receipt.id}/allocate`, {
@@ -265,7 +267,10 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                   {/* EXTERNAL_IMPORT (Nhập Ngoài Luồng) */}
                   <button
                     type="button"
-                    onClick={() => setAllocationType("EXTERNAL_IMPORT")}
+                    onClick={() => {
+                      setAllocationType("EXTERNAL_IMPORT");
+                      if (!importId) setImportId(generateRandomImportId());
+                    }}
                     className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
                       allocationType === "EXTERNAL_IMPORT"
                         ? "bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md shadow-amber-950/40"
@@ -344,31 +349,24 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
           {/* EXTERNAL_IMPORT Fields (For Nhập Ngoài Luồng) */}
           {allocationType === "EXTERNAL_IMPORT" && (
             <div className="p-4 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-3">
-              <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                <PackagePlus className="w-4 h-4" />
-                Thông Tin Nhập Nguồn Ngoài Luồng
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <PackagePlus className="w-4 h-4" />
+                  Thông Tin Nhập Nguồn Ngoài Luồng
+                </div>
+                <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
+                  Mã tự động: {importId || "Tự tạo"}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">MÃ ĐƠN NHẬP *</label>
-                  <input
-                    type="text"
-                    value={importId}
-                    onChange={(e) => setImportId(e.target.value.toUpperCase())}
-                    placeholder="VD: IMP-882"
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-amber-300 font-mono font-bold text-xs uppercase focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">NHÀ CUNG CẤP / NGUỒN *</label>
-                  <input
-                    type="text"
-                    value={supplierName}
-                    onChange={(e) => setSupplierName(e.target.value)}
-                    placeholder="VD: Adobe Global"
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">NHÀ CUNG CẤP / NGUỒN *</label>
+                <input
+                  type="text"
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  placeholder="VD: Adobe Global, MAVRYK STORE..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 text-xs focus:outline-none focus:border-amber-500 transition-all"
+                />
               </div>
             </div>
           )}

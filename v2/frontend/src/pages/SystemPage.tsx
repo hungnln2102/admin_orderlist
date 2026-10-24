@@ -12,15 +12,10 @@ import {
   ToggleLeft,
   ToggleRight,
   Database,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
   X,
-  Eye,
-  Info,
-  Key,
+  AlarmClock,
 } from "lucide-react";
+import { CronSchedulerTab } from "@/features/system/components/CronSchedulerTab";
 
 interface SystemConfig {
   id: number;
@@ -34,20 +29,8 @@ interface SystemConfig {
   updated_by: string;
 }
 
-interface NotificationLog {
-  id: number;
-  channel: string;
-  event_type: string;
-  recipient: string;
-  message_content: string;
-  status: "SENT" | "FAILED" | "PENDING";
-  error_message: string | null;
-  sent_at: string | null;
-  created_at: string;
-}
-
 export const SystemPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"general" | "telegram" | "integrations" | "backup" | "logs">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "cron" | "telegram" | "backup">("general");
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -56,15 +39,7 @@ export const SystemPage: React.FC = () => {
   // Editable Values state
   const [formData, setFormData] = useState<Record<string, any>>({});
 
-  // Notification Logs state
-  const [logs, setLogs] = useState<NotificationLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
-  const [logsFilterStatus, setLogsFilterStatus] = useState<string>("");
-  const [logsSearchQuery, setLogsSearchQuery] = useState<string>("");
-
-  // Modal State
-  const [selectedLog, setSelectedLog] = useState<NotificationLog | null>(null);
+  // Telegram test modal
   const [testMessageText, setTestMessageText] = useState<string>("");
   const [testTopicId, setTestTopicId] = useState<string>("");
   const [sendingTest, setSendingTest] = useState(false);
@@ -95,37 +70,9 @@ export const SystemPage: React.FC = () => {
     }
   };
 
-  // 2. Load Notification Logs
-  const fetchLogs = async (page = 1, status = logsFilterStatus) => {
-    try {
-      setLogsLoading(true);
-      const query = new URLSearchParams({
-        page: String(page),
-        limit: String(logsPagination.limit),
-      });
-      if (status) query.append("status", status);
-
-      const res = await fetch(`/api/system/notification-logs?${query.toString()}`);
-      if (!res.ok) throw new Error("Không thể tải nhật ký thông báo.");
-      const result = await res.json();
-      setLogs(result.data || []);
-      setLogsPagination(result.pagination || { page: 1, limit: 15, total: 0, totalPages: 1 });
-    } catch (err: any) {
-      showToast("error", err.message || "Lỗi tải nhật ký thông báo");
-    } finally {
-      setLogsLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchConfigs();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === "logs") {
-      fetchLogs(1, logsFilterStatus);
-    }
-  }, [activeTab, logsFilterStatus]);
 
   // Handle Input Change
   const handleChange = (key: string, value: any) => {
@@ -158,17 +105,6 @@ export const SystemPage: React.FC = () => {
   };
 
   const getConfigObj = (key: string) => configs.find((c) => c.config_key === key);
-
-  // Filter logs locally by search query
-  const filteredLogs = logs.filter((log) => {
-    if (!logsSearchQuery.trim()) return true;
-    const q = logsSearchQuery.toLowerCase();
-    return (
-      log.event_type.toLowerCase().includes(q) ||
-      log.message_content.toLowerCase().includes(q) ||
-      (log.recipient && log.recipient.toLowerCase().includes(q))
-    );
-  });
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans text-slate-100">
@@ -233,6 +169,18 @@ export const SystemPage: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveTab("cron")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === "cron"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <AlarmClock className="w-4 h-4 text-cyan-400" />
+          Lịch Trình Tác Vụ (Báo Thức Cron)
+        </button>
+
+        <button
           onClick={() => setActiveTab("telegram")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
             activeTab === "telegram"
@@ -242,18 +190,6 @@ export const SystemPage: React.FC = () => {
         >
           <Bell className="w-4 h-4" />
           Thông Báo Telegram
-        </button>
-
-        <button
-          onClick={() => setActiveTab("integrations")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-            activeTab === "integrations"
-              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-          }`}
-        >
-          <Key className="w-4 h-4" />
-          API Keys & Tích Hợp
         </button>
 
         <button
@@ -267,19 +203,12 @@ export const SystemPage: React.FC = () => {
           <Database className="w-4 h-4" />
           Backup & Google Drive
         </button>
-
-        <button
-          onClick={() => setActiveTab("logs")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-            activeTab === "logs"
-              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          Nhật Ký Thông Báo (Logs)
-        </button>
       </div>
+
+      {/* Tab: Smart Cron Scheduler (Alarm UI) */}
+      {activeTab === "cron" && (
+        <CronSchedulerTab onShowToast={(type, text) => showToast(type, text)} />
+      )}
 
       {/* Tab 1: General Business Configs */}
       {activeTab === "general" && (
@@ -539,41 +468,6 @@ export const SystemPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab: API Keys & Integrations */}
-      {activeTab === "integrations" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[
-            { key: "GOOGLE_API_KEY", label: "Google API Key", desc: "Khóa API tích hợp Google Sheets, Maps hoặc Google Services" },
-            { key: "AI_API_KEY", label: "AI / Gemini / OpenAI API Key", desc: "Khóa API tích hợp các dịch vụ Trí tuệ nhân tạo (AI Assistant)" },
-            { key: "SEPAY_API_KEY", label: "SePay API Key", desc: "Khóa API dùng để gọi các dịch vụ SePay API" },
-            { key: "SEPAY_WEBHOOK_SECRET", label: "SePay Webhook Secret", desc: "Mã xác thực Webhook Token từ cổng SePay" },
-            { key: "WEBHOOK_SECRET", label: "General Webhook Secret", desc: "Mã xác thực webhook chung cho hệ thống" },
-          ].map((item) => (
-            <div key={item.key} className="p-6 bg-slate-900/70 rounded-2xl border border-slate-800/90 space-y-3 shadow-xl">
-              <label className="text-xs font-bold text-white block">{item.label} ({item.key})</label>
-              <p className="text-[11px] text-slate-400">{item.desc}</p>
-              <div className="flex items-center gap-3 pt-1">
-                <input
-                  type="password"
-                  placeholder="VD: AIzaSy..."
-                  value={formData[item.key] ?? ""}
-                  onChange={(e) => handleChange(item.key, e.target.value)}
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition-all font-mono"
-                />
-                <button
-                  onClick={() => handleSaveConfig(item.key)}
-                  disabled={savingKey === item.key}
-                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  {savingKey === item.key ? "Đang lưu..." : "Lưu Key"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Tab: Backup & Google Drive */}
       {activeTab === "backup" && (
         <div className="space-y-6">
@@ -627,213 +521,6 @@ export const SystemPage: React.FC = () => {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Notification Logs Audit */}
-      {activeTab === "logs" && (
-        <div className="p-6 bg-slate-900/70 rounded-2xl border border-slate-800/90 space-y-4 shadow-xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-bold text-white">Nhật Ký Gửi Thông Báo (Notification Audit Logs)</h3>
-              <p className="text-[11px] text-slate-400">Giám sát lịch sử tất cả các tin nhắn phát sinh từ EventBus tới Telegram</p>
-            </div>
-
-            {/* Controls & Search */}
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Local Search Input */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo nội dung..."
-                  value={logsSearchQuery}
-                  onChange={(e) => setLogsSearchQuery(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 w-44"
-                />
-              </div>
-
-              {/* Status Filter Dropdown */}
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <select
-                  value={logsFilterStatus}
-                  onChange={(e) => setLogsFilterStatus(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="">Tất cả trạng thái</option>
-                  <option value="SENT">Gửi thành công (SENT 🟢)</option>
-                  <option value="FAILED">Gửi thất bại (FAILED 🔴)</option>
-                </select>
-              </div>
-
-              <button
-                onClick={() => fetchLogs(logsPagination.page, logsFilterStatus)}
-                className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 transition-all"
-                title="Làm mới bảng log"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? "animate-spin text-cyan-400" : ""}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider bg-slate-950/40">
-                  <th className="py-3 px-4">ID</th>
-                  <th className="py-3 px-4">Kênh</th>
-                  <th className="py-3 px-4">Loại Sự Kiện</th>
-                  <th className="py-3 px-4">Nội Dung Tin Nhắn</th>
-                  <th className="py-3 px-4">Trạng Thái</th>
-                  <th className="py-3 px-4">Thời Gian</th>
-                  <th className="py-3 px-4 text-right">Thao Tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {logsLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500">
-                      <RefreshCw className="w-5 h-5 animate-spin mx-auto text-cyan-400 mb-2" />
-                      Đang tải nhật ký thông báo...
-                    </td>
-                  </tr>
-                ) : filteredLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500">
-                      Chưa có nhật ký thông báo nào phù hợp.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-4 font-mono text-slate-400">#{log.id}</td>
-                      <td className="py-3 px-4 font-bold text-cyan-400">{log.channel || "TELEGRAM"}</td>
-                      <td className="py-3 px-4 font-semibold text-slate-200">{log.event_type}</td>
-                      <td className="py-3 px-4 max-w-md truncate text-slate-300 font-mono text-[11px]" title={log.message_content}>
-                        {log.message_content}
-                      </td>
-                      <td className="py-3 px-4">
-                        {log.status === "SENT" ? (
-                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            SENT 🟢
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            FAILED 🔴
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-slate-400 text-[11px]">
-                        {log.created_at ? new Date(log.created_at).toLocaleString("vi-VN") : "-"}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => setSelectedLog(log)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all"
-                          title="Xem chi tiết nội dung log"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls */}
-          {logsPagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800/80 text-xs text-slate-400">
-              <div>
-                Hiển thị trang <span className="font-bold text-white">{logsPagination.page}</span> /{" "}
-                <span className="font-bold text-white">{logsPagination.totalPages}</span> (Tổng {logsPagination.total} bản ghi)
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => fetchLogs(logsPagination.page - 1, logsFilterStatus)}
-                  disabled={logsPagination.page <= 1}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-lg transition-all flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Trang trước
-                </button>
-                <button
-                  onClick={() => fetchLogs(logsPagination.page + 1, logsFilterStatus)}
-                  disabled={logsPagination.page >= logsPagination.totalPages}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white rounded-lg transition-all flex items-center gap-1"
-                >
-                  Trang sau <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Log Detail Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-                <Info className="w-4 h-4" /> Chi Tiết Nhật Ký Thông Báo #{selectedLog.id}
-              </div>
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-4 bg-slate-950 p-3 rounded-xl border border-slate-800/80">
-                <div>
-                  <span className="text-slate-400 block">Kênh thông báo:</span>
-                  <span className="font-bold text-cyan-300">{selectedLog.channel}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Loại sự kiện:</span>
-                  <span className="font-bold text-slate-200">{selectedLog.event_type}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Trạng thái:</span>
-                  <span className="font-bold text-emerald-400">{selectedLog.status}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Thời gian tạo:</span>
-                  <span className="text-slate-300">{new Date(selectedLog.created_at).toLocaleString("vi-VN")}</span>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-slate-400 font-semibold block mb-1">Nội dung tin nhắn:</span>
-                <pre className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-slate-200 font-mono text-[11px] whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed">
-                  {selectedLog.message_content}
-                </pre>
-              </div>
-
-              {selectedLog.error_message && (
-                <div>
-                  <span className="text-rose-400 font-semibold block mb-1">Thông báo lỗi:</span>
-                  <pre className="bg-rose-950/40 border border-rose-500/30 p-3 rounded-xl text-rose-200 font-mono text-[11px] whitespace-pre-wrap">
-                    {selectedLog.error_message}
-                  </pre>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
-              >
-                Đóng
-              </button>
-            </div>
           </div>
         </div>
       )}

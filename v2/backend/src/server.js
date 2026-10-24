@@ -74,8 +74,8 @@ app.use(
 
 // Khởi chạy và đăng ký Event Subscribers & Cron Scheduler khi khởi động Server
 registerAllSubscribers();
-require("@/scheduler");
 require("@/domains/system/services/systemConfigService").initCache();
+require("@/scheduler").initScheduler().catch((error) => console.error("[Scheduler] Không thể khởi tạo:", error));
 
 // Health Check Endpoint
 app.get("/api/health", async (req, res) => {
