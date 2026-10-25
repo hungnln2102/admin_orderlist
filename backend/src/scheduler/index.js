@@ -4,6 +4,7 @@ const { notifyZeroDaysTask } = require("./tasks/notifyZeroDaysTask");
 const { notifyFourDaysTask } = require("./tasks/notifyFourDaysTask");
 const { finalizeDailySummaryTask } = require("./tasks/finalizeDailySummaryTask");
 const { creditSavingsProfitTask } = require("./tasks/creditSavingsProfitTask");
+const { autoBackupDatabaseTask } = require("./tasks/autoBackupDatabaseTask");
 const cronJobService = require("@/domains/system/services/cronJobService");
 
 const TIMEZONE = "Asia/Ho_Chi_Minh";
@@ -14,6 +15,7 @@ const handlers = {
   notify_four_days: () => notifyFourDaysTask("cron_schedule"),
   credit_savings_profit: () => creditSavingsProfitTask("cron_schedule"),
   finalize_daily_summary: () => finalizeDailySummaryTask("cron_schedule"),
+  auto_backup_database: () => autoBackupDatabaseTask("cron_schedule"),
 };
 
 const serializeResult = (result) => JSON.stringify(result ?? { success: true });

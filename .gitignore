@@ -10,6 +10,8 @@ backend/.env
 backend/.env.*
 v2/
 *.dump
+backups/
+backend/backups/
 backend/creds/
 backend/creds/**
 backend/creds/*.json
