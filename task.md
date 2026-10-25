@@ -345,3 +345,4 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] **FIX-V2-02** Warehouse login icon now follows a verified session cookie from the account profile; remove click-only local state toggle and add configurable exact cookie names.
 - [x] **FIX-V2-03** Adobe icon validation now requires non-empty `idg_token` and no visible login form; live profile `110` correctly remains logged out while Adobe Sign in is displayed.
 - [x] **FIX-V2-04** Persist trạng thái xác minh phiên browser kho trong warehouse.account_slots; icon đăng nhập được khôi phục từ API sau F5 và mỗi lần bấm vẫn kiểm tra profile thực.
+- [x] **DEPLOY-V2-PROD** Xóa toàn bộ mã nguồn V1, sáp nhập V2 làm chuẩn duy nhất, cập nhật file cấu hình Docker/Nginx/Env trên VPS, fix idempotent Knex migration (Batch 1: 9 migrations) và đồng bộ tài khoản admin.users. Hệ thống hoạt động hoàn hảo trên https://admin.mavrykpremium.com (HTTP/2 200 OK).
