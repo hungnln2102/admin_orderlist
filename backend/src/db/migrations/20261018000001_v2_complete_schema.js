@@ -131,6 +131,13 @@ exports.up = async function (knex) {
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
+    ALTER TABLE ${schemaOrders}.order_list
+      ADD COLUMN IF NOT EXISTS was_paid BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+    ALTER TABLE ${schemaPartner}.supplier
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
     CREATE INDEX IF NOT EXISTS idx_order_list_status_v2 ON ${schemaOrders}.order_list (status);
     CREATE INDEX IF NOT EXISTS idx_order_list_id_order_v2 ON ${schemaOrders}.order_list (id_order);
     CREATE INDEX IF NOT EXISTS idx_order_list_expired_at_v2 ON ${schemaOrders}.order_list (expired_at);
@@ -204,6 +211,11 @@ exports.up = async function (knex) {
       applied_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE ${schemaReceipt}.payment_receipt
+      ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'UNALLOCATED',
+      ADD COLUMN IF NOT EXISTS unallocated_amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 
     CREATE INDEX IF NOT EXISTS idx_payment_receipt_id_order ON ${schemaReceipt}.payment_receipt(id_order);
     CREATE INDEX IF NOT EXISTS idx_payment_receipt_payment_date ON ${schemaReceipt}.payment_receipt(payment_date DESC);
@@ -534,6 +546,16 @@ exports.up = async function (knex) {
       createdat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  const hasFinanceUsers = await knex.schema.withSchema(schemaFinance).hasTable("users");
+  if (hasFinanceUsers) {
+    await knex.raw(`
+      INSERT INTO ${schemaAdmin}.users (username, passwordhash, role, createdat)
+      SELECT username, passwordhash, role, createdat
+      FROM ${schemaFinance}.users
+      ON CONFLICT (username) DO NOTHING;
+    `);
+  }
 
   const defaultAdminUser = String(process.env.DEFAULT_ADMIN_USER || '').trim();
   const defaultAdminPass = String(process.env.DEFAULT_ADMIN_PASS || '');

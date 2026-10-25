@@ -137,7 +137,9 @@ const DEFAULT_EXTERNAL_APIS = [
 
 exports.up = async (knex) => {
   await knex.raw("CREATE SCHEMA IF NOT EXISTS ??", [SYSTEM_SCHEMA]);
-  await knex.schema.withSchema(SYSTEM_SCHEMA).createTable("external_api_configs", (table) => {
+  const exists = await knex.schema.withSchema(SYSTEM_SCHEMA).hasTable("external_api_configs");
+  if (!exists) {
+    await knex.schema.withSchema(SYSTEM_SCHEMA).createTable("external_api_configs", (table) => {
     table.increments("id").primary();
     table.string("service_key", 100).notNullable().unique();
     table.string("service_name", 255).notNullable();
@@ -154,6 +156,7 @@ exports.up = async (knex) => {
     table.index(["service_key"]);
     table.index(["category"]);
   });
+  }
 
   await knex.withSchema(SYSTEM_SCHEMA).table("external_api_configs").insert(DEFAULT_EXTERNAL_APIS).onConflict("service_key").ignore();
 };

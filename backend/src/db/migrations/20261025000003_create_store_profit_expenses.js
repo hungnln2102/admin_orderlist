@@ -22,6 +22,11 @@ exports.up = async function (knex) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    ALTER TABLE ${FINANCE_SCHEMA}.store_profit_expenses
+      ADD COLUMN IF NOT EXISTS expense_date DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+      ADD COLUMN IF NOT EXISTS payment_receipt_id BIGINT REFERENCES ${BILLING_SCHEMA}.payment_receipt(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
     CREATE INDEX IF NOT EXISTS idx_store_profit_expenses_date ON ${FINANCE_SCHEMA}.store_profit_expenses(expense_date);
     CREATE INDEX IF NOT EXISTS idx_store_profit_expenses_type ON ${FINANCE_SCHEMA}.store_profit_expenses(expense_type);
     CREATE INDEX IF NOT EXISTS idx_store_profit_expenses_receipt ON ${FINANCE_SCHEMA}.store_profit_expenses(payment_receipt_id);
