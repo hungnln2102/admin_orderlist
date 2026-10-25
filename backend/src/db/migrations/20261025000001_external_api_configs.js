@@ -140,22 +140,27 @@ exports.up = async (knex) => {
   const exists = await knex.schema.withSchema(SYSTEM_SCHEMA).hasTable("external_api_configs");
   if (!exists) {
     await knex.schema.withSchema(SYSTEM_SCHEMA).createTable("external_api_configs", (table) => {
-    table.increments("id").primary();
-    table.string("service_key", 100).notNullable().unique();
-    table.string("service_name", 255).notNullable();
-    table.string("category", 50).notNullable().defaultTo("OTP");
-    table.text("description").defaultTo("");
-    table.text("base_url").notNullable();
-    table.jsonb("endpoints").notNullable().defaultTo(knex.raw("'{}'::jsonb"));
-    table.jsonb("auth_config").notNullable().defaultTo(knex.raw("'{}'::jsonb"));
-    table.jsonb("field_mapping").notNullable().defaultTo(knex.raw("'[]'::jsonb"));
-    table.boolean("is_active").notNullable().defaultTo(true);
-    table.timestamp("created_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    table.timestamp("updated_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
+      table.increments("id").primary();
+      table.string("service_key", 100).notNullable().unique();
+      table.string("service_name", 255).notNullable();
+      table.string("category", 50).notNullable().defaultTo("OTP");
+      table.text("description").defaultTo("");
+      table.text("base_url").notNullable();
+      table.jsonb("endpoints").notNullable().defaultTo(knex.raw("'{}'::jsonb"));
+      table.jsonb("auth_config").notNullable().defaultTo(knex.raw("'{}'::jsonb"));
+      table.jsonb("field_mapping").notNullable().defaultTo(knex.raw("'[]'::jsonb"));
+      table.boolean("is_active").notNullable().defaultTo(true);
+      table.timestamp("created_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
+      table.timestamp("updated_at", { useTz: true }).notNullable().defaultTo(knex.fn.now());
 
-    table.index(["service_key"]);
-    table.index(["category"]);
-  });
+      table.index(["service_key"]);
+      table.index(["category"]);
+    });
+  } else {
+    await knex.raw(`
+      ALTER TABLE ${SYSTEM_SCHEMA}.external_api_configs
+        ADD COLUMN IF NOT EXISTS category VARCHAR(50) NOT NULL DEFAULT 'OTP';
+    `);
   }
 
   await knex.withSchema(SYSTEM_SCHEMA).table("external_api_configs").insert(DEFAULT_EXTERNAL_APIS).onConflict("service_key").ignore();
