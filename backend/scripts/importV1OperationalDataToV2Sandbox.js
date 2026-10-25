@@ -49,6 +49,9 @@ const STATUS_MAP = new Map([
   ['Đã Hoàn Tiền', 'REFUNDED'],
   ['Cần Gia Hạn', 'RENEW_REQUIRED'],
   ['Chưa Thanh Toán', 'UNPAID'],
+  ['Đang Xử Lý', 'PROCESSING'],
+  ['Đang xử lý', 'PROCESSING'],
+  ['PROCESSING', 'PROCESSING'],
   ['EXPIRED', 'EXPIRED'],
   ['PAID', 'PAID'],
   ['REFUNDED', 'REFUNDED'],
@@ -179,6 +182,9 @@ function determineOrderStatus(rawStatus, expiredAtInput, refundInput, todayMidni
   }
   if (['Chưa Thanh Toán', 'UNPAID'].includes(statusStr)) {
     return 'UNPAID';
+  }
+  if (['Đang Xử Lý', 'Đang xử lý', 'PROCESSING'].includes(statusStr)) {
+    return 'PROCESSING';
   }
   if (['Đã Hủy', 'CANCELED', 'CANCELLED'].includes(statusStr)) {
     return 'REFUNDED';

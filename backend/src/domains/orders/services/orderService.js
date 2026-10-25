@@ -217,6 +217,9 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
         WHERE status = '${ORDER_STATUS.PAID}'
       ) as "paidCount",
       COUNT(*) FILTER (
+        WHERE status = '${ORDER_STATUS.PROCESSING}'
+      ) as "processingCount",
+      COUNT(*) FILTER (
         WHERE status = '${ORDER_STATUS.RENEW_REQUIRED}'
       ) as "renewCount",
       COUNT(*) FILTER (

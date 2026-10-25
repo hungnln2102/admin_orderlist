@@ -316,6 +316,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
               className="bg-transparent text-white text-xs font-medium focus:outline-none cursor-pointer"
             >
               <option value="ALL" className="bg-slate-900 text-white">Tất cả trạng thái</option>
+              <option value={ORDER_STATUS.PROCESSING} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.PROCESSING]}</option>
               <option value={ORDER_STATUS.PAID} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.PAID]}</option>
               <option value={ORDER_STATUS.UNPAID} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.UNPAID]}</option>
               <option value={ORDER_STATUS.RENEW_REQUIRED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}</option>
