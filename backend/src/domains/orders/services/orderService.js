@@ -1050,11 +1050,128 @@ async function updateOrder(id, payload) {
  */
 async function renewOrder(id, payload = {}) {
   return await withTransaction(async (trx) => {
-    const existingOrder = await getOrderTable(trx).where({ id: Number(id) }).first();
+    const existingOrder = await getOrderTable(trx).where({ id: Number(id) }).forUpdate().first();
     if (!existingOrder) {
       throw new Error("Không tìm thấy đơn hàng cần gia hạn.");
     }
 
+    const isMavn = Boolean(
+      (existingOrder.id_order && String(existingOrder.id_order).toUpperCase().startsWith("MAVN")) ||
+      (existingOrder.customer && isCustomerMavryk(existingOrder.customer))
+    );
+
+    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+    const daysToAdd = payload.days ? Number(payload.days) : Number(existingOrder.days || 365);
+
+    // ─────────────────────────────────────────────────────────────
+    // 1. XỬ LÝ RIÊNG CHO ĐƠN NHẬP HÀNG (MAVN... / Mavryk)
+    // ─────────────────────────────────────────────────────────────
+    if (isMavn) {
+      const newExpiredAt = calculateNewExpiry(existingOrder.expired_at, daysToAdd);
+      const renewCost = payload.cost != null ? Number(payload.cost) : Number(existingOrder.cost || 0);
+
+      const updateFields = {
+        status: ORDER_STATUS.PAID,
+        was_paid: true,
+        expired_at: newExpiredAt,
+        days: daysToAdd,
+      };
+
+      if (payload.cost !== undefined) updateFields.cost = renewCost;
+      if (payload.note !== undefined) updateFields.note = payload.note;
+      if (payload.supply_id !== undefined) {
+        updateFields.supply_id = payload.supply_id ? Number(payload.supply_id) : existingOrder.supply_id;
+      }
+
+      const [updatedOrder] = await getOrderTable(trx)
+        .where({ id: Number(id) })
+        .update(updateFields)
+        .returning("*");
+
+      // A. Trừ lợi nhuận: Phát event ORDER_IMPORT_CREATED để tăng total_shop_cost và trừ lợi nhuận
+      if (renewCost > 0) {
+        emitOrderEvent(trx, EVENTS.ORDER_IMPORT_CREATED, {
+          orderId: updatedOrder.id,
+          id_order: updatedOrder.id_order,
+          orderCode: updatedOrder.id_order,
+          cost: renewCost,
+          order_date: trx.fn.now(),
+          created_at: trx.fn.now(),
+          customer: updatedOrder.customer,
+          action: "RENEW_IMPORT",
+          summary: `Gia hạn đơn nhập hàng #${updatedOrder.id_order}: ${formatMoney(renewCost)}`,
+        });
+      }
+
+      // B. Quản lý công nợ NCC: Đối với Mavryk (chủ shop) thì KHÔNG TẠO LOG trong NCC
+      const supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
+      let isSupplierMavryk = false;
+      if (supplyId) {
+        const sup = await trx(TABLES.SUPPLIER).where({ id: supplyId }).first();
+        if (sup && String(sup.supplier_name || "").trim().toLowerCase() === "mavryk") {
+          isSupplierMavryk = true;
+        }
+      }
+
+      if (!isSupplierMavryk && supplyId && renewCost > 0) {
+        await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+          order_list_id: updatedOrder.id,
+          supply_id: supplyId,
+          id_order: updatedOrder.id_order,
+          import_cost: renewCost,
+          ncc_payment_status: "Chưa Thanh Toán",
+          logged_at: trx.fn.now(),
+        });
+
+        emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
+          cost: renewCost,
+          supplier_id: supplyId,
+          order_id: updatedOrder.id,
+          id_order: updatedOrder.id_order,
+          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${formatMoney(renewCost)}`,
+        });
+      }
+
+      // C. Phát event cập nhật và gia hạn
+      emitOrderEvent(trx, EVENTS.ORDER_PAID, {
+        orderId: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+        customer: updatedOrder.customer,
+        amount: 0,
+        cost: renewCost,
+        status: updatedOrder.status,
+        isRenewal: true,
+        action: "RENEW_IMPORT",
+      });
+
+      emitOrderEvent(trx, EVENTS.ORDER_RENEWED, {
+        orderId: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+        customer: updatedOrder.customer,
+        daysAdded: daysToAdd,
+        newExpiredAt: updatedOrder.expired_at,
+        action: "RENEW_IMPORT",
+      });
+
+      emitOrderEvent(trx, EVENTS.ORDER_UPDATED, {
+        orderId: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+        customer: updatedOrder.customer,
+        previousStatus: existingOrder.status,
+        newStatus: updatedOrder.status,
+        price: updatedOrder.price,
+        cost: updatedOrder.cost,
+        days: updatedOrder.days,
+        summary: `Gia hạn thành công đơn nhập hàng #${updatedOrder.id_order} (Đã Thanh Toán, gia hạn đến ${newExpiredAt})`,
+        action: "RENEW_IMPORT",
+      });
+
+      return updatedOrder;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. XỬ LÝ CHO ĐƠN BÁN CỦA KHÁCH HÀNG (GIỮ NGUYÊN NHƯ CŨ)
+    // ─────────────────────────────────────────────────────────────
     const rawBasePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
     const basePrice = Math.floor(rawBasePrice / 1000) * 1000 || rawBasePrice;
 
@@ -1062,7 +1179,7 @@ async function renewOrder(id, payload = {}) {
     const suffix = await getAvailableSuffix();
     const finalPrice = applySuffixToPrice(basePrice, suffix);
 
-    const days = payload.days ? Number(payload.days) : Number(existingOrder.days || 365);
+    const days = daysToAdd;
 
     const updateFields = {
       status: ORDER_STATUS.RENEW_REQUIRED,
@@ -1079,7 +1196,6 @@ async function renewOrder(id, payload = {}) {
       .update(updateFields)
       .returning("*");
 
-    const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
     const summary = `Yêu cầu gia hạn đơn hàng #${updatedOrder.id_order} thành công. Trạng thái: "${getOrderStatusLabel(ORDER_STATUS.RENEW_REQUIRED)}", Tổng tiền thanh toán: ${formatMoney(updatedOrder.price)} (Slot Suffix: ${suffix})`;
 
     // Phát event Domain: ORDER_UPDATED với action RENEWAL_REQUESTED

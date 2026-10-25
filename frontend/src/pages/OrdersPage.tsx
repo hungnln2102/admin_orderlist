@@ -140,7 +140,16 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       });
       const data = await res.json();
       if (res.ok) {
-        notify.success(`Yêu cầu gia hạn đơn #${order.id_order} thành công!`);
+        const isImport = Boolean(
+          (order.id_order && String(order.id_order).toUpperCase().startsWith("MAVN")) ||
+          (order.customer && String(order.customer).trim().toLowerCase() === "mavryk") ||
+          activeTab === "import"
+        );
+        if (isImport) {
+          notify.success(`Đã gia hạn đơn nhập hàng #${order.id_order} thành công (Đã Thanh Toán)!`);
+        } else {
+          notify.success(`Yêu cầu gia hạn đơn #${order.id_order} thành công!`);
+        }
         fetchOrders();
       } else {
         throw new Error(data.error || "Không thể gia hạn.");
