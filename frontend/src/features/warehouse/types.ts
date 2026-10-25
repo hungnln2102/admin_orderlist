@@ -1,49 +1,68 @@
-export type WarehouseService = {
-  id?: number;
-  stock_id?: number;
-  product_id?: number | string | null;
-  warehouse_product_name_id?: number | string | null;
-  category?: string | null;
-  display_name?: string | null;
-  variant_name?: string | null;
-  password?: string | null;
-  backup_email?: string | null;
-  two_fa?: string | null;
-  note?: string | null;
-  status?: string | null;
-  expires_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
+export type WarehouseSlotStatus =
+  | "AVAILABLE"
+  | "IN_USE"
+  | "EXPIRED"
+  | "RESERVED"
+  | "UNAVAILABLE";
 
-export type WarehouseItem = {
-  id?: number;
-  account?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  services?: WarehouseService[];
+export interface WarehouseServiceSlot {
+  id: number;
+  display_name: string;
+  category: string;
+  password?: string;
+  backup_email?: string;
+  two_fa?: string;
+  expires_at?: string;
+  raw_expires_at?: string;
+  note?: string;
+  is_authenticated?: boolean;
+  session_checked_at?: string | null;
+  status: WarehouseSlotStatus;
+}
 
-  // Legacy fields for UI compatibility if needed during transition
-  category?: string | null;
-  password?: string | null;
-  backup_email?: string | null;
-  two_fa?: string | null;
-  expires_at?: string | null;
-  note?: string | null;
-  status?: string | null;
-  is_verified?: boolean | null;
-};
+export interface WarehouseSlotEditFormData {
+  accountUsername: string;
+  serviceName: string;
+  password: string;
+  backupEmail: string;
+  twoFa: string;
+  expiresAt: string;
+  status: WarehouseSlotStatus;
+  note: string;
+}
 
-export const inputClass =
-  "w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white placeholder:text-slate-300 focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/60";
+export interface WarehouseAccountItem {
+  id: number;
+  account: string;
+  created_at: string;
+  updated_at: string;
+  services: WarehouseServiceSlot[];
+}
 
-export const normalizeText = (value: unknown) =>
-  (value ?? "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+export interface ServiceNameCategoryItem {
+  id: number;
+  name: string;
+  category: string;
+  loginUrl?: string | null;
+  totalSlots?: number;
+  inStockSlots: number;
+  reservedSlots: number;
+  status: "ACTIVE" | "LOW_STOCK" | "OUT_OF_STOCK";
+}
 
-export const getWarehouseServiceDisplayName = (service?: WarehouseService | null) =>
-  String(service?.display_name || service?.category || "").trim();
+export interface WarehouseAccountFormData {
+  account: string;
+  serviceName: string;
+  category: string;
+  password: string;
+  backupEmail: string;
+  twoFa: string;
+  expiresAt: string;
+  note: string;
+}
+
+export interface CatalogFormData {
+  name: string;
+  category: string;
+  loginUrl?: string;
+}

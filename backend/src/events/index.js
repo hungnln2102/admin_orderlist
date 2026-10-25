@@ -1,34 +1,31 @@
-const eventBus = require("@/events/eventBus");
-const EVENTS = require("@/events/eventTypes");
-const logger = require("@/utils/logger");
-
-// Import your subscribers here when they are created
-const { registerTelegramSubscribers } = require("@/events/subscribers/telegramSubscriber");
-const { registerSepaySubscribers } = require("@/events/subscribers/sepaySubscriber");
-const { registerFinancialMetricsSubscribers } = require("@/events/subscribers/financialMetricsSubscriber");
-const { registerWarehouseSubscribers } = require("@/events/subscribers/warehouseSubscriber");
-const { registerProductPricingSubscribers } = require("@/events/subscribers/productPricingSubscriber");
-
+const eventBus = require("./eventBus");
+const EVENTS = require("./eventTypes");
+const { recordEvent, ensureEventStoreTable } = require("./eventStoreService");
 function registerAllSubscribers() {
-  logger.info('[EventBus] Registering all subscribers...');
+  console.log("⚡ [EventBus] Khởi tạo bảng Event Store & đăng ký tất cả Subscribers...");
+  ensureEventStoreTable().catch((err) =>
+    console.error("[EventStore] Lỗi đảm bảo bảng event store:", err.message)
+  );
 
-  registerTelegramSubscribers();
-  registerSepaySubscribers();
-  registerFinancialMetricsSubscribers();
-  registerWarehouseSubscribers();
-  
-  const { subscribeToEvents: registerLedger } = require("@/events/subscribers/financialAllocationLedgerSubscriber");
-  registerLedger(eventBus, EVENTS);
-  
-  const { registerSupplierCostSubscribers } = require("@/events/subscribers/supplierCostSubscriber");
-  registerSupplierCostSubscribers();
-  registerProductPricingSubscribers();
+  const { registerOrderEventSubscribers } = require("./subscribers/orderEventSubscriber");
+  const { registerProductEventSubscribers } = require("./subscribers/productSubscriber");
+  const { registerSupplierEventSubscribers } = require("./subscribers/supplierSubscriber");
+  const { registerTelegramSubscriber } = require("./subscribers/telegramSubscriber");
+  const { registerWarehouseEventSubscribers } = require("./subscribers/warehouseSubscriber");
+  const { registerDailySummaryListeners } = require("@/domains/dashboard/services/dailySummaryService");
 
-  logger.info('[EventBus] All subscribers registered successfully.');
+  registerOrderEventSubscribers();
+  registerProductEventSubscribers();
+  registerSupplierEventSubscribers();
+  registerTelegramSubscriber();
+  registerWarehouseEventSubscribers();
+  registerDailySummaryListeners();
 }
+
 
 module.exports = {
   eventBus,
   EVENTS,
+  recordEvent,
   registerAllSubscribers,
 };

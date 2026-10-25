@@ -2,8 +2,24 @@
  * Format số, tiền, ngày, chuỗi an toàn cho Telegram (HTML escape, inline code).
  */
 
-const { formatYMDToDMY } = require("@/utils/normalizers");
-const { roundGiaBanValue } = require("@/utils/orderHelpers");
+const formatYMDToDMY = (value) => {
+  if (!value) return "";
+  const str = String(value).trim();
+  if (!str) return "";
+  let match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  match = str.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return "";
+};
+
+const roundGiaBanValue = (value) => {
+  const numeric = Number.isFinite(Number(value)) ? Number(value) : 0;
+  if (numeric >= 0) return Math.floor(numeric + 0.5);
+  return -Math.floor(Math.abs(numeric) + 0.5);
+};
 
 const toSafeString = (value) =>
   value === undefined || value === null ? "" : String(value);

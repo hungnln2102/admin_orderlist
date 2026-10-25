@@ -1,10 +1,9 @@
 # syntax=docker/dockerfile:1.4
-# BuildKit: npm run docker:build (repo root), hoặc ./deploy.sh (server), hoặc DOCKER_BUILDKIT=1 docker compose build
-# → cache apt; Chromium ghi vào image (không dùng cache mount cho ms-playwright).
+# Backend Production Dockerfile (Node 20 Bookworm Slim + PG Client 16 + Playwright Chromium)
 
 FROM node:20-bookworm-slim
 
-# postgresql-client mặc định Debian 12 = PG 15; pg_dump phải >= major server (VD server 16.x → client 16+).
+# Cài đặt postgresql-client-16 phục vụ sao lưu tự động Google Drive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates wget gnupg \
@@ -21,8 +20,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# `--with-deps`: cài gói hệ thống (apt) + Chromium.
-# Chỉ cache apt: cache /root/.cache/ms-playwright làm binary KHÔNG nằm trong image layer → runtime thiếu Chrome.
+# Cài đặt Chromium cho Playwright (mở kho tự động và kiểm tra dịch vụ)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     npx playwright install --with-deps chromium
 
@@ -31,4 +29,4 @@ COPY . .
 ENV NODE_ENV=production
 EXPOSE 3001
 
-CMD ["node", "index.js"]
+CMD ["node", "-r", "module-alias/register", "src/server.js"]

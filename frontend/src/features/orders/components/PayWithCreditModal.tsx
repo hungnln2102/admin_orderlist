@@ -1,21 +1,22 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from "react";
-import { Order, ORDER_FIELDS, VIRTUAL_FIELDS } from "@/constants";
-import { formatCurrency } from "../utils/ordersHelpers";
-import { apiPost } from "@/shared/api/client";
-import toast from "react-hot-toast";
-import { useApiQuery } from "@/shared/hooks/useApiQuery";
-import {
-  fetchAvailableRefundCredits,
-  type AvailableRefundCredit,
-} from "@/lib/refundCreditsApi";
+import React, { useState, useEffect } from "react";
+import { X, CreditCard, Check, AlertCircle, Search, DollarSign } from "lucide-react";
+import { Order } from "../types";
+import { useNotification } from "@/shared/context/NotificationContext";
 
-type PayWithCreditModalProps = {
+interface CreditNote {
+  id: number;
+  credit_code: string;
+  customer_name: string;
+  available_amount: number;
+  status: string;
+}
+
+interface PayWithCreditModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order | null;
   onSuccess: () => void;
-};
+}
 
 export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   isOpen,
@@ -23,149 +24,184 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
   order,
   onSuccess,
 }) => {
+  const notify = useNotification();
+  const [credits, setCredits] = useState<CreditNote[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [selectedCreditId, setSelectedCreditId] = useState<number | null>(null);
-  const [waiveRemaining, setWaiveRemaining] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [search, setSearch] = useState<string>("");
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const { data: creditsData, loading } = useApiQuery<AvailableRefundCredit[]>(
-    fetchAvailableRefundCredits,
-    { lazy: !isOpen, initialData: [] }
-  );
+  useEffect(() => {
+    if (isOpen) {
+      fetchAvailableCredits();
+      setSelectedCreditId(null);
+      setSearch("");
+    }
+  }, [isOpen]);
 
-  const credits = creditsData || [];
+  const fetchAvailableCredits = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/credits?group=available&limit=50");
+      const data = await res.json();
+      if (data && data.items) {
+        setCredits(data.items);
+      }
+    } catch (err) {
+      console.error("Lỗi tải danh sách credit:", err);
+      notify.error("Không thể tải danh sách credit khả dụng.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen || !order) return null;
 
-  const totalCreditApplied = Number.isFinite(Number(order[VIRTUAL_FIELDS.TOTAL_CREDIT_APPLIED]))
-    ? Number(order[VIRTUAL_FIELDS.TOTAL_CREDIT_APPLIED])
-    : 0;
-  const remainingAmount = Math.max(0, Number(order[ORDER_FIELDS.PRICE]) - totalCreditApplied);
+  const orderPrice = Number(order.price || 0);
+  const filteredCredits = credits.filter(
+    (c) =>
+      c.credit_code.toLowerCase().includes(search.toLowerCase()) ||
+      c.customer_name.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleSubmit = async () => {
-    if (!selectedCreditId && !waiveRemaining) {
-      toast.error("Vui lòng chọn một credit hoặc chọn Xí xóa số tiền còn thiếu.");
+    if (!selectedCreditId) {
+      notify.warning("Vui lòng chọn một mã credit để thanh toán.");
       return;
     }
 
-    setIsSubmitting(true);
+    const selected = credits.find((c) => c.id === selectedCreditId);
+    if (!selected) return;
+
+    if (selected.available_amount < orderPrice) {
+      notify.warning(`Số dư credit (${selected.available_amount.toLocaleString()} ₫) không đủ để thanh toán đơn hàng (${orderPrice.toLocaleString()} ₫).`);
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await apiPost("/api/orders/refund-credits/apply-to-order", {
-        targetOrderId: order[ORDER_FIELDS.ID],
-        creditNoteId: selectedCreditId ? Number(selectedCreditId) : null,
-        waiveRemaining,
+      const res = await fetch(`/api/orders/${order.id}/pay-credit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credit_note_id: selected.id }),
       });
-      toast.success("Thanh toán thành công!");
-      onSuccess();
-      onClose();
-    } catch (error: any) {
-      toast.error(error.message || "Lỗi khi thanh toán bằng credit");
+      const data = await res.json();
+      if (res.ok && data.success) {
+        notify.success(`Thanh toán đơn #${order.id_order} bằng credit ${selected.credit_code} thành công! Đã chuyển sang Đang Xử Lý.`);
+        onSuccess();
+        onClose();
+      } else {
+        throw new Error(data.error || "Không thể thanh toán bằng credit.");
+      }
+    } catch (err: any) {
+      console.error("Lỗi thanh toán bằng credit:", err);
+      notify.error(err.message || "Lỗi hệ thống khi thanh toán bằng credit.");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-2xl transform rounded-2xl bg-slate-800 p-6 text-left align-middle shadow-xl transition-all border border-slate-700">
-        <h3 className="text-lg font-medium leading-6 text-white mb-4">
-          Thanh toán đơn hàng bằng Credit
-        </h3>
-
-        <div className="mb-4 p-4 rounded-xl bg-slate-900/50 border border-slate-700">
-          <p className="text-sm text-slate-300">
-            Đơn hàng: <span className="font-bold text-white">{order[ORDER_FIELDS.ID_ORDER]}</span>
-          </p>
-          <p className="text-sm text-slate-300 mt-1">
-            Tổng giá bán: <span className="font-bold text-emerald-400">{formatCurrency(order[ORDER_FIELDS.PRICE])}</span>
-          </p>
-          {totalCreditApplied > 0 && (
-            <p className="text-sm text-amber-400 mt-1">
-              Đã trả một phần: <span className="font-bold">{formatCurrency(totalCreditApplied)}</span>
-            </p>
-          )}
-          <p className="text-sm text-rose-300 mt-1">
-            Số tiền còn thiếu: <span className="font-bold text-rose-400">{formatCurrency(remainingAmount)}</span>
-          </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-[#0a1225] border border-slate-700/50 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 to-[#0a1225]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
+              <CreditCard className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Thanh Toán Bằng Credit</h3>
+              <p className="text-[10px] text-slate-400">
+                Đơn hàng: <span className="text-cyan-300 font-mono font-bold">#{order.id_order}</span> (Cần: {orderPrice.toLocaleString()} ₫)
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            Chọn Credit khả dụng:
-          </label>
-          
-          {loading ? (
-            <div className="text-center py-4 text-slate-400">Đang tải danh sách credit...</div>
-          ) : credits.length === 0 ? (
-            <div className="text-center py-4 text-rose-400 bg-rose-500/10 rounded-xl border border-rose-500/20">
-              Không có credit nào khả dụng.
-            </div>
-          ) : (
-            <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2">
-              {credits.map((credit) => (
-                <div
-                  key={credit.id}
-                  onClick={() => setSelectedCreditId(Number(credit.id))}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                    selectedCreditId === Number(credit.id)
-                      ? "bg-cyan-500/20 border-cyan-500 shadow-md shadow-cyan-900/20"
-                      : "bg-slate-900/40 border-slate-700 hover:border-slate-500"
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-white">{credit.credit_code}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Từ đơn gốc: {credit.source_order_code || "N/A"}
-                      </p>
+        {/* Body */}
+        <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm mã credit hoặc tên khách..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+
+          <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+            {loading ? (
+              <div className="py-8 text-center text-slate-400 text-xs">Đang tải danh sách credit...</div>
+            ) : filteredCredits.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 text-xs">Không có credit khả dụng nào.</div>
+            ) : (
+              filteredCredits.map((c) => {
+                const isSelected = selectedCreditId === c.id;
+                const isEnough = c.available_amount >= orderPrice;
+
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => isEnough && setSelectedCreditId(c.id)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                      isSelected
+                        ? "bg-cyan-950/40 border-cyan-500 text-white shadow-md shadow-cyan-950"
+                        : isEnough
+                        ? "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                        : "bg-slate-900/30 border-slate-900 opacity-50 cursor-not-allowed"
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-cyan-300">{c.credit_code}</span>
+                        <span className="text-xs text-slate-400">({c.customer_name || "Khách lẻ"})</span>
+                      </div>
+                      <div className="text-[11px] text-emerald-400 font-mono font-semibold">
+                        Số dư: {c.available_amount.toLocaleString()} ₫
+                      </div>
+                      {!isEnough && (
+                        <div className="text-[10px] text-rose-400">Không đủ số dư để thanh toán đơn này</div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-emerald-400">
-                        {formatCurrency(credit.available_amount)}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 uppercase">
-                        {credit.status}
-                      </p>
+                    <div>
+                      {isSelected ? (
+                        <div className="w-6 h-6 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center font-bold">
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full border border-slate-700" />
+                      )}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
 
-        <div className="mt-4 mb-2 flex items-center gap-2 px-1">
-          <input
-            type="checkbox"
-            id="waiveRemaining"
-            checked={waiveRemaining}
-            onChange={(e) => setWaiveRemaining(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-600 bg-slate-800/50 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-800"
-          />
-          <label htmlFor="waiveRemaining" className="text-sm font-medium text-amber-200 cursor-pointer select-none">
-            Xí xóa số tiền còn thiếu (đánh dấu Đã Thanh toán)
-          </label>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3">
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-slate-800 flex justify-end gap-2 bg-slate-900/40">
           <button
-            type="button"
-            className="rounded-xl px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 focus:outline-none transition-colors"
             onClick={onClose}
-            disabled={isSubmitting}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
           >
             Hủy
           </button>
           <button
-            type="button"
-            className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-2 text-sm font-medium text-white shadow-md shadow-cyan-900/30 hover:from-cyan-500 hover:to-blue-500 focus:outline-none transition-all disabled:opacity-50"
             onClick={handleSubmit}
-            disabled={isSubmitting || (!selectedCreditId && !waiveRemaining)}
+            disabled={!selectedCreditId || submitting}
+            className="px-5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
           >
-            {isSubmitting ? "Đang xử lý..." : "Xác nhận"}
+            {submitting ? "Đang xử lý..." : "Xác nhận Thanh Toán"}
           </button>
         </div>
       </div>

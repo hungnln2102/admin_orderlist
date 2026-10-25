@@ -1,45 +1,22 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { LoginPage } from "@/features/auth";
-import { AuthProvider } from "./AuthContext";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import { MainLayout } from "./components/layout/MainLayout";
-import { AppRoutes } from "./routes/AppRoutes";
-import AppNotification from "./components/modals/AppNotification";
-import PricingSellerPage from "@/features/products/pricing-seller";
+import React from "react";
+import { BrowserRouter } from "react-router-dom";
+import { AppLayout } from "@/layout/AppLayout";
+import { AppRoutes } from "@/routes/AppRoutes";
+import { NotificationProvider } from "@/shared/context/NotificationContext";
+import { AuthProvider } from "@/shared/context/AuthContext";
 
-function AdminApp() {
+export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <AppNotification />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <MainLayout>
-                <AppRoutes />
-              </MainLayout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppLayout>
+            <AppRoutes />
+          </AppLayout>
+        </NotificationProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
-}
-
-function App() {
-  return (
-    <ErrorBoundary>
-      <Router>
-        <Routes>
-          <Route path="/pricing-seller" element={<PricingSellerPage />} />
-          <Route path="/*" element={<AdminApp />} />
-        </Routes>
-      </Router>
-    </ErrorBoundary>
-  );
-}
+};
 
 export default App;

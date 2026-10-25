@@ -8,6 +8,8 @@ const HTTP_TIMEOUT_MS = (() => {
   return 20_000;
 })();
 
+const systemConfigService = require("@/domains/system/services/systemConfigService");
+
 function parseOptionalTopicId(raw) {
   if (raw == null) return NaN;
   const s = String(raw).trim();
@@ -16,23 +18,48 @@ function parseOptionalTopicId(raw) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
+const getConfigVal = (configKey, envVal, defaultVal = "") => {
+  const dynamicVal = systemConfigService.get(configKey);
+  if (dynamicVal !== null && dynamicVal !== undefined && String(dynamicVal).trim() !== "") {
+    return String(dynamicVal).trim();
+  }
+  return String(envVal || defaultVal).trim();
+};
 
-// Các cờ kích hoạt/tắt
-const SEND_ORDER_NOTIFICATION = String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !== "false";
-const SEND_FINANCE_DELTA_NOTIFICATION = String(process.env.SEND_FINANCE_DELTA_NOTIFICATION ?? "true").toLowerCase() !== "false";
-const SEND_ERROR_NOTIFICATION = String(process.env.SEND_ERROR_NOTIFICATION || "true").toLowerCase() !== "false";
-const SEND_ORDER_TO_TOPIC = String(process.env.SEND_ORDER_TO_TOPIC ?? "true").toLowerCase() !== "false";
-const SEND_ORDER_COPY_BUTTONS = String(process.env.SEND_ORDER_COPY_BUTTONS || "true").toLowerCase() !== "false";
+const TELEGRAM_BOT_TOKEN = getConfigVal("TELEGRAM_BOT_TOKEN", process.env.TELEGRAM_BOT_TOKEN);
+const TELEGRAM_CHAT_ID = getConfigVal("TELEGRAM_CHAT_ID", process.env.TELEGRAM_CHAT_ID);
 
-// Topic IDs
-const TELEGRAM_ORDER_TOPIC_ID = parseOptionalTopicId(process.env.TELEGRAM_ORDER_TOPIC_ID);
-const TELEGRAM_IMPORT_ORDER_TOPIC_ID = parseOptionalTopicId(process.env.TELEGRAM_IMPORT_ORDER_TOPIC_ID);
-const TELEGRAM_FINANCE_TOPIC_ID = parseOptionalTopicId(process.env.TELEGRAM_FINANCE_TOPIC_ID || "7009");
-const ERROR_TOPIC_ID = parseOptionalTopicId(process.env.ERROR_TOPIC_ID || "6");
-const ZERO_DAYS_TOPIC_ID = parseOptionalTopicId(process.env.ZERO_DAYS_TOPIC_ID || "2563");
-const FOUR_DAYS_TOPIC_ID = parseOptionalTopicId(process.env.FOUR_DAYS_TOPIC_ID || "12");
+const getBoolConfig = (configKey, envVal, defaultVal = true) => {
+  const dynamicVal = systemConfigService.get(configKey);
+  if (dynamicVal !== null && dynamicVal !== undefined) {
+    if (typeof dynamicVal === 'boolean') return dynamicVal;
+    return String(dynamicVal).toLowerCase() !== 'false';
+  }
+  return String(envVal ?? defaultVal).toLowerCase() !== 'false';
+};
+
+// Các cờ kích hoạt/tắt (Đọc từ systemConfigService với fallback qua env)
+const SEND_ORDER_NOTIFICATION = getBoolConfig("SEND_ORDER_NOTIFICATION", process.env.SEND_ORDER_NOTIFICATION, true);
+const SEND_FINANCE_DELTA_NOTIFICATION = getBoolConfig("SEND_FINANCE_DELTA_NOTIFICATION", process.env.SEND_FINANCE_DELTA_NOTIFICATION, true);
+const SEND_ERROR_NOTIFICATION = getBoolConfig("SEND_ERROR_NOTIFICATION", process.env.SEND_ERROR_NOTIFICATION, true);
+const SEND_ORDER_TO_TOPIC = getBoolConfig("SEND_ORDER_TO_TOPIC", process.env.SEND_ORDER_TO_TOPIC, true);
+const SEND_ORDER_COPY_BUTTONS = getBoolConfig("SEND_ORDER_COPY_BUTTONS", process.env.SEND_ORDER_COPY_BUTTONS, true);
+
+// Topic IDs (Đọc từ systemConfigService với fallback qua env)
+const getTopicId = (configKey, envVal, defaultVal) => {
+  const dynamicVal = systemConfigService.get(configKey);
+  if (dynamicVal !== null && dynamicVal !== undefined && String(dynamicVal).trim() !== "") {
+    return parseOptionalTopicId(dynamicVal);
+  }
+  return parseOptionalTopicId(envVal || defaultVal);
+};
+
+const TELEGRAM_ORDER_TOPIC_ID = getTopicId("TELEGRAM_ORDER_TOPIC_ID", process.env.TELEGRAM_ORDER_TOPIC_ID);
+const TELEGRAM_IMPORT_ORDER_TOPIC_ID = getTopicId("TELEGRAM_IMPORT_ORDER_TOPIC_ID", process.env.TELEGRAM_IMPORT_ORDER_TOPIC_ID);
+const TELEGRAM_FINANCE_TOPIC_ID = getTopicId("TELEGRAM_FINANCE_TOPIC_ID", process.env.TELEGRAM_FINANCE_TOPIC_ID, "7009");
+const ERROR_TOPIC_ID = getTopicId("TELEGRAM_SYSTEM_ALERT_TOPIC_ID", process.env.ERROR_TOPIC_ID, "6");
+const ZERO_DAYS_TOPIC_ID = getTopicId("TELEGRAM_RENEWAL_TOPIC_ID", process.env.ZERO_DAYS_TOPIC_ID, "2563");
+const FOUR_DAYS_TOPIC_ID = getTopicId("TELEGRAM_RENEWAL_TOPIC_ID", process.env.FOUR_DAYS_TOPIC_ID, "12");
 
 // Logic gán topic mặc định cho Đơn mới
 const ORDER_CREATED_TOPIC_ID = (() => {

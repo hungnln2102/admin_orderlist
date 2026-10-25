@@ -1,3 +1,0 @@
-admin.mavrykpremium.com, mavrykpremium.com, www.mavrykpremium.com {
-    reverse_proxy frontend:80
-}

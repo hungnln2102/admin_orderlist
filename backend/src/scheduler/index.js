@@ -1,192 +1,75 @@
-/**
- * Scheduler entry — đăng ký cron jobs.
- * File này có side-effect: khi require() sẽ tự động schedule cron.
- * Chỉ nên import bởi scheduler process (scheduler.js / scheduler-server.js).
- * API server dùng SchedulerController → import taskInstances.js trực tiếp.
- */
 const cron = require("node-cron");
-const logger = require("@/utils/logger");
+const { updateOrderStatusTask } = require("./tasks/updateOrderStatusTask");
+const { notifyZeroDaysTask } = require("./tasks/notifyZeroDaysTask");
+const { notifyFourDaysTask } = require("./tasks/notifyFourDaysTask");
+const { finalizeDailySummaryTask } = require("./tasks/finalizeDailySummaryTask");
+const { creditSavingsProfitTask } = require("./tasks/creditSavingsProfitTask");
+const cronJobService = require("@/domains/system/services/cronJobService");
 
-const {
-  updateDatabaseTask,
-  notifyZeroDaysRemainingTask,
-  notifyFourDaysRemainingTask,
-  renewAdobeCheckAndNotifyTask,
-  cleanupExpiredAdobeUsersTask,
-  cleanupAdobeProfileGarbageTask,
-  cleanupExpiredTrackingTask,
-  syncDailyRevenueSummaryTask,
-  getSchedulerStatus,
-  schedulerTimezone,
-  cronExpression,
-  runOnStart,
-} = require("@/scheduler/taskInstances");
-
-const dailyRevenueSummaryCron =
-  process.env.DAILY_REVENUE_SUMMARY_CRON || "15 0 * * *";
-
-const runCronSafe = (source) =>
-  updateDatabaseTask(source).catch((err) =>
-    logger.error(`[CRON] Failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runZeroDaysNotificationSafe = (source) =>
-  notifyZeroDaysRemainingTask(source).catch((err) =>
-    logger.error(`[CRON] Zero days notification failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runFourDaysNotificationSafe = (source) =>
-  notifyFourDaysRemainingTask(source).catch((err) =>
-    logger.error(`[CRON] Four days notification failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runRenewAdobeCheckSafe = (source) =>
-  renewAdobeCheckAndNotifyTask(source).catch((err) =>
-    logger.error(`[CRON] Renew Adobe check & notify failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runCleanupExpiredAdobeUsersSafe = (source) =>
-  cleanupExpiredAdobeUsersTask(source).catch((err) =>
-    logger.error(`[CRON] Cleanup expired Adobe users failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runCleanupAdobeProfileGarbageSafe = (source) =>
-  cleanupAdobeProfileGarbageTask(source).catch((err) =>
-    logger.error(`[CRON] Cleanup Adobe profile garbage failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runDailyRevenueSummarySafe = (source) =>
-  syncDailyRevenueSummaryTask(source).catch((err) =>
-    logger.error(`[CRON] daily_revenue_summary failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-const runCleanupExpiredTrackingSafe = (source) =>
-  cleanupExpiredTrackingTask(source).catch((err) =>
-    logger.error(`[CRON] cleanup expired tracking failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-if (require.main === module && process.argv.includes("--run-once")) {
-  runCronSafe("manual");
-}
-
-cron.schedule(
-  cronExpression,
-  async () => {
-    logger.info("[Scheduler] Cron 00:01 triggered", { cronExpression, timezone: schedulerTimezone });
-    await runCronSafe("cron");
-    // Cleanup tracking ngay sau update DB — tránh giữ row hết hạn trong UI Renew Adobe.
-    await runCleanupExpiredTrackingSafe("cron");
-  },
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-if (runOnStart) {
-  runCronSafe("startup");
-}
-
-cron.schedule(
-  "0 0 * * *",
-  async () => {
-    logger.info("[Scheduler] Cron 00:00 — cleanup orphan Adobe profile dirs");
-    await runCleanupAdobeProfileGarbageSafe("cron");
-  },
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-cron.schedule(
-  "30 23 * * *",
-  async () => {
-    logger.info(
-      "[Scheduler] Cron 23:30 — cleanup user Adobe: tracking/order hết hạn + mapping → theo từng admin (tùy env check-all trước)"
-    );
-    await runCleanupExpiredAdobeUsersSafe("cron");
-  },
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-cron.schedule(
-  "0 18 * * *",
-  () => runZeroDaysNotificationSafe("cron"),
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-cron.schedule(
-  "0 7 * * *",
-  () => runFourDaysNotificationSafe("cron"),
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-cron.schedule(
-  "0 * * * *",
-  () => {
-    logger.info(
-      "[Scheduler] Cron hàng giờ — check tài khoản Adobe & thông báo hết gói"
-    );
-    runRenewAdobeCheckSafe("cron");
-  },
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-if (process.env.ENABLE_DAILY_REVENUE_SUMMARY_CRON !== "false") {
-  cron.schedule(
-    dailyRevenueSummaryCron,
-    async () => {
-      logger.info("[Scheduler] Cron daily_revenue_summary", {
-        cron: dailyRevenueSummaryCron,
-        timezone: schedulerTimezone,
-      });
-      await runDailyRevenueSummarySafe("cron");
-    },
-    { scheduled: true, timezone: schedulerTimezone }
-  );
-}
-
-logger.info(`[Scheduler] Đã khởi động`, {
-  cronExpression,
-  /** Job update DB / backup — không phải Renew Adobe. */
-  cronExpressionNote: "CRON_SCHEDULE (vd. 1 0 * * * = 00:01 mỗi ngày)",
-  renewAdobeCron: "0 * * * *",
-  renewAdobeNote: "Mỗi giờ phút 0 (timezone scheduler) — check tài khoản Adobe",
-  dailyRevenueSummaryCron:
-    process.env.ENABLE_DAILY_REVENUE_SUMMARY_CRON === "false"
-      ? "(tắt)"
-      : dailyRevenueSummaryCron,
-  schedulerTimezone,
-  runOnStart,
-});
-
-module.exports = {
-  updateDatabaseTask,
-  notifyZeroDaysRemainingTask,
-  notifyFourDaysRemainingTask,
-  renewAdobeCheckAndNotifyTask,
-  cleanupExpiredAdobeUsersTask,
-  cleanupAdobeProfileGarbageTask,
-  cleanupExpiredTrackingTask,
-  syncDailyRevenueSummaryTask,
-  getSchedulerStatus,
+const TIMEZONE = "Asia/Ho_Chi_Minh";
+const scheduledTasks = new Map();
+let initialized = false;
+const handlers = {
+  order_status_0h: async () => ({ update: await updateOrderStatusTask("cron_schedule"), zeroDays: await notifyZeroDaysTask("cron_schedule") }),
+  notify_four_days: () => notifyFourDaysTask("cron_schedule"),
+  credit_savings_profit: () => creditSavingsProfitTask("cron_schedule"),
+  finalize_daily_summary: () => finalizeDailySummaryTask("cron_schedule"),
 };
+
+const serializeResult = (result) => JSON.stringify(result ?? { success: true });
+
+async function executeJob(job, triggeredBy = "cron_schedule") {
+  const handler = handlers[job.handler_key];
+  if (!handler) throw new Error("Tác vụ chưa được gắn handler chạy nền.");
+  const startedAt = new Date();
+  try {
+    const result = await handler();
+    await cronJobService.recordExecution(job.id, { startedAt, durationMs: Date.now() - startedAt.getTime(), status: "success", output: serializeResult(result), triggeredBy });
+    return result;
+  } catch (error) {
+    await cronJobService.recordExecution(job.id, { startedAt, durationMs: Date.now() - startedAt.getTime(), status: "failed", output: error.message || "Không thể chạy tác vụ.", triggeredBy });
+    throw error;
+  }
+}
+
+function stopJob(id) {
+  const task = scheduledTasks.get(id);
+  if (task) task.stop();
+  scheduledTasks.delete(id);
+}
+
+function scheduleJob(job) {
+  stopJob(job.id);
+  if (!job.enabled || !job.handler_key) return;
+  const expression = cronJobService.buildCronExpression({ time: job.time, frequency: job.frequency, selectedDays: Array.isArray(job.selected_days) ? job.selected_days : JSON.parse(job.selected_days || "[]") });
+  if (!cron.validate(expression)) throw new Error(`Biểu thức cron không hợp lệ: ${expression}`);
+  const task = cron.schedule(expression, () => executeJob(job).catch((error) => console.error(`[Scheduler] ${job.id} failed:`, error.message)), { timezone: TIMEZONE });
+  scheduledTasks.set(job.id, task);
+}
+
+async function refreshJob(id) {
+  const job = await cronJobService.getJob(id);
+  scheduleJob(job);
+  return job;
+}
+
+async function initScheduler() {
+  if (initialized) return;
+  const jobs = await cronJobService.listJobs();
+  const rawJobs = await Promise.all(jobs.map((job) => cronJobService.getJob(job.id)));
+  rawJobs.forEach(scheduleJob);
+  initialized = true;
+  console.log(`[Scheduler] Đã khởi tạo ${scheduledTasks.size} lịch tác vụ.`);
+}
+
+function getNextRunTime(id) {
+  const nextRun = scheduledTasks.get(id)?.getNextRun?.();
+  return nextRun ? nextRun.toISOString() : null;
+}
+
+async function runJobNow(id) {
+  const job = await cronJobService.getJob(id);
+  return executeJob(job, "manual_ui");
+}
+
+module.exports = { getNextRunTime, initScheduler, refreshJob, runJobNow };

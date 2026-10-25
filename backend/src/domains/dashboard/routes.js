@@ -1,17 +1,33 @@
 const express = require("express");
-const {
-  dashboardStats,
-  dashboardYears,
-  dashboardCharts,
-  dashboardMonthlySummary,
-} = require("@/domains/dashboard/controller");
-const { dateRangeRules } = require("@/domains/dashboard/validators/dashboardValidator");
-
 const router = express.Router();
+const dashboardService = require("./services/dashboardService");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
-router.get("/stats", ...dateRangeRules, dashboardStats);
-router.get("/years", dashboardYears);
-router.get("/charts", ...dateRangeRules, dashboardCharts);
-router.get("/monthly-summary", dashboardMonthlySummary);
+/**
+ * GET /api/dashboard/summary
+ * Query parameters:
+ *  - period: 'day' | 'month' | 'year' | 'custom'
+ *  - date: YYYY-MM-DD
+ *  - month: YYYY-MM
+ *  - year: YYYY
+ *  - startDate: YYYY-MM-DD
+ *  - endDate: YYYY-MM-DD
+ */
+router.get("/summary", async (req, res) => {
+  try {
+    const data = await dashboardService.getDashboardSummary(req.query);
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    console.error("Lỗi lấy dữ liệu tổng quan dashboard:", err);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải dữ liệu báo cáo dashboard",
+      error: getClientErrorMessage(err, "Không thể tải dữ liệu báo cáo dashboard"),
+    });
+  }
+});
 
 module.exports = router;

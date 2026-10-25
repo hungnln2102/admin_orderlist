@@ -6,7 +6,16 @@ const {
   buildExpiredOrderMessage 
 } = require("@/domains/notifications/telegram/builders/orderMessageBuilder");
 const { db } = require("@/db");
-const { resolveDefaultShopBankAccount } = require("@/services/shopBankAccountResolver");
+const { listBankAccounts } = require("@/domains/wallets/services/walletService");
+
+async function resolveDefaultShopBankAccount() {
+  try {
+    const accounts = await listBankAccounts();
+    return accounts.find((a) => a.isDefault && a.isActive) || accounts[0] || null;
+  } catch {
+    return null;
+  }
+}
 const { fetchQrImageBytes } = require("@/domains/notifications/telegram/services/qr");
 const { 
   TELEGRAM_CHAT_ID,

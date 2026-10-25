@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch } from "../../../shared/api/client";
-import { useAuth } from "../../../AuthContext";
+import { useAuth } from "@/shared/context/AuthContext";
 
 interface UseLoginReturn {
   email: string;
@@ -13,41 +12,27 @@ interface UseLoginReturn {
   handleSubmit: (e: React.FormEvent) => void;
 }
 
-/**
- * useLogin Hook
- * Handles login logic, API calls, and state management
- */
 export const useLogin = (): UseLoginReturn => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { setUser } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    apiFetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: email, password }),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Login failed");
-        }
-        const data = await response.json();
-        setUser(data.user || null);
-        navigate("/dashboard", { replace: true });
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Login failed");
-      })
-      .finally(() => setLoading(false));
+    try {
+      await login(email, password);
+      navigate("/dashboard", { replace: true });
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {

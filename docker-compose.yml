@@ -1,9 +1,6 @@
 services:
-  # Biến môi trường Node: local → backend/.env.local (+ .env tùy chọn); stack Docker → backend/.env.docker (xem backend/env.*.example).
-  # API: api.mavrykpremium.com -> 3001.
-# Bot/Webhook: botapi.mavrykpremium.com -> 5000.
-# ==========================================
-  # 1. DATABASE SERVICE (PostgreSQL)
+  # ==========================================
+  # 1. DATABASE SERVICE (PostgreSQL 16)
   # ==========================================
   postgres:
     container_name: admin_orderlist-postgres
@@ -11,19 +8,15 @@ services:
       context: ./database
     restart: always
     environment:
-      # Mặc định phải khớp tài khoản DB app để tránh healthcheck ping nhầm user "postgres".
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASS:-change_me}
       POSTGRES_DB: ${DB_NAME:-mydtbmav}
-    # Postgres 16 (image chính thức): PGDATA = /var/lib/postgresql/data
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      # Production hardening: chỉ cho truy cập từ localhost host machine, không public ra Internet.
       - "127.0.0.1:5432:5432"
     networks:
       - app-network
-    # Dùng DB_* từ compose để tránh lệch user khi volume DB đã init sẵn (case spam user "postgres").
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"${DB_USER:-admin}\" -d \"${DB_NAME:-mydtbmav}\""]
       interval: 10s
@@ -37,7 +30,7 @@ services:
           cpus: '1.0'
 
   # ==========================================
-  # 2. REDIS SERVICE (Session + Queue)
+  # 2. REDIS SERVICE (Session + Cache)
   # ==========================================
   redis:
     container_name: admin_orderlist-redis
@@ -47,7 +40,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "127.0.0.1:6379:6379"   # Redis chi host local truy cap; khong public ra Internet
+      - "127.0.0.1:6379:6379"
     networks:
       - app-network
     healthcheck:
@@ -63,7 +56,8 @@ services:
           cpus: '0.5'
 
   # ==========================================
-  # 3. BACKEND SERVICE (Node.js)
+  # 3. BACKEND SERVICE (Node.js 20 - V2 Clean Architecture)
+  # Hợp nhất: API REST, Webhook SePay, Internal Cron Scheduler & Event Bus
   # ==========================================
   backend:
     container_name: admin_orderlist-backend
@@ -81,16 +75,12 @@ services:
       APP_ENV: docker
       NODE_ENV: production
     ports:
-      - "127.0.0.1:3001:3001"   # Main API (chi host local truy cap; Internet di qua Nginx)
-    volumes:
-      # Bind mount: cùng thư mục trên host với ./backend/... (SFTP/file manager, modal chọn ảnh)
-      - ./backend/image_product:/app/image_product
-      - ./backend/image_variant:/app/image_variant
-      - ./backend/image:/app/image
+      - "127.0.0.1:3001:3001"   # Main API
+      - "127.0.0.1:5000:3001"   # Webhook port (forward trực tiếp vào backend để tương thích Nginx host)
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:3001/api/health || exit 1"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -99,87 +89,24 @@ services:
       resources:
         limits:
           memory: 1G
-          cpus: '1.0'
+          cpus: '1.5'
 
   # ==========================================
-  # 4. WEBHOOK SERVICE (Sepay — tách riêng khỏi API)
-  # ==========================================
-  webhook:
-    container_name: admin_orderlist-webhook
-    build:
-      context: ./backend
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - ./backend/.env.docker
-    environment:
-      APP_ENV: docker
-      NODE_ENV: production
-    command: ["node", "webhook-server.js"]
-    ports:
-      - "127.0.0.1:5000:5000"   # Sepay webhook (chi host local truy cap; Internet di qua Nginx)
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:5000/ || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-
-  # ==========================================
-  # 5. SCHEDULER SERVICE (Cron jobs — tách riêng khỏi API)
-  # ==========================================
-  scheduler:
-    container_name: admin_orderlist-scheduler
-    build:
-      context: ./backend
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - ./backend/.env.docker
-    environment:
-      APP_ENV: docker
-      NODE_ENV: production
-      RUN_CRON_ON_START: true
-    command: ["node", "scheduler.js"]
-    networks:
-      - app-network
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '2.0'
-
-  # ==========================================
-  # 6. FRONTEND SERVICE (React + Vite)
+  # 4. FRONTEND SERVICE (React + Vite + Nginx)
   # ==========================================
   frontend:
     container_name: admin_orderlist-frontend
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ./frontend
+      dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://admin.mavrykpremium.com}
     restart: always
     depends_on:
       backend:
         condition: service_started
-      webhook:
-        condition: service_started
     ports:
-      - "127.0.0.1:8081:80"   # Frontend chi host local truy cap; Internet di qua Host Nginx
+      - "127.0.0.1:8081:80"   # Frontend qua Host Nginx
     networks:
       - app-network
     deploy:
@@ -187,11 +114,6 @@ services:
         limits:
           memory: 128M
           cpus: '0.5'
-
-# ==========================================
-# NGINX: Chạy qua Host Nginx (Unified). Xem Website/nginx-server.conf.
-# Admin/Main: admin.mavrykpremium.com + mavrykpremium.com + www.mavrykpremium.com -> 8081 (frontend), 3001 (api), 5000 (webhook).
-# ==========================================
 
 # ==========================================
 # NETWORKS & VOLUMES

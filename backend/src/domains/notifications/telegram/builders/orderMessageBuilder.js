@@ -19,14 +19,14 @@ function extractOrderData(order) {
   if (!order) return {};
   return {
     orderCode: toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim(),
-    productName: toSafeString(order.productName || order.product_name || order.id_product || order.idProduct).trim(),
-    info: toSafeString(order.information_order || order.informationOrder).trim(),
+    productName: toSafeString(order.productName || order.product_name || order.package_name || order.id_product || order.idProduct).trim(),
+    info: toSafeString(order.information_order || order.informationOrder || order.info || order.note).trim(),
     slot: toSafeString(order.slot).trim(),
     customer: toSafeString(order.customer || order.customer_name).trim(),
     supply: toSafeString(order.supply).trim(),
     contact: toSafeString(order.contact || order.customer_link).trim(),
-    registerDate: toSafeString(order.registration_date_display || order.registration_date_str).trim() || formatDateDMY(order.order_date),
-    expiryDate: toSafeString(order.expiry_date_display || order.expiry_date_str).trim() || formatDateDMY(order.expiry_date),
+    registerDate: toSafeString(order.registration_date_display || order.registration_date_str).trim() || formatDateDMY(order.order_date || order.created_at),
+    expiryDate: toSafeString(order.expiry_date_display || order.expiry_date_str).trim() || formatDateDMY(order.expired_at || order.expiry_date),
     days: Number(order.days || order.total_days || 0) || 0,
     daysLeft: Number(order.days_left) || 4,
     cost: Number(order.cost || 0) || 0,

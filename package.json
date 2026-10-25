@@ -1,19 +1,21 @@
 {
-  "name": "admin-orderlist",
+  "name": "admin_orderlist",
+  "version": "2.0.0",
   "private": true,
-  "version": "1.0.0",
   "description": "Workspace orchestrator for admin_orderlist. Runtime dependencies live inside backend/ and frontend/.",
   "scripts": {
-    "docker:build": "node scripts/docker-build.js",
-    "docker:up": "docker compose up -d",
-    "dev:renew-adobe": "node services/renew-adobe-api/server.js",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
     "build:frontend": "npm --prefix frontend run build",
-    "lint:backend": "npm --prefix backend run lint",
-    "lint:frontend": "npm --prefix frontend run lint",
+    "test": "npm --prefix backend run test",
     "test:backend": "npm --prefix backend run test",
-    "test:frontend": "npm --prefix frontend run test",
-    "i18n:extract": "node scripts/i18n/extract-lang.mjs"
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
   }
 }

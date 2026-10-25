@@ -1,40 +1,160 @@
 require("module-alias/register");
-const app = require("@/app");
-const { port } = require("@/config/appConfig");
-const { ensureDefaultAdmin } = require("@/domains/auth/controller");
-const logger = require("@/utils/logger");
-const { notifyCritical } = require("@/domains/notifications/telegram").systemNotifier;
+const express = require("express");
+const cors = require("cors");
+const session = require("express-session");
+const PgSessionStore = require("connect-pg-simple")(session);
+const crypto = require("crypto");
+const { PORT, DATABASE_URL } = require("@/config/env");
+const { db, SCHEMAS } = require("@/db");
 const { registerAllSubscribers } = require("@/events");
+const { requireAuthenticatedUser } = require("@/domains/auth/middleware/requireAuthenticatedUser");
+const { requireAdmin } = require("@/domains/auth/middleware/requireAdmin");
+const { getClientErrorMessage } = require("@/utils/clientError");
 
-registerAllSubscribers();
+const app = express();
+app.disable("x-powered-by");
+app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
+const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.FRONTEND_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const sessionSecret = process.env.SESSION_SECRET || (!isProduction ? crypto.randomBytes(32).toString("hex") : "");
 
-process.on("uncaughtException", (err) => {
-  logger.error("[FATAL] uncaughtException", { error: err.message, stack: err.stack });
-  notifyCritical({
-    message: `uncaughtException: ${err.message}`,
-    stack: err.stack,
-    extra: "Server sẽ tắt trong 3 giây",
+if (isProduction && (!sessionSecret || allowedOrigins.length === 0 || !process.env.SEPAY_API_KEY)) {
+  throw new Error("SESSION_SECRET, CORS_ORIGINS và SEPAY_API_KEY là bắt buộc khi chạy production.");
+}
+
+const isAllowedOrigin = (origin) =>
+  !origin || (!isProduction && allowedOrigins.length === 0) || allowedOrigins.includes(origin);
+
+const requireTrustedMutationOrigin = (req, res, next) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  const origin = req.get("Origin");
+  if (origin && isAllowedOrigin(origin)) return next();
+  return res.status(403).json({ error: "Trusted Origin is required for state-changing API requests." });
+};
+
+app.use((req, res, next) => {
+  res.set({
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Resource-Policy": "same-site",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
   });
-  setTimeout(() => process.exit(1), 3000);
+  if (isProduction) {
+    res.set("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+  }
+  next();
 });
 
-process.on("unhandledRejection", (reason) => {
-  const msg = reason instanceof Error ? reason.message : String(reason);
-  const stack = reason instanceof Error ? reason.stack : undefined;
-  logger.error("[FATAL] unhandledRejection", { error: msg, stack });
-  notifyCritical({ message: `unhandledRejection: ${msg}`, stack });
+app.use((req, res, next) => {
+  if (isAllowedOrigin(req.get("Origin"))) return next();
+  return res.status(403).json({ error: "Origin không được phép truy cập API." });
 });
 
-ensureDefaultAdmin().catch((err) =>
-  logger.error("[AUTH] ensureDefaultAdmin thất bại", { error: err.message, stack: err.stack })
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: "1mb" }));
+
+app.use(
+  session({
+    name: "admin_orderlist_v2.sid",
+    secret: sessionSecret,
+    store: new PgSessionStore({
+      conString: DATABASE_URL,
+      schemaName: SCHEMAS.ADMIN,
+      tableName: "user_sessions",
+      pruneSessionInterval: 60 * 15,
+      errorLog: (...args) => console.error("[SessionStore]", ...args),
+    }),
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
+    cookie: {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
 );
 
-const server = app.listen(port, () => {
-  console.log(`Backend server running at http://localhost:${port}`);
+// Khởi chạy và đăng ký Event Subscribers & Cron Scheduler khi khởi động Server
+registerAllSubscribers();
+require("@/domains/system/services/systemConfigService").initCache();
+require("@/scheduler").initScheduler().catch((error) => console.error("[Scheduler] Không thể khởi tạo:", error));
+
+// Health Check Endpoint
+app.get("/api/health", async (req, res) => {
+  try {
+    await db.raw("SELECT 1");
+    res.json({
+      status: "ok",
+      version: "2.0.0",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[Health] Database check failed:", err.message);
+    res.status(500).json({
+      status: "error",
+      version: "2.0.0",
+      database: "disconnected",
+    });
+  }
 });
 
-server.requestTimeout  = 60_000;   // 60s nhận full request (body)
-server.headersTimeout  = 65_000;   // > requestTimeout (Node.js yêu cầu)
-server.keepAliveTimeout = 65_000;  // chuẩn Nginx upstream
+app.use("/api/auth", require("@/domains/auth/routes"));
+app.use("/api/webhooks", require("@/domains/webhooks/routes"));
+// Backward-compatibility cho các endpoint webhook SePay cấu hình cũ từ V1
+app.post(
+  ["/api/payment/notify", "/webhook"],
+  require("@/domains/webhooks/services/sepayAuth").requireSepayApiKey,
+  require("@/domains/webhooks/controllers/webhookController").handleSePayWebhook
+);
+app.use("/api", requireAuthenticatedUser, requireAdmin);
+app.use("/api", requireTrustedMutationOrigin);
+
+// Domain Routers
+app.use("/api/orders", require("@/domains/orders/routes"));
+app.use("/api/products", require("@/domains/products/routes"));
+app.use("/api/suppliers", require("@/domains/suppliers/routes"));
+app.use("/api/invoices", require("@/domains/invoices/routes"));
+app.use("/api/credits", require("@/domains/credits/routes"));
+app.use("/api/wallets", require("@/domains/wallets/routes"));
+app.use("/api/system", require("@/domains/system/routes"));
+app.use("/api/dashboard", require("@/domains/dashboard/routes"));
+app.use("/api/warehouse", require("@/domains/warehouse/routes"));
+app.use("/api/finance", require("@/domains/finance/routes/financeHubRoutes"));
+app.use("/api/store-profit-expenses", require("@/domains/finance/routes/storeProfitExpenseRoutes"));
+app.use("/api/finance/store-profit-expenses", require("@/domains/finance/routes/storeProfitExpenseRoutes"));
+app.use("/api/traffic", require("@/domains/traffic/routes/trafficRoutes"));
+
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "Không tìm thấy API." });
+});
+
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ success: false, error: "Dữ liệu JSON không hợp lệ.", message: "Dữ liệu JSON không hợp lệ." });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ success: false, error: "Dữ liệu gửi lên quá lớn.", message: "Dữ liệu gửi lên quá lớn." });
+  }
+
+  console.error(`[API] ${req.method} ${req.originalUrl} failed:`, err);
+  const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  const message = getClientErrorMessage(err, "Đã xảy ra lỗi máy chủ, vui lòng thử lại sau.");
+  return res.status(status).json({ success: false, error: message, message });
+});
+
+app.listen(PORT, () => {
+  console.log(`=================================`);
+  console.log(`🚀 Admin Order List Backend running on port ${PORT}`);
+  console.log(`=================================`);
+});
 
 module.exports = app;

@@ -5,12 +5,7 @@ import { LoginForm } from "../components/LoginForm";
 import { useLogin } from "../hooks/useLogin";
 import "../styles/login.css";
 
-/**
- * LoginPage Component
- * Retro-future login page inspired by https://github.com/puikinsh/login-forms/tree/main/forms/retro-future
- * Refactored into smaller, maintainable components
- */
-const LoginPage: React.FC = () => {
+export const LoginPage: React.FC = () => {
   const {
     email,
     password,
@@ -22,24 +17,21 @@ const LoginPage: React.FC = () => {
   } = useLogin();
 
   return (
-    <div className="login-page retro-login">
-      <div className="login-page__shell retro-shell">
-        <LoginBackground />
-        <LoginCard>
-          <LoginForm
-            email={email}
-            password={password}
-            loading={loading}
-            error={error}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            onSubmit={handleSubmit}
-          />
-        </LoginCard>
-      </div>
+    <div className="modern-login-root min-h-screen min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 relative overflow-hidden bg-[#060911]">
+      <LoginBackground />
+      <LoginCard>
+        <LoginForm
+          email={email}
+          password={password}
+          loading={loading}
+          error={error}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onSubmit={handleSubmit}
+        />
+      </LoginCard>
     </div>
   );
 };
-
 
 export default LoginPage;

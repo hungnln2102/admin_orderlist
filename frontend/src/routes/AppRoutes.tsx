@@ -1,103 +1,110 @@
-import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense } from "react";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/shared/context/AuthContext";
 
-const PageLoader = () => (
-  <div className="flex items-center justify-center h-[60vh]">
-    <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
+// Code-splitting bằng React.lazy giúp tối ưu tải trang và giảm bundle size ban đầu
+const DashboardPage = React.lazy(() => import("@/features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
+const OrdersPage = React.lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
+const PricingPage = React.lazy(() => import("@/pages/PricingPage").then(m => ({ default: m.PricingPage })));
+const SuppliersPage = React.lazy(() => import("@/pages/SuppliersPage").then(m => ({ default: m.SuppliersPage })));
+const CreditPage = React.lazy(() => import("@/pages/CreditPage").then(m => ({ default: m.CreditPage })));
+const PaymentWalletsPage = React.lazy(() => import("@/pages/PaymentWalletsPage").then(m => ({ default: m.PaymentWalletsPage })));
+const PackageManagementPage = React.lazy(() => import("@/features/packages/PackageManagementPage").then(m => ({ default: m.PackageManagementPage })));
+const LoginPage = React.lazy(() => import("@/features/auth/pages/LoginPage").then(m => ({ default: m.LoginPage })));
+const WarehousePage = React.lazy(() => import("@/pages/WarehousePage").then(m => ({ default: m.WarehousePage })));
+const ReceiptsPage = React.lazy(() => import("@/pages/ReceiptsPage").then(m => ({ default: m.ReceiptsPage })));
+const SystemPage = React.lazy(() => import("@/pages/SystemPage").then(m => ({ default: m.SystemPage })));
+const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPage").then(m => ({ default: m.FinanceHubPage })));
+const TrafficPage = React.lazy(() => import("@/features/traffic/TrafficPage").then(m => ({ default: m.TrafficPage })));
+const ExternalImportsPage = React.lazy(() => import("@/pages/ExternalImportsPage").then(m => ({ default: m.ExternalImportsPage })));
+const SystemLogsPage = React.lazy(() => import("@/pages/SystemLogsPage").then(m => ({ default: m.SystemLogsPage })));
+const ExternalApiConfigPage = React.lazy(() => import("@/pages/ExternalApiConfigPage").then(m => ({ default: m.ExternalApiConfigPage })));
+
+const PageLoadingSpinner = () => (
+  <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
+    <div className="flex items-center gap-3">
+      <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-sm font-medium">Đang tải trang...</span>
+    </div>
   </div>
 );
 
-const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
-const TaxPage = lazy(() => import("@/features/tax/pages/TaxPage"));
-const TrafficPage = lazy(() => import("@/features/traffic/pages/TrafficPage"));
-const Orders = lazy(() => import("@/features/orders/index.tsx"));
-const CreditLogsPage = lazy(() => import("@/features/credit/index.tsx"));
-const PackageProduct = lazy(() => import("@/features/products/package-product/index.tsx"));
-const ProductInfo = lazy(() => import("@/features/products/product-info/index.ts"));
-const FormInfo = lazy(() => import("@/features/form-info/index.tsx"));
-const Pricing = lazy(() => import("@/features/products/pricing/index.tsx"));
-const Sources = lazy(() => import("@/features/supply/index.tsx"));
-const ExternalImportsPage = lazy(() => import("@/features/supply/pages/ExternalImportsPage.tsx"));
-const ShowPrice = lazy(() => import("@/features/products/product-price"));
-const BillOrder = lazy(() => import("@/features/bill-order/index.tsx"));
-const Invoices = lazy(() => import("@/features/invoices/index.tsx"));
-const Warehouse = lazy(() => import("@/features/warehouse/index.tsx"));
-const CtvList = lazy(() => import("@/features/ctv-list/index.tsx"));
-const PromoCodes = lazy(() => import("@/features/promo-codes/index.tsx"));
-const AddMcoin = lazy(() => import("@/features/add-mcoin/index.tsx"));
-const ActiveKeys = lazy(() => import("@/features/active-keys/index.tsx"));
-const IpWhitelistPage = lazy(() => import("@/features/ip-whitelist/pages/IpWhitelistPage").then(m => ({ default: m.IpWhitelistPage })));
-const PaymentAccountsPage = lazy(() =>
-  import("@/features/wallet/payment-accounts/pages/PaymentAccountsPage").then((m) => ({
-    default: m.PaymentAccountsPage,
-  }))
-);
-const ShopBankAccountsPage = lazy(() =>
-  import("@/features/wallet/shop-bank-accounts/pages/ShopBankAccountsPage").then((m) => ({
-    default: m.ShopBankAccountsPage,
-  }))
-);
-const UsdtWalletsPage = lazy(() =>
-  import("@/features/wallet/usdt-wallets/pages/UsdtWalletsPage").then((m) => ({
-    default: m.UsdtWalletsPage,
-  }))
-);
-const RenewAdobeAdminPage = lazy(() => import("@/features/renew-adobe/pages/RenewAdobeAdminPage"));
-const RenewSystemLogsPage = lazy(() => import("@/features/renew-adobe/pages/RenewSystemLogsPage"));
-const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/RenewOrdersDeskPage"));
-const RenewProfileCheckDeskPage = lazy(
-  () => import("@/features/renew-adobe/storefront-check/RenewProfileCheckDeskPage"),
-);
-const ExternalApiConfigPage = lazy(
-  () => import("@/features/system-config/pages/ExternalApiConfigPage"),
-);
-const ArticlesPage = lazy(() => import("@/features/content/pages/ArticlesPage"));
-const CreateArticlePage = lazy(() => import("@/features/content/pages/CreateArticlePage"));
-const ArticleCategoriesPage = lazy(() => import("@/features/content/pages/ArticleCategoriesPage"));
-const BannersPage = lazy(() => import("@/features/content/pages/BannersPage"));
-const NetflixAdminPage = lazy(() => import("@/features/netflix/pages/NetflixAdminPage"));
+const ProtectedRoute: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
 
-export function AppRoutes() {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-slate-400 font-sans">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Đang kiểm tra quyền truy cập...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+};
+
+const PublicOnlyRoute: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+};
+
+export const AppRoutes: React.FC = () => {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<PageLoadingSpinner />}>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/traffic" element={<TrafficPage />} />
-        <Route path="/tax" element={<TaxPage />} />
-        <Route path="/orders" element={<Orders />} />
-        <Route path="/credit" element={<CreditLogsPage />} />
-        <Route path="/package-products" element={<PackageProduct />} />
-        <Route path="/product-info" element={<ProductInfo />} />
-        <Route path="/form-info" element={<FormInfo />} />
-        <Route path="/sources" element={<Sources />} />
-        <Route path="/external-imports" element={<ExternalImportsPage />} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/bill-order" element={<BillOrder />} />
-        <Route path="/show-price" element={<ShowPrice />} />
-        <Route path="/invoices" element={<Invoices />} />
-        <Route path="/warehouse" element={<Warehouse />} />
-        <Route path="/customer-list" element={<CtvList />} />
-        <Route path="/promo-codes" element={<PromoCodes />} />
-        <Route path="/add-mcoin" element={<AddMcoin />} />
-        <Route path="/active-keys" element={<ActiveKeys />} />
-        <Route path="/ip-whitelist" element={<IpWhitelistPage />} />
-        <Route path="/payment-accounts" element={<PaymentAccountsPage />} />
-        <Route path="/shop-bank-accounts" element={<ShopBankAccountsPage />} />
-        <Route path="/usdt-wallets" element={<UsdtWalletsPage />} />
-        <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />
-        <Route path="/renew-adobe-system-logs" element={<RenewSystemLogsPage />} />
-        <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
-        <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />
-        <Route path="/external-api-config" element={<ExternalApiConfigPage />} />
-        <Route path="/netflix" element={<NetflixAdminPage />} />
-        <Route path="/content/articles" element={<ArticlesPage />} />
-        <Route path="/content/create" element={<CreateArticlePage />} />
-        <Route path="/content/edit/:id" element={<CreateArticlePage />} />
-        <Route path="/content/categories" element={<ArticleCategoriesPage />} />
-        <Route path="/content/banners" element={<BannersPage />} />
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+
+          {/* 1. Tổng quan & Báo cáo */}
+          <Route path="/finance" element={<FinanceHubPage />} />
+          <Route path="/traffic" element={<TrafficPage />} />
+
+          {/* 2. Bán hàng & Đơn hàng */}
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/credit" element={<CreditPage />} />
+          <Route path="/invoices" element={<ReceiptsPage />} />
+
+          {/* 3. Danh mục Sản phẩm & Giá */}
+          <Route path="/package-products" element={<PackageManagementPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+
+          {/* 4. Nguồn hàng & Kho */}
+          <Route path="/sources" element={<SuppliersPage />} />
+          <Route path="/external-imports" element={<ExternalImportsPage />} />
+          <Route path="/warehouse" element={<WarehousePage />} />
+
+          {/* 5. Hệ thống & Ví */}
+          <Route path="/system-config" element={<SystemPage />} />
+          <Route path="/system-logs" element={<SystemLogsPage />} />
+          <Route path="/shop-bank-accounts" element={<PaymentWalletsPage />} />
+          <Route path="/payment-accounts" element={<Navigate to="/shop-bank-accounts" replace />} />
+          <Route path="/usdt-wallets" element={<Navigate to="/shop-bank-accounts" replace />} />
+          <Route path="/external-api-config" element={<ExternalApiConfigPage />} />
+        </Route>
+
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
   );
-}
+};

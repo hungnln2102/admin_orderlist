@@ -1,54 +1,51 @@
-const eventBus = require("@/events/eventBus");
-const EVENTS = require("@/events/eventTypes");
-const logger = require("@/utils/logger");
-const { notifyOrderCreated, notifyFourDaysRemaining, notifyZeroDaysRemaining } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
-
 /**
- * Lắng nghe các sự kiện và bắn Telegram
+ * telegramSubscriber.js (V2)
+ * Event Subscriber lắng nghe các sự kiện hệ thống và gửi thông báo Telegram tự động
  */
-function handleOrderCreated(orderData) {
-  try {
-    logger.info(`[TelegramSubscriber] Nhận sự kiện ORDER_CREATED cho đơn: ${orderData?.id_order || 'N/A'}`);
-    if (orderData?.skipTelegramNotification) {
-      logger.info(`[TelegramSubscriber] Bỏ qua gửi Telegram lẻ cho đơn gộp: ${orderData?.id_order}`);
-      return;
+
+const eventBus = require("@/events/eventBus");
+const eventTypes = require("@/events/eventTypes");
+const { orderNotifier, financeNotifier, systemNotifier } = require("@/domains/notifications/telegram");
+
+function registerTelegramSubscriber() {
+  // 1. Lắng nghe Event Đơn Hàng Mới -> Bắn Telegram
+  eventBus.on(eventTypes.ORDER_CREATED, async (orderData) => {
+    try {
+      console.log(`[TelegramSubscriber] Nhận sự kiện ORDER_CREATED cho đơn #${orderData.id_order || orderData.id}`);
+      await orderNotifier.notifyOrderCreated(orderData);
+    } catch (err) {
+      console.error("[TelegramSubscriber] Lỗi khi xử lý ORDER_CREATED:", err.message);
     }
-    notifyOrderCreated(orderData);
-  } catch (error) {
-    logger.error('[TelegramSubscriber] Lỗi khi xử lý ORDER_CREATED', { error: error.message });
-  }
+  });
+
+  // 2. Lắng nghe Event Webhook Tiền Vào (Chuyển khoản bank) -> Bắn Telegram
+  eventBus.on(eventTypes.WEBHOOK_MONEY_IN, async (webhookData) => {
+    try {
+      console.log(`[TelegramSubscriber] Nhận sự kiện WEBHOOK_MONEY_IN cho GD ${webhookData.transaction_id || webhookData.id}`);
+      if (typeof financeNotifier.notifySepayReceived === 'function') {
+        await financeNotifier.notifySepayReceived(webhookData);
+      }
+    } catch (err) {
+      console.error("[TelegramSubscriber] Lỗi khi xử lý WEBHOOK_MONEY_IN:", err.message);
+    }
+  });
+
+  // Lưu ý: Các sự kiện biến động tài chính (ORDER_PAID, ORDER_RENEWED, ORDER_CANCELED_REFUNDED, SUPPLIER_DEBT_PAID)
+  // được quản lý và phát thông báo tập trung tại dailySummaryService sau khi đã ghi nhận hoàn tất vào CSDL.
+
+  // 7. Lắng nghe Event Thay Đổi Cấu Hình Hệ Thống
+  eventBus.on(eventTypes.SYSTEM_CONFIG_UPDATED, async (configData) => {
+    try {
+      console.log(`[TelegramSubscriber] Nhận sự kiện SYSTEM_CONFIG_UPDATED: ${configData.summary}`);
+      if (typeof systemNotifier?.notifyCritical === 'function') {
+        systemNotifier.notifyCritical(`⚙️ [SYSTEM CONFIG] ${configData.summary}`);
+      }
+    } catch (err) {
+      console.error("[TelegramSubscriber] Lỗi khi xử lý SYSTEM_CONFIG_UPDATED:", err.message);
+    }
+  });
+
+  console.log("✅ [EventBus] Telegram Event Subscriber registered successfully.");
 }
 
-function handleFourDaysDue(orders) {
-  try {
-    logger.info(`[TelegramSubscriber] Nhận sự kiện DAILY_FOUR_DAYS_DUE cho ${orders.length} đơn`);
-    notifyFourDaysRemaining(orders);
-  } catch (error) {
-    logger.error('[TelegramSubscriber] Lỗi khi xử lý DAILY_FOUR_DAYS_DUE', { error: error.message });
-  }
-}
-
-function handleZeroDaysDue(orders) {
-  try {
-    logger.info(`[TelegramSubscriber] Nhận sự kiện DAILY_ZERO_DAYS_DUE cho ${orders.length} đơn`);
-    notifyZeroDaysRemaining(orders);
-  } catch (error) {
-    logger.error('[TelegramSubscriber] Lỗi khi xử lý DAILY_ZERO_DAYS_DUE', { error: error.message });
-  }
-}
-
-
-
-// Hàm này sẽ được gọi ở index.js để ghim các listener vào EventBus
-function registerTelegramSubscribers() {
-  eventBus.on(EVENTS.ORDER_CREATED, handleOrderCreated);
-  eventBus.on(EVENTS.DAILY_FOUR_DAYS_DUE, handleFourDaysDue);
-  eventBus.on(EVENTS.DAILY_ZERO_DAYS_DUE, handleZeroDaysDue);
-
-  
-  logger.info('[TelegramSubscriber] Đã đăng ký thành công');
-}
-
-module.exports = {
-  registerTelegramSubscribers,
-};
+module.exports = { registerTelegramSubscriber };

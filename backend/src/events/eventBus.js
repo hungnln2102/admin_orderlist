@@ -1,14 +1,13 @@
-const EventEmitter = require('events');
+const EventEmitter = require("events");
 
 class EventBus extends EventEmitter {
   constructor() {
     super();
-    // Increase limit if many modules subscribe to the same events
-    this.setMaxListeners(20);
+    this.setMaxListeners(30);
   }
 }
 
-// Export a singleton instance so all files share the same Event Bus
+// Instance singleton dùng chung cho toàn hệ thống V2
 const eventBus = new EventBus();
 
 module.exports = eventBus;

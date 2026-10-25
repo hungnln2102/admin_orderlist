@@ -1,31 +1,23 @@
-import React, { useMemo } from "react";
+import React from "react";
 
-/**
- * LoginBackground Component
- * Renders the retro-futuristic background effects
- */
 export const LoginBackground: React.FC = () => {
-  const gradientId = useMemo(
-    () => `retro-grid-${Math.random().toString(36).slice(2)}`,
-    []
-  );
-
   return (
-    <>
-      <svg width="0" height="0" className="sr-only" aria-hidden="true">
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ff6ec7" />
-          <stop offset="50%" stopColor="#7c5cff" />
-          <stop offset="100%" stopColor="#4de1ec" />
-        </linearGradient>
-      </svg>
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-[#060911]" aria-hidden="true">
+      {/* Dynamic Aurora Gradient Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[55vw] h-[55vw] max-w-[650px] max-h-[650px] rounded-full bg-gradient-to-tr from-indigo-600/30 via-purple-600/20 to-sky-500/20 blur-[100px] aurora-blob-1" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] rounded-full bg-gradient-to-bl from-cyan-500/25 via-indigo-600/20 to-violet-600/30 blur-[110px] aurora-blob-2" />
+      <div className="absolute top-[30%] right-[20%] w-[35vw] h-[35vw] max-w-[450px] max-h-[450px] rounded-full bg-gradient-to-br from-fuchsia-600/15 via-indigo-500/15 to-transparent blur-[90px] aurora-blob-3" />
 
-      <div className="retro-bg" aria-hidden="true">
-        <div className="retro-grid" />
-        <div className="retro-sun" />
-        <div className="retro-planet" />
-        <div className="retro-glow" />
-      </div>
-    </>
+      {/* Cyber Grid Dot Matrix */}
+      <div
+        className="absolute inset-0 opacity-[0.18]"
+        style={{
+          backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.25) 1px, transparent 1px)`,
+          backgroundSize: "32px 32px",
+          maskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 80%)",
+          WebkitMaskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 80%)",
+        }}
+      />
+    </div>
   );
 };

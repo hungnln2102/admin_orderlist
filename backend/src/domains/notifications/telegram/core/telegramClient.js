@@ -20,6 +20,8 @@ function getLogger() {
   return { info: () => {}, error: () => {}, warn: () => {} };
 }
 const { HTTP_TIMEOUT_MS, TELEGRAM_BOT_TOKEN } = require("@/domains/notifications/telegram/core/constants");
+const systemConfigService = require("@/domains/system/services/systemConfigService");
+const { db, TABLES } = require("@/db");
 
 const RATE_LIMIT_MS = 1500; // Giãn cách 1.5s giữa mỗi tin nhắn
 const MAX_QUEUE = 300; // Ngăn rò rỉ bộ nhớ nếu mạng sập dài hạn
@@ -30,9 +32,28 @@ let isSending = false;
 const agent = new https.Agent({ keepAlive: true });
 
 /**
+ * Ghi log thông báo vào Database
+ */
+async function logNotification({ eventType, recipient, content, status, errorMessage }) {
+  try {
+    await db(TABLES.NOTIFICATION_LOGS).insert({
+      channel: 'TELEGRAM',
+      event_type: eventType || 'GENERAL_MESSAGE',
+      recipient: String(recipient || ''),
+      message_content: String(content || ''),
+      status,
+      error_message: errorMessage || null,
+      sent_at: status === 'SENT' ? db.fn.now() : null
+    });
+  } catch (e) {
+    getLogger().error("[TelegramClient] Không thể ghi log notification_logs:", e.message);
+  }
+}
+
+/**
  * Lõi gọi HTTP Request tới API Telegram
  */
-function rawPostToTelegram(payload) {
+function rawPostToTelegram(payload, eventType = 'GENERAL_MESSAGE') {
   return new Promise((resolve, reject) => {
     if (!TELEGRAM_BOT_TOKEN) {
       return reject(new Error("Missing TELEGRAM_BOT_TOKEN"));
@@ -66,8 +87,21 @@ function rawPostToTelegram(payload) {
               text: payload.text ? payload.text.substring(0, 50) + "..." : "Media",
               thread: payload.message_thread_id 
             });
+            logNotification({
+              eventType,
+              recipient: payload.message_thread_id || payload.chat_id,
+              content: payload.text || payload.caption || '[Photo/Media]',
+              status: 'SENT'
+            });
             resolve(data);
           } else {
+            logNotification({
+              eventType,
+              recipient: payload.message_thread_id || payload.chat_id,
+              content: payload.text || payload.caption || '[Photo/Media]',
+              status: 'FAILED',
+              errorMessage: `Telegram Error ${res.statusCode}: ${data}`
+            });
             reject(new Error(`Telegram Error ${res.statusCode}: ${data}`));
           }
         });
@@ -128,7 +162,7 @@ async function processQueue() {
 
   try {
     const payloadToSend = preparePayload(job.payload);
-    await rawPostToTelegram(payloadToSend);
+    await rawPostToTelegram(payloadToSend, job.eventType);
     job.resolve(true);
   } catch (error) {
     getLogger().error("[TelegramClient] Failed to send message", { error: error.message });
@@ -139,7 +173,7 @@ async function processQueue() {
       delete job.payload.message_thread_id;
       try {
         const retryPayload = preparePayload(job.payload);
-        await rawPostToTelegram(retryPayload);
+        await rawPostToTelegram(retryPayload, job.eventType);
         job.resolve(true);
       } catch (fallbackError) {
         getLogger().error("[TelegramClient] Fallback failed", { error: fallbackError.message });
@@ -180,9 +214,14 @@ async function processQueue() {
  * @param {boolean} options.isError Đánh dấu tin nhắn báo lỗi để xếp ưu tiên lên đầu
  * @returns {Promise}
  */
-function enqueueMessage(payload, { isError = false } = {}) {
+function enqueueMessage(payload, { isError = false, eventType = 'GENERAL_MESSAGE' } = {}) {
   return new Promise((resolve, reject) => {
     if (process.env.NODE_ENV === "test") {
+      return resolve(false);
+    }
+    const isEnabled = systemConfigService.get("TELEGRAM_ENABLED", true);
+    if (!isEnabled) {
+      getLogger().info("[TelegramClient] Bỏ qua gửi tin: Cấu hình TELEGRAM_ENABLED đang tắt (false).");
       return resolve(false);
     }
     if (!TELEGRAM_BOT_TOKEN) {
@@ -196,7 +235,7 @@ function enqueueMessage(payload, { isError = false } = {}) {
       return reject(new Error(dropMsg));
     }
 
-    const job = { payload, resolve, reject };
+    const job = { payload, resolve, reject, eventType };
 
     if (isError) {
       queue.unshift(job); // Nhảy cóc lên đầu hàng đợi

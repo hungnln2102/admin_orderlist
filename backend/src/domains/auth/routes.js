@@ -1,20 +1,14 @@
 const express = require("express");
-const {
-  login,
-  logout,
-  me,
-  getCsrfToken,
-  changePassword,
-} = require("@/domains/auth/controller");
-const { authLimiter, sensitiveLimiter, apiLimiter } = require("@/middleware/rateLimiter");
-const { loginRules, changePasswordRules } = require("@/domains/auth/validators/authValidator");
+const { login, logout, me, changePassword } = require("./controller");
+const { requireAuthenticatedUser } = require("./middleware/requireAuthenticatedUser");
+const { loginRateLimiter } = require("./middleware/loginRateLimiter");
 
 const router = express.Router();
 
-router.post("/login", authLimiter, ...loginRules, login);
+router.post("/login", loginRateLimiter, login);
+router.use(requireAuthenticatedUser);
 router.post("/logout", logout);
-router.get("/me", apiLimiter, me);
-router.get("/csrf-token", apiLimiter, getCsrfToken);
-router.post("/change-password", sensitiveLimiter, ...changePasswordRules, changePassword);
+router.get("/me", me);
+router.post("/change-password", changePassword);
 
 module.exports = router;
