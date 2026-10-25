@@ -3,10 +3,15 @@ export interface PricingItem {
   san_pham: string;
   package_product: string;
   base_price: number;
+  cost_price?: number;
   retail_price: number;
   ctv_price: number;
   student_price: number;
   promo_price: number;
+  min_margin_pct?: number;
+  max_margin_pct?: number;
+  min_profit_amount?: number;
+  max_profit_amount?: number;
   margin: string;
   is_active: boolean;
   updated_at: string;

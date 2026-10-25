@@ -310,10 +310,35 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Sản Phẩm" : "Chọn Sản Phẩm từ Catalog *"}</label>
+                <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Sản Phẩm (Biến Thể)" : "Chọn Sản Phẩm từ Catalog *"}</label>
                 {isEdit ? (
                   <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-cyan-300 font-bold flex items-center min-h-[38px]">
-                    {productsCatalog.find((p) => p.id === Number(formData.id_product) || p.san_pham === formData.id_product)?.san_pham || formData.id_product || "Không đổi"}
+                    {(() => {
+                      const matched = productsCatalog.find(
+                        (p) =>
+                          Number(p.id) === Number(formData.id_product) ||
+                          String(p.id) === String(formData.id_product) ||
+                          (p.package_product && p.package_product === formData.id_product) ||
+                          p.san_pham === formData.id_product
+                      );
+                      const displayVariant = matched?.package_product || formData.variant_name || matched?.san_pham;
+                      const skuBadge = matched?.san_pham || formData.display_name;
+                      if (displayVariant && !/^\d+$/.test(displayVariant)) {
+                        return (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-white font-bold">{displayVariant}</span>
+                            {skuBadge && skuBadge !== displayVariant && (
+                              <span className="text-[10.5px] text-slate-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                {skuBadge}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+                      return formData.id_product && !/^\d+$/.test(formData.id_product)
+                        ? formData.id_product
+                        : `Sản phẩm #${formData.id_product || "Không đổi"}`;
+                    })()}
                   </div>
                 ) : (
                   <SearchableProductDropdown

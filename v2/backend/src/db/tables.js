@@ -60,6 +60,7 @@ const TABLES = {
   PERSONAL_ASSETS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
   PERSONAL_SAVINGS: formatTable(SCHEMAS.FINANCE, "personal_savings"),
   DEBT_PAYMENT_LOGS: formatTable(SCHEMAS.FINANCE, "debt_payment_logs"),
+  EXTERNAL_API_CONFIGS: formatTable(SCHEMAS.SYSTEM, "external_api_configs"),
 };
 
 const COLS = {

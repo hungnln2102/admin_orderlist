@@ -4,6 +4,7 @@ export interface SlotAssignment {
   customerName?: string;
   customerContact?: string;
   slotLabel?: string;
+  capacity?: number | null;
 }
 
 export interface PackageItem {
@@ -11,11 +12,20 @@ export interface PackageItem {
   category: string;
   name: string;
   accountInfo: string;
+  password?: string | null;
+  twoFa?: string | null;
+  backupEmail?: string | null;
   storageAccountInfo?: string | null;
+  storagePassword?: string | null;
+  storageTwoFa?: string | null;
+  storageBackupEmail?: string | null;
   storageTotal?: string | null;
   requiresStorage?: boolean;
   usedSlots: number;
   totalSlots: number;
+  capacityLimit?: number | null;
+  capacityUsed?: number | null;
+  remainingCapacity?: number | null;
   supplier: string;
   costPrice: number;
   expiredAt: string;

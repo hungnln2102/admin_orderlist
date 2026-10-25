@@ -79,7 +79,7 @@ const login = async (req, res) => {
     const sessionUser = {
       id: user.id,
       username: user.username,
-      role: user.role || "admin",
+      role: String(user.role || "admin").trim().toLowerCase(),
     };
 
     await regenerateSession(req);
@@ -121,8 +121,13 @@ const changePassword = async (req, res) => {
     return res.status(400).json({ error: "Mật khẩu hiện tại và mật khẩu mới là bắt buộc" });
   }
 
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: "Mật khẩu mới phải có ít nhất 6 ký tự" });
+  if (
+    newPassword.length < 12
+    || !/[a-z]/.test(newPassword)
+    || !/[A-Z]/.test(newPassword)
+    || !/\d/.test(newPassword)
+  ) {
+    return res.status(400).json({ error: "Mật khẩu mới phải có ít nhất 12 ký tự, gồm chữ hoa, chữ thường và số" });
   }
 
   try {

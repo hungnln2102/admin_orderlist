@@ -61,17 +61,6 @@ function registerWarehouseEventSubscribers() {
     });
   });
 
-  // 6. WAREHOUSE_ACCOUNT_BROWSER_OPENED
-  eventBus.on(EVENTS.WAREHOUSE_ACCOUNT_BROWSER_OPENED, async (data) => {
-    console.log(`🌐 [EventBus] Tiếp nhận WAREHOUSE_ACCOUNT_BROWSER_OPENED (Account #${data.accountId}):`, data.targetUrl);
-    await recordEvent({
-      eventName: EVENTS.WAREHOUSE_ACCOUNT_BROWSER_OPENED,
-      aggregateType: "WAREHOUSE_BROWSER",
-      aggregateId: data.accountId,
-      payload: data,
-    });
-  });
-
   console.log("✅ [EventBus] Đăng ký thành công Warehouse Event Subscribers");
 }
 

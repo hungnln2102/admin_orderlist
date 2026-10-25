@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const knex = require('knex');
 
-const EXPECTED_TARGET_DATABASES = ['mydtbmav', 'mydtbmav_v2_import'];
+const EXPECTED_TARGET_DATABASES = ['mydtbmav', 'mydtbmav_v2_import', 'mydtbmav_prod'];
 const applyChanges = process.argv.includes('--apply');
 const resetTarget = process.argv.includes('--reset-target');
 
@@ -36,14 +36,23 @@ const TARGET = {
   slots: TABLES.STOCK_SERVICES,
   productNames: TABLES.PRODUCT_NAMES,
   packages: TABLES.PACKAGE_PRODUCT,
+  dailySummary: TABLES.DAILY_REVENUE_SUMMARY,
+  systemConfigs: TABLES.SYSTEM_CONFIGS,
+  shopBankAccounts: TABLES.SHOP_BANK_ACCOUNTS,
 };
 
 const STATUS_MAP = new Map([
   ['Hết Hạn', 'EXPIRED'],
   ['Đã Thanh Toán', 'PAID'],
   ['Đã Hoàn', 'REFUNDED'],
+  ['Đã Hoàn Tiền', 'REFUNDED'],
   ['Cần Gia Hạn', 'RENEW_REQUIRED'],
   ['Chưa Thanh Toán', 'UNPAID'],
+  ['EXPIRED', 'EXPIRED'],
+  ['PAID', 'PAID'],
+  ['REFUNDED', 'REFUNDED'],
+  ['RENEW_REQUIRED', 'RENEW_REQUIRED'],
+  ['UNPAID', 'UNPAID'],
 ]);
 
 function databaseName(url) {
@@ -80,7 +89,16 @@ async function upsert(trx, table, rows, conflictColumns) {
   }
 }
 
-function normalizeSlot(value) {
+/**
+ * Giữ nguyên vẹn chuỗi text slot gốc từ V1 (chống ép số, chống null sai)
+ */
+function normalizeOrderSlot(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text === '' ? null : text;
+}
+
+function normalizePackageSlot(value) {
   const text = String(value ?? '').trim();
   const parsed = Number.parseInt(text, 10);
   return /^\d{19}$/.test(text) || !Number.isInteger(parsed) || parsed < 1 || parsed >= 100000 ? 1 : parsed;
@@ -88,6 +106,102 @@ function normalizeSlot(value) {
 
 function normalizeText(value) {
   return String(value || '').trim().toLocaleLowerCase('vi-VN');
+}
+
+/**
+ * Chuẩn hóa múi giờ giữ nguyên con số ngày giờ hiển thị (Wall-clock time theo giờ VN)
+ * Ví dụ: 2026-10-24 17:00:00 UTC -> 2026-10-24 17:00:00+07
+ */
+function keepWallTimeAsVietnam(dateInput) {
+  if (!dateInput) return null;
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return `${trimmed} 00:00:00+07`;
+    }
+    const matchFull = trimmed.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+    if (matchFull) {
+      return `${matchFull[1]} ${matchFull[2]}+07`;
+    }
+  }
+
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return dateInput;
+
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const h = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
+  const sec = String(d.getUTCSeconds()).padStart(2, '0');
+
+  return `${y}-${m}-${day} ${h}:${min}:${sec}+07`;
+}
+
+/**
+ * Chuyển ngày bất kỳ về mốc 00:00:00 theo múi giờ Việt Nam
+ */
+function parseVietnamDateToMidnight(dateInput) {
+  if (!dateInput) return null;
+  if (typeof dateInput === 'string') {
+    const match = dateInput.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0);
+    }
+  }
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
+
+  // Lấy mốc ngày theo giờ Việt Nam (+7)
+  const vnTime = new Date(d.getTime() + 7 * 3600 * 1000);
+  return new Date(vnTime.getUTCFullYear(), vnTime.getUTCMonth(), vnTime.getUTCDate(), 0, 0, 0);
+}
+
+function getVietnamTodayMidnight() {
+  const now = new Date();
+  const vnNow = new Date(now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60 * 1000);
+  return new Date(vnNow.getFullYear(), vnNow.getMonth(), vnNow.getDate(), 0, 0, 0);
+}
+
+/**
+ * Tự động tính toán trạng thái đơn hàng theo ngày hết hạn (Dynamic Status Resolution)
+ * - Đã hoàn tiền / Chưa thanh toán: giữ nguyên
+ * - Quá hạn (< 0 ngày): EXPIRED
+ * - Cận hạn (0 đến warnDays ngày): RENEW_REQUIRED
+ * - Còn hạn (> warnDays ngày): PAID
+ */
+function determineOrderStatus(rawStatus, expiredAtInput, refundInput, todayMidnight, warnDays = 4) {
+  const statusStr = String(rawStatus || '').trim();
+
+  if (['Đã Hoàn Tiền', 'Đã Hoàn', 'REFUNDED'].includes(statusStr) || (refundInput != null && Number(refundInput) > 0)) {
+    return 'REFUNDED';
+  }
+  if (['Chưa Thanh Toán', 'UNPAID'].includes(statusStr)) {
+    return 'UNPAID';
+  }
+  if (['Đã Hủy', 'CANCELED', 'CANCELLED'].includes(statusStr)) {
+    return 'REFUNDED';
+  }
+
+  if (!expiredAtInput) {
+    return STATUS_MAP.get(statusStr) || 'PAID';
+  }
+
+  const expDate = parseVietnamDateToMidnight(expiredAtInput);
+  if (!expDate) {
+    return STATUS_MAP.get(statusStr) || 'PAID';
+  }
+
+  const diffMs = expDate.getTime() - todayMidnight.getTime();
+  const diffDays = Math.round(diffMs / (24 * 3600 * 1000));
+
+  if (diffDays < 0) {
+    return 'EXPIRED';
+  }
+  if (diffDays <= warnDays) {
+    return 'RENEW_REQUIRED';
+  }
+  return 'PAID';
 }
 
 async function loadSource(sourceDb) {
@@ -120,10 +234,122 @@ function createReport(source, sourceDatabase, targetDatabase) {
     reset_target: resetTarget,
     source_counts: Object.fromEntries(Object.entries(source).map(([name, rows]) => [name, rows.length])),
     imported_counts: {},
+    status_distribution: {},
+    slot_summary: {},
     exceptions: { skipped_supplier_costs: [], normalized_order_slots: [], unmapped_package_accounts: [], unmapped_package_slots: [] },
     package_catalog: { created: [], reused: [] },
     validation: {},
   };
+}
+
+async function syncDailyRevenueSummary(trx) {
+  console.log('🔄 [ETL] Đang tự động đồng bộ bảng finance.daily_revenue_summary...');
+  const upsertSql = `
+    WITH order_dates AS (
+      SELECT
+        id,
+        id_order,
+        status,
+        price,
+        gross_selling_price,
+        cost,
+        refund,
+        COALESCE(
+          (order_date AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+          (created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+        ) AS v_date
+      FROM ${TARGET.orders}
+      WHERE order_date IS NOT NULL OR created_at IS NOT NULL
+    ),
+    sales_daily AS (
+      SELECT
+        v_date,
+        COUNT(*) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED'))::integer AS sales_orders_count,
+        COUNT(*) FILTER (WHERE status = 'REFUNDED')::integer AS canceled_count,
+        COALESCE(SUM(COALESCE(gross_selling_price, price, 0)) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED')), 0)::numeric AS earned_revenue,
+        COALESCE(SUM(COALESCE(cost, 0)) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED')), 0)::numeric AS sales_cost,
+        COALESCE(SUM(COALESCE(refund, price, 0)) FILTER (WHERE status = 'REFUNDED'), 0)::numeric AS revenue_reversed
+      FROM order_dates
+      WHERE id_order NOT LIKE 'MAVN%'
+      GROUP BY v_date
+    ),
+    import_daily AS (
+      SELECT
+        v_date,
+        COUNT(*)::integer AS import_count,
+        COALESCE(SUM(COALESCE(cost, price, 0)), 0)::numeric AS import_cost
+      FROM order_dates
+      WHERE id_order LIKE 'MAVN%'
+      GROUP BY v_date
+    ),
+    all_dates AS (
+      SELECT v_date FROM sales_daily
+      UNION
+      SELECT v_date FROM import_daily
+    ),
+    daily_merged AS (
+      SELECT
+        ad.v_date AS summary_date,
+        COALESCE(s.sales_orders_count, 0) AS dashboard_orders_count,
+        COALESCE(s.sales_orders_count, 0) AS total_orders,
+        COALESCE(s.canceled_count, 0) AS dashboard_canceled_count,
+        ROUND(COALESCE(s.earned_revenue, 0), 2) AS earned_revenue,
+        ROUND(COALESCE(s.earned_revenue, 0), 2) AS total_revenue,
+        ROUND(COALESCE(s.sales_cost, 0) + COALESCE(imp.import_cost, 0), 2) AS total_shop_cost,
+        ROUND(COALESCE(s.sales_cost, 0) + COALESCE(imp.import_cost, 0), 2) AS total_cost,
+        ROUND(COALESCE(s.revenue_reversed, 0), 2) AS revenue_reversed,
+        ROUND(
+          COALESCE(s.earned_revenue, 0) - (COALESCE(s.sales_cost, 0) + COALESCE(imp.import_cost, 0)) - COALESCE(s.revenue_reversed, 0),
+          2
+        ) AS net_profit
+      FROM all_dates ad
+      LEFT JOIN sales_daily s ON s.v_date = ad.v_date
+      LEFT JOIN import_daily imp ON imp.v_date = ad.v_date
+    )
+    INSERT INTO ${TARGET.dailySummary} (
+      summary_date,
+      total_orders,
+      total_revenue,
+      total_cost,
+      net_profit,
+      earned_revenue,
+      total_shop_cost,
+      revenue_reversed,
+      dashboard_orders_count,
+      dashboard_canceled_count,
+      created_at,
+      updated_at
+    )
+    SELECT
+      m.summary_date,
+      m.total_orders,
+      m.total_revenue,
+      m.total_cost,
+      m.net_profit,
+      m.earned_revenue,
+      m.total_shop_cost,
+      m.revenue_reversed,
+      m.dashboard_orders_count,
+      m.dashboard_canceled_count,
+      NOW(),
+      NOW()
+    FROM daily_merged m
+    WHERE m.summary_date IS NOT NULL
+    ON CONFLICT (summary_date) DO UPDATE SET
+      total_orders = EXCLUDED.total_orders,
+      total_revenue = EXCLUDED.total_revenue,
+      total_cost = EXCLUDED.total_cost,
+      net_profit = EXCLUDED.net_profit,
+      earned_revenue = EXCLUDED.earned_revenue,
+      total_shop_cost = EXCLUDED.total_shop_cost,
+      revenue_reversed = EXCLUDED.revenue_reversed,
+      dashboard_orders_count = EXCLUDED.dashboard_orders_count,
+      dashboard_canceled_count = EXCLUDED.dashboard_canceled_count,
+      updated_at = NOW();
+  `;
+  await trx.raw(upsertSql);
+  const countRow = await trx(TARGET.dailySummary).count('* as count').first();
+  console.log(`✅ [ETL] Đã đồng bộ thành công ${countRow.count} ngày vào finance.daily_revenue_summary.`);
 }
 
 async function importData(targetDb, source, report) {
@@ -145,23 +371,49 @@ async function importData(targetDb, source, report) {
     return valid;
   });
 
+  const todayMidnight = getVietnamTodayMidnight();
+  const statusStats = { EXPIRED: 0, RENEW_REQUIRED: 0, PAID: 0, REFUNDED: 0, UNPAID: 0 };
+  let slotWithTextCount = 0;
+
   const orders = source.orders.map((row) => {
-    const slot = normalizeSlot(row.slot);
-    if (/^\d{19}$/.test(String(row.slot ?? '').trim())) {
-      report.exceptions.normalized_order_slots.push({ id: row.id, original_slot: row.slot, normalized_slot: slot });
-    }
-    const status = STATUS_MAP.get(String(row.status || '').trim()) || String(row.status || 'UNPAID').trim();
+    const slot = normalizeOrderSlot(row.slot);
+    if (slot != null) slotWithTextCount++;
+
+    const status = determineOrderStatus(row.status, row.expired_at, row.refund, todayMidnight, 4);
+    statusStats[status] = (statusStats[status] || 0) + 1;
+
     return {
-      id: row.id, id_order: row.id_order, id_product: row.id_product, information_order: row.information_order,
-      customer: row.customer, contact: row.contact, slot, order_date: row.order_date, days: row.days,
-      expired_at: row.expired_at, supply_id: supplierIds.has(String(row.supply_id)) ? row.supply_id : null,
-      cost: row.cost, price: row.price, note: row.note, status, was_paid: status === 'PAID', refund: row.refund,
-      canceled_at: row.canceled_at, gross_selling_price: row.gross_selling_price, transaction: row.transaction,
-      payment_method: row.payment_method, usdt_amount_usd: row.usdt_amount_usd,
-      usdt_exchange_rate: row.usdt_exchange_rate, usdt_wallet_id: null, created_at: row.created_at,
-      updated_at: row.updated_at || row.created_at,
+      id: row.id,
+      id_order: row.id_order,
+      id_product: row.id_product,
+      information_order: row.information_order,
+      customer: row.customer,
+      contact: row.contact,
+      slot,
+      order_date: keepWallTimeAsVietnam(row.order_date),
+      days: row.days,
+      expired_at: keepWallTimeAsVietnam(row.expired_at),
+      supply_id: supplierIds.has(String(row.supply_id)) ? row.supply_id : null,
+      cost: row.cost,
+      price: row.price,
+      note: row.note,
+      status,
+      was_paid: ['PAID', 'RENEW_REQUIRED', 'EXPIRED'].includes(status),
+      refund: row.refund,
+      canceled_at: keepWallTimeAsVietnam(row.canceled_at),
+      gross_selling_price: row.gross_selling_price,
+      transaction: row.transaction,
+      payment_method: row.payment_method,
+      usdt_amount_usd: row.usdt_amount_usd,
+      usdt_exchange_rate: row.usdt_exchange_rate,
+      usdt_wallet_id: null,
+      created_at: keepWallTimeAsVietnam(row.created_at),
+      updated_at: keepWallTimeAsVietnam(row.updated_at || row.created_at),
     };
   });
+
+  report.status_distribution = statusStats;
+  report.slot_summary = { total_orders: orders.length, orders_with_slot: slotWithTextCount, orders_without_slot: orders.length - slotWithTextCount };
 
   const supplierLogs = source.supplierLogs.filter((row) =>
     (!row.order_list_id || orderIds.has(String(row.order_list_id))) && (!row.supply_id || supplierIds.has(String(row.supply_id)))
@@ -193,7 +445,7 @@ async function importData(targetDb, source, report) {
     await upsert(trx, TARGET.supplierLogs, supplierLogs.map((row) => ({
       id: row.id, order_list_id: row.order_list_id, supply_id: row.supply_id, id_order: row.id_order,
       import_cost: row.import_cost, refund_amount: row.refund_amount, ncc_payment_status: row.ncc_payment_status,
-      logged_at: row.logged_at,
+      logged_at: keepWallTimeAsVietnam(row.logged_at),
     })), 'id');
     await upsert(trx, TARGET.productNames, source.productNames.map((row) => ({
       id: row.id, name: row.name, description: null, category: null, is_active: true, is_package: false,
@@ -247,18 +499,33 @@ async function importData(targetDb, source, report) {
         id: row.id, product_name_id: packageCatalogIds.get(String(row.package_id)) || null,
         package_name: productById.get(String(row.package_id))?.package_name || null,
         account_id: accountId, storage_account_id: storageAccountId, supplier: row.supplier || 'Mavryk',
-        cost: row.cost, slot: normalizeSlot(row.slot), storage_total: row.storage_total == null ? null : String(row.storage_total),
+        cost: row.cost, slot: normalizePackageSlot(row.slot), storage_total: row.storage_total == null ? null : String(row.storage_total),
         match_rule: row.match || 'slot', package_note: slotId ? `V1 stock_service_id=${slotId}` : null,
         created_at: trx.fn.now(), updated_at: trx.fn.now(),
       };
     });
     await upsert(trx, TARGET.packages, packageRows, 'id');
+
     for (const table of [
       TARGET.suppliers, TARGET.products, TARGET.variants, TARGET.supplierCosts, TARGET.orders,
       TARGET.supplierLogs, TARGET.productNames, TARGET.accounts, TARGET.slots, TARGET.packages,
     ]) {
       await trx.raw(`SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM ${table}), 1), true)`);
     }
+
+    // Tự động đồng bộ doanh thu vào finance.daily_revenue_summary
+    await syncDailyRevenueSummary(trx);
+
+    // Tự động nạp cấu hình hệ thống & tài khoản ngân hàng chính từ .env.docker
+    try {
+      const { syncSystemConfigs, syncShopBankAccount, parseEnvDocker } = require('./importSystemConfigsFromDockerEnv');
+      const envDocker = parseEnvDocker();
+      await syncSystemConfigs(trx, envDocker);
+      await syncShopBankAccount(trx, envDocker);
+    } catch (cfgErr) {
+      console.warn('⚠️ [System Configs] Không thể nạp cấu hình từ .env.docker:', cfgErr.message);
+    }
+
     report.imported_counts = {
       suppliers: source.suppliers.length, products: source.products.length, variants: source.variants.length,
       variant_prices: source.variantPrices.length, supplier_costs: supplierCosts.length, orders: orders.length,
@@ -277,6 +544,9 @@ async function validateTarget(sourceDb, targetDb, report) {
     orders: await count(TARGET.orders), supplier_order_cost_logs: await count(TARGET.supplierLogs),
     warehouse_product_names: await count(TARGET.productNames), warehouse_accounts: await count(TARGET.accounts),
     warehouse_account_slots: await count(TARGET.slots), warehouse_package_products: await count(TARGET.packages),
+    daily_revenue_summaries: await count(TARGET.dailySummary),
+    system_configs: await count(TARGET.systemConfigs),
+    shop_bank_accounts: await count(TARGET.shopBankAccounts),
     admin_users: await count('admin.users'),
   };
   const checks = {
@@ -301,42 +571,82 @@ function writeReport(report) {
   const directory = path.resolve(__dirname, '../reports');
   fs.mkdirSync(directory, { recursive: true });
   const reportPath = path.join(directory, `v1-operational-import-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(reportPath, `${JSON.stringify(redactReport(report), null, 2)}\n`, 'utf8');
   return reportPath;
 }
 
+function redactReport(value, key = '') {
+  const isSensitiveKey = /password|passmail|token|secret|api[_-]?key|authorization|cookie|backup_email|two_fa|original.?slot/i.test(key);
+  if (isSensitiveKey) return '[REDACTED]';
+  if (Array.isArray(value)) return value.map((item) => redactReport(item));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [entryKey, redactReport(entryValue, entryKey)]));
+  }
+  return value;
+}
+
 async function main() {
+  console.log('========================================================================');
+  console.log('🚀 MAVRYK V1 ➔ V2 OPERATIONAL DATA IMPORTER (ALL-IN-ONE PRODUCTION)');
+  console.log('========================================================================');
+
   const sourceUrl = connectionUrl('V1_DATABASE_URL', 'mydtbmav_v1_restore');
-  const targetUrl = connectionUrl('V2_IMPORT_DATABASE_URL', EXPECTED_TARGET_DATABASE);
+  const targetUrl = connectionUrl('V2_IMPORT_DATABASE_URL', 'mydtbmav');
   assertSafeTarget(targetUrl);
   const sourceDb = knex({ client: 'pg', connection: sourceUrl });
   const targetDb = knex({ client: 'pg', connection: targetUrl });
   try {
     const source = await loadSource(sourceDb);
     const report = createReport(source, databaseName(sourceUrl), databaseName(targetUrl));
-    console.log(`[V1 import] source=${report.source_database}, target=${report.target_database}, mode=${report.mode}`);
+    console.log(`[V1 import] Source DB: ${report.source_database}`);
+    console.log(`[V1 import] Target DB: ${report.target_database}`);
+    console.log(`[V1 import] Mode:      ${report.mode.toUpperCase()}`);
+    console.log(`[V1 import] Reset:     ${report.reset_target ? 'YES' : 'NO'}`);
     console.table(report.source_counts);
+
     if (!applyChanges) {
-      console.log(`[V1 import] dry-run complete; no data written; report=${writeReport(report)}`);
+      console.log(`\n⚠️ DRY-RUN HOÀN TẤT. Chưa có dữ liệu nào được ghi vào ${report.target_database}.`);
+      console.log(`👉 Chạy thêm cờ --apply (và --reset-target nếu muốn tạo mới schema) để thực thi.`);
+      const reportPath = writeReport(report);
+      console.log(`📄 Báo cáo dry-run: ${reportPath}`);
       return;
     }
+
     if (resetTarget) {
-      console.log('[V1 import] resetting target sandbox');
+      console.log('\n🧹 Đang reset target database và chạy migrations mới nhất...');
       await resetSandbox(targetDb);
+      console.log('✅ Reset và migration hoàn tất.');
     }
+
+    console.log('\n📦 Đang nạp dữ liệu chuẩn hóa sang target database...');
     await importData(targetDb, source, report);
+
+    console.log('\n🔍 Đang kiểm tra tính toàn vẹn (Integrity & Validation)...');
     await validateTarget(sourceDb, targetDb, report);
+
     const reportPath = writeReport(report);
+
+    console.log('\n========================================================================');
+    console.log('🎉 NHẬP LIỆU TOÀN DIỆN THÀNH CÔNG RỰC RỠ!');
+    console.log('========================================================================');
+    console.log('📊 Phân bố trạng thái đơn hàng (Chuẩn hóa tự động):');
+    console.table(report.status_distribution);
+    console.log('📦 Thống kê dữ liệu Slot text:');
+    console.table(report.slot_summary);
+    console.log('📋 Số lượng bảng đích đã nạp:');
+    console.table(report.validation.counts);
+
     if (Object.values(report.validation.integrity).some((count) => count !== 0)) {
       throw new Error(`Integrity validation failed; see ${reportPath}`);
     }
-    console.log(`[V1 import] completed successfully; report=${reportPath}`);
+
+    console.log(`📄 Chi tiết báo cáo JSON: ${reportPath}`);
   } finally {
     await Promise.all([sourceDb.destroy(), targetDb.destroy()]);
   }
 }
 
 main().catch((error) => {
-  console.error('[V1 import] failed:', error.message);
+  console.error('❌ [V1 import] LỖI THỰC THI:', error.message);
   process.exitCode = 1;
 });

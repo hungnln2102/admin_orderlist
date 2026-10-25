@@ -51,6 +51,7 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       COALESCE(p_promo.${VP_COLS.PRICE}, 0) AS promo_price,
       p_retail.${VP_COLS.MARGIN_RATIO} AS retail_margin_ratio,
       p_ctv.${VP_COLS.MARGIN_RATIO} AS ctv_margin_ratio,
+      sc.min_cost AS supplier_min_cost,
       v.${V_COLS.UPDATED_AT}
     FROM ${TABLES.VARIANT} v
     LEFT JOIN ${TABLES.PRODUCT} p ON p.${P_COLS.ID} = v.${V_COLS.PRODUCT_ID}
@@ -58,6 +59,11 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_ctv ON p_ctv.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_ctv.${VP_COLS.TIER_ID} = 1
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_student ON p_student.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_student.${VP_COLS.TIER_ID} = 4
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_promo ON p_promo.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_promo.${VP_COLS.TIER_ID} = 3
+    LEFT JOIN LATERAL (
+      SELECT MIN(${SC_COLS.PRICE}) AS min_cost
+      FROM ${TABLES.SUPPLIER_COST}
+      WHERE ${SC_COLS.VARIANT_ID} = v.${V_COLS.ID} AND ${SC_COLS.PRICE} > 0
+    ) sc ON true
     ${whereClause}
     ORDER BY v.${V_COLS.IS_ACTIVE} DESC, COALESCE(p.${P_COLS.PACKAGE_NAME}, v.${V_COLS.DISPLAY_NAME}) ASC, v.${V_COLS.DISPLAY_NAME} ASC
     LIMIT ? OFFSET ?
@@ -75,15 +81,56 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
     const studentPrice = parseFloat(r.student_price || 0);
     const promoPrice = parseFloat(r.promo_price || 0);
     const basePrice = parseFloat(r.base_price || 0);
+    const supplierMinCost =
+      r.supplier_min_cost !== null && r.supplier_min_cost !== undefined
+        ? parseFloat(r.supplier_min_cost)
+        : 0;
+    const costPrice = supplierMinCost > 0 ? supplierMinCost : (basePrice > 0 ? basePrice : 0);
 
-    let marginPct = "0.0%";
+    let minProfitAmount = 0;
+    let maxProfitAmount = 0;
+    let minMarginPct = 0;
+    let maxMarginPct = 0;
 
-    if (r.retail_margin_ratio !== null && r.retail_margin_ratio !== undefined) {
-      marginPct = (parseFloat(r.retail_margin_ratio) * 100).toFixed(1) + "%";
-    } else if (retailPrice > 0 && ctvPrice > 0) {
-      marginPct = (((retailPrice - ctvPrice) / retailPrice) * 100).toFixed(1) + "%";
+    if (costPrice > 0) {
+      minProfitAmount = ctvPrice > 0 ? ctvPrice - costPrice : 0;
+      maxProfitAmount = retailPrice > 0 ? retailPrice - costPrice : 0;
+      minMarginPct = ctvPrice > 0 ? ((ctvPrice - costPrice) / ctvPrice) * 100 : 0;
+      maxMarginPct = retailPrice > 0 ? ((retailPrice - costPrice) / retailPrice) * 100 : 0;
     } else {
-      marginPct = "0.0%";
+      // Khi chưa có giá vốn NCC và base_price = 0, fallback theo margin_ratio định sẵn
+      const ctvRatio =
+        r.ctv_margin_ratio !== null && r.ctv_margin_ratio !== undefined
+          ? parseFloat(r.ctv_margin_ratio)
+          : null;
+      const retailRatio =
+        r.retail_margin_ratio !== null && r.retail_margin_ratio !== undefined
+          ? parseFloat(r.retail_margin_ratio)
+          : null;
+
+      if (ctvRatio !== null) {
+        minMarginPct = ctvRatio * 100;
+      } else if (ctvPrice > 0 && retailPrice > 0) {
+        minMarginPct = ((retailPrice - ctvPrice) / retailPrice) * 100;
+      }
+
+      if (retailRatio !== null) {
+        maxMarginPct = retailRatio * 100;
+      } else {
+        maxMarginPct = minMarginPct;
+      }
+
+      minProfitAmount = ctvPrice > 0 ? ctvPrice * (minMarginPct / 100) : 0;
+      maxProfitAmount = retailPrice > 0 ? retailPrice * (maxMarginPct / 100) : 0;
+    }
+
+    let marginStr = "0.0%";
+    if (minMarginPct !== 0 || maxMarginPct !== 0) {
+      if (Math.abs(minMarginPct - maxMarginPct) < 0.1) {
+        marginStr = `${minMarginPct.toFixed(1)}%`;
+      } else {
+        marginStr = `${minMarginPct.toFixed(1)}% - ${maxMarginPct.toFixed(1)}%`;
+      }
     }
 
     return {
@@ -91,11 +138,16 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       san_pham: r.san_pham || r.package_product || "N/A",
       package_product: r.package_product || "",
       base_price: basePrice,
+      cost_price: costPrice,
       retail_price: retailPrice,
       ctv_price: ctvPrice,
       student_price: studentPrice,
       promo_price: promoPrice,
-      margin: marginPct,
+      min_margin_pct: parseFloat(minMarginPct.toFixed(1)),
+      max_margin_pct: parseFloat(maxMarginPct.toFixed(1)),
+      min_profit_amount: Math.round(minProfitAmount),
+      max_profit_amount: Math.round(maxProfitAmount),
+      margin: marginStr,
       is_active: Boolean(r.is_active),
       updated_at: r.updated_at,
     };
@@ -562,10 +614,16 @@ const getPackageProducts = async () => {
       pp.id,
       pp.product_name_id,
       pn.name AS product_name,
-      COALESCE(pn.name, 'Kh?c') AS category,
+      COALESCE(pn.name, 'Khác') AS category,
       pn.requires_storage AS category_requires_storage,
       COALESCE(acc.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
+      COALESCE(acc_slot.password, acc.password) AS password,
+      acc_slot.two_fa,
+      acc_slot.backup_email,
       storage_acc.account_username AS storage_account_info,
+      COALESCE(storage_slot.password, storage_acc.password) AS storage_password,
+      storage_slot.two_fa AS storage_two_fa,
+      storage_slot.backup_email AS storage_backup_email,
       COALESCE(pp.supplier, 'Mavryk') AS supplier,
       COALESCE(pp.cost, 0) AS cost_price,
       COALESCE(pp.slot, 2) AS total_slots,
@@ -575,7 +633,21 @@ const getPackageProducts = async () => {
     FROM ${TABLES.PACKAGE_PRODUCT} pp
     LEFT JOIN ${TABLES.PRODUCT_NAMES} pn ON pn.id = pp.product_name_id
     LEFT JOIN ${TABLES.PRODUCT_KEYS} acc ON acc.id = pp.account_id
+    LEFT JOIN LATERAL (
+      SELECT password, two_fa, backup_email
+      FROM ${TABLES.STOCK_SERVICES}
+      WHERE account_id = pp.account_id
+      ORDER BY id ASC
+      LIMIT 1
+    ) acc_slot ON true
     LEFT JOIN ${TABLES.PRODUCT_KEYS} storage_acc ON storage_acc.id = pp.storage_account_id
+    LEFT JOIN LATERAL (
+      SELECT password, two_fa, backup_email
+      FROM ${TABLES.STOCK_SERVICES}
+      WHERE account_id = pp.storage_account_id
+      ORDER BY id ASC
+      LIMIT 1
+    ) storage_slot ON true
     ORDER BY pp.id DESC;
   `;
 
@@ -593,9 +665,10 @@ const getPackageProducts = async () => {
   );
 
   let ordersList = [];
+  let variantMap = new Map();
   if (targetAccounts.length > 0) {
     ordersList = await db(TABLES.ORDER_LIST)
-      .select("id", "id_order", "customer", "contact", "information_order", "slot", "status", "expired_at", "cost", "supply_id")
+      .select("id", "id_order", "id_product", "customer", "contact", "information_order", "slot", "status", "expired_at", "cost", "supply_id")
       .whereNotIn("status", [ORDER_STATUS.CANCELED, ORDER_STATUS.REFUNDED, "Đã Xóa", "Đã Hủy", "Hoàn Tiền"])
       .whereNot("id_order", "ilike", "MAVN%")
       .whereRaw("LOWER(COALESCE(customer, '')) != 'mavryk'")
@@ -605,7 +678,22 @@ const getPackageProducts = async () => {
           builder.orWhereRaw("CAST(slot AS TEXT) ILIKE ?", [`%${acc}%`]);
         });
       });
+
+    const vIds = Array.from(new Set(ordersList.map((o) => parseInt(o.id_product, 10)).filter((id) => Number.isInteger(id) && id > 0)));
+    if (vIds.length > 0) {
+      const variants = await db(TABLES.VARIANT).whereIn("id", vIds).select("id", "variant_name", "display_name");
+      variantMap = new Map(variants.map((v) => [String(v.id), v]));
+    }
   }
+
+  const extractCapacityFromVariant = (variantName, displayName) => {
+    const text = `${variantName || ""} ${displayName || ""}`.toLowerCase();
+    const tbMatch = text.match(/(\d+(?:\.\d+)?)\s*tb/);
+    if (tbMatch) return Math.round(parseFloat(tbMatch[1]) * 1000);
+    const gbMatch = text.match(/(\d+)\s*gb/);
+    if (gbMatch) return parseInt(gbMatch[1], 10);
+    return null;
+  };
 
   return rows.map((r) => {
     const matchRule = (r.match_rule || "information").toLowerCase();
@@ -633,13 +721,25 @@ const getPackageProducts = async () => {
     const totalSlots = parseInt(r.total_slots || 2, 10);
     const usedSlots = Math.min(totalSlots, matchingOrders.length);
 
-    const slotAssignments = matchingOrders.map((ord, idx) => ({
-      slotNumber: idx + 1,
-      orderCode: ord.id_order || `ĐƠN #${ord.id}`,
-      customerName: ord.customer || "",
-      customerContact: ord.contact || ord.information_order || "",
-      slotLabel: ord.slot || `Slot ${idx + 1}`,
-    }));
+    const slotAssignments = matchingOrders.map((ord, idx) => {
+      const v = ord.id_product ? variantMap.get(String(ord.id_product)) : null;
+      const capacity = extractCapacityFromVariant(v?.variant_name, v?.display_name);
+      return {
+        slotNumber: idx + 1,
+        orderCode: ord.id_order || `ĐƠN #${ord.id}`,
+        customerName: ord.customer || "",
+        customerContact: ord.contact || ord.information_order || "",
+        slotLabel: ord.slot || `Slot ${idx + 1}`,
+        capacity: capacity || null,
+      };
+    });
+
+    const capacityLimit = r.storage_total ? parseInt(r.storage_total, 10) : null;
+    let capacityUsed = 0;
+    if (capacityLimit && capacityLimit > 0) {
+      capacityUsed = slotAssignments.reduce((acc, s) => acc + (s.capacity || 0), 0);
+    }
+    const remainingCapacity = capacityLimit && capacityLimit > 0 ? Math.max(0, capacityLimit - capacityUsed) : null;
 
     return {
       id: r.id,
@@ -648,8 +748,17 @@ const getPackageProducts = async () => {
       requiresStorage: Boolean(r.category_requires_storage),
       name: r.product_name || (r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`),
       accountInfo: r.account_info,
+      password: r.password || null,
+      twoFa: r.two_fa || null,
+      backupEmail: r.backup_email || null,
       storageAccountInfo: r.storage_account_info || null,
+      storagePassword: r.storage_password || null,
+      storageTwoFa: r.storage_two_fa || null,
+      storageBackupEmail: r.storage_backup_email || null,
       storageTotal: r.storage_total || null,
+      capacityLimit: capacityLimit || null,
+      capacityUsed: capacityLimit ? capacityUsed : null,
+      remainingCapacity: capacityLimit ? remainingCapacity : null,
       usedSlots,
       totalSlots,
       supplier: r.supplier,

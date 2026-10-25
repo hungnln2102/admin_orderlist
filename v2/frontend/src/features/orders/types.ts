@@ -6,6 +6,8 @@ export interface Order {
   id: number;
   id_order: string;
   id_product?: number | string;
+  variant_name?: string;
+  display_name?: string;
   customer: string;
   contact: string;
   information_order: string;
@@ -14,6 +16,7 @@ export interface Order {
   gross_selling_price?: number;
   cost?: number;
   supply_id?: number | string;
+  supplier_name?: string;
   status: string;
   payment_method?: string;
   note?: string;
@@ -44,6 +47,8 @@ export interface OrderFormData {
   information_order: string;
   slot: string;
   id_product: string;
+  variant_name?: string;
+  display_name?: string;
   supply_id: string;
   price: number;
   gross_selling_price: number;
@@ -148,10 +153,25 @@ export function calculateRemainingValue(order: Order): number {
 export function formatDateDisplay(dateStr?: string): string {
   if (!dateStr) return "—";
   const str = String(dateStr).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    const [y, m, d] = str.substring(0, 10).split("-");
+  if (!str) return "—";
+
+  // Nếu là ISO timestamp có giờ (ví dụ 2026-10-24T17:00:00.000Z)
+  if (str.includes("T") || str.includes(":")) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+  }
+
+  // Nếu là chuỗi ngày thuần túy YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-");
     return `${d}/${m}/${y}`;
   }
+
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "—";
   const day = String(d.getDate()).padStart(2, "0");
@@ -173,20 +193,20 @@ export function getDisplayProductName(
   let rawName = str;
 
   if (!isNaN(pId) && pId > 0) {
-    const found = productsCatalog.find((p) => p.id === pId);
+    const found = productsCatalog.find((p) => Number(p.id) === pId || String(p.id) === str);
     if (found) {
       variantName = found.package_product || found.san_pham;
-      rawName = `${found.san_pham} ${found.package_product || ""}`;
+      rawName = `${found.package_product || found.san_pham} ${found.san_pham !== found.package_product ? found.san_pham : ""}`;
     }
   } else if (str) {
     const found = productsCatalog.find(
       (p) =>
-        p.san_pham.toLowerCase() === str.toLowerCase() ||
-        (p.package_product && p.package_product.toLowerCase() === str.toLowerCase())
+        (p.package_product && p.package_product.toLowerCase() === str.toLowerCase()) ||
+        p.san_pham.toLowerCase() === str.toLowerCase()
     );
     if (found) {
       variantName = found.package_product || found.san_pham;
-      rawName = `${found.san_pham} ${found.package_product || ""}`;
+      rawName = `${found.package_product || found.san_pham} ${found.san_pham !== found.package_product ? found.san_pham : ""}`;
     } else {
       variantName = str;
     }
@@ -194,7 +214,7 @@ export function getDisplayProductName(
 
   // Nếu không tìm thấy tên biến thể hoặc kết quả là số thuần túy (ID chưa khớp catalog)
   if (!variantName || /^\d+$/.test(variantName)) {
-    if (fallbackName && fallbackName.trim()) return fallbackName.trim();
+    if (fallbackName && fallbackName.trim() && !/^\d+$/.test(fallbackName)) return fallbackName.trim();
     if (/^\d+$/.test(str)) return `Sản phẩm #${str}`;
   }
 
@@ -208,3 +228,4 @@ export function getDisplayProductName(
 
   return variantName || fallbackName || str;
 }
+

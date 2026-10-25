@@ -135,7 +135,7 @@ export const NetWorthCards: React.FC<Props> = ({ metrics, breakEven }) => {
 
         <div className="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
           <span className="text-[11px] text-slate-400">
-            Dư nợ trả góp + Nợ cá nhân phải trả
+            Nợ & Trả góp + Chi phí cố định
           </span>
         </div>
       </GlassCard>

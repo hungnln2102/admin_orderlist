@@ -19,6 +19,7 @@ const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPag
 const TrafficPage = React.lazy(() => import("@/features/traffic/TrafficPage").then(m => ({ default: m.TrafficPage })));
 const ExternalImportsPage = React.lazy(() => import("@/pages/ExternalImportsPage").then(m => ({ default: m.ExternalImportsPage })));
 const SystemLogsPage = React.lazy(() => import("@/pages/SystemLogsPage").then(m => ({ default: m.SystemLogsPage })));
+const ExternalApiConfigPage = React.lazy(() => import("@/pages/ExternalApiConfigPage").then(m => ({ default: m.ExternalApiConfigPage })));
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -252,25 +253,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/shop-bank-accounts" element={<PaymentWalletsPage />} />
       <Route path="/payment-accounts" element={<Navigate to="/shop-bank-accounts" replace />} />
       <Route path="/usdt-wallets" element={<Navigate to="/shop-bank-accounts" replace />} />
-      <Route
-        path="/external-api-config"
-        element={
-          <GenericPage
-            title="Cấu Hình API Bên Thứ 3"
-            category="Hệ thống & Ví"
-            description="Cấu hình API Sepay, Telegram Bot, Mail Service"
-            columns={[
-              { key: "service", label: "Dịch vụ" },
-              { key: "apiKey", label: "API Key / Token" },
-              { key: "status", label: "Trạng thái kết nối" },
-            ]}
-            sampleData={[
-              { service: "Sepay Auto Webhook", apiKey: "sepay_sec_*******", status: "Đã kết nối" },
-              { service: "Telegram Bot Notify", apiKey: "bot_token_*******", status: "Đã kết nối" },
-            ]}
-          />
-        }
-      />
+      <Route path="/external-api-config" element={<ExternalApiConfigPage />} />
       <Route
         path="/netflix"
         element={

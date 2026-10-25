@@ -17,6 +17,7 @@ import {
   Calendar,
   LogIn,
   UserCheck,
+  Loader2,
 } from "lucide-react";
 import { WarehouseAccountItem, WarehouseServiceSlot } from "../types";
 import {
@@ -40,6 +41,7 @@ interface WarehouseAccountsTableProps {
   onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   loggedSlotsMap?: Record<number, boolean>;
   onVerifySession?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
+  openingSlotId?: number | null;
 }
 
 interface CopyableFieldProps {
@@ -142,6 +144,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
   onOpenBrowser,
   loggedSlotsMap,
   onVerifySession,
+  openingSlotId,
 }) => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -618,25 +621,38 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                         <div className="flex items-center justify-center gap-1.5">
                                           {onOpenBrowser && (() => {
                                             const isLoggedIn = loggedSlotsMap ? loggedSlotsMap[srv.id] : false;
+                                            const isOpening = openingSlotId === srv.id;
                                             return (
                                               <button
                                                 type="button"
+                                                disabled={isOpening}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
+                                                  if (isOpening) return;
                                                   if (onVerifySession) {
                                                     onVerifySession(account, srv);
                                                   } else {
                                                     onOpenBrowser(account, srv);
                                                   }
                                                 }}
-                                                className={`flex h-7 w-7 items-center justify-center rounded-xl border transition-all cursor-pointer group/btn ${
-                                                  isLoggedIn
-                                                    ? "border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 hover:border-emerald-500/50"
-                                                    : "border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 hover:border-blue-500/50"
-                                                }`}
-                                                title={isLoggedIn ? "Phiên đăng nhập đã được xác minh (bấm để kiểm tra lại)" : `Mở profile và kiểm tra phiên đăng nhập ${srv.display_name || srv.category}`}
+                                                className={`flex h-7 w-7 items-center justify-center rounded-xl border transition-all ${
+                                                  isOpening
+                                                    ? "border-blue-500/30 bg-blue-600/10 text-blue-300 opacity-60 cursor-not-allowed"
+                                                    : isLoggedIn
+                                                    ? "border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 hover:border-emerald-500/50 cursor-pointer"
+                                                    : "border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 hover:border-blue-500/50 cursor-pointer"
+                                                } group/btn`}
+                                                title={
+                                                  isOpening
+                                                    ? "Đang mở trình duyệt và kiểm tra phiên..."
+                                                    : isLoggedIn
+                                                    ? "Phiên đăng nhập đã được xác minh (bấm để kiểm tra lại)"
+                                                    : `Mở profile và kiểm tra phiên đăng nhập ${srv.display_name || srv.category}`
+                                                }
                                               >
-                                                {isLoggedIn ? (
+                                                {isOpening ? (
+                                                  <Loader2 className="w-3.5 h-3.5 text-blue-300 animate-spin" />
+                                                ) : isLoggedIn ? (
                                                   <UserCheck className="w-3.5 h-3.5 text-emerald-300 group-hover/btn:scale-110 transition-transform" />
                                                 ) : (
                                                   <LogIn className="w-3.5 h-3.5 text-blue-300 group-hover/btn:scale-110 transition-transform" />
@@ -841,25 +857,38 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                               </span>
                               {onOpenBrowser && (() => {
                                 const isLoggedIn = loggedSlotsMap ? loggedSlotsMap[srv.id] : false;
+                                const isOpening = openingSlotId === srv.id;
                                 return (
                                   <button
                                     type="button"
+                                    disabled={isOpening}
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (isOpening) return;
                                       if (onVerifySession) {
                                         onVerifySession(account, srv);
                                       } else {
                                         onOpenBrowser(account, srv);
                                       }
                                     }}
-                                    className={`flex h-6 w-6 items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                                      isLoggedIn
-                                        ? "border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
-                                        : "border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                                    className={`flex h-6 w-6 items-center justify-center rounded-lg border transition-all ${
+                                      isOpening
+                                        ? "border-blue-500/30 bg-blue-600/10 text-blue-300 opacity-60 cursor-not-allowed"
+                                        : isLoggedIn
+                                        ? "border-emerald-500/30 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 cursor-pointer"
+                                        : "border-blue-500/30 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 cursor-pointer"
                                     }`}
-                                    title={isLoggedIn ? "Phiên đăng nhập đã được xác minh (bấm để kiểm tra lại)" : `Mở profile và kiểm tra phiên đăng nhập ${srv.display_name || srv.category}`}
+                                    title={
+                                      isOpening
+                                        ? "Đang mở trình duyệt..."
+                                        : isLoggedIn
+                                        ? "Phiên đăng nhập đã được xác minh (bấm để kiểm tra lại)"
+                                        : `Mở profile và kiểm tra phiên đăng nhập ${srv.display_name || srv.category}`
+                                    }
                                   >
-                                    {isLoggedIn ? (
+                                    {isOpening ? (
+                                      <Loader2 className="w-3 h-3 text-blue-300 animate-spin" />
+                                    ) : isLoggedIn ? (
                                       <UserCheck className="w-3 h-3 text-emerald-300" />
                                     ) : (
                                       <LogIn className="w-3 h-3 text-blue-300" />

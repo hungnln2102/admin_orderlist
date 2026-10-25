@@ -361,6 +361,26 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
     }
   }
 
+  // 3b. Gom danh sách tất cả unique variantIds (id_product) cần nạp
+  const neededVariantIds = new Set();
+  for (const o of orders) {
+    if (o.id_product) {
+      const num = Number(o.id_product);
+      if (!isNaN(num) && num > 0) neededVariantIds.add(num);
+    }
+  }
+
+  // 3c. Truy vấn nạp danh sách variant trong 1 query duy nhất
+  const variantMap = new Map();
+  if (neededVariantIds.size > 0) {
+    const variants = await queryDb(TABLES.VARIANT)
+      .whereIn("id", Array.from(neededVariantIds))
+      .select("id", "variant_name", "display_name", "product_id");
+    for (const v of variants) {
+      variantMap.set(Number(v.id), v);
+    }
+  }
+
   // 4. Lấy tài khoản ngân hàng mặc định của shop (đã có in-memory cache)
   const defaultBank = await getDefaultShopBank(trx);
   let defaultShopBankInfo = null;
@@ -385,10 +405,17 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
     const supplier = !isNaN(numSupplyId) ? supplierMap.get(numSupplyId) : null;
     const supplierName = supplier ? (supplier[COLS.SUPPLIER.SUPPLIER_NAME] || "") : "";
 
+    const vId = Number(order.id_product);
+    const matchedVariant = !isNaN(vId) ? variantMap.get(vId) : null;
+    const variantName = matchedVariant ? matchedVariant.variant_name : (order.id_product && isNaN(vId) ? String(order.id_product) : null);
+    const displayName = matchedVariant ? matchedVariant.display_name : null;
+
     const enriched = {
       ...order,
       supply_id: resolvedSupplyId,
       supplier_name: supplierName,
+      variant_name: variantName,
+      display_name: displayName,
     };
 
     const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") || 
@@ -445,10 +472,27 @@ async function attachSupplierInfo(order, trx) {
       }
     }
 
+    let variantName = null;
+    let displayName = null;
+    if (order.id_product) {
+      const vId = Number(order.id_product);
+      if (!isNaN(vId) && vId > 0) {
+        const variant = await queryDb(TABLES.VARIANT).where({ id: vId }).first();
+        if (variant) {
+          variantName = variant.variant_name;
+          displayName = variant.display_name;
+        }
+      } else {
+        variantName = String(order.id_product);
+      }
+    }
+
     return {
       ...order,
       supply_id: supplyId || order.supply_id || null,
       supplier_name: supplierName,
+      variant_name: variantName,
+      display_name: displayName,
     };
   } catch (err) {
     console.error("[attachSupplierInfo] Lỗi:", err.message);

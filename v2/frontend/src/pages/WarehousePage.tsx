@@ -41,6 +41,7 @@ export const WarehousePage: React.FC = () => {
   const [showPasswordMap, setShowPasswordMap] = useState<Record<number, boolean>>({});
   const [copiedKeyMap, setCopiedKeyMap] = useState<Record<string, boolean>>({});
   const [loggedSlotsMap, setLoggedSlotsMap] = useState<Record<number, boolean>>({});
+  const [openingSlotId, setOpeningSlotId] = useState<number | null>(null);
 
   // Dynamic state from PostgreSQL
   const [accounts, setAccounts] = useState<WarehouseAccountItem[]>([]);
@@ -220,6 +221,8 @@ export const WarehousePage: React.FC = () => {
   };
 
   const handleOpenBrowser = async (account: WarehouseAccountItem, service: any) => {
+    if (openingSlotId) return;
+    setOpeningSlotId(service.id);
     try {
       notification.info(`Đang mở trình duyệt với Profile riêng cho ${account.account}...`, "Đăng Nhập Kho");
       const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
@@ -253,6 +256,8 @@ export const WarehousePage: React.FC = () => {
     } catch (err: any) {
       console.error("Lỗi mở trình duyệt:", err);
       notification.error(err.message || "Lỗi mở trình duyệt", "Đăng Nhập Thất Bại");
+    } finally {
+      setOpeningSlotId(null);
     }
   };
 
@@ -447,6 +452,7 @@ export const WarehousePage: React.FC = () => {
           onOpenBrowser={handleOpenBrowser}
           loggedSlotsMap={loggedSlotsMap}
           onVerifySession={handleOpenBrowser}
+          openingSlotId={openingSlotId}
         />
       )}
 

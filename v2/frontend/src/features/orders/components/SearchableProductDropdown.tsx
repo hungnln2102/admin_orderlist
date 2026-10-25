@@ -19,15 +19,17 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
   const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const selectedProduct = products.find((p) => p.id === selectedProductId);
+  const selectedProduct = products.find(
+    (p) => Number(p.id) === selectedProductId || String(p.id) === String(selectedProductId)
+  );
 
   const filteredProducts = useMemo(() => {
     if (!search.trim()) return products;
     const term = search.toLowerCase().trim();
     return products.filter(
       (p) =>
-        p.san_pham.toLowerCase().includes(term) ||
-        (p.package_product && p.package_product.toLowerCase().includes(term))
+        (p.package_product && p.package_product.toLowerCase().includes(term)) ||
+        p.san_pham.toLowerCase().includes(term)
     );
   }, [products, search]);
 
@@ -53,9 +55,11 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
         <span className="text-xs font-medium text-white break-words whitespace-normal leading-snug flex-1 pr-2">
           {selectedProduct ? (
             <span className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-cyan-300">{selectedProduct.san_pham}</span>
-              {selectedProduct.package_product && selectedProduct.package_product !== selectedProduct.san_pham && (
-                <span className="text-[10.5px] text-slate-400">({selectedProduct.package_product})</span>
+              <span className="font-bold text-cyan-300">
+                {selectedProduct.package_product || selectedProduct.san_pham}
+              </span>
+              {selectedProduct.san_pham && selectedProduct.san_pham !== selectedProduct.package_product && (
+                <span className="text-[10.5px] text-slate-400 font-mono">({selectedProduct.san_pham})</span>
               )}
             </span>
           ) : (
@@ -89,7 +93,8 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
               </div>
             ) : (
               filteredProducts.map((p) => {
-                const isSelected = p.id === selectedProductId;
+                const isSelected = Number(p.id) === selectedProductId || String(p.id) === String(selectedProductId);
+                const primaryName = p.package_product || p.san_pham;
                 return (
                   <button
                     key={p.id}
@@ -107,11 +112,11 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
                   >
                     <div className="flex-1 min-w-0 pr-2">
                       <div className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 whitespace-normal break-words leading-snug">
-                        {p.san_pham}
+                        {primaryName}
                       </div>
-                      {p.package_product && p.package_product !== p.san_pham && (
-                        <div className="text-[11px] text-slate-400 font-normal whitespace-normal break-words mt-0.5">
-                          {p.package_product}
+                      {p.san_pham && p.san_pham !== primaryName && (
+                        <div className="text-[11px] text-slate-400 font-mono whitespace-normal break-words mt-0.5">
+                          {p.san_pham}
                         </div>
                       )}
                     </div>

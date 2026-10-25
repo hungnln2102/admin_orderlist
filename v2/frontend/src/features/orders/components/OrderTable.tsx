@@ -210,17 +210,23 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                           <span className="text-slate-500 font-bold px-0.5">-</span>
                           <span className="text-amber-300 font-semibold">{formatDateDisplay(order.expired_at)}</span>
                         </div>
-                        {remainingDays !== 0 && activeTab !== "canceled" && (
+                        {activeTab !== "canceled" && (
                           <div
                             className={`text-[10.5px] font-bold mt-0.5 ${
-                              remainingDays > 30
+                              remainingDays === 0
+                                ? "text-rose-400 font-extrabold animate-pulse"
+                                : remainingDays > 30
                                 ? "text-slate-400"
                                 : remainingDays > 0
                                 ? "text-amber-400 animate-pulse"
                                 : "text-rose-400"
                             }`}
                           >
-                            {remainingDays > 0 ? `Còn ${remainingDays} ngày` : `Hết hạn ${Math.abs(remainingDays)} ngày`}
+                            {remainingDays === 0
+                              ? "Hôm nay hết hạn"
+                              : remainingDays > 0
+                              ? `Còn ${remainingDays} ngày`
+                              : `Hết hạn ${Math.abs(remainingDays)} ngày`}
                           </div>
                         )}
                       </td>
@@ -478,13 +484,23 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       {formatDateDisplay(order.order_date || order.created_at)} -{" "}
                       <span className="text-amber-300 font-semibold">{formatDateDisplay(order.expired_at)}</span>
                     </div>
-                    {remainingDays !== 0 && activeTab !== "canceled" && (
+                    {activeTab !== "canceled" && (
                       <div
                         className={`text-[10.5px] font-bold ${
-                          remainingDays > 30 ? "text-slate-400" : remainingDays > 0 ? "text-amber-400" : "text-rose-400"
+                          remainingDays === 0
+                            ? "text-rose-400 font-extrabold animate-pulse"
+                            : remainingDays > 30
+                            ? "text-slate-400"
+                            : remainingDays > 0
+                            ? "text-amber-400"
+                            : "text-rose-400"
                         }`}
                       >
-                        {remainingDays > 0 ? `Còn ${remainingDays} ngày` : `Hết hạn ${Math.abs(remainingDays)} ngày`}
+                        {remainingDays === 0
+                          ? "Hôm nay hết hạn"
+                          : remainingDays > 0
+                          ? `Còn ${remainingDays} ngày`
+                          : `Hết hạn ${Math.abs(remainingDays)} ngày`}
                       </div>
                     )}
                   </div>

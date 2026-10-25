@@ -23,33 +23,9 @@ interface ExternalImportItem {
   note: string;
 }
 
-const INITIAL_IMPORTS: ExternalImportItem[] = [
-  {
-    id: 1,
-    importId: "IMP-992",
-    amount: 4000000,
-    importDate: "2026-10-18",
-    note: "Nhập 10 gói Adobe All Apps bản quyền 1 năm",
-  },
-  {
-    id: 2,
-    importId: "IMP-991",
-    amount: 1850000,
-    importDate: "2026-10-15",
-    note: "Nâng cấp 5 slot Canva Pro Team",
-  },
-  {
-    id: 3,
-    importId: "IMP-990",
-    amount: 2500000,
-    importDate: "2026-10-12",
-    note: "Mua credit API ChatGPT Plus / Claude 3.5",
-  },
-];
-
 export const ExternalImportsPage: React.FC = () => {
   const notify = useNotification();
-  const [items, setItems] = useState<ExternalImportItem[]>(INITIAL_IMPORTS);
+  const [items, setItems] = useState<ExternalImportItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -280,8 +256,23 @@ export const ExternalImportsPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    Không tìm thấy đơn nhập ngoài luồng nào phù hợp.
+                  <td colSpan={6} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 shadow-inner">
+                        <PackagePlus className="w-6 h-6 text-cyan-400/60" />
+                      </div>
+                      <div className="text-slate-300 text-sm font-semibold">Chưa có đợt nhập hàng ngoài luồng nào</div>
+                      <p className="text-slate-500 text-xs max-w-sm">
+                        Ghi nhận các khoản chi phí mua credit API, tài khoản ngoài luồng hoặc chi phí nhập hàng phát sinh.
+                      </p>
+                      <button
+                        onClick={openCreateModal}
+                        className="mt-2 px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Ghi Nhận Đợt Nhập Mới
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}

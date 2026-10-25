@@ -36,7 +36,6 @@ const EVENT_NAME_VI_MAP = {
   WAREHOUSE_STOCK_DELETED: "Xóa kho hàng / tài khoản kho",
   WAREHOUSE_CATALOG_CREATED: "Thêm danh mục kho",
   WAREHOUSE_CATALOG_DELETED: "Xóa danh mục kho",
-  WAREHOUSE_ACCOUNT_BROWSER_OPENED: "Mở trình duyệt tự động kho",
 
   PACKAGE_CATEGORY_CREATED: "Thêm danh mục gói dịch vụ",
   PACKAGE_CATEGORY_UPDATED: "Cập nhật danh mục gói dịch vụ",

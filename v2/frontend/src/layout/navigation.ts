@@ -6,22 +6,13 @@ import {
   ShoppingCart,
   CreditCard,
   Package,
-  Layers,
-  FileText,
   Tag,
-  Key,
   Building2,
   PackagePlus,
   Warehouse,
   Landmark,
-  Shield,
   ShieldCheck,
   Sliders,
-  Tv,
-  Newspaper,
-  PenTool,
-  FolderKanban,
-  Image,
   Settings
 } from "lucide-react";
 
@@ -76,25 +67,6 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
       { name: "Nhật ký Hoạt động", path: "/system-logs", icon: ShieldCheck },
       { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
       { name: "Cấu hình API bên thứ 3", path: "/external-api-config", icon: Sliders },
-      { name: "Quản trị Netflix", path: "/netflix", icon: Tv },
-    ],
-  },
-  {
-    groupName: "Nội dung & Truyền thông",
-    items: [
-      { name: "Danh sách Bài viết", path: "/content/articles", icon: Newspaper },
-      { name: "Tạo / Sửa Bài viết", path: "/content/create", icon: PenTool },
-      { name: "Danh mục Bài viết", path: "/content/categories", icon: FolderKanban },
-      { name: "Banners Quảng cáo", path: "/content/banners", icon: Image },
-    ],
-  },
-  {
-    groupName: "Hệ thống Website",
-    items: [
-      { name: "Thông tin Sản phẩm", path: "/product-info", icon: Layers },
-      { name: "Cấu hình Form Đơn", path: "/form-info", icon: FileText },
-      { name: "Active Keys", path: "/active-keys", icon: Key },
-      { name: "IP Whitelist", path: "/ip-whitelist", icon: Shield },
     ],
   },
 ];

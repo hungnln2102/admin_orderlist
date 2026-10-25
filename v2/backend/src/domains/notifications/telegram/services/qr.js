@@ -40,10 +40,7 @@ function buildSepayQrUrl({
     params.set("amount", Math.round(numericAmount).toString());
   }
 
-  const desc = String(description || "").trim();
-  if (desc) {
-    params.set("addInfo", desc);
-  }
+  // V2 không dùng addInfo (đối soát tự động bằng slot suffix / số tiền)
 
   const name = String(accountName || "").trim();
   if (name) {
@@ -70,15 +67,14 @@ function buildQrProviderUrls({
   const acc = String(accountNumber || "").trim();
   if (!bank || !acc) return [];
 
-  const desc = String(addInfo || "").trim();
   const name = String(accountName || "").trim();
   const numericAmount = Number(amount);
   const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
   const amountStr = hasAmount ? Math.round(numericAmount).toString() : "";
 
+  // V2: VietQR luôn dùng compact2.png và không dùng addInfo
   const vietQrParams = new URLSearchParams();
   if (hasAmount) vietQrParams.set("amount", amountStr);
-  if (desc) vietQrParams.set("addInfo", desc);
   if (name) vietQrParams.set("accountName", name);
   const vietQrUrl = `https://img.vietqr.io/image/${bank}-${acc}-${VIETQR_IMAGE_TEMPLATE}.png${
     vietQrParams.toString() ? `?${vietQrParams.toString()}` : ""

@@ -2,8 +2,6 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { chromium } = require("playwright");
-const eventBus = require("@/events/eventBus");
-const EVENTS = require("@/events/eventTypes");
 
 const activeContexts = new Map();
 const launchingContexts = new Map();
@@ -349,8 +347,6 @@ const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, c
     hasAuthenticatedSession,
     currentUrl,
   };
-
-  eventBus.emit(EVENTS.WAREHOUSE_ACCOUNT_BROWSER_OPENED, payload);
 
   return {
     success: true,

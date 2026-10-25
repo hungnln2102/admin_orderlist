@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   AlarmClock,
   Clock,
@@ -9,6 +9,7 @@ import {
   Power,
   X,
   Terminal,
+  RefreshCw,
 } from "lucide-react";
 
 export interface CronJobItem {
@@ -48,133 +49,13 @@ const CATEGORY_ACCENTS = [
   { border: "border-amber-500/30", glow: "bg-amber-500/20", text: "text-amber-400" },
 ];
 
-const INITIAL_CRON_JOBS: CronJobItem[] = [
-  {
-    id: "task_order_status_0h",
-    name: "Cập nhật trạng thái đơn & Báo 0 ngày",
-    description: "Rà soát hạn dùng đơn hàng, chuyển trạng thái Hết hạn (<0 ngày), Cần gia hạn và bắn Telegram đơn 0 ngày.",
-    group: "orders",
-    groupLabel: "ĐƠN HÀNG & VẬN HÀNH",
-    time: "00:00",
-    frequency: "daily",
-    frequencyLabel: "Hàng ngày",
-    selectedDays: [1, 2, 3, 4, 5, 6, 7],
-    enabled: true,
-    lastRunTime: "Hôm nay 00:00:03",
-    lastRunStatus: "success",
-    lastRunMessage: "Đã cập nhật 14 đơn hết hạn, 8 đơn cần gia hạn.",
-    nextRunTime: "00:00 ngày mai",
-    cronExpressionPreview: "0 0 * * *",
-  },
-  {
-    id: "task_notify_four_days_7h",
-    name: "Thông báo nhắc gia hạn đơn (4 ngày)",
-    description: "Quét tất cả đơn hàng còn 4 ngày sử dụng và gửi danh sách chi tiết đến nhóm Telegram CSKH chăm sóc khách.",
-    group: "notifications",
-    groupLabel: "THÔNG BÁO KHÁCH HÀNG",
-    time: "07:00",
-    frequency: "daily",
-    frequencyLabel: "Hàng ngày",
-    selectedDays: [1, 2, 3, 4, 5, 6, 7],
-    enabled: true,
-    lastRunTime: "Hôm nay 07:00:02",
-    lastRunStatus: "success",
-    lastRunMessage: "Tìm thấy 6 đơn hàng còn 4 ngày sử dụng.",
-    nextRunTime: "07:00 ngày mai",
-    cronExpressionPreview: "0 7 * * *",
-  },
-  {
-    id: "task_credit_savings_profit",
-    name: "Tự động sinh lời & cộng lãi đa sổ",
-    description: "Rà soát các sổ tiết kiệm tích lũy Credit đến hạn, tính lãi sinh lời và tự động cộng dồn số dư ví tín dụng.",
-    group: "finance",
-    groupLabel: "TÀI CHÍNH & TÍN DỤNG",
-    time: "01:00",
-    frequency: "hourly",
-    frequencyLabel: "Định kỳ mỗi giờ",
-    selectedDays: [1, 2, 3, 4, 5, 6, 7],
-    enabled: true,
-    lastRunTime: "Vừa xong 21:00:01",
-    lastRunStatus: "success",
-    lastRunMessage: "Quét 24 sổ tiết kiệm, đã cộng lãi thành công.",
-    nextRunTime: "22:00 hôm nay",
-    cronExpressionPreview: "0 * * * *",
-  },
-  {
-    id: "task_finalize_daily_summary",
-    name: "Chốt số liệu doanh thu cuối ngày",
-    description: "Khóa sổ giao dịch hàng ngày, chốt tổng doanh thu, giá vốn, lợi nhuận gộp và tạo snapshot đối soát dòng tiền.",
-    group: "summary",
-    groupLabel: "BÁO CÁO & KẾ TOÁN",
-    time: "23:55",
-    frequency: "daily",
-    frequencyLabel: "Hàng ngày",
-    selectedDays: [1, 2, 3, 4, 5, 6, 7],
-    enabled: true,
-    lastRunTime: "Hôm qua 23:55:01",
-    lastRunStatus: "success",
-    lastRunMessage: "Doanh thu 18.450.000 ₫, Lợi nhuận 7.120.000 ₫.",
-    nextRunTime: "23:55 hôm nay",
-    cronExpressionPreview: "55 23 * * *",
-  },
-  {
-    id: "task_auto_backup_database",
-    name: "Tự động sao lưu Database lên Drive",
-    description: "Dump toàn bộ CSDL PostgreSQL, nén file snapshot mã hóa và đồng bộ lên thư mục Google Drive dự phòng.",
-    group: "backup",
-    groupLabel: "SAO LƯU HỆ THỐNG",
-    time: "03:30",
-    frequency: "daily",
-    frequencyLabel: "Hàng ngày",
-    selectedDays: [1, 2, 3, 4, 5, 6, 7],
-    enabled: false,
-    lastRunTime: "Chưa kích hoạt",
-    lastRunStatus: undefined,
-    lastRunMessage: "Tác vụ đang tạm dừng để bảo trì đường truyền.",
-    nextRunTime: "Tạm dừng",
-    cronExpressionPreview: "30 3 * * *",
-  },
-];
-
-const MOCK_EXECUTION_LOGS: CronExecutionLog[] = [
-  {
-    id: "log_1",
-    jobId: "task_order_status_0h",
-    jobName: "Cập nhật trạng thái đơn & Báo 0 ngày",
-    startedAt: "23/10/2026 00:00:00",
-    durationMs: 3120,
-    status: "success",
-    output: "[CRON 0H] Hoàn thành cập nhật trạng thái đơn. Expired: 14, Renew: 8. Telegram notify: 4 sent.",
-    triggeredBy: "cron_schedule",
-  },
-  {
-    id: "log_2",
-    jobId: "task_notify_four_days_7h",
-    jobName: "Thông báo nhắc gia hạn đơn (4 ngày)",
-    startedAt: "23/10/2026 07:00:00",
-    durationMs: 1850,
-    status: "success",
-    output: "[CRON 7H] Quét xong đơn 4 ngày. Gửi 6 thông báo đơn hàng sắp hết hạn đến nhóm CSKH.",
-    triggeredBy: "cron_schedule",
-  },
-  {
-    id: "log_3",
-    jobId: "task_credit_savings_profit",
-    jobName: "Tự động sinh lời & cộng lãi đa sổ",
-    startedAt: "23/10/2026 21:00:00",
-    durationMs: 980,
-    status: "success",
-    output: "[CRON HOURLY] Đã tính lãi tích lũy cho 24 tài khoản ví Credit. Tổng chi trả: 142.500 MCoin.",
-    triggeredBy: "cron_schedule",
-  },
-];
-
 interface CronSchedulerTabProps {
   onShowToast: (type: "success" | "error", message: string) => void;
 }
 
 export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast }) => {
-  const [jobs, setJobs] = useState<CronJobItem[]>(INITIAL_CRON_JOBS);
+  const [jobs, setJobs] = useState<CronJobItem[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
 
@@ -189,8 +70,10 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("all");
 
-  // Modal State
+  // Modal State for Logs
   const [selectedJobLogs, setSelectedJobLogs] = useState<CronJobItem | null>(null);
+  const [jobLogs, setJobLogs] = useState<CronExecutionLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // New Job Form State
@@ -200,28 +83,75 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
   const [newJobFrequency, setNewJobFrequency] = useState<"daily" | "weekdays" | "hourly" | "custom">("daily");
   const [newJobGroup, setNewJobGroup] = useState<"orders" | "notifications" | "finance" | "summary" | "backup">("orders");
 
-  // Toggle Alarm Status (On / Off)
-  const handleToggleJob = (id: string) => {
-    setJobs((prev) =>
-      prev.map((job) => {
-        if (job.id === id) {
-          const nextState = !job.enabled;
-          onShowToast(
-            "success",
-            `${nextState ? "Đã BẬT" : "Đã TẮT"} báo thức: [${job.name}]`
-          );
-          return {
-            ...job,
-            enabled: nextState,
-            nextRunTime: nextState ? `${job.time} ${job.frequency === "daily" ? "mai" : ""}` : "Tạm dừng",
-          };
-        }
-        return job;
-      })
-    );
+  // 1. Fetch live cron jobs from PostgreSQL backend
+  const fetchJobs = useCallback(async () => {
+    try {
+      setLoadingJobs(true);
+      const res = await fetch("/api/system/cron-jobs");
+      if (res.ok) {
+        const data = await res.json();
+        setJobs(Array.isArray(data) ? data : []);
+      } else {
+        onShowToast("error", "Không thể tải lịch tác vụ từ máy chủ.");
+      }
+    } catch (err) {
+      console.error("Lỗi tải cron jobs:", err);
+      onShowToast("error", "Lỗi kết nối máy chủ khi tải tác vụ.");
+    } finally {
+      setLoadingJobs(false);
+    }
+  }, [onShowToast]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  // 2. Fetch live logs for a specific job
+  const handleOpenLogs = async (job: CronJobItem) => {
+    setSelectedJobLogs(job);
+    setLoadingLogs(true);
+    setJobLogs([]);
+    try {
+      const res = await fetch(`/api/system/cron-jobs/${job.id}/logs`);
+      if (res.ok) {
+        const data = await res.json();
+        setJobLogs(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Lỗi tải lịch sử tác vụ:", err);
+    } finally {
+      setLoadingLogs(false);
+    }
   };
 
-  // Change Time for a job
+  // Toggle Alarm Status (On / Off) via Backend API
+  const handleToggleJob = async (id: string) => {
+    const current = jobs.find((j) => j.id === id);
+    if (!current) return;
+    const nextState = !current.enabled;
+
+    try {
+      const res = await fetch(`/api/system/cron-jobs/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextState }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setJobs((prev) =>
+          prev.map((j) => (j.id === id ? { ...j, ...updated, enabled: nextState } : j))
+        );
+        onShowToast("success", `${nextState ? "Đã BẬT" : "Đã TẮT"} tác vụ: [${current.name}]`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        onShowToast("error", errData.error || "Không thể cập nhật trạng thái tác vụ.");
+      }
+    } catch (err: any) {
+      onShowToast("error", err.message || "Lỗi kết nối máy chủ");
+    }
+  };
+
+  // Change Time for a job locally
   const handleTimeChange = (id: string, newTime: string) => {
     setJobs((prev) =>
       prev.map((job) => {
@@ -239,7 +169,7 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
     );
   };
 
-  // Change Frequency
+  // Change Frequency locally
   const handleFrequencyChange = (id: string, freq: "daily" | "weekdays" | "hourly" | "custom") => {
     setJobs((prev) =>
       prev.map((job) => {
@@ -255,87 +185,90 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
     );
   };
 
-  // Run Job Immediately
+  // Run Job Immediately via Backend API
   const handleRunNow = async (job: CronJobItem) => {
     setRunningJobId(job.id);
     onShowToast("success", `⚡ Đang kích hoạt: ${job.name}...`);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setJobs((prev) =>
-        prev.map((item) =>
-          item.id === job.id
-            ? {
-                ...item,
-                lastRunTime: `Vừa xong (${new Date().toLocaleTimeString("vi-VN")})`,
-                lastRunStatus: "success",
-                lastRunMessage: "Chạy thủ công thành công.",
-              }
-            : item
-        )
-      );
-      onShowToast("success", `✅ Tác vụ [${job.name}] đã chạy thành công!`);
+      const res = await fetch(`/api/system/cron-jobs/${job.id}/run-now`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        onShowToast("success", `✅ Tác vụ [${job.name}] đã chạy thành công!`);
+        await fetchJobs();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        onShowToast("error", errData.error || "Không thể kích hoạt chạy tác vụ.");
+      }
+    } catch (err: any) {
+      onShowToast("error", err.message || "Lỗi kết nối khi chạy tác vụ");
     } finally {
       setRunningJobId(null);
     }
   };
 
-  // Save Job Settings
+  // Save Job Settings via Backend API
   const handleSaveJob = async (job: CronJobItem) => {
     setSavingJobId(job.id);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      onShowToast("success", `Đã lưu báo thức [${job.name}] (${job.time})!`);
+      const res = await fetch(`/api/system/cron-jobs/${job.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          time: job.time,
+          frequency: job.frequency,
+          selectedDays: job.selectedDays,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, ...updated } : j)));
+        onShowToast("success", `Đã lưu lịch tác vụ [${job.name}] (${job.time})!`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        onShowToast("error", errData.error || "Không thể lưu cấu hình tác vụ.");
+      }
+    } catch (err: any) {
+      onShowToast("error", err.message || "Lỗi kết nối khi lưu");
     } finally {
       setSavingJobId(null);
     }
   };
 
-  // Handle Add New Job
-  const handleCreateJob = (e: React.FormEvent) => {
+  // Handle Add New Job via Backend API
+  const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newJobName.trim()) {
       onShowToast("error", "Vui lòng nhập tên tác vụ!");
       return;
     }
 
-    const [hour, min] = newJobTime.split(":");
-    const newJob: CronJobItem = {
-      id: `task_${Date.now()}`,
-      name: newJobName,
-      description: newJobDesc || "Tác vụ tự động hóa quản trị hệ thống.",
-      group: newJobGroup,
-      groupLabel:
-        newJobGroup === "orders"
-          ? "ĐƠN HÀNG & VẬN HÀNH"
-          : newJobGroup === "notifications"
-          ? "THÔNG BÁO KHÁCH HÀNG"
-          : newJobGroup === "finance"
-          ? "TÀI CHÍNH & TÍN DỤNG"
-          : newJobGroup === "summary"
-          ? "BÁO CÁO & KẾ TOÁN"
-          : "SAO LƯU HỆ THỐNG",
-      time: newJobTime,
-      frequency: newJobFrequency,
-      frequencyLabel:
-        newJobFrequency === "daily"
-          ? "Hàng ngày"
-          : newJobFrequency === "weekdays"
-          ? "Thứ 2 - Thứ 6"
-          : newJobFrequency === "hourly"
-          ? "Mỗi giờ"
-          : "Tùy chọn",
-      enabled: true,
-      lastRunTime: "Chưa kích hoạt",
-      lastRunStatus: undefined,
-      nextRunTime: `${newJobTime} mai`,
-      cronExpressionPreview: `${min || "0"} ${hour || "0"} * * *`,
-    };
-
-    setJobs((prev) => [newJob, ...prev]);
-    onShowToast("success", `Đã tạo báo thức mới: [${newJobName}]!`);
-    setShowCreateModal(false);
-    setNewJobName("");
-    setNewJobDesc("");
+    try {
+      const res = await fetch("/api/system/cron-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newJobName,
+          description: newJobDesc || "Tác vụ tự động hóa quản trị hệ thống.",
+          group: newJobGroup,
+          time: newJobTime,
+          frequency: newJobFrequency,
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setJobs((prev) => [created, ...prev]);
+        onShowToast("success", `Đã tạo tác vụ mới: [${newJobName}]!`);
+        setShowCreateModal(false);
+        setNewJobName("");
+        setNewJobDesc("");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        onShowToast("error", errData.error || "Không thể tạo tác vụ.");
+      }
+    } catch (err: any) {
+      onShowToast("error", err.message || "Lỗi kết nối máy chủ");
+    }
   };
 
   // Filtered List
@@ -488,7 +421,7 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
                     <Save className={`w-3.5 h-3.5 ${isSaving ? "animate-spin text-cyan-400" : ""}`} />
                   </button>
                   <button
-                    onClick={() => setSelectedJobLogs(job)}
+                    onClick={() => handleOpenLogs(job)}
                     className="p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                     title="Xem nhật ký chạy"
                   >
@@ -612,19 +545,26 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
             </div>
 
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {MOCK_EXECUTION_LOGS.filter((l) => l.jobId === selectedJobLogs.id).length > 0 ? (
-                MOCK_EXECUTION_LOGS.filter((l) => l.jobId === selectedJobLogs.id).map((log) => (
+              {loadingLogs ? (
+                <div className="p-8 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                  <span>Đang tải nhật ký từ máy chủ...</span>
+                </div>
+              ) : jobLogs.length > 0 ? (
+                jobLogs.map((log) => (
                   <div key={log.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1 font-mono text-[11px]">
                     <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                      <span>{log.startedAt}</span>
-                      <span className="text-cyan-400">{log.durationMs}ms</span>
+                      <span>{log.startedAt ? new Date(log.startedAt).toLocaleString("vi-VN") : "--"}</span>
+                      <span className={log.status === "success" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                        {log.durationMs || 0}ms • {log.status || "done"}
+                      </span>
                     </div>
-                    <div className="text-slate-300 break-words">{log.output}</div>
+                    <div className="text-slate-300 break-words whitespace-pre-wrap">{log.output || "Không có chi tiết"}</div>
                   </div>
                 ))
               ) : (
                 <div className="p-6 text-center text-slate-500 text-xs font-mono">
-                  Chưa có nhật ký ghi nhận cho tác vụ này.
+                  Chưa có nhật ký ghi nhận cho tác vụ này trên hệ thống.
                 </div>
               )}
             </div>

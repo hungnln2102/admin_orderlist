@@ -18,6 +18,7 @@ import {
   Link2,
 } from "lucide-react";
 import { AllocateReceiptModal } from "../features/invoices/components/AllocateReceiptModal";
+import { CreateReceiptModal } from "../features/invoices/components/CreateReceiptModal";
 
 interface InvoiceReceipt {
   id: number;
@@ -88,6 +89,7 @@ export const ReceiptsPage: React.FC = () => {
   const [page, setPage] = useState<number>(1);
   const [selectedReceipt, setSelectedReceipt] = useState<InvoiceReceipt | null>(null);
   const [allocatingReceipt, setAllocatingReceipt] = useState<InvoiceReceipt | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -182,10 +184,11 @@ export const ReceiptsPage: React.FC = () => {
           </button>
 
           <button
-            className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-cyan-600/25 transition-all active:scale-95"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-cyan-600/25 transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Tạo Mới</span>
+            <span>Tạo Mới</span>
           </button>
         </div>
       </div>
@@ -674,6 +677,13 @@ export const ReceiptsPage: React.FC = () => {
         receipt={allocatingReceipt}
         isOpen={!!allocatingReceipt}
         onClose={() => setAllocatingReceipt(null)}
+        onSuccess={fetchInvoices}
+      />
+
+      {/* Create Receipt & VietQR Modal */}
+      <CreateReceiptModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchInvoices}
       />
     </div>

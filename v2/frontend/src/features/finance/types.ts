@@ -91,9 +91,11 @@ export interface NetWorthBreakdown {
   personalCashBankTotal: number;
   personalInvestmentsTotal: number;
   personalDebtReceivableTotal: number;
-  supplierDebtTotal: number;
+  supplierDebtTotal?: number;
   personalDebtPayableTotal: number;
   totalInstallmentsRemainingDebt: number;
+  activeFixedCostsTotal?: number;
+  totalDebtAndInstallments?: number;
 }
 
 export interface NetWorthMetrics {

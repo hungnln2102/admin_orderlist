@@ -67,7 +67,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   };
 
   const amountToPay = order.bank_info?.type === "supplier" ? Number(order.cost || order.price || 0) : Number(order.price || 0);
-  const vietQrUrl = order.vietqr_url || (order.id_order ? `https://img.vietqr.io/image/MB-970422-compact2.png?amount=${amountToPay}` : null);
+  const fallbackAccName = order.bank_info?.account_holder ? `&accountName=${encodeURIComponent(order.bank_info.account_holder)}` : "";
+  const vietQrUrl = order.vietqr_url || (order.id_order ? `https://img.vietqr.io/image/MB-970422-compact2.png?amount=${amountToPay}${fallbackAccName}` : null);
   const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(v);
 
   return (

@@ -480,14 +480,11 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   const totalShopAssets = shopBalanceTotal;
   const grandTotalAssets = shopBalanceTotal + personalSavingsTotal + personalCashBankTotal + personalInvestmentsTotal + personalDebtReceivableTotal;
 
-  const shopLiabilities =
-    totalInstallmentsRemainingDebt +
-    supplierDebtTotal;
-
-  const totalLiabilities =
-    totalInstallmentsRemainingDebt +
-    personalDebtPayableTotal +
-    supplierDebtTotal;
+  // Tổng nghĩa vụ nợ: Loại bỏ công nợ NCC theo chỉ thị Master (NCC đã ghi nhận trong chi phí đơn hàng/COGS)
+  // Chỉ ghi nhận 2 mục: Nợ & Trả Góp và Chi Phí Cố Định
+  const totalDebtAndInstallments = totalInstallmentsRemainingDebt + personalDebtPayableTotal;
+  const shopLiabilities = totalInstallmentsRemainingDebt + activeFixedCostsTotal;
+  const totalLiabilities = totalDebtAndInstallments + activeFixedCostsTotal;
 
   const netWorthBase = totalShopAssets - shopLiabilities;
   const monthlyObligations = monthlyDebtBurden + activeFixedCostsTotal;
@@ -600,6 +597,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
         supplierDebtTotal,
         personalDebtPayableTotal,
         totalInstallmentsRemainingDebt,
+        activeFixedCostsTotal,
+        totalDebtAndInstallments,
       },
     },
     fixedCosts,

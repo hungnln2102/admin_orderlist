@@ -169,10 +169,50 @@ export const PricingTable: React.FC<PricingTableProps> = ({
                     </td>
 
                     {/* Margin */}
-                    <td className="py-3.5 px-3 text-center">
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-                        {item.margin}
-                      </span>
+                    <td
+                      className="py-3.5 px-3 text-center"
+                      title={
+                        item.min_profit_amount || item.max_profit_amount
+                          ? `• Lợi nhuận Min (Giá sỉ): +${formatCurrency(
+                              item.min_profit_amount || 0
+                            )} (${item.min_margin_pct ?? 0}%)\n• Lợi nhuận Max (Giá lẻ): +${formatCurrency(
+                              item.max_profit_amount || 0
+                            )} (${item.max_margin_pct ?? 0}%)\n• Giá vốn thấp nhất: ${formatCurrency(
+                              item.cost_price || 0
+                            )}`
+                          : undefined
+                      }
+                    >
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10.5px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap shadow-sm">
+                          {item.min_margin_pct !== undefined &&
+                          item.max_margin_pct !== undefined &&
+                          item.min_margin_pct !== item.max_margin_pct ? (
+                            <>
+                              <span className="text-indigo-300">{item.min_margin_pct}%</span>
+                              <span className="text-slate-500 font-normal">~</span>
+                              <span className="text-cyan-300">{item.max_margin_pct}%</span>
+                            </>
+                          ) : (
+                            <span>{item.margin}</span>
+                          )}
+                        </span>
+
+                        {(item.min_profit_amount !== undefined ||
+                          item.max_profit_amount !== undefined) &&
+                          ((item.min_profit_amount || 0) > 0 ||
+                            (item.max_profit_amount || 0) > 0) && (
+                            <span className="text-[10px] font-semibold text-emerald-400/90 whitespace-nowrap">
+                              {formatCurrency(item.min_profit_amount || 0)}
+                              {item.min_profit_amount !== item.max_profit_amount && (
+                                <>
+                                  <span className="text-slate-500 font-normal mx-0.5">~</span>
+                                  <span>{formatCurrency(item.max_profit_amount || 0)}</span>
+                                </>
+                              )}
+                            </span>
+                          )}
+                      </div>
                     </td>
 
                     {/* Active Status */}

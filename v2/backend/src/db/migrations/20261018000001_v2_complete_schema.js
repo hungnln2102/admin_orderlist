@@ -535,16 +535,23 @@ exports.up = async function (knex) {
     );
   `);
 
-  // Seed default admin user if not exists
-  const adminExists = await knex(`${schemaAdmin}.users`).where({ username: 'admin' }).first();
-  if (!adminExists) {
-    const bcrypt = require('bcryptjs');
-    const hashedPass = await bcrypt.hash('admin123', 10);
-    await knex(`${schemaAdmin}.users`).insert({
-      username: 'admin',
-      passwordhash: hashedPass,
-      role: 'admin',
-    });
+  const defaultAdminUser = String(process.env.DEFAULT_ADMIN_USER || '').trim();
+  const defaultAdminPass = String(process.env.DEFAULT_ADMIN_PASS || '');
+  if (defaultAdminUser || defaultAdminPass) {
+    if (!defaultAdminUser || (process.env.NODE_ENV === 'production' && defaultAdminPass.length < 12)) {
+      throw new Error('DEFAULT_ADMIN_USER and DEFAULT_ADMIN_PASS (at least 12 characters in production) must be configured together.');
+    }
+
+    const adminExists = await knex(`${schemaAdmin}.users`).where({ username: defaultAdminUser }).first();
+    if (!adminExists) {
+      const bcrypt = require('bcryptjs');
+      const hashedPass = await bcrypt.hash(defaultAdminPass, 10);
+      await knex(`${schemaAdmin}.users`).insert({
+        username: defaultAdminUser,
+        passwordhash: hashedPass,
+        role: 'admin',
+      });
+    }
   }
 
   // Seed default bank account if not exists

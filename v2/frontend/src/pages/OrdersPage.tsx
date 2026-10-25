@@ -309,17 +309,25 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   const handleOpenEdit = async (order: Order) => {
     setSelectedOrder(order);
     setIsCustomPriceMode(false);
-    const prodName = order.id_product ? String(order.id_product) : "";
+    const prodIdOrName = order.id_product ? String(order.id_product) : "";
+    const pId = Number(prodIdOrName);
     const matchedProd = productsCatalog.find(
-      (p) => p.san_pham.toLowerCase() === prodName.toLowerCase() || String(p.id) === prodName
+      (p) =>
+        (!isNaN(pId) && Number(p.id) === pId) ||
+        String(p.id) === prodIdOrName ||
+        (p.package_product && p.package_product.toLowerCase() === prodIdOrName.toLowerCase()) ||
+        p.san_pham.toLowerCase() === prodIdOrName.toLowerCase()
     );
 
     const prefixConfig = getOrderPrefixConfig(order.id_order);
     const prefix = prefixConfig.prefix;
 
     if (matchedProd) {
-      setSelectedProductId(matchedProd.id);
-      await fetchSuppliersForProduct(matchedProd.id);
+      setSelectedProductId(Number(matchedProd.id));
+      await fetchSuppliersForProduct(Number(matchedProd.id));
+    } else if (!isNaN(pId) && pId > 0) {
+      setSelectedProductId(pId);
+      await fetchSuppliersForProduct(pId);
     } else {
       setSelectedProductId(null);
       setProductSuppliersCatalog([]);
@@ -330,12 +338,17 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     );
     const supplierName = (matchedSupplier ? (matchedSupplier.supplier_name || matchedSupplier.ncc_name) : null) || (order.supply_id ? String(order.supply_id) : "") || "";
 
+    const resolvedVariantName = order.variant_name || matchedProd?.package_product || matchedProd?.san_pham || prodIdOrName;
+    const resolvedDisplayName = order.display_name || matchedProd?.san_pham || "";
+
     setFormData({
       customer: order.customer || "",
       contact: order.contact || "",
       information_order: order.information_order || "",
       slot: order.slot || "",
-      id_product: prodName,
+      id_product: prodIdOrName,
+      variant_name: resolvedVariantName,
+      display_name: resolvedDisplayName,
       supply_id: supplierName,
       price: Number(order.price || 0),
       gross_selling_price: Number(order.gross_selling_price || order.price || 0),

@@ -8,11 +8,12 @@ const { PORT, DATABASE_URL } = require("@/config/env");
 const { db, SCHEMAS } = require("@/db");
 const { registerAllSubscribers } = require("@/events");
 const { requireAuthenticatedUser } = require("@/domains/auth/middleware/requireAuthenticatedUser");
+const { requireAdmin } = require("@/domains/auth/middleware/requireAdmin");
 const { getClientErrorMessage } = require("@/utils/clientError");
 
 const app = express();
 app.disable("x-powered-by");
-app.set("trust proxy", 1);
+app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
 const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = String(process.env.CORS_ORIGINS || "")
   .split(",")
@@ -26,6 +27,13 @@ if (isProduction && (!sessionSecret || allowedOrigins.length === 0 || !process.e
 
 const isAllowedOrigin = (origin) =>
   !origin || (!isProduction && allowedOrigins.length === 0) || allowedOrigins.includes(origin);
+
+const requireTrustedMutationOrigin = (req, res, next) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  const origin = req.get("Origin");
+  if (origin && isAllowedOrigin(origin)) return next();
+  return res.status(403).json({ error: "Trusted Origin is required for state-changing API requests." });
+};
 
 app.use((req, res, next) => {
   res.set({
@@ -99,7 +107,8 @@ app.get("/api/health", async (req, res) => {
 
 app.use("/api/auth", require("@/domains/auth/routes"));
 app.use("/api/webhooks", require("@/domains/webhooks/routes"));
-app.use("/api", requireAuthenticatedUser);
+app.use("/api", requireAuthenticatedUser, requireAdmin);
+app.use("/api", requireTrustedMutationOrigin);
 
 // Domain Routers
 app.use("/api/orders", require("@/domains/orders/routes"));

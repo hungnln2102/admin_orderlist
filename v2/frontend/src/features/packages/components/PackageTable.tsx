@@ -7,6 +7,7 @@ import {
   Eye,
   Trash2,
   Zap,
+  HardDrive,
 } from "lucide-react";
 import { PackageItem } from "../types";
 
@@ -125,26 +126,51 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                       </td>
 
                       {/* Số lượng + Slot Progress bar */}
-                      <td className="py-3.5 px-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] font-bold">
-                            <span className="text-white font-mono">
-                              {item.usedSlots} / {item.totalSlots} Vị trí
-                            </span>
-                          </div>
-                          {/* Progress bar */}
-                          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                            <div
-                              className={`h-full rounded-full transition-all duration-300 ${
+                      <td className="py-3.5 px-4 min-w-[170px]">
+                        <div className="space-y-1.5">
+                          {/* Slot progress */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[11px] font-bold">
+                              <span className="text-white font-mono">
+                                {item.usedSlots} / {item.totalSlots} Vị trí
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
                                 percentUsed >= 100
                                   ? "bg-rose-500"
                                   : percentUsed >= 50
                                   ? "bg-amber-400"
-                                  : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${percentUsed}%` }}
-                            />
+                                    : "bg-emerald-400"
+                                }`}
+                                style={{ width: `${percentUsed}%` }}
+                              />
+                            </div>
                           </div>
+
+                          {/* Dung lượng progress (nếu có giới hạn dung lượng) */}
+                          {item.capacityLimit && item.capacityLimit > 0 && (() => {
+                            const capPercent = Math.min(100, Math.round(((item.capacityUsed || 0) / item.capacityLimit) * 100));
+                            return (
+                              <div className="space-y-0.5 pt-0.5">
+                                <div className="flex items-center justify-between text-[10px] font-mono">
+                                  <span className="text-purple-300 font-bold">
+                                    {item.capacityUsed || 0} / {item.capacityLimit} GB
+                                  </span>
+                                  <span className="text-slate-400 text-[9px]">
+                                    Trống: {item.remainingCapacity || 0} GB
+                                  </span>
+                                </div>
+                                <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-300 bg-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.4)]"
+                                    style={{ width: `${capPercent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </td>
 
@@ -214,6 +240,35 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                               </div>
                             </div>
 
+                            {/* Thanh Tiến Độ Dung Lượng (Nếu gói có giới hạn dung lượng) */}
+                            {item.capacityLimit && item.capacityLimit > 0 && (
+                              <div className="bg-slate-950/80 border border-purple-500/25 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-purple-950/10">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="p-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400">
+                                    <HardDrive className="w-4 h-4" />
+                                  </div>
+                                  <div className="text-xs">
+                                    <span className="text-slate-400">Tiến độ Dung Lượng: </span>
+                                    <strong className="text-purple-300 font-mono font-bold text-sm">
+                                      {item.capacityUsed || 0}
+                                    </strong>
+                                    <span className="text-slate-500 font-mono"> / {item.capacityLimit} GB</span>
+                                    <span className="ml-2.5 text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                                      Còn trống: {item.remainingCapacity || 0} GB
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full sm:w-56 bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800 shrink-0">
+                                  <div
+                                    className="h-full rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)] transition-all duration-500"
+                                    style={{
+                                      width: `${Math.min(100, Math.round(((item.capacityUsed || 0) / item.capacityLimit) * 100))}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
                             {/* Slot Grid Cards */}
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                               {Array.from({ length: item.totalSlots }, (_, idx) => {
@@ -248,6 +303,13 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                                       <div className="text-[10px] text-slate-400 truncate max-w-full">
                                         {assignment.customerName}
                                       </div>
+                                    )}
+
+                                    {/* Hiển thị số GB mỗi slot đang mua */}
+                                    {assignment?.capacity && (
+                                      <span className="mt-1.5 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold tracking-wide">
+                                        {assignment.capacity} GB
+                                      </span>
                                     )}
 
                                     {!assignment && isUsed && (

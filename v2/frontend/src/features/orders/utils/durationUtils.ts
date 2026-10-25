@@ -55,13 +55,23 @@ export function parseDateToMidnight(dateInput?: string | Date | null): Date | nu
   const str = String(dateInput).trim();
   if (!str) return null;
 
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-    const [y, m, d] = str.substring(0, 10).split("-").map(Number);
+  // Nếu là ISO timestamp (ví dụ 2026-10-24T17:00:00.000Z hoặc có chứa giờ)
+  if (str.includes("T") || str.includes(":")) {
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 0, 0, 0, 0);
+    }
+  }
+
+  // Nếu là chuỗi ngày thuần túy YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-").map(Number);
     return new Date(y, m - 1, d, 0, 0, 0, 0);
   }
 
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
-    const [d, m, y] = str.substring(0, 10).split("/").map(Number);
+  // Nếu là chuỗi ngày thuần túy DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    const [d, m, y] = str.split("/").map(Number);
     return new Date(y, m - 1, d, 0, 0, 0, 0);
   }
 
