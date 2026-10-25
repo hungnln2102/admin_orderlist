@@ -335,7 +335,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       .select("order_list_id", "supply_id");
     for (const l of logs) {
       if (l.order_list_id && l.supply_id) {
-        logSupplyMap.set(l.order_list_id, l.supply_id);
+        logSupplyMap.set(Number(l.order_list_id), Number(l.supply_id));
       }
     }
   }
@@ -343,7 +343,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
   // 2. Gom danh sách tất cả unique supply_ids cần nạp
   const neededSupplyIds = new Set();
   for (const o of orders) {
-    const sId = o.supply_id || logSupplyMap.get(o.id);
+    const sId = o.supply_id || logSupplyMap.get(Number(o.id));
     if (sId) {
       const num = Number(sId);
       if (!isNaN(num) && num > 0) neededSupplyIds.add(num);
@@ -357,7 +357,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       .whereIn("id", Array.from(neededSupplyIds))
       .select("id", COLS.SUPPLIER.SUPPLIER_NAME, "number_bank", "bin_bank", "account_holder");
     for (const s of suppliers) {
-      supplierMap.set(s.id, s);
+      supplierMap.set(Number(s.id), s);
     }
   }
 
@@ -400,10 +400,10 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
 
   // 5. Gắn thông tin hoàn toàn in-memory (0 extra queries)
   return orders.map((order) => {
-    const resolvedSupplyId = order.supply_id || logSupplyMap.get(order.id) || null;
+    const resolvedSupplyId = order.supply_id || logSupplyMap.get(Number(order.id)) || null;
     const numSupplyId = Number(resolvedSupplyId);
     const supplier = !isNaN(numSupplyId) ? supplierMap.get(numSupplyId) : null;
-    const supplierName = supplier ? (supplier[COLS.SUPPLIER.SUPPLIER_NAME] || "") : "";
+    const supplierName = supplier ? (supplier[COLS.SUPPLIER.SUPPLIER_NAME] || supplier.ncc_name || "") : "";
 
     const vId = Number(order.id_product);
     const matchedVariant = !isNaN(vId) ? variantMap.get(vId) : null;

@@ -62,7 +62,9 @@ export const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const selectedItem = displayList.find((s) => s.name === selectedSupplierName);
+  const selectedItem = displayList.find(
+    (s) => s.name === selectedSupplierName || String(s.id) === String(selectedSupplierName)
+  );
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -78,7 +80,7 @@ export const SearchableSupplierDropdown: React.FC<SearchableSupplierDropdownProp
             <span className="text-cyan-400 animate-pulse">Đang tải NCC phù hợp...</span>
           ) : selectedSupplierName ? (
             <span className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-cyan-300">{selectedSupplierName}</span>
+              <span className="font-bold text-cyan-300">{selectedItem ? selectedItem.name : selectedSupplierName}</span>
               {selectedItem && selectedItem.cost > 0 && (
                 <span className="text-[11px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
                   (Giá nhập: {new Intl.NumberFormat("vi-VN").format(selectedItem.cost)} ₫)

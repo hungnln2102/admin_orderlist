@@ -69,11 +69,15 @@ export const OrderTable: React.FC<OrderTableProps> = ({
   };
 
   const getSupplierDisplayName = (order: Order): string => {
+    if (order.supplier_name && order.supplier_name.trim()) {
+      return order.supplier_name;
+    }
     if (order.supply_id) {
       const found = allSuppliersCatalog.find(
-        (s) => s.id === Number(order.supply_id)
+        (s) => Number(s.id) === Number(order.supply_id) || (s.supplier_name || s.ncc_name) === String(order.supply_id)
       );
-      if (found) return found.supplier_name || found.ncc_name || "Mavryk";
+      if (found) return found.supplier_name || found.ncc_name || String(order.supply_id);
+      return String(order.supply_id);
     }
     return "Mavryk";
   };

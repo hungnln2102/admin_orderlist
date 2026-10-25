@@ -211,7 +211,7 @@ const getAllSuppliersList = async () => {
   `;
   const result = await db.raw(query);
   return (result.rows || []).map((r) => ({
-    id: r[S_COLS.ID],
+    id: Number(r[S_COLS.ID]),
     supplier_name: r.ncc_name || "N/A",
     ncc_name: r.ncc_name || "N/A",
     number_bank: r[S_COLS.NUMBER_BANK] || "",

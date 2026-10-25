@@ -21,7 +21,12 @@ export function useOrderCatalog() {
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : data.data || [];
-        setAllSuppliersCatalog(list);
+        setAllSuppliersCatalog(
+          list.map((s: any) => ({
+            ...s,
+            id: Number(s.id),
+          }))
+        );
       })
       .catch((err) => console.error("Lỗi tải danh sách NCC:", err));
   }, []);
