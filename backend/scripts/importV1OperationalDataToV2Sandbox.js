@@ -353,7 +353,7 @@ async function syncDailyRevenueSummary(trx) {
   console.log(`✅ [ETL] Đã đồng bộ thành công ${countRow.count} ngày vào finance.daily_revenue_summary.`);
 }
 
-async function importData(targetDb, source, report) {
+async function importData(targetDb, sourceDb, source, report) {
   const variantIds = new Set(source.variants.map((row) => String(row.id)));
   const supplierIds = new Set(source.suppliers.map((row) => String(row.id)));
   const orderIds = new Set(source.orders.map((row) => String(row.id)));
@@ -746,7 +746,7 @@ async function main() {
     }
 
     console.log('\n📦 Đang nạp dữ liệu chuẩn hóa sang target database...');
-    await importData(targetDb, source, report);
+    await importData(targetDb, sourceDb, source, report);
 
     console.log('\n🔍 Đang kiểm tra tính toàn vẹn (Integrity & Validation)...');
     await validateTarget(sourceDb, targetDb, report);
