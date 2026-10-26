@@ -82,7 +82,7 @@ async function syncWarehouseExpiryOnRenewal(data) {
       await db(TABLES.STOCK_SERVICES)
         .where({ id: existingService.id })
         .update({
-          expires_at: new Date(newExpiredAt),
+          expired_at: new Date(newExpiredAt),
           status: "AVAILABLE",
           updated_at: new Date(),
         });
@@ -91,12 +91,12 @@ async function syncWarehouseExpiryOnRenewal(data) {
       await db(TABLES.STOCK_SERVICES).insert({
         account_id: stockId,
         name_id: nameId,
-        password_encrypted: order.slot || null,
+        password: order.slot || null,
         backup_email: "",
-        two_fa_encrypted: null,
-        expires_at: new Date(newExpiredAt),
+        two_fa: null,
+        expired_at: new Date(newExpiredAt),
         status: "AVAILABLE",
-        note: order.note || null,
+        service_note: order.note || null,
         created_at: new Date(),
         updated_at: new Date(),
       });

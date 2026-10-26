@@ -43,9 +43,9 @@ fi
 
 if [ "$CLEAR_CACHE_ON_DEPLOY" = "1" ]; then
   echo ""
-  echo "Clearing Redis cache (DB $REDIS_DB) for debug..."
-  if "${DC[@]}" -f docker-compose.yml exec -T redis redis-cli -n "$REDIS_DB" FLUSHDB >/dev/null 2>&1; then
-    echo "Redis cache cleared."
+  echo "Clearing Redis cache (FLUSHALL across all databases)..."
+  if "${DC[@]}" -f docker-compose.yml exec -T redis redis-cli FLUSHALL >/dev/null 2>&1; then
+    echo "Redis cache cleared (FLUSHALL OK)."
   else
     echo "Warning: Could not clear Redis cache automatically."
   fi
@@ -53,8 +53,11 @@ fi
 
 if command -v nginx >/dev/null 2>&1 || [ -x /usr/sbin/nginx ]; then
   echo ""
-  echo "Reloading Host Nginx to clear proxy cache..."
-  sudo nginx -s reload 2>/dev/null && echo "Host Nginx reloaded." || echo "Could not reload Host Nginx (requires sudo)."
+  echo "Reloading Host Nginx and clearing proxy caches..."
+  if [ -d "/var/cache/nginx" ]; then
+    sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
+  fi
+  (sudo nginx -t && sudo nginx -s reload) 2>/dev/null && echo "Host Nginx reloaded successfully." || echo "Notice: Host Nginx reload skipped or failed."
 fi
 
 echo ""
