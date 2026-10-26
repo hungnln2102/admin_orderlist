@@ -137,7 +137,7 @@ services:
     volumes:
       - ./warehouse_profiles:/config
     ports:
-      - "127.0.0.1:3002:3000"
+      - "127.0.0.1:3088:3000"
     shm_size: "1gb"
     networks:
       - app-network
