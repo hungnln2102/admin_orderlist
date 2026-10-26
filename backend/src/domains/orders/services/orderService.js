@@ -658,166 +658,177 @@ async function createOrder(payload) {
     const shouldSyncWarehouseOrPackage = isMavn || String(id_order).toUpperCase().startsWith("MAVN") || payload.save_to_package === true || payload.save_to_warehouse === true;
     if (shouldSyncWarehouseOrPackage) {
       try {
-        const isSaveToWarehouse = payload.save_to_warehouse !== false;
-        const isSaveToPackage = payload.save_to_package !== false;
-        const accountUsername = payload.information_order 
-          ? String(payload.information_order).trim().toLowerCase()
-          : (payload.slot ? (payload.slot.split('|')[0] || payload.customer).trim().toLowerCase() : String(payload.customer || "mavryk").trim().toLowerCase());
-        
-        let productName = payload.information_order || "Dịch vụ";
-        const prodIdToLookup = newOrderData.id_product || payload.id_product;
-        if (prodIdToLookup) {
-          try {
-            const variantRow = await trx(TABLES.VARIANT)
-              .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.id`, `${TABLES.VARIANT}.product_id`)
-              .select(
-                `${TABLES.VARIANT}.display_name as variant_display`,
-                `${TABLES.VARIANT}.variant_name as variant_name`,
-                `${TABLES.PRODUCT}.package_name as parent_package_name`
-              )
-              .where(`${TABLES.VARIANT}.id`, Number(prodIdToLookup))
+        await trx.savepoint(async (subTrx) => {
+          const isSaveToWarehouse = payload.save_to_warehouse !== false;
+          const isSaveToPackage = payload.save_to_package !== false;
+          const accountUsername = payload.information_order 
+            ? String(payload.information_order).trim().toLowerCase()
+            : (payload.slot ? (payload.slot.split('|')[0] || payload.customer).trim().toLowerCase() : String(payload.customer || "mavryk").trim().toLowerCase());
+          
+          let productName = payload.information_order || "Dịch vụ";
+          const prodIdToLookup = newOrderData.id_product || payload.id_product;
+          if (prodIdToLookup) {
+            try {
+              const numProdId = Number(prodIdToLookup);
+              const variantQuery = subTrx(TABLES.VARIANT)
+                .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.id`, `${TABLES.VARIANT}.product_id`)
+                .select(
+                  `${TABLES.VARIANT}.display_name as variant_display`,
+                  `${TABLES.VARIANT}.variant_name as variant_name`,
+                  `${TABLES.PRODUCT}.package_name as parent_package_name`
+                );
+              if (!isNaN(numProdId) && numProdId > 0) {
+                variantQuery.where(`${TABLES.VARIANT}.id`, numProdId);
+              } else {
+                variantQuery.where(function() {
+                  this.whereILike(`${TABLES.VARIANT}.display_name`, String(prodIdToLookup))
+                      .orWhereILike(`${TABLES.VARIANT}.variant_name`, String(prodIdToLookup));
+                });
+              }
+              const variantRow = await variantQuery.first();
+              if (variantRow) {
+                productName = variantRow.parent_package_name || variantRow.variant_name || variantRow.variant_display || productName;
+              }
+            } catch (e) {
+              console.log("[OrderService] Không resolve được sản phẩm chính cho kho:", e.message);
+            }
+          }
+          
+          let pName = await subTrx(TABLES.PRODUCT_NAMES)
+            .whereRaw("LOWER(name) = ?", [productName.toLowerCase().trim()])
+            .first();
+
+          let nameId = pName?.id;
+          if (!nameId && (isSaveToWarehouse || isSaveToPackage)) {
+            const [insertedP] = await subTrx(TABLES.PRODUCT_NAMES)
+              .insert({ name: productName.trim() })
+              .returning("id");
+            nameId = insertedP.id || insertedP;
+          }
+
+          let stockId = null;
+          if (accountUsername) {
+            let stock = await subTrx(TABLES.PRODUCT_KEYS)
+              .whereRaw("LOWER(account_username) = ?", [accountUsername])
               .first();
 
-            if (variantRow) {
-              productName = variantRow.parent_package_name || variantRow.variant_name || variantRow.variant_display || productName;
+            stockId = stock?.id;
+            if (!stockId && (isSaveToWarehouse || isSaveToPackage)) {
+              const [newStock] = await subTrx(TABLES.PRODUCT_KEYS)
+                .insert({
+                  account_username: accountUsername,
+                  created_at: new Date(),
+                })
+                .returning("*");
+              stockId = newStock.id;
             }
-          } catch (e) {
-            console.log("[OrderService] Không resolve được sản phẩm chính cho kho:", e.message);
           }
-        }
-        
-        let pName = await trx(TABLES.PRODUCT_NAMES)
-          .whereRaw("LOWER(name) = ?", [productName.toLowerCase().trim()])
-          .first();
 
-        let nameId = pName?.id;
-        if (!nameId && (isSaveToWarehouse || isSaveToPackage)) {
-          const [insertedP] = await trx(TABLES.PRODUCT_NAMES)
-            .insert({ name: productName.trim() })
-            .returning("id");
-          nameId = insertedP.id || insertedP;
-        }
-
-        let stockId = null;
-        if (accountUsername) {
-          let stock = await trx(TABLES.PRODUCT_KEYS)
-            .whereRaw("LOWER(account_username) = ?", [accountUsername])
-            .first();
-
-          stockId = stock?.id;
-          if (!stockId && (isSaveToWarehouse || isSaveToPackage)) {
-            const [newStock] = await trx(TABLES.PRODUCT_KEYS)
-              .insert({
-                account_username: accountUsername,
-                created_at: new Date(),
+          if (stockId && nameId && isSaveToWarehouse) {
+            const existingService = await subTrx(TABLES.STOCK_SERVICES)
+              .where({
+                account_id: stockId,
+                name_id: nameId,
               })
-              .returning("*");
-            stockId = newStock.id;
-          }
-        }
+              .first();
 
-        if (stockId && nameId && isSaveToWarehouse) {
-          const existingService = await trx(TABLES.STOCK_SERVICES)
-            .where({
-              account_id: stockId,
-              name_id: nameId,
-            })
-            .first();
-
-          if (existingService) {
-            // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
-            await trx(TABLES.STOCK_SERVICES)
-              .where({ id: existingService.id })
-              .update({
-                password_encrypted: payload.slot || existingService.password_encrypted,
-                expires_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expires_at,
+            if (existingService) {
+              // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
+              await subTrx(TABLES.STOCK_SERVICES)
+                .where({ id: existingService.id })
+                .update({
+                  password: payload.slot || existingService.password,
+                  expired_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expired_at,
+                  status: "AVAILABLE",
+                  service_note: payload.note || existingService.service_note,
+                  updated_at: new Date(),
+                });
+              console.log(`✅ [WarehouseSync] Đã đồng bộ dữ liệu mới cho tài khoản "${accountUsername}" từ đơn ${id_order}`);
+            } else {
+              // Chưa có trong kho nhưng bật lưu kho -> tạo mới
+              await subTrx(TABLES.STOCK_SERVICES).insert({
+                account_id: stockId,
+                name_id: nameId,
+                slot_index: 1,
+                password: payload.slot || null,
+                backup_email: "",
+                two_fa: null,
+                expired_at: payload.expired_at ? new Date(payload.expired_at) : null,
                 status: "AVAILABLE",
-                note: payload.note || existingService.note,
+                service_note: payload.note || null,
+                created_at: new Date(),
                 updated_at: new Date(),
               });
-            console.log(`✅ [WarehouseSync] Đã đồng bộ dữ liệu mới cho tài khoản "${accountUsername}" từ đơn ${id_order}`);
-          } else {
-            // Chưa có trong kho nhưng bật lưu kho -> tạo mới
-            await trx(TABLES.STOCK_SERVICES).insert({
-              account_id: stockId,
-              name_id: nameId,
-              password_encrypted: payload.slot || null,
-              backup_email: "",
-              two_fa_encrypted: null,
-              expires_at: payload.expired_at ? new Date(payload.expired_at) : null,
-              status: "AVAILABLE",
-              note: payload.note || null,
-              created_at: new Date(),
-              updated_at: new Date(),
+            }
+          }
+
+          if (stockId) {
+            emitOrderEvent(trx, EVENTS.WAREHOUSE_STOCK_CREATED, {
+              id: stockId,
+              account: accountUsername,
+              source: "order_sync",
+              orderId: createdOrder.id,
+              orderCode: createdOrder.id_order,
             });
           }
-        }
 
-        if (stockId) {
-          emitOrderEvent(trx, EVENTS.WAREHOUSE_STOCK_CREATED, {
-            id: stockId,
-            account: accountUsername,
-            source: "order_sync",
-            orderId: createdOrder.id,
-            orderCode: createdOrder.id_order,
-          });
-        }
+          // 4. Check & Sync Package Product (warehouse.package_products)
+          if (isSaveToPackage && stockId && nameId) {
+            const existingPackage = await subTrx(TABLES.PACKAGE_PRODUCT)
+              .where({
+                product_name_id: nameId,
+                account_id: stockId,
+              })
+              .first();
 
-        // 4. Check & Sync Package Product (warehouse.package_products)
-        if (isSaveToPackage && stockId && nameId) {
-          const existingPackage = await trx(TABLES.PACKAGE_PRODUCT)
-            .where({
-              product_name_id: nameId,
-              account_id: stockId,
-            })
-            .first();
-
-          if (!existingPackage) {
-            let storageAccountId = null;
-            if (payload.storage_account_username && String(payload.storage_account_username).trim()) {
-              const storageAccUser = String(payload.storage_account_username).trim().toLowerCase();
-              let storageStock = await trx(TABLES.PRODUCT_KEYS)
-                .whereRaw("LOWER(account_username) = ?", [storageAccUser])
-                .first();
-              if (storageStock) {
-                storageAccountId = storageStock.id;
-              } else {
-                const [newStorageStock] = await trx(TABLES.PRODUCT_KEYS)
-                  .insert({
-                    account_username: storageAccUser,
-                    created_at: new Date(),
-                  })
-                  .returning("*");
-                storageAccountId = newStorageStock.id;
+            if (!existingPackage) {
+              let storageAccountId = null;
+              if (payload.storage_account_username && String(payload.storage_account_username).trim()) {
+                const storageAccUser = String(payload.storage_account_username).trim().toLowerCase();
+                let storageStock = await subTrx(TABLES.PRODUCT_KEYS)
+                  .whereRaw("LOWER(account_username) = ?", [storageAccUser])
+                  .first();
+                if (storageStock) {
+                  storageAccountId = storageStock.id;
+                } else {
+                  const [newStorageStock] = await subTrx(TABLES.PRODUCT_KEYS)
+                    .insert({
+                      account_username: storageAccUser,
+                      created_at: new Date(),
+                    })
+                    .returning("*");
+                  storageAccountId = newStorageStock.id;
+                }
               }
-            }
 
-            let supplierName = payload.supply_id || "Mavryk";
-            if (typeof supplierName === "number" || !isNaN(Number(supplierName))) {
-              const sup = await trx(TABLES.SUPPLIER).where("id", Number(supplierName)).first();
-              if (sup) supplierName = sup.supplier_name || sup.ncc_name || supplierName;
-            }
+              let supplierName = payload.supply_id || "Mavryk";
+              if (typeof supplierName === "number" || !isNaN(Number(supplierName))) {
+                const sup = await subTrx(TABLES.SUPPLIER).where("id", Number(supplierName)).first();
+                if (sup) supplierName = sup.supplier_name || sup.ncc_name || supplierName;
+              }
 
-            await trx(TABLES.PACKAGE_PRODUCT).insert({
-              product_name_id: nameId,
-              account_id: stockId,
-              supplier: supplierName,
-              cost: Number(payload.cost || 0),
-              slot: Number(payload.package_slots || 2),
-              match_rule: payload.package_match_rule || "information",
-              package_note: payload.note || null,
-              storage_account_id: storageAccountId,
-              storage_total: payload.storage_total || null,
-              created_at: new Date(),
-              updated_at: new Date(),
-            });
-            console.log(`📦 [PackageSync] Đã tự động tạo mới Gói sản phẩm cho tài khoản "${accountUsername}" - dịch vụ ID ${nameId}`);
-          } else {
-            console.log(`📦 [PackageSync] Gói sản phẩm cho tài khoản "${accountUsername}" đã tồn tại, bỏ qua.`);
+              await subTrx(TABLES.PACKAGE_PRODUCT).insert({
+                product_name_id: nameId,
+                account_id: stockId,
+                package_name: productName.trim(),
+                supplier: supplierName,
+                cost: Number(payload.cost || 0),
+                slot: Number(payload.package_slots || 2),
+                match_rule: payload.package_match_rule || "information",
+                package_note: payload.note || null,
+                storage_account_id: storageAccountId,
+                storage_total: payload.storage_total || null,
+                created_at: new Date(),
+                updated_at: new Date(),
+              });
+              console.log(`📦 [PackageSync] Đã tự động tạo mới Gói sản phẩm cho tài khoản "${accountUsername}" - dịch vụ ID ${nameId}`);
+            } else {
+              console.log(`📦 [PackageSync] Gói sản phẩm cho tài khoản "${accountUsername}" đã tồn tại, bỏ qua.`);
+            }
           }
-        }
+        });
       } catch (err) {
-        console.error("[OrderService] Lỗi tự động lưu/đồng bộ kho/gói:", err);
+        console.error("[OrderService] Lỗi tự động lưu/đồng bộ kho/gói:", err.message);
       }
     }
 
