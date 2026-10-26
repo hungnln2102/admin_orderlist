@@ -22,12 +22,48 @@ const parseBoolean = (raw, fallback) => {
   return !["false", "0", "no", "off"].includes(String(raw).trim().toLowerCase());
 };
 
+const findFallbackChromiumExecutable = () => {
+  if (process.env.WAREHOUSE_BROWSER_EXECUTABLE_PATH) {
+    return process.env.WAREHOUSE_BROWSER_EXECUTABLE_PATH;
+  }
+
+  const candidateDirs = [
+    path.join(os.homedir(), ".cache", "ms-playwright"),
+    "/root/.cache/ms-playwright",
+  ];
+
+  for (const baseDir of candidateDirs) {
+    if (!fs.existsSync(baseDir)) continue;
+    try {
+      const entries = fs.readdirSync(baseDir);
+      const chromiumDirs = entries
+        .filter((e) => e.startsWith("chromium-"))
+        .sort()
+        .reverse();
+
+      for (const dir of chromiumDirs) {
+        const candidatePath = path.join(baseDir, dir, "chrome-linux64", "chrome");
+        if (fs.existsSync(candidatePath)) {
+          return candidatePath;
+        }
+      }
+    } catch {
+      // ignore read error
+    }
+  }
+
+  return undefined;
+};
+
 const getLaunchConfig = () => {
   const rawTimeout = Number.parseInt(process.env.WAREHOUSE_BROWSER_TIMEOUT_MS || "", 10);
+  const isLinuxNoDisplay = process.platform === "linux" && !process.env.DISPLAY;
+  const defaultHeadless = isLinuxNoDisplay ? true : false;
+  const fallbackExec = findFallbackChromiumExecutable();
 
   return {
-    headless: parseBoolean(process.env.WAREHOUSE_BROWSER_HEADLESS, false),
-    executablePath: process.env.WAREHOUSE_BROWSER_EXECUTABLE_PATH || undefined,
+    headless: parseBoolean(process.env.WAREHOUSE_BROWSER_HEADLESS, defaultHeadless),
+    executablePath: process.env.WAREHOUSE_BROWSER_EXECUTABLE_PATH || fallbackExec,
     timeout: Number.isFinite(rawTimeout) && rawTimeout >= 5_000 ? rawTimeout : 30_000,
   };
 };
@@ -38,7 +74,11 @@ const getBrowserWindowArgs = () => {
   const safeWidth = Number.isFinite(width) && width >= 480 ? width : 760;
   const safeHeight = Number.isFinite(height) && height >= 400 ? height : 640;
 
-  return ["--no-first-run", "--no-default-browser-check", `--window-size=${safeWidth},${safeHeight}`];
+  const args = ["--no-first-run", "--no-default-browser-check", `--window-size=${safeWidth},${safeHeight}`];
+  if (process.platform === "linux") {
+    args.push("--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage");
+  }
+  return args;
 };
 
 /**
@@ -240,14 +280,18 @@ const launchContextForChannel = (accountId, channelKey) => {
 
   const { headless, executablePath, timeout } = getLaunchConfig();
   const profileDir = getAccountProfileDir(channelKey, accountId);
+  const launchOptions = {
+    headless,
+    channel: BROWSER_CHANNELS[channelKey].channel,
+    timeout,
+    viewport: null,
+    args: getBrowserWindowArgs(),
+  };
+  if (channelKey === "chromium" && executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
   const contextPromise = chromium
-    .launchPersistentContext(profileDir, {
-      headless,
-      channel: BROWSER_CHANNELS[channelKey].channel,
-      timeout,
-      viewport: null,
-      args: getBrowserWindowArgs(),
-    })
+    .launchPersistentContext(profileDir, launchOptions)
     .then((context) => {
       activeContexts.set(key, context);
       context.once("close", () => activeContexts.delete(key));
