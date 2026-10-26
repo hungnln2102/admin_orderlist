@@ -31,6 +31,16 @@ const deleteWarehouseAccount = async (req, res) => {
   }
 };
 
+const updateWarehouseAccount = async (req, res) => {
+  try {
+    const result = await warehouseService.updateWarehouseAccount(req.params.id, req.body);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] updateWarehouseAccount error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật tài khoản kho.") });
+  }
+};
+
 const getCatalogItems = async (req, res) => {
   try {
     const data = await warehouseService.listCatalogItems();
@@ -88,6 +98,7 @@ module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
   deleteWarehouseAccount,
+  updateWarehouseAccount,
   updateWarehouseServiceSlot,
   getCatalogItems,
   createCatalogItem,

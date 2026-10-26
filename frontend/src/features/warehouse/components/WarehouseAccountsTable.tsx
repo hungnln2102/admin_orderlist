@@ -360,19 +360,47 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       </div>
                     </td>
 
-                    {/* COL 3: EXPAND CHEVRON */}
+                    {/* COL 3: ACTIONS & EXPAND */}
                     <td
-                      className={`px-4 py-3.5 border-y border-r last:rounded-r-2xl pr-6 text-right transition-colors ${
+                      className={`px-4 py-3.5 border-y border-r last:rounded-r-2xl pr-5 text-right transition-colors ${
                         isExpanded
                           ? "bg-slate-900/90 border-indigo-500/30"
                           : "bg-slate-900/80 border-white/5 group-hover/row:bg-slate-800/60"
                       }`}
                     >
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+                        {/* NÚT SỬA TÀI KHOẢN GỐC */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditAccount(account);
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/25 hover:border-amber-500/40 hover:text-amber-300 transition-all active:scale-95 cursor-pointer shadow-sm shadow-amber-950/30"
+                          title="Chỉnh sửa tài khoản gốc"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* NÚT XÓA TÀI KHOẢN GỐC */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteAccount(account);
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/25 hover:border-rose-500/40 hover:text-rose-300 transition-all active:scale-95 cursor-pointer shadow-sm shadow-rose-950/30"
+                          title="Xóa tài khoản gốc khỏi kho"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* CHEVRON TOGGLE */}
                         <div
                           className={`flex h-8 w-8 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-slate-400 transition-transform duration-200 ${
-                            isExpanded ? "rotate-180 text-indigo-400 bg-indigo-500/10 border-indigo-500/20" : ""
+                            isExpanded ? "rotate-180 text-indigo-400 bg-indigo-500/10 border-indigo-500/20" : "group-hover/row:text-white group-hover/row:bg-white/10"
                           }`}
+                          title={isExpanded ? "Thu gọn chi tiết" : "Mở rộng chi tiết"}
                         >
                           <ChevronDown className="h-4 w-4" />
                         </div>
@@ -405,7 +433,27 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                             </div>
 
                             <div className="flex items-center gap-2">
+                              {/* NÚT SỬA TÀI KHOẢN GỐC */}
+                              <button
+                                type="button"
+                                onClick={() => onEditAccount(account)}
+                                className="rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+                                title="Chỉnh sửa tài khoản gốc"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                <span>Sửa tài khoản</span>
+                              </button>
 
+                              {/* NÚT XÓA TÀI KHOẢN GỐC */}
+                              <button
+                                type="button"
+                                onClick={() => onDeleteAccount(account)}
+                                className="rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-3 py-2 text-xs font-semibold text-rose-300 hover:text-rose-200 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+                                title="Xóa tài khoản gốc khỏi kho"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Xóa tài khoản</span>
+                              </button>
 
                               {/* SAO CHÉP TẤT CẢ BUTTON */}
                               <button
@@ -450,7 +498,39 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-white/5 font-medium">
-                                {services.map((srv, idx) => {
+                                {services.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={8} className="px-6 py-8 text-center text-slate-400">
+                                      <div className="flex flex-col items-center justify-center gap-2 max-w-md mx-auto">
+                                        <p className="text-sm font-semibold text-slate-200">
+                                          Tài khoản này chưa có slot dịch vụ nào
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                          Master có thể chỉnh sửa tên/email tài khoản gốc hoặc xóa tài khoản này khỏi kho hàng.
+                                        </p>
+                                        <div className="flex items-center gap-2.5 mt-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => onEditAccount(account)}
+                                            className="px-3.5 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-semibold text-amber-300 transition-all flex items-center gap-1.5 cursor-pointer"
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            <span>Sửa tài khoản</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => onDeleteAccount(account)}
+                                            className="px-3.5 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-xs font-semibold text-rose-300 transition-all flex items-center gap-1.5 cursor-pointer"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <span>Xóa tài khoản</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  services.map((srv, idx) => {
                                   const isAvailable = srv.status === "AVAILABLE";
                                   const brand = getServiceBrandStyle(
                                     srv.display_name || srv.category,
@@ -690,7 +770,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                       </td>
                                     </tr>
                                   );
-                                })}
+                                }))}
                               </tbody>
                             </table>
                           </div>

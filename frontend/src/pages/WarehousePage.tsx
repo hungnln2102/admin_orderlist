@@ -26,6 +26,7 @@ import {
   WarehouseCatalogGrid,
   WarehouseCreateModal,
   WarehouseEditSlotModal,
+  WarehouseEditAccountModal,
   CatalogCreateModal,
   CatalogDeleteModal,
 } from "@/features/warehouse";
@@ -53,6 +54,7 @@ export const WarehousePage: React.FC = () => {
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [deletingCatalogItem, setDeletingCatalogItem] = useState<ServiceNameCategoryItem | null>(null);
   const [isDeletingCatalog, setIsDeletingCatalog] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<WarehouseAccountItem | null>(null);
   const [editingSlotData, setEditingSlotData] = useState<{
     account: WarehouseAccountItem;
     slot: WarehouseServiceSlot;
@@ -285,6 +287,30 @@ export const WarehousePage: React.FC = () => {
     }
   };
 
+  const handleUpdateAccount = async (accountId: number, newAccountName: string) => {
+    try {
+      const res = await fetch(`/api/warehouse/accounts/${accountId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account: newAccountName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể cập nhật tài khoản kho");
+      }
+      notification.success(
+        `Đã cập nhật tài khoản "${newAccountName}" thành công!`,
+        "Cập Nhật Thành Công"
+      );
+      setEditingAccount(null);
+      await loadWarehouseData();
+    } catch (err: any) {
+      console.error("Lỗi cập nhật tài khoản kho:", err);
+      notification.error(err.message || "Cập nhật tài khoản kho thất bại");
+      throw err;
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto animate-fadeIn">
       {/* HEADER PAGE */}
@@ -425,13 +451,7 @@ export const WarehousePage: React.FC = () => {
           onToggleExpand={toggleExpand}
           onToggleShowPassword={toggleShowPassword}
           onCopy={copyToClipboard}
-          onEditAccount={(acc) => {
-            if (acc.services && acc.services.length > 0) {
-              setEditingSlotData({ account: acc, slot: acc.services[0] });
-            } else {
-              notification.info(`Chỉnh sửa tài khoản kho ${acc.account}`);
-            }
-          }}
+          onEditAccount={(acc) => setEditingAccount(acc)}
           onEditSlot={(acc, srv) => setEditingSlotData({ account: acc, slot: srv })}
           onDeleteAccount={(acc) =>
             notification.confirm({
@@ -535,6 +555,14 @@ export const WarehousePage: React.FC = () => {
         isSubmitting={isUpdatingSlot}
         onClose={() => setEditingSlotData(null)}
         onSubmit={handleUpdateSlot}
+      />
+
+      {/* MODAL EDIT ACCOUNT (TÀI KHOẢN GỐC) */}
+      <WarehouseEditAccountModal
+        open={!!editingAccount}
+        account={editingAccount}
+        onClose={() => setEditingAccount(null)}
+        onSubmit={handleUpdateAccount}
       />
     </div>
   );
