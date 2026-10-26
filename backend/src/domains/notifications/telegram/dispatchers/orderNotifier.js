@@ -189,18 +189,18 @@ async function notifyOrderCreated(order) {
   }
 }
 
-function notifyFourDaysRemaining(orders) {
+async function notifyFourDaysRemaining(orders, warnDays = 4) {
   const total = orders.length;
-  sendBulkTelegramOrders(orders, {
+  return await sendBulkTelegramOrders(orders, {
     topicId: FOUR_DAYS_TOPIC_ID,
-    headerMessage: `☀️ THÔNG BÁO GIA HẠN (7:00 Sáng)\n\nPhát hiện ${total} đơn hàng cần gia hạn (còn 4 ngày):`,
+    headerMessage: `☀️ THÔNG BÁO GIA HẠN (7:00 Sáng)\n\nPhát hiện ${total} đơn hàng cần gia hạn (còn ${warnDays} ngày):`,
     messageBuilder: buildDueOrderMessage,
     includeQR: true,
   });
 }
 
-function notifyZeroDaysRemaining(orders) {
-  sendBulkTelegramOrders(orders, {
+async function notifyZeroDaysRemaining(orders) {
+  return await sendBulkTelegramOrders(orders, {
     topicId: ZERO_DAYS_TOPIC_ID,
     headerMessage: null,
     messageBuilder: buildExpiredOrderMessage,

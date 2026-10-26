@@ -13,7 +13,7 @@ async function notifyZeroDaysTask(trigger = "cron") {
     const todaySql = "(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date";
 
     const result = await db.raw(`
-      SELECT id, id_order, customer, contact, information_order, price, expired_at, status
+      SELECT *, (expired_at::date - ${todaySql}) AS days_left
       FROM ${TARGET_TABLE}
       WHERE (expired_at::date - ${todaySql}) = 0
         AND status IN ('${ORDER_STATUS.RENEW_REQUIRED}', '${ORDER_STATUS.EXPIRED}')
@@ -25,6 +25,11 @@ async function notifyZeroDaysTask(trigger = "cron") {
 
     for (const order of orders) {
       console.log(` -> Đơn #${order.id_order || order.id} (${order.customer}): Cần gia hạn ngay hôm nay (Hạn: ${order.expired_at})`);
+    }
+
+    if (orders.length > 0) {
+      const { notifyZeroDaysRemaining } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
+      await notifyZeroDaysRemaining(orders);
     }
 
     return {
