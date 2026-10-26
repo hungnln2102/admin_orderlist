@@ -22,6 +22,7 @@ const {
   ORDER_CREATED_TOPIC_ID, 
   ZERO_DAYS_TOPIC_ID, 
   FOUR_DAYS_TOPIC_ID,
+  TELEGRAM_RENEWAL_TOPIC_ID,
   SEND_ORDER_NOTIFICATION 
 } = require("@/domains/notifications/telegram/core/constants");
 
@@ -239,11 +240,50 @@ async function notifyBatchCreated(batch, orders) {
   }
 }
 
+async function notifyOrderRenewed(orderData) {
+  if (!SEND_ORDER_NOTIFICATION) return;
+
+  try {
+    const { formatDateDMY, formatCurrency } = require("@/domains/notifications/telegram/builders/formatters");
+    const orderCode = orderData.id_order || orderData.orderCode || "...";
+    const customer = orderData.customer || "N/A";
+    const productName = orderData.productName || orderData.id_product || "N/A";
+    const daysAdded = orderData.daysAdded || 30;
+    const expiryDate = orderData.newExpiredAt ? formatDateDMY(orderData.newExpiredAt) : "N/A";
+    const priceStr = orderData.price ? `${formatCurrency(orderData.price)} đ` : "";
+
+    const lines = [
+      `🎉 <b>Gia hạn đơn hàng thành công!</b>`,
+      `📦 Sản phẩm: <b>${productName}</b>`,
+      `🆔 Mã đơn: <code>${orderCode}</code>`,
+      `👤 Khách hàng: <code>${customer}</code>`,
+      daysAdded ? `⏳ Gia hạn thêm: <b>+${daysAdded} ngày</b>` : null,
+      expiryDate ? `📆 Hạn dùng mới: <b>${expiryDate}</b>` : null,
+      priceStr ? `💰 Số tiền: <b>${priceStr}</b>` : null,
+    ].filter(Boolean);
+
+    const topicId = Number.isFinite(TELEGRAM_RENEWAL_TOPIC_ID) 
+      ? TELEGRAM_RENEWAL_TOPIC_ID 
+      : (Number.isFinite(FOUR_DAYS_TOPIC_ID) ? FOUR_DAYS_TOPIC_ID : 2);
+
+    enqueueMessage({
+      chat_id: TELEGRAM_CHAT_ID,
+      message_thread_id: topicId,
+      text: lines.join("\n"),
+      parse_mode: "HTML",
+    });
+  } catch (error) {
+    const logger = require("@/utils/logger");
+    logger.error("[OrderNotifier] Lỗi khi notifyOrderRenewed", { error: error.message });
+  }
+}
+
 module.exports = {
   sendOrderCreatedNotification: notifyOrderCreated,
   sendFourDaysRemainingNotification: notifyFourDaysRemaining,
   sendZeroDaysRemainingNotification: notifyZeroDaysRemaining,
   notifyOrderCreated,
+  notifyOrderRenewed,
   notifyFourDaysRemaining,
   notifyZeroDaysRemaining,
   notifyBatchCreated,
