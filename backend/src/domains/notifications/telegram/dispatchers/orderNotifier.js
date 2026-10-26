@@ -103,7 +103,11 @@ async function sendBulkTelegramOrders(orders = [], config) {
 
     // 4. Đẩy từng đơn vào hàng đợi
     for (let i = 0; i < deduped.length; i++) {
-      const order = deduped[i];
+      let order = deduped[i];
+      if (!order.productName && order.id_product) {
+        const productName = await resolveProductName(order.id_product);
+        order = { ...order, productName };
+      }
       const text = messageBuilder(order, i + 1, total);
       const price = Number(order.price) || 0;
 
@@ -138,6 +142,37 @@ const extractDurationSuffix = (displayName) => {
   return match ? formatDuration(match[1]) : "";
 };
 
+async function resolveProductName(rawProduct) {
+  if (!rawProduct) return "";
+  const str = String(rawProduct).trim();
+  const num = Number(str);
+  const isNumeric = Number.isFinite(num) && num >= 1 && String(num) === str;
+
+  try {
+    let variantRow = null;
+    if (isNumeric) {
+      variantRow = await db("variant").where("id", num).first();
+    } else {
+      variantRow = await db("variant")
+        .where("display_name", str)
+        .orWhere("variant_name", str)
+        .first();
+    }
+
+    if (variantRow) {
+      const variantName = variantRow.variant_name ? String(variantRow.variant_name).trim() : "";
+      const displayName = variantRow.display_name ? String(variantRow.display_name).trim() : "";
+      const duration = extractDurationSuffix(displayName);
+      return variantName
+        ? `${variantName}${duration ? ` (${duration})` : ""}`
+        : displayName || str;
+    }
+  } catch (_e) {
+    // Fallback về chuỗi ban đầu nếu lỗi query
+  }
+  return str;
+}
+
 /**
  * Thông báo đơn tạo mới — enrich productName từ DB trước rồi gửi QR.
  */
@@ -145,32 +180,7 @@ async function notifyOrderCreated(order) {
   if (!SEND_ORDER_NOTIFICATION) return;
 
   try {
-    // Enrich productName từ DB (đặc thù của flow tạo đơn mới)
-    let productName = order.id_product;
-    if (order.id_product) {
-      const str = String(order.id_product).trim();
-      const num = Number(str);
-      const isNumeric = Number.isFinite(num) && num >= 1 && String(num) === str;
-
-      let variantRow = null;
-      if (isNumeric) {
-        variantRow = await db("variant").where("id", num).first();
-      } else {
-        variantRow = await db("variant")
-          .where("display_name", str)
-          .orWhere("variant_name", str)
-          .first();
-      }
-
-      if (variantRow) {
-        const variantName = variantRow.variant_name ? String(variantRow.variant_name).trim() : "";
-        const displayName = variantRow.display_name ? String(variantRow.display_name).trim() : "";
-        const duration = extractDurationSuffix(displayName);
-        productName = variantName
-          ? `${variantName}${duration ? ` (${duration})` : ""}`
-          : displayName || str;
-      }
-    }
+    const productName = await resolveProductName(order.productName || order.id_product);
     const enrichedOrder = { ...order, productName };
 
     const defaultBank = await resolveDefaultShopBankAccount();
