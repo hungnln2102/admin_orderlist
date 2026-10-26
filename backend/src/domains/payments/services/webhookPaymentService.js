@@ -82,7 +82,7 @@ async function processPaymentWebhook(payload = {}) {
       .insert({
         payment_date: paymentDate,
         amount: transferAmount,
-        unallocated_amount: isOutbound ? 0 : transferAmount,
+        unallocated_amount: transferAmount,
         status: RECEIPT_STATUS.UNALLOCATED,
         sender: payload.accountNumber || payload.sender || gateway || null,
         receiver: payload.receiver || null,
