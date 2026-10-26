@@ -210,7 +210,7 @@ async function allocateReceipt(receiptId, payload) {
         .forUpdate()
         .first();
       if (!order) throw new Error(`Không tìm thấy đơn hàng ${code}.`);
-      if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
+      if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING].includes(order.status)) {
         throw new Error(`Đơn hàng ${code} đang ở trạng thái ${order.status}, không thể phân bổ thanh toán.`);
       }
     }
@@ -227,12 +227,16 @@ async function allocateReceipt(receiptId, payload) {
     }).returning("id");
 
     // 2. Cập nhật số dư và trạng thái Biên lai gốc
+    const receiptUpdates = {
+      unallocated_amount: newUnallocated,
+      status: newStatus,
+    };
+    if (resolvedAllocType === ALLOCATION_TYPE.ORDER && code && !receipt.id_order) {
+      receiptUpdates.id_order = code;
+    }
     await trx(TABLES.PAYMENT_RECEIPT)
       .where({ id })
-      .update({
-        unallocated_amount: newUnallocated,
-        status: newStatus,
-      });
+      .update(receiptUpdates);
 
     // 3. Nếu gán cho Đơn hàng (ORDER): Cập nhật trạng thái đơn + gia hạn + phát EventBus
     let orderResult = null;
@@ -316,7 +320,7 @@ async function getMatchableOrders({ q = "", limit = 50 } = {}) {
       "information_order",
       "id_product"
     )
-    .whereIn("status", [ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED])
+    .whereIn("status", [ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING])
     .whereNotNull("id_order")
     .whereRaw("TRIM(id_order) != ''");
 
@@ -389,7 +393,7 @@ async function createInvoice(payload) {
         throw new Error(`Không tìm thấy đơn hàng "${cleanOrderCode}".`);
       }
 
-      if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
+      if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING].includes(order.status)) {
         throw new Error(`Đơn hàng ${cleanOrderCode} đang ở trạng thái ${order.status}, không thể thanh toán.`);
       }
     }
@@ -527,7 +531,7 @@ async function completeBatchPayment({ orderCodes = [], financialAccountId, gatew
     }
 
     const invalidOrders = orders.filter(
-      (o) => ![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(o.status)
+      (o) => ![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING].includes(o.status)
     );
     if (invalidOrders.length > 0) {
       const invalidCodes = invalidOrders.map((o) => `${o.id_order} (${o.status})`).join(", ");

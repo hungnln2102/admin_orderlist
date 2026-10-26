@@ -55,7 +55,7 @@ function calculateNewExpiry(currentExpiredAt, daysToAdd) {
 async function processOrderPayment(trx, order, amount, options = {}) {
   const { receiptId, action = "PAYMENT_RECEIVED" } = options;
 
-  if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
+  if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING].includes(order.status)) {
     throw new Error(`Đơn hàng ${order.id_order} đang ở trạng thái ${order.status}, không thể ghi nhận thanh toán.`);
   }
 
@@ -65,6 +65,7 @@ async function processOrderPayment(trx, order, amount, options = {}) {
   // Xây dựng object update
   const updateFields = {
     status: ORDER_STATUS.PAID,
+    was_paid: true,
   };
 
   let newExpiredAt = null;
