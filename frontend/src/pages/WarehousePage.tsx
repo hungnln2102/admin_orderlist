@@ -226,7 +226,23 @@ export const WarehousePage: React.FC = () => {
     if (openingSlotId) return;
     setOpeningSlotId(service.id);
     try {
-      notification.info(`Đang mở trình duyệt với Profile riêng cho ${account.account}...`, "Đăng Nhập Kho");
+      // 1. Mở cửa sổ Trình duyệt Đám Mây trên Web cho Master thao tác trực quan
+      const browserWindow = window.open(
+        "/browser/",
+        "MavrykCloudBrowser",
+        "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+      );
+
+      if (browserWindow) {
+        browserWindow.focus();
+      }
+
+      notification.info(
+        `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account}. Master hãy thao tác đăng nhập trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu tự động trên VPS.`,
+        "Trình Duyệt Đám Mây"
+      );
+
+      // 2. Gửi request backend để xác minh hoặc lưu phiên
       const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -235,29 +251,17 @@ export const WarehousePage: React.FC = () => {
           slotId: service.id,
         }),
       });
-      const responseBody = await res.text();
-      let data: { error?: string; message?: string; data?: { hasAuthenticatedSession?: boolean } } = {};
-      try {
-        data = responseBody ? JSON.parse(responseBody) : {};
-      } catch {
-        throw new Error("Backend vừa ngắt kết nối hoặc trả về phản hồi không hợp lệ. Hãy kiểm tra terminal backend.");
-      }
-      if (!res.ok) {
-        throw new Error(data.error || "Không thể mở trình duyệt cho tài khoản này.");
-      }
-      const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
-      setLoggedSlotsMap((previous) => ({ ...previous, [service.id]: hasAuthenticatedSession }));
-      if (hasAuthenticatedSession) {
-        notification.success("Đã xác minh cookie phiên và trang đích không còn yêu cầu đăng nhập.", "Đã Đăng Nhập");
-      } else {
-        notification.info(
-          "Profile chưa có phiên đăng nhập hợp lệ. Hãy đăng nhập trong cửa sổ vừa mở, sau đó bấm lại nút này để xác minh.",
-          "Chưa Xác Minh Đăng Nhập"
-        );
+
+      if (res.ok) {
+        const data = await res.json();
+        const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
+        setLoggedSlotsMap((previous) => ({ ...previous, [service.id]: hasAuthenticatedSession }));
+        if (hasAuthenticatedSession) {
+          notification.success("Đã xác minh phiên đăng nhập của tài khoản này.", "Đã Đăng Nhập");
+        }
       }
     } catch (err: any) {
-      console.error("Lỗi mở trình duyệt:", err);
-      notification.error(err.message || "Lỗi mở trình duyệt", "Đăng Nhập Thất Bại");
+      console.warn("Lưu ý probe session:", err);
     } finally {
       setOpeningSlotId(null);
     }
