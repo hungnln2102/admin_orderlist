@@ -67,6 +67,8 @@ function rawPostToTelegram(payload, eventType = 'GENERAL_MESSAGE') {
           "Content-Length": Buffer.byteLength(JSON.stringify(payload)),
         };
 
+    const meta = payload._meta || payload;
+
     const req = https.request(
       {
         hostname: "api.telegram.org",
@@ -82,23 +84,26 @@ function rawPostToTelegram(payload, eventType = 'GENERAL_MESSAGE') {
           data += chunk;
         });
         res.on("end", () => {
+          const displaySummary = meta.caption
+            ? meta.caption.substring(0, 50) + "..."
+            : (meta.text ? meta.text.substring(0, 50) + "..." : "Media");
           if (res.statusCode >= 200 && res.statusCode < 300) {
             getLogger().info("[TelegramClient] Gửi tin nhắn thành công!", { 
-              text: payload.text ? payload.text.substring(0, 50) + "..." : "Media",
-              thread: payload.message_thread_id 
+              text: displaySummary,
+              thread: meta.message_thread_id 
             });
             logNotification({
               eventType,
-              recipient: payload.message_thread_id || payload.chat_id,
-              content: payload.text || payload.caption || '[Photo/Media]',
+              recipient: meta.message_thread_id || meta.chat_id,
+              content: meta.caption || meta.text || '[Photo/Media]',
               status: 'SENT'
             });
             resolve(data);
           } else {
             logNotification({
               eventType,
-              recipient: payload.message_thread_id || payload.chat_id,
-              content: payload.text || payload.caption || '[Photo/Media]',
+              recipient: meta.message_thread_id || meta.chat_id,
+              content: meta.caption || meta.text || '[Photo/Media]',
               status: 'FAILED',
               errorMessage: `Telegram Error ${res.statusCode}: ${data}`
             });
@@ -141,6 +146,7 @@ function preparePayload(basePayload) {
     form.append("photo", basePayload.photo, { filename: "qr.png", contentType: "image/png" });
     if (basePayload.caption) form.append("caption", basePayload.caption);
     if (basePayload.parse_mode) form.append("parse_mode", basePayload.parse_mode);
+    form._meta = basePayload;
     return form;
   }
 
