@@ -134,8 +134,9 @@ function preparePayload(basePayload) {
     const FormData = require("form-data");
     const form = new FormData();
     if (basePayload.chat_id) form.append("chat_id", basePayload.chat_id);
-    if (basePayload.message_thread_id && Number.isFinite(basePayload.message_thread_id)) {
-      form.append("message_thread_id", basePayload.message_thread_id);
+    const threadId = Number(basePayload.message_thread_id);
+    if (Number.isFinite(threadId)) {
+      form.append("message_thread_id", threadId);
     }
     form.append("photo", basePayload.photo, { filename: "qr.png", contentType: "image/png" });
     if (basePayload.caption) form.append("caption", basePayload.caption);
@@ -145,7 +146,10 @@ function preparePayload(basePayload) {
 
   // Clean up message_thread_id for JSON payload too
   const finalPayload = { ...basePayload };
-  if (!Number.isFinite(finalPayload.message_thread_id)) {
+  const threadId = Number(finalPayload.message_thread_id);
+  if (Number.isFinite(threadId)) {
+    finalPayload.message_thread_id = threadId;
+  } else {
     delete finalPayload.message_thread_id;
   }
   return finalPayload;

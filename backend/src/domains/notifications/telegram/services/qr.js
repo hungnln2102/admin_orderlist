@@ -59,6 +59,7 @@ function buildSepayQrUrl({
 function buildQrProviderUrls({
   amount,
   addInfo,
+  description,
   accountName,
   bankCode,
   accountNumber,
@@ -72,10 +73,13 @@ function buildQrProviderUrls({
   const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
   const amountStr = hasAmount ? Math.round(numericAmount).toString() : "";
 
-  // V2: VietQR luôn dùng compact2.png và không dùng addInfo
+  const desc = String(description || addInfo || "").trim();
+
+  // V2: VietQR luôn dùng compact2.png và không dùng addInfo (hoặc thêm nếu có desc)
   const vietQrParams = new URLSearchParams();
   if (hasAmount) vietQrParams.set("amount", amountStr);
   if (name) vietQrParams.set("accountName", name);
+  if (desc) vietQrParams.set("addInfo", desc);
   const vietQrUrl = `https://img.vietqr.io/image/${bank}-${acc}-${VIETQR_IMAGE_TEMPLATE}.png${
     vietQrParams.toString() ? `?${vietQrParams.toString()}` : ""
   }`;
