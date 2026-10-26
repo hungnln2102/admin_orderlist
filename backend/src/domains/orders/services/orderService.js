@@ -295,7 +295,7 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
         WHEN status = '${ORDER_STATUS.PAID}' THEN 4
         ELSE 5
       END ASC,
-      COALESCE(order_date, created_at) DESC NULLS LAST,
+      expired_at ASC NULLS LAST,
       id DESC
     `)
     .limit(limit)
