@@ -5,7 +5,7 @@ const {
   buildDueOrderMessage, 
   buildExpiredOrderMessage 
 } = require("@/domains/notifications/telegram/builders/orderMessageBuilder");
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
 const { listBankAccounts } = require("@/domains/wallets/services/walletService");
 
 async function resolveDefaultShopBankAccount() {
@@ -108,7 +108,7 @@ async function sendBulkTelegramOrders(orders = [], config) {
         const productName = await resolveProductName(order.id_product);
         order = { ...order, productName };
       }
-      const text = messageBuilder(order, i + 1, total);
+      const text = messageBuilder(order, i + 1, total, defaultBank);
       const price = Number(order.price) || 0;
 
       await enqueueOrderMessage({
@@ -151,9 +151,9 @@ async function resolveProductName(rawProduct) {
   try {
     let variantRow = null;
     if (isNumeric) {
-      variantRow = await db("variant").where("id", num).first();
+      variantRow = await db(TABLES.VARIANT).where("id", num).first();
     } else {
-      variantRow = await db("variant")
+      variantRow = await db(TABLES.VARIANT)
         .where("display_name", str)
         .orWhere("variant_name", str)
         .first();
