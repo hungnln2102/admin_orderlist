@@ -284,9 +284,12 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     .orderByRaw(`
       CASE
         WHEN status = '${ORDER_STATUS.UNPAID}' THEN 1
-        WHEN status = '${ORDER_STATUS.RENEW_REQUIRED}' THEN 2
-        ELSE 3
-      END,
+        WHEN status = '${ORDER_STATUS.PROCESSING}' THEN 2
+        WHEN status = '${ORDER_STATUS.RENEW_REQUIRED}' THEN 3
+        WHEN status = '${ORDER_STATUS.PAID}' THEN 4
+        ELSE 5
+      END ASC,
+      COALESCE(order_date, created_at) DESC NULLS LAST,
       id DESC
     `)
     .limit(limit)
