@@ -51,6 +51,7 @@ interface StoreExpenseItem {
   bankAccountNumber: string | null;
   bankShortCode: string | null;
   bankDisplayName: string | null;
+  bankAccountScope?: string | null;
   receiptReferenceCode: string | null;
   status: string;
   createdAt: string;
@@ -59,6 +60,7 @@ interface StoreExpenseItem {
 interface ExpenseStats {
   totalAmount: number;
   externalImportTotal: number;
+  externalImportShopTotal?: number;
   monthlyExpenseTotal: number;
   totalCount: number;
 }
@@ -386,9 +388,13 @@ export const ExternalImportsPage: React.FC = () => {
             <div className="text-2xl font-black text-cyan-400 tracking-tight">
               {formatVND(stats.externalImportTotal)}
             </div>
-            <div className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Đã tự động trừ vào Lợi Nhuận Ngày</span>
+            <div className="text-[11px] text-slate-300 mt-1 flex flex-col gap-0.5">
+              <span className="text-emerald-400 font-medium">
+                🏦 TK Shop (Có BĐ Tháng): {formatVND(stats.externalImportShopTotal || 0)}
+              </span>
+              <span className="text-slate-400">
+                💵 Ví Cá Nhân (Ko BĐ Tháng): {formatVND(Math.max(0, stats.externalImportTotal - (stats.externalImportShopTotal || 0)))}
+              </span>
             </div>
           </div>
         </div>
@@ -566,18 +572,34 @@ export const ExternalImportsPage: React.FC = () => {
                       {/* Nguồn Chi / Tài khoản */}
                       <td className="py-3.5 px-4 text-slate-300 text-[11px]">
                         {item.shopBankAccountId && item.bankAccountNumber ? (
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
-                            <Landmark className="w-3.5 h-3.5" />
-                            <span>{item.bankShortCode || item.bankAccountLabel || "Ngân hàng"}</span>
-                            <span className="text-slate-400 font-mono text-[10px]">({item.bankAccountNumber})</span>
-                          </div>
+                          item.bankAccountScope === "SHOP" ? (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-medium">
+                              <Landmark className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>{item.bankShortCode || item.bankAccountLabel || "Ngân hàng"}</span>
+                              <span className="text-slate-400 font-mono text-[10px]">({item.bankAccountNumber})</span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-500/30 text-indigo-200 font-semibold uppercase ml-1">
+                                TK Shop: Có BĐ
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-medium">
+                              <Landmark className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{item.bankShortCode || item.bankAccountLabel || "Ví cá nhân"}</span>
+                              <span className="text-slate-400 font-mono text-[10px]">({item.bankAccountNumber})</span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-slate-700 text-slate-400 font-semibold ml-1">
+                                Ví Cá Nhân (Ko BĐ)
+                              </span>
+                            </div>
+                          )
                         ) : item.paymentReceiptId ? (
                           <span className="inline-flex items-center gap-1 text-emerald-400 font-mono">
                             <Receipt className="w-3.5 h-3.5" />
                             Biên lai #{item.paymentReceiptId}
                           </span>
                         ) : (
-                          <span className="text-slate-500 italic">Tiền mặt / Chi ngoài</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-400 italic text-[11px]">
+                            💵 Tiền mặt / Ví cá nhân (Không BĐ)
+                          </span>
                         )}
                       </td>
 
@@ -694,16 +716,38 @@ export const ExternalImportsPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, shop_bank_account_id: e.target.value })}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xs focus:outline-none focus:border-cyan-500 cursor-pointer appearance-none pr-8"
                   >
-                    <option value="">💵 Tiền mặt cá nhân / Không trừ ví hệ thống</option>
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        🏦 {acc.bankShortCode || acc.label} — {acc.accountNumber} ({formatVND(acc.balance)})
-                      </option>
-                    ))}
+                    <option value="">💵 Tiền mặt / Ví cá nhân (Không tính biến động tháng của Shop)</option>
+                    {accounts.map((acc) => {
+                      const isShop = acc.accountScope === "SHOP";
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {isShop ? "🏦" : "💼"} {acc.bankShortCode || acc.label} — {acc.accountNumber} ({formatVND(acc.balance)}) {isShop ? "[Tài Khoản Shop: Có Biến Động Tháng]" : "[Ví Cá Nhân: Không Biến Động]"}
+                        </option>
+                      );
+                    })}
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                     <ChevronDown className="w-4 h-4" />
                   </div>
+                </div>
+
+                {/* Ghi chú trực quan về biến động tháng theo chỉ đạo Master */}
+                <div className="mt-2 p-2 rounded-xl border text-[11px] space-y-1 bg-slate-950/60 border-slate-800">
+                  {selectedAccount?.accountScope === "SHOP" ? (
+                    <div className="flex items-start gap-1.5 text-amber-400">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>
+                        Khoản chi này dùng <b>Tài Khoản Shop</b>: Trừ trực tiếp két tiền Shop, tính vào chi phí nhập tháng và phát thông báo <b>Biến Động Tháng</b>.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1.5 text-slate-400">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-400" />
+                      <span>
+                        Khoản chi này dùng <b>Ví cá nhân / Tiền mặt</b>: Két tiền của Shop không bị trừ, <b>không tính biến động tháng</b> của Shop.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {selectedAccount && Number(formData.amount.replace(/\D/g, "")) > selectedAccount.balance && (
@@ -847,19 +891,40 @@ export const ExternalImportsPage: React.FC = () => {
 
               {/* Tài khoản chi */}
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Tài Khoản Chi Tiền</label>
+                <label className="block text-slate-400 mb-1 font-semibold">Tài Khoản Chi Tiền (Khấu Trừ Số Dư)</label>
                 <select
                   value={formData.shop_bank_account_id}
                   onChange={(e) => setFormData({ ...formData, shop_bank_account_id: e.target.value })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500 cursor-pointer"
                 >
-                  <option value="">💵 Tiền mặt cá nhân / Không trừ ví hệ thống</option>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      🏦 {acc.bankShortCode || acc.label} — {acc.accountNumber} ({formatVND(acc.balance)})
-                    </option>
-                  ))}
+                  <option value="">💵 Tiền mặt / Ví cá nhân (Không tính biến động tháng của Shop)</option>
+                  {accounts.map((acc) => {
+                    const isShop = acc.accountScope === "SHOP";
+                    return (
+                      <option key={acc.id} value={acc.id}>
+                        {isShop ? "🏦" : "💼"} {acc.bankShortCode || acc.label} — {acc.accountNumber} ({formatVND(acc.balance)}) {isShop ? "[Tài Khoản Shop: Có Biến Động Tháng]" : "[Ví Cá Nhân: Không Biến Động]"}
+                      </option>
+                    );
+                  })}
                 </select>
+
+                <div className="mt-2 p-2 rounded-xl border text-[11px] space-y-1 bg-slate-950/60 border-slate-800">
+                  {selectedAccount?.accountScope === "SHOP" ? (
+                    <div className="flex items-start gap-1.5 text-amber-400">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>
+                        Tài khoản này là <b>Tài Khoản Shop</b>: Có tính biến động tháng, trừ két tiền Shop và phát thông báo Telegram.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1.5 text-slate-400">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-400" />
+                      <span>
+                        Tài khoản này là <b>Ví cá nhân / Tiền mặt</b>: Không trừ két tiền Shop và <b>không tính biến động tháng</b>.
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Số tiền */}
@@ -982,11 +1047,21 @@ export const ExternalImportsPage: React.FC = () => {
               <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                 <span className="text-slate-400">Tài Khoản Chi / Nguồn Tiền:</span>
                 <span className="font-semibold text-emerald-400">
-                  {activeItem.shopBankAccountId && activeItem.bankAccountNumber
-                    ? `🏦 ${activeItem.bankShortCode || activeItem.bankAccountLabel} (${activeItem.bankAccountNumber})`
-                    : activeItem.paymentReceiptId
-                    ? `🧾 Biên lai #${activeItem.paymentReceiptId}`
-                    : "💵 Tiền mặt / Chi ngoài hệ thống"}
+                  {activeItem.shopBankAccountId && activeItem.bankAccountNumber ? (
+                    activeItem.bankAccountScope === "SHOP" ? (
+                      <span className="text-indigo-300">
+                        🏦 {activeItem.bankShortCode || activeItem.bankAccountLabel} ({activeItem.bankAccountNumber}) — [TK Shop: Có BĐ Tháng]
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">
+                        💼 {activeItem.bankShortCode || activeItem.bankAccountLabel} ({activeItem.bankAccountNumber}) — [Ví Cá Nhân: Ko BĐ Tháng]
+                      </span>
+                    )
+                  ) : activeItem.paymentReceiptId ? (
+                    `🧾 Biên lai #${activeItem.paymentReceiptId}`
+                  ) : (
+                    <span className="text-slate-400">💵 Tiền mặt / Ví cá nhân (Không BĐ Tháng)</span>
+                  )}
                 </span>
               </div>
 

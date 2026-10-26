@@ -121,12 +121,13 @@ async function getExpensesForRange(start, end) {
   const endDateStr = end.toISOString().slice(0, 10);
 
   const row = await db(TABLES.STORE_PROFIT_EXPENSES)
-    .whereRaw("expense_date >= ? AND expense_date <= ?", [startDateStr, endDateStr])
-    .where("status", "completed")
+    .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
+    .whereRaw(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date >= ? AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_date <= ?`, [startDateStr, endDateStr])
+    .where(`${TABLES.STORE_PROFIT_EXPENSES}.status`, "completed")
     .select(
-      db.raw("COALESCE(SUM(amount), 0)::numeric as total_expenses"),
-      db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('external_import', 'mavn_import') THEN amount ELSE 0 END), 0)::numeric as total_external_import"),
-      db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('monthly_expense', 'withdraw_profit') THEN amount ELSE 0 END), 0)::numeric as total_monthly_expense")
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_expenses`),
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_external_import`),
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_monthly_expense`)
     )
     .first();
 

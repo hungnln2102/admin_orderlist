@@ -306,14 +306,15 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     )
     .first();
 
-  // Chi phí nhập ngoài luồng & chi phí phát sinh tháng trong khoảng thời gian
+  // Chi phí nhập ngoài luồng (chỉ tính tài khoản Shop) & chi phí phát sinh tháng trong khoảng thời gian
   const expenseStats = await db(TABLES.STORE_PROFIT_EXPENSES)
-    .whereRaw("expense_date >= ? AND expense_date <= ?", [startDateStr, endDateStr])
-    .where("status", "completed")
+    .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
+    .whereRaw(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date >= ? AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_date <= ?`, [startDateStr, endDateStr])
+    .where(`${TABLES.STORE_PROFIT_EXPENSES}.status`, "completed")
     .select(
-      db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('external_import', 'mavn_import') THEN amount ELSE 0 END), 0)::numeric as total_external_import"),
-      db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('monthly_expense', 'withdraw_profit') THEN amount ELSE 0 END), 0)::numeric as total_monthly_expense"),
-      db.raw("COALESCE(SUM(amount), 0)::numeric as total_all_expenses")
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_external_import`),
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_monthly_expense`),
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_all_expenses`)
     )
     .first();
 
@@ -324,7 +325,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   const shopOrdersCount = Number(summaryStats?.count || 0);
   const shopRevenue = toNumber(summaryStats?.total_revenue || 0);
   const shopCogs = toNumber(summaryStats?.total_cost || 0);
-  // Lợi nhuận gộp đã trừ chi phí nhập ngoài luồng và chi phí biến đổi theo chỉ thị của Master:
+  // Lợi nhuận gộp đã trừ chi phí nhập ngoài luồng của Shop và chi phí biến đổi:
   const shopGrossProfit = shopRevenue - shopCogs - totalOperationalExpenses;
 
   // 4. Động cơ Điểm Hòa Vốn (Break-even Engine)
@@ -350,15 +351,16 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
         db.raw("COALESCE(total_shop_cost, 0)::numeric as daily_cost")
       ),
     db(TABLES.STORE_PROFIT_EXPENSES)
-      .whereRaw("expense_date >= ? AND expense_date <= ?", [startDateStr, endDateStr])
-      .where("status", "completed")
+      .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
+      .whereRaw(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date >= ? AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_date <= ?`, [startDateStr, endDateStr])
+      .where(`${TABLES.STORE_PROFIT_EXPENSES}.status`, "completed")
       .select(
-        db.raw("TO_CHAR(expense_date, 'YYYY-MM-DD') as day_str"),
-        db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('external_import', 'mavn_import') THEN amount ELSE 0 END), 0)::numeric as daily_external_import"),
-        db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('monthly_expense', 'withdraw_profit') THEN amount ELSE 0 END), 0)::numeric as daily_monthly_expense"),
-        db.raw("COALESCE(SUM(amount), 0)::numeric as daily_total_expense")
+        db.raw(`TO_CHAR(${TABLES.STORE_PROFIT_EXPENSES}.expense_date, 'YYYY-MM-DD') as day_str`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_external_import`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_monthly_expense`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_total_expense`)
       )
-      .groupBy("expense_date"),
+      .groupByRaw(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date`),
   ]);
 
   const dailyExpenseMap = new Map();

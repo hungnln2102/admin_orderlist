@@ -3,6 +3,9 @@
  * Quản lý chi phí nhập hàng ngoài luồng (external_import) và chi phí biến đổi phát sinh trong tháng (monthly_expense).
  */
 const { db, TABLES, withTransaction } = require("@/db");
+const { accumulateDailySummary } = require("@/domains/dashboard/services/dailySummaryService");
+const { financeNotifier } = require("@/domains/notifications/telegram");
+const { getVietnamDateString, getVietnamMonthString } = require("@/utils/time");
 
 const toNumber = (val) => {
   const n = Number(val);
@@ -72,18 +75,20 @@ async function listExpenses({ month, expenseType, search, page = 1, limit = 50 }
   }
 
   // 1. Thống kê tổng quan của bộ lọc (Promise.all)
-  const statsQuery = db(TABLES.STORE_PROFIT_EXPENSES);
+  const statsQuery = db(TABLES.STORE_PROFIT_EXPENSES)
+    .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`);
   if (month && /^\d{4}-\d{2}$/.test(month)) {
-    statsQuery.whereRaw("TO_CHAR(expense_date, 'YYYY-MM') = ?", [month]);
+    statsQuery.whereRaw(`TO_CHAR(${TABLES.STORE_PROFIT_EXPENSES}.expense_date, 'YYYY-MM') = ?`, [month]);
   }
 
   const [statsRes, countRes] = await Promise.all([
     statsQuery
       .select(
-        db.raw("COALESCE(SUM(amount), 0)::numeric as total_amount"),
-        db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('external_import', 'mavn_import') THEN amount ELSE 0 END), 0)::numeric as external_import_total"),
-        db.raw("COALESCE(SUM(CASE WHEN expense_type IN ('monthly_expense', 'withdraw_profit') THEN amount ELSE 0 END), 0)::numeric as monthly_expense_total"),
-        db.raw("COUNT(id)::int as total_count")
+        db.raw(`COALESCE(SUM(${TABLES.STORE_PROFIT_EXPENSES}.amount), 0)::numeric as total_amount`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as external_import_total`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as external_import_shop_total`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as monthly_expense_total`),
+        db.raw(`COUNT(${TABLES.STORE_PROFIT_EXPENSES}.id)::int as total_count`)
       )
       .first(),
     baseQuery.clone().count("id as count").first(),
@@ -111,7 +116,8 @@ async function listExpenses({ month, expenseType, search, page = 1, limit = 50 }
       `${TABLES.FINANCIAL_ACCOUNTS}.label as bank_account_label`,
       `${TABLES.FINANCIAL_ACCOUNTS}.account_number as bank_account_number`,
       `${TABLES.FINANCIAL_ACCOUNTS}.bank_short_code as bank_short_code`,
-      `${TABLES.FINANCIAL_ACCOUNTS}.bank_display_name as bank_display_name`
+      `${TABLES.FINANCIAL_ACCOUNTS}.bank_display_name as bank_display_name`,
+      `${TABLES.FINANCIAL_ACCOUNTS}.account_scope as bank_account_scope`
     )
     .orderBy(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date`, "desc")
     .orderBy(`${TABLES.STORE_PROFIT_EXPENSES}.id`, "desc")
@@ -133,6 +139,7 @@ async function listExpenses({ month, expenseType, search, page = 1, limit = 50 }
       bankAccountNumber: r.bank_account_number || null,
       bankShortCode: r.bank_short_code || null,
       bankDisplayName: r.bank_display_name || null,
+      bankAccountScope: r.bank_account_scope || null,
       receiptReferenceCode: r.receipt_reference_code || null,
       status: r.status,
       createdAt: r.created_at,
@@ -146,6 +153,7 @@ async function listExpenses({ month, expenseType, search, page = 1, limit = 50 }
     stats: {
       totalAmount: toNumber(statsRes?.total_amount || 0),
       externalImportTotal: toNumber(statsRes?.external_import_total || 0),
+      externalImportShopTotal: toNumber(statsRes?.external_import_shop_total || 0),
       monthlyExpenseTotal: toNumber(statsRes?.monthly_expense_total || 0),
       totalCount: Number(statsRes?.total_count || 0),
     },
@@ -177,10 +185,14 @@ async function createExpense(payload) {
 
   const accountIdNum = shop_bank_account_id ? Number(shop_bank_account_id) : null;
 
-  return withTransaction(async (trx) => {
-    // 1. Nếu có chọn tài khoản ngân hàng / ví: Gọi debitFinancialAccount để trừ số dư và ghi sổ cái
+  const result = await withTransaction(async (trx) => {
     let debitInfo = null;
+    let accountScope = null;
+
     if (accountIdNum) {
+      const acc = await trx(TABLES.FINANCIAL_ACCOUNTS).where({ id: accountIdNum }).first();
+      accountScope = acc?.account_scope || null;
+
       const { debitFinancialAccount } = require("@/domains/wallets/services/walletService");
       debitInfo = await debitFinancialAccount(trx, {
         accountId: accountIdNum,
@@ -190,7 +202,6 @@ async function createExpense(payload) {
       });
     }
 
-    // 2. Tạo bản ghi chi phí trong store_profit_expenses
     const [created] = await trx(TABLES.STORE_PROFIT_EXPENSES)
       .insert({
         amount: numAmount,
@@ -205,8 +216,39 @@ async function createExpense(payload) {
       })
       .returning("*");
 
-    return { ...created, debitInfo };
+    return { created, debitInfo, accountScope };
   });
+
+  const { created, debitInfo, accountScope } = result;
+
+  // Xử lý biến động tháng: CHỈ áp dụng nếu là nhập ngoài luồng từ TÀI KHOẢN SHOP
+  const isExternalImport = ["external_import", "mavn_import"].includes(created.expense_type);
+  const isShopAccount = accountScope === "SHOP";
+
+  if (isExternalImport && isShopAccount) {
+    try {
+      const dateStr = getVietnamDateString(created.expense_date);
+      const monthKey = getVietnamMonthString(dateStr);
+
+      await accumulateDailySummary(dateStr, {
+        total_shop_cost: numAmount,
+      });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey,
+        importDelta: numAmount,
+        profitDelta: -numAmount,
+        bankBalanceDelta: -numAmount,
+        context: `Nhập ngoài luồng #${created.id} (Tài khoản Shop): ${reason || ""}`,
+      });
+    } catch (notifyErr) {
+      console.error("[StoreProfitExpense] Lỗi cập nhật biến động tháng:", notifyErr.message);
+    }
+  } else if (isExternalImport) {
+    console.log(`ℹ️ [StoreProfitExpense] Khoản nhập ngoài luồng #${created.id} chi từ Ví cá nhân / Tiền mặt -> Không ghi nhận biến động tháng của Shop.`);
+  }
+
+  return { ...created, debitInfo };
 }
 
 /**
@@ -216,13 +258,19 @@ async function updateExpense(id, payload) {
   const targetId = Number(id);
   if (!targetId || isNaN(targetId)) throw new Error("ID không hợp lệ");
 
-  return withTransaction(async (trx) => {
+  const result = await withTransaction(async (trx) => {
     const existing = await trx(TABLES.STORE_PROFIT_EXPENSES)
       .where({ id: targetId })
       .forUpdate()
       .first();
 
     if (!existing) throw new Error("Không tìm thấy bản ghi chi phí để cập nhật");
+
+    let oldAccountScope = null;
+    if (existing.shop_bank_account_id) {
+      const acc = await trx(TABLES.FINANCIAL_ACCOUNTS).where({ id: existing.shop_bank_account_id }).select("account_scope").first();
+      oldAccountScope = acc?.account_scope || null;
+    }
 
     const updateData = { updated_at: trx.fn.now() };
 
@@ -245,6 +293,12 @@ async function updateExpense(id, payload) {
     if (payload.shop_bank_account_id !== undefined) {
       newAccountId = payload.shop_bank_account_id ? Number(payload.shop_bank_account_id) : null;
       updateData.shop_bank_account_id = newAccountId;
+    }
+
+    let newAccountScope = null;
+    if (newAccountId) {
+      const acc = await trx(TABLES.FINANCIAL_ACCOUNTS).where({ id: newAccountId }).select("account_scope").first();
+      newAccountScope = acc?.account_scope || null;
     }
 
     // Điều chỉnh số dư ngân hàng nếu có thay đổi về tài khoản hoặc số tiền
@@ -299,8 +353,39 @@ async function updateExpense(id, payload) {
       .update(updateData)
       .returning("*");
 
-    return updated;
+    return { updated, existing, oldAccountScope, newAccountScope };
   });
+
+  const { updated, existing, oldAccountScope, newAccountScope } = result;
+
+  // Tính chênh lệch biến động tháng của Shop
+  const wasShopImport = ["external_import", "mavn_import"].includes(existing.expense_type) && oldAccountScope === "SHOP";
+  const isNowShopImport = ["external_import", "mavn_import"].includes(updated.expense_type) && newAccountScope === "SHOP";
+
+  const oldCost = wasShopImport ? toNumber(existing.amount) : 0;
+  const newCost = isNowShopImport ? toNumber(updated.amount) : 0;
+  const costDelta = newCost - oldCost;
+
+  if (costDelta !== 0) {
+    try {
+      const dateStr = getVietnamDateString(updated.expense_date);
+      const monthKey = getVietnamMonthString(dateStr);
+
+      await accumulateDailySummary(dateStr, { total_shop_cost: costDelta });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey,
+        importDelta: costDelta,
+        profitDelta: -costDelta,
+        bankBalanceDelta: -costDelta,
+        context: `Điều chỉnh khoản chi #${targetId}: ${updated.reason || ""}`,
+      });
+    } catch (err) {
+      console.error("[StoreProfitExpense] Lỗi cập nhật biến động tháng khi sửa khoản chi:", err.message);
+    }
+  }
+
+  return updated;
 }
 
 /**
@@ -310,13 +395,19 @@ async function deleteExpense(id) {
   const targetId = Number(id);
   if (!targetId || isNaN(targetId)) throw new Error("ID không hợp lệ");
 
-  return withTransaction(async (trx) => {
+  const result = await withTransaction(async (trx) => {
     const existing = await trx(TABLES.STORE_PROFIT_EXPENSES)
       .where({ id: targetId })
       .forUpdate()
       .first();
 
     if (!existing) throw new Error("Không tìm thấy bản ghi chi phí để xóa");
+
+    let accountScope = null;
+    if (existing.shop_bank_account_id) {
+      const acc = await trx(TABLES.FINANCIAL_ACCOUNTS).where({ id: existing.shop_bank_account_id }).select("account_scope").first();
+      accountScope = acc?.account_scope || null;
+    }
 
     // Nếu khoản chi này trước đó đã trừ từ tài khoản ngân hàng, hoàn lại tiền (credit)
     if (existing.shop_bank_account_id && Number(existing.amount) > 0) {
@@ -331,8 +422,34 @@ async function deleteExpense(id) {
     }
 
     await trx(TABLES.STORE_PROFIT_EXPENSES).where({ id: targetId }).del();
-    return { success: true, id: targetId };
+    return { success: true, id: targetId, existing, accountScope };
   });
+
+  const { existing, accountScope } = result;
+
+  // Nếu là khoản nhập ngoài luồng từ tài khoản Shop, hoàn lại biến động tháng
+  const isShopImport = ["external_import", "mavn_import"].includes(existing.expense_type) && accountScope === "SHOP";
+  if (isShopImport && Number(existing.amount) > 0) {
+    try {
+      const amt = toNumber(existing.amount);
+      const dateStr = getVietnamDateString(existing.expense_date);
+      const monthKey = getVietnamMonthString(dateStr);
+
+      await accumulateDailySummary(dateStr, { total_shop_cost: -amt });
+
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey,
+        importDelta: -amt,
+        profitDelta: amt,
+        bankBalanceDelta: amt,
+        context: `Xóa khoản nhập ngoài luồng #${existing.id} (Hoàn trả Shop): ${existing.reason || ""}`,
+      });
+    } catch (err) {
+      console.error("[StoreProfitExpense] Lỗi cập nhật biến động tháng khi xóa khoản chi:", err.message);
+    }
+  }
+
+  return { success: true, id: targetId };
 }
 
 module.exports = {
