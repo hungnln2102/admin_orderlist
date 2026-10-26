@@ -29,6 +29,7 @@ export interface Order {
   vietqr_url?: string;
   bank_info?: {
     bank_name?: string;
+    bank_bin?: string;
     account_number?: string;
     account_holder?: string;
     type?: string;

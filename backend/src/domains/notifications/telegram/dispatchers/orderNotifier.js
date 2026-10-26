@@ -37,6 +37,7 @@ async function enqueueOrderMessage({ topicId, text, bank, price }) {
   if (price > 0 && bank?.accountNumber && (bank?.bankShortCode || bank?.bankBin)) {
     const qrResult = await fetchQrImageBytes({
       bankCode: bank.bankShortCode || bank.bankBin,
+      bankBin: bank.bankBin,
       accountNumber: bank.accountNumber,
       amount: price,
       accountName: bank.accountHolder || "",

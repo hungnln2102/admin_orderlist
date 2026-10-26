@@ -88,6 +88,7 @@ function buildQrProviderUrls({
   sepayParams.set("acc", acc);
   sepayParams.set("bank", bank);
   if (hasAmount) sepayParams.set("amount", amountStr);
+  sepayParams.set("template", "compact");
   if (desc) sepayParams.set("des", desc);
   const sepayUrl = `https://qr.sepay.vn/img?${sepayParams.toString()}`;
 
@@ -223,15 +224,113 @@ function httpsGetBuffer(url, options = {}) {
   });
 }
 
+const BANK_SHORT_CODE_TO_BIN = {
+  MB: "970422",
+  MBB: "970422",
+  TCB: "970407",
+  VCB: "970436",
+  ACB: "970416",
+  VPB: "970432",
+  TPB: "970423",
+  BIDV: "970418",
+  STB: "970403",
+  CTG: "970415",
+  AGR: "970405",
+  MSB: "970426",
+};
+
+/**
+ * Gọi trực tiếp API chính thức của VietQR để sinh ảnh PNG chuẩn 100% compact2 (kèm banner Napas & ngân hàng).
+ */
+async function fetchVietQrApiCompact2({
+  accountNumber,
+  accountName,
+  bankCode,
+  bankBin,
+  amount,
+  template = VIETQR_IMAGE_TEMPLATE,
+  timeoutMs = FETCH_TIMEOUT_MS,
+}) {
+  const rawBin = String(bankBin || "").trim();
+  const rawCode = String(bankCode || "").trim().toUpperCase();
+  const bin =
+    (rawBin.match(/^\d{6}$/) ? rawBin : null) ||
+    BANK_SHORT_CODE_TO_BIN[rawCode] ||
+    (rawCode.match(/^\d{6}$/) ? rawCode : null);
+
+  const acc = String(accountNumber || "").trim();
+  if (!bin || !acc) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch("https://api.vietqr.io/v2/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accountNo: acc,
+        accountName: String(accountName || "").trim(),
+        acqId: bin,
+        amount: Number(amount) || 0,
+        template: template || VIETQR_IMAGE_TEMPLATE,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.code === "00" && data?.data?.qrDataURL) {
+      const base64Data = data.data.qrDataURL.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      if (Buffer.isBuffer(buffer) && buffer.length > 0) {
+        return buffer;
+      }
+    }
+  } catch (_e) {
+    // Không ném lỗi để tự động chuyển sang provider tiếp theo
+  } finally {
+    clearTimeout(timer);
+  }
+  return null;
+}
+
 /**
  * Fetch QR ảnh theo thứ tự provider; trả về { buffer, sourceUrl, cached } đầu
  * tiên thành công. Có cache theo provider URL.
  *
- * @param {{ amount?: number, addInfo?: string, accountName?: string, bankCode?: string, accountNumber?: string }} args
+ * @param {{ amount?: number, addInfo?: string, accountName?: string, bankCode?: string, bankBin?: string, accountNumber?: string }} args
  * @param {{ timeoutMs?: number, deps?: { httpsGetBuffer?: typeof httpsGetBuffer }, providers?: string[] }} [options]
  * @returns {Promise<{ buffer: Buffer, sourceUrl: string, cached: boolean } | null>}
  */
 async function fetchQrImageBytes(args, options = {}) {
+  const cacheKey = `vietqr_compact2:${args.bankBin || args.bankCode}:${args.accountNumber}:${args.amount}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return { buffer: cached, sourceUrl: "vietqr_api_v2_cache", cached: true };
+  }
+
+  // 1. Ưu tiên gọi VietQR API v2 chính thức để lấy đúng mẫu compact2 chuẩn (PNG có đầy đủ logo Napas & ngân hàng)
+  if (!options.providers) {
+    try {
+      const vietQrBuf = await fetchVietQrApiCompact2({
+        accountNumber: args.accountNumber,
+        accountName: args.accountName,
+        bankCode: args.bankCode,
+        bankBin: args.bankBin,
+        amount: args.amount,
+        timeoutMs: options.timeoutMs ?? FETCH_TIMEOUT_MS,
+      });
+      if (vietQrBuf) {
+        cacheSet(cacheKey, vietQrBuf);
+        return { buffer: vietQrBuf, sourceUrl: "https://api.vietqr.io/v2/generate", cached: false };
+      }
+    } catch (_e) {
+      // Tiếp tục fallback qua các provider tiếp theo
+    }
+  }
+
+  // 2. Dự phòng qua provider URLs (Sepay, etc.)
   const providers =
     Array.isArray(options.providers) && options.providers.length > 0
       ? options.providers
@@ -243,9 +342,9 @@ async function fetchQrImageBytes(args, options = {}) {
 
   const errors = [];
   for (const url of providers) {
-    const cached = cacheGet(url);
-    if (cached) {
-      return { buffer: cached, sourceUrl: url, cached: true };
+    const cachedUrl = cacheGet(url);
+    if (cachedUrl) {
+      return { buffer: cachedUrl, sourceUrl: url, cached: true };
     }
     try {
       const buffer = await fetchFn(url, { timeoutMs });

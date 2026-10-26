@@ -27,12 +27,18 @@ async function getDefaultShopBank(trx) {
     return cachedDefaultBank;
   }
   const queryDb = trx || db;
-  let defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS).where({ is_default: true, is_active: true }).first();
+  let defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS)
+    .where({ account_type: "bank", is_deleted: false, is_default: true, is_active: true })
+    .first();
   if (!defaultBank) {
-    defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS).where({ is_active: true }).first();
+    defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS)
+      .where({ account_type: "bank", is_deleted: false, is_active: true })
+      .first();
   }
   if (!defaultBank) {
-    defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS).first();
+    defaultBank = await queryDb(TABLES.SHOP_BANK_ACCOUNTS)
+      .where({ account_type: "bank", is_deleted: false })
+      .first();
   }
   if (defaultBank) {
     cachedDefaultBank = defaultBank;
@@ -397,6 +403,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
     if (accNum) {
       defaultShopBankInfo = {
         bin,
+        bankBin: defaultBank.bank_bin || defaultBank.bankBin || bin,
         accNum,
         accName,
         bankName: defaultBank.bank_display_name || defaultBank.bankShortCode || bin,
@@ -435,6 +442,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       enriched.vietqr_url = `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`;
       enriched.bank_info = {
         bank_name: supplier.bin_bank || bin,
+        bank_bin: bin,
         account_number: accNum,
         account_holder: accName,
         type: "supplier",
@@ -444,6 +452,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       enriched.vietqr_url = `https://img.vietqr.io/image/${defaultShopBankInfo.bin}-${defaultShopBankInfo.accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(defaultShopBankInfo.accName)}`;
       enriched.bank_info = {
         bank_name: defaultShopBankInfo.bankName,
+        bank_bin: defaultShopBankInfo.bankBin,
         account_number: defaultShopBankInfo.accNum,
         account_holder: defaultShopBankInfo.accName,
         type: "shop",
@@ -552,6 +561,7 @@ async function attachVietQrToOrder(order, trx) {
           vietqr_url: `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`,
           bank_info: {
             bank_name: defaultBank.bank_display_name || defaultBank.bankShortCode || bin,
+            bank_bin: defaultBank.bank_bin || defaultBank.bankBin || bin,
             account_number: accNum,
             account_holder: accName,
             type: "shop",

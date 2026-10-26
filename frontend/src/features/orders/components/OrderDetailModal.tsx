@@ -68,7 +68,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const amountToPay = order.bank_info?.type === "supplier" ? Number(order.cost || order.price || 0) : Number(order.price || 0);
   const fallbackAccName = order.bank_info?.account_holder ? `&accountName=${encodeURIComponent(order.bank_info.account_holder)}` : "";
-  const vietQrUrl = order.vietqr_url || (order.id_order ? `https://img.vietqr.io/image/MB-970422-compact2.png?amount=${amountToPay}${fallbackAccName}` : null);
+  const bankBin = order.bank_info?.bank_bin || "970422";
+  const bankAcc = order.bank_info?.account_number || "0378304963";
+  const vietQrUrl = order.vietqr_url || (order.id_order ? `https://img.vietqr.io/image/${bankBin}-${bankAcc}-compact2.png?amount=${amountToPay}${fallbackAccName}` : null);
+  const sepayFallbackUrl = `https://qr.sepay.vn/img?acc=${bankAcc}&bank=${bankBin}&amount=${amountToPay}&template=compact`;
   const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(v);
 
   return (
@@ -103,14 +106,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
         {/* ── Body (2 Columns Side-by-Side) ── */}
         <div className="px-5 py-4 overflow-y-auto custom-scrollbar text-xs">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start min-w-0">
             
             {/* ─ Left Column: Order Form Details ─ */}
-            <div className="md:col-span-7 space-y-3">
+            <div className="md:col-span-7 space-y-3 min-w-0">
               {/* Product Title Banner */}
               {displayProduct && (
-                <div className="bg-slate-900/60 px-4 py-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="bg-slate-900/60 px-4 py-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <ShoppingBag className="w-4 h-4 text-cyan-400 shrink-0" />
                     <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold shrink-0">Sản Phẩm:</span>
                     <span className="text-cyan-300 font-bold text-[13px] truncate" title={displayProduct}>{displayProduct}</span>
@@ -119,33 +122,33 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               )}
 
               {/* Customer + Product Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                 {/* Customer */}
-                <div className="bg-slate-900/40 px-4 py-3 rounded-xl border border-slate-800/60 space-y-2">
+                <div className="bg-slate-900/40 px-4 py-3 rounded-xl border border-slate-800/60 space-y-2 min-w-0 overflow-hidden">
                   <div className="font-bold text-cyan-400 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
                     <User className="w-3 h-3" /> Khách Hàng
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-white font-bold text-[13px]">{order.customer || "Khách Vãng Lai"}</div>
-                    <div className="text-slate-400 text-[11px]">{order.contact || "Chưa có liên hệ"}</div>
+                  <div className="space-y-1 min-w-0">
+                    <div className="text-white font-bold text-[13px] break-words">{order.customer || "Khách Vãng Lai"}</div>
+                    <div className="text-slate-400 text-[11px] break-all">{order.contact || "Chưa có liên hệ"}</div>
                   </div>
                 </div>
 
                 {/* Product Info & Slot */}
-                <div className="bg-slate-900/40 px-4 py-3 rounded-xl border border-slate-800/60 space-y-2">
+                <div className="bg-slate-900/40 px-4 py-3 rounded-xl border border-slate-800/60 space-y-2 min-w-0 overflow-hidden">
                   <div className="font-bold text-cyan-400 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
                     <ShoppingBag className="w-3 h-3" /> Thông Tin Sản Phẩm
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     {order.information_order ? (
-                      <div className="text-cyan-300 font-bold text-[13px] leading-tight">{order.information_order}</div>
+                      <div className="text-cyan-300 font-bold text-[13px] leading-tight break-all">{order.information_order}</div>
                     ) : (
                       <div className="text-slate-500 text-[11px]">—</div>
                     )}
                     {order.slot && (
-                      <div className="inline-flex items-center gap-1 mt-1">
-                        <span className="text-[9px] text-slate-500">Slot:</span>
-                        <span className="font-mono text-cyan-400 text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/15 px-1.5 py-0.5 rounded">
+                      <div className="inline-flex items-center gap-1 mt-1 max-w-full">
+                        <span className="text-[9px] text-slate-500 shrink-0">Slot:</span>
+                        <span className="font-mono text-cyan-400 text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/15 px-1.5 py-0.5 rounded truncate max-w-full" title={order.slot}>
                           {order.slot}
                         </span>
                       </div>
@@ -261,6 +264,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                         src={vietQrUrl}
                         alt={`QR #${order.id_order}`}
                         className="w-[190px] h-[190px] object-contain rounded-lg"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (!target.dataset.fallback && sepayFallbackUrl) {
+                            target.dataset.fallback = "true";
+                            target.src = sepayFallbackUrl;
+                          }
+                        }}
                       />
                     </div>
                     <button

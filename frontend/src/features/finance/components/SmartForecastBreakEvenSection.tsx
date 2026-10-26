@@ -88,7 +88,8 @@ export const SmartForecastBreakEvenSection: React.FC<Props> = ({ breakEven, dail
   }, [breakEven.breakEvenTarget, breakEven.shopGrossProfit, chartData, currentDay, metrics.avgProfitPerDay]);
 
   const linePath = getSmoothPath(chart.points);
-  const areaPath = linePath ? `${linePath} L ${chart.points.at(-1)?.x},${chart.zeroY} L ${chart.points[0]?.x},${chart.zeroY} Z` : "";
+  const lastPoint = chart.points[chart.points.length - 1];
+  const areaPath = linePath ? `${linePath} L ${lastPoint?.x},${chart.zeroY} L ${chart.points[0]?.x},${chart.zeroY} Z` : "";
   const progress = Math.min(100, Math.max(0, breakEven.breakEvenPercent));
   const isPassed = breakEven.isBreakEvenPassed;
   const selectedIsFuture = selectedDay?.isFuture;
