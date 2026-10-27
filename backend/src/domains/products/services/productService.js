@@ -669,9 +669,16 @@ const getPackageProducts = async () => {
   if (targetAccounts.length > 0) {
     ordersList = await db(TABLES.ORDER_LIST)
       .select("id", "id_order", "id_product", "customer", "contact", "information_order", "slot", "status", "expired_at", "cost", "supply_id")
-      .whereNotIn("status", [ORDER_STATUS.CANCELED, ORDER_STATUS.REFUNDED, "Đã Xóa", "Đã Hủy", "Hoàn Tiền"])
+      .whereIn("status", [
+        ORDER_STATUS.PAID,
+        ORDER_STATUS.RENEW_REQUIRED,
+        "Đã Thanh Toán",
+        "Cần Gia Hạn",
+      ])
+      .whereRaw("(expired_at IS NULL OR expired_at::date >= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)")
       .whereNot("id_order", "ilike", "MAVN%")
       .whereRaw("LOWER(COALESCE(customer, '')) != 'mavryk'")
+      .whereRaw("LOWER(COALESCE(status, '')) NOT LIKE '%nhập hàng%'")
       .where((builder) => {
         targetAccounts.forEach((acc) => {
           builder.orWhereILike("information_order", `%${acc}%`);
@@ -700,10 +707,30 @@ const getPackageProducts = async () => {
     const matchingOrders = ordersList.filter((o) => {
       if (!r.account_info) return false;
 
-      // Tuyệt đối không khớp đơn nhập hàng MAVN hoặc khách Mavryk vào slot bán cho khách
+      // 1. Chỉ chấp nhận các đơn Đã Thanh Toán hoặc Cần Gia Hạn
+      const statusUpper = String(o.status || "").trim().toUpperCase();
+      const validStatuses = [
+        ORDER_STATUS.PAID,
+        ORDER_STATUS.RENEW_REQUIRED,
+        "ĐÃ THANH TOÁN",
+        "CẦN GIA HẠN",
+      ];
+      if (!validStatuses.includes(statusUpper)) return false;
+
+      // 2. Tuyệt đối không khớp đơn nhập hàng MAVN, khách Mavryk hoặc đơn có trạng thái nhập hàng
       const idOrder = String(o.id_order || "").toUpperCase();
       if (idOrder.startsWith("MAVN")) return false;
       if (String(o.customer || "").trim().toLowerCase() === "mavryk") return false;
+      if (String(o.status || "").toLowerCase().includes("nhập hàng")) return false;
+
+      // 3. Tuyệt đối không khớp đơn đã hết hạn theo mốc ngày thực tế
+      if (o.expired_at) {
+        const expDate = new Date(o.expired_at);
+        const now = new Date();
+        if (expDate.setHours(0, 0, 0, 0) < now.setHours(0, 0, 0, 0)) {
+          return false;
+        }
+      }
 
       const targetUser = r.account_info.toLowerCase();
       if (matchRule === "slot") {

@@ -89,18 +89,18 @@ export const OrderTable: React.FC<OrderTableProps> = ({
     <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl overflow-hidden flex flex-col w-full">
       {/* 1. Desktop & Laptop Table View */}
       <div className="hidden sm:block overflow-x-auto custom-scrollbar flex-1 min-h-[420px] w-full">
-        <table className="w-full min-w-[850px] border-collapse text-left">
+        <table className="w-full table-fixed border-collapse text-left">
           <thead>
             <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
-              <th className="py-3.5 px-3 w-10 text-center">#</th>
-              <th className="py-3.5 px-3 min-w-[140px]">Mã Đơn & Sản Phẩm</th>
-              <th className="py-3.5 px-3 min-w-[120px]">Khách Hàng & Liên Hệ</th>
-              <th className="py-3.5 px-3 min-w-[130px]">Thông Tin & Slot</th>
-              <th className="py-3.5 px-3 w-44 text-center whitespace-nowrap">Ngày Đăng Ký - Hết Hạn</th>
-              <th className="py-3.5 px-3 w-28 text-right whitespace-nowrap">Giá Bán</th>
-              {activeTab === "import" && <th className="py-3.5 px-3 w-24 text-right whitespace-nowrap">Giá Nhập</th>}
-              <th className="py-3.5 px-3 w-32 text-center whitespace-nowrap">Trạng Thái</th>
-              {showActions && <th className="py-3.5 px-3 w-28 text-right whitespace-nowrap">Thao Tác</th>}
+              <th className="py-3.5 px-2.5 w-10 text-center">#</th>
+              <th className={`py-3.5 px-3 ${activeTab === "import" ? "w-[20%]" : "w-[24%]"}`}>Mã Đơn & Sản Phẩm</th>
+              <th className={`py-3.5 px-3 ${activeTab === "import" ? "w-[16%]" : "w-[18%]"}`}>Khách Hàng & Liên Hệ</th>
+              <th className={`py-3.5 px-3 ${activeTab === "import" ? "w-[17%]" : "w-[19%]"}`}>Thông Tin & Slot</th>
+              <th className="py-3.5 px-2.5 w-[150px] text-center whitespace-nowrap">Ngày Đăng Ký - Hết Hạn</th>
+              <th className="py-3.5 px-2.5 w-24 text-right whitespace-nowrap">Giá Bán</th>
+              {activeTab === "import" && <th className="py-3.5 px-2.5 w-24 text-right whitespace-nowrap">Giá Nhập</th>}
+              <th className="py-3.5 px-2 w-28 text-center whitespace-nowrap">Trạng Thái</th>
+              {showActions && <th className="py-3.5 px-2 w-20 text-right whitespace-nowrap">Thao Tác</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -126,7 +126,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
             ) : (
               orders.map((order, idx) => {
                 const prefixConfig = getOrderPrefixConfig(order.id_order);
-                const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.information_order);
+                const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name);
                 const remainingDays = calculateRemainingDays(order);
                 const isExpanded = expandedRowId === order.id;
 
@@ -139,12 +139,11 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                   <React.Fragment key={order.id}>
                     <tr
                       onClick={() => toggleRow(order.id)}
-                      className={`hover:bg-slate-800/50 transition-colors group border-b border-slate-800/40 cursor-pointer ${
-                        isExpanded ? "bg-slate-800/60" : ""
-                      }`}
+                      className={`hover:bg-slate-800/50 transition-colors group border-b border-slate-800/40 cursor-pointer ${isExpanded ? "bg-slate-800/60" : ""
+                        }`}
                     >
                       {/* Index */}
-                      <td className="py-3.5 px-3 text-center text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                      <td className="py-3.5 px-2 text-center text-slate-500 font-mono text-[11px] whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
@@ -165,7 +164,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Order Code Badge & Product Name */}
-                      <td className="py-3.5 px-3 max-w-[180px]">
+                      <td className="py-3.5 px-3 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span
                             className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${prefixConfig.badgeBg} ${prefixConfig.badgeText} ${prefixConfig.badgeBorder} shadow-sm font-mono tracking-wider`}
@@ -173,32 +172,47 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                             #{order.id_order}
                           </span>
                         </div>
-                        <div className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors truncate text-xs">
+                        <div
+                          className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors truncate text-xs"
+                          title={String(displayProduct || order.id_product || "—")}
+                        >
                           {displayProduct || order.id_product || "—"}
                         </div>
                       </td>
 
                       {/* Customer & Contact */}
-                      <td className="py-3.5 px-3 max-w-[150px]">
-                        <div className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors truncate">
+                      <td className="py-3.5 px-3 min-w-0">
+                        <div
+                          className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors truncate"
+                          title={order.customer || "Khách Vãng Lai"}
+                        >
                           {order.customer || "Khách Vãng Lai"}
                         </div>
                         {order.contact && (
-                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                          <div
+                            className="text-[11px] text-slate-400 truncate mt-0.5"
+                            title={order.contact}
+                          >
                             {order.contact}
                           </div>
                         )}
                       </td>
 
                       {/* Order Information & Slot */}
-                      <td className="py-3.5 px-3 max-w-[170px]">
+                      <td className="py-3.5 px-3 min-w-0">
                         {order.information_order && (
-                          <div className="text-slate-200 truncate font-medium">
+                          <div
+                            className="text-slate-200 truncate font-medium"
+                            title={order.information_order}
+                          >
                             {order.information_order}
                           </div>
                         )}
                         {order.slot && (
-                          <div className="text-[10.5px] text-cyan-400/90 font-mono mt-0.5 truncate">
+                          <div
+                            className="text-[10.5px] text-cyan-400/90 font-mono mt-0.5 truncate"
+                            title={`Slot: ${order.slot}`}
+                          >
                             Slot: {order.slot}
                           </div>
                         )}
@@ -208,53 +222,52 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Registration & Expiration Dates */}
-                      <td className="py-3.5 px-3 text-center whitespace-nowrap w-44">
-                        <div className="text-slate-300 font-medium flex items-center justify-center gap-1 font-mono text-[11.5px]">
+                      <td className="py-3.5 px-2.5 text-center whitespace-nowrap">
+                        <div className="text-slate-300 font-medium flex items-center justify-center gap-1 font-mono text-[11px]">
                           <span>{formatDateDisplay(order.order_date || order.created_at)}</span>
                           <span className="text-slate-500 font-bold px-0.5">-</span>
                           <span className="text-amber-300 font-semibold">{formatDateDisplay(order.expired_at)}</span>
                         </div>
                         {activeTab !== "canceled" && (
                           <div
-                            className={`text-[10.5px] font-bold mt-0.5 ${
-                              remainingDays === 0
+                            className={`text-[10px] font-bold mt-0.5 ${remainingDays === 0
                                 ? "text-rose-400 font-extrabold animate-pulse"
                                 : remainingDays > 30
-                                ? "text-slate-400"
-                                : remainingDays > 0
-                                ? "text-amber-400 animate-pulse"
-                                : "text-rose-400"
-                            }`}
+                                  ? "text-slate-400"
+                                  : remainingDays > 0
+                                    ? "text-amber-400 animate-pulse"
+                                    : "text-rose-400"
+                              }`}
                           >
                             {remainingDays === 0
                               ? "Hôm nay hết hạn"
                               : remainingDays > 0
-                              ? `Còn ${remainingDays} ngày`
-                              : `Hết hạn ${Math.abs(remainingDays)} ngày`}
+                                ? `Còn ${remainingDays} ngày`
+                                : `Hết hạn ${Math.abs(remainingDays)} ngày`}
                           </div>
                         )}
                       </td>
 
                       {/* Selling Price */}
-                      <td className="py-3.5 px-3 text-right font-bold text-emerald-400 font-mono text-xs whitespace-nowrap w-28">
+                      <td className="py-3.5 px-2.5 text-right font-bold text-emerald-400 font-mono text-xs whitespace-nowrap">
                         {new Intl.NumberFormat("vi-VN").format(Number(order.price || 0))} ₫
                       </td>
 
                       {/* Import Cost (Only for Import tab) */}
                       {activeTab === "import" && (
-                        <td className="py-3.5 px-3 text-right font-semibold text-purple-300 font-mono text-xs whitespace-nowrap w-24">
+                        <td className="py-3.5 px-2.5 text-right font-semibold text-purple-300 font-mono text-xs whitespace-nowrap">
                           {new Intl.NumberFormat("vi-VN").format(Number(order.cost || 0))} ₫
                         </td>
                       )}
 
                       {/* Status Badge */}
-                      <td className="py-3.5 px-3 text-center whitespace-nowrap w-32">
+                      <td className="py-3.5 px-2 text-center whitespace-nowrap">
                         {renderStatusBadge(order.status)}
                       </td>
 
                       {/* Action Buttons */}
                       {showActions && (
-                        <td className="py-3.5 px-3 text-right whitespace-nowrap w-28">
+                        <td className="py-3.5 px-2 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => onOpenView(order)}
@@ -408,13 +421,12 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                               <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 text-center space-y-1 shadow-sm">
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CÒN THIẾU</div>
                                 <div
-                                  className={`font-bold text-xs font-mono ${
-                                    webhookDelta < 0
+                                  className={`font-bold text-xs font-mono ${webhookDelta < 0
                                       ? "text-rose-400"
                                       : webhookDelta > 0
-                                      ? "text-amber-400"
-                                      : "text-emerald-400"
-                                  }`}
+                                        ? "text-amber-400"
+                                        : "text-emerald-400"
+                                    }`}
                                 >
                                   {new Intl.NumberFormat("vi-VN").format(webhookDelta)} ₫
                                 </div>
@@ -463,7 +475,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
         ) : (
           orders.map((order) => {
             const prefixConfig = getOrderPrefixConfig(order.id_order);
-            const displayProduct = getDisplayProductName(order.id_product, productsCatalog);
+            const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name);
             const remainingDays = calculateRemainingDays(order);
 
             return (
@@ -520,21 +532,20 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                     </div>
                     {activeTab !== "canceled" && (
                       <div
-                        className={`text-[10.5px] font-bold ${
-                          remainingDays === 0
+                        className={`text-[10.5px] font-bold ${remainingDays === 0
                             ? "text-rose-400 font-extrabold animate-pulse"
                             : remainingDays > 30
-                            ? "text-slate-400"
-                            : remainingDays > 0
-                            ? "text-amber-400"
-                            : "text-rose-400"
-                        }`}
+                              ? "text-slate-400"
+                              : remainingDays > 0
+                                ? "text-amber-400"
+                                : "text-rose-400"
+                          }`}
                       >
                         {remainingDays === 0
                           ? "Hôm nay hết hạn"
                           : remainingDays > 0
-                          ? `Còn ${remainingDays} ngày`
-                          : `Hết hạn ${Math.abs(remainingDays)} ngày`}
+                            ? `Còn ${remainingDays} ngày`
+                            : `Hết hạn ${Math.abs(remainingDays)} ngày`}
                       </div>
                     )}
                   </div>

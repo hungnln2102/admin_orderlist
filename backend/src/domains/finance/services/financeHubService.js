@@ -229,23 +229,45 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   const diffTime = Math.abs(endDObj.getTime() - startDObj.getTime());
   const daysInMonth = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
-  // 1. Chi phí cố định (Fixed costs)
+  // 1. Chi phí cố định (Fixed costs) & Trạng thái thanh toán trong tháng
   const fixedCostRows = await db(TABLES.FIXED_COSTS)
     .select("*")
     .orderBy("id", "asc");
 
-  const fixedCosts = fixedCostRows.map((r) => ({
-    id: Number(r.id),
-    name: r.name,
-    amount: toNumber(r.amount),
-    category: r.category || "LIVING",
-    isActive: Boolean(r.is_active),
-    note: r.note || "",
-    createdAt: r.created_at,
-  }));
+  const fixedCostPaymentLogs = await db(TABLES.DEBT_PAYMENT_LOGS)
+    .where("target_type", "FIXED_COST")
+    .where("period_month", currentMonthStr);
+
+  const paymentLogMap = new Map();
+  fixedCostPaymentLogs.forEach((l) => paymentLogMap.set(Number(l.target_id), l));
+
+  const fixedCosts = fixedCostRows.map((r) => {
+    const paidLog = paymentLogMap.get(Number(r.id));
+    return {
+      id: Number(r.id),
+      name: r.name,
+      amount: toNumber(r.amount),
+      category: r.category || "LIVING",
+      isActive: Boolean(r.is_active),
+      note: r.note || "",
+      createdAt: r.created_at,
+      isPaidThisMonth: Boolean(paidLog),
+      paidDate: paidLog?.payment_date ? new Date(paidLog.payment_date).toISOString().slice(0, 10) : null,
+      paidAmount: paidLog ? toNumber(paidLog.amount) : 0,
+      paidLogId: paidLog ? Number(paidLog.id) : null,
+    };
+  });
 
   const activeFixedCostsTotal = fixedCosts
     .filter((f) => f.isActive)
+    .reduce((sum, f) => sum + f.amount, 0);
+
+  const unpaidFixedCostsTotal = fixedCosts
+    .filter((f) => f.isActive && !f.isPaidThisMonth)
+    .reduce((sum, f) => sum + f.amount, 0);
+
+  const paidFixedCostsTotal = fixedCosts
+    .filter((f) => f.isActive && f.isPaidThisMonth)
     .reduce((sum, f) => sum + f.amount, 0);
 
   // 2. Các khoản trả góp (Installments)
@@ -523,15 +545,15 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   const grandTotalAssets = shopBalanceTotal + personalSavingsTotal + personalCashBankTotal + personalInvestmentsTotal + personalDebtReceivableTotal;
 
   // Tổng nghĩa vụ nợ: Loại bỏ công nợ NCC theo chỉ thị Master (NCC đã ghi nhận trong chi phí đơn hàng/COGS)
-  // Chỉ ghi nhận 2 mục: Nợ & Trả Góp và Chi Phí Cố Định
+  // Chỉ ghi nhận 2 mục: Nợ & Trả Góp và Chi Phí Cố Định CHƯA THANH TOÁN (khoản đã trả thì nghĩa vụ = 0, chống double-counting)
   const totalDebtAndInstallments = totalInstallmentsRemainingDebt + personalDebtPayableTotal;
-  const shopLiabilities = totalInstallmentsRemainingDebt + activeFixedCostsTotal;
-  const totalLiabilities = totalDebtAndInstallments + activeFixedCostsTotal;
+  const shopLiabilities = totalInstallmentsRemainingDebt + unpaidFixedCostsTotal;
+  const totalLiabilities = totalDebtAndInstallments + unpaidFixedCostsTotal;
 
   // Tài sản ròng chuẩn mực: Tổng tài sản thực có - Tổng nghĩa vụ nợ
   // Không cộng thêm lợi nhuận tích lũy vì tiền lãi đơn hàng đã nằm trong số dư ngân hàng Shop (chống double-counting)
   const netWorthBase = grandTotalAssets - totalLiabilities;
-  const monthlyObligations = monthlyDebtBurden + activeFixedCostsTotal;
+  const monthlyObligations = monthlyDebtBurden + unpaidFixedCostsTotal;
   const baseNetWorth = netWorthBase;
 
   let cumulativeProfit = 0;
@@ -627,6 +649,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       totalMonthlyExpense,
       totalOperationalExpenses,
       activeFixedCostsTotal,
+      unpaidFixedCostsTotal,
+      paidFixedCostsTotal,
       installmentsInMonthTotal,
       scheduledInstallmentsMonthlyTotal,
       personalDebtMonthlyTotal,
@@ -647,6 +671,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
         personalDebtPayableTotal,
         totalInstallmentsRemainingDebt,
         activeFixedCostsTotal,
+        unpaidFixedCostsTotal,
+        paidFixedCostsTotal,
         totalDebtAndInstallments,
       },
     },
@@ -724,6 +750,122 @@ async function deleteFixedCost(id) {
   const res = await db(TABLES.FIXED_COSTS).where("id", id).del();
   if (res > 0) publishFixedCostMutation("DELETE", Number(id));
   return res;
+}
+
+async function payFixedCost(id, payload = {}) {
+  const { periodMonth, receiptId, financialAccountId, amount, note } = payload;
+  return await withTransaction(async (trx) => {
+    const fixedCost = await trx(TABLES.FIXED_COSTS).where("id", id).first();
+    if (!fixedCost) throw new Error("Không tìm thấy chi phí cố định");
+
+    const now = new Date();
+    const targetMonth = periodMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const numAmount = toNumber(amount) || toNumber(fixedCost.amount);
+
+    const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .where({ target_type: "FIXED_COST", target_id: id, period_month: targetMonth })
+      .first();
+
+    if (existingLog) {
+      throw new Error(`Khoản chi phí cố định "${fixedCost.name}" tháng ${targetMonth} đã được thanh toán trước đó!`);
+    }
+
+    if (receiptId) {
+      await allocateReceiptInTrx(
+        trx,
+        receiptId,
+        numAmount,
+        "FIXED_COST",
+        `FIXED_COST_${id}`,
+        note || `Thanh toán chi phí cố định "${fixedCost.name}" tháng ${targetMonth}`
+      );
+    } else if (financialAccountId) {
+      await debitFinancialAccount(trx, {
+        accountId: Number(financialAccountId),
+        amount: numAmount,
+        sourceKind: "fixed_cost_payment",
+        sourceId: `${id}_${targetMonth}`,
+        note: note || `Thanh toán chi phí cố định "${fixedCost.name}" tháng ${targetMonth}`,
+      });
+    }
+
+    const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .insert({
+        target_type: "FIXED_COST",
+        target_id: id,
+        period_month: targetMonth,
+        financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+        amount: numAmount,
+        payment_date: new Date().toISOString().slice(0, 10),
+        note: note || `Thanh toán chi phí cố định tháng ${targetMonth}`,
+      })
+      .returning("*");
+
+    publishFixedCostMutation("PAY", Number(id), fixedCost.name);
+
+    return { success: true, logId: Number(createdLog.id), periodMonth: targetMonth };
+  });
+}
+
+async function cancelFixedCostPayment(id, payload = {}) {
+  const { periodMonth } = payload;
+  return await withTransaction(async (trx) => {
+    const now = new Date();
+    const targetMonth = periodMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .where({ target_type: "FIXED_COST", target_id: id, period_month: targetMonth })
+      .first();
+
+    if (!existingLog) {
+      throw new Error(`Không tìm thấy giao dịch thanh toán tháng ${targetMonth} của khoản chi phí này`);
+    }
+
+    if (existingLog.financial_account_id) {
+      const { creditFinancialAccount } = require("@/domains/wallets/services/walletService");
+      await creditFinancialAccount(trx, {
+        accountId: Number(existingLog.financial_account_id),
+        amount: Number(existingLog.amount),
+        sourceKind: "fixed_cost_payment_reversal",
+        sourceId: `${id}_${targetMonth}`,
+        note: `Hoàn tiền hủy thanh toán chi phí cố định tháng ${targetMonth}`,
+      });
+    }
+
+    await trx(TABLES.DEBT_PAYMENT_LOGS)
+      .where({ id: existingLog.id })
+      .del();
+
+    publishFixedCostMutation("UNPAY", Number(id));
+
+    return { success: true };
+  });
+}
+
+async function getFixedCosts(month) {
+  const targetMonth = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const rows = await db(TABLES.FIXED_COSTS).select("*").orderBy("id", "asc");
+  const logs = await db(TABLES.DEBT_PAYMENT_LOGS)
+    .where("target_type", "FIXED_COST")
+    .where("period_month", targetMonth);
+  const logMap = new Map();
+  logs.forEach((l) => logMap.set(Number(l.target_id), l));
+
+  return rows.map((r) => {
+    const paidLog = logMap.get(Number(r.id));
+    return {
+      id: Number(r.id),
+      name: r.name,
+      amount: toNumber(r.amount),
+      category: r.category || "LIVING",
+      isActive: Boolean(r.is_active),
+      note: r.note || "",
+      isPaidThisMonth: Boolean(paidLog),
+      paidDate: paidLog?.payment_date ? new Date(paidLog.payment_date).toISOString().slice(0, 10) : null,
+      paidAmount: paidLog ? toNumber(paidLog.amount) : 0,
+      paidLogId: paidLog ? Number(paidLog.id) : null,
+    };
+  });
 }
 
 // --- CRUD INSTALLMENTS ---
@@ -1089,6 +1231,9 @@ module.exports = {
   createFixedCost,
   updateFixedCost,
   deleteFixedCost,
+  payFixedCost,
+  cancelFixedCostPayment,
+  getFixedCosts,
   createInstallment,
   updateInstallment,
   deleteInstallment,

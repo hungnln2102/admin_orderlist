@@ -446,6 +446,7 @@ export const FinanceHubPage: React.FC = () => {
                   onAdd={handleAddFixedCost}
                   onEdit={handleEditFixedCost}
                   onDelete={handleDeleteFixedCost}
+                  onRefresh={() => fetchData(month, period, year, startDate, endDate)}
                 />
               )}
 

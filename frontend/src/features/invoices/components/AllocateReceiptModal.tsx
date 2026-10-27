@@ -9,6 +9,7 @@ import {
   Receipt,
   Gift,
   PackagePlus,
+  DollarSign,
 } from "lucide-react";
 
 interface InvoiceReceipt {
@@ -34,7 +35,7 @@ interface AllocateReceiptModalProps {
   onSuccess: () => void;
 }
 
-type AllocationType = "ORDER" | "OPERATIONAL_EXPENSE" | "OTHER_INCOME" | "EXTERNAL_IMPORT";
+type AllocationType = "ORDER" | "OPERATIONAL_EXPENSE" | "OTHER_INCOME" | "EXTERNAL_IMPORT" | "FIXED_COST";
 
 export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   receipt,
@@ -48,6 +49,9 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   const [note, setNote] = useState<string>("");
   const [importId, setImportId] = useState<string>("");
   const [supplierName, setSupplierName] = useState<string>("");
+  const [fixedCosts, setFixedCosts] = useState<any[]>([]);
+  const [selectedFixedCostId, setSelectedFixedCostId] = useState<string>("");
+  const [loadingFixedCosts, setLoadingFixedCosts] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,10 +68,29 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       const isOut = receipt.transfer_type === "out";
 
       if (isOut) {
-        setAllocationType("OPERATIONAL_EXPENSE");
+        setAllocationType("FIXED_COST");
         setImportId(generateRandomImportId());
         setSupplierName(receipt.sender || "");
         setTargetCode("");
+        // Tự động nạp danh sách chi phí cố định để gợi ý khớp
+        setLoadingFixedCosts(true);
+        fetch("/api/finance/fixed-costs")
+          .then((res) => (res.ok ? res.json() : { items: [] }))
+          .then((data) => {
+            const items = (data.items || []).filter((i: any) => i.isActive);
+            setFixedCosts(items);
+            const matched = items.find((i: any) => Number(i.amount) === avail);
+            if (matched) {
+              setSelectedFixedCostId(String(matched.id));
+              setAllocationType("FIXED_COST");
+            } else if (items.length > 0) {
+              setSelectedFixedCostId(String(items[0].id));
+            } else {
+              setAllocationType("OPERATIONAL_EXPENSE");
+            }
+          })
+          .catch((err) => console.error("Lỗi nạp chi phí cố định:", err))
+          .finally(() => setLoadingFixedCosts(false));
       } else {
         setAllocationType("ORDER");
         setImportId("");
@@ -112,6 +135,11 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       return;
     }
 
+    if (allocationType === "FIXED_COST" && !selectedFixedCostId) {
+      setError("Vui lòng chọn Khoản chi phí cố định cần khớp.");
+      return;
+    }
+
     if (allocationType === "ORDER" && !targetCode.trim()) {
       setError("Vui lòng nhập Mã đơn hàng.");
       return;
@@ -129,7 +157,9 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         ? `[${supplierName.trim()}] ${note.trim()}`
         : (note.trim() || (allocationType === "OTHER_INCOME" ? "Khách tip / tặng thêm" : ""));
 
-      const finalTargetCode = allocationType === "EXTERNAL_IMPORT"
+      const finalTargetCode = allocationType === "FIXED_COST"
+        ? `FIXED_COST_${selectedFixedCostId}`
+        : allocationType === "EXTERNAL_IMPORT"
         ? (importId.trim() || generateRandomImportId())
         : (allocationType === "ORDER" ? targetCode.trim() : null);
 
@@ -242,25 +272,25 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                 {isOut ? 'TIỀN RA NGÂN HÀNG' : 'TIỀN VÀO NGÂN HÀNG'}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {isOut ? (
                 <>
-                  {/* OPERATIONAL_EXPENSE */}
+                  {/* FIXED_COST */}
                   <button
                     type="button"
-                    onClick={() => setAllocationType("OPERATIONAL_EXPENSE")}
-                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
-                      allocationType === "OPERATIONAL_EXPENSE"
-                        ? "bg-purple-500/10 border-purple-500/40 text-purple-300 shadow-md shadow-purple-950/40"
+                    onClick={() => setAllocationType("FIXED_COST")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      allocationType === "FIXED_COST"
+                        ? "bg-purple-500/15 border-purple-500/50 text-purple-300 shadow-md shadow-purple-950/40"
                         : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
-                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
                       <Building2 className="w-4 h-4 text-purple-400" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-slate-200">Chi Phí Vận Hành</div>
-                      <div className="text-[10px] text-slate-400">Server, ăn uống, chi ngoài</div>
+                      <div className="text-xs font-bold text-slate-200">Chi Phí Cố Định</div>
+                      <div className="text-[10px] text-slate-400">Server, mặt bằng, tool</div>
                     </div>
                   </button>
 
@@ -271,18 +301,37 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                       setAllocationType("EXTERNAL_IMPORT");
                       if (!importId) setImportId(generateRandomImportId());
                     }}
-                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
                       allocationType === "EXTERNAL_IMPORT"
-                        ? "bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md shadow-amber-950/40"
+                        ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-md shadow-amber-950/40"
                         : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
-                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
                       <PackagePlus className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-200">Nhập Ngoài Luồng</div>
                       <div className="text-[10px] text-slate-400">Mua nguồn, NCC ngoài</div>
+                    </div>
+                  </button>
+
+                  {/* OPERATIONAL_EXPENSE */}
+                  <button
+                    type="button"
+                    onClick={() => setAllocationType("OPERATIONAL_EXPENSE")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      allocationType === "OPERATIONAL_EXPENSE"
+                        ? "bg-rose-500/15 border-rose-500/50 text-rose-300 shadow-md shadow-rose-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+                      <DollarSign className="w-4 h-4 text-rose-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Chi Phí Đột Xuất</div>
+                      <div className="text-[10px] text-slate-400">Ăn uống, ngoài luồng</div>
                     </div>
                   </button>
                 </>
@@ -329,6 +378,38 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* FIXED_COST Fields (For Chi Phí Cố Định) */}
+          {allocationType === "FIXED_COST" && (
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-300">
+                CHỌN KHOẢN CHI PHÍ CỐ ĐỊNH CẦN KHỚP *
+              </label>
+              {loadingFixedCosts ? (
+                <div className="p-3 bg-slate-950/60 rounded-xl text-xs text-slate-400">Đang tải danh sách chi phí...</div>
+              ) : fixedCosts.length === 0 ? (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300">
+                  Chưa có khoản chi phí cố định nào đang kích hoạt trong Trung Tâm Tài Chính.
+                </div>
+              ) : (
+                <select
+                  value={selectedFixedCostId}
+                  onChange={(e) => setSelectedFixedCostId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-purple-300 font-semibold focus:outline-none focus:border-purple-500 text-xs"
+                >
+                  <option value="">-- Chọn khoản chi phí (Server, Mặt bằng, Tool...) --</option>
+                  {fixedCosts.map((f: any) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} • {formatCurrency(f.amount)} {f.isPaidThisMonth ? "✓ (Đã trả tháng này)" : "⚠️ (Chưa thanh toán)"}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-300">
+                💡 Khớp với Chi phí cố định sẽ bảo toàn 100% Tài Sản Ròng và không bị trừ double vào Lợi Nhuận P&L.
+              </div>
+            </div>
+          )}
 
           {/* Target Code Field (For ORDER) */}
           {allocationType === "ORDER" && (

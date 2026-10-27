@@ -18,12 +18,15 @@ import {
   XCircle,
 } from "lucide-react";
 import { FixedCostModal } from "./FixedCostModal";
+import { FixedCostPaymentModal } from "./FixedCostPaymentModal";
+import { CreditCard } from "lucide-react";
 
 interface Props {
   items: FixedCost[];
   onAdd: (payload: any) => Promise<void>;
   onEdit: (id: number, payload: any) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onRefresh?: () => void;
 }
 
 export const FixedCostList: React.FC<Props> = ({
@@ -31,10 +34,13 @@ export const FixedCostList: React.FC<Props> = ({
   onAdd,
   onEdit,
   onDelete,
+  onRefresh,
 }) => {
   const notify = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<FixedCost | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payingItem, setPayingItem] = useState<FixedCost | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<"ALL" | FixedCostCategory>("ALL");
 
   const handleOpenAdd = () => {
@@ -198,6 +204,7 @@ export const FixedCostList: React.FC<Props> = ({
                   <th className="py-3.5 px-4">Khoản Chi</th>
                   <th className="py-3.5 px-4">Phân Loại</th>
                   <th className="py-3.5 px-4 text-right">Số Tiền / Tháng</th>
+                  <th className="py-3.5 px-4 text-center">Thanh Toán Tháng Này</th>
                   <th className="py-3.5 px-4 text-center">Trạng Thái Tính Hòa Vốn</th>
                   <th className="py-3.5 px-4">Ghi Chú</th>
                   <th className="py-3.5 px-4 text-right">Thao Tác</th>
@@ -231,6 +238,30 @@ export const FixedCostList: React.FC<Props> = ({
 
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-300 text-sm">
                         {formatVND(item.amount)}
+                      </td>
+
+                      {/* Thanh toán tháng này */}
+                      <td className="py-3.5 px-4 text-center">
+                        {item.isPaidThisMonth ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Đã trả {item.paidDate ? `(ngày ${item.paidDate.split("-")[2]})` : ""}</span>
+                          </div>
+                        ) : item.isActive ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPayingItem(item);
+                              setPayModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm active:scale-95"
+                          >
+                            <CreditCard className="w-3 h-3 text-amber-400" />
+                            <span>Chưa trả • Thanh toán</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-600">—</span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
@@ -287,6 +318,20 @@ export const FixedCostList: React.FC<Props> = ({
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         editingItem={editingItem}
+      />
+
+      <FixedCostPaymentModal
+        isOpen={payModalOpen}
+        onClose={() => {
+          setPayModalOpen(false);
+          setPayingItem(null);
+        }}
+        fixedCost={payingItem}
+        onSuccess={() => {
+          notify.success(`Đã xác nhận thanh toán chi phí "${payingItem?.name}"`);
+          if (onRefresh) onRefresh();
+          else window.location.reload();
+        }}
       />
     </div>
   );

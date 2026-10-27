@@ -13,6 +13,10 @@ export interface FixedCost {
   isActive: boolean;
   note?: string;
   createdAt?: string;
+  isPaidThisMonth?: boolean;
+  paidDate?: string | null;
+  paidAmount?: number;
+  paidLogId?: number | null;
 }
 
 export type InstallmentStatus = "ACTIVE" | "COMPLETED" | "NOT_STARTED";
@@ -32,6 +36,10 @@ export interface Installment {
   isActive: boolean;
   note?: string;
   createdAt?: string;
+  isPaidThisMonth?: boolean;
+  paidDate?: string | null;
+  paidAmount?: number;
+  paidLogId?: number | null;
 }
 
 export type ProfitFrequency = "DAILY" | "MONTHLY" | "YEARLY";
@@ -80,6 +88,8 @@ export interface BreakEvenMetrics {
   remainingToBreakEven: number;
   isBreakEvenPassed: boolean;
   activeFixedCostsTotal: number;
+  unpaidFixedCostsTotal?: number;
+  paidFixedCostsTotal?: number;
   installmentsInMonthTotal: number;
   personalDebtMonthlyTotal: number;
   monthlyDebtBurden: number;
@@ -95,6 +105,8 @@ export interface NetWorthBreakdown {
   personalDebtPayableTotal: number;
   totalInstallmentsRemainingDebt: number;
   activeFixedCostsTotal?: number;
+  unpaidFixedCostsTotal?: number;
+  paidFixedCostsTotal?: number;
   totalDebtAndInstallments?: number;
 }
 

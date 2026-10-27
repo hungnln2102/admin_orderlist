@@ -247,8 +247,34 @@ async function allocateReceipt(receiptId, payload) {
       });
     }
 
-    // 4. Nếu gán cho Nhập ngoài luồng hoặc Chi phí tháng: Tự động ghi vào STORE_PROFIT_EXPENSES
-    if (resolvedAllocType === ALLOCATION_TYPE.EXTERNAL_IMPORT || resolvedAllocType === "EXTERNAL_IMPORT") {
+    // 4. Nếu gán cho Chi Phí Cố Định: Ghi nhận thanh toán vào DEBT_PAYMENT_LOGS (KHÔNG ghi vào STORE_PROFIT_EXPENSES để chống double-counting)
+    if (resolvedAllocType === "FIXED_COST" || (code && String(code).startsWith("FIXED_COST_"))) {
+      const fixedCostId = Number(String(code).replace("FIXED_COST_", ""));
+      if (fixedCostId && !isNaN(fixedCostId)) {
+        const paymentDate = receipt.payment_date
+          ? new Date(receipt.payment_date).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+        const periodMonth = paymentDate.slice(0, 7);
+
+        const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
+          .where({ target_type: "FIXED_COST", target_id: fixedCostId, period_month: periodMonth })
+          .first();
+
+        if (existingLog) {
+          throw new Error(`Khoản chi phí cố định này đã được thanh toán cho tháng ${periodMonth}!`);
+        }
+
+        await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+          target_type: "FIXED_COST",
+          target_id: fixedCostId,
+          period_month: periodMonth,
+          financial_account_id: receipt.financial_account_id || null,
+          amount: allocAmount,
+          payment_date: paymentDate,
+          note: note ? note.trim() : (receipt.note || `Thanh toán chi phí cố định từ Biên lai #${id}`),
+        });
+      }
+    } else if (resolvedAllocType === ALLOCATION_TYPE.EXTERNAL_IMPORT || resolvedAllocType === "EXTERNAL_IMPORT") {
       const expenseDate = receipt.payment_date
         ? new Date(receipt.payment_date).toISOString().slice(0, 10)
         : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

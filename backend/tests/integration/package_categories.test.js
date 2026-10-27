@@ -126,4 +126,63 @@ test("Package Categories Integration Tests (V2)", async (t) => {
     const delPkg = await productService.deletePackageProduct(newPkg.id);
     assert.equal(delPkg.success, true);
   });
+
+  await t.test("6. getPackageProducts slot matching only includes PAID and RENEW_REQUIRED with valid expired_at", async () => {
+    const { TABLES } = require("@/db");
+    const { ORDER_STATUS } = require("@/constants/orderStatus");
+
+    const testAccount = `slot_test_acc_${Date.now()}@domain.com`;
+    const createdPkg = await productService.createPackageProduct({
+      name: "TestSlotMatching",
+      category: "TestSlotMatching",
+      accountUsername: testAccount,
+      totalSlots: 5,
+      costPrice: 100000,
+      matchRule: "information",
+    });
+
+    // Tạo các đơn thử nghiệm:
+    // 1. Đơn PAID còn hạn -> PHẢI MATCH
+    // 2. Đơn RENEW_REQUIRED còn hạn -> PHẢI MATCH
+    // 3. Đơn EXPIRED -> KHÔNG ĐƯỢC MATCH
+    // 4. Đơn REFUNDED -> KHÔNG ĐƯỢC MATCH
+    // 5. Đơn MAVN (nhập hàng) -> KHÔNG ĐƯỢC MATCH
+    // 6. Đơn PAID nhưng đã quá hạn ngày (expired_at trong quá khứ) -> KHÔNG ĐƯỢC MATCH
+    const futureDate = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+    const pastDate = new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0];
+
+    const testOrders = [
+      { id_order: `MAVC_SLOT_VALID_1_${Date.now()}`, information_order: testAccount, status: ORDER_STATUS.PAID, expired_at: futureDate },
+      { id_order: `MAVC_SLOT_VALID_2_${Date.now()}`, information_order: testAccount, status: ORDER_STATUS.RENEW_REQUIRED, expired_at: futureDate },
+      { id_order: `MAVC_SLOT_EXPIRED_${Date.now()}`, information_order: testAccount, status: ORDER_STATUS.EXPIRED, expired_at: pastDate },
+      { id_order: `MAVC_SLOT_REFUND_${Date.now()}`, information_order: testAccount, status: ORDER_STATUS.REFUNDED, expired_at: futureDate },
+      { id_order: `MAVN_SLOT_IMPORT_${Date.now()}`, information_order: testAccount, status: ORDER_STATUS.PAID, expired_at: futureDate },
+      { id_order: `MAVC_SLOT_PAST_EXP_${Date.now()}`, information_order: testAccount, status: ORDER_STATUS.PAID, expired_at: pastDate },
+    ];
+
+    await db(TABLES.ORDER_LIST).insert(testOrders);
+
+    try {
+      const allPkgs = await productService.getPackageProducts();
+      const targetPkg = allPkgs.find((p) => p.id === createdPkg.id);
+
+      assert.ok(targetPkg, "Gói thử nghiệm phải tồn tại");
+      assert.equal(targetPkg.usedSlots, 2, "Chỉ có đúng 2 đơn hợp lệ (PAID & RENEW_REQUIRED còn hạn) được chiếm slot");
+      assert.equal(targetPkg.slotAssignments.length, 2, "Danh sách slotAssignments chỉ chứa 2 đơn hợp lệ");
+
+      const matchedCodes = targetPkg.slotAssignments.map((s) => s.orderCode);
+      assert.ok(matchedCodes.includes(testOrders[0].id_order), "Phải match đơn PAID còn hạn");
+      assert.ok(matchedCodes.includes(testOrders[1].id_order), "Phải match đơn RENEW_REQUIRED còn hạn");
+      assert.ok(!matchedCodes.includes(testOrders[2].id_order), "Tuyệt đối không match đơn EXPIRED");
+      assert.ok(!matchedCodes.includes(testOrders[3].id_order), "Tuyệt đối không match đơn REFUNDED");
+      assert.ok(!matchedCodes.includes(testOrders[4].id_order), "Tuyệt đối không match đơn nhập hàng MAVN");
+      assert.ok(!matchedCodes.includes(testOrders[5].id_order), "Tuyệt đối không match đơn PAID đã quá hạn thực tế");
+    } finally {
+      // Dọn dẹp dữ liệu test
+      await db(TABLES.ORDER_LIST).whereIn("id_order", testOrders.map((o) => o.id_order)).del();
+      await productService.deletePackageProduct(createdPkg.id);
+      await productService.deletePackageCategory("TestSlotMatching");
+    }
+  });
 });
+

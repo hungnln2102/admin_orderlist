@@ -57,6 +57,36 @@ async function deleteFixedCost(req, res, next) {
   }
 }
 
+async function getFixedCosts(req, res, next) {
+  try {
+    const { month } = req.query;
+    const items = await financeHubService.getFixedCosts(month);
+    return res.json({ success: true, items });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function payFixedCost(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const result = await financeHubService.payFixedCost(id, req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function cancelFixedCostPayment(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const result = await financeHubService.cancelFixedCostPayment(id, req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // --- INSTALLMENTS ---
 async function createInstallment(req, res, next) {
   try {
@@ -159,6 +189,9 @@ module.exports = {
   createFixedCost,
   updateFixedCost,
   deleteFixedCost,
+  getFixedCosts,
+  payFixedCost,
+  cancelFixedCostPayment,
   createInstallment,
   updateInstallment,
   deleteInstallment,

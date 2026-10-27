@@ -30,7 +30,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   if (!isOpen || !order) return null;
 
   const prefixConfig = getOrderPrefixConfig(order.id_order);
-  const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.information_order);
+  const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name);
   const remainingDays = calculateRemainingDays(order);
   const remainingValue = calculateRemainingValue(order);
 

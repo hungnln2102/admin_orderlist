@@ -8,9 +8,9 @@ export function useOrderCatalog() {
   const [loadingSuppliers, setLoadingSuppliers] = useState<boolean>(false);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
-  // Fetch product catalog and all suppliers catalog once on mount
+  // Fetch product catalog and all suppliers catalog once on mount (nạp đầy đủ kể cả sản phẩm đã ngừng bán)
   useEffect(() => {
-    fetch("/api/products/prices?limit=500&activeOnly=true")
+    fetch("/api/products/prices?limit=1000")
       .then((res) => res.json())
       .then((data) => {
         if (data.data) setProductsCatalog(data.data);

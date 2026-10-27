@@ -1115,21 +1115,6 @@ async function renewOrder(id, payload = {}) {
         .update(updateFields)
         .returning("*");
 
-      // A. Trừ lợi nhuận: Phát event ORDER_IMPORT_CREATED để tăng total_shop_cost và trừ lợi nhuận
-      if (renewCost > 0) {
-        emitOrderEvent(trx, EVENTS.ORDER_IMPORT_CREATED, {
-          orderId: updatedOrder.id,
-          id_order: updatedOrder.id_order,
-          orderCode: updatedOrder.id_order,
-          cost: renewCost,
-          order_date: trx.fn.now(),
-          created_at: trx.fn.now(),
-          customer: updatedOrder.customer,
-          action: "RENEW_IMPORT",
-          summary: `Gia hạn đơn nhập hàng #${updatedOrder.id_order}: ${formatMoney(renewCost)}`,
-        });
-      }
-
       // B. Quản lý công nợ NCC: Đối với Mavryk (chủ shop) thì KHÔNG TẠO LOG trong NCC
       const supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
       let isSupplierMavryk = false;

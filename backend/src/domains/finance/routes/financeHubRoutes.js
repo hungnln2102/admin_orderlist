@@ -11,9 +11,12 @@ router.get("/summary", financeHubController.getSummary);
 router.get("/unallocated-receipts", financeHubController.getUnallocatedReceipts);
 
 // Chi phí cố định (Fixed costs)
+router.get("/fixed-costs", financeHubController.getFixedCosts);
 router.post("/fixed-costs", financeHubController.createFixedCost);
 router.put("/fixed-costs/:id", financeHubController.updateFixedCost);
 router.delete("/fixed-costs/:id", financeHubController.deleteFixedCost);
+router.post("/fixed-costs/:id/pay", financeHubController.payFixedCost);
+router.delete("/fixed-costs/:id/pay", financeHubController.cancelFixedCostPayment);
 
 // Trả góp theo kỳ (Installments)
 router.post("/installments", financeHubController.createInstallment);
