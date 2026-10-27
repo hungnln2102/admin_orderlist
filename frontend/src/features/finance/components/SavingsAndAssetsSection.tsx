@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { PersonalAssetsModal } from "./PersonalAssetsModal";
 import { PersonalBankAccountModal } from "./PersonalBankAccountModal";
+import { PersonalFinanceBalanceLogSection } from "./PersonalFinanceBalanceLogSection";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
   onAdd: (payload: any) => Promise<void>;
   onEdit: (id: number, payload: any) => Promise<void>;
   onDelete: (item: any) => Promise<void>;
+  onRefresh?: () => void;
 }
 
 export const SavingsAndAssetsSection: React.FC<Props> = ({
@@ -39,7 +41,9 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   onAdd,
   onEdit,
   onDelete,
+  onRefresh,
 }) => {
+
   const navigate = useNavigate();
   const notify = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
@@ -411,8 +415,17 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
         </GlassCard>
       </div>
 
+      {/* 3. Nhật Ký Chốt Tài Chính & Stat Tròn Biến Động */}
+      <PersonalFinanceBalanceLogSection
+        assets={assets}
+        shopBalanceTotal={shopBalanceTotal}
+        onSyncComplete={onRefresh}
+      />
+
+
       {/* Modals */}
       <PersonalAssetsModal
+
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}

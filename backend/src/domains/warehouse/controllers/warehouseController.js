@@ -94,11 +94,33 @@ const updateWarehouseServiceSlot = async (req, res) => {
   }
 };
 
+const addServiceSlotToAccount = async (req, res) => {
+  try {
+    const result = await warehouseService.addServiceSlotToAccount(req.params.id, req.body);
+    return res.status(201).json(result);
+  } catch (err) {
+    console.error("[WarehouseController] addServiceSlotToAccount error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể thêm dịch vụ vào tài khoản kho.") });
+  }
+};
+
+const deleteWarehouseServiceSlot = async (req, res) => {
+  try {
+    const result = await warehouseService.deleteWarehouseServiceSlot(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] deleteWarehouseServiceSlot error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa slot dịch vụ kho.") });
+  }
+};
+
 module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
   deleteWarehouseAccount,
   updateWarehouseAccount,
+  addServiceSlotToAccount,
+  deleteWarehouseServiceSlot,
   updateWarehouseServiceSlot,
   getCatalogItems,
   createCatalogItem,

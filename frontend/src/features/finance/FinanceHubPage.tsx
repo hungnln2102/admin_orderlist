@@ -459,8 +459,10 @@ export const FinanceHubPage: React.FC = () => {
                   onAdd={handleAddPersonalAsset}
                   onEdit={handleEditPersonalAsset}
                   onDelete={handleDeletePersonalAsset}
+                  onRefresh={() => fetchData(month, period, year, startDate, endDate)}
                 />
               )}
+
             </div>
           </div>
         </div>

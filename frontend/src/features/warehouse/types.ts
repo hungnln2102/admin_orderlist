@@ -66,3 +66,14 @@ export interface CatalogFormData {
   category: string;
   loginUrl?: string;
 }
+
+export interface WarehouseAddServiceFormData {
+  serviceName: string;
+  category: string;
+  password: string;
+  backupEmail: string;
+  twoFa: string;
+  expiresAt: string;
+  status: WarehouseSlotStatus;
+  note: string;
+}

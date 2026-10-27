@@ -31,4 +31,11 @@ router.delete("/personal-assets/:id", financeHubController.deletePersonalAsset);
 router.post("/personal-assets/:id/pay", financeHubController.payPersonalAsset);
 router.post("/personal-assets/:id/borrow", financeHubController.borrowPersonalAsset);
 
+// Lịch sử chốt số dư tài chính cá nhân & Stat tròn (Personal balance snapshots)
+router.get("/personal-balance-snapshots", financeHubController.getPersonalBalanceSnapshots);
+router.post("/personal-balance-snapshots", financeHubController.createPersonalBalanceSnapshot);
+router.put("/personal-balance-snapshots/:id", financeHubController.updatePersonalBalanceSnapshot);
+router.delete("/personal-balance-snapshots/:id", financeHubController.deletePersonalBalanceSnapshot);
+
 module.exports = router;
+

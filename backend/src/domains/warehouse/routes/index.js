@@ -12,6 +12,8 @@ router.get("/catalog", controller.getCatalogItems);
 router.post("/catalog", controller.createCatalogItem);
 router.delete("/catalog/:id", controller.deleteCatalogItem);
 router.post("/accounts/:id/open-browser", controller.openAccountBrowser);
+router.post("/accounts/:id/services", controller.addServiceSlotToAccount);
 router.put("/services/:id", controller.updateWarehouseServiceSlot);
+router.delete("/services/:id", controller.deleteWarehouseServiceSlot);
 
 module.exports = router;

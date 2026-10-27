@@ -183,6 +183,48 @@ async function borrowPersonalAsset(req, res, next) {
   }
 }
 
+// --- PERSONAL BALANCE SNAPSHOTS & CIRCULAR STAT ---
+async function getPersonalBalanceSnapshots(req, res, next) {
+  try {
+    const data = await financeHubService.getPersonalBalanceSnapshots();
+    return res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function createPersonalBalanceSnapshot(req, res, next) {
+  try {
+    const created = await financeHubService.createPersonalBalanceSnapshot(req.body);
+    return res.status(201).json({ success: true, data: created });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updatePersonalBalanceSnapshot(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const updated = await financeHubService.updatePersonalBalanceSnapshot(id, req.body);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy bản ghi chốt số dư" });
+    }
+    return res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deletePersonalBalanceSnapshot(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    await financeHubService.deletePersonalBalanceSnapshot(id);
+    return res.json({ success: true, message: "Đã xóa bản ghi chốt số dư" });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getSummary,
   getUnallocatedReceipts,
@@ -201,4 +243,9 @@ module.exports = {
   deletePersonalAsset,
   payPersonalAsset,
   borrowPersonalAsset,
+  getPersonalBalanceSnapshots,
+  createPersonalBalanceSnapshot,
+  updatePersonalBalanceSnapshot,
+  deletePersonalBalanceSnapshot,
 };
+

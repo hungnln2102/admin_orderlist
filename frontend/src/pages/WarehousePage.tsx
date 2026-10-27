@@ -20,11 +20,13 @@ import {
   WarehouseSlotEditFormData,
   ServiceNameCategoryItem,
   WarehouseAccountFormData,
+  WarehouseAddServiceFormData,
   CatalogFormData,
   WarehouseFilterBar,
   WarehouseAccountsTable,
   WarehouseCatalogGrid,
   WarehouseCreateModal,
+  WarehouseAddServiceModal,
   WarehouseEditSlotModal,
   WarehouseEditAccountModal,
   CatalogCreateModal,
@@ -55,6 +57,8 @@ export const WarehousePage: React.FC = () => {
   const [deletingCatalogItem, setDeletingCatalogItem] = useState<ServiceNameCategoryItem | null>(null);
   const [isDeletingCatalog, setIsDeletingCatalog] = useState(false);
   const [editingAccount, setEditingAccount] = useState<WarehouseAccountItem | null>(null);
+  const [addingServiceAccount, setAddingServiceAccount] = useState<WarehouseAccountItem | null>(null);
+  const [isAddingService, setIsAddingService] = useState(false);
   const [editingSlotData, setEditingSlotData] = useState<{
     account: WarehouseAccountItem;
     slot: WarehouseServiceSlot;
@@ -315,6 +319,33 @@ export const WarehousePage: React.FC = () => {
     }
   };
 
+  const handleAddServiceSubmit = async (formData: WarehouseAddServiceFormData) => {
+    if (!addingServiceAccount) return;
+    setIsAddingService(true);
+    try {
+      const res = await fetch(`/api/warehouse/accounts/${addingServiceAccount.id}/services`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể thêm dịch vụ vào tài khoản");
+      }
+      notification.success(
+        `Đã thêm dịch vụ "${formData.serviceName}" vào tài khoản ${addingServiceAccount.account} thành công!`,
+        "Thêm dịch vụ kho"
+      );
+      setAddingServiceAccount(null);
+      await loadWarehouseData();
+    } catch (err: any) {
+      console.error("Lỗi thêm dịch vụ kho:", err);
+      notification.error(err.message || "Không thể thêm dịch vụ vào tài khoản");
+    } finally {
+      setIsAddingService(false);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto animate-fadeIn">
       {/* HEADER PAGE */}
@@ -455,8 +486,28 @@ export const WarehousePage: React.FC = () => {
           onToggleExpand={toggleExpand}
           onToggleShowPassword={toggleShowPassword}
           onCopy={copyToClipboard}
+          onAddService={(acc) => setAddingServiceAccount(acc)}
           onEditAccount={(acc) => setEditingAccount(acc)}
           onEditSlot={(acc, srv) => setEditingSlotData({ account: acc, slot: srv })}
+          onDeleteSlot={(acc, srv) =>
+            notification.confirm({
+              title: "Xóa dịch vụ kho?",
+              message: `Bạn có chắc muốn xóa dịch vụ "${srv.display_name || srv.category}" khỏi tài khoản ${acc.account}?`,
+              onConfirm: async () => {
+                try {
+                  const res = await fetch(`/api/warehouse/services/${srv.id}`, { method: "DELETE" });
+                  if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || "Lỗi xóa dịch vụ kho");
+                  }
+                  notification.success(`Đã xóa dịch vụ "${srv.display_name || srv.category}" thành công!`);
+                  await loadWarehouseData();
+                } catch (err: any) {
+                  notification.error(err.message || "Không thể xóa dịch vụ kho");
+                }
+              },
+            })
+          }
           onDeleteAccount={(acc) =>
             notification.confirm({
               title: "Xóa tài khoản kho?",
@@ -541,6 +592,16 @@ export const WarehousePage: React.FC = () => {
             notification.error(err.message || "Tạo dịch vụ thất bại");
           }
         }}
+      />
+
+      {/* MODAL ADD SERVICE TO ACCOUNT */}
+      <WarehouseAddServiceModal
+        open={!!addingServiceAccount}
+        account={addingServiceAccount}
+        catalogItems={catalog}
+        isSubmitting={isAddingService}
+        onClose={() => setAddingServiceAccount(null)}
+        onSubmit={handleAddServiceSubmit}
       />
 
       {/* MODAL DELETE CATALOG */}

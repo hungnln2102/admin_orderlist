@@ -4,6 +4,7 @@ import {
   Check,
   Pencil,
   Trash2,
+  PlusCircle,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -35,8 +36,10 @@ interface WarehouseAccountsTableProps {
   onToggleExpand: (id: number) => void;
   onToggleShowPassword: (serviceId: number) => void;
   onCopy: (text: string, label: string, keyId: string) => void;
+  onAddService?: (acc: WarehouseAccountItem) => void;
   onEditAccount: (acc: WarehouseAccountItem) => void;
   onEditSlot?: (account: WarehouseAccountItem, slot: WarehouseServiceSlot) => void;
+  onDeleteSlot?: (account: WarehouseAccountItem, slot: WarehouseServiceSlot) => void;
   onDeleteAccount: (acc: WarehouseAccountItem) => void;
   onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   loggedSlotsMap?: Record<number, boolean>;
@@ -138,8 +141,10 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
   onToggleExpand,
   onToggleShowPassword,
   onCopy,
+  onAddService,
   onEditAccount,
   onEditSlot,
+  onDeleteSlot,
   onDeleteAccount,
   onOpenBrowser,
   loggedSlotsMap,
@@ -433,6 +438,19 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                             </div>
 
                             <div className="flex items-center gap-2">
+                              {/* NÚT THÊM DỊCH VỤ VÀO TÀI KHOẢN */}
+                              {onAddService && (
+                                <button
+                                  type="button"
+                                  onClick={() => onAddService(account)}
+                                  className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-2 text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm shadow-indigo-500/10"
+                                  title="Thêm một slot dịch vụ mới vào tài khoản này"
+                                >
+                                  <PlusCircle className="h-3.5 w-3.5" />
+                                  <span>Thêm dịch vụ</span>
+                                </button>
+                              )}
+
                               {/* NÚT SỬA TÀI KHOẢN GỐC */}
                               <button
                                 type="button"
@@ -509,6 +527,16 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                           Master có thể chỉnh sửa tên/email tài khoản gốc hoặc xóa tài khoản này khỏi kho hàng.
                                         </p>
                                         <div className="flex items-center gap-2.5 mt-2">
+                                          {onAddService && (
+                                            <button
+                                              type="button"
+                                              onClick={() => onAddService(account)}
+                                              className="px-3.5 py-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-xs font-semibold text-indigo-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-indigo-500/10"
+                                            >
+                                              <PlusCircle className="h-3.5 w-3.5" />
+                                              <span>Thêm dịch vụ</span>
+                                            </button>
+                                          )}
                                           <button
                                             type="button"
                                             onClick={() => onEditAccount(account)}
@@ -759,10 +787,14 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                             type="button"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              onDeleteAccount(account);
+                                              if (onDeleteSlot) {
+                                                onDeleteSlot(account, srv);
+                                              } else {
+                                                onDeleteAccount(account);
+                                              }
                                             }}
                                             className="flex h-7 w-7 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all cursor-pointer"
-                                            title="Xóa tài khoản kho"
+                                            title="Xóa dịch vụ này khỏi tài khoản"
                                           >
                                             <Trash2 className="w-3.5 h-3.5" />
                                           </button>
@@ -885,7 +917,15 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-
+                      {onAddService && (
+                        <button
+                          type="button"
+                          onClick={() => onAddService(account)}
+                          className="rounded-lg bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-1 text-[11px] font-semibold text-indigo-300"
+                        >
+                          + Dịch vụ
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -995,10 +1035,14 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDeleteAccount(account);
+                                  if (onDeleteSlot) {
+                                    onDeleteSlot(account, srv);
+                                  } else {
+                                    onDeleteAccount(account);
+                                  }
                                 }}
                                 className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all cursor-pointer"
-                                title="Xóa tài khoản"
+                                title="Xóa dịch vụ này khỏi tài khoản"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>

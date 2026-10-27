@@ -3,6 +3,7 @@ export * from "./components/WarehouseFilterBar";
 export * from "./components/WarehouseAccountsTable";
 export * from "./components/WarehouseCatalogGrid";
 export * from "./components/WarehouseCreateModal";
+export * from "./components/WarehouseAddServiceModal";
 export * from "./components/WarehouseEditSlotModal";
 export * from "./components/WarehouseEditAccountModal";
 export * from "./components/CatalogCreateModal";

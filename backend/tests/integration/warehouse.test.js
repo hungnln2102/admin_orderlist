@@ -143,7 +143,7 @@ test("Warehouse Integration Tests (V2)", async (t) => {
     });
 
     const accounts = await warehouseService.listWarehouseAccounts();
-    const foundAcc = accounts.find((a) => a.id === acc.id);
+    const foundAcc = accounts.find((a) => Number(a.id) === Number(acc.id));
     assert.ok(foundAcc, "Account should be created");
     assert.ok(foundAcc.services.length > 0, "Account should have 1 service slot");
     const slot = foundAcc.services[0];
@@ -165,6 +165,57 @@ test("Warehouse Integration Tests (V2)", async (t) => {
     assert.equal(updated.note, "Updated via slot edit modal");
 
     // Cleanup
+    await warehouseService.deleteWarehouseAccount(acc.id);
+  });
+
+  await t.test("7. addServiceSlotToAccount and deleteWarehouseServiceSlot lifecycle", async () => {
+    // 7.1. Create a base account with 1 service
+    const baseEmail = `multiservice_${Date.now()}@test.com`;
+    const acc = await warehouseService.createWarehouseAccount({
+      account: baseEmail,
+      serviceName: "Mail",
+      password: "mail_pass_123",
+    });
+
+    assert.ok(acc.id);
+
+    // 7.2. Add a second service slot (Adobe) to this exact account
+    const addedSlot = await warehouseService.addServiceSlotToAccount(acc.id, {
+      serviceName: "Adobe All Apps 12M Slot",
+      password: "adobe_pass_999",
+      backupEmail: "backup_adobe@test.com",
+      twoFa: "JBSWY3DPEHPK3PXP",
+      expiresAt: "2027-12-31",
+      status: "AVAILABLE",
+      note: "Added via addServiceSlotToAccount",
+    });
+
+    assert.ok(addedSlot.id);
+    assert.equal(Number(addedSlot.account_id), Number(acc.id));
+    assert.equal(addedSlot.display_name, "Adobe All Apps 12M Slot");
+    assert.equal(addedSlot.password, "adobe_pass_999");
+    assert.equal(addedSlot.status, "AVAILABLE");
+
+    // 7.3. Verify that listWarehouseAccounts shows 2 services under the same account
+    const list = await warehouseService.listWarehouseAccounts();
+    const foundAcc = list.find((a) => Number(a.id) === Number(acc.id));
+    assert.ok(foundAcc);
+    assert.equal(foundAcc.services.length, 2, "Account must now have exactly 2 service slots");
+    assert.ok(foundAcc.services.some((s) => s.display_name === "Mail"));
+    assert.ok(foundAcc.services.some((s) => s.display_name === "Adobe All Apps 12M Slot"));
+
+    // 7.4. Delete just the newly added service slot
+    const delSlotRes = await warehouseService.deleteWarehouseServiceSlot(addedSlot.id);
+    assert.equal(delSlotRes.success, true);
+    assert.equal(delSlotRes.remainingSlots, 1);
+
+    // 7.5. Verify account still exists with remaining 1 service
+    const listAfterSlotDel = await warehouseService.listWarehouseAccounts();
+    const foundAccAfter = listAfterSlotDel.find((a) => Number(a.id) === Number(acc.id));
+    assert.ok(foundAccAfter, "Account must still exist");
+    assert.equal(foundAccAfter.services.length, 1, "Only 1 service remaining");
+
+    // 7.6. Cleanup account
     await warehouseService.deleteWarehouseAccount(acc.id);
   });
 });

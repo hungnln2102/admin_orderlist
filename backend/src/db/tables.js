@@ -62,7 +62,9 @@ const TABLES = {
   DEBT_PAYMENT_LOGS: formatTable(SCHEMAS.FINANCE, "debt_payment_logs"),
   EXTERNAL_API_CONFIGS: formatTable(SCHEMAS.SYSTEM, "external_api_configs"),
   STORE_PROFIT_EXPENSES: formatTable(SCHEMAS.FINANCE, "store_profit_expenses"),
+  PERSONAL_BALANCE_SNAPSHOTS: formatTable(SCHEMAS.FINANCE, "personal_balance_snapshots"),
 };
+
 
 const COLS = {
   USERS: {
@@ -339,7 +341,23 @@ const COLS = {
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },
+  PERSONAL_BALANCE_SNAPSHOTS: {
+    ID: "id",
+    SNAPSHOT_DATE: "snapshot_date",
+    TOTAL_BALANCE: "total_balance",
+    PERSONAL_BALANCE: "personal_balance",
+    SHOP_BALANCE: "shop_balance",
+    PREVIOUS_BALANCE: "previous_balance",
+    DELTA_AMOUNT: "delta_amount",
+    DELTA_PERCENT: "delta_percent",
+    BALANCES_DETAIL: "balances_detail",
+    NOTE: "note",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
 };
+
+
 
 module.exports = {
   SCHEMAS,
