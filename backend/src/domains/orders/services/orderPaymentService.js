@@ -80,12 +80,35 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     .update(updateFields)
     .returning("*");
 
+  // Ghi nhận chi phí nhập NCC khi gia hạn thành công (chu kỳ mới)
+  let supplierCostInserted = false;
+  const importCost = Number(order.cost || 0);
+  const supplyId = order.supply_id ? Number(order.supply_id) : null;
+  if (isRenewal && importCost > 0 && supplyId) {
+    const supplier = await trx(TABLES.SUPPLIER).where({ id: supplyId }).first();
+    const isSupplierMavryk = supplier && String(supplier.supplier_name || "").trim().toLowerCase() === "mavryk";
+
+    if (!isSupplierMavryk) {
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+        order_list_id: updatedOrder.id,
+        supply_id: supplyId,
+        id_order: updatedOrder.id_order,
+        import_cost: importCost,
+        refund_amount: 0,
+        ncc_payment_status: "Chưa Thanh Toán",
+        logged_at: trx.fn.now(),
+      });
+      supplierCostInserted = true;
+    }
+  }
+
   trx.afterCommit(() => {
     eventBus.emit(EVENTS.ORDER_PAID, {
       orderId: updatedOrder.id,
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
       amount,
+      cost: importCost,
       status: updatedOrder.status,
       receiptId,
       isRenewal,
@@ -101,7 +124,22 @@ async function processOrderPayment(trx, order, amount, options = {}) {
         newExpiredAt: updatedOrder.expired_at,
         receiptId,
         action,
+        productName: updatedOrder.product_name || updatedOrder.package_name || updatedOrder.id_product,
+        slot: updatedOrder.slot,
+        information_order: updatedOrder.information_order,
+        price: amount,
+        cost: importCost,
       });
+
+      if (supplierCostInserted) {
+        eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+          cost: importCost,
+          supplier_id: supplyId,
+          order_id: updatedOrder.id,
+          id_order: updatedOrder.id_order,
+          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${importCost} ₫`,
+        });
+      }
     }
   });
 

@@ -22,7 +22,16 @@ RUN npm ci --omit=dev
 
 # Cài đặt Chromium cho Playwright (mở kho tự động và kiểm tra dịch vụ)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    npx playwright install --with-deps chromium
+    npx playwright install --with-deps chromium \
+ && if [ -d /root/.cache/ms-playwright/chromium-1248 ] && [ ! -e /root/.cache/ms-playwright/chromium-1208 ]; then \
+      ln -s /root/.cache/ms-playwright/chromium-1248 /root/.cache/ms-playwright/chromium-1208; \
+    fi \
+ && if [ -d /root/.cache/ms-playwright/chromium_headless_shell-1248 ] && [ ! -e /root/.cache/ms-playwright/chromium_headless_shell-1208 ]; then \
+      ln -s /root/.cache/ms-playwright/chromium_headless_shell-1248 /root/.cache/ms-playwright/chromium_headless_shell-1208; \
+    fi \
+ && if [ -d /root/.cache/ms-playwright/ffmpeg-1013 ] && [ ! -e /root/.cache/ms-playwright/ffmpeg-1011 ]; then \
+      ln -s /root/.cache/ms-playwright/ffmpeg-1013 /root/.cache/ms-playwright/ffmpeg-1011; \
+    fi
 
 COPY . .
 

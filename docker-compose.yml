@@ -77,6 +77,8 @@ services:
     ports:
       - "127.0.0.1:3001:3001"   # Main API
       - "127.0.0.1:5000:3001"   # Webhook port (forward trực tiếp vào backend để tương thích Nginx host)
+    volumes:
+      - ./warehouse_profiles:/root/.admin_orderlist/warehouse_browser_profiles
     networks:
       - app-network
     healthcheck:
@@ -114,6 +116,36 @@ services:
         limits:
           memory: 128M
           cpus: '0.5'
+
+  # ==========================================
+  # 5. CLOUD BROWSER (KasmVNC Web-Streamed Chromium)
+  # Phục vụ đăng nhập tài khoản kho trực tiếp trên Web & lưu Profile vĩnh viễn
+  # ==========================================
+  cloud-browser:
+    container_name: admin_orderlist-cloud-browser
+    image: lscr.io/linuxserver/chromium:latest
+    restart: always
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Ho_Chi_Minh
+      - CUSTOM_USER=admin
+      - PASSWORD=mavryk_store_cloud_2026
+      - CHROME_CLI=--no-sandbox --disable-dev-shm-usage https://account.adobe.com
+    volumes:
+      - ./warehouse_profiles:/config
+    ports:
+      - "127.0.0.1:3088:3000"
+    shm_size: "1gb"
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
 
 # ==========================================
 # NETWORKS & VOLUMES

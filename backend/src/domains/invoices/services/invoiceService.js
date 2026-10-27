@@ -213,6 +213,11 @@ async function allocateReceipt(receiptId, payload) {
       if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING].includes(order.status)) {
         throw new Error(`Đơn hàng ${code} đang ở trạng thái ${order.status}, không thể phân bổ thanh toán.`);
       }
+
+      const orderPrice = Number(order.price || order.gross_selling_price || 0);
+      if (orderPrice > 0 && allocAmount > orderPrice) {
+        throw new Error(`Số tiền phân bổ (${allocAmount.toLocaleString("vi-VN")} ₫) vượt quá giá trị đơn hàng (${orderPrice.toLocaleString("vi-VN")} ₫). Vui lòng nhập tối đa ${orderPrice.toLocaleString("vi-VN")} ₫.`);
+      }
     }
 
     // 1. Thêm bản ghi phân bổ
@@ -288,6 +293,25 @@ async function allocateReceipt(receiptId, payload) {
         payment_receipt_id: id,
         shop_bank_account_id: receipt.financial_account_id || null,
         status: "completed",
+      });
+
+      trx.afterCommit(() => {
+        try {
+          const { financeNotifier } = require("@/domains/notifications/telegram");
+          const { getVietnamMonthString } = require("@/utils/time");
+          if (typeof financeNotifier.notifyFinanceMonthlyDelta === "function") {
+            financeNotifier.notifyFinanceMonthlyDelta({
+              monthKey: getVietnamMonthString(expenseDate),
+              revenueDelta: 0,
+              importDelta: allocAmount,
+              profitDelta: -allocAmount,
+              bankBalanceDelta: 0,
+              context: `allocation.externalImport:#${id}${code ? ` (${code})` : ""}`,
+            }).catch((e) => console.error("[InvoiceService] Lỗi gửi thông báo external_import:", e.message));
+          }
+        } catch (e) {
+          console.error("[InvoiceService] Lỗi afterCommit external_import:", e.message);
+        }
       });
     } else if (
       resolvedAllocType === ALLOCATION_TYPE.MONTHLY_EXPENSE ||

@@ -203,6 +203,42 @@ const deleteWarehouseAccount = async (id) => {
 /**
  * Lấy danh mục dịch vụ (Catalog) kèm số lượng slot tồn kho
  */
+/**
+ * Cập nhật tài khoản gốc (đổi tên/email tài khoản mẹ)
+ */
+const updateWarehouseAccount = async (id, payload) => {
+  const stockId = Number(id);
+  if (!stockId) throw new Error("ID tài khoản kho không hợp lệ!");
+
+  const { account } = payload || {};
+  if (!account || !String(account).trim()) {
+    throw new Error("Tên/Email tài khoản kho không được để trống!");
+  }
+
+  const normalizedAccount = String(account).trim().toLowerCase();
+
+  return await db.transaction(async (trx) => {
+    const existing = await trx(TABLES.PRODUCT_KEYS).where("id", stockId).first();
+    if (!existing) {
+      throw new Error(`Không tìm thấy tài khoản kho với ID ${stockId}`);
+    }
+
+    await trx(TABLES.PRODUCT_KEYS)
+      .where("id", stockId)
+      .update({
+        account_username: normalizedAccount,
+      });
+
+    const result = { id: stockId, account: normalizedAccount };
+    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
+      accountId: stockId,
+      accountUsername: normalizedAccount,
+    });
+
+    return result;
+  });
+};
+
 const listCatalogItems = async () => {
   const pNames = await db(TABLES.PRODUCT_NAMES)
     .select("id", "name", "login_url")
@@ -516,6 +552,7 @@ module.exports = {
   listWarehouseAccounts,
   createWarehouseAccount,
   deleteWarehouseAccount,
+  updateWarehouseAccount,
   updateWarehouseServiceSlot,
   listCatalogItems,
   createCatalogItem,

@@ -6,6 +6,7 @@ const router = express.Router();
 router.get("/", controller.getWarehouseAccounts);
 router.post("/", controller.createWarehouseAccount);
 router.delete("/:id", controller.deleteWarehouseAccount);
+router.put("/accounts/:id", controller.updateWarehouseAccount);
 
 router.get("/catalog", controller.getCatalogItems);
 router.post("/catalog", controller.createCatalogItem);

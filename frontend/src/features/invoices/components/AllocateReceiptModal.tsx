@@ -54,12 +54,49 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   const [loadingFixedCosts, setLoadingFixedCosts] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [matchedOrder, setMatchedOrder] = useState<any | null>(null);
+  const [searchingOrder, setSearchingOrder] = useState<boolean>(false);
 
   const availableAmount = receipt
     ? Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount)
     : 0;
 
   const generateRandomImportId = () => `IMP-${Math.floor(100 + Math.random() * 900)}`;
+
+  useEffect(() => {
+    if (allocationType !== "ORDER" || !targetCode.trim()) {
+      setMatchedOrder(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSearchingOrder(true);
+        const res = await fetch(`/api/invoices/matchable-orders?q=${encodeURIComponent(targetCode.trim())}&limit=5`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const exact = json.data.find(
+            (o: any) => String(o.id_order || "").toUpperCase() === targetCode.trim().toUpperCase()
+          );
+          if (exact) {
+            setMatchedOrder(exact);
+            const orderPrice = Number(exact.price || exact.gross_selling_price || 0);
+            if (orderPrice > 0) {
+              setAmount(String(Math.min(availableAmount, orderPrice)));
+            }
+          } else {
+            setMatchedOrder(null);
+          }
+        }
+      } catch {
+        setMatchedOrder(null);
+      } finally {
+        setSearchingOrder(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [targetCode, allocationType, availableAmount]);
 
   useEffect(() => {
     if (receipt) {
@@ -143,6 +180,14 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     if (allocationType === "ORDER" && !targetCode.trim()) {
       setError("Vui lòng nhập Mã đơn hàng.");
       return;
+    }
+
+    if (allocationType === "ORDER" && matchedOrder) {
+      const orderPrice = Number(matchedOrder.price || matchedOrder.gross_selling_price || 0);
+      if (orderPrice > 0 && allocAmount > orderPrice) {
+        setError(`Số tiền phân bổ (${formatCurrency(allocAmount)}) vượt quá giá trị đơn hàng (${formatCurrency(orderPrice)}).`);
+        return;
+      }
     }
 
     if (allocationType === "EXTERNAL_IMPORT" && !supplierName.trim()) {
@@ -414,16 +459,45 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
           {/* Target Code Field (For ORDER) */}
           {allocationType === "ORDER" && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                MÃ ĐƠN HÀNG KÍCH HOẠT *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-300">
+                  MÃ ĐƠN HÀNG KÍCH HOẠT *
+                </label>
+                {searchingOrder && (
+                  <span className="text-[10px] text-cyan-400 animate-pulse">
+                    Đang tra cứu đơn hàng...
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 value={targetCode}
                 onChange={(e) => setTargetCode(e.target.value.toUpperCase())}
-                placeholder="Nhập mã đơn (VD: MAVC98A2F1)"
+                placeholder="Nhập mã đơn (VD: MAVK4HX3Z)"
                 className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-cyan-300 font-mono font-bold placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm uppercase transition-all"
               />
+
+              {matchedOrder && (
+                <div className="mt-2.5 p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs space-y-1 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-cyan-300">
+                      {matchedOrder.product_name || matchedOrder.variant_display_name || matchedOrder.id_product || "Sản phẩm"}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-200">
+                      {matchedOrder.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span>Khách: <b className="text-slate-200">{matchedOrder.customer}</b></span>
+                    <span>Giá đơn: <b className="text-emerald-400 font-mono">{formatCurrency(Number(matchedOrder.price || matchedOrder.gross_selling_price || 0))}</b></span>
+                  </div>
+                  {Number(matchedOrder.price || 0) < availableAmount && (
+                    <p className="text-[10px] text-amber-300 pt-1">
+                      ⚡ Tự động giới hạn số tiền theo giá đơn để không chiếm hết số dư biên lai.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -457,6 +531,15 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-300">SỐ TIỀN PHÂN BỔ (VND) *</label>
               <div className="flex items-center gap-1.5">
+                {matchedOrder && (
+                  <button
+                    type="button"
+                    onClick={() => setAmount(String(Math.min(availableAmount, Number(matchedOrder.price || matchedOrder.gross_selling_price || 0))))}
+                    className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-semibold border border-emerald-500/30 transition-all"
+                  >
+                    Giá Đơn ({formatCurrency(Number(matchedOrder.price || matchedOrder.gross_selling_price || 0))})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleSetHalfAmount}
