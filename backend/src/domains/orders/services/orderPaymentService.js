@@ -6,11 +6,88 @@
  *
  * Đảm bảo: Cập nhật trạng thái đơn, cộng ngày gia hạn, phát EventBus đều đi qua 1 điểm duy nhất.
  */
-const { TABLES } = require("@/db");
+const { db, TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { eventBus, EVENTS } = require("@/events");
-const { addDaysVietnam } = require("@/utils/time");
+const { getVietnamDateString } = require("@/utils/time");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
+
+/**
+ * Trích xuất số tháng (X) của gói từ biến thể sản phẩm (--xm) hoặc order.days.
+ * Thứ tự ưu tiên:
+ * 1. options.months truyền vào
+ * 2. Regex (?:--|—|-)(\d+)m từ display_name, variant_name, id_product, information_order...
+ * 3. Query bảng business.variant nếu id_product là số
+ * 4. Fallback theo số ngày (days) lưu trong order (365 -> 12, 180 -> 6, 90 -> 3, 30 -> 1)
+ */
+async function resolveMonthsToAdd(order, options = {}) {
+  if (options.months && Number(options.months) > 0) {
+    return Number(options.months);
+  }
+
+  // 1. Kiểm tra chuỗi text có sẵn trên order
+  const localTexts = [
+    order?.display_name,
+    order?.variant_name,
+    order?.id_product,
+    order?.information_order,
+    order?.slot,
+    order?.note,
+  ]
+    .filter(Boolean)
+    .map(String)
+    .join(" ");
+
+  const matchLocalM =
+    localTexts.match(/(?:--|—|-)(\d+)m\b/i) ||
+    localTexts.match(/(\d+)\s*(?:tháng|month)/i);
+  if (matchLocalM && Number(matchLocalM[1]) > 0) {
+    return Number(matchLocalM[1]);
+  }
+
+  const matchLocalY =
+    localTexts.match(/(?:--|—|-)(\d+)y\b/i) ||
+    localTexts.match(/(\d+)\s*(?:năm|year)/i);
+  if (matchLocalY && Number(matchLocalY[1]) > 0) {
+    return Number(matchLocalY[1]) * 12;
+  }
+
+  // 2. Nếu id_product là ID biến thể và chưa có display_name, tra cứu trực tiếp bảng variant
+  const pId = Number(order?.id_product);
+  const queryDb = options.trx || db;
+  if (!isNaN(pId) && pId > 0 && queryDb) {
+    try {
+      const variant = await queryDb(TABLES.VARIANT)
+        .where({ id: pId })
+        .select("display_name", "variant_name")
+        .first();
+      if (variant) {
+        const vText = `${variant.display_name || ""} ${variant.variant_name || ""}`;
+        const matchM =
+          vText.match(/(?:--|—|-)(\d+)m\b/i) ||
+          vText.match(/(\d+)\s*(?:tháng|month)/i);
+        if (matchM && Number(matchM[1]) > 0) return Number(matchM[1]);
+        const matchY =
+          vText.match(/(?:--|—|-)(\d+)y\b/i) ||
+          vText.match(/(\d+)\s*(?:năm|year)/i);
+        if (matchY && Number(matchY[1]) > 0) return Number(matchY[1]) * 12;
+      }
+    } catch {
+      // Query lỗi -> tiếp tục fallback
+    }
+  }
+
+  // 3. Fallback theo số ngày (days) đã lưu trong order
+  const days = Number(options.days || order?.days || 0);
+  if (days >= 350 && days <= 375) return 12;
+  if (days >= 170 && days <= 190) return 6;
+  if (days >= 80 && days <= 100) return 3;
+  if (days >= 50 && days <= 70) return 2;
+  if (days >= 25 && days <= 35) return 1;
+  if (days > 0) return Math.max(1, Math.round(days / 30));
+
+  return 1; // Mặc định 1 tháng
+}
 
 /**
  * Kiểm tra đơn hàng có phải đang ở trạng thái Gia Hạn (Renewal) hay không.
@@ -29,15 +106,83 @@ function isRenewalOrder(status) {
 }
 
 /**
- * Tính ngày hết hạn mới khi gia hạn đơn hàng theo chuẩn giờ Việt Nam (UTC+7).
- * Nếu đơn chưa hết hạn (expiredAt > now), cộng thêm từ ngày hết hạn cũ.
- * Nếu đã hết hạn hoặc không có, cộng từ ngày hiện tại.
- * @param {string|Date|null} currentExpiredAt - Ngày hết hạn hiện tại
- * @param {number} daysToAdd - Số ngày cần cộng thêm
- * @returns {string} - Ngày hết hạn mới (YYYY-MM-DD)
+ * Tính ngày bắt đầu mới và ngày hết hạn mới khi gia hạn đơn hàng.
+ * Chuẩn hóa theo chỉ đạo của Master:
+ * - Ngày bắt đầu mới = Ngày hết hạn hiện tại + 1 ngày
+ * - Ngày hết hạn mới = Tháng hiện tại + X tháng (theo gói --xm), ngày (day) giữ nguyên như cũ
+ *
+ * @param {object|string|Date} orderOrExpiry - Đối tượng order (hoặc chuỗi expired_at)
+ * @param {object|number} [optionsOrDays={}] - Options bổ sung (trx, months, days) hoặc số ngày
+ * @returns {Promise<{newOrderDate: string, newExpiredAt: string, days: number, monthsAdded: number} & string>}
  */
-function calculateNewExpiry(currentExpiredAt, daysToAdd) {
-  return addDaysVietnam(currentExpiredAt, daysToAdd);
+async function calculateNewExpiry(orderOrExpiry, optionsOrDays = {}) {
+  let order = {};
+  let options = {};
+
+  if (typeof orderOrExpiry === "string" || orderOrExpiry instanceof Date) {
+    order = { expired_at: orderOrExpiry };
+    if (typeof optionsOrDays === "number") {
+      options = { days: optionsOrDays };
+    } else if (optionsOrDays && typeof optionsOrDays === "object") {
+      options = optionsOrDays;
+    }
+  } else if (orderOrExpiry && typeof orderOrExpiry === "object") {
+    order = orderOrExpiry;
+    if (typeof optionsOrDays === "number") {
+      options = { days: optionsOrDays };
+    } else if (optionsOrDays && typeof optionsOrDays === "object") {
+      options = optionsOrDays;
+    }
+  }
+
+  const monthsToAdd = await resolveMonthsToAdd(order, options);
+  const baseExpiredAt = order?.expired_at || options.currentExpiredAt;
+
+  // Lấy chuỗi YYYY-MM-DD theo giờ Việt Nam
+  const expStr = getVietnamDateString(baseExpiredAt || new Date());
+  const [y, m, d] = expStr.split("-").map(Number);
+
+  // 1. Ngày bắt đầu mới = expired_at + 1 ngày
+  const nextStartUtc = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0));
+  const newOrderDate = nextStartUtc.toISOString().slice(0, 10);
+
+  // 2. Ngày hết hạn mới = cộng monthsToAdd, giữ nguyên ngày d cũ
+  const totalMonths = m - 1 + monthsToAdd;
+  const newYear = y + Math.floor(totalMonths / 12);
+  const newMonth = (totalMonths % 12) + 1;
+
+  // Chốt an toàn ngày tối đa của tháng đích (VD: 31/01 -> 28/02)
+  const maxDaysInTargetMonth = new Date(Date.UTC(newYear, newMonth, 0)).getUTCDate();
+  const targetDay = Math.min(d, maxDaysInTargetMonth);
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const newExpiredAt = `${newYear}-${pad(newMonth)}-${pad(targetDay)}`;
+
+  // 3. Tính số ngày thực tế giữa chu kỳ mới để lưu cột days
+  const startObj = new Date(
+    Date.UTC(
+      nextStartUtc.getUTCFullYear(),
+      nextStartUtc.getUTCMonth(),
+      nextStartUtc.getUTCDate()
+    )
+  );
+  const endObj = new Date(Date.UTC(newYear, newMonth - 1, targetDay));
+  const newDays = Math.max(
+    1,
+    Math.round((endObj.getTime() - startObj.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  );
+
+  const result = {
+    newOrderDate,
+    newExpiredAt,
+    days: newDays,
+    monthsAdded: monthsToAdd,
+    toString() {
+      return newExpiredAt;
+    },
+  };
+
+  return result;
 }
 
 /**
@@ -50,17 +195,24 @@ function calculateNewExpiry(currentExpiredAt, daysToAdd) {
  * @param {object} options
  * @param {number} options.receiptId - ID biên lai đi kèm
  * @param {string} [options.action] - Nhãn hành động (VD: "WEBHOOK_PAYMENT_MATCH", "ADMIN_MANUAL_ALLOCATE")
- * @returns {Promise<{updatedOrder: object, isRenewal: boolean, newExpiredAt: string|null}>}
+ * @returns {Promise<{updatedOrder: object, isRenewal: boolean, newExpiredAt: string|null, newOrderDate: string|null}>}
  */
 async function processOrderPayment(trx, order, amount, options = {}) {
   const { receiptId, action = "PAYMENT_RECEIVED" } = options;
 
-  if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.PROCESSING].includes(order.status)) {
-    throw new Error(`Đơn hàng ${order.id_order} đang ở trạng thái ${order.status}, không thể ghi nhận thanh toán.`);
+  if (
+    ![
+      ORDER_STATUS.UNPAID,
+      ORDER_STATUS.RENEW_REQUIRED,
+      ORDER_STATUS.PROCESSING,
+    ].includes(order.status)
+  ) {
+    throw new Error(
+      `Đơn hàng ${order.id_order} đang ở trạng thái ${order.status}, không thể ghi nhận thanh toán.`
+    );
   }
 
   const isRenewal = isRenewalOrder(order.status);
-  const daysToAdd = Number(order.days || 365);
 
   // Xây dựng object update
   const updateFields = {
@@ -69,9 +221,20 @@ async function processOrderPayment(trx, order, amount, options = {}) {
   };
 
   let newExpiredAt = null;
+  let newOrderDate = null;
+  let newDays = Number(order.days || 365);
+  let monthsAdded = 1;
+
   if (isRenewal) {
-    newExpiredAt = calculateNewExpiry(order.expired_at, daysToAdd);
+    const renewal = await calculateNewExpiry(order, { trx });
+    newOrderDate = renewal.newOrderDate;
+    newExpiredAt = renewal.newExpiredAt;
+    newDays = renewal.days;
+    monthsAdded = renewal.monthsAdded;
+
+    updateFields.order_date = newOrderDate;
     updateFields.expired_at = newExpiredAt;
+    updateFields.days = newDays;
   }
 
   // Cập nhật Đơn hàng trong transaction
@@ -121,11 +284,16 @@ async function processOrderPayment(trx, order, amount, options = {}) {
         orderId: updatedOrder.id,
         id_order: updatedOrder.id_order,
         customer: updatedOrder.customer,
-        daysAdded: daysToAdd,
+        newOrderDate: updatedOrder.order_date,
         newExpiredAt: updatedOrder.expired_at,
+        daysAdded: newDays,
+        monthsAdded,
         receiptId,
         action,
-        productName: updatedOrder.product_name || updatedOrder.package_name || updatedOrder.id_product,
+        productName:
+          updatedOrder.product_name ||
+          updatedOrder.package_name ||
+          updatedOrder.id_product,
         slot: updatedOrder.slot,
         information_order: updatedOrder.information_order,
         price: amount,
@@ -145,11 +313,12 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     }
   });
 
-  return { updatedOrder, isRenewal, newExpiredAt };
+  return { updatedOrder, isRenewal, newExpiredAt, newOrderDate };
 }
 
 module.exports = {
   processOrderPayment,
   isRenewalOrder,
   calculateNewExpiry,
+  resolveMonthsToAdd,
 };

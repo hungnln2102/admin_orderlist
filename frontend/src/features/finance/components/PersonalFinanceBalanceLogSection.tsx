@@ -82,6 +82,10 @@ const formatDateVN = (dateStr?: string) => {
   return dateStr;
 };
 
+const getTodayVNDateString = () => {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+};
+
 export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
   assets,
   shopBalanceTotal = 0,
@@ -94,17 +98,36 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
   const [modalOpen, setModalOpen] = useState(false);
 
   // Form State in Modal (điền 1 lần rồi thôi)
-  const [formDate, setFormDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  // Ngày hiện tại theo múi giờ Việt Nam (UTC+7) - tự động nhảy sang ngày kế tiếp khi qua 0h
+  const [currentDateVN, setCurrentDateVN] = useState<string>(getTodayVNDateString);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const nowVN = getTodayVNDateString();
+      if (nowVN !== currentDateVN) {
+        setCurrentDateVN(nowVN);
+      }
+    }, 15000); // Mỗi 15s kiểm tra 1 lần để phát hiện khi qua 0h
+    return () => clearInterval(timer);
+  }, [currentDateVN]);
+
+  // Kiểm tra xem ngày hôm nay đã được chốt sổ chưa
+  const isTodayFinalized = useMemo(() => {
+    return snapshots.some((s) => s.snapshotDate && s.snapshotDate.slice(0, 10) === currentDateVN);
+  }, [snapshots, currentDateVN]);
+
+  // Form State in Modal
+  const [formDate, setFormDate] = useState<string>(() => getTodayVNDateString());
   const [formItems, setFormItems] = useState<{ id?: string; name: string; amountStr: string; type?: string; bankAccountId?: number; assetId?: number }[]>([]);
   const [formAutoSync, setFormAutoSync] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Danh sách các cột tài sản cá nhân động (tổng hợp từ assets hiện có + lịch sử các lần chốt)
+  // Danh sách các cột tài sản cá nhân động (ĐỒNG BỘ 100% THEO NGUỒN CHÍNH: 2. Tài Khoản & Tích Lũy Cá Nhân)
   const dynamicColumns = useMemo<DynamicAssetColumn[]>(() => {
     const list: DynamicAssetColumn[] = [];
     const seenKeys = new Set<string>();
 
-    // 1. Nạp từ danh sách assets hiện tại (Tài khoản cá nhân, Sổ tiết kiệm, Vàng...)
+    // 1. Nạp từ danh sách assets hiện tại (Tài khoản cá nhân, Sổ tiết kiệm, Vàng...) - NGUỒN CHÍNH
     const validAssets = (assets || []).filter(
       (a) => a.type === "CASH_BANK" || a.type === "SAVINGS" || a.type === "GOLD_INVESTMENT"
     );
@@ -123,16 +146,17 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
       }
     }
 
-    // 2. Quét qua toàn bộ lịch sử snapshots để bổ sung các cột từng tồn tại trong quá khứ
+    // 2. Chỉ bổ sung cột từ snapshot quá khứ nếu có bản ghi lịch sử thật
     for (const snap of snapshots) {
       if (Array.isArray(snap.balancesDetail)) {
         for (const it of snap.balancesDetail) {
           if (!it || !it.name) continue;
-          const key = it.assetId ? `asset_${it.assetId}` : `name_${it.name.trim().toLowerCase()}`;
+          const key = it.assetId ? `asset_${it.assetId}` : it.bankAccountId ? `bank_${it.bankAccountId}` : `name_${it.name.trim().toLowerCase()}`;
           const exists = list.some(
             (c) =>
               c.key === key ||
               (it.assetId && c.assetId === it.assetId) ||
+              (it.bankAccountId && c.bankAccountId === it.bankAccountId) ||
               c.name.trim().toLowerCase() === it.name.trim().toLowerCase()
           );
           if (!exists) {
@@ -162,6 +186,10 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
       const found = snap.balancesDetail.find((it) => it.assetId === col.assetId);
       if (found) return Number(found.amount) || 0;
     }
+    if (col.bankAccountId) {
+      const found = snap.balancesDetail.find((it) => it.bankAccountId === col.bankAccountId);
+      if (found) return Number(found.amount) || 0;
+    }
     const normName = col.name.trim().toLowerCase();
     const foundByName = snap.balancesDetail.find(
       (it) => it.name && it.name.trim().toLowerCase() === normName
@@ -169,6 +197,42 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
     if (foundByName) return Number(foundByName.amount) || 0;
     return null;
   };
+
+  // Trích xuất số tiền realtime của 1 cột tài sản cho dòng Live Chưa Chốt (CHỈ LẤY TỪ NGUỒN CHÍNH assets)
+  const getLiveColumnValue = useCallback(
+    (col: DynamicAssetColumn): number => {
+      // Tìm trong danh sách assets hiện tại (Nguồn chính)
+      if (col.assetId) {
+        const found = (assets || []).find(
+          (a) => (a as any).assetId === col.assetId || a.id === col.assetId
+        );
+        if (found) return Number(found.amount) || 0;
+      }
+      if (col.bankAccountId) {
+        const found = (assets || []).find(
+          (a) => (a as any).bankAccountId === col.bankAccountId
+        );
+        if (found) return Number(found.amount) || 0;
+      }
+      const normName = col.name.trim().toLowerCase();
+      const foundByName = (assets || []).find(
+        (a) => a.name && a.name.trim().toLowerCase() === normName
+      );
+      if (foundByName) return Number(foundByName.amount) || 0;
+
+      // Nếu không tồn tại trong Nguồn chính thì số dư live là 0, tuyệt đối không tự bịa số liệu
+      return 0;
+    },
+    [assets]
+  );
+
+  // Tổng tài sản cá nhân realtime cho dòng Live
+  const livePersonalTotal = useMemo(() => {
+    return dynamicColumns.reduce((sum, col) => sum + getLiveColumnValue(col), 0);
+  }, [dynamicColumns, getLiveColumnValue]);
+
+  // Tổng tài sản toàn diện realtime cho dòng Live (Cá nhân Live + Shop Live)
+  const liveGrandTotal = livePersonalTotal + (shopBalanceTotal || 0);
 
   // Render số tiền trong ô kèm icon TrendingUp/TrendingDown so sánh với log cũ gần nhất
   const renderCellAmount = (
@@ -225,70 +289,26 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
     fetchSnapshots();
   }, [fetchSnapshots]);
 
-  // Chuẩn bị form khi mở Modal Chốt Tài Chính
-  const handleOpenCreateModal = () => {
-    setFormDate(new Date().toISOString().slice(0, 10));
+  // Chuẩn bị form khi mở Modal Chốt Tài Chính (LUÔN LẤY 100% TỪ NGUỒN CHÍNH: 2. Tài Khoản & Tích Lũy Cá Nhân)
+  const handleOpenCreateModal = (targetDate?: string) => {
+    setFormDate(targetDate || currentDateVN || getTodayVNDateString());
     setFormAutoSync(true);
 
-    // Lấy số liệu từ lần snapshot gần nhất nếu có, kết hợp danh sách assets hiện tại
-    const currentValidAssets = assets.filter(
+    // Lấy danh sách tài sản cá nhân hợp lệ từ NGUỒN CHÍNH
+    const currentValidAssets = (assets || []).filter(
       (a) => a.type === "CASH_BANK" || a.type === "SAVINGS" || a.type === "GOLD_INVESTMENT"
     );
 
-    if (snapshots.length > 0 && snapshots[0].balancesDetail?.length > 0) {
-      const existingItems = snapshots[0].balancesDetail.map((it, idx) => ({
-        id: `item_${idx}`,
-        name: it.name,
-        amountStr: formatAmountInput(it.amount),
-        type: it.type,
-        bankAccountId: it.bankAccountId,
-        assetId: it.assetId,
-      }));
+    const items = currentValidAssets.map((a, idx) => ({
+      id: `item_${idx}`,
+      name: a.name,
+      amountStr: formatAmountInput(a.amount),
+      type: a.type,
+      bankAccountId: (a as any).bankAccountId,
+      assetId: (a as any).assetId || a.id,
+    }));
 
-      // Bổ sung các tài khoản mới tạo trong assets mà chưa có trong snapshot cũ
-      const addedFromAssets = currentValidAssets
-        .filter((a) => {
-          const aId = (a as any).assetId || a.id;
-          return !existingItems.some(
-            (it) =>
-              (it.assetId && it.assetId === aId) ||
-              it.name.trim().toLowerCase() === a.name.trim().toLowerCase()
-          );
-        })
-        .map((a, idx) => ({
-          id: `new_asset_${idx}`,
-          name: a.name,
-          amountStr: formatAmountInput(a.amount),
-          type: a.type,
-          bankAccountId: (a as any).bankAccountId,
-          assetId: (a as any).assetId || a.id,
-        }));
-
-      setFormItems([...existingItems, ...addedFromAssets]);
-    } else {
-      // Dùng danh sách assets cá nhân hiện có
-      const items = currentValidAssets.map((a, idx) => ({
-        id: `item_${idx}`,
-        name: a.name,
-        amountStr: formatAmountInput(a.amount),
-        type: a.type,
-        bankAccountId: (a as any).bankAccountId,
-        assetId: (a as any).assetId || a.id,
-      }));
-
-      if (items.length === 0) {
-        // Gợi ý mặc định theo mẫu của Master
-        setFormItems([
-          { id: "1", name: "Tài khoản cá nhân", amountStr: "100000000" },
-          { id: "2", name: "Hanagold", amountStr: "10000000" },
-          { id: "3", name: "Momo", amountStr: "20000000" },
-          { id: "4", name: "Supper Sinh Lời", amountStr: "20000000" },
-        ]);
-      } else {
-        setFormItems(items);
-      }
-    }
-
+    setFormItems(items);
     setModalOpen(true);
   };
 
@@ -559,7 +579,7 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
             </button>
 
             <button
-              onClick={handleOpenCreateModal}
+              onClick={() => handleOpenCreateModal()}
               className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
@@ -576,8 +596,13 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
             <History className="w-4 h-4 text-cyan-400" />
             <h4 className="text-sm font-bold text-white">Lịch Sử Biến Động Số Dư Qua Các Lần Chốt</h4>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">
-            {snapshots.length} bản ghi
+          <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
+            <span>{snapshots.length} lần chốt</span>
+            {!isTodayFinalized && (
+              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                +1 live
+              </span>
+            )}
           </span>
         </div>
 
@@ -650,7 +675,77 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-sans">
-                {snapshots.length === 0 ? (
+                {/* DÒNG SỐ DƯ CHƯA CHỐT (LIVE REALTIME CHO NGÀY HÔM NAY - TỰ ĐỔI NGÀY QUA 0H) */}
+                {!isTodayFinalized && (
+                  <tr className="bg-gradient-to-r from-amber-500/15 via-slate-900/80 to-amber-500/10 border-b-2 border-amber-500/40 hover:bg-amber-500/20 transition-all whitespace-nowrap shadow-inner group">
+                    {/* Ngày chốt Live (Sticky Left) */}
+                    <td className="py-3.5 px-4 font-mono font-bold text-white sticky left-0 bg-slate-900/95 z-10 border-r border-amber-500/25 shadow-md">
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex items-center justify-center">
+                          <Calendar className="w-4 h-4 text-amber-400" />
+                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                        </div>
+                        <span className="text-amber-300 font-extrabold text-sm">{formatDateVN(currentDateVN)}</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 tracking-wider shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          Chưa Chốt
+                        </span>
+                        <button
+                          onClick={() => handleOpenCreateModal(currentDateVN)}
+                          className="ml-1 px-2 py-0.5 text-[10px] font-extrabold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 rounded-md shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 flex items-center gap-1"
+                          title={`Chốt số dư cho ngày ${formatDateVN(currentDateVN)}`}
+                        >
+                          <Plus className="w-3 h-3 stroke-[3]" />
+                          <span>Chốt Ngay</span>
+                        </button>
+                      </div>
+                    </td>
+
+                    {/* Các cột tài sản cá nhân riêng biệt (Live) */}
+                    {dynamicColumns.length === 0 ? (
+                      <td className="py-3.5 px-4 text-right">
+                        {renderCellAmount(
+                          livePersonalTotal,
+                          snapshots.length > 0 ? livePersonalTotal - snapshots[0].personalBalance : 0,
+                          "text-emerald-300 font-extrabold"
+                        )}
+                      </td>
+                    ) : (
+                      dynamicColumns.map((col) => {
+                        const currVal = getLiveColumnValue(col);
+                        const prevVal = snapshots.length > 0 ? getCellData(snapshots[0], col) : null;
+                        const diff = prevVal !== null ? currVal - prevVal : 0;
+
+                        return (
+                          <td key={col.key} className="py-3.5 px-4 text-right">
+                            {renderCellAmount(currVal, diff, "text-emerald-300 font-semibold")}
+                          </td>
+                        );
+                      })
+                    )}
+
+                    {/* Cột 2: Tài sản shop (tổng các ví shop tự động realtime) */}
+                    <td className="py-3.5 px-4 text-right">
+                      {renderCellAmount(
+                        shopBalanceTotal || 0,
+                        snapshots.length > 0 ? (shopBalanceTotal || 0) - snapshots[0].shopBalance : 0,
+                        "text-cyan-300 font-extrabold"
+                      )}
+                    </td>
+
+                    {/* Cột 3: Tổng tài sản (Cá nhân Live + Shop Live) */}
+                    <td className="py-3.5 px-4 text-right">
+                      {renderCellAmount(
+                        liveGrandTotal,
+                        snapshots.length > 0 ? liveGrandTotal - snapshots[0].totalBalance : 0,
+                        "text-white font-extrabold text-sm"
+                      )}
+                    </td>
+                  </tr>
+                )}
+
+                {/* CÁC DÒNG ĐÃ CHỐT TRONG LỊCH SỬ */}
+                {snapshots.length === 0 && isTodayFinalized ? (
                   <tr>
                     <td
                       colSpan={(dynamicColumns.length || 1) + 3}

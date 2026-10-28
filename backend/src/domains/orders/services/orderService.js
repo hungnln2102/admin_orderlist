@@ -1089,14 +1089,15 @@ async function renewOrder(id, payload = {}) {
     // 1. XỬ LÝ RIÊNG CHO ĐƠN NHẬP HÀNG (MAVN... / Mavryk)
     // ─────────────────────────────────────────────────────────────
     if (isMavn) {
-      const newExpiredAt = calculateNewExpiry(existingOrder.expired_at, daysToAdd);
+      const renewal = await calculateNewExpiry(existingOrder, { trx, days: payload.days });
       const renewCost = payload.cost != null ? Number(payload.cost) : Number(existingOrder.cost || 0);
 
       const updateFields = {
         status: ORDER_STATUS.PAID,
         was_paid: true,
-        expired_at: newExpiredAt,
-        days: daysToAdd,
+        order_date: renewal.newOrderDate,
+        expired_at: renewal.newExpiredAt,
+        days: renewal.days,
       };
 
       if (payload.cost !== undefined) updateFields.cost = renewCost;
@@ -1151,8 +1152,10 @@ async function renewOrder(id, payload = {}) {
         orderId: updatedOrder.id,
         id_order: updatedOrder.id_order,
         customer: updatedOrder.customer,
-        daysAdded: daysToAdd,
+        newOrderDate: updatedOrder.order_date,
         newExpiredAt: updatedOrder.expired_at,
+        daysAdded: renewal.days,
+        monthsAdded: renewal.monthsAdded,
         action: "RENEW_IMPORT",
       });
 
@@ -1165,7 +1168,7 @@ async function renewOrder(id, payload = {}) {
         price: updatedOrder.price,
         cost: updatedOrder.cost,
         days: updatedOrder.days,
-        summary: `Gia hạn thành công đơn nhập hàng #${updatedOrder.id_order} (Đã Thanh Toán, gia hạn đến ${newExpiredAt})`,
+        summary: `Gia hạn thành công đơn nhập hàng #${updatedOrder.id_order} (Đã Thanh Toán, chu kỳ mới: ${updatedOrder.order_date} đến ${updatedOrder.expired_at})`,
         action: "RENEW_IMPORT",
       });
 
@@ -1182,7 +1185,8 @@ async function renewOrder(id, payload = {}) {
     const suffix = await getAvailableSuffix();
     const finalPrice = applySuffixToPrice(basePrice, suffix);
 
-    const days = daysToAdd;
+    const renewal = await calculateNewExpiry(existingOrder, { trx, days: payload.days });
+    const days = renewal.days;
 
     const updateFields = {
       status: ORDER_STATUS.RENEW_REQUIRED,
@@ -1330,9 +1334,16 @@ async function processOrderToProcessing(id) {
     };
 
     let newExpiredAt = null;
+    let newOrderDate = null;
+    let renewalDays = null;
     if (isRenewal) {
-      newExpiredAt = calculateNewExpiry(existingOrder.expired_at, daysToAdd);
+      const renewal = await calculateNewExpiry(existingOrder, { trx });
+      newOrderDate = renewal.newOrderDate;
+      newExpiredAt = renewal.newExpiredAt;
+      renewalDays = renewal.days;
+      updateFields.order_date = newOrderDate;
       updateFields.expired_at = newExpiredAt;
+      updateFields.days = renewalDays;
     }
 
     const [updatedOrder] = await getOrderTable(trx)
@@ -1394,9 +1405,18 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
     };
 
     let newExpiredAt = null;
+    let newOrderDate = null;
+    let renewalDays = null;
+    let monthsAdded = 1;
     if (isRenewal) {
-      newExpiredAt = calculateNewExpiry(order.expired_at, daysToAdd);
+      const renewal = await calculateNewExpiry(order, { trx });
+      newOrderDate = renewal.newOrderDate;
+      newExpiredAt = renewal.newExpiredAt;
+      renewalDays = renewal.days;
+      monthsAdded = renewal.monthsAdded;
+      updateFields.order_date = newOrderDate;
       updateFields.expired_at = newExpiredAt;
+      updateFields.days = renewalDays;
     }
 
     const [updatedOrder] = await getOrderTable(trx)
@@ -1428,8 +1448,10 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
         orderId: updatedOrder.id,
         id_order: updatedOrder.id_order,
         customer: updatedOrder.customer,
-        daysAdded: daysToAdd,
+        newOrderDate: updatedOrder.order_date,
         newExpiredAt: updatedOrder.expired_at,
+        daysAdded: renewalDays,
+        monthsAdded,
         action: options.action || "COMPLETED",
       });
     }
@@ -1500,7 +1522,10 @@ async function payOrderWithCredit(id, creditNoteId) {
     };
 
     if (isRenewal) {
-      updateFields.expired_at = calculateNewExpiry(order.expired_at, daysToAdd);
+      const renewal = await calculateNewExpiry(order, { trx });
+      updateFields.order_date = renewal.newOrderDate;
+      updateFields.expired_at = renewal.newExpiredAt;
+      updateFields.days = renewal.days;
     }
 
     const [updatedOrder] = await getOrderTable(trx)

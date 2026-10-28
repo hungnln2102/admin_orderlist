@@ -4,7 +4,7 @@ import path from "path";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const target = env.VITE_API_PROXY_TARGET || env.BACKEND_URL || "http://localhost:3001";
+  const target = env.VITE_API_PROXY_TARGET || env.BACKEND_URL || "http://127.0.0.1:3002";
 
   return {
     plugins: [react()],
