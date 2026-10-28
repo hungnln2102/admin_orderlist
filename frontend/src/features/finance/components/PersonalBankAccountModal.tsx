@@ -10,18 +10,18 @@ interface Props {
 }
 
 const POPULAR_BANKS = [
-  { name: "MBBank (Ngân hàng Quân Đội)", shortCode: "MB", bin: "970422" },
-  { name: "Techcombank (TCB)", shortCode: "TCB", bin: "970407" },
-  { name: "Vietcombank (VCB)", shortCode: "VCB", bin: "970436" },
-  { name: "ACB (Á Châu)", shortCode: "ACB", bin: "970416" },
-  { name: "VPBank (VPB)", shortCode: "VPB", bin: "970432" },
-  { name: "TPBank (Tiên Phong)", shortCode: "TPB", bin: "970423" },
-  { name: "BIDV (Đầu tư và Phát triển)", shortCode: "BIDV", bin: "970418" },
+  { name: "MBBank", shortCode: "MB", bin: "970422" },
+  { name: "Techcombank", shortCode: "TCB", bin: "970407" },
+  { name: "Vietcombank", shortCode: "VCB", bin: "970436" },
+  { name: "ACB", shortCode: "ACB", bin: "970416" },
+  { name: "VPBank", shortCode: "VPB", bin: "970432" },
+  { name: "TPBank", shortCode: "TPB", bin: "970423" },
+  { name: "BIDV", shortCode: "BIDV", bin: "970418" },
   { name: "Sacombank", shortCode: "STB", bin: "970403" },
   { name: "VietinBank", shortCode: "CTG", bin: "970415" },
-  { name: "Agribank (Nông nghiệp)", shortCode: "AGR", bin: "970405" },
-  { name: "Momo (Ví điện tử)", shortCode: "MOMO", bin: "MOMO" },
-  { name: "ZaloPay (Ví điện tử)", shortCode: "ZLP", bin: "ZLP" },
+  { name: "Agribank", shortCode: "AGR", bin: "970405" },
+  { name: "Momo", shortCode: "MOMO", bin: "MOMO" },
+  { name: "ZaloPay", shortCode: "ZLP", bin: "ZLP" },
 ];
 
 const formatAmountInput = (value: string) => {
@@ -37,11 +37,11 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
   const [formData, setFormData] = useState({
     accountNumber: "",
     accountHolder: "",
-    bankDisplayName: "MBBank (Ngân hàng Quân Đội)",
+    bankDisplayName: "MBBank",
     bankShortCode: "MB",
     bankBin: "970422",
     qrNotePrefix: "PERS",
-    label: "Tài khoản cá nhân",
+    label: "",
     balance: "",
   });
 
@@ -55,7 +55,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
           bankShortCode: editingItem.bankShortCode || editingItem.bank_short_code || "MB",
           bankBin: editingItem.bankBin || editingItem.bank_bin || "970422",
           qrNotePrefix: editingItem.qrNotePrefix || editingItem.qr_note_prefix || "PERS",
-          label: editingItem.label || editingItem.name || "Tài khoản cá nhân",
+          label: (editingItem.label && editingItem.label !== "Tài khoản cá nhân") ? editingItem.label : "",
           balance: formatAmountInput(String(editingItem.amount !== undefined ? editingItem.amount : (editingItem.balance !== undefined ? editingItem.balance : 0))),
         });
       } else {
@@ -66,7 +66,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
           bankShortCode: "MB",
           bankBin: "970422",
           qrNotePrefix: "PERS",
-          label: "Tài khoản cá nhân",
+          label: "",
           balance: "",
         });
       }
@@ -199,7 +199,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
               <label className="block text-xs font-semibold text-slate-300 mb-1">Nhãn Hiển Thị / Ghi Chú</label>
               <input
                 type="text"
-                placeholder="VD: Techcombank chính"
+                placeholder="VD: MB Chi tiêu, VCB Lương (không bắt buộc)"
                 value={formData.label}
                 onChange={(e) => setFormData({ ...formData, label: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"

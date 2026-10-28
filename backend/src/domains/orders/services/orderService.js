@@ -3,6 +3,7 @@ const { eventBus, EVENTS } = require("@/events");
 const { getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
 const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
+const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -835,19 +836,12 @@ async function createOrder(payload) {
 
     // 5. Tự động ghi nhận log chi phí NCC cho đơn nhập hàng (MAVN)
     const importCost = Number(createdOrder.cost || 0);
-    if (isMavn && importCost > 0) {
+    const isSupplierMavryk = await isMavrykSupplier(trx, createdOrder);
+    if (isMavn && !isSupplierMavryk && importCost > 0) {
       let supplyId = createdOrder.supply_id ? Number(createdOrder.supply_id) : null;
       if (!supplyId) {
         const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();
         supplyId = defaultSupplier ? defaultSupplier.id : 1;
-      }
-
-      let isSupplierMavryk = false;
-      if (supplyId) {
-        const sup = await trx(TABLES.SUPPLIER).where({ id: supplyId }).first();
-        if (sup && String(sup.supplier_name || "").trim().toLowerCase() === "mavryk") {
-          isSupplierMavryk = true;
-        }
       }
 
       if (!isSupplierMavryk) {
@@ -888,7 +882,7 @@ async function createOrder(payload) {
       action: "CREATE",
     });
 
-    if (isMavn && Number(createdOrder.cost) > 0) {
+    if (!isSupplierMavryk && isMavn && Number(createdOrder.cost) > 0) {
       emitOrderEvent(trx, EVENTS.ORDER_IMPORT_CREATED, {
         orderId: createdOrder.id,
         id_order: createdOrder.id_order,
@@ -897,6 +891,7 @@ async function createOrder(payload) {
         order_date: createdOrder.order_date,
         created_at: createdOrder.created_at,
         customer: createdOrder.customer,
+        isSupplierMavryk,
       });
     }
 
@@ -1117,13 +1112,7 @@ async function renewOrder(id, payload = {}) {
 
       // B. Quản lý công nợ NCC: Đối với Mavryk (chủ shop) thì KHÔNG TẠO LOG trong NCC
       const supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
-      let isSupplierMavryk = false;
-      if (supplyId) {
-        const sup = await trx(TABLES.SUPPLIER).where({ id: supplyId }).first();
-        if (sup && String(sup.supplier_name || "").trim().toLowerCase() === "mavryk") {
-          isSupplierMavryk = true;
-        }
-      }
+      const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
 
       if (!isSupplierMavryk && supplyId && renewCost > 0) {
         await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
@@ -1150,7 +1139,9 @@ async function renewOrder(id, payload = {}) {
         id_order: updatedOrder.id_order,
         customer: updatedOrder.customer,
         amount: 0,
-        cost: renewCost,
+        cost: isSupplierMavryk ? 0 : renewCost,
+        isSupplierMavryk,
+        supply_id: supplyId,
         status: updatedOrder.status,
         isRenewal: true,
         action: "RENEW_IMPORT",
@@ -1349,12 +1340,13 @@ async function processOrderToProcessing(id) {
       .update(updateFields)
       .returning("*");
 
+    const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
     const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
       .where({ order_list_id: updatedOrder.id })
       .first();
 
     const importCost = Number(updatedOrder.cost || 0);
-    if (!existingLog && importCost > 0) {
+    if (!isSupplierMavryk && !existingLog && importCost > 0) {
       let supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
       if (!supplyId) {
         const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();
@@ -1413,6 +1405,8 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
       .returning("*");
 
     const payAmount = amount != null ? Number(amount) : Number(updatedOrder.price || 0);
+    const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
+    const effectiveCost = isSupplierMavryk ? 0 : Number(updatedOrder.cost || 0);
 
     emitOrderEvent(trx, EVENTS.ORDER_PAID, {
       orderId: updatedOrder.id,
@@ -1420,7 +1414,9 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
       customer: updatedOrder.customer,
       amount: payAmount,
       price: Number(updatedOrder.price || 0),
-      cost: Number(updatedOrder.cost || 0),
+      cost: effectiveCost,
+      isSupplierMavryk,
+      supply_id: updatedOrder.supply_id,
       order_date: updatedOrder.order_date,
       status: updatedOrder.status,
       isRenewal,
@@ -1512,11 +1508,12 @@ async function payOrderWithCredit(id, creditNoteId) {
       .update(updateFields)
       .returning("*");
 
+    const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
     const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
       .where({ order_list_id: updatedOrder.id })
       .first();
     const importCost = Number(updatedOrder.cost || 0);
-    if (!existingLog && importCost > 0) {
+    if (!isSupplierMavryk && !existingLog && importCost > 0) {
       let supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
       if (!supplyId) {
         const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();

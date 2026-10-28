@@ -449,34 +449,40 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     .where("is_active", true)
     .orderBy("id", "asc");
 
-  const personalBankAssets = personalBankRows.map((r) => ({
-    id: 1000000 + Number(r.id),
-    name: `${r.bank_display_name || "Ngân hàng"} (${r.account_number}) - ${r.label || "Tài khoản cá nhân"}`,
-    type: "CASH_BANK",
-    amount: toNumber(r.balance),
-    note: r.account_holder ? `Chủ TK: ${r.account_holder}` : "",
-    accountNumber: r.account_number || "",
-    accountHolder: r.account_holder || "",
-    bankDisplayName: r.bank_display_name || "",
-    bankShortCode: r.bank_short_code || "",
-    bankBin: r.bank_bin || "",
-    qrNotePrefix: r.qr_note_prefix || "",
-    label: r.label || "",
-    profitEnabled: false,
-    profitFrequency: null,
-    annualInterestRate: 0,
-    profitDestination: null,
-    profitAccountId: null,
-    profitCreditTime: null,
-    debtInterestEnabled: false,
-    debtAnnualInterestRate: 0,
-    debtDueDay: null,
-    debtEndDate: null,
-    debtRepaymentFrequency: null,
-    updatedAt: r.updated_at,
-    accountScope: "PERSONAL",
-    bankAccountId: Number(r.id),
-  }));
+  const personalBankAssets = personalBankRows.map((r) => {
+    const hasCustomLabel = r.label && r.label.trim() && r.label.trim() !== "Tài khoản cá nhân";
+    const labelSuffix = hasCustomLabel ? ` - ${r.label.trim()}` : "";
+    const rawBank = r.bank_display_name || r.bank_short_code || "Ngân hàng";
+    const cleanBank = rawBank.replace(/\s*\([A-Za-z0-9]{2,6}\)/g, "").trim();
+    return {
+      id: 1000000 + Number(r.id),
+      name: `${cleanBank} (${r.account_number})${labelSuffix}`,
+      type: "CASH_BANK",
+      amount: toNumber(r.balance),
+      note: r.account_holder ? `Chủ TK: ${r.account_holder}` : "",
+      accountNumber: r.account_number || "",
+      accountHolder: r.account_holder || "",
+      bankDisplayName: cleanBank,
+      bankShortCode: r.bank_short_code || "",
+      bankBin: r.bank_bin || "",
+      qrNotePrefix: r.qr_note_prefix || "",
+      label: r.label || "",
+      profitEnabled: false,
+      profitFrequency: null,
+      annualInterestRate: 0,
+      profitDestination: null,
+      profitAccountId: null,
+      profitCreditTime: null,
+      debtInterestEnabled: false,
+      debtAnnualInterestRate: 0,
+      debtDueDay: null,
+      debtEndDate: null,
+      debtRepaymentFrequency: null,
+      updatedAt: r.updated_at,
+      accountScope: "PERSONAL",
+      bankAccountId: Number(r.id),
+    };
+  });
 
   const personalAssets = [...mappedPersonalAssets, ...personalBankAssets];
 

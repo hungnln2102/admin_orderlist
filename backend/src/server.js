@@ -25,8 +25,11 @@ if (isProduction && (!sessionSecret || allowedOrigins.length === 0 || !process.e
   throw new Error("SESSION_SECRET, CORS_ORIGINS và SEPAY_API_KEY là bắt buộc khi chạy production.");
 }
 
+const defaultDevOrigins = ["http://localhost:3003", "http://127.0.0.1:3003", "http://localhost:5173", "http://127.0.0.1:5173"];
 const isAllowedOrigin = (origin) =>
-  !origin || (!isProduction && allowedOrigins.length === 0) || allowedOrigins.includes(origin);
+  !origin ||
+  (!isProduction && (allowedOrigins.length === 0 || defaultDevOrigins.includes(origin))) ||
+  allowedOrigins.includes(origin);
 
 const requireTrustedMutationOrigin = (req, res, next) => {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();

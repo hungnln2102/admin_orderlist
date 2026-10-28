@@ -9,6 +9,8 @@
 const { TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { eventBus, EVENTS } = require("@/events");
+const { addDaysVietnam } = require("@/utils/time");
+const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 
 /**
  * Kiểm tra đơn hàng có phải đang ở trạng thái Gia Hạn (Renewal) hay không.
@@ -25,8 +27,6 @@ function isRenewalOrder(status) {
     normalized.includes("GIA HAN")
   );
 }
-
-const { addDaysVietnam } = require("@/utils/time");
 
 /**
  * Tính ngày hết hạn mới khi gia hạn đơn hàng theo chuẩn giờ Việt Nam (UTC+7).
@@ -80,26 +80,25 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     .update(updateFields)
     .returning("*");
 
-  // Ghi nhận chi phí nhập NCC khi gia hạn thành công (chu kỳ mới)
-  let supplierCostInserted = false;
-  const importCost = Number(order.cost || 0);
+  // Kiểm tra xem NCC có phải là Mavryk (Chủ shop) hay không.
+  // Nếu là Mavryk -> Không phát sinh chi phí nhập NCC, không tạo công nợ NCC.
+  const isSupplierMavryk = await isMavrykSupplier(trx, order);
+  const effectiveCost = isSupplierMavryk ? 0 : Number(order.cost || 0);
   const supplyId = order.supply_id ? Number(order.supply_id) : null;
-  if (isRenewal && importCost > 0 && supplyId) {
-    const supplier = await trx(TABLES.SUPPLIER).where({ id: supplyId }).first();
-    const isSupplierMavryk = supplier && String(supplier.supplier_name || "").trim().toLowerCase() === "mavryk";
 
-    if (!isSupplierMavryk) {
-      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
-        order_list_id: updatedOrder.id,
-        supply_id: supplyId,
-        id_order: updatedOrder.id_order,
-        import_cost: importCost,
-        refund_amount: 0,
-        ncc_payment_status: "Chưa Thanh Toán",
-        logged_at: trx.fn.now(),
-      });
-      supplierCostInserted = true;
-    }
+  // Ghi nhận chi phí nhập NCC khi gia hạn thành công (chu kỳ mới, chỉ áp dụng cho NCC ngoài)
+  let supplierCostInserted = false;
+  if (isRenewal && !isSupplierMavryk && effectiveCost > 0 && supplyId) {
+    await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+      order_list_id: updatedOrder.id,
+      supply_id: supplyId,
+      id_order: updatedOrder.id_order,
+      import_cost: effectiveCost,
+      refund_amount: 0,
+      ncc_payment_status: "Chưa Thanh Toán",
+      logged_at: trx.fn.now(),
+    });
+    supplierCostInserted = true;
   }
 
   trx.afterCommit(() => {
@@ -108,7 +107,9 @@ async function processOrderPayment(trx, order, amount, options = {}) {
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
       amount,
-      cost: importCost,
+      cost: effectiveCost,
+      isSupplierMavryk,
+      supply_id: supplyId,
       status: updatedOrder.status,
       receiptId,
       isRenewal,
@@ -128,16 +129,17 @@ async function processOrderPayment(trx, order, amount, options = {}) {
         slot: updatedOrder.slot,
         information_order: updatedOrder.information_order,
         price: amount,
-        cost: importCost,
+        cost: effectiveCost,
+        isSupplierMavryk,
       });
 
       if (supplierCostInserted) {
         eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
-          cost: importCost,
+          cost: effectiveCost,
           supplier_id: supplyId,
           order_id: updatedOrder.id,
           id_order: updatedOrder.id_order,
-          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${importCost} ₫`,
+          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${effectiveCost} ₫`,
         });
       }
     }

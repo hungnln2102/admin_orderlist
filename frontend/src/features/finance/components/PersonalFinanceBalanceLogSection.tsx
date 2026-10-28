@@ -16,7 +16,17 @@ import {
   Wallet,
   XCircle,
   Trash2,
+  CreditCard,
+  Coins,
 } from "lucide-react";
+
+export interface DynamicAssetColumn {
+  key: string;
+  name: string;
+  type?: string;
+  assetId?: number;
+  bankAccountId?: number;
+}
 
 export interface SnapshotItem {
   name: string;
@@ -89,6 +99,112 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
   const [formAutoSync, setFormAutoSync] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Danh sách các cột tài sản cá nhân động (tổng hợp từ assets hiện có + lịch sử các lần chốt)
+  const dynamicColumns = useMemo<DynamicAssetColumn[]>(() => {
+    const list: DynamicAssetColumn[] = [];
+    const seenKeys = new Set<string>();
+
+    // 1. Nạp từ danh sách assets hiện tại (Tài khoản cá nhân, Sổ tiết kiệm, Vàng...)
+    const validAssets = (assets || []).filter(
+      (a) => a.type === "CASH_BANK" || a.type === "SAVINGS" || a.type === "GOLD_INVESTMENT"
+    );
+
+    for (const a of validAssets) {
+      const key = (a as any).assetId ? `asset_${(a as any).assetId}` : `asset_${a.id}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        list.push({
+          key,
+          name: a.name,
+          type: a.type,
+          assetId: (a as any).assetId || a.id,
+          bankAccountId: (a as any).bankAccountId,
+        });
+      }
+    }
+
+    // 2. Quét qua toàn bộ lịch sử snapshots để bổ sung các cột từng tồn tại trong quá khứ
+    for (const snap of snapshots) {
+      if (Array.isArray(snap.balancesDetail)) {
+        for (const it of snap.balancesDetail) {
+          if (!it || !it.name) continue;
+          const key = it.assetId ? `asset_${it.assetId}` : `name_${it.name.trim().toLowerCase()}`;
+          const exists = list.some(
+            (c) =>
+              c.key === key ||
+              (it.assetId && c.assetId === it.assetId) ||
+              c.name.trim().toLowerCase() === it.name.trim().toLowerCase()
+          );
+          if (!exists) {
+            seenKeys.add(key);
+            list.push({
+              key,
+              name: it.name,
+              type: it.type || "SAVINGS",
+              assetId: it.assetId,
+              bankAccountId: it.bankAccountId,
+            });
+          }
+        }
+      }
+    }
+
+    return list;
+  }, [assets, snapshots]);
+
+  // Hàm trích xuất số tiền của 1 tài khoản trong 1 snapshot
+  const getCellData = (
+    snap: PersonalBalanceSnapshot,
+    col: DynamicAssetColumn
+  ): number | null => {
+    if (!snap.balancesDetail || !Array.isArray(snap.balancesDetail)) return null;
+    if (col.assetId) {
+      const found = snap.balancesDetail.find((it) => it.assetId === col.assetId);
+      if (found) return Number(found.amount) || 0;
+    }
+    const normName = col.name.trim().toLowerCase();
+    const foundByName = snap.balancesDetail.find(
+      (it) => it.name && it.name.trim().toLowerCase() === normName
+    );
+    if (foundByName) return Number(foundByName.amount) || 0;
+    return null;
+  };
+
+  // Render số tiền trong ô kèm icon TrendingUp/TrendingDown so sánh với log cũ gần nhất
+  const renderCellAmount = (
+    currVal: number | null,
+    diff: number,
+    colorClass = "text-emerald-300"
+  ) => {
+    if (currVal === null) {
+      return <span className="text-slate-600 font-mono">-</span>;
+    }
+
+    return (
+      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+        <span className={`font-mono font-bold text-xs ${colorClass}`}>
+          {formatVND(currVal)}
+        </span>
+        {diff > 0 && (
+          <span
+            className="inline-flex items-center text-emerald-400"
+            title={`Tăng +${formatVND(diff)} so với lần chốt trước`}
+          >
+            <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+          </span>
+        )}
+        {diff < 0 && (
+          <span
+            className="inline-flex items-center text-rose-400"
+            title={`Giảm ${formatVND(diff)} so với lần chốt trước`}
+          >
+            <TrendingDown className="w-3.5 h-3.5 shrink-0" />
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const fetchSnapshots = useCallback(async () => {
     try {
       setLoading(true);
@@ -114,9 +230,13 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormAutoSync(true);
 
-    // Lấy số liệu từ lần snapshot gần nhất nếu có, hoặc từ danh sách assets hiện tại
+    // Lấy số liệu từ lần snapshot gần nhất nếu có, kết hợp danh sách assets hiện tại
+    const currentValidAssets = assets.filter(
+      (a) => a.type === "CASH_BANK" || a.type === "SAVINGS" || a.type === "GOLD_INVESTMENT"
+    );
+
     if (snapshots.length > 0 && snapshots[0].balancesDetail?.length > 0) {
-      const items = snapshots[0].balancesDetail.map((it, idx) => ({
+      const existingItems = snapshots[0].balancesDetail.map((it, idx) => ({
         id: `item_${idx}`,
         name: it.name,
         amountStr: formatAmountInput(it.amount),
@@ -124,19 +244,37 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
         bankAccountId: it.bankAccountId,
         assetId: it.assetId,
       }));
-      setFormItems(items);
-    } else {
-      // Dùng danh sách assets cá nhân hiện có
-      const items = assets
-        .filter((a) => a.type === "CASH_BANK" || a.type === "SAVINGS" || a.type === "GOLD_INVESTMENT")
+
+      // Bổ sung các tài khoản mới tạo trong assets mà chưa có trong snapshot cũ
+      const addedFromAssets = currentValidAssets
+        .filter((a) => {
+          const aId = (a as any).assetId || a.id;
+          return !existingItems.some(
+            (it) =>
+              (it.assetId && it.assetId === aId) ||
+              it.name.trim().toLowerCase() === a.name.trim().toLowerCase()
+          );
+        })
         .map((a, idx) => ({
-          id: `item_${idx}`,
+          id: `new_asset_${idx}`,
           name: a.name,
           amountStr: formatAmountInput(a.amount),
           type: a.type,
           bankAccountId: (a as any).bankAccountId,
           assetId: (a as any).assetId || a.id,
         }));
+
+      setFormItems([...existingItems, ...addedFromAssets]);
+    } else {
+      // Dùng danh sách assets cá nhân hiện có
+      const items = currentValidAssets.map((a, idx) => ({
+        id: `item_${idx}`,
+        name: a.name,
+        amountStr: formatAmountInput(a.amount),
+        type: a.type,
+        bankAccountId: (a as any).bankAccountId,
+        assetId: (a as any).assetId || a.id,
+      }));
 
       if (items.length === 0) {
         // Gợi ý mặc định theo mẫu của Master
@@ -454,60 +592,135 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
               <thead>
                 <tr className="bg-slate-950/80 text-slate-300 uppercase tracking-wider font-semibold border-b border-slate-800 whitespace-nowrap">
                   <th className="py-3 px-4 sticky left-0 bg-slate-950 z-10">Ngày Chốt</th>
-                  <th className="py-3 px-4">
-                    <div className="flex items-center gap-1.5 text-emerald-400">
-                      <PiggyBank className="w-4 h-4" />
-                      <span>Tài Sản Cá Nhân</span>
-                    </div>
-                  </th>
-                  <th className="py-3 px-4">
-                    <div className="flex items-center gap-1.5 text-cyan-400">
-                      <Landmark className="w-4 h-4" />
+
+                  {/* Render từng cột tài sản cá nhân & sổ tiết kiệm riêng biệt */}
+                  {dynamicColumns.length === 0 ? (
+                    <th className="py-3 px-4 text-right min-w-[140px]">
+                      <div className="flex items-center justify-end gap-1.5 text-emerald-400">
+                        <PiggyBank className="w-4 h-4" />
+                        <span>Tài Sản Cá Nhân</span>
+                      </div>
+                    </th>
+                  ) : (
+                    dynamicColumns.map((col) => {
+                      const isBank = col.type === "CASH_BANK";
+                      const isGold = col.type === "GOLD_INVESTMENT";
+                      const IconComp = isBank ? CreditCard : isGold ? Coins : PiggyBank;
+                      const colorClass = isBank
+                        ? "text-cyan-400"
+                        : isGold
+                        ? "text-yellow-400"
+                        : "text-emerald-400";
+
+                      return (
+                        <th key={col.key} className="py-3 px-4 text-right min-w-[140px]">
+                          <div className={`flex items-center justify-end gap-1.5 ${colorClass}`}>
+                            <IconComp className="w-3.5 h-3.5 shrink-0" />
+                            {(() => {
+                            const cleanName = col.name
+                              .replace(/\s*[-–—]\s*Tài khoản cá nhân/gi, "")
+                              .replace(/\s*\([A-Za-z0-9]{2,6}\)/g, "")
+                              .trim();
+                            return (
+                              <span className="truncate max-w-[160px]" title={cleanName}>
+                                {cleanName}
+                              </span>
+                            );
+                          })()}
+  
+                          </div>
+                        </th>
+                      );
+                    })
+                  )}
+
+                  {/* Cột Tài Sản Shop */}
+                  <th className="py-3 px-4 text-right min-w-[140px]">
+                    <div className="flex items-center justify-end gap-1.5 text-cyan-400">
+                      <Landmark className="w-4 h-4 shrink-0" />
                       <span>Tài Sản Shop</span>
                       <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
                         TỰ ĐỘNG
                       </span>
                     </div>
                   </th>
-                  <th className="py-3 px-4 text-right">Tổng Tài Sản</th>
+
+                  {/* Cột Tổng Tài Sản Toàn Diện */}
+                  <th className="py-3 px-4 text-right min-w-[140px] text-white">Tổng Tài Sản</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-sans">
                 {snapshots.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-slate-500 space-y-1">
+                    <td
+                      colSpan={(dynamicColumns.length || 1) + 3}
+                      className="py-10 text-center text-slate-500 space-y-1"
+                    >
                       <p className="font-semibold text-slate-400 text-sm">Chưa có lịch sử chốt tài chính nào.</p>
-                      <p className="text-xs">Bấm <strong className="text-emerald-300 font-bold">+ Chốt Tài Chính</strong> ở góc trên bên phải để ghi nhận mốc đầu tiên (Tài sản cá nhân + Tài sản shop tự động).</p>
+                      <p className="text-xs">
+                        Bấm <strong className="text-emerald-300 font-bold">+ Chốt Tài Chính</strong> ở góc trên bên phải để ghi nhận mốc đầu tiên.
+                      </p>
                     </td>
                   </tr>
                 ) : (
-                  snapshots.map((snap) => (
-                    <tr
-                      key={snap.id}
-                      className="hover:bg-slate-800/25 transition-colors whitespace-nowrap"
-                    >
-                      {/* Ngày chốt */}
-                      <td className="py-3 px-4 font-mono font-bold text-white sticky left-0 bg-slate-900/90 z-10 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-cyan-400" />
-                        <span>{formatDateVN(snap.snapshotDate)}</span>
-                      </td>
+                  snapshots.map((snap, rowIndex) => {
+                    const prevSnap = snapshots[rowIndex + 1] || null;
 
-                      {/* Cột 1: Tài sản cá nhân (tổng các nguồn cá nhân) */}
-                      <td className="py-3 px-4 font-mono font-bold text-emerald-300 text-sm">
-                        {formatVND(snap.personalBalance)}
-                      </td>
+                    return (
+                      <tr
+                        key={snap.id}
+                        className="hover:bg-slate-800/25 transition-colors whitespace-nowrap"
+                      >
+                        {/* Ngày chốt (Sticky Left) */}
+                        <td className="py-3 px-4 font-mono font-bold text-white sticky left-0 bg-slate-900/90 z-10 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-cyan-400" />
+                          <span>{formatDateVN(snap.snapshotDate)}</span>
+                        </td>
 
-                      {/* Cột 2: Tài sản shop (tổng các ví shop tự động) */}
-                      <td className="py-3 px-4 font-mono font-bold text-cyan-300 text-sm">
-                        {formatVND(snap.shopBalance)}
-                      </td>
+                        {/* Các cột tài sản cá nhân riêng biệt */}
+                        {dynamicColumns.length === 0 ? (
+                          <td className="py-3 px-4 text-right">
+                            {renderCellAmount(
+                              snap.personalBalance,
+                              prevSnap ? snap.personalBalance - prevSnap.personalBalance : 0,
+                              "text-emerald-300"
+                            )}
+                          </td>
+                        ) : (
+                          dynamicColumns.map((col) => {
+                            const currVal = getCellData(snap, col);
+                            const prevVal = prevSnap ? getCellData(prevSnap, col) : null;
+                            const diff =
+                              prevVal !== null && currVal !== null ? currVal - prevVal : 0;
 
-                      {/* Cột 3: Tổng tài sản (Cá nhân + Shop) */}
-                      <td className="py-3 px-4 text-right font-mono font-black text-white text-sm">
-                        {formatVND(snap.totalBalance)}
-                      </td>
-                    </tr>
-                  ))
+                            return (
+                              <td key={col.key} className="py-3 px-4 text-right">
+                                {renderCellAmount(currVal, diff, "text-emerald-300")}
+                              </td>
+                            );
+                          })
+                        )}
+
+                        {/* Cột 2: Tài sản shop (tổng các ví shop tự động) */}
+                        <td className="py-3 px-4 text-right">
+                          {renderCellAmount(
+                            snap.shopBalance,
+                            prevSnap ? snap.shopBalance - prevSnap.shopBalance : 0,
+                            "text-cyan-300"
+                          )}
+                        </td>
+
+                        {/* Cột 3: Tổng tài sản (Cá nhân + Shop) */}
+                        <td className="py-3 px-4 text-right">
+                          {renderCellAmount(
+                            snap.totalBalance,
+                            prevSnap ? snap.totalBalance - prevSnap.totalBalance : 0,
+                            "text-white"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

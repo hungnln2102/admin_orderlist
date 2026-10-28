@@ -14,18 +14,18 @@ interface WalletCreateEditModalProps {
 }
 
 const POPULAR_BANKS = [
-  { name: "MBBank (Ngân hàng Quân Đội)", shortCode: "MB", bin: "970422" },
-  { name: "Techcombank (TCB)", shortCode: "TCB", bin: "970407" },
-  { name: "Vietcombank (VCB)", shortCode: "VCB", bin: "970436" },
-  { name: "ACB (Á Châu)", shortCode: "ACB", bin: "970416" },
-  { name: "VPBank (VPB)", shortCode: "VPB", bin: "970432" },
-  { name: "TPBank (Tiên Phong)", shortCode: "TPB", bin: "970423" },
-  { name: "BIDV (Đầu tư và Phát triển)", shortCode: "BIDV", bin: "970418" },
+  { name: "MBBank", shortCode: "MB", bin: "970422" },
+  { name: "Techcombank", shortCode: "TCB", bin: "970407" },
+  { name: "Vietcombank", shortCode: "VCB", bin: "970436" },
+  { name: "ACB", shortCode: "ACB", bin: "970416" },
+  { name: "VPBank", shortCode: "VPB", bin: "970432" },
+  { name: "TPBank", shortCode: "TPB", bin: "970423" },
+  { name: "BIDV", shortCode: "BIDV", bin: "970418" },
   { name: "Sacombank", shortCode: "STB", bin: "970403" },
   { name: "VietinBank", shortCode: "CTG", bin: "970415" },
-  { name: "Agribank (Nông nghiệp)", shortCode: "AGR", bin: "970405" },
-  { name: "Momo (Ví điện tử)", shortCode: "MOMO", bin: "MOMO" },
-  { name: "ZaloPay (Ví điện tử)", shortCode: "ZLP", bin: "ZLP" },
+  { name: "Agribank", shortCode: "AGR", bin: "970405" },
+  { name: "Momo", shortCode: "MOMO", bin: "MOMO" },
+  { name: "ZaloPay", shortCode: "ZLP", bin: "ZLP" },
 ];
 
 export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({

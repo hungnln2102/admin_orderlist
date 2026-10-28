@@ -332,57 +332,84 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
               {displayedList.map((item) => {
                 const isWallet = item.type === "CASH_BANK";
                 const isSavings = item.type === "SAVINGS";
+
+                // 1. Cột 1: STK
+                let stk = (item as any).accountNumber || (item as any).account_number || "";
+                if (!stk && isWallet) {
+                  const match = String(item.name || "").match(/\(([0-9a-zA-Z]+)\)/);
+                  if (match) stk = match[1];
+                }
+
+                // 2. Cột 2: Ngân Hàng
+                let bankName = (item as any).bankDisplayName || (item as any).bank_display_name || (item as any).bankShortCode || "";
+                if (!bankName) {
+                  if (isWallet) {
+                    bankName = String(item.name || "")
+                      .replace(/\s*[-–—]\s*Tài khoản cá nhân/gi, "")
+                      .replace(/\s*\([0-9a-zA-Z]{5,}\)/g, "")
+                      .trim();
+                  } else {
+                    bankName = item.name;
+                  }
+                }
+                if (!bankName) bankName = isWallet ? "Ngân hàng" : item.name;
+                bankName = String(bankName).replace(/\s*\([A-Za-z0-9]{2,6}\)/g, "").trim();
+
+                // Tên chủ TK
+                let accountHolder = (item as any).accountHolder || (item as any).account_holder || "";
+                if (!accountHolder && item.note && item.note.includes("Chủ TK:")) {
+                  accountHolder = item.note.replace("Chủ TK:", "").trim();
+                }
+
                 return (
                   <div
                     key={item.id}
-                    className="py-3 flex items-center justify-between hover:bg-slate-800/20 transition-colors rounded-lg px-2"
+                    className="py-3 px-2 rounded-xl hover:bg-slate-800/30 transition-colors grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] items-center gap-2 sm:gap-4"
                   >
+                    {/* Cột 1: STK */}
                     <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        {isWallet ? (
-                          <div className="p-1 rounded-md bg-cyan-500/10 text-cyan-400">
-                            <CreditCard className="w-3.5 h-3.5" />
-                          </div>
-                        ) : isSavings ? (
-                          <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400">
-                            <PiggyBank className="w-3.5 h-3.5" />
-                          </div>
-                        ) : (
-                          <div className="p-1 rounded-md bg-amber-500/10 text-amber-400">
-                            <Coins className="w-3.5 h-3.5" />
-                          </div>
-                        )}
-                        <span className="text-sm font-bold text-white truncate max-w-[280px] sm:max-w-[420px]" title={item.name}>{item.name}</span>
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            isWallet
-                              ? "bg-cyan-500/10 text-cyan-300 border-cyan-500/20"
-                              : isSavings
-                              ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                              : "bg-amber-500/10 text-amber-300 border-amber-500/20"
-                          }`}
-                        >
-                          {isWallet
-                            ? "Tài Khoản Cá Nhân"
-                            : isSavings
-                            ? "Sổ Tiết Kiệm"
-                            : "Vàng / Đầu Tư"}
-                        </span>
+                      <div className="font-mono font-bold text-white text-xs tracking-wider">
+                        {stk || "-"}
                       </div>
-                      {item.note && <p className="text-xs text-slate-400 italic">{item.note}</p>}
-                      {item.profitEnabled && (
-                        <p className="text-[11px] text-purple-300 font-mono">
-                          Sinh lời {item.annualInterestRate || 0}%/năm ·{" "}
-                          {item.profitFrequency === "DAILY"
-                            ? "Theo ngày"
-                            : item.profitFrequency === "YEARLY"
-                            ? "Theo năm"
-                            : "Theo tháng"}
-                        </p>
+                      {accountHolder && (
+                        <div className="text-[11px] text-slate-400 font-mono truncate" title={accountHolder}>
+                          Chủ TK: {accountHolder}
+                        </div>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    {/* Cột 2: Ngân Hàng */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {isWallet ? (
+                        <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 shrink-0">
+                          <CreditCard className="w-4 h-4" />
+                        </div>
+                      ) : isSavings ? (
+                        <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
+                          <PiggyBank className="w-4 h-4" />
+                        </div>
+                      ) : (
+                        <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
+                          <Coins className="w-4 h-4" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-200 truncate block" title={bankName}>
+                          {bankName}
+                        </span>
+                        {item.note && !item.note.startsWith("Chủ TK:") && (
+                          <p className="text-[11px] text-slate-400 italic truncate">{item.note}</p>
+                        )}
+                        {item.profitEnabled && (
+                          <p className="text-[10px] text-purple-300 font-mono">
+                            Sinh lời {item.annualInterestRate || 0}%/năm
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Cột 3: Tài Sản */}
+                    <div className="flex items-center justify-end gap-3 shrink-0">
                       <span
                         className={`font-mono font-bold text-sm ${
                           isWallet ? "text-cyan-300" : "text-emerald-300"
@@ -390,7 +417,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                       >
                         {formatVND(item.amount)}
                       </span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
                         <button
                           onClick={() => handleOpenEdit(item)}
                           className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"

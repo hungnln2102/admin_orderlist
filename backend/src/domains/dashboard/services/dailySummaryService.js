@@ -7,6 +7,7 @@ const { db, TABLES } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { financeNotifier } = require("@/domains/notifications/telegram");
 const { getVietnamDateString, getVietnamMonthString } = require("@/utils/time");
+const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 
 /**
  * Hàm tích lũy số liệu vào daily_revenue_summary theo ngày (Event-driven, chuẩn UTC+7)
@@ -55,10 +56,23 @@ function registerDailySummaryListeners() {
   eventBus.on(EVENTS.ORDER_PAID, async (data) => {
     try {
       const amount = Number(data.amount || data.price || data.gross_selling_price || 0);
-      const cost = Number(data.cost || 0);
+      
+      // Kiểm tra nếu NCC là Mavryk (Chủ shop) -> Chi phí nhập hàng = 0, cộng thẳng vào lợi nhuận
+      let isMavryk = Boolean(data.isSupplierMavryk);
+      if (!isMavryk && (data.id_order || data.supply_id || data.orderId)) {
+        isMavryk = await isMavrykSupplier(db, {
+          id: data.orderId,
+          id_order: data.id_order,
+          supply_id: data.supply_id,
+          supplier_name: data.supplier_name,
+          supply: data.supply,
+        });
+      }
+
+      const cost = isMavryk ? 0 : Number(data.cost || 0);
       const dateStr = getVietnamDateString(data.order_date || data.transactionDate || data.updated_at);
       const isRenewal = Boolean(data.isRenewal);
-      console.log(`📊 [DailySummary] Nhận ORDER_PAID (${isRenewal ? "Gia hạn" : "Đơn mới"}): +${amount} ₫ doanh thu, +${cost} ₫ chi phí, +1 đơn (Ngày: ${dateStr})`);
+      console.log(`📊 [DailySummary] Nhận ORDER_PAID (${isRenewal ? "Gia hạn" : "Đơn mới"}${isMavryk ? " - NCC Mavryk (Chủ shop)" : ""}): +${amount} ₫ doanh thu, +${cost} ₫ chi phí, +1 đơn (Ngày: ${dateStr})`);
 
       await accumulateDailySummary(dateStr, {
         earned_revenue: amount,
@@ -76,8 +90,8 @@ function registerDailySummaryListeners() {
       await financeNotifier.notifyFinanceMonthlyDelta({
         monthKey: getVietnamMonthString(dateStr),
         revenueDelta: amount,
-        importDelta: cost,
-        profitDelta: amount - cost,
+        importDelta: cost, // 0 nếu là Mavryk -> Nhập hàng không tăng!
+        profitDelta: amount - cost, // = amount nếu là Mavryk -> Cộng thẳng toàn bộ doanh thu vào lợi nhuận!
         bankBalanceDelta: bankDelta,
         context,
       });
@@ -140,9 +154,24 @@ function registerDailySummaryListeners() {
     }
   });
 
-  // 5. Đơn nhập hàng mới thành công -> Tăng chi phí nhập hàng, giảm lợi nhuận đúng bằng số tiền nhập
+  // 5. Đơn nhập hàng mới thành công -> Tăng chi phí nhập hàng, giảm lợi nhuận đúng bằng số tiền nhập (chỉ áp dụng nếu NCC không phải Mavryk)
   eventBus.on(EVENTS.ORDER_IMPORT_CREATED, async (data) => {
     try {
+      let isMavryk = Boolean(data.isSupplierMavryk);
+      if (!isMavryk && (data.id_order || data.supply_id || data.orderId)) {
+        isMavryk = await isMavrykSupplier(db, {
+          id: data.orderId,
+          id_order: data.id_order,
+          supply_id: data.supply_id,
+          supplier_name: data.supplier_name,
+          supply: data.supply,
+        });
+      }
+      if (isMavryk) {
+        console.log(`📦 [DailySummary] Đơn nhập hàng #${data.id_order} thuộc chủ shop Mavryk -> Bỏ qua cộng chi phí nhập hàng.`);
+        return;
+      }
+
       const cost = Number(data.cost || data.amount || 0);
       if (cost <= 0) return;
       const date = getVietnamDateString(data.order_date || data.created_at);
@@ -166,6 +195,21 @@ function registerDailySummaryListeners() {
   // 6. Hủy / Xóa đơn nhập hàng thành công -> Giảm chi phí nhập hàng, cộng lại lợi nhuận đúng bằng số tiền còn lại
   eventBus.on(EVENTS.ORDER_IMPORT_CANCELED, async (data) => {
     try {
+      let isMavryk = Boolean(data.isSupplierMavryk);
+      if (!isMavryk && (data.id_order || data.supply_id || data.orderId)) {
+        isMavryk = await isMavrykSupplier(db, {
+          id: data.orderId,
+          id_order: data.id_order,
+          supply_id: data.supply_id,
+          supplier_name: data.supplier_name,
+          supply: data.supply,
+        });
+      }
+      if (isMavryk) {
+        console.log(`📦 [DailySummary] Hủy đơn nhập hàng #${data.id_order} thuộc chủ shop Mavryk -> Bỏ qua trừ chi phí.`);
+        return;
+      }
+
       const remainingAmount = Number(data.remainingAmount ?? data.amount ?? data.cost ?? 0);
       if (remainingAmount <= 0) return;
       const date = getVietnamDateString();
