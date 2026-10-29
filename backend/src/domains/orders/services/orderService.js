@@ -182,13 +182,28 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
     query = query.where("status", status);
   }
 
-  if (search) {
+  const trimmedSearch = String(search || "").trim();
+  if (trimmedSearch) {
     query = query.where((builder) => {
       builder
-        .whereILike("id_order", `%${search}%`)
-        .orWhereILike("customer", `%${search}%`)
-        .orWhereILike("contact", `%${search}%`)
-        .orWhereILike("information_order", `%${search}%`);
+        .whereILike(O_COLS.ID_ORDER, `%${trimmedSearch}%`)
+        .orWhereILike(O_COLS.CUSTOMER, `%${trimmedSearch}%`)
+        .orWhereILike(O_COLS.CONTACT, `%${trimmedSearch}%`)
+        .orWhereILike(O_COLS.INFORMATION_ORDER, `%${trimmedSearch}%`)
+        .orWhereIn(O_COLS.SUPPLY_ID, function () {
+          this.select(COLS.SUPPLIER.ID)
+            .from(TABLES.SUPPLIER)
+            .whereILike(COLS.SUPPLIER.SUPPLIER_NAME, `%${trimmedSearch}%`);
+        })
+        .orWhereIn(O_COLS.ID, function () {
+          this.select(COLS.SUPPLIER_ORDER_COST_LOG.ORDER_LIST_ID)
+            .from(TABLES.SUPPLIER_ORDER_COST_LOG)
+            .whereIn(COLS.SUPPLIER_ORDER_COST_LOG.SUPPLY_ID, function () {
+              this.select(COLS.SUPPLIER.ID)
+                .from(TABLES.SUPPLIER)
+                .whereILike(COLS.SUPPLIER.SUPPLIER_NAME, `%${trimmedSearch}%`);
+            });
+        });
     });
   }
 
