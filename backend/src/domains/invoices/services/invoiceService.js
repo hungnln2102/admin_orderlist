@@ -9,6 +9,7 @@ const { db, TABLES, withTransaction } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
+const { resolveOrdersWithCatalogPrices } = require("./batchPaymentService");
 
 const getReceiptTable = () => db(TABLES.PAYMENT_RECEIPT);
 
@@ -388,9 +389,15 @@ async function getMatchableOrders({ q = "", limit = 50 } = {}) {
     .orderBy("id", "desc")
     .limit(limitNum);
 
-  return rows.map((r) => ({
+  const enrichedRows = await resolveOrdersWithCatalogPrices(db, rows);
+
+  return enrichedRows.map((r) => ({
     id: Number(r.id),
     orderCode: r.id_order,
+    orderPrefix: r.orderPrefix || "MAVL",
+    catalogBasePrice: Number(r.catalogBasePrice || r.price || 0),
+    displayName: r.display_name || "",
+    variantName: r.variant_name || "",
     customer: r.customer || "",
     price: Number(r.price || 0),
     status: r.status,

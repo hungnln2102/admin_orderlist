@@ -152,11 +152,11 @@ Khi SePay bắn Webhook số tiền về (ví dụ `500.023đ`), hàm `processPa
 
 ## 📋 7. KẾ HOẠCH TRIỂN KHAI THEO CÁC BƯỚC (CHECKLIST)
 
-- [ ] **Bước 1:** Viết file Migration `20261029000001_create_batch_payment_requests.js` và cập nhật `backend/src/db/tables.js`.
-- [ ] **Bước 2:** Cập nhật `slotSuffixService.js` mở rộng quét suffix cho cả đợt gộp.
-- [ ] **Bước 3:** Viết service `batchPaymentService.js` và đăng ký API routes tại `backend/src/domains/invoices/routes.js`.
-- [ ] **Bước 4:** Tích hợp logic đối soát đợt gộp 2 lớp vào `webhookPaymentService.js`.
-- [ ] **Bước 5:** Cập nhật giao diện `CreateReceiptModal.tsx` và `ReceiptsPage.tsx`.
-- [ ] **Bước 6:** Viết integration test `batch_payment_webhook_reconciliation.test.js` kiểm tra kịch bản giả lập webhook thanh toán và gia hạn thành công 100%.
-- [ ] **Bước 7:** Build TypeScript Frontend và nghiệm thu toàn diện cùng Master.
+- [x] **Bước 1:** Viết file Migration `20261029000001_create_batch_payment_requests.js` và cập nhật `backend/src/db/tables.js`.
+- [x] **Bước 2:** Cập nhật `slotSuffixService.js` mở rộng quét suffix cho cả đợt gộp.
+- [x] **Bước 3:** Viết service `batchPaymentService.js` và đăng ký API routes tại `backend/src/domains/invoices/routes.js`.
+- [x] **Bước 4:** Tích hợp logic đối soát đợt gộp 2 lớp vào `webhookPaymentService.js`.
+- [x] **Bước 5:** Cập nhật giao diện `CreateReceiptModal.tsx` và `ReceiptsPage.tsx`.
+- [x] **Bước 6:** Viết integration test `batch_payment_webhook_reconciliation.test.js` kiểm tra kịch bản giả lập webhook thanh toán và gia hạn thành công 100%.
+- [x] **Bước 7:** Build TypeScript Frontend và nghiệm thu toàn diện cùng Master.
 

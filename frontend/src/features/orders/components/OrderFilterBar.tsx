@@ -91,8 +91,8 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
     },
     {
       key: "canceled" as OrderDatasetKey,
-      label: "Hoàn Tiền & Đã Hủy",
-      description: "Đơn đã hoàn, chưa hoàn tiền & đơn hủy",
+      label: "Đơn Đã Hủy",
+      description: "Danh sách đơn hàng đã hủy",
       count: tabCounts.canceled,
       gradient: "from-rose-500/20 via-pink-500/10 to-transparent",
       borderColor: "border-rose-500/40",
@@ -143,7 +143,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
     if (activeTab === "canceled") {
       return [
         {
-          title: "TỔNG ĐƠN HOÀN TIỀN & HỦY",
+          title: "TỔNG ĐƠN ĐÃ HỦY",
           mainValue: `${totalOrdersCount} đơn`,
           subLabel: "Chờ hoàn trả:",
           subValue: `${pendingRefundCount} đơn`,

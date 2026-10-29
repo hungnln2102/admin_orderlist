@@ -1248,7 +1248,7 @@ async function deleteOrder(id) {
     }
 
     const status = existingOrder.status;
-    if (status === ORDER_STATUS.CANCELED) {
+    if (status === ORDER_STATUS.CANCELED || status === "Đã Hủy") {
       throw new Error("Đơn hàng đã hủy không thể bị xóa vĩnh viễn.");
     }
     const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
@@ -1258,6 +1258,8 @@ async function deleteOrder(id) {
       (existingOrder.id_order && String(existingOrder.id_order).startsWith("MAVN")) ||
       (existingOrder.customer && isCustomerMavryk(existingOrder.customer))
     );
+
+    const { excludeOrderFromPendingBatches } = require("@/domains/invoices/services/batchPaymentService");
 
     // Xử lý riêng cho Đơn Nhập Hàng (MAVN... / Mavryk)
     if (isMavn) {
@@ -1292,45 +1294,79 @@ async function deleteOrder(id) {
       return { success: true, action: "deleted", message: summary };
     }
 
-    const isPaidOrder = status === ORDER_STATUS.PAID;
+    // 1. Đơn Cần Gia Hạn (RENEW_REQUIRED) -> Chuyển sang Tab "Hết Hạn" (EXPIRED)
+    // Bảo lưu an toàn 100% dữ liệu tài khoản, mật khẩu, email của khách hàng
+    if (status === ORDER_STATUS.RENEW_REQUIRED || status === "Cần Gia Hạn") {
+      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
+        status: ORDER_STATUS.EXPIRED,
+        updated_at: trx.fn ? trx.fn.now() : new Date(),
+      });
 
-    if (!isPaidOrder) {
-      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
-      const summary = `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
-      emitOrderEvent(trx, EVENTS.ORDER_DELETED, {
+      // Tự động loại trừ khỏi các đợt gộp pending nếu có
+      await excludeOrderFromPendingBatches(trx, existingOrder.id_order, "Đơn cần gia hạn chuyển sang Hết Hạn");
+
+      const summary = `Đã chuyển đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" sang danh sách Hết Hạn`;
+
+      emitOrderEvent(trx, EVENTS.ORDER_EXPIRED, {
         orderId: existingOrder.id,
         id_order: existingOrder.id_order,
+        orderCode: existingOrder.id_order,
         customer: existingOrder.customer,
         price: existingOrder.price,
-        deletedOrder: existingOrder,
+        order: { ...existingOrder, status: ORDER_STATUS.EXPIRED },
         summary,
-        action: "HARD_DELETE",
+        action: "ORDER_EXPIRED",
       });
-      return { success: true, action: "deleted", message: `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order}` };
+
+      return { success: true, action: "expired", message: summary };
     }
 
-    // Đơn Đã Thanh Toán khi xóa -> Chuyển thành Đã Hủy (CANCELED) để nằm trong tab Hoàn Tiền
-    await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
-      status: ORDER_STATUS.CANCELED,
-      canceled_at: existingOrder.canceled_at || todayYMD,
-    });
+    // 2. Đơn Đã Thanh Toán (PAID) -> Chuyển thành "Đã Hủy" (CANCELED)
+    if (status === ORDER_STATUS.PAID || status === "Đã Thanh Toán") {
+      await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).update({
+        status: ORDER_STATUS.CANCELED,
+        canceled_at: existingOrder.canceled_at || todayYMD,
+        updated_at: trx.fn ? trx.fn.now() : new Date(),
+      });
 
-    const refundAmount = calculateOrderRemainingValue(existingOrder, Number(existingOrder.price || 0));
-    await createRefundCreditNoteForCanceledOrder(trx, existingOrder, refundAmount, todayYMD);
+      // Tự động loại trừ khỏi các đợt gộp pending nếu có
+      await excludeOrderFromPendingBatches(trx, existingOrder.id_order, "Đơn đã thanh toán bị hủy");
 
-    const summary = `Đã hủy đơn hàng đã thanh toán #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)}), hoàn credit theo ngày còn lại: ${formatMoney(refundAmount)}`;
+      const refundAmount = calculateOrderRemainingValue(existingOrder, Number(existingOrder.price || 0));
+      await createRefundCreditNoteForCanceledOrder(trx, existingOrder, refundAmount, todayYMD);
 
-    emitOrderEvent(trx, EVENTS.ORDER_CANCELED_REFUNDED, {
+      const summary = `Đã hủy đơn hàng đã thanh toán #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)}), hoàn credit theo ngày còn lại: ${formatMoney(refundAmount)}`;
+
+      emitOrderEvent(trx, EVENTS.ORDER_CANCELED_REFUNDED, {
+        orderId: existingOrder.id,
+        orderCode: existingOrder.id_order,
+        order: existingOrder,
+        refundAmount,
+        canceledAt: todayYMD,
+        summary,
+        action: "ORDER_CANCELED",
+      });
+
+      return { success: true, action: "canceled", message: summary };
+    }
+
+    // 3. Đơn Chưa Thanh Toán (UNPAID) hoặc đơn nháp khác -> Xóa vĩnh viễn (Hard Delete)
+    await excludeOrderFromPendingBatches(trx, existingOrder.id_order, "Đơn chưa thanh toán bị xóa");
+
+    await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
+    const summary = `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order} của khách "${existingOrder.customer}" (${formatMoney(existingOrder.price)})`;
+
+    emitOrderEvent(trx, EVENTS.ORDER_DELETED, {
       orderId: existingOrder.id,
-      orderCode: existingOrder.id_order,
-      order: existingOrder,
-      refundAmount,
-      canceledAt: todayYMD,
+      id_order: existingOrder.id_order,
+      customer: existingOrder.customer,
+      price: existingOrder.price,
+      deletedOrder: existingOrder,
       summary,
-      action: "ORDER_CANCELED",
+      action: "HARD_DELETE",
     });
 
-    return { success: true, action: "canceled", message: summary };
+    return { success: true, action: "deleted", message: `Đã xóa vĩnh viễn đơn hàng #${existingOrder.id_order}` };
   });
 }
 

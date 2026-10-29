@@ -16,9 +16,11 @@ import {
   Plus,
   HelpCircle,
   Link2,
+  Layers,
 } from "lucide-react";
 import { AllocateReceiptModal } from "../features/invoices/components/AllocateReceiptModal";
 import { CreateReceiptModal } from "../features/invoices/components/CreateReceiptModal";
+import { PendingBatchesModal } from "../features/invoices/components/PendingBatchesModal";
 
 interface InvoiceReceipt {
   id: number;
@@ -90,6 +92,7 @@ export const ReceiptsPage: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<InvoiceReceipt | null>(null);
   const [allocatingReceipt, setAllocatingReceipt] = useState<InvoiceReceipt | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [isPendingBatchesOpen, setIsPendingBatchesOpen] = useState<boolean>(false);
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -168,6 +171,15 @@ export const ReceiptsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsPendingBatchesOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 text-xs font-semibold rounded-xl border border-cyan-500/30 hover:border-cyan-500/60 transition-all shadow-sm active:scale-95 cursor-pointer"
+            title="Xem danh sách các đợt gộp đơn đang chờ khách chuyển tiền"
+          >
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span>Đợt Gộp Đang Chờ</span>
+          </button>
+
           <button
             onClick={fetchInvoices}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 text-xs font-medium rounded-xl border border-slate-700/60 transition-all shadow-sm active:scale-95"
@@ -685,6 +697,13 @@ export const ReceiptsPage: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchInvoices}
+      />
+
+      {/* Pending Batches Management Modal */}
+      <PendingBatchesModal
+        isOpen={isPendingBatchesOpen}
+        onClose={() => setIsPendingBatchesOpen(false)}
+        onRefresh={fetchInvoices}
       />
     </div>
   );

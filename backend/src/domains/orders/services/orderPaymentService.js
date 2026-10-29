@@ -313,6 +313,14 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     }
   });
 
+  // Tự động đối soát và loại trừ đơn hàng khỏi các đợt gộp PENDING còn hiệu lực (nếu có)
+  try {
+    const { excludeOrderFromPendingBatches } = require("@/domains/invoices/services/batchPaymentService");
+    await excludeOrderFromPendingBatches(trx, updatedOrder.id_order, "Đã thanh toán");
+  } catch (exErr) {
+    console.warn(`[OrderPayment] Bỏ qua loại trừ batch cho đơn ${updatedOrder.id_order}:`, exErr.message);
+  }
+
   return { updatedOrder, isRenewal, newExpiredAt, newOrderDate };
 }
 
