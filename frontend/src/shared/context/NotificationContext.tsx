@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
-import { NotificationModal, NotificationState, NotificationType } from "../components/NotificationModal";
+import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { NotificationModal, NotificationState } from "../components/NotificationModal";
+import { ToastNotificationContainer, ToastItem } from "../components/ToastNotification";
 
 interface ConfirmOptions {
   title?: string;
@@ -21,49 +22,69 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+// Giới hạn tối đa 4 thẻ hiển thị cùng lúc
+const MAX_TOASTS = 4;
+
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [modalState, setModalState] = useState<NotificationState>({
+  // Danh sách Toasts góc phải (tối đa 4 thẻ)
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  // State riêng cho Modal Xác Nhận (confirm) ở giữa màn hình
+  const [confirmModalState, setConfirmModalState] = useState<NotificationState>({
     isOpen: false,
     message: "",
   });
 
-  const showNotification = (
-    type: NotificationType,
-    message: string,
-    title?: string,
-    extra?: Partial<NotificationState>
-  ) => {
-    setModalState({
-      isOpen: true,
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const addToast = useCallback((type: "info" | "success" | "warning" | "error", message: string, title?: string) => {
+    const newToast: ToastItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type,
       message,
       title,
-      ...extra,
+    };
+
+    setToasts((prev) => {
+      // Quy tắc Master: Tối đa 4 thẻ, thẻ thứ 5 hiện thì lập tức mất thẻ 1
+      const trimmed = prev.length >= MAX_TOASTS ? prev.slice(prev.length - (MAX_TOASTS - 1)) : prev;
+      return [...trimmed, newToast];
     });
-  };
+  }, []);
 
-  const close = () => {
-    setModalState((prev) => ({ ...prev, isOpen: false }));
-  };
+  const close = useCallback(() => {
+    setConfirmModalState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
 
-  const info = (message: string, title?: string) => showNotification("info", message, title);
-  const success = (message: string, title?: string) => showNotification("success", message, title);
-  const warning = (message: string, title?: string) => showNotification("warning", message, title);
-  const error = (message: string, title?: string) => showNotification("error", message, title);
+  const info = useCallback((message: string, title?: string) => addToast("info", message, title), [addToast]);
+  const success = useCallback((message: string, title?: string) => addToast("success", message, title), [addToast]);
+  const warning = useCallback((message: string, title?: string) => addToast("warning", message, title), [addToast]);
+  const error = useCallback((message: string, title?: string) => addToast("error", message, title), [addToast]);
 
-  const confirm = (options: ConfirmOptions) => {
-    showNotification("confirm", options.message, options.title, {
+  const confirm = useCallback((options: ConfirmOptions) => {
+    setConfirmModalState({
+      isOpen: true,
+      type: "confirm",
+      message: options.message,
+      title: options.title,
       confirmText: options.confirmText || "Xác Nhận",
       cancelText: options.cancelText || "Hủy Bỏ",
       onConfirm: options.onConfirm,
       onCancel: options.onCancel,
     });
-  };
+  }, []);
 
   return (
     <NotificationContext.Provider value={{ info, success, warning, error, confirm, close }}>
       {children}
-      <NotificationModal {...modalState} onClose={close} />
+
+      {/* 1. Hệ thống Toast góc phải: 5s mờ dần, tối đa 4 thẻ, thẻ thứ 5 đẩy thẻ 1 */}
+      <ToastNotificationContainer toasts={toasts} onClose={removeToast} />
+
+      {/* 2. Giữ nguyên modal confirm ở giữa màn hình cho thao tác xác nhận an toàn */}
+      <NotificationModal {...confirmModalState} onClose={close} />
     </NotificationContext.Provider>
   );
 };
