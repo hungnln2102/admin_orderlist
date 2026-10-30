@@ -8,6 +8,7 @@ router.post("/", controller.createWarehouseAccount);
 router.delete("/:id", controller.deleteWarehouseAccount);
 router.put("/accounts/:id", controller.updateWarehouseAccount);
 
+router.get("/system-products", controller.getSystemProducts);
 router.get("/catalog", controller.getCatalogItems);
 router.post("/catalog", controller.createCatalogItem);
 router.delete("/catalog/:id", controller.deleteCatalogItem);

@@ -45,6 +45,10 @@ test("Package Categories Integration Tests (V2)", async (t) => {
     const listAfter = await productService.getPackageCategories();
     const foundUpdated = listAfter.find((c) => c.name === updatedName);
     assert.ok(foundUpdated, "Updated category should be present");
+
+    // Cleanup
+    await productService.deletePackageCategory(updatedName);
+    await db("warehouse.product_names").where("id", created.id).del();
   });
 
   await t.test("3. deletePackageCategory sets is_package = false and emits event", async () => {
@@ -66,6 +70,9 @@ test("Package Categories Integration Tests (V2)", async (t) => {
     const row = await db("warehouse.product_names").where("id", created.id).first();
     assert.ok(row, "Row must still exist in DB (soft delete)");
     assert.equal(row.is_package, false);
+
+    // Hard delete test row
+    await db("warehouse.product_names").where("id", created.id).del();
   });
 
   await t.test("4. getAllCatalogProductNames returns all master catalog names", async () => {
@@ -125,6 +132,10 @@ test("Package Categories Integration Tests (V2)", async (t) => {
     // Delete package
     const delPkg = await productService.deletePackageProduct(newPkg.id);
     assert.equal(delPkg.success, true);
+
+    // Cleanup category
+    await productService.deletePackageCategory(catName);
+    await db("warehouse.product_names").where("name", catName).del();
   });
 
   await t.test("6. getPackageProducts slot matching only includes PAID and RENEW_REQUIRED with valid expired_at", async () => {

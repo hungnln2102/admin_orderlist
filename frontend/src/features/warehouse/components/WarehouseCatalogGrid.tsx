@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Table as TableIcon,
   Globe,
+  Package,
 } from "lucide-react";
 import { ServiceNameCategoryItem } from "../types";
 
@@ -136,15 +137,26 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                 <div className="space-y-3">
                   {/* HEADER THẺ: TÊN DỊCH VỤ & STATUS */}
                   <div className="flex items-start justify-between gap-3 min-w-0">
-                    <div className="min-w-0 flex-1">
-                      <h4
-                        className="font-bold text-white text-sm sm:text-base truncate block"
-                        title={cat.name}
-                      >
-                        {cat.name}
-                      </h4>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4
+                          className="font-bold text-white text-sm sm:text-base truncate block"
+                          title={cat.name}
+                        >
+                          {cat.name}
+                        </h4>
+                        {cat.systemProductName && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-semibold shrink-0"
+                            title={`Liên kết sản phẩm hệ thống: ${cat.systemProductName}`}
+                          >
+                            <Package className="w-3 h-3 text-cyan-400" />
+                            <span>{cat.systemProductName}</span>
+                          </span>
+                        )}
+                      </div>
                       <span
-                        className="text-xs text-slate-400 font-medium truncate block mt-0.5"
+                        className="text-xs text-slate-400 font-medium truncate block"
                         title={cat.category}
                       >
                         {cat.category}
@@ -299,7 +311,18 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                   <tr key={cat.id} className="hover:bg-white/[0.03] transition-colors">
                     {/* TÊN DỊCH VỤ */}
                     <td className="px-4 py-3.5 font-bold text-white text-sm">
-                      {cat.name}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{cat.name}</span>
+                        {cat.systemProductName && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-medium"
+                            title={`Liên kết sản phẩm hệ thống: ${cat.systemProductName}`}
+                          >
+                            <Package className="w-3 h-3 text-cyan-400" />
+                            <span>{cat.systemProductName}</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* CHUYÊN MỤC */}

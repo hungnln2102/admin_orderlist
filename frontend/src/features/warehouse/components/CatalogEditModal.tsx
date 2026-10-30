@@ -1,18 +1,26 @@
 import React, { useState, useEffect } from "react";
-import { Edit2, X, ExternalLink, Link2, Loader2 } from "lucide-react";
-import { ServiceNameCategoryItem } from "../types";
+import { Edit2, X, ExternalLink, Link2, Loader2, Package } from "lucide-react";
+import { ServiceNameCategoryItem, SystemProduct } from "../types";
 
 interface CatalogEditModalProps {
   open: boolean;
   item: ServiceNameCategoryItem | null;
+  systemProducts?: SystemProduct[];
   isSubmitting?: boolean;
   onClose: () => void;
-  onSubmit: (data: { id: number; name: string; category: string; loginUrl: string }) => void;
+  onSubmit: (data: {
+    id: number;
+    name: string;
+    category: string;
+    loginUrl: string;
+    productId: number | null;
+  }) => void;
 }
 
 export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
   open,
   item,
+  systemProducts = [],
   isSubmitting = false,
   onClose,
   onSubmit,
@@ -20,6 +28,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Thiết Kế Đồ Họa");
   const [loginUrl, setLoginUrl] = useState("");
+  const [productId, setProductId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -27,6 +36,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
       setName(item.name || "");
       setCategory(item.category || "Thiết Kế Đồ Họa");
       setLoginUrl(item.loginUrl || "");
+      setProductId(item.productId !== undefined ? item.productId : null);
       setError("");
     }
   }, [item, open]);
@@ -45,6 +55,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
       name: name.trim(),
       category: category.trim(),
       loginUrl: loginUrl.trim(),
+      productId: productId ? Number(productId) : null,
     });
   };
 
@@ -87,11 +98,33 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
             </label>
             <input
               type="text"
-              placeholder="Ví dụ: Netflix, Canva, Youtube Premium..."
+              placeholder="Ví dụ: GoogleOne 5000gb, Netflix, Canva..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Sản Phẩm Hệ Thống Liên Kết (Tùy chọn)</span>
+            </label>
+            <select
+              value={productId || ""}
+              onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+            >
+              <option value="">-- Không liên kết (Dịch vụ tự do) --</option>
+              {systemProducts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              💡 Liên kết dịch vụ kho này với loại sản phẩm bán hàng trong hệ thống (VD: Google One).
+            </p>
           </div>
 
           <div>
@@ -170,4 +203,3 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
     </div>
   );
 };
-

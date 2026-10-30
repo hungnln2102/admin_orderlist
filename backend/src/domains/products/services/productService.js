@@ -614,6 +614,7 @@ const getPackageProducts = async () => {
       pp.id,
       pp.product_name_id,
       pn.name AS product_name,
+      pn.product_id AS category_product_id,
       COALESCE(pn.name, 'Khác') AS category,
       pn.requires_storage AS category_requires_storage,
       COALESCE(acc.account_username, 'Tài khoản kho #' || pp.id) AS account_info,
@@ -688,7 +689,10 @@ const getPackageProducts = async () => {
 
     const vIds = Array.from(new Set(ordersList.map((o) => parseInt(o.id_product, 10)).filter((id) => Number.isInteger(id) && id > 0)));
     if (vIds.length > 0) {
-      const variants = await db(TABLES.VARIANT).whereIn("id", vIds).select("id", "variant_name", "display_name");
+      const variants = await db(`${TABLES.VARIANT} as v`)
+        .leftJoin(`${TABLES.PRODUCT} as p`, "p.id", "v.product_id")
+        .whereIn("v.id", vIds)
+        .select("v.id", "v.product_id", "v.variant_name", "v.display_name", "p.package_name as product_package_name");
       variantMap = new Map(variants.map((v) => [String(v.id), v]));
     }
   }
@@ -729,6 +733,40 @@ const getPackageProducts = async () => {
         const now = new Date();
         if (expDate.setHours(0, 0, 0, 0) < now.setHours(0, 0, 0, 0)) {
           return false;
+        }
+      }
+
+      // 4. KIỂM TRA ĐƠN HÀNG CÓ THUỘC SẢN PHẨM CỦA GÓI NÀY HAY KHÔNG (Chỉ đạo của Master)
+      const pkgProductId = r.category_product_id ? Number(r.category_product_id) : null;
+      const pkgName = String(r.product_name || r.category || "").trim();
+      if (pkgProductId || pkgName) {
+        const variant = variantMap.get(String(o.id_product));
+        if (variant) {
+          let isMatchedProduct = false;
+          // Ưu tiên 1: Khớp chính xác 100% bằng product_id hệ thống
+          if (pkgProductId && variant.product_id) {
+            isMatchedProduct = Number(variant.product_id) === pkgProductId;
+          } else if (pkgName) {
+            // Ưu tiên 2: Fallback so sánh text nếu chưa có liên kết product_id
+            const normalize = (str) =>
+              String(str || "")
+                .toLowerCase()
+                .replace(/[\s\-_]+/g, "");
+
+            const normPkg = normalize(pkgName);
+            const normProd = normalize(variant.product_package_name);
+            const normDisplay = normalize(variant.display_name);
+            const normVariant = normalize(variant.variant_name);
+
+            isMatchedProduct =
+              (normProd && (normProd === normPkg || normProd.includes(normPkg) || normPkg.includes(normProd))) ||
+              (normDisplay && normDisplay.includes(normPkg)) ||
+              (normVariant && normVariant.includes(normPkg));
+          }
+
+          if (!isMatchedProduct) {
+            return false;
+          }
         }
       }
 
@@ -801,56 +839,66 @@ const getPackageProducts = async () => {
 
 /**
  * Lấy danh mục các Loại Gói từ warehouse.product_names (lọc is_package = true)
- * Bao gồm cờ requires_storage (Sử dụng tài khoản dung lượng liên kết)
+ * Bao gồm cờ requires_storage và liên kết product_id với business.product
  */
 const getPackageCategories = async () => {
-  let categories = await db(TABLES.PRODUCT_NAMES)
-    .where("is_package", true)
-    .orderBy("id", "asc");
+  // 1. Tìm các loại gói đang có trong kho gói warehouse.package_products
+  const usedPnRows = await db(TABLES.PACKAGE_PRODUCT).distinct("product_name_id");
+  const usedPnIds = usedPnRows
+    .map((r) => Number(r.product_name_id))
+    .filter((id) => Number.isInteger(id) && id > 0);
 
-  // Nếu DB chưa có bản ghi nào đánh dấu is_package = true, tự động đảm bảo 6 loại gói mặc định
-  if (!categories || categories.length === 0) {
-    const defaultPackages = [
-      { name: "Adobe", requiresStorage: true },
-      { name: "Canva", requiresStorage: true },
-      { name: "Gemini", requiresStorage: false },
-      { name: "GoogleOne", requiresStorage: true },
-      { name: "Netflix", requiresStorage: false },
-      { name: "Youtube", requiresStorage: false },
-    ];
-    for (const pkg of defaultPackages) {
-      const existing = await db(TABLES.PRODUCT_NAMES)
-        .whereRaw("LOWER(name) = ?", [pkg.name.toLowerCase()])
-        .first();
+  // 2. Chỉ lấy các bản ghi có is_package = true hoặc đang có gói trong kho
+  let query = db(TABLES.PRODUCT_NAMES).where("is_package", true);
+  if (usedPnIds.length > 0) {
+    query = query.orWhereIn("id", usedPnIds);
+  }
 
-      if (existing) {
-        await db(TABLES.PRODUCT_NAMES)
-          .where("id", existing.id)
-          .update({ is_package: true, requires_storage: pkg.requiresStorage });
-      } else {
-        await db(TABLES.PRODUCT_NAMES).insert({
-          name: pkg.name,
-          is_package: true,
-          requires_storage: pkg.requiresStorage,
-        });
+  const categories = await query.orderBy("name", "asc");
+
+  // 3. Tự động đồng bộ cờ is_package = true và liên kết product_id từ business.product
+  const sysProducts = await db(TABLES.PRODUCT).select("id", "package_name");
+  const normalize = (str) => String(str || "").toLowerCase().replace(/[\s\-_]+/g, "");
+
+  for (const cat of categories) {
+    let shouldUpdate = false;
+    const updateData = {};
+
+    if (!cat.is_package) {
+      updateData.is_package = true;
+      cat.is_package = true;
+      shouldUpdate = true;
+    }
+
+    if (!cat.product_id) {
+      const normCatName = normalize(cat.name);
+      const matchedProd = sysProducts.find((p) => {
+        const normP = normalize(p.package_name);
+        return normP === normCatName || normP.includes(normCatName) || normCatName.includes(normP);
+      });
+      if (matchedProd) {
+        updateData.product_id = matchedProd.id;
+        cat.product_id = matchedProd.id;
+        shouldUpdate = true;
       }
     }
 
-    categories = await db(TABLES.PRODUCT_NAMES)
-      .where("is_package", true)
-      .orderBy("id", "asc");
+    if (shouldUpdate) {
+      await db(TABLES.PRODUCT_NAMES).where("id", cat.id).update(updateData);
+    }
   }
 
   return categories.map((c) => ({
     id: c.id,
+    productId: c.product_id ? Number(c.product_id) : null,
     name: c.name,
-    isPackage: Boolean(c.is_package),
+    isPackage: true,
     requiresStorage: Boolean(c.requires_storage),
   }));
 };
 
 /**
- * Tạo mới hoặc cập nhật Loại Gói (đánh dấu is_package = true & requires_storage)
+ * Tạo mới hoặc cập nhật Loại Gói (đánh dấu is_package = true, requires_storage, và liên kết product_id)
  */
 const createPackageCategory = async ({ name, requiresStorage = false }) => {
   const trimmedName = (name || "").trim();
@@ -858,22 +906,38 @@ const createPackageCategory = async ({ name, requiresStorage = false }) => {
     throw new Error("Tên loại gói không được để trống!");
   }
 
+  // Tự động tìm product_id từ business.product
+  const normalize = (str) => String(str || "").toLowerCase().replace(/[\s\-_]+/g, "");
+  const normName = normalize(trimmedName);
+  const sysProducts = await db(TABLES.PRODUCT).select("id", "package_name");
+  const matchedProd = sysProducts.find((p) => {
+    const normP = normalize(p.package_name);
+    return normP === normName || normP.includes(normName) || normName.includes(normP);
+  });
+  const linkedProductId = matchedProd ? matchedProd.id : null;
+
   const existing = await db(TABLES.PRODUCT_NAMES)
     .whereRaw("LOWER(name) = ?", [trimmedName.toLowerCase()])
     .first();
 
   if (existing) {
+    const updateData = {
+      is_package: true,
+      requires_storage: Boolean(requiresStorage),
+      updated_at: db.fn.now(),
+    };
+    if (linkedProductId && !existing.product_id) {
+      updateData.product_id = linkedProductId;
+    }
+
     const [updated] = await db(TABLES.PRODUCT_NAMES)
       .where("id", existing.id)
-      .update({
-        is_package: true,
-        requires_storage: Boolean(requiresStorage),
-        updated_at: db.fn.now(),
-      })
+      .update(updateData)
       .returning("*");
 
     const result = {
       id: updated.id,
+      productId: updated.product_id ? Number(updated.product_id) : null,
       name: updated.name,
       isPackage: Boolean(updated.is_package),
       requiresStorage: Boolean(updated.requires_storage),
@@ -887,11 +951,13 @@ const createPackageCategory = async ({ name, requiresStorage = false }) => {
       name: trimmedName,
       is_package: true,
       requires_storage: Boolean(requiresStorage),
+      product_id: linkedProductId,
     })
     .returning("*");
 
   const result = {
     id: inserted.id,
+    productId: inserted.product_id ? Number(inserted.product_id) : null,
     name: inserted.name,
     isPackage: Boolean(inserted.is_package),
     requiresStorage: Boolean(inserted.requires_storage),
@@ -926,6 +992,20 @@ const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
     updateFields.requires_storage = Boolean(requiresStorage);
   }
 
+  // Tự động cập nhật product_id nếu đổi tên sang sản phẩm khác
+  if (trimmedNew.toLowerCase() !== trimmedOld.toLowerCase()) {
+    const normalize = (str) => String(str || "").toLowerCase().replace(/[\s\-_]+/g, "");
+    const normNew = normalize(trimmedNew);
+    const sysProducts = await db(TABLES.PRODUCT).select("id", "package_name");
+    const matchedProd = sysProducts.find((p) => {
+      const normP = normalize(p.package_name);
+      return normP === normNew || normP.includes(normNew) || normNew.includes(normP);
+    });
+    if (matchedProd) {
+      updateFields.product_id = matchedProd.id;
+    }
+  }
+
   const [updated] = await db(TABLES.PRODUCT_NAMES)
     .where("id", existing.id)
     .update(updateFields)
@@ -933,11 +1013,14 @@ const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
 
   const result = {
     id: updated.id,
+    productId: updated.product_id ? Number(updated.product_id) : null,
     name: updated.name,
     isPackage: Boolean(updated.is_package),
     requiresStorage: Boolean(updated.requires_storage),
   };
+
   eventBus.emit(EVENTS.PACKAGE_CATEGORY_UPDATED, result);
+
   return result;
 };
 
@@ -1224,15 +1307,16 @@ const deletePackageProduct = async (id) => {
  * Lấy toàn bộ danh sách tên sản phẩm trong bảng Master Catalog (warehouse.product_names)
  */
 const getAllCatalogProductNames = async () => {
-  const list = await db(TABLES.PRODUCT_NAMES)
-    .select("id", "name", "is_package", "login_url")
-    .orderBy("name", "asc");
+  const list = await db(TABLES.PRODUCT)
+    .select("id", "package_name as name", "is_active")
+    .where("is_active", true)
+    .orderBy("package_name", "asc");
 
   return list.map((item) => ({
     id: item.id,
     name: item.name,
-    isPackage: Boolean(item.is_package),
-    loginUrl: item.login_url || null,
+    isPackage: true,
+    loginUrl: null,
   }));
 };
 

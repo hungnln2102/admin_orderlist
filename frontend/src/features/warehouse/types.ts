@@ -40,11 +40,19 @@ export interface WarehouseAccountItem {
   services: WarehouseServiceSlot[];
 }
 
+export interface SystemProduct {
+  id: number;
+  name: string;
+  isActive?: boolean;
+}
+
 export interface ServiceNameCategoryItem {
   id: number;
   name: string;
   category: string;
   loginUrl?: string | null;
+  productId?: number | null;
+  systemProductName?: string | null;
   totalSlots?: number;
   inStockSlots: number;
   reservedSlots: number;
@@ -65,6 +73,7 @@ export interface WarehouseAccountFormData {
 export interface CatalogFormData {
   name: string;
   category: string;
+  productId?: number | null;
   loginUrl?: string;
 }
 
@@ -72,6 +81,7 @@ export interface CatalogEditFormData {
   id: number;
   name: string;
   category: string;
+  productId?: number | null;
   loginUrl: string;
 }
 

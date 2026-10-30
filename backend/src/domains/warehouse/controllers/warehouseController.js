@@ -124,6 +124,16 @@ const updateCatalogItem = async (req, res) => {
   }
 };
 
+const getSystemProducts = async (req, res) => {
+  try {
+    const data = await warehouseService.getSystemProducts();
+    return res.json(data);
+  } catch (err) {
+    console.error("[WarehouseController] getSystemProducts error:", err);
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải danh sách sản phẩm hệ thống.") });
+  }
+};
+
 module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
@@ -137,4 +147,5 @@ module.exports = {
   updateCatalogItem,
   deleteCatalogItem,
   openAccountBrowser,
+  getSystemProducts,
 };

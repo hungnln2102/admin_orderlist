@@ -4,7 +4,7 @@
   "private": true,
   "description": "Workspace orchestrator for admin_orderlist. Runtime dependencies live inside backend/ and frontend/.",
   "scripts": {
-    "dev": "npx --yes concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev": "npx --yes concurrently@9 -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
@@ -16,6 +16,6 @@
     "docker:down": "docker compose down"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.2.5"
   }
 }

@@ -1,10 +1,11 @@
 import React from "react";
-import { Layers, X } from "lucide-react";
-import { CatalogFormData } from "../types";
+import { Layers, X, Package } from "lucide-react";
+import { CatalogFormData, SystemProduct } from "../types";
 
 interface CatalogCreateModalProps {
   open: boolean;
   formData: CatalogFormData;
+  systemProducts?: SystemProduct[];
   onClose: () => void;
   onFormChange: (data: CatalogFormData) => void;
   onSubmit: () => void;
@@ -13,6 +14,7 @@ interface CatalogCreateModalProps {
 export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
   open,
   formData,
+  systemProducts = [],
   onClose,
   onFormChange,
   onSubmit,
@@ -40,11 +42,38 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
             <label className="block text-xs font-medium text-slate-300 mb-1">Tên Dịch Vụ / Gói (*)</label>
             <input
               type="text"
-              placeholder="Ví dụ: Office 365 E5 License"
+              placeholder="Ví dụ: GoogleOne 5000gb, Office 365, Mail..."
               value={formData.name}
               onChange={(e) => onFormChange({ ...formData, name: e.target.value })}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Sản Phẩm Hệ Thống Liên Kết (Tùy chọn)</span>
+            </label>
+            <select
+              value={formData.productId || ""}
+              onChange={(e) =>
+                onFormChange({
+                  ...formData,
+                  productId: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
+            >
+              <option value="">-- Không liên kết (Dịch vụ tự do) --</option>
+              {systemProducts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              💡 Dùng để liên kết với loại sản phẩm bán hàng trong hệ thống (VD: Google One, Adobe...).
+            </p>
           </div>
 
           <div>

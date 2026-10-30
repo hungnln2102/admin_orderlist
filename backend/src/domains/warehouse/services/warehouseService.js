@@ -379,9 +379,16 @@ const deleteWarehouseServiceSlot = async (slotId) => {
 };
 
 const listCatalogItems = async () => {
-  const pNames = await db(TABLES.PRODUCT_NAMES)
-    .select("id", "name", "login_url")
-    .orderBy("id", "asc");
+  const pNames = await db(`${TABLES.PRODUCT_NAMES} as pn`)
+    .leftJoin(`${TABLES.PRODUCT} as p`, "p.id", "pn.product_id")
+    .select(
+      "pn.id",
+      "pn.name",
+      "pn.login_url",
+      "pn.product_id",
+      "p.package_name as system_product_name"
+    )
+    .orderBy("pn.id", "asc");
 
   const slotStats = await db(TABLES.STOCK_SERVICES)
     .select("name_id")
@@ -410,6 +417,8 @@ const listCatalogItems = async () => {
       name: p.name,
       category: p.name,
       loginUrl: p.login_url || null,
+      productId: p.product_id ? Number(p.product_id) : null,
+      systemProductName: p.system_product_name || null,
       totalSlots: stats.total,
       inStockSlots: stats.inStock,
       reservedSlots: stats.reserved,
@@ -425,16 +434,24 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
   const title = (name || category || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
+  const resolvedProductId = productId ? Number(productId) : null;
+  const resolvedLoginUrl = loginUrl ? String(loginUrl).trim() : null;
+
   const existing = await db(TABLES.PRODUCT_NAMES)
     .whereRaw("LOWER(name) = ?", [title.toLowerCase()])
     .first();
 
   if (existing) {
-    if (loginUrl && loginUrl.trim() && existing.login_url !== loginUrl.trim()) {
-      await db(TABLES.PRODUCT_NAMES)
-        .where("id", existing.id)
-        .update({ login_url: loginUrl.trim() });
-      existing.login_url = loginUrl.trim();
+    const updates = {};
+    if (resolvedLoginUrl && existing.login_url !== resolvedLoginUrl) {
+      updates.login_url = resolvedLoginUrl;
+    }
+    if (resolvedProductId !== undefined && existing.product_id !== resolvedProductId) {
+      updates.product_id = resolvedProductId;
+    }
+    if (Object.keys(updates).length > 0) {
+      await db(TABLES.PRODUCT_NAMES).where("id", existing.id).update(updates);
+      Object.assign(existing, updates);
     }
     return existing;
   }
@@ -442,8 +459,8 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
   const [inserted] = await db(TABLES.PRODUCT_NAMES)
     .insert({
       name: title,
-      product_id: productId || null,
-      login_url: loginUrl ? loginUrl.trim() : null,
+      product_id: resolvedProductId,
+      login_url: resolvedLoginUrl,
     })
     .returning("*");
 
@@ -694,7 +711,7 @@ const updateCatalogItem = async (id, payload) => {
   const numericId = Number(id);
   if (!numericId) throw new Error("ID dịch vụ không hợp lệ!");
 
-  const { name, category, loginUrl } = payload || {};
+  const { name, category, loginUrl, productId } = payload || {};
   const title = (name || category || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
@@ -712,15 +729,29 @@ const updateCatalogItem = async (id, payload) => {
     if (loginUrl !== undefined) {
       updateData.login_url = loginUrl ? String(loginUrl).trim() : null;
     }
+    if (productId !== undefined) {
+      updateData.product_id = productId ? Number(productId) : null;
+    }
 
     await trx(TABLES.PRODUCT_NAMES).where("id", numericId).update(updateData);
 
-    const updated = await trx(TABLES.PRODUCT_NAMES).where("id", numericId).first();
+    const updated = await trx(`${TABLES.PRODUCT_NAMES} as pn`)
+      .leftJoin(`${TABLES.PRODUCT} as p`, "p.id", "pn.product_id")
+      .select(
+        "pn.id",
+        "pn.name",
+        "pn.login_url",
+        "pn.product_id",
+        "p.package_name as system_product_name"
+      )
+      .where("pn.id", numericId)
+      .first();
 
     eventBus.emit(EVENTS.WAREHOUSE_CATALOG_UPDATED, {
       id: updated.id,
       name: updated.name,
       loginUrl: updated.login_url,
+      productId: updated.product_id,
     });
 
     return {
@@ -728,8 +759,25 @@ const updateCatalogItem = async (id, payload) => {
       name: updated.name,
       category: updated.name,
       loginUrl: updated.login_url || null,
+      productId: updated.product_id ? Number(updated.product_id) : null,
+      systemProductName: updated.system_product_name || null,
     };
   });
+};
+
+/**
+ * Lấy danh sách sản phẩm hệ thống từ business.product
+ */
+const getSystemProducts = async () => {
+  const list = await db(TABLES.PRODUCT)
+    .select("id", "package_name as name", "is_active")
+    .orderBy("package_name", "asc");
+
+  return list.map((p) => ({
+    id: Number(p.id),
+    name: p.name || "",
+    isActive: Boolean(p.is_active),
+  }));
 };
 
 module.exports = {
@@ -745,4 +793,5 @@ module.exports = {
   updateCatalogItem,
   deleteCatalogItem,
   openAccountBrowser,
+  getSystemProducts,
 };

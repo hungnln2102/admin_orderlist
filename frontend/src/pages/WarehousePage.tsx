@@ -19,6 +19,7 @@ import {
   WarehouseServiceSlot,
   WarehouseSlotEditFormData,
   ServiceNameCategoryItem,
+  SystemProduct,
   WarehouseAccountFormData,
   WarehouseAddServiceFormData,
   CatalogFormData,
@@ -50,6 +51,7 @@ export const WarehousePage: React.FC = () => {
   // Dynamic state from PostgreSQL
   const [accounts, setAccounts] = useState<WarehouseAccountItem[]>([]);
   const [catalog, setCatalog] = useState<ServiceNameCategoryItem[]>([]);
+  const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Modals
@@ -82,7 +84,9 @@ export const WarehousePage: React.FC = () => {
 
   const [catalogForm, setCatalogForm] = useState<CatalogFormData>({
     name: "",
-    category: "Giải Trí & Video",
+    category: "Văn Phòng & Phần Mềm",
+    productId: null,
+    loginUrl: "",
   });
 
   const hasAutoExpandedRef = useRef(false);
@@ -91,9 +95,10 @@ export const WarehousePage: React.FC = () => {
   const loadWarehouseData = useCallback(async () => {
     setLoading(true);
     try {
-      const [accRes, catRes] = await Promise.all([
+      const [accRes, catRes, sysProdRes] = await Promise.all([
         fetch("/api/warehouse"),
         fetch("/api/warehouse/catalog"),
+        fetch("/api/warehouse/system-products"),
       ]);
 
       if (accRes.ok) {
@@ -111,6 +116,10 @@ export const WarehousePage: React.FC = () => {
       if (catRes.ok) {
         const catData: ServiceNameCategoryItem[] = await catRes.json();
         setCatalog(Array.isArray(catData) ? catData : []);
+      }
+      if (sysProdRes.ok) {
+        const sysProdData: SystemProduct[] = await sysProdRes.json();
+        setSystemProducts(Array.isArray(sysProdData) ? sysProdData : []);
       }
     } catch (err) {
       console.error("Error loading warehouse data:", err);
@@ -209,6 +218,7 @@ export const WarehousePage: React.FC = () => {
     name: string;
     category: string;
     loginUrl: string;
+    productId: number | null;
   }) => {
     setIsUpdatingCatalog(true);
     try {
@@ -621,6 +631,7 @@ export const WarehousePage: React.FC = () => {
       <CatalogCreateModal
         open={isCatalogModalOpen}
         formData={catalogForm}
+        systemProducts={systemProducts}
         onClose={() => setIsCatalogModalOpen(false)}
         onFormChange={setCatalogForm}
         onSubmit={async () => {
@@ -678,10 +689,12 @@ export const WarehousePage: React.FC = () => {
         onClose={() => setEditingAccount(null)}
         onSubmit={handleUpdateAccount}
       />
+
       {/* MODAL EDIT CATALOG (SỬA THÔNG TIN & CẤU HÌNH LINK) */}
       <CatalogEditModal
         open={!!editingCatalogItem}
         item={editingCatalogItem}
+        systemProducts={systemProducts}
         isSubmitting={isUpdatingCatalog}
         onClose={() => setEditingCatalogItem(null)}
         onSubmit={handleUpdateCatalogSubmit}
