@@ -31,6 +31,7 @@ import {
   WarehouseEditAccountModal,
   CatalogCreateModal,
   CatalogDeleteModal,
+  CatalogEditModal,
 } from "@/features/warehouse";
 
 export const WarehousePage: React.FC = () => {
@@ -56,6 +57,8 @@ export const WarehousePage: React.FC = () => {
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [deletingCatalogItem, setDeletingCatalogItem] = useState<ServiceNameCategoryItem | null>(null);
   const [isDeletingCatalog, setIsDeletingCatalog] = useState(false);
+  const [editingCatalogItem, setEditingCatalogItem] = useState<ServiceNameCategoryItem | null>(null);
+  const [isUpdatingCatalog, setIsUpdatingCatalog] = useState(false);
   const [editingAccount, setEditingAccount] = useState<WarehouseAccountItem | null>(null);
   const [addingServiceAccount, setAddingServiceAccount] = useState<WarehouseAccountItem | null>(null);
   const [isAddingService, setIsAddingService] = useState(false);
@@ -200,6 +203,51 @@ export const WarehousePage: React.FC = () => {
       acc + item.services.filter((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE").length,
     0
   );
+
+  const handleUpdateCatalogSubmit = async (data: {
+    id: number;
+    name: string;
+    category: string;
+    loginUrl: string;
+  }) => {
+    setIsUpdatingCatalog(true);
+    try {
+      const res = await fetch(`/api/warehouse/catalog/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Không thể cập nhật dịch vụ kho");
+      }
+      notification.success(
+        `Đã cập nhật dịch vụ "${data.name}" thành công!`,
+        "Cập Nhật Thành Công"
+      );
+      setEditingCatalogItem(null);
+      await loadWarehouseData();
+    } catch (err: any) {
+      console.error("Lỗi cập nhật catalog item:", err);
+      notification.error(err.message || "Cập nhật dịch vụ thất bại");
+    } finally {
+      setIsUpdatingCatalog(false);
+    }
+  };
+
+  const handleOpenBrowserForUrl = (url: string, serviceName: string) => {
+    const targetUrl = url.startsWith("http") ? url : `https://${url}`;
+    const browserWindow = window.open(
+      targetUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+    if (browserWindow) browserWindow.focus();
+    notification.info(
+      `Đang mở trang đăng nhập ${serviceName}: ${targetUrl}`,
+      "Mở Trình Duyệt"
+    );
+  };
 
   const handleConfirmDeleteCatalog = async () => {
     if (!deletingCatalogItem) return;
@@ -536,8 +584,9 @@ export const WarehousePage: React.FC = () => {
         <WarehouseCatalogGrid
           catalogItems={catalog}
           onOpenCreateCatalog={() => setIsCatalogModalOpen(true)}
-          onEditCatalog={(cat) => notification.info(`Chỉnh sửa dịch vụ ${cat.name}`)}
+          onEditCatalog={(cat) => setEditingCatalogItem(cat)}
           onDeleteCatalog={(cat) => setDeletingCatalogItem(cat)}
+          onOpenBrowserWithUrl={handleOpenBrowserForUrl}
         />
       )}
 
@@ -628,6 +677,14 @@ export const WarehousePage: React.FC = () => {
         account={editingAccount}
         onClose={() => setEditingAccount(null)}
         onSubmit={handleUpdateAccount}
+      />
+      {/* MODAL EDIT CATALOG (SỬA THÔNG TIN & CẤU HÌNH LINK) */}
+      <CatalogEditModal
+        open={!!editingCatalogItem}
+        item={editingCatalogItem}
+        isSubmitting={isUpdatingCatalog}
+        onClose={() => setEditingCatalogItem(null)}
+        onSubmit={handleUpdateCatalogSubmit}
       />
     </div>
   );

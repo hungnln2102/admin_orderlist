@@ -50,6 +50,17 @@ function registerWarehouseEventSubscribers() {
     });
   });
 
+  // 4b. WAREHOUSE_CATALOG_UPDATED
+  eventBus.on(EVENTS.WAREHOUSE_CATALOG_UPDATED, async (data) => {
+    console.log(`📦 [EventBus] Tiếp nhận WAREHOUSE_CATALOG_UPDATED:`, data.name);
+    await recordEvent({
+      eventName: EVENTS.WAREHOUSE_CATALOG_UPDATED,
+      aggregateType: "WAREHOUSE_CATALOG",
+      aggregateId: data.id,
+      payload: data,
+    });
+  });
+
   // 5. WAREHOUSE_CATALOG_DELETED
   eventBus.on(EVENTS.WAREHOUSE_CATALOG_DELETED, async (data) => {
     console.log(`📦 [EventBus] Tiếp nhận WAREHOUSE_CATALOG_DELETED:`, data.name);

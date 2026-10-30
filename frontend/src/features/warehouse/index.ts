@@ -8,4 +8,5 @@ export * from "./components/WarehouseEditSlotModal";
 export * from "./components/WarehouseEditAccountModal";
 export * from "./components/CatalogCreateModal";
 export * from "./components/CatalogDeleteModal";
+export * from "./components/CatalogEditModal";
 export * from "./components/warehouseRowUtils";

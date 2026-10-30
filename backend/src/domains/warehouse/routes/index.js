@@ -11,6 +11,7 @@ router.put("/accounts/:id", controller.updateWarehouseAccount);
 router.get("/catalog", controller.getCatalogItems);
 router.post("/catalog", controller.createCatalogItem);
 router.delete("/catalog/:id", controller.deleteCatalogItem);
+router.put("/catalog/:id", controller.updateCatalogItem);
 router.post("/accounts/:id/open-browser", controller.openAccountBrowser);
 router.post("/accounts/:id/services", controller.addServiceSlotToAccount);
 router.put("/services/:id", controller.updateWarehouseServiceSlot);

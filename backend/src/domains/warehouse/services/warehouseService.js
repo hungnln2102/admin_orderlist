@@ -41,6 +41,7 @@ const listWarehouseAccounts = async () => {
       "ss.account_id",
       "ss.name_id",
       "pn.name as display_name",
+      "pn.login_url as login_url",
       "ss.password",
       "ss.backup_email",
       "ss.two_fa",
@@ -64,6 +65,7 @@ const listWarehouseAccounts = async () => {
     servicesByStock.get(sId).push({
       id: Number(srv.id),
       display_name: srv.display_name || "Dịch vụ",
+      login_url: srv.login_url || "",
       category: srv.display_name || "Dịch vụ",
       password: srv.password || "",
       backup_email: srv.backup_email || "",
@@ -685,6 +687,51 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
   });
 };
 
+/**
+ * Cập nhật thông tin dịch vụ trong danh mục (name, category, login_url)
+ */
+const updateCatalogItem = async (id, payload) => {
+  const numericId = Number(id);
+  if (!numericId) throw new Error("ID dịch vụ không hợp lệ!");
+
+  const { name, category, loginUrl } = payload || {};
+  const title = (name || category || "").trim();
+  if (!title) throw new Error("Tên dịch vụ không được để trống!");
+
+  return await db.transaction(async (trx) => {
+    const existing = await trx(TABLES.PRODUCT_NAMES).where("id", numericId).first();
+    if (!existing) {
+      throw new Error(`Không tìm thấy dịch vụ kho với ID ${numericId}!`);
+    }
+
+    const now = new Date();
+    const updateData = {
+      name: title,
+      updated_at: now,
+    };
+    if (loginUrl !== undefined) {
+      updateData.login_url = loginUrl ? String(loginUrl).trim() : null;
+    }
+
+    await trx(TABLES.PRODUCT_NAMES).where("id", numericId).update(updateData);
+
+    const updated = await trx(TABLES.PRODUCT_NAMES).where("id", numericId).first();
+
+    eventBus.emit(EVENTS.WAREHOUSE_CATALOG_UPDATED, {
+      id: updated.id,
+      name: updated.name,
+      loginUrl: updated.login_url,
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      category: updated.name,
+      loginUrl: updated.login_url || null,
+    };
+  });
+};
+
 module.exports = {
   listWarehouseAccounts,
   createWarehouseAccount,
@@ -695,6 +742,7 @@ module.exports = {
   updateWarehouseServiceSlot,
   listCatalogItems,
   createCatalogItem,
+  updateCatalogItem,
   deleteCatalogItem,
   openAccountBrowser,
 };

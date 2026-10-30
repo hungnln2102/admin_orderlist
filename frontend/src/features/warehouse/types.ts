@@ -9,6 +9,7 @@ export interface WarehouseServiceSlot {
   id: number;
   display_name: string;
   category: string;
+  login_url?: string;
   password?: string;
   backup_email?: string;
   two_fa?: string;
@@ -65,6 +66,13 @@ export interface CatalogFormData {
   name: string;
   category: string;
   loginUrl?: string;
+}
+
+export interface CatalogEditFormData {
+  id: number;
+  name: string;
+  category: string;
+  loginUrl: string;
 }
 
 export interface WarehouseAddServiceFormData {

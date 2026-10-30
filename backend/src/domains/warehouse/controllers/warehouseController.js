@@ -114,6 +114,16 @@ const deleteWarehouseServiceSlot = async (req, res) => {
   }
 };
 
+const updateCatalogItem = async (req, res) => {
+  try {
+    const result = await warehouseService.updateCatalogItem(req.params.id, req.body);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] updateCatalogItem error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật dịch vụ kho.") });
+  }
+};
+
 module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
@@ -124,6 +134,7 @@ module.exports = {
   updateWarehouseServiceSlot,
   getCatalogItems,
   createCatalogItem,
+  updateCatalogItem,
   deleteCatalogItem,
   openAccountBrowser,
 };

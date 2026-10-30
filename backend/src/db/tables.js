@@ -338,6 +338,7 @@ const COLS = {
     PACKAGE_NOTE: "package_note",
     SERVICE_NOTE: "service_note",
     IS_PACKAGE: "is_package",
+    LOGIN_URL: "login_url",
     REQUIRES_STORAGE: "requires_storage",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
