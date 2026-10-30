@@ -5,7 +5,7 @@ import { Calendar, ChevronLeft, ChevronRight, X, Clock } from "lucide-react";
 interface DateRangePickerProps {
   startDate: string; // "YYYY-MM-DD"
   endDate: string;   // "YYYY-MM-DD"
-  onChange: (start: string, end: string) => void;
+  onChange: (start: string, end: string, changedField?: "start" | "end") => void;
   label?: string;
   className?: string;
   openDirection?: "up" | "down" | "auto";
@@ -169,16 +169,16 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     if (activePicking === "start") {
       if (endD && selectedDate > endD) {
         const newEnd = new Date(selectedDate.getTime() + 365 * 24 * 60 * 60 * 1000);
-        onChange(selectedIso, formatIso(newEnd));
+        onChange(selectedIso, formatIso(newEnd), "start");
       } else {
-        onChange(selectedIso, endDate || selectedIso);
+        onChange(selectedIso, endDate || selectedIso, "start");
       }
       setActivePicking("end");
     } else {
       if (startD && selectedDate < startD) {
-        onChange(selectedIso, selectedIso);
+        onChange(startDate || selectedIso, selectedIso, "end");
       } else {
-        onChange(startDate || selectedIso, selectedIso);
+        onChange(startDate || selectedIso, selectedIso, "end");
       }
     }
   };
@@ -264,7 +264,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => onChange(e.target.value, endDate)}
+                  onChange={(e) => onChange(e.target.value, endDate, "start")}
                   onClick={(e) => e.stopPropagation()}
                   onFocus={() => setActivePicking("start")}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-500/60"
@@ -288,7 +288,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => onChange(startDate, e.target.value)}
+                  onChange={(e) => onChange(startDate, e.target.value, "end")}
                   onClick={(e) => e.stopPropagation()}
                   onFocus={() => setActivePicking("end")}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-500/60"

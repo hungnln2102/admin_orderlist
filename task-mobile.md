@@ -1,70 +1,70 @@
-# Task Mobile APK - admin_orderlist
+# Task Mobile App - admin_orderlist (iOS & Android)
 
-## Muc tieu
+> **Mục tiêu:** Phát triển và hoàn thiện ứng dụng di động bỏ túi dành cho Master khi ra ngoài đường.  
+> **Kế hoạch chi tiết:** Xem tại [docs/plans/2026-10-30_web_to_mobile_app_conversion_plan.md](file:///d:/Desktop/admin/admin_orderlist/docs/plans/2026-10-30_web_to_mobile_app_conversion_plan.md)  
+> **Nguyên tắc cốt lõi:**  
+> - Tối ưu thao tác nhanh: Tra cứu đơn, duyệt thanh toán, xem số dư, copy slot gửi khách.  
+> - **Tuyệt đối KHÔNG đưa tính năng đăng nhập nhanh tài khoản kho lên Mobile App** (giữ nguyên desktop-only theo chỉ đạo của Master).
 
-- Hoan thien va phat hanh ban `.apk` noi bo cho app tai `mobile/expo-admin-app`.
+---
 
-## Trang thai tong quan
+## 🎯 Trạng thái tổng quan
 
-- [x] Bootstrap Expo app (`mobile/expo-admin-app`)
-- [x] Cau hinh EAS build APK (`eas.json`, profile `preview`)
-- [x] Bo sung script build (`build:apk`) va huong dan README
-- [/] Hoan tat build APK release noi bo (dang blocker login Expo + chua co artifact)
+- [x] Bootstrap Expo React Native app tại `mobile/expo-admin-app`
+- [x] Lập bản kế hoạch quy hoạch tính năng Mobile bỏ túi (`docs/plans/2026-10-30_web_to_mobile_app_conversion_plan.md`)
+- [ ] Xây dựng 4 Tab chức năng cốt lõi (Trang chủ, Đơn hàng, Tài chính, Kho hàng)
+- [ ] Đóng gói và phát hành bản thử nghiệm (TestFlight cho iOS / APK cho Android)
 
-## P0 - Bat buoc de ra APK
+---
 
-- [/] Xac nhan moi truong local (da check bang command line)
-  - [/] `node -v` dat LTS (hien tai v22.22.0, can doi ve Node LTS)
-  - [x] `npm -v` hoat dong binh thuong (11.11.0)
-  - [/] `eas --version` hoat dong (`eas` global chua co; da xac nhan `npx eas-cli --version` = 18.13.0)
-- [/] Dang nhap Expo account (blocker thao tac thu cong)
-  - [/] Chay `eas login` (chua thuc hien duoc trong phien tu dong)
-  - [/] Xac nhan login thanh cong (`npx eas-cli whoami` tra ve "Not logged in")
-- [/] Cau hinh env cho mobile
-  - [x] Tao `.env` tu `.env.example` (da tao file `.env`)
-  - [/] Dat `EXPO_PUBLIC_API_BASE_URL` dung server (dang la `http://10.0.2.2:3001`, can user xac nhan)
-  - [/] Kiem tra backend co endpoint health (timeout khi goi `/health`)
-- [x] Kiem tra truoc khi build
-  - [x] Chay `npm run typecheck` trong `mobile/expo-admin-app` (pass)
-- [/] Build APK (dang blocker login Expo)
-  - [/] Chay `npm run build:apk` (script da doi sang `npx eas-cli`, hien fail vi chua login Expo)
-  - [ ] Luu link artifact tu EAS
-  - [ ] Tai file `.apk` ve may
+## 📋 Checklist Triển khai Theo Giai đoạn
 
-## P1 - Bat buoc de APK dung duoc
+### 🔹 GIAI ĐOẠN 1: KẾT NỐI HỆ THỐNG & XÁC THỰC (CORE & AUTH)
+- [ ] Cập nhật biến môi trường `EXPO_PUBLIC_API_BASE_URL` trỏ đúng máy chủ API.
+- [ ] Tích hợp màn hình Đăng nhập Admin bảo mật bằng JWT Token.
+- [ ] Hỗ trợ mở khóa bằng FaceID / TouchID (Biometric Auth) để mở app trong 1 giây ngoài đường.
+- [ ] Thiết lập khung điều hướng Bottom Tabs (4 Tabs).
 
-- [/] Cai APK tren may Android that (cho artifact APK)
-- [/] Smoke test luong chinh (cho cai APK tren may that)
-  - [/] App mo duoc, khong crash (chua test duoc)
-  - [/] Health check API pass (chua test tren thiet bi)
-  - [/] Cac man chinh tai du lieu thanh cong (chua test duoc)
-- [/] Xu ly loi blocker (neu co)
-  - [/] Network / DNS / SSL (health timeout, can xac nhan backend/public host)
-  - [/] Auth / token / 401 (chua den buoc test auth tren may)
-  - [/] Timeout / retry (co dau hieu timeout endpoint health)
+### 🔹 GIAI ĐOẠN 2: TAB ĐƠN HÀNG & KHO HÀNG (ORDERS & WAREHOUSE)
+- [ ] **Tab Đơn hàng (`/orders`)**:
+  - [ ] Danh sách đơn hàng kèm thanh tìm kiếm tức thời (Tên khách, SĐT, Mã đơn).
+  - [ ] Bộ lọc trạng thái đơn: Chờ xử lý, Hoàn tất, Hết hạn.
+  - [ ] Màn hình chi tiết đơn: Thông tin gói, ngày hết hạn, slot đã gán.
+  - [ ] Nút **"Copy thông tin bàn giao"**: Định dạng sẵn text để Master dán ngay vào Zalo/Telegram gửi khách.
+  - [ ] Thao tác gia hạn hoặc đổi slot 1 chạm.
+- [ ] **Tab Kho hàng (`/warehouse - Read & Copy Only`)**:
+  - [ ] Thống kê số lượng slot trống khả dụng theo từng dịch vụ (Netflix, Adobe, Youtube, Canva...).
+  - [ ] Nút copy nhanh User/Pass tài khoản để phục vụ bàn giao ngoài đường.
+  - [x] *Ghi chú ranh giới: Loại bỏ hoàn toàn tính năng mở profile trình duyệt/Playwright đăng nhập nhanh.*
 
-## P2 - San sang ban giao noi bo
+### 🔹 GIAI ĐOẠN 3: TAB TÀI CHÍNH & DUYỆT BIÊN LAI (FINANCE & INVOICES)
+- [ ] **Tab Tài chính (`/finance`)**:
+  - [ ] Thẻ tổng quan số dư các tài khoản (Ngân hàng, Ví shop, USDT, Tiền mặt).
+  - [ ] Lịch sử biến động số dư theo thời gian thực (kết nối webhook ngân hàng / email inbound).
+  - [ ] Cảnh báo các khoản nợ nhà cung cấp đến hạn.
+- [ ] **Duyệt Biên lai Thanh toán (`/invoices`)**:
+  - [ ] Danh sách biên lai khách chuyển tiền.
+  - [ ] Nút 1 chạm: Xác nhận "Đã nhận tiền" và hoàn tất đơn hàng tức thì.
 
-- [/] Chot version release (cho sau khi build thanh cong)
-  - [/] Cap nhat `version` (hien tai 1.0.0)
-  - [/] Cap nhat `android.versionCode` (chua co trong `app.json`)
-- [/] Viet release note ngan (cho sau khi co artifact)
-  - [/] Build number (chua co)
-  - [/] Danh sach thay doi (dang tong hop)
-  - [/] Loi da biet (neu co) (da ghi login Expo + health timeout)
-- [/] Chia se kenh tai APK cho team (cho sau khi co file APK)
+### 🔹 GIAI ĐOẠN 4: TAB TRANG CHỦ & THÔNG BÁO ĐẨY (DASHBOARD & NOTIFICATIONS)
+- [ ] **Tab Trang chủ (Dashboard KPI)**:
+  - [ ] Thẻ chỉ số: Doanh thu hôm nay vs hôm qua, số đơn mới, lợi nhuận gộp ước tính.
+  - [ ] Danh sách đơn sắp hết hạn trong 24h–48h cần chăm sóc gia hạn.
+- [ ] **Push Notifications**:
+  - [ ] Bắn thông báo đẩy khi có đơn hàng mới phát sinh.
+  - [ ] Bắn thông báo khi có tiền vào tài khoản.
 
-## Lenh nhanh
+### 🔹 GIAI ĐOẠN 5: ĐÓNG GÓI & PHÁT HÀNH (IOS TESTFLIGHT & ANDROID APK)
+- [ ] Cấu hình Expo EAS Build cho cả iOS và Android.
+- [ ] Xuất file `.apk` cài trực tiếp cho máy Android.
+- [ ] Hướng dẫn cài đặt trên iPhone của Master qua TestFlight / Expo Go.
+
+---
+
+## 🛠️ Lệnh nhanh cho Mobile
 
 ```powershell
-cd E:\Project\admin_store\admin_orderlist\mobile\expo-admin-app
+cd mobile/expo-admin-app
 npm run typecheck
-eas login
-npm run build:apk
+npx expo start
 ```
-
-## Nhat ky cap nhat
-
-- 2026-05-16: Tao task file ban dau cho luong hoan thien APK.
-- 2026-05-16: Da chay check moi truong/typecheck/build thu; blocker chinh la chua login Expo va endpoint health timeout.
-- 2026-05-16: Da cap nhat script `eas:configure`/`build:apk` sang `npx eas-cli` de khong phu thuoc `eas` global.
