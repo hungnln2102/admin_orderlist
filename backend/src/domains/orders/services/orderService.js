@@ -780,12 +780,13 @@ async function createOrder(payload) {
       .insert(newOrderData)
       .returning("*");
 
-    const shouldSyncWarehouseOrPackage = isMavn || String(id_order).toUpperCase().startsWith("MAVN") || payload.save_to_package === true || payload.save_to_warehouse === true;
+    const isMavnOrder = isMavn || String(id_order).toUpperCase().startsWith("MAVN");
+    const shouldSyncWarehouseOrPackage = isMavnOrder && (payload.save_to_package === true || payload.save_to_warehouse === true);
     if (shouldSyncWarehouseOrPackage) {
       try {
         await trx.savepoint(async (subTrx) => {
-          const isSaveToWarehouse = payload.save_to_warehouse !== false;
-          const isSaveToPackage = payload.save_to_package !== false;
+          const isSaveToWarehouse = payload.save_to_warehouse === true;
+          const isSaveToPackage = payload.save_to_package === true;
           const accountUsername = payload.information_order
             ? String(payload.information_order).trim().toLowerCase()
             : (payload.slot ? (payload.slot.split('|')[0] || payload.customer).trim().toLowerCase() : String(payload.customer || "mavryk").trim().toLowerCase());

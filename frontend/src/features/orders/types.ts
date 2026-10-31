@@ -86,8 +86,8 @@ export const DEFAULT_FORM_DATA: OrderFormData = {
   order_date: "",
   expired_at: "",
   order_prefix: ORDER_PREFIX.MAVC,
-  save_to_warehouse: true,
-  save_to_package: true,
+  save_to_warehouse: false,
+  save_to_package: false,
   package_slots: 2,
   package_match_rule: "information",
 };

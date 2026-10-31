@@ -294,6 +294,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         order_date: today,
         expired_at: nextYear,
         save_to_warehouse: true,
+        save_to_package: true,
       });
     } else {
       setFormData({
@@ -302,6 +303,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         status: ORDER_STATUS.UNPAID,
         order_date: today,
         expired_at: nextYear,
+        save_to_warehouse: false,
+        save_to_package: false,
       });
     }
     setIsCreateModalOpen(true);
@@ -411,6 +414,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         id_order: generatedCode,
         status: isImportTab ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID,
         customer: isImportTab ? "Mavryk" : (formData.customer || "Khách Hàng"),
+        save_to_warehouse: isImportTab ? (formData.save_to_warehouse !== false) : false,
+        save_to_package: isImportTab ? (formData.save_to_package !== false) : false,
       };
 
       const res = await fetch("/api/orders", {
