@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { fetchCachedJson, invalidateApiCache } from "@/shared/api/apiCache";
-import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 import {
   WarehouseAccountItem,
   WarehouseServiceSlot,
@@ -180,14 +179,6 @@ export const WarehousePage: React.FC = () => {
     });
   }, [accounts, searchTerm, categoryFilter, statusFilter]);
 
-  const accountsPageSize = 20;
-  const { page: accountsPage, setPage: setAccountsPage, resetPage: resetAccountsPage } = useUrlPagination(
-    Math.ceil(filteredAccounts.length / accountsPageSize) || 1
-  );
-  const pagedAccounts = filteredAccounts.slice(
-    (accountsPage - 1) * accountsPageSize,
-    accountsPage * accountsPageSize
-  );
   // Available categories list for filter
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
@@ -536,11 +527,11 @@ export const WarehousePage: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         searchTerm={searchTerm}
-        onSearchChange={(value) => { setSearchTerm(value); resetAccountsPage(); }}
+        onSearchChange={(value) => { setSearchTerm(value); }}
         categoryFilter={categoryFilter}
-        onCategoryFilterChange={(value) => { setCategoryFilter(value); resetAccountsPage(); }}
+        onCategoryFilterChange={(value) => { setCategoryFilter(value); }}
         statusFilter={statusFilter}
-        onStatusFilterChange={(value) => { setStatusFilter(value); resetAccountsPage(); }}
+        onStatusFilterChange={(value) => { setStatusFilter(value); }}
         accountCount={filteredAccounts.length}
         catalogCount={catalog.length}
         availableCategories={availableCategories}
@@ -549,7 +540,7 @@ export const WarehousePage: React.FC = () => {
       {/* TAB 1: ACCOUNTS TABLE */}
       {activeTab === "accounts" && (
         <WarehouseAccountsTable
-          accounts={pagedAccounts}
+          accounts={filteredAccounts}
           expandedAccountIds={expandedAccountIds}
           showPasswordMap={showPasswordMap}
           copiedKeyMap={copiedKeyMap}
@@ -603,15 +594,7 @@ export const WarehousePage: React.FC = () => {
         />
       )}
 
-        {filteredAccounts.length > accountsPageSize && (
-          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-400">
-            <span>Trang {accountsPage} / {Math.ceil(filteredAccounts.length / accountsPageSize)}</span>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setAccountsPage((current) => current - 1)} disabled={accountsPage <= 1} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Trước</button>
-              <button type="button" onClick={() => setAccountsPage((current) => current + 1)} disabled={accountsPage >= Math.ceil(filteredAccounts.length / accountsPageSize)} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Sau</button>
-            </div>
-          </div>
-        )}
+        
       {/* TAB 2: CATALOG GRID */}
       {activeTab === "catalog" && (
         <WarehouseCatalogGrid
