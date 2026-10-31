@@ -178,6 +178,7 @@ const COLS = {
     ID: "id",
     ACCOUNT_ID: "account_id",
     NAME_ID: "name_id",
+    VARIANT_TAG: "variant_tag",
     SLOT_INDEX: "slot_index",
     PASSWORD: "password",
     KEY_HINT: "key_hint",

@@ -15,11 +15,13 @@
  *     b. Nếu không khớp đợt gộp: Khớp đơn hàng lẻ theo số tiền thực chuyển (kèm slot suffix đơn lẻ).
  *     c. KHÔNG KHỚP: Giữ Biên lai ở UNALLOCATED.
  */
-const { db, TABLES, withTransaction } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processCompleteOrder } = require("@/domains/orders/services/orderService");
 const { creditFinancialAccount, debitFinancialAccount } = require("@/domains/wallets/services/walletService");
+const { settleSupplierDebtTransaction } = require("@/domains/suppliers/services/supplierSettlementService");
+const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 
 // Các trạng thái đơn hàng hợp lệ cần thanh toán
 const PAYABLE_STATUSES = [
@@ -99,7 +101,7 @@ async function processPaymentWebhook(payload = {}) {
 
       const receiptId = typeof receiptIdRes === "object" ? receiptIdRes.id : receiptIdRes;
 
-      // 3. Tiền ra (OUT) — Trừ tiền tài khoản/ví, lưu Biên lai rồi dừng
+      // 3. Tiền ra (OUT) — ghi sổ cái và chỉ tất toán NCC khi khớp duy nhất.
       if (isOutbound) {
         await debitFinancialAccount(trx, {
           accountNumber: payload.accountNumber || payload.receiver || null,
@@ -109,13 +111,54 @@ async function processPaymentWebhook(payload = {}) {
           note: noteContent || `Webhook Tiền ra #${receiptId}`,
         });
 
+        const candidateSuppliers = await trx(`${TABLES.SUPPLIER} as s`)
+          .leftJoin(`${TABLES.SUPPLIER_ORDER_COST_LOG} as l`, `l.${COLS.SUPPLIER_ORDER_COST_LOG.SUPPLY_ID}`, `s.${COLS.SUPPLIER.ID}`)
+          .where(`l.${COLS.SUPPLIER_ORDER_COST_LOG.NCC_PAYMENT_STATUS}`, SUPPLIER_PAYMENT_STATUS.UNPAID)
+          .groupBy(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`)
+          .havingRaw(
+            `COALESCE(SUM(l.${COLS.SUPPLIER_ORDER_COST_LOG.IMPORT_COST} - l.${COLS.SUPPLIER_ORDER_COST_LOG.REFUND_AMOUNT}), 0) = ? + s.${COLS.SUPPLIER.ID}`,
+            [transferAmount]
+          )
+          .select(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`);
+
+        const noteMatches = (supplier) =>
+          new RegExp(`\\bNCC${supplier.id}\\b`, "i").test(String(noteContent));
+        const receiverMatches = (supplier) => {
+          const bankNumber = String(supplier.number_bank || "").replace(/\s+/g, "");
+          const receiver = String(payload.receiver || payload.receiverAccount || "").replace(/\s+/g, "");
+          return Boolean(bankNumber && receiver && bankNumber === receiver);
+        };
+        const verifiedCandidates = candidateSuppliers.filter((supplier) =>
+          noteMatches(supplier) || receiverMatches(supplier)
+        );
+
+        if (verifiedCandidates.length === 1) {
+          const supplierId = Number(verifiedCandidates[0].id);
+          const settlement = await settleSupplierDebtTransaction({
+            trx,
+            supplierId,
+            receiptId,
+            bankPaidAmount: transferAmount,
+            source: "WEBHOOK",
+          });
+          return {
+            success: true,
+            matched: settlement.settled,
+            receiptId,
+            supplierId,
+            transferType: TRANSFER_TYPE.OUT,
+            amount: transferAmount,
+            settlement,
+          };
+        }
+
         return {
           success: true,
           matched: false,
           receiptId,
           transferType: TRANSFER_TYPE.OUT,
           amount: transferAmount,
-          reason: `Đã lưu Biên lai Tiền ra #${receiptId}`,
+          reason: `Đã lưu Biên lai Tiền ra #${receiptId} chưa phân bổ NCC`,
         };
       }
 

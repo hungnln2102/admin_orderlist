@@ -14,6 +14,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { fetchCachedJson, invalidateApiCache } from "@/shared/api/apiCache";
+import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 import {
   WarehouseAccountItem,
   WarehouseServiceSlot,
@@ -75,6 +77,7 @@ export const WarehousePage: React.FC = () => {
     account: "",
     serviceName: "Youtube Premium",
     category: "Youtube Premium",
+    variantTag: "",
     password: "",
     backupEmail: "",
     twoFa: "",
@@ -95,32 +98,28 @@ export const WarehousePage: React.FC = () => {
   const loadWarehouseData = useCallback(async () => {
     setLoading(true);
     try {
-      const [accRes, catRes, sysProdRes] = await Promise.all([
-        fetch("/api/warehouse"),
-        fetch("/api/warehouse/catalog"),
-        fetch("/api/warehouse/system-products"),
+      const [accRes, catalogResult, systemProductsResult] = await Promise.all([
+        fetch("/api/warehouse", { credentials: "include" }),
+        fetchCachedJson<ServiceNameCategoryItem[]>("/api/warehouse/catalog", { ttlMs: 5 * 60 * 1000, staleWhileRevalidateMs: 5 * 60 * 1000 }),
+        fetchCachedJson<SystemProduct[]>("/api/warehouse/system-products", { ttlMs: 5 * 60 * 1000, staleWhileRevalidateMs: 5 * 60 * 1000 }),
       ]);
 
-      if (accRes.ok) {
-        const accData: WarehouseAccountItem[] = await accRes.json();
-        const nextAccounts = Array.isArray(accData) ? accData : [];
-        setAccounts(nextAccounts);
-        setLoggedSlotsMap(
-          Object.fromEntries(
-            nextAccounts.flatMap((account) =>
-              account.services.map((service) => [service.id, service.is_authenticated === true])
-            )
+      if (!accRes.ok) throw new Error("Kh?ng th? t?i danh s?ch kho.");
+      const accData: WarehouseAccountItem[] = await accRes.json();
+      const nextAccounts = Array.isArray(accData) ? accData : [];
+      setAccounts(nextAccounts);
+      setLoggedSlotsMap(
+        Object.fromEntries(
+          nextAccounts.flatMap((account) =>
+            account.services.map((service) => [service.id, service.is_authenticated === true])
           )
-        );
-      }
-      if (catRes.ok) {
-        const catData: ServiceNameCategoryItem[] = await catRes.json();
-        setCatalog(Array.isArray(catData) ? catData : []);
-      }
-      if (sysProdRes.ok) {
-        const sysProdData: SystemProduct[] = await sysProdRes.json();
-        setSystemProducts(Array.isArray(sysProdData) ? sysProdData : []);
-      }
+        )
+      );
+      setCatalog(Array.isArray(catalogResult.data) ? catalogResult.data : []);
+      setSystemProducts(Array.isArray(systemProductsResult.data) ? systemProductsResult.data : []);
+
+      void catalogResult.revalidate?.then((data) => setCatalog(Array.isArray(data) ? data : [])).catch(() => undefined);
+      void systemProductsResult.revalidate?.then((data) => setSystemProducts(Array.isArray(data) ? data : [])).catch(() => undefined);
     } catch (err) {
       console.error("Error loading warehouse data:", err);
       notification.error("Không thể kết nối đến cơ sở dữ liệu kho hàng.");
@@ -181,6 +180,14 @@ export const WarehousePage: React.FC = () => {
     });
   }, [accounts, searchTerm, categoryFilter, statusFilter]);
 
+  const accountsPageSize = 20;
+  const { page: accountsPage, setPage: setAccountsPage, resetPage: resetAccountsPage } = useUrlPagination(
+    Math.ceil(filteredAccounts.length / accountsPageSize) || 1
+  );
+  const pagedAccounts = filteredAccounts.slice(
+    (accountsPage - 1) * accountsPageSize,
+    accountsPage * accountsPageSize
+  );
   // Available categories list for filter
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
@@ -236,7 +243,8 @@ export const WarehousePage: React.FC = () => {
         "Cập Nhật Thành Công"
       );
       setEditingCatalogItem(null);
-      await loadWarehouseData();
+      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
     } catch (err: any) {
       console.error("Lỗi cập nhật catalog item:", err);
       notification.error(err.message || "Cập nhật dịch vụ thất bại");
@@ -275,7 +283,8 @@ export const WarehousePage: React.FC = () => {
         "Xóa Dịch Vụ Kho"
       );
       setDeletingCatalogItem(null);
-      await loadWarehouseData();
+      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
     } catch (err: any) {
       console.error("Lỗi xóa dịch vụ kho:", err);
       notification.error(err.message || "Xóa dịch vụ kho thất bại", "Lỗi Xóa Dịch Vụ");
@@ -344,7 +353,8 @@ export const WarehousePage: React.FC = () => {
       }
       notification.success("Cập nhật thông tin slot thành công!");
       setEditingSlotData(null);
-      await loadWarehouseData();
+      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
     } catch (err: any) {
       console.error("Lỗi cập nhật slot:", err);
       notification.error(err.message || "Lỗi cập nhật slot");
@@ -369,7 +379,8 @@ export const WarehousePage: React.FC = () => {
         "Cập Nhật Thành Công"
       );
       setEditingAccount(null);
-      await loadWarehouseData();
+      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
     } catch (err: any) {
       console.error("Lỗi cập nhật tài khoản kho:", err);
       notification.error(err.message || "Cập nhật tài khoản kho thất bại");
@@ -395,7 +406,8 @@ export const WarehousePage: React.FC = () => {
         "Thêm dịch vụ kho"
       );
       setAddingServiceAccount(null);
-      await loadWarehouseData();
+      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
     } catch (err: any) {
       console.error("Lỗi thêm dịch vụ kho:", err);
       notification.error(err.message || "Không thể thêm dịch vụ vào tài khoản");
@@ -524,11 +536,11 @@ export const WarehousePage: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={(value) => { setSearchTerm(value); resetAccountsPage(); }}
         categoryFilter={categoryFilter}
-        onCategoryFilterChange={setCategoryFilter}
+        onCategoryFilterChange={(value) => { setCategoryFilter(value); resetAccountsPage(); }}
         statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
+        onStatusFilterChange={(value) => { setStatusFilter(value); resetAccountsPage(); }}
         accountCount={filteredAccounts.length}
         catalogCount={catalog.length}
         availableCategories={availableCategories}
@@ -537,7 +549,7 @@ export const WarehousePage: React.FC = () => {
       {/* TAB 1: ACCOUNTS TABLE */}
       {activeTab === "accounts" && (
         <WarehouseAccountsTable
-          accounts={filteredAccounts}
+          accounts={pagedAccounts}
           expandedAccountIds={expandedAccountIds}
           showPasswordMap={showPasswordMap}
           copiedKeyMap={copiedKeyMap}
@@ -559,7 +571,8 @@ export const WarehousePage: React.FC = () => {
                     throw new Error(err.error || "Lỗi xóa dịch vụ kho");
                   }
                   notification.success(`Đã xóa dịch vụ "${srv.display_name || srv.category}" thành công!`);
-                  await loadWarehouseData();
+                  invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
                 } catch (err: any) {
                   notification.error(err.message || "Không thể xóa dịch vụ kho");
                 }
@@ -575,7 +588,8 @@ export const WarehousePage: React.FC = () => {
                   const res = await fetch(`/api/warehouse/${acc.id}`, { method: "DELETE" });
                   if (!res.ok) throw new Error("Lỗi xóa tài khoản");
                   notification.success("Đã xóa tài khoản kho thành công!");
-                  await loadWarehouseData();
+                  invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+            await loadWarehouseData();
                 } catch (err: any) {
                   notification.error(err.message || "Không thể xóa tài khoản");
                 }
@@ -589,6 +603,15 @@ export const WarehousePage: React.FC = () => {
         />
       )}
 
+        {filteredAccounts.length > accountsPageSize && (
+          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-400">
+            <span>Trang {accountsPage} / {Math.ceil(filteredAccounts.length / accountsPageSize)}</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setAccountsPage((current) => current - 1)} disabled={accountsPage <= 1} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Trước</button>
+              <button type="button" onClick={() => setAccountsPage((current) => current + 1)} disabled={accountsPage >= Math.ceil(filteredAccounts.length / accountsPageSize)} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Sau</button>
+            </div>
+          </div>
+        )}
       {/* TAB 2: CATALOG GRID */}
       {activeTab === "catalog" && (
         <WarehouseCatalogGrid
@@ -620,6 +643,7 @@ export const WarehousePage: React.FC = () => {
             }
             notification.success("Đã tạo mới tài khoản kho thành công!", "Tạo tài khoản");
             setIsAccountModalOpen(false);
+            invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
             await loadWarehouseData();
           } catch (err: any) {
             notification.error(err.message || "Tạo tài khoản kho thất bại");
@@ -647,6 +671,7 @@ export const WarehousePage: React.FC = () => {
             }
             notification.success("Đã thêm dịch vụ vào danh mục thành công!", "Tạo dịch vụ");
             setIsCatalogModalOpen(false);
+            invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
             await loadWarehouseData();
           } catch (err: any) {
             notification.error(err.message || "Tạo dịch vụ thất bại");

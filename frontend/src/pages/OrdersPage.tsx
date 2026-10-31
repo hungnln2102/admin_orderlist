@@ -51,11 +51,16 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     tabCounts,
     summaryData,
     fetchOrders,
+    refreshOrders,
   } = useOrders(initialTab);
 
   const {
     productsCatalog,
     allSuppliersCatalog,
+    packageProductsList,
+    packageCategoriesList,
+    loadingCatalog,
+    ensureOrderCatalog,
     productSuppliersCatalog,
     setProductSuppliersCatalog,
     loadingSuppliers,
@@ -75,20 +80,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   // Form states
   const [formData, setFormData] = useState<OrderFormData>(DEFAULT_FORM_DATA);
   const [isCustomPriceMode, setIsCustomPriceMode] = useState<boolean>(false);
-  const [packageProductsList, setPackageProductsList] = useState<any[]>([]);
-  const [packageCategoriesList, setPackageCategoriesList] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetch("/api/products/packages")
-      .then((res) => res.json())
-      .then((data) => setPackageProductsList(data.data || []))
-      .catch(() => {});
-
-    fetch("/api/products/packages/categories")
-      .then((res) => res.json())
-      .then((data) => setPackageCategoriesList(data.data || data || []))
-      .catch(() => {});
-  }, []);
 
   const handleMarkPaid = async (order: Order) => {
     try {
@@ -98,7 +89,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       const data = await res.json();
       if (res.ok && data.success) {
         notify.success(`Đã chuyển đơn #${order.id_order} sang Đang Xử Lý thành công!`);
-        fetchOrders();
+        refreshOrders();
       } else {
         throw new Error(data.error || "Không thể chuyển trạng thái.");
       }
@@ -116,7 +107,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       const data = await res.json();
       if (res.ok && data.success) {
         notify.success(`Đã hoàn thành đơn #${order.id_order} (Đã Thanh Toán)! Đã ghi nhận doanh thu.`);
-        fetchOrders();
+        refreshOrders();
       } else {
         throw new Error(data.error || "Không thể hoàn thành đơn hàng.");
       }
@@ -150,7 +141,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         } else {
           notify.success(`Yêu cầu gia hạn đơn #${order.id_order} thành công!`);
         }
-        fetchOrders();
+        refreshOrders();
       } else {
         throw new Error(data.error || "Không thể gia hạn.");
       }
@@ -282,7 +273,13 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     };
   }, [isCreateModalOpen, isEditModalOpen, isDeleteModalOpen, isViewModalOpen, isPayWithCreditModalOpen]);
 
-  const handleOpenCreate = () => {
+  const handleOpenCreate = async () => {
+    try {
+      await ensureOrderCatalog({ refresh: true });
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Không thể tải catalog đơn hàng.");
+      return;
+    }
     const today = formatDateYYYYMMDD(new Date());
     const nextYear = calculateExpirationDate(today, 365);
     setSelectedProductId(null);
@@ -316,6 +313,13 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
   };
 
   const handleOpenEdit = async (order: Order) => {
+    try {
+      await ensureOrderCatalog({ refresh: true });
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Không thể tải catalog đơn hàng.");
+      return;
+    }
+
     setSelectedOrder(order);
     setIsCustomPriceMode(false);
     const prodIdOrName = order.id_product ? String(order.id_product) : "";
@@ -417,7 +421,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       if (res.ok) {
         const createdOrder = await res.json();
         setIsCreateModalOpen(false);
-        fetchOrders();
+        refreshOrders();
         if (createdOrder && createdOrder.id_order) {
           setSelectedOrder(createdOrder);
           setIsViewModalOpen(true);
@@ -459,7 +463,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       if (res.ok) {
         setIsEditModalOpen(false);
         notify.success("Cập nhật đơn hàng thành công!", "Cập Nhật Đơn Hàng");
-        fetchOrders();
+        refreshOrders();
       } else {
         const errData = await res.json();
         notify.error(errData.error || "Cập nhật đơn thất bại", "Lỗi Cập Nhật");
@@ -479,7 +483,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       if (res.ok) {
         setIsDeleteModalOpen(false);
         notify.success(data.message || "Đã xử lý xóa đơn hàng!", "Xóa Đơn Hàng");
-        fetchOrders();
+        refreshOrders();
       } else {
         notify.error(data.error || "Xóa đơn thất bại", "Lỗi Xóa Đơn");
       }
@@ -603,7 +607,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
             productsCatalog={productsCatalog}
             allSuppliersCatalog={allSuppliersCatalog}
             productSuppliersCatalog={productSuppliersCatalog}
-            loadingSuppliers={loadingSuppliers}
+            loadingSuppliers={loadingSuppliers || loadingCatalog}
             selectedProductId={selectedProductId}
             onProductChange={handleProductChange}
             onSupplierChange={handleSupplierChange}
@@ -628,7 +632,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         productsCatalog={productsCatalog}
         allSuppliersCatalog={allSuppliersCatalog}
         productSuppliersCatalog={productSuppliersCatalog}
-        loadingSuppliers={loadingSuppliers}
+        loadingSuppliers={loadingSuppliers || loadingCatalog}
         selectedProductId={selectedProductId}
         onProductChange={handleProductChange}
         onSupplierChange={handleSupplierChange}
@@ -659,7 +663,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         onClose={() => setIsPayWithCreditModalOpen(false)}
         order={selectedOrder}
         onSuccess={() => {
-          fetchOrders();
+          refreshOrders();
         }}
       />
     </div>

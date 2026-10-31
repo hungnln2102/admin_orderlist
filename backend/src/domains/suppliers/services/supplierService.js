@@ -1,6 +1,8 @@
-const { db, TABLES, COLS } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
+const { RECEIPT_STATUS, TRANSFER_TYPE } = require("@/constants/receiptStatus");
+const { settleSupplierDebtTransaction } = require("./supplierSettlementService");
 
 const S_COLS = COLS.SUPPLIER;
 const LOG_COLS = COLS.SUPPLIER_ORDER_COST_LOG;
@@ -264,7 +266,7 @@ const getSupplierDetailById = async (id) => {
   const accNum = supplier[S_COLS.NUMBER_BANK] || "";
   const accName = supplier[S_COLS.ACCOUNT_HOLDER] || supplier[S_COLS.SUPPLIER_NAME];
   const vietqrUrl = accNum
-    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${remainingDebt}&accountName=${encodeURIComponent(accName)}`
+    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${Math.max(0, remainingDebt - supplierId)}&addInfo=${encodeURIComponent(`NCC${supplierId}`)}&accountName=${encodeURIComponent(accName)}`
     : null;
 
   return {
@@ -308,30 +310,60 @@ const getSupplierDetailById = async (id) => {
  * Xử lý Thanh Toán Công Nợ cho NCC
  */
 const paySupplierDebt = async (id) => {
-  const supplierId = parseInt(id, 10);
-  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).first();
-  if (!supplier) throw new Error("Không tìm thấy Nhà cung cấp");
+  const supplierId = Number(id);
+  if (!supplierId) throw new Error("ID nhà cung cấp không hợp lệ.");
 
-  const unpaidLogs = await db(TABLES.SUPPLIER_ORDER_COST_LOG)
-    .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID });
+  return withTransaction(async (trx) => {
+    const supplier = await trx(TABLES.SUPPLIER)
+      .where({ [S_COLS.ID]: supplierId })
+      .forUpdate()
+      .first();
+    if (!supplier) throw new Error("Không tìm thấy nhà cung cấp.");
 
-  const totalPaidAmount = unpaidLogs.reduce((sum, log) => sum + Number(log[LOG_COLS.IMPORT_COST] || 0), 0);
+    const unpaidLogs = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+      .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
+      .forUpdate();
+    const settledDebt = unpaidLogs.reduce(
+      (total, log) => total + Number(log[LOG_COLS.IMPORT_COST] || 0) - Number(log[LOG_COLS.REFUND_AMOUNT] || 0),
+      0
+    );
+    if (settledDebt <= 0) {
+      return { success: true, alreadySettled: true, message: "Nhà cung cấp không còn công nợ chưa thanh toán." };
+    }
 
-  // Đổi ncc_payment_status của tất cả đơn 'Chưa Thanh Toán' sang 'Đã Thanh Toán'
-  await db(TABLES.SUPPLIER_ORDER_COST_LOG)
-    .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
-    .update({ [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.PAID });
+    const bankPaidAmount = Math.max(0, Math.round(settledDebt) - supplierId);
+    const referenceCode = `MAN-SUPPLIER-${supplierId}-${Date.now()}`;
+    const [receiptResult] = await trx(TABLES.PAYMENT_RECEIPT)
+      .insert({
+        payment_date: new Date().toISOString().slice(0, 10),
+        amount: bankPaidAmount,
+        unallocated_amount: bankPaidAmount,
+        status: RECEIPT_STATUS.UNALLOCATED,
+        receiver: supplier[S_COLS.NUMBER_BANK] || supplier[S_COLS.SUPPLIER_NAME],
+        gateway: "MANUAL",
+        reference_code: referenceCode,
+        transfer_type: TRANSFER_TYPE.OUT,
+        note: `Thanh toán thủ công NCC${supplierId}`,
+      })
+      .returning("id");
+    const receiptId = typeof receiptResult === "object" ? receiptResult.id : receiptResult;
 
-  eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, {
-    id: supplierId,
-    supplier_name: supplier[S_COLS.SUPPLIER_NAME],
-    amount: totalPaidAmount,
-    summary: `Đã thanh toán công nợ cho nhà cung cấp "${supplier[S_COLS.SUPPLIER_NAME]}" (${totalPaidAmount.toLocaleString('vi-VN')} ₫)`,
+    const settlement = await settleSupplierDebtTransaction({
+      trx,
+      supplierId,
+      receiptId,
+      bankPaidAmount,
+      source: "MANUAL",
+    });
+
+    return {
+      success: true,
+      receiptId,
+      ...settlement,
+      message: `Đã ghi nhận thanh toán công nợ cho NCC ${supplier[S_COLS.SUPPLIER_NAME]}.`,
+    };
   });
-
-  return { success: true, message: `Đã cập nhật thanh toán công nợ cho NCC ${supplier[S_COLS.SUPPLIER_NAME]}` };
 };
-
 /**
  * Toggle trạng thái hoạt động NCC (Bật/Tắt Power)
  */

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 import {
   PricingItem,
   SupplierCostItem,
@@ -19,8 +20,8 @@ export const PricingPage: React.FC = () => {
   const [items, setItems] = useState<PricingItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
-  const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const { page, setPage, resetPage } = useUrlPagination(totalPages);
   const [totalItems, setTotalItems] = useState<number>(0);
 
   // Expandable Row state for Supplier Prices
@@ -80,7 +81,7 @@ export const PricingPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, notify]);
+  }, [page, search]);
 
   const fetchAllSuppliers = useCallback(async () => {
     try {
@@ -133,7 +134,7 @@ export const PricingPage: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
-    setPage(1);
+    resetPage();
   };
 
   const handleExportExcel = () => {

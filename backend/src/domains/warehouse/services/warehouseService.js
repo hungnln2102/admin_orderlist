@@ -40,6 +40,7 @@ const listWarehouseAccounts = async () => {
       "ss.id",
       "ss.account_id",
       "ss.name_id",
+      "ss.variant_tag",
       "pn.name as display_name",
       "pn.login_url as login_url",
       "ss.password",
@@ -67,6 +68,7 @@ const listWarehouseAccounts = async () => {
       display_name: srv.display_name || "Dịch vụ",
       login_url: srv.login_url || "",
       category: srv.display_name || "Dịch vụ",
+      variant_tag: srv.variant_tag || "",
       password: srv.password || "",
       backup_email: srv.backup_email || "",
       two_fa: srv.two_fa || "",
@@ -101,6 +103,7 @@ const createWarehouseAccount = async (payload) => {
     twoFa,
     expiresAt,
     note,
+    variantTag,
     services = [],
   } = payload;
 
@@ -132,6 +135,7 @@ const createWarehouseAccount = async (payload) => {
         two_fa: twoFa,
         expires_at: expiresAt ? new Date(expiresAt) : null,
         note,
+        variant_tag: variantTag ? String(variantTag).trim() : null,
         status: "AVAILABLE",
       });
     }
@@ -150,8 +154,10 @@ const createWarehouseAccount = async (payload) => {
         nameId = insertedP.id || insertedP;
       }
 
+      const variantTag = String(slot.variantTag ?? slot.variant_tag ?? "").trim();
       const existingService = await trx(TABLES.STOCK_SERVICES)
         .where({ account_id: stockId, name_id: nameId })
+        .whereRaw("COALESCE(variant_tag, '') = ?", [variantTag])
         .first();
 
       if (existingService) {
@@ -164,6 +170,7 @@ const createWarehouseAccount = async (payload) => {
             expired_at: slot.expires_at ? new Date(slot.expires_at) : existingService.expired_at,
             status: slot.status || existingService.status || "AVAILABLE",
             service_note: slot.note || existingService.service_note,
+            variant_tag: variantTag || null,
             updated_at: now,
           });
       } else {
@@ -176,6 +183,7 @@ const createWarehouseAccount = async (payload) => {
           expired_at: slot.expires_at ? new Date(slot.expires_at) : null,
           status: slot.status || "AVAILABLE",
           service_note: slot.note || null,
+          variant_tag: variantTag || null,
           created_at: now,
           updated_at: now,
         });
@@ -257,6 +265,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
     expiresAt,
     status = "AVAILABLE",
     note,
+    variantTag,
   } = payload || {};
 
   const slotName = String(serviceName || category || "").trim();
@@ -318,6 +327,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
         expired_at: parsedExpiredAt,
         status: status || "AVAILABLE",
         service_note: note ? String(note).trim() : null,
+        variant_tag: variantTag ? String(variantTag).trim() : null,
         created_at: now,
         updated_at: now,
       })
@@ -328,6 +338,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
       account_id: stockId,
       name_id: nameId,
       display_name: slotName,
+      variant_tag: insertedSlot.variant_tag || "",
       password: insertedSlot.password || "",
       backup_email: insertedSlot.backup_email || "",
       two_fa: insertedSlot.two_fa || "",
@@ -390,22 +401,33 @@ const listCatalogItems = async () => {
     )
     .orderBy("pn.id", "asc");
 
-  const slotStats = await db(TABLES.STOCK_SERVICES)
+  const accountStats = await db(TABLES.STOCK_SERVICES)
     .select("name_id")
-    .count("id as total_slots")
-    .sum({ in_stock: db.raw("CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END") })
-    .sum({ reserved: db.raw("CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END") })
+    .select(db.raw("COUNT(DISTINCT account_id) AS total_accounts"))
+    .select(db.raw("COUNT(DISTINCT CASE WHEN status = 'AVAILABLE' THEN account_id END) AS in_stock_accounts"))
+    .select(db.raw("COUNT(DISTINCT CASE WHEN status = 'RESERVED' THEN account_id END) AS reserved_accounts"))
     .groupBy("name_id");
 
+  const variantStats = await db(TABLES.STOCK_SERVICES)
+    .select("name_id", "variant_tag")
+    .select(db.raw("COUNT(DISTINCT account_id) AS account_count"))
+    .groupBy("name_id", "variant_tag")
+    .orderBy("variant_tag", "asc");
+
   const statMap = new Map();
-  slotStats.forEach((st) => {
+  accountStats.forEach((st) => {
     statMap.set(st.name_id, {
-      total: Number(st.total_slots || 0),
-      inStock: Number(st.in_stock || 0),
-      reserved: Number(st.reserved || 0),
+      total: Number(st.total_accounts || 0),
+      inStock: Number(st.in_stock_accounts || 0),
+      reserved: Number(st.reserved_accounts || 0),
     });
   });
-
+  const variantMap = new Map();
+  variantStats.forEach((variant) => {
+    const variants = variantMap.get(variant.name_id) || [];
+    variants.push({ tag: variant.variant_tag || "Chưa gắn tag", accountCount: Number(variant.account_count || 0) });
+    variantMap.set(variant.name_id, variants);
+  });
   return pNames.map((p) => {
     const stats = statMap.get(p.id) || { total: 0, inStock: 0, reserved: 0 };
     let status = "ACTIVE";
@@ -419,9 +441,13 @@ const listCatalogItems = async () => {
       loginUrl: p.login_url || null,
       productId: p.product_id ? Number(p.product_id) : null,
       systemProductName: p.system_product_name || null,
+      totalAccounts: stats.total,
+      inStockAccounts: stats.inStock,
+      reservedAccounts: stats.reserved,
       totalSlots: stats.total,
       inStockSlots: stats.inStock,
       reservedSlots: stats.reserved,
+      variants: variantMap.get(p.id) || [],
       status,
     };
   });
@@ -607,6 +633,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     expiresAt,
     status,
     note,
+    variantTag,
     accountUsername,
   } = payload;
 
@@ -628,6 +655,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     if (backupEmail !== undefined) updateData.backup_email = backupEmail || null;
     if (twoFa !== undefined) updateData.two_fa = twoFa || null;
     if (note !== undefined) updateData.service_note = note || null;
+    if (variantTag !== undefined) updateData.variant_tag = String(variantTag || "").trim() || null;
     if (status !== undefined) {
       updateData.status = status;
     }
@@ -685,6 +713,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
       id: Number(updatedSlot.id),
       account_id: Number(updatedSlot.account_id),
       display_name: updatedSlot.display_name || "Dịch vụ",
+      variant_tag: updatedSlot.variant_tag || "",
       password: updatedSlot.password || "",
       backup_email: updatedSlot.backup_email || "",
       two_fa: updatedSlot.two_fa || "",

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { NotificationModal, NotificationState } from "../components/NotificationModal";
 import { ToastNotificationContainer, ToastItem } from "../components/ToastNotification";
 
@@ -76,8 +76,13 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     });
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ info, success, warning, error, confirm, close }),
+    [info, success, warning, error, confirm, close]
+  );
+
   return (
-    <NotificationContext.Provider value={{ info, success, warning, error, confirm, close }}>
+    <NotificationContext.Provider value={contextValue}>
       {children}
 
       {/* 1. Hệ thống Toast góc phải: 5s mờ dần, tối đa 4 thẻ, thẻ thứ 5 đẩy thẻ 1 */}

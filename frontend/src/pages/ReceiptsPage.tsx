@@ -21,6 +21,7 @@ import {
 import { AllocateReceiptModal } from "../features/invoices/components/AllocateReceiptModal";
 import { CreateReceiptModal } from "../features/invoices/components/CreateReceiptModal";
 import { PendingBatchesModal } from "../features/invoices/components/PendingBatchesModal";
+import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 
 interface InvoiceReceipt {
   id: number;
@@ -88,7 +89,7 @@ export const ReceiptsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("all"); // 'all' | 'in' | 'out'
-  const [page, setPage] = useState<number>(1);
+  const { page, setPage, resetPage } = useUrlPagination(pagination.totalPages);
   const [selectedReceipt, setSelectedReceipt] = useState<InvoiceReceipt | null>(null);
   const [allocatingReceipt, setAllocatingReceipt] = useState<InvoiceReceipt | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -126,12 +127,12 @@ export const ReceiptsPage: React.FC = () => {
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    setPage(1);
+    resetPage();
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
-    setPage(1);
+    resetPage();
   };
 
   const formatCurrency = (val: number) =>
@@ -311,7 +312,7 @@ export const ReceiptsPage: React.FC = () => {
               value={typeFilter}
               onChange={(e) => {
                 setTypeFilter(e.target.value);
-                setPage(1);
+                resetPage();
               }}
               className="bg-transparent text-xs text-slate-300 font-medium focus:outline-none cursor-pointer"
             >
@@ -417,7 +418,13 @@ export const ReceiptsPage: React.FC = () => {
                           </span>
                         );
                       }
-                      if (receipt.allocation_type === "EXTERNAL_IMPORT") {
+                      if (receipt.allocation_type === "SUPPLIER") {
+                        return (
+                          <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 shadow-sm font-medium">
+                            Chi Trả NCC
+                          </span>
+                        );
+                      }                      if (receipt.allocation_type === "EXTERNAL_IMPORT") {
                         return (
                           <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-sm font-medium">
                             Nhập Ngoài Luồng {receipt.id_order ? `(${receipt.id_order})` : ''}

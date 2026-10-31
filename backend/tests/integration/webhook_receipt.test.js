@@ -6,7 +6,7 @@
  * [TC-02] Webhook tiền vào → Khớp đơn GIA HẠN → Đơn chuyển sang PAID, expired_at được cộng thêm
  * [TC-03] Webhook tiền vào → Không khớp đơn nào → Biên lai giữ nguyên UNALLOCATED
  * [TC-04] Webhook trùng lặp (Idempotency) → Trả về duplicate=true, KHÔNG tạo Biên lai mới
- * [TC-05] Webhook tiền ra (OUT) → Chỉ lưu Biên lai, matched=false
+ * [TC-05] Webhook tiền ra (OUT) chưa khớp NCC → Giữ Biên lai UNALLOCATED
  */
 const path = require("path");
 require("module-alias/register");
@@ -194,7 +194,7 @@ async function tc05_webhookMoneyOut() {
 
   const receipt = await db(TABLES.PAYMENT_RECEIPT).where({ id: result.receiptId }).first();
   assert(receipt.transfer_type === TRANSFER_TYPE.OUT, `transfer_type phải là 'out', nhận: ${receipt.transfer_type}`);
-  assert(Number(receipt.unallocated_amount) === 0, `unallocated_amount tiền ra phải là 0, nhận: ${receipt.unallocated_amount}`);
+  assert(Number(receipt.unallocated_amount) === 500000, `unallocated_amount tiền ra chưa khớp phải giữ nguyên 500000, nhận: ${receipt.unallocated_amount}`);
 }
 
 // ────────────── Main Runner ──────────────
@@ -206,7 +206,7 @@ async function main() {
   await runTest("[TC-02] Webhook tiền vào → Khớp đơn GIA HẠN → expired_at được cộng thêm", tc02_webhookMatchRenewalOrder);
   await runTest("[TC-03] Webhook tiền vào → Không khớp đơn → Biên lai giữ UNALLOCATED", tc03_webhookNoMatchingOrder);
   await runTest("[TC-04] Webhook trùng lặp (Idempotency) → duplicate=true, KHÔNG tạo Biên lai mới", tc04_webhookIdempotency);
-  await runTest("[TC-05] Webhook tiền ra (OUT) → Lưu Biên lai, matched=false, unallocated=0", tc05_webhookMoneyOut);
+  await runTest("[TC-05] Webhook tiền ra (OUT) chưa khớp NCC → Lưu Biên lai UNALLOCATED", tc05_webhookMoneyOut);
 
   console.log(`\n────────────────────────────────────`);
   console.log(`📊 KẾT QUẢ: ${PASS} PASS / ${FAIL} FAIL`);

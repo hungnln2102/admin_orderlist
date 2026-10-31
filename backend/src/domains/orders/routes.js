@@ -6,8 +6,15 @@ const { getClientErrorMessage } = require("@/utils/clientError");
 // GET /api/orders - Lấy danh sách đơn hàng
 router.get("/", async (req, res) => {
   try {
-    const { page, limit, search, status, tab } = req.query;
-    const result = await orderService.getOrders({ page, limit, search, status, tab });
+    const { page, limit, search, status, tab, includeStats } = req.query;
+    const result = await orderService.getOrders({
+      page,
+      limit,
+      search,
+      status,
+      tab,
+      includeStats: includeStats !== "false",
+    });
     res.json(result);
   } catch (err) {
     console.error("[Orders API] Lỗi lấy danh sách đơn hàng:", err);

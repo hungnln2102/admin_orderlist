@@ -1,24 +1,25 @@
 import React, { Suspense } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/shared/context/AuthContext";
+import { routeLoaders } from "./routeLoaders";
 
 // Code-splitting bằng React.lazy giúp tối ưu tải trang và giảm bundle size ban đầu
-const DashboardPage = React.lazy(() => import("@/features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
-const OrdersPage = React.lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
-const PricingPage = React.lazy(() => import("@/pages/PricingPage").then(m => ({ default: m.PricingPage })));
-const SuppliersPage = React.lazy(() => import("@/pages/SuppliersPage").then(m => ({ default: m.SuppliersPage })));
-const CreditPage = React.lazy(() => import("@/pages/CreditPage").then(m => ({ default: m.CreditPage })));
-const PaymentWalletsPage = React.lazy(() => import("@/pages/PaymentWalletsPage").then(m => ({ default: m.PaymentWalletsPage })));
-const PackageManagementPage = React.lazy(() => import("@/features/packages/PackageManagementPage").then(m => ({ default: m.PackageManagementPage })));
+const DashboardPage = React.lazy(routeLoaders["/dashboard"]);
+const OrdersPage = React.lazy(routeLoaders["/orders"]);
+const PricingPage = React.lazy(routeLoaders["/pricing"]);
+const SuppliersPage = React.lazy(routeLoaders["/sources"]);
+const CreditPage = React.lazy(routeLoaders["/credit"]);
+const PaymentWalletsPage = React.lazy(routeLoaders["/shop-bank-accounts"]);
+const PackageManagementPage = React.lazy(routeLoaders["/package-products"]);
 const LoginPage = React.lazy(() => import("@/features/auth/pages/LoginPage").then(m => ({ default: m.LoginPage })));
-const WarehousePage = React.lazy(() => import("@/pages/WarehousePage").then(m => ({ default: m.WarehousePage })));
-const ReceiptsPage = React.lazy(() => import("@/pages/ReceiptsPage").then(m => ({ default: m.ReceiptsPage })));
-const SystemPage = React.lazy(() => import("@/pages/SystemPage").then(m => ({ default: m.SystemPage })));
-const FinanceHubPage = React.lazy(() => import("@/features/finance/FinanceHubPage").then(m => ({ default: m.FinanceHubPage })));
-const TrafficPage = React.lazy(() => import("@/features/traffic/TrafficPage").then(m => ({ default: m.TrafficPage })));
-const ExternalImportsPage = React.lazy(() => import("@/pages/ExternalImportsPage").then(m => ({ default: m.ExternalImportsPage })));
-const SystemLogsPage = React.lazy(() => import("@/pages/SystemLogsPage").then(m => ({ default: m.SystemLogsPage })));
-const ExternalApiConfigPage = React.lazy(() => import("@/pages/ExternalApiConfigPage").then(m => ({ default: m.ExternalApiConfigPage })));
+const WarehousePage = React.lazy(routeLoaders["/warehouse"]);
+const ReceiptsPage = React.lazy(routeLoaders["/invoices"]);
+const SystemPage = React.lazy(routeLoaders["/system-config"]);
+const FinanceHubPage = React.lazy(routeLoaders["/finance"]);
+const TrafficPage = React.lazy(routeLoaders["/traffic"]);
+const ExternalImportsPage = React.lazy(routeLoaders["/external-imports"]);
+const SystemLogsPage = React.lazy(routeLoaders["/system-logs"]);
+const ExternalApiConfigPage = React.lazy(routeLoaders["/external-api-config"]);
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">

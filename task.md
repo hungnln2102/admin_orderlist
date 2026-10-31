@@ -374,3 +374,11 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] **FEAT-FINANCE-04** Khắc phục lỗi tính đúp chi phí cố định (Fixed Costs) và bảo toàn Tài Sản Ròng (Net Worth) khi gán biên lai tiền ra: Không ghi nhận trùng vào store_profit_expenses, trừ totalLiabilities theo unpaidFixedCostsTotal, bổ sung giao diện gán biên lai và thanh toán cố định 2 chiều (AllocateReceiptModal & FixedCostList).
 - [x] **FEAT-ORDER-02** Fix co giãn thu phóng bảng đơn hàng OrderTable.tsx: Chuyển sang table-fixed toàn diện, loại bỏ min-w-[850px], text tự động cắt dấu ba chấm ... và hiển thị tooltip title tránh đè chữ khi zoom màn hình.
+
+---
+
+## Master task 2026-10-31
+
+- [x] Đồng bộ phân trang URL, sắp xếp đơn hết hạn, luồng biên lai/tất toán NCC và hỗ trợ tag biến thể kho đã được triển khai trong mã nguồn.
+- [x] Đã nghiệm thu live: migration `20261031000001_add_variant_tag_to_warehouse_account_slots.js` đã áp dụng; cột `warehouse.account_slots.variant_tag` và `listWarehouseAccounts()` được xác minh trực tiếp. Test Gate tích hợp vẫn cần `TEST_DATABASE_URL` có tên database chứa `test`.
+- [x] **PERF-2026-10-31** Chuẩn hóa kế hoạch và triển khai tối ưu tải trang lần 1: Express compression, dashboard song song, lazy catalog đơn hàng, cache catalog theo phiên, prefetch route; frontend build đã pass.

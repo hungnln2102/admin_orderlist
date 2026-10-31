@@ -92,7 +92,7 @@ export const SuppliersPage: React.FC = () => {
     } finally {
       setLoadingOverview(false);
     }
-  }, [searchOverview, activeFilter, sortBy, notify]);
+  }, [searchOverview, activeFilter, sortBy]);
 
   const fetchSupplierLogs = async (supplierId: number) => {
     setSupplierLogsMap((prev) => ({

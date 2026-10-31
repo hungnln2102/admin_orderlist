@@ -41,6 +41,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
   const [formData, setFormData] = useState<WarehouseSlotEditFormData>({
     accountUsername: "",
     serviceName: "",
+    variantTag: "",
     password: "",
     backupEmail: "",
     twoFa: "",
@@ -66,6 +67,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
       setFormData({
         accountUsername: account.account || "",
         serviceName: slot.display_name || slot.category || "Dịch vụ",
+        variantTag: slot.variant_tag || "",
         password: slot.password || "",
         backupEmail: slot.backup_email || "",
         twoFa: slot.two_fa || "",
@@ -309,11 +311,21 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
               onChange={(e) =>
                 setFormData({ ...formData, note: e.target.value })
               }
-              placeholder="Nhập ghi chú cho slot này..."
+              placeholder="Nhập ghi chú cho tài khoản này..."
               className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-600 focus:outline-none focus:border-slate-500 transition-colors resize-none"
             />
           </div>
 
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tag biến thể</label>
+            <input
+              type="text"
+              value={formData.variantTag}
+              onChange={(e) => setFormData({ ...formData, variantTag: e.target.value })}
+              placeholder="Ví dụ: 12M, Family, Premium"
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
+            />
+          </div>
           {/* ACTIONS FOOTER */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
             <button

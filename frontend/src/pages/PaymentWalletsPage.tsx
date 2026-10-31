@@ -80,7 +80,7 @@ export const PaymentWalletsPage: React.FC = () => {
       console.error(err);
       notify.error("Không thể tải danh sách tài khoản ngân hàng.", "Lỗi Máy Chủ");
     }
-  }, [notify]);
+  }, []);
 
   const fetchUsdtWallets = useCallback(async () => {
     try {
@@ -92,7 +92,7 @@ export const PaymentWalletsPage: React.FC = () => {
       console.error(err);
       notify.error("Không thể tải danh sách ví USDT.", "Lỗi Máy Chủ");
     }
-  }, [notify]);
+  }, []);
 
   const fetchExchangeRate = useCallback(async () => {
     try {

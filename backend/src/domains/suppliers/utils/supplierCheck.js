@@ -48,7 +48,7 @@ async function isMavrykSupplier(trxOrDb, orderOrSupplyId) {
   // Nếu truyền vào supplyId (number/string)
   const supplyId = Number(orderOrSupplyId);
   if (!supplyId) return false;
-  if (supplyId === 22) return true; // ID cố định của NCC Mavryk trong hệ thống
+  if (supplyId === 1 || supplyId === 22) return true;
 
   try {
     const sup = await trxOrDb(TABLES.SUPPLIER)
@@ -68,7 +68,7 @@ async function isMavrykSupplier(trxOrDb, orderOrSupplyId) {
  */
 function isMavrykSupplierSync(order) {
   if (!order) return false;
-  if (Number(order.supply_id) === 22) return true;
+  if (Number(order.supply_id) === 1 || Number(order.supply_id) === 22) return true;
   const supplyStr = String(
     order.supplier_name ||
     order.supply_name ||

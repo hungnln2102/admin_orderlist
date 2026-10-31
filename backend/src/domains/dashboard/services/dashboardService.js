@@ -164,12 +164,21 @@ async function getDashboardSummary(params = {}) {
   const { start, end, prevStart, prevEnd, bucketMode, targetYear, period } = parseDateRange(params);
 
   // 1. Thống kê kỳ hiện tại & kỳ so sánh trực tiếp từ daily_revenue_summary & store_profit_expenses
-  const currentStats = await getOrderStatsForRange(start, end);
-  const prevStats = await getOrderStatsForRange(prevStart, prevEnd);
-  const currentExpenses = await getExpensesForRange(start, end);
-  const previousExpenses = await getExpensesForRange(prevStart, prevEnd);
-  const currentFinanceCosts = await getFinanceCostsForRange(start, end);
-  const previousFinanceCosts = await getFinanceCostsForRange(prevStart, prevEnd);
+  const [
+    currentStats,
+    prevStats,
+    currentExpenses,
+    previousExpenses,
+    currentFinanceCosts,
+    previousFinanceCosts,
+  ] = await Promise.all([
+    getOrderStatsForRange(start, end),
+    getOrderStatsForRange(prevStart, prevEnd),
+    getExpensesForRange(start, end),
+    getExpensesForRange(prevStart, prevEnd),
+    getFinanceCostsForRange(start, end),
+    getFinanceCostsForRange(prevStart, prevEnd),
+  ]);
 
   const { totalOrders, canceledOrders, totalRevenue, totalCost: baseCost, totalRefund, totalProfit: rawGrossProfit } = currentStats;
   const { totalOrders: prevOrders, canceledOrders: prevCanceled, totalRevenue: prevRevenue, totalCost: prevBaseCost, totalRefund: prevRefund, totalProfit: prevRawGrossProfit } = prevStats;

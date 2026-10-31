@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { NAVIGATION_GROUPS } from "./navigation";
 import { useAuth } from "@/shared/context/AuthContext";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { preloadRoute } from "@/routes/routeLoaders";
 import {
   Search,
   ChevronDown,
@@ -240,6 +241,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           key={item.path}
                           to={item.path}
                           onClick={onCloseMobile}
+                           onPointerEnter={() => preloadRoute(item.path)}
+                           onFocus={() => preloadRoute(item.path)}
                           title={item.name}
                           className={({ isActive }) =>
                             `relative group flex items-center ${

@@ -124,7 +124,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
       {viewMode === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {catalogItems.map((cat) => {
-            const total = cat.totalSlots ?? ((cat.inStockSlots || 0) + (cat.reservedSlots || 0));
+            const total = cat.totalAccounts ?? cat.totalSlots ?? ((cat.inStockAccounts ?? cat.inStockSlots ?? 0) + (cat.reservedAccounts ?? cat.reservedSlots ?? 0));
             const isEmptyStock = total === 0;
             const hasLink = Boolean(cat.loginUrl && cat.loginUrl.trim());
             const isCopied = copiedId === cat.id;
@@ -253,7 +253,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                     isEmptyStock ? (
                       <button
                         onClick={() => onDeleteCatalog(cat)}
-                        title="Xóa dịch vụ khỏi danh mục (Kho đang trống 0 slots)"
+                        title="Xóa dịch vụ khỏi danh mục (Kho đang trống 0 tài khoảns)"
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -262,7 +262,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                     ) : (
                       <button
                         disabled
-                        title={`Không thể xóa: Kho vẫn còn ${total} slot. Kho phải trống hoàn toàn (0 slot) mới có thể xóa.`}
+                        title={`Không thể xóa: Kho vẫn còn ${total} tài khoản. Kho phải trống hoàn toàn (0 tài khoản) mới có thể xóa.`}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/40 text-slate-600 border border-slate-800/60 transition-all cursor-not-allowed opacity-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -294,7 +294,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                 <th className="px-4 py-3.5 font-semibold">Tên Dịch Vụ / Gói</th>
                 <th className="px-4 py-3.5 font-semibold">Chuyên Mục</th>
                 <th className="px-4 py-3.5 font-semibold">Link Đăng Nhập / Quản Trị</th>
-                <th className="px-4 py-3.5 font-semibold text-center">Tổng Slot</th>
+                <th className="px-4 py-3.5 font-semibold text-center">Tổng Tài khoản</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Chưa Dùng</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Trạng Thái</th>
                 <th className="px-4 py-3.5 font-semibold text-right">Thao Tác</th>
@@ -302,7 +302,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
               {catalogItems.map((cat) => {
-                const total = cat.totalSlots ?? ((cat.inStockSlots || 0) + (cat.reservedSlots || 0));
+                const total = cat.totalAccounts ?? cat.totalSlots ?? ((cat.inStockAccounts ?? cat.inStockSlots ?? 0) + (cat.reservedAccounts ?? cat.reservedSlots ?? 0));
                 const isEmptyStock = total === 0;
                 const hasLink = Boolean(cat.loginUrl && cat.loginUrl.trim());
                 const isCopied = copiedId === cat.id;
@@ -376,7 +376,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                       )}
                     </td>
 
-                    {/* TỔNG SLOTS */}
+                    {/* TỔNG TÀI KHOẢNS */}
                     <td className="px-4 py-3.5 text-center font-bold text-blue-400">
                       {total}
                     </td>
@@ -423,7 +423,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                               type="button"
                               onClick={() => onDeleteCatalog(cat)}
                               className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
-                              title="Xóa dịch vụ (Kho đang trống 0 slot)"
+                              title="Xóa dịch vụ (Kho đang trống 0 tài khoản)"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -432,7 +432,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                               type="button"
                               disabled
                               className="p-1.5 rounded-lg text-slate-600 border border-slate-800 cursor-not-allowed opacity-50"
-                              title={`Không thể xóa: Kho vẫn còn ${total} slot.`}
+                              title={`Không thể xóa: Kho vẫn còn ${total} tài khoản.`}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

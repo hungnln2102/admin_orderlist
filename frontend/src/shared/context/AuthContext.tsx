@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { clearApiCache } from "@/shared/api/apiCache";
 
 interface User {
   id?: number | string;
@@ -82,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const data = await response.json();
+    clearApiCache();
     const loggedUser = data.user || { username };
     setUser(loggedUser);
     localStorage.setItem("v2_auth_user", JSON.stringify(loggedUser));
@@ -97,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore network errors on logout
     } finally {
+      clearApiCache();
       setUser(null);
       localStorage.removeItem("v2_auth_user");
     }

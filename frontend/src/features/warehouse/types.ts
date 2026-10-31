@@ -9,6 +9,7 @@ export interface WarehouseServiceSlot {
   id: number;
   display_name: string;
   category: string;
+  variant_tag?: string;
   login_url?: string;
   password?: string;
   backup_email?: string;
@@ -24,6 +25,7 @@ export interface WarehouseServiceSlot {
 export interface WarehouseSlotEditFormData {
   accountUsername: string;
   serviceName: string;
+  variantTag: string;
   password: string;
   backupEmail: string;
   twoFa: string;
@@ -56,6 +58,10 @@ export interface ServiceNameCategoryItem {
   totalSlots?: number;
   inStockSlots: number;
   reservedSlots: number;
+  totalAccounts?: number;
+  inStockAccounts?: number;
+  reservedAccounts?: number;
+  variants?: Array<{ tag: string; accountCount: number }>;
   status: "ACTIVE" | "LOW_STOCK" | "OUT_OF_STOCK";
 }
 
@@ -63,6 +69,7 @@ export interface WarehouseAccountFormData {
   account: string;
   serviceName: string;
   category: string;
+  variantTag: string;
   password: string;
   backupEmail: string;
   twoFa: string;
@@ -88,6 +95,7 @@ export interface CatalogEditFormData {
 export interface WarehouseAddServiceFormData {
   serviceName: string;
   category: string;
+  variantTag: string;
   password: string;
   backupEmail: string;
   twoFa: string;

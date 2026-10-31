@@ -1,5 +1,6 @@
 require("module-alias/register");
 const express = require("express");
+const compression = require("compression");
 const cors = require("cors");
 const session = require("express-session");
 const PgSessionStore = require("connect-pg-simple")(session);
@@ -14,6 +15,7 @@ const { getClientErrorMessage } = require("@/utils/clientError");
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
+app.use(compression({ level: 6 }));
 const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.FRONTEND_ORIGINS || "")
   .split(",")

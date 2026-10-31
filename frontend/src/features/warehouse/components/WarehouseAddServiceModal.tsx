@@ -39,6 +39,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
   const [formData, setFormData] = useState<WarehouseAddServiceFormData>({
     serviceName: "",
     category: "",
+    variantTag: "",
     password: "",
     backupEmail: "",
     twoFa: "",
@@ -58,6 +59,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
       setFormData({
         serviceName: defaultCatalog,
         category: foundCat ? foundCat.category : defaultCatalog,
+        variantTag: "",
         password: "",
         backupEmail: "",
         twoFa: "",
@@ -257,6 +259,16 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tag biến thể</label>
+            <input
+              type="text"
+              value={formData.variantTag}
+              onChange={(e) => setFormData({ ...formData, variantTag: e.target.value })}
+              placeholder="Ví dụ: 12M, Family, Premium"
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+            />
+          </div>
           {/* HẠN DÙNG & TRẠNG THÁI */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
@@ -294,7 +306,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Trạng Thái Slot
+                Trạng Thái Tài Khoản
               </label>
               <select
                 value={formData.status}
@@ -324,7 +336,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
               onChange={(e) =>
                 setFormData({ ...formData, note: e.target.value })
               }
-              placeholder="Ghi chú về nguồn gốc, chi tiết gói hoặc slot này..."
+              placeholder="Ghi chú về nguồn gốc, chi tiết gói hoặc tài khoản này..."
               className="w-full px-3.5 py-2 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-600 focus:outline-none focus:border-slate-500 transition-colors"
             />
           </div>
@@ -347,7 +359,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Đang lưu slot...</span>
+                  <span>Đang lưu tài khoản...</span>
                 </>
               ) : (
                 <>

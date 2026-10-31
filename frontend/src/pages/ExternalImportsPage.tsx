@@ -22,6 +22,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 
 interface PaymentAccount {
   id: number;
@@ -85,6 +86,9 @@ export const ExternalImportsPage: React.FC = () => {
     totalCount: 0,
   });
   const [loading, setLoading] = useState<boolean>(true);
+  const pageSize = 20;
+  const { page, setPage, resetPage } = useUrlPagination(Math.ceil(items.length / pageSize) || 1);
+  const pagedItems = items.slice((page - 1) * pageSize, page * pageSize);
 
   // Modal States
   const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
@@ -131,6 +135,7 @@ export const ExternalImportsPage: React.FC = () => {
       const json = await res.json();
       if (json.success) {
         setItems(json.data || []);
+        resetPage();
         if (json.stats) setStats(json.stats);
       }
     } catch (err: any) {
@@ -138,7 +143,7 @@ export const ExternalImportsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, activeTab, search, notify]);
+  }, [selectedMonth, activeTab, search]);
 
   useEffect(() => {
     fetchAccounts();
@@ -483,7 +488,7 @@ export const ExternalImportsPage: React.FC = () => {
             <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
             <span className="text-xs text-slate-400">Đang tải dữ liệu chi phí...</span>
           </div>
-        ) : items.length === 0 ? (
+        ) : pagedItems.length === 0 ? (
           <div className="py-16 px-4 text-center">
             <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-500">
               <PackagePlus className="w-7 h-7" />
@@ -517,7 +522,7 @@ export const ExternalImportsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
-                {items.map((item) => {
+                {pagedItems.map((item) => {
                   const isExternal = ["external_import", "mavn_import"].includes(item.expenseType);
                   return (
                     <tr
@@ -640,6 +645,16 @@ export const ExternalImportsPage: React.FC = () => {
         )}
       </div>
 
+
+      {!loading && items.length > pageSize && (
+        <div className="flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
+          <span>Trang {page} / {Math.ceil(items.length / pageSize)}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPage((current) => current - 1)} disabled={page <= 1} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Trước</button>
+            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= Math.ceil(items.length / pageSize)} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Sau</button>
+          </div>
+        </div>
+      )}
       {/* Modal Tạo Mới */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">

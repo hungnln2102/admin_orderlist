@@ -145,27 +145,46 @@ function applyActiveFilter(builder) {
 /**
  * Lấy danh sách đơn hàng có phân trang, lọc theo tab & tìm kiếm (Tối ưu SQL Aggregation)
  */
-async function getOrders({ page = 1, limit = 20, search = "", status = "", tab = "" } = {}) {
+async function getOrders({ page = 1, limit = 20, search = "", status = "", tab = "", includeStats = true } = {}) {
   page = Math.max(1, parseInt(page, 10) || 1);
   limit = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
   const offset = (page - 1) * limit;
+  const shouldIncludeStats = includeStats !== false;
 
   // 1. Tính toán tabCounts song song trên toàn bộ cơ sở dữ liệu (Tối ưu Promise.all)
-  const [[canceledRes], [expiredRes], [importRes], [activeRes]] = await Promise.all([
-    getOrderTable().where(applyCanceledFilter).count("id as count"),
-    getOrderTable().where(applyExpiredFilter).count("id as count"),
-    getOrderTable().where(applyImportFilter).count("id as count"),
-    getOrderTable().where(applyActiveFilter).count("id as count"),
-  ]);
+  let tabCounts;
+  if (shouldIncludeStats) {
+      const [[canceledRes], [expiredRes], [importRes], [activeRes]] = await Promise.all([
 
-  const tabCounts = {
-    active: Number(activeRes?.count || 0),
-    import: Number(importRes?.count || 0),
-    expired: Number(expiredRes?.count || 0),
-    canceled: Number(canceledRes?.count || 0),
-  };
+        getOrderTable().where(applyCanceledFilter).count("id as count"),
 
-  // 2. Truy vấn danh sách đơn thuộc tab hiện tại
+        getOrderTable().where(applyExpiredFilter).count("id as count"),
+
+        getOrderTable().where(applyImportFilter).count("id as count"),
+
+        getOrderTable().where(applyActiveFilter).count("id as count"),
+
+      ]);
+
+
+
+      tabCounts = {
+
+        active: Number(activeRes?.count || 0),
+
+        import: Number(importRes?.count || 0),
+
+        expired: Number(expiredRes?.count || 0),
+
+        canceled: Number(canceledRes?.count || 0),
+
+      };
+
+
+
+      // 2. Truy vấn danh sách đơn thuộc tab hiện tại
+  }
+
   let query = getOrderTable();
 
   if (tab === "canceled") {
@@ -213,97 +232,188 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
   // 3. SQL Aggregation trực tiếp trong PostgreSQL (Tối ưu tốc độ, không kéo all rows về Node RAM)
   const todayStr = new Date().toISOString().split("T")[0];
 
-  const [summaryRow] = await query.clone().select(
-    db.raw(`
-      COALESCE(SUM(price), 0)::numeric as "totalRevenue",
-      COALESCE(SUM(cost), 0)::numeric as "totalCost",
-      COALESCE(SUM(
-        CASE 
-          WHEN status = '${ORDER_STATUS.REFUND_PENDING}' THEN price 
-          ELSE 0 
-        END
-      ), 0)::numeric as "refundCustomerAmount",
-      COALESCE(SUM(
-        CASE 
-          WHEN status IN ('${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN price 
-          ELSE 0 
-        END
-      ), 0)::numeric as "refundedCustomerAmount",
-      COALESCE(SUM(
-        CASE 
-          WHEN status IN ('${ORDER_STATUS.REFUND_PENDING}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN cost 
-          ELSE 0 
-        END
-      ), 0)::numeric as "refundSupplierAmount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.PAID}'
-      ) as "paidCount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.PROCESSING}'
-      ) as "processingCount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.RENEW_REQUIRED}'
-      ) as "renewCount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.UNPAID}'
-      ) as "pendingCount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.REFUND_PENDING}'
-      ) as "pendingRefundCount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.REFUNDED}'
-      ) as "refundedCount",
-      COUNT(*) FILTER (
-        WHERE status = '${ORDER_STATUS.CANCELED}'
-      ) as "canceledCount",
-      COUNT(*) FILTER (
-        WHERE order_date::text LIKE '${todayStr}%' OR created_at::text LIKE '${todayStr}%'
-      ) as "todayCount"
-    `)
-  );
+  let summary;
+  if (shouldIncludeStats) {
+      const [summaryRow] = await query.clone().select(
 
-  // Tính toán remaining values dựa trên SQL
-  const [remRow] = await query.clone().select(
-    db.raw(`
-      COALESCE(SUM(
-        CASE 
-          WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
-          THEN ROUND((price::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
-          ELSE 0 
-        END
-      ), 0)::numeric as "totalRemainingValue",
-      COALESCE(SUM(
-        CASE 
-          WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
-          THEN ROUND((cost::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
-          ELSE 0 
-        END
-      ), 0)::numeric as "supplierRemainingValue"
-    `)
-  );
+        db.raw(`
 
-  const summary = {
-    totalRevenue: Number(summaryRow?.totalRevenue || 0),
-    totalCost: Number(summaryRow?.totalCost || 0),
-    totalRemainingValue: Number(remRow?.totalRemainingValue || 0),
-    supplierRemainingValue: Number(remRow?.supplierRemainingValue || 0),
-    refundCustomerAmount: Number(summaryRow?.refundCustomerAmount || 0),
-    refundedCustomerAmount: Number(summaryRow?.refundedCustomerAmount || 0),
-    refundSupplierAmount: Number(summaryRow?.refundSupplierAmount || 0),
-    paidCount: Number(summaryRow?.paidCount || 0),
-    renewCount: Number(summaryRow?.renewCount || 0),
-    processingCount: Number(summaryRow?.processingCount || 0),
-    pendingCount: Number(summaryRow?.pendingCount || 0),
-    pendingRefundCount: Number(summaryRow?.pendingRefundCount || 0),
-    refundedCount: Number(summaryRow?.refundedCount || 0),
-    canceledCount: Number(summaryRow?.canceledCount || 0),
-    todayCount: Number(summaryRow?.todayCount || 0),
-    totalOrders: total,
-  };
+          COALESCE(SUM(price), 0)::numeric as "totalRevenue",
 
-  const orders = await query
-    .select("*")
-    .orderByRaw(`
+          COALESCE(SUM(cost), 0)::numeric as "totalCost",
+
+          COALESCE(SUM(
+
+            CASE
+
+              WHEN status = '${ORDER_STATUS.REFUND_PENDING}' THEN price
+
+              ELSE 0
+
+            END
+
+          ), 0)::numeric as "refundCustomerAmount",
+
+          COALESCE(SUM(
+
+            CASE
+
+              WHEN status IN ('${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN price
+
+              ELSE 0
+
+            END
+
+          ), 0)::numeric as "refundedCustomerAmount",
+
+          COALESCE(SUM(
+
+            CASE
+
+              WHEN status IN ('${ORDER_STATUS.REFUND_PENDING}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN cost
+
+              ELSE 0
+
+            END
+
+          ), 0)::numeric as "refundSupplierAmount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.PAID}'
+
+          ) as "paidCount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.PROCESSING}'
+
+          ) as "processingCount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.RENEW_REQUIRED}'
+
+          ) as "renewCount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.UNPAID}'
+
+          ) as "pendingCount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.REFUND_PENDING}'
+
+          ) as "pendingRefundCount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.REFUNDED}'
+
+          ) as "refundedCount",
+
+          COUNT(*) FILTER (
+
+            WHERE status = '${ORDER_STATUS.CANCELED}'
+
+          ) as "canceledCount",
+
+          COUNT(*) FILTER (
+
+            WHERE order_date::text LIKE '${todayStr}%' OR created_at::text LIKE '${todayStr}%'
+
+          ) as "todayCount"
+
+        `)
+
+      );
+
+
+
+      // Tính toán remaining values dựa trên SQL
+
+      const [remRow] = await query.clone().select(
+
+        db.raw(`
+
+          COALESCE(SUM(
+
+            CASE
+
+              WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
+
+              THEN ROUND((price::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
+
+              ELSE 0
+
+            END
+
+          ), 0)::numeric as "totalRemainingValue",
+
+          COALESCE(SUM(
+
+            CASE
+
+              WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
+
+              THEN ROUND((cost::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
+
+              ELSE 0
+
+            END
+
+          ), 0)::numeric as "supplierRemainingValue"
+
+        `)
+
+      );
+
+
+
+      summary = {
+
+        totalRevenue: Number(summaryRow?.totalRevenue || 0),
+
+        totalCost: Number(summaryRow?.totalCost || 0),
+
+        totalRemainingValue: Number(remRow?.totalRemainingValue || 0),
+
+        supplierRemainingValue: Number(remRow?.supplierRemainingValue || 0),
+
+        refundCustomerAmount: Number(summaryRow?.refundCustomerAmount || 0),
+
+        refundedCustomerAmount: Number(summaryRow?.refundedCustomerAmount || 0),
+
+        refundSupplierAmount: Number(summaryRow?.refundSupplierAmount || 0),
+
+        paidCount: Number(summaryRow?.paidCount || 0),
+
+        renewCount: Number(summaryRow?.renewCount || 0),
+
+        processingCount: Number(summaryRow?.processingCount || 0),
+
+        pendingCount: Number(summaryRow?.pendingCount || 0),
+
+        pendingRefundCount: Number(summaryRow?.pendingRefundCount || 0),
+
+        refundedCount: Number(summaryRow?.refundedCount || 0),
+
+        canceledCount: Number(summaryRow?.canceledCount || 0),
+
+        todayCount: Number(summaryRow?.todayCount || 0),
+
+        totalOrders: total,
+
+      };
+  }
+
+  const ordersQuery = query.select("*");
+  if (tab === "expired") {
+    ordersQuery.orderByRaw("expired_at DESC NULLS LAST, id DESC");
+  } else {
+    ordersQuery.orderByRaw(`
       CASE
         WHEN status = '${ORDER_STATUS.UNPAID}' THEN 1
         WHEN status = '${ORDER_STATUS.PROCESSING}' THEN 2
@@ -313,10 +423,9 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
       END ASC,
       expired_at ASC NULLS LAST,
       id DESC
-    `)
-    .limit(limit)
-    .offset(offset);
-
+    `);
+  }
+  const orders = await ordersQuery.limit(limit).offset(offset);
   const enrichedOrders = await attachBatchSupplierAndQrInfo(orders);
 
   return {
@@ -327,8 +436,8 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
       limit: Number(limit),
       totalPages: Math.ceil(total / Number(limit)) || 1,
     },
-    tabCounts,
-    summary,
+    ...(tabCounts ? { tabCounts } : {}),
+    ...(summary ? { summary } : {}),
   };
 }
 
@@ -347,7 +456,7 @@ async function resolveSupplyId(trx, supplyInput) {
 }
 
 /**
- * Tối ưu hóa truy vấn hàng loạt (Batch Loader): Nạp toàn bộ thông tin NCC và VietQR 
+ * Tối ưu hóa truy vấn hàng loạt (Batch Loader): Nạp toàn bộ thông tin NCC và VietQR
  * cho danh sách đơn hàng chỉ bằng 1-2 queries (Loại bỏ triệt để lỗi N+1 Query).
  */
 async function attachBatchSupplierAndQrInfo(orders, trx) {
@@ -447,7 +556,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       display_name: displayName,
     };
 
-    const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") || 
+    const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") ||
       (Number(order.cost || 0) > 0 && String(order.status || "").toLowerCase().includes("nhập hàng"));
 
     if (isImport && supplier && (supplier.number_bank || supplier.numberBank)) {
@@ -677,10 +786,10 @@ async function createOrder(payload) {
         await trx.savepoint(async (subTrx) => {
           const isSaveToWarehouse = payload.save_to_warehouse !== false;
           const isSaveToPackage = payload.save_to_package !== false;
-          const accountUsername = payload.information_order 
+          const accountUsername = payload.information_order
             ? String(payload.information_order).trim().toLowerCase()
             : (payload.slot ? (payload.slot.split('|')[0] || payload.customer).trim().toLowerCase() : String(payload.customer || "mavryk").trim().toLowerCase());
-          
+
           let productName = payload.information_order || "Dịch vụ";
           const prodIdToLookup = newOrderData.id_product || payload.id_product;
           if (prodIdToLookup) {
@@ -709,7 +818,7 @@ async function createOrder(payload) {
               console.log("[OrderService] Không resolve được sản phẩm chính cho kho:", e.message);
             }
           }
-          
+
           let pName = await subTrx(TABLES.PRODUCT_NAMES)
             .whereRaw("LOWER(name) = ?", [productName.toLowerCase().trim()])
             .first();
