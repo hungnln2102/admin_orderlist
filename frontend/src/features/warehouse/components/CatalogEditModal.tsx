@@ -333,27 +333,6 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
               </div>
             </div>
 
-            {/* Thông báo hướng dẫn / trạng thái của nút Tick & X */}
-            {isDeleteMode && (
-              <p className="text-[11px] text-rose-400 mt-1.5 font-medium flex items-center gap-1 animate-in fade-in">
-                <span>⚠️ Ô text đang rỗng. Bấm nút</span>
-                <span className="font-bold underline text-rose-300">Tick (✓)</span>
-                <span>bên phải để XÓA VĨNH VIỄN tag "{selectedPillTag}".</span>
-              </p>
-            )}
-            {isRenameMode && (
-              <p className="text-[11px] text-emerald-400 mt-1.5 font-medium flex items-center gap-1 animate-in fade-in">
-                <span>💡 Bấm nút</span>
-                <span className="font-bold underline text-emerald-300">Tick (✓)</span>
-                <span>bên phải để đổi tên: "{selectedPillTag}" ➔ "{category.trim()}".</span>
-              </p>
-            )}
-            {tagActionMessage && (
-              <p className="text-[11px] text-cyan-400 mt-1.5 font-medium animate-in fade-in">
-                ✓ {tagActionMessage}
-              </p>
-            )}
-
             {/* Danh sách Tag đang lưu có sẵn của sản phẩm đó */}
             {productTags.length > 0 ? (
               <div className="mt-2.5 space-y-1.5">
