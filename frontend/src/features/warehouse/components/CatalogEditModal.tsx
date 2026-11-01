@@ -1,23 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Edit2, X, ExternalLink, Link2, Loader2, Package, Tag } from "lucide-react";
 import { ServiceNameCategoryItem, SystemProduct } from "../types";
-
-export const DEFAULT_SUGGESTED_TAGS = [
-  "5Tb",
-  "2Tb",
-  "100gb",
-  "12 Tháng",
-  "6 Tháng",
-  "1 Tháng",
-  "1PC Cố Định",
-  "Full App",
-  "Slot Team",
-  "Plus Cá Nhân",
-  "Gia Đình",
-  "Gia Hạn",
-  "Chính Chủ",
-  "Cấp Sẵn",
-];
 
 interface CatalogEditModalProps {
   open: boolean;
@@ -57,6 +40,34 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
       setError("");
     }
   }, [item, open]);
+
+  // Chỉ lấy các tag đang lưu có sẵn của chính sản phẩm đó
+  const productTags = useMemo(() => {
+    const set = new Set<string>();
+
+    // 1. Tag từ availableTags của dịch vụ này
+    (item?.availableTags || []).forEach((t) => {
+      if (t && t.trim()) set.add(t.trim());
+    });
+
+    // 2. Tag từ các slot tài khoản thuộc dịch vụ này
+    (item?.variants || []).forEach((v) => {
+      if (v.tag && v.tag !== "Chưa gắn tag" && v.tag.trim()) {
+        set.add(v.tag.trim());
+      }
+    });
+
+    // 3. Tag từ sản phẩm hệ thống được liên kết
+    const activeProductId = productId !== null ? productId : item?.productId;
+    if (activeProductId) {
+      const sp = systemProducts.find((p) => p.id === activeProductId);
+      (sp?.tags || []).forEach((t) => {
+        if (t && t.trim()) set.add(t.trim());
+      });
+    }
+
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [item, productId, systemProducts]);
 
   if (!open || !item) return null;
 
@@ -162,44 +173,54 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
             <div className="relative">
               <input
                 type="text"
-                list="edit-suggested-tags-list"
-                placeholder="Nhập hoặc chọn tag (VD: 5Tb, 2Tb, 1PC Cố Định, Slot Team...)"
+                list="edit-product-tags-list"
+                placeholder="Nhập hoặc chọn tag của sản phẩm này (VD: 5Tb, 1PC Cố Định...)"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono text-xs sm:text-sm"
               />
-              <datalist id="edit-suggested-tags-list">
-                {DEFAULT_SUGGESTED_TAGS.map((t) => (
+              <datalist id="edit-product-tags-list">
+                {productTags.map((t) => (
                   <option key={t} value={t} />
                 ))}
               </datalist>
             </div>
 
-            {/* Quick Tag Pills */}
-            <div className="mt-2 space-y-1.5">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
-                Gợi ý tag có sẵn (Bấm chọn hoặc tự nhập mới):
-              </span>
-              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar p-1.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
-                {DEFAULT_SUGGESTED_TAGS.map((t) => {
-                  const isSelected = category.toLowerCase().trim() === t.toLowerCase().trim();
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setCategory(t)}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
-                        isSelected
-                          ? "bg-purple-600 text-white font-bold border border-purple-400 shadow-sm shadow-purple-600/30 scale-105"
-                          : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
+            {/* Danh sách Tag đang lưu có sẵn của sản phẩm đó */}
+            {productTags.length > 0 ? (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                  <span>Tag có sẵn của sản phẩm này:</span>
+                  <span className="text-[10px] text-purple-400/80 font-normal lowercase">
+                    (bấm để điền & sửa đổi tùy ý)
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar p-1.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+                  {productTags.map((t) => {
+                    const isSelected = category.toLowerCase().trim() === t.toLowerCase().trim();
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setCategory(t)}
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-purple-600 text-white font-bold border border-purple-400 shadow-sm shadow-purple-600/30 scale-105"
+                            : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
+                        }`}
+                        title="Bấm để đưa tag này vào ô nhập và chỉnh sửa tùy ý"
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-slate-500 italic">
+                Sản phẩm này chưa có tag nào lưu sẵn. Master có thể tự do nhập tag mới ở ô trên.
+              </p>
+            )}
 
             {/* Live Preview Badge */}
             <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">
@@ -208,7 +229,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                 <span>{name || "Tên dịch vụ"}</span>
                 {category.trim() && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/10 text-white border border-white/10 lowercase first-letter:uppercase">
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/10 text-white border border-white/10">
                     [{category.trim()}]
                   </span>
                 )}

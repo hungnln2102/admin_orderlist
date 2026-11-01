@@ -46,6 +46,7 @@ export interface SystemProduct {
   id: number;
   name: string;
   isActive?: boolean;
+  tags?: string[];
 }
 
 export interface ServiceNameCategoryItem {
@@ -62,6 +63,7 @@ export interface ServiceNameCategoryItem {
   inStockAccounts?: number;
   reservedAccounts?: number;
   variants?: Array<{ tag: string; accountCount: number }>;
+  availableTags?: string[];
   status: "ACTIVE" | "LOW_STOCK" | "OUT_OF_STOCK";
 }
 

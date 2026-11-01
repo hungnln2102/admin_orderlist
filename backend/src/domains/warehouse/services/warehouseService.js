@@ -417,6 +417,25 @@ const listCatalogItems = async () => {
     .groupBy("name_id", "variant_tag")
     .orderBy("variant_tag", "asc");
 
+  const productIds = pNames.map((p) => p.product_id).filter(Boolean);
+  const systemVariants = productIds.length > 0
+    ? await db(TABLES.VARIANT)
+        .select("product_id", "variant_name")
+        .whereIn("product_id", productIds)
+        .whereNotNull("variant_name")
+        .orderBy("variant_name", "asc")
+    : [];
+
+  const systemVariantsByProduct = new Map();
+  systemVariants.forEach((v) => {
+    const pId = Number(v.product_id);
+    if (!systemVariantsByProduct.has(pId)) {
+      systemVariantsByProduct.set(pId, new Set());
+    }
+    const name = String(v.variant_name || "").trim();
+    if (name) systemVariantsByProduct.get(pId).add(name);
+  });
+
   const statMap = new Map();
   accountStats.forEach((st) => {
     statMap.set(st.name_id, {
@@ -437,6 +456,19 @@ const listCatalogItems = async () => {
     if (stats.inStock === 0) status = "OUT_OF_STOCK";
     else if (stats.inStock <= 3) status = "LOW_STOCK";
 
+    const existingTagsSet = new Set();
+    if (p.category && String(p.category).trim()) {
+      existingTagsSet.add(String(p.category).trim());
+    }
+    (variantMap.get(p.id) || []).forEach((v) => {
+      if (v.tag && v.tag !== "Chưa gắn tag" && String(v.tag).trim()) {
+        existingTagsSet.add(String(v.tag).trim());
+      }
+    });
+    if (p.product_id && systemVariantsByProduct.has(Number(p.product_id))) {
+      systemVariantsByProduct.get(Number(p.product_id)).forEach((t) => existingTagsSet.add(t));
+    }
+
     return {
       id: p.id,
       name: p.name,
@@ -451,6 +483,7 @@ const listCatalogItems = async () => {
       inStockSlots: stats.inStock,
       reservedSlots: stats.reserved,
       variants: variantMap.get(p.id) || [],
+      availableTags: Array.from(existingTagsSet),
       status,
     };
   });
@@ -815,10 +848,26 @@ const getSystemProducts = async () => {
     .select("id", "package_name as name", "is_active")
     .orderBy("package_name", "asc");
 
+  const variants = await db(TABLES.VARIANT)
+    .select("product_id", "variant_name")
+    .whereNotNull("variant_name")
+    .orderBy("variant_name", "asc");
+
+  const variantsByProduct = new Map();
+  variants.forEach((v) => {
+    const pId = Number(v.product_id);
+    if (!variantsByProduct.has(pId)) {
+      variantsByProduct.set(pId, new Set());
+    }
+    const name = String(v.variant_name || "").trim();
+    if (name) variantsByProduct.get(pId).add(name);
+  });
+
   return list.map((p) => ({
     id: Number(p.id),
     name: p.name || "",
     isActive: Boolean(p.is_active),
+    tags: Array.from(variantsByProduct.get(Number(p.id)) || []),
   }));
 };
 
