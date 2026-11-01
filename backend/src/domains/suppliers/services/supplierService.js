@@ -72,7 +72,9 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       COALESCE(SUM(l.${LOG_COLS.IMPORT_COST}), 0) AS total_import_cost,
       COALESCE(SUM(l.${LOG_COLS.REFUND_AMOUNT}), 0) AS total_refund,
       COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_unpaid_cost
-    FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l;
+    FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l
+    LEFT JOIN ${TABLES.SUPPLIER} s ON s.${S_COLS.ID} = l.${LOG_COLS.SUPPLY_ID}
+    WHERE (s.${S_COLS.ID} != 1 AND LOWER(COALESCE(s.${S_COLS.SUPPLIER_NAME}, '')) != 'mavryk');
   `;
   const statsRes = await db.raw(statsQuery);
   const statsRow = statsRes.rows[0] || {};
@@ -101,20 +103,23 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
 
   const dataRes = await db.raw(dataSql, params);
 
-  const suppliers = (dataRes.rows || []).map((row) => ({
-    id: row[S_COLS.ID],
-    supplier_name: row[S_COLS.SUPPLIER_NAME] || "Chưa có tên",
-    number_bank: row[S_COLS.NUMBER_BANK] || "",
-    bin_bank: row[S_COLS.BIN_BANK] || "",
-    account_holder: row[S_COLS.ACCOUNT_HOLDER] || "",
-    active_supply: row[S_COLS.ACTIVE_SUPPLY] !== false,
-    total_orders: parseInt(row.total_orders || 0, 10),
-    current_month_orders: parseInt(row.current_month_orders || 0, 10),
-    current_month_cost: parseFloat(row.current_month_cost || 0),
-    last_order_date: row.last_order_date ? row.last_order_date : null,
-    total_paid: parseFloat(row.total_paid || 0),
-    total_debt: parseFloat(row.total_debt || 0),
-  }));
+  const suppliers = (dataRes.rows || []).map((row) => {
+    const isMavryk = Number(row[S_COLS.ID]) === 1 || String(row[S_COLS.SUPPLIER_NAME] || "").trim().toLowerCase() === "mavryk";
+    return {
+      id: row[S_COLS.ID],
+      supplier_name: row[S_COLS.SUPPLIER_NAME] || "Chưa có tên",
+      number_bank: row[S_COLS.NUMBER_BANK] || "",
+      bin_bank: row[S_COLS.BIN_BANK] || "",
+      account_holder: row[S_COLS.ACCOUNT_HOLDER] || "",
+      active_supply: row[S_COLS.ACTIVE_SUPPLY] !== false,
+      total_orders: isMavryk ? 0 : parseInt(row.total_orders || 0, 10),
+      current_month_orders: isMavryk ? 0 : parseInt(row.current_month_orders || 0, 10),
+      current_month_cost: isMavryk ? 0 : parseFloat(row.current_month_cost || 0),
+      last_order_date: isMavryk ? null : (row.last_order_date ? row.last_order_date : null),
+      total_paid: isMavryk ? 0 : parseFloat(row.total_paid || 0),
+      total_debt: isMavryk ? 0 : parseFloat(row.total_debt || 0),
+    };
+  });
 
   return {
     stats: {
@@ -239,11 +244,12 @@ const getSupplierDetailById = async (id) => {
     WHERE ${LOG_COLS.SUPPLY_ID} = ?;
   `, [supplierId]);
 
+  const isMavryk = supplierId === 1 || String(supplier[S_COLS.SUPPLIER_NAME] || "").trim().toLowerCase() === "mavryk";
   const sRow = statsRes.rows[0] || {};
-  const remainingDebt = parseFloat(sRow.remaining_debt || 0);
-  const totalPaid = parseFloat(sRow.total_paid || 0);
-  const totalRefund = parseFloat(sRow.total_refund || 0);
-  const unpaidOrdersCount = parseInt(sRow.unpaid_orders || 0, 10);
+  const remainingDebt = isMavryk ? 0 : parseFloat(sRow.remaining_debt || 0);
+  const totalPaid = isMavryk ? 0 : parseFloat(sRow.total_paid || 0);
+  const totalRefund = isMavryk ? 0 : parseFloat(sRow.total_refund || 0);
+  const unpaidOrdersCount = isMavryk ? 0 : parseInt(sRow.unpaid_orders || 0, 10);
 
   // Phân tích đơn theo tháng
   const monthlyRes = await db.raw(`
@@ -265,7 +271,7 @@ const getSupplierDetailById = async (id) => {
   const bin = supplier[S_COLS.BIN_BANK] || "970422";
   const accNum = supplier[S_COLS.NUMBER_BANK] || "";
   const accName = supplier[S_COLS.ACCOUNT_HOLDER] || supplier[S_COLS.SUPPLIER_NAME];
-  const vietqrUrl = accNum
+  const vietqrUrl = (!isMavryk && accNum && remainingDebt > 0)
     ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${Math.max(0, remainingDebt - supplierId)}&accountName=${encodeURIComponent(accName)}`
     : null;
 
