@@ -353,7 +353,63 @@ async function getUsdtExchangeRate() {
 
 // --- FINANCIAL ACCOUNT CREDIT & DEBIT (WEBHOOK MONEY IN / OUT) ---
 
-async function resolveFinancialAccount(trxContext, { accountNumber = null, accountId = null } = {}) {
+/**
+ * So khớp tên ngân hàng từ Webhook SePay (gateway/bankBrandName) với tài khoản trong hệ thống
+ * @param {string} gateway - Giá trị gateway từ webhook SePay (vd: "MBBank", "MB", "VPBank", "TPBank"...)
+ * @param {object} account - Bản ghi financial_accounts (chứa bank_short_code, label, bank_display_name)
+ * @returns {boolean}
+ */
+function matchBankGateway(gateway, account) {
+  if (!gateway || !account) return false;
+  const cleanGw = String(gateway).toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!cleanGw) return false;
+
+  const shortCode = String(account.bank_short_code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const label = String(account.label || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const displayName = String(account.bank_display_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // 1. So khớp trực tiếp hoặc chứa nhau giữa shortCode, label, displayName
+  if (shortCode && (cleanGw === shortCode || cleanGw.includes(shortCode) || shortCode.includes(cleanGw))) return true;
+  if (label && (cleanGw === label || cleanGw.includes(label) || label.includes(cleanGw))) return true;
+  if (displayName && (cleanGw === displayName || cleanGw.includes(displayName) || displayName.includes(cleanGw))) return true;
+
+  // 2. Tra cứu Alias các ngân hàng phổ biến tại Việt Nam
+  const BANK_ALIASES = [
+    { code: "mb", aliases: ["mb", "mbbank", "militarybank", "quandoi"] },
+    { code: "vpb", aliases: ["vpb", "vpbank", "vietnamthinhvuong", "thinhvuong"] },
+    { code: "tpb", aliases: ["tpb", "tpbank", "tienphong"] },
+    { code: "vcb", aliases: ["vcb", "vietcombank", "ngoainthuong", "vietcom"] },
+    { code: "tcb", aliases: ["tcb", "techcombank", "kythuong", "techcom"] },
+    { code: "acb", aliases: ["acb", "acbbank", "achau"] },
+    { code: "bidv", aliases: ["bidv", "dautuphattrien"] },
+    { code: "ctg", aliases: ["ctg", "vietinbank", "congthuong", "vietin"] },
+    { code: "stb", aliases: ["stb", "sacombank", "saigonthuongtin"] },
+    { code: "vib", aliases: ["vib", "quocte"] },
+    { code: "shb", aliases: ["shb", "saigonhanoi"] },
+    { code: "ocb", aliases: ["ocb", "phuongdong"] },
+    { code: "msb", aliases: ["msb", "hanghai"] },
+    { code: "hdb", aliases: ["hdb", "hdbank", "phattrien"] },
+  ];
+
+  for (const group of BANK_ALIASES) {
+    const isGwMatched = group.aliases.some((alias) => cleanGw.includes(alias));
+    if (isGwMatched) {
+      const isAccMatched = group.aliases.some((alias) =>
+        shortCode.includes(alias) || label.includes(alias) || displayName.includes(alias)
+      );
+      if (isAccMatched) return true;
+    }
+  }
+
+  return false;
+}
+
+async function resolveFinancialAccount(trxContext, {
+  accountNumber = null,
+  accountId = null,
+  gateway = null,
+  accountScope = null,
+} = {}) {
   const queryDb = trxContext || db;
 
   if (accountId) {
@@ -365,11 +421,53 @@ async function resolveFinancialAccount(trxContext, { accountNumber = null, accou
 
   const cleanAccNum = String(accountNumber || "").replace(/\s+/g, "").trim();
   if (cleanAccNum) {
-    const acc = await queryDb(BANK_TABLE)
+    const candidates = await queryDb(BANK_TABLE)
       .whereRaw("REPLACE(account_number, ' ', '') = ?", [cleanAccNum])
-      .where("is_deleted", false)
-      .first();
-    if (acc) return acc;
+      .where("is_deleted", false);
+
+    if (candidates && candidates.length > 0) {
+      // 1. Nếu có gateway: Bắt buộc đối chiếu đồng thời cả Số tài khoản VÀ Ngân hàng (Gateway)
+      if (gateway) {
+        // Ưu tiên 1.1: Khớp ngân hàng + Khớp đúng accountScope (nếu có yêu cầu, ví dụ SHOP)
+        if (accountScope) {
+          const matchScopeAndBank = candidates.find(
+            (c) => c.account_scope === accountScope && matchBankGateway(gateway, c) && c.is_active !== false
+          );
+          if (matchScopeAndBank) return matchScopeAndBank;
+        }
+
+        // Ưu tiên 1.2: Khớp ngân hàng (bất kể scope nào, active trước)
+        const matchBankActive = candidates.find(
+          (c) => matchBankGateway(gateway, c) && c.is_active !== false
+        );
+        if (matchBankActive) return matchBankActive;
+
+        const matchBankAny = candidates.find((c) => matchBankGateway(gateway, c));
+        if (matchBankAny) return matchBankAny;
+      }
+
+      // 2. Nếu không có gateway hoặc gateway không match được: Sắp xếp theo thứ tự ưu tiên an toàn
+      const sorted = [...candidates].sort((a, b) => {
+        // Ưu tiên accountScope (ví dụ: SHOP lên trước PERSONAL)
+        if (accountScope) {
+          if (a.account_scope === accountScope && b.account_scope !== accountScope) return -1;
+          if (b.account_scope === accountScope && a.account_scope !== accountScope) return 1;
+        } else {
+          // Mặc định luôn ưu tiên SHOP lên trước PERSONAL để bảo vệ tiền Shop
+          if (a.account_scope === "SHOP" && b.account_scope !== "SHOP") return -1;
+          if (b.account_scope === "SHOP" && a.account_scope !== "SHOP") return 1;
+        }
+        // Ưu tiên tài khoản mặc định
+        if (a.is_default && !b.is_default) return -1;
+        if (!a.is_default && b.is_default) return 1;
+        // Ưu tiên tài khoản đang hoạt động
+        if (a.is_active && !b.is_active) return -1;
+        if (!a.is_active && b.is_active) return 1;
+        return a.id - b.id;
+      });
+
+      return sorted[0];
+    }
   }
 
   // Fallback 1: Tài khoản ngân hàng mặc định đang hoạt động
@@ -396,6 +494,8 @@ async function resolveFinancialAccount(trxContext, { accountNumber = null, accou
 async function creditFinancialAccount(trxContext, {
   accountNumber = null,
   accountId = null,
+  gateway = null,
+  accountScope = null,
   amount,
   sourceKind = "payment_receipt",
   sourceId = null,
@@ -405,7 +505,7 @@ async function creditFinancialAccount(trxContext, {
   if (numAmount <= 0) return { skipped: true, reason: "invalid_amount" };
 
   const execute = async (trx) => {
-    const account = await resolveFinancialAccount(trx, { accountNumber, accountId });
+    const account = await resolveFinancialAccount(trx, { accountNumber, accountId, gateway, accountScope });
     if (!account) {
       console.warn("[WalletService] Không tìm thấy tài khoản ngân hàng/ví để cộng tiền Webhook.");
       return { skipped: true, reason: "no_account_found" };
@@ -494,6 +594,8 @@ async function creditFinancialAccount(trxContext, {
 async function debitFinancialAccount(trxContext, {
   accountNumber = null,
   accountId = null,
+  gateway = null,
+  accountScope = null,
   amount,
   sourceKind = "payment_receipt",
   sourceId = null,
@@ -503,7 +605,7 @@ async function debitFinancialAccount(trxContext, {
   if (numAmount <= 0) return { skipped: true, reason: "invalid_amount" };
 
   const execute = async (trx) => {
-    const account = await resolveFinancialAccount(trx, { accountNumber, accountId });
+    const account = await resolveFinancialAccount(trx, { accountNumber, accountId, gateway, accountScope });
     if (!account) {
       console.warn("[WalletService] Không tìm thấy tài khoản ngân hàng/ví để trừ tiền Webhook.");
       return { skipped: true, reason: "no_account_found" };
@@ -603,6 +705,7 @@ module.exports = {
   deleteUsdtWallet,
   recordUsdtWithdrawal,
   getUsdtExchangeRate,
+  matchBankGateway,
   resolveFinancialAccount,
   creditFinancialAccount,
   debitFinancialAccount,

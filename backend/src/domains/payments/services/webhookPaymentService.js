@@ -105,6 +105,8 @@ async function processPaymentWebhook(payload = {}) {
       if (isOutbound) {
         await debitFinancialAccount(trx, {
           accountNumber: payload.accountNumber || payload.receiver || null,
+          gateway,
+          accountScope: "SHOP",
           amount: transferAmount,
           sourceKind: "payment_receipt",
           sourceId: receiptId,
@@ -165,6 +167,8 @@ async function processPaymentWebhook(payload = {}) {
       // 4. Tiền vào (IN) — Cộng tiền tài khoản/ví ngay khi nhận Webhook
       const creditRes = await creditFinancialAccount(trx, {
         accountNumber: payload.accountNumber || payload.receiver || null,
+        gateway,
+        accountScope: "SHOP",
         amount: transferAmount,
         sourceKind: "payment_receipt",
         sourceId: receiptId,
