@@ -140,7 +140,7 @@ services:
       - TZ=Asia/Ho_Chi_Minh
       - CUSTOM_USER=admin
       - PASSWORD=${CLOUD_BROWSER_PASSWORD:-mavryk_store_cloud_2026}
-      - CHROME_CLI=--no-sandbox --disable-dev-shm-usage https://account.adobe.com
+      - CHROME_CLI=--no-sandbox --disable-dev-shm-usage about:blank
     volumes:
       - ./warehouse_profiles:/config
     ports:

@@ -99,7 +99,7 @@ const getAllowedLoginHosts = () => {
 const isAllowedLoginUrl = (value) => {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && getAllowedLoginHosts().has(url.hostname.toLowerCase());
+    return url.protocol === "https:" || url.protocol === "http:";
   } catch {
     return false;
   }
@@ -112,7 +112,7 @@ const resolveLoginUrl = (serviceName = "", customUrl = null) => {
   if (customUrl && typeof customUrl === "string" && customUrl.trim()) {
     const trimmedUrl = customUrl.trim();
     if (!isAllowedLoginUrl(trimmedUrl)) {
-      throw new Error("URL đăng nhập không hợp lệ hoặc chưa nằm trong WAREHOUSE_BROWSER_ALLOWED_HOSTS.");
+      throw new Error("URL đăng nhập không hợp lệ. Phải bắt đầu bằng http:// hoặc https://");
     }
     return trimmedUrl;
   }

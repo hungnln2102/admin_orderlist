@@ -266,7 +266,7 @@ const getSupplierDetailById = async (id) => {
   const accNum = supplier[S_COLS.NUMBER_BANK] || "";
   const accName = supplier[S_COLS.ACCOUNT_HOLDER] || supplier[S_COLS.SUPPLIER_NAME];
   const vietqrUrl = accNum
-    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${Math.max(0, remainingDebt - supplierId)}&addInfo=${encodeURIComponent(`NCC${supplierId}`)}&accountName=${encodeURIComponent(accName)}`
+    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${Math.max(0, remainingDebt - supplierId)}&accountName=${encodeURIComponent(accName)}`
     : null;
 
   return {

@@ -288,21 +288,34 @@ export const WarehousePage: React.FC = () => {
     if (openingSlotId) return;
     setOpeningSlotId(service.id);
     try {
-      // 1. Mở cửa sổ Trình duyệt Đám Mây trên Web cho Master thao tác trực quan
-      const browserWindow = window.open(
-        "/browser/",
-        "MavrykCloudBrowser",
-        "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-      );
+      // 1. Trích xuất link đăng nhập động từ slot hoặc danh mục (loại bỏ hoàn toàn link hardcode)
+      const rawUrl = (service.login_url || "").trim() ||
+        (catalog.find((c) => c.name === service.display_name || c.name === service.category)?.loginUrl || "").trim();
 
-      if (browserWindow) {
-        browserWindow.focus();
+      if (rawUrl) {
+        const targetUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+          ? rawUrl
+          : `https://${rawUrl}`;
+
+        const browserWindow = window.open(
+          targetUrl,
+          "_blank",
+          "noopener,noreferrer"
+        );
+        if (browserWindow) {
+          browserWindow.focus();
+        }
+
+        notification.info(
+          `Đang mở trang đăng nhập ${service.display_name || service.category}: ${targetUrl}`,
+          "Mở Trình Duyệt"
+        );
+      } else {
+        notification.warning(
+          `Dịch vụ "${service.display_name || service.category}" chưa có link đăng nhập. Master vui lòng cấu hình link trong tab Danh Mục!`,
+          "Chưa Có Link Đăng Nhập"
+        );
       }
-
-      notification.info(
-        `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account}. Master hãy thao tác đăng nhập trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu tự động trên VPS.`,
-        "Trình Duyệt Đám Mây"
-      );
 
       // 2. Gửi request backend để xác minh hoặc lưu phiên
       const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {

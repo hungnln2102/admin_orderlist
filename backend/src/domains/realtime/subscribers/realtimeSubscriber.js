@@ -60,3 +60,4 @@ function registerRealtimeSubscriber() {
 }
 
 module.exports = { registerRealtimeSubscriber };
+

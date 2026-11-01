@@ -49,11 +49,11 @@ test("thử trình duyệt ưu tiên trước rồi mới tới trình duyệt d
   assert.deepEqual(getChannelCandidates("msedge"), ["msedge", "chrome", "chromium"]);
 });
 
-test("chỉ chấp nhận URL https thuộc allowlist trình duyệt kho", () => {
+test("chấp nhận URL http hoặc https hợp lệ", () => {
   assert.equal(isAllowedLoginUrl("https://accounts.google.com/signin"), true);
-  assert.equal(isAllowedLoginUrl("http://accounts.google.com/signin"), false);
-  assert.equal(isAllowedLoginUrl("https://127.0.0.1:3000"), false);
-  assert.equal(isAllowedLoginUrl("https://example.com"), false);
+  assert.equal(isAllowedLoginUrl("http://canva.com/"), true);
+  assert.equal(isAllowedLoginUrl("https://example.com"), true);
+  assert.equal(isAllowedLoginUrl("invalid-url"), false);
 });
 
 test("chỉ xác nhận đăng nhập khi profile có session cookie hợp lệ của đúng hostname", () => {
@@ -89,10 +89,10 @@ test("Adobe chỉ được xác minh khi session probe vẫn ở trang profile",
   assert.equal(isVerifiedSessionUrl("https://account.adobe.com/profile", probeUrl), true);
 });
 
-test("custom URL ngoài allowlist bị chặn", () => {
+test("custom URL không hợp lệ bị chặn", () => {
   assert.throws(
-    () => resolveLoginUrl("Netflix", "http://127.0.0.1:3000"),
-    /WAREHOUSE_BROWSER_ALLOWED_HOSTS/
+    () => resolveLoginUrl("Netflix", "not-a-valid-url"),
+    /URL đăng nhập không hợp lệ/
   );
 });
 

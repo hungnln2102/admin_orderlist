@@ -79,7 +79,7 @@ function buildQrProviderUrls({
   const vietQrParams = new URLSearchParams();
   if (hasAmount) vietQrParams.set("amount", amountStr);
   if (name) vietQrParams.set("accountName", name);
-  if (desc) vietQrParams.set("addInfo", desc);
+  // V2: Không dùng addInfo theo chỉ đạo Master
   const vietQrUrl = `https://img.vietqr.io/image/${bank}-${acc}-${VIETQR_IMAGE_TEMPLATE}.png${
     vietQrParams.toString() ? `?${vietQrParams.toString()}` : ""
   }`;
@@ -89,7 +89,7 @@ function buildQrProviderUrls({
   sepayParams.set("bank", bank);
   if (hasAmount) sepayParams.set("amount", amountStr);
   sepayParams.set("template", "compact");
-  if (desc) sepayParams.set("des", desc);
+  // V2: Không dùng des theo chỉ đạo Master
   const sepayUrl = `https://qr.sepay.vn/img?${sepayParams.toString()}`;
 
   return [vietQrUrl, sepayUrl];
