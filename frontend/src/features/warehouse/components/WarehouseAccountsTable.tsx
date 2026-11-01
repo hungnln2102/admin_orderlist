@@ -155,25 +155,37 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Sorted accounts by primary service name, then secondary by account email
+  // Sorted accounts by primary service name, then variant tag, then secondary by account email
   const sortedAccounts = useMemo(() => {
     return [...accounts].sort((a, b) => {
-      const getPrimaryService = (item: WarehouseAccountItem) => {
-        if (!item.services || item.services.length === 0) return "";
-        return item.services
+      const getServiceInfo = (item: WarehouseAccountItem) => {
+        if (!item.services || item.services.length === 0) return { name: "", tag: "" };
+        const srvNames = item.services
           .map((s) => s.display_name || s.category)
           .filter(Boolean)
           .join(", ")
           .trim()
           .toLowerCase();
+        const srvTags = item.services
+          .map((s) => s.variant_tag || (s.category !== s.display_name ? s.category : ""))
+          .filter(Boolean)
+          .join(", ")
+          .trim()
+          .toLowerCase();
+        return { name: srvNames, tag: srvTags };
       };
 
-      const srvA = getPrimaryService(a);
-      const srvB = getPrimaryService(b);
+      const srvA = getServiceInfo(a);
+      const srvB = getServiceInfo(b);
 
-      const cmp = srvA.localeCompare(srvB);
-      if (cmp !== 0) {
-        return sortOrder === "asc" ? cmp : -cmp;
+      const cmpName = srvA.name.localeCompare(srvB.name);
+      if (cmpName !== 0) {
+        return sortOrder === "asc" ? cmpName : -cmpName;
+      }
+
+      const cmpTag = srvA.tag.localeCompare(srvB.tag, undefined, { numeric: true });
+      if (cmpTag !== 0) {
+        return sortOrder === "asc" ? cmpTag : -cmpTag;
       }
 
       // Secondary sort: by account email A-Z
