@@ -27,6 +27,8 @@ interface PricingTableProps {
   onOpenAddSupplierModal: (productId: number) => void;
   onOpenEditSupplierCostModal: (state: EditingSupplierCostState) => void;
   onDeleteSupplierCost: (productId: number, supplierCostId: number) => void;
+  onToggleActive?: (item: PricingItem) => void;
+  togglingId?: number | null;
 }
 
 export const PricingTable: React.FC<PricingTableProps> = ({
@@ -43,6 +45,8 @@ export const PricingTable: React.FC<PricingTableProps> = ({
   onOpenAddSupplierModal,
   onOpenEditSupplierCostModal,
   onDeleteSupplierCost,
+  onToggleActive,
+  togglingId,
 }) => {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800/60">
@@ -217,17 +221,29 @@ export const PricingTable: React.FC<PricingTableProps> = ({
 
                     {/* Active Status */}
                     <td className="py-3.5 px-3 text-center">
-                      {item.is_active ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Hoạt động
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-slate-400 bg-slate-800/60 border border-slate-700/60">
-                          <XCircle className="w-3 h-3" />
-                          Ẩn
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onToggleActive) onToggleActive(item);
+                        }}
+                        disabled={togglingId === item.id}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold border transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          item.is_active
+                            ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10"
+                            : "text-slate-400 bg-slate-800/80 border-slate-700/80 hover:bg-slate-700 hover:text-slate-200"
+                        }`}
+                        title={item.is_active ? "Bấm để Chuyển sang Ẩn (Ngưng bán)" : "Bấm để Kích hoạt (Hoạt động)"}
+                      >
+                        {togglingId === item.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
+                        ) : item.is_active ? (
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-slate-400" />
+                        )}
+                        <span>{item.is_active ? "Hoạt động" : "Ẩn"}</span>
+                      </button>
                     </td>
 
                     {/* Actions */}

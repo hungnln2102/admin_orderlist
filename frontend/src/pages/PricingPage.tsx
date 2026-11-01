@@ -38,6 +38,7 @@ export const PricingPage: React.FC = () => {
   const [deletingItem, setDeletingItem] = useState<PricingItem | null>(null);
   const [addSupplierProductId, setAddSupplierProductId] = useState<number | null>(null);
   const [editingSupplierCost, setEditingSupplierCost] = useState<EditingSupplierCostState | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   // Form States
   const [productForm, setProductForm] = useState<ProductFormData>({
@@ -48,6 +49,7 @@ export const PricingPage: React.FC = () => {
     ctv_price: 0,
     student_price: 0,
     promo_price: 0,
+    is_active: true,
   });
 
   const [supplierForm, setSupplierForm] = useState({
@@ -150,6 +152,7 @@ export const PricingPage: React.FC = () => {
       ctv_price: 0,
       student_price: 0,
       promo_price: 0,
+      is_active: true,
     });
     setIsCreateModalOpen(true);
   };
@@ -193,7 +196,36 @@ export const PricingPage: React.FC = () => {
       ctv_price: item.ctv_price || 0,
       student_price: item.student_price || 0,
       promo_price: item.promo_price || 0,
+      is_active: item.is_active ?? true,
     });
+  };
+
+  const handleToggleActive = async (item: PricingItem) => {
+    setTogglingId(item.id);
+    const newStatus = !item.is_active;
+    try {
+      const res = await fetch(`/api/products/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        notify.success(
+          `Đã chuyển "${item.san_pham}" sang ${newStatus ? "Hoạt động" : "Ẩn"}!`,
+          "Cập Nhật Thành Công"
+        );
+        setItems((prev) =>
+          prev.map((it) => (it.id === item.id ? { ...it, is_active: newStatus } : it))
+        );
+      } else {
+        notify.error(data.error || "Không thể cập nhật trạng thái", "Lỗi Cập Nhật");
+      }
+    } catch (err) {
+      notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -355,6 +387,8 @@ export const PricingPage: React.FC = () => {
           }}
           onOpenEditSupplierCostModal={(costState) => setEditingSupplierCost(costState)}
           onDeleteSupplierCost={handleDeleteSupplierCost}
+          onToggleActive={handleToggleActive}
+          togglingId={togglingId}
         />
 
         {/* Pagination Footer */}

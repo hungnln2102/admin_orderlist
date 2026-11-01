@@ -40,6 +40,7 @@ export interface ProductFormData {
   ctv_price: number;
   student_price: number;
   promo_price: number;
+  is_active?: boolean;
 }
 
 export interface EditingSupplierCostState {

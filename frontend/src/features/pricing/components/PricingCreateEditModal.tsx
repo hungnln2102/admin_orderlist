@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Pencil, X, Tag, DollarSign, TrendingUp, AlertTriangle, Layers } from "lucide-react";
+import { Plus, Pencil, X, Tag, DollarSign, TrendingUp, AlertTriangle, Layers, Power, CheckCircle2, XCircle } from "lucide-react";
 import { PricingItem, ProductFormData } from "../types";
 
 interface PricingCreateEditModalProps {
@@ -268,6 +268,44 @@ export const PricingCreateEditModal: React.FC<PricingCreateEditModalProps> = ({
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Section 4: Status (Active / Inactive) */}
+          <div className="space-y-2 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-bold text-slate-200 text-xs flex items-center gap-2">
+                  <Power className={`w-4 h-4 ${productForm.is_active !== false ? "text-emerald-400" : "text-slate-500"}`} />
+                  <span>Trạng Thái Kinh Doanh</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {productForm.is_active !== false
+                    ? "Đang mở bán: Cho phép chọn tạo đơn mới và đồng bộ giá gia hạn kèm VietQR."
+                    : "Tạm ngưng: Ẩn khỏi form tạo đơn mới và tự động lược bỏ mã VietQR khi gia hạn."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProductForm({ ...productForm, is_active: productForm.is_active === false ? true : false })}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                  productForm.is_active !== false
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/20"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+              >
+                {productForm.is_active !== false ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Hoạt động</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Ẩn (Ngưng)</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
