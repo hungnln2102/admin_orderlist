@@ -123,19 +123,9 @@ async function processPaymentWebhook(payload = {}) {
           )
           .select(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`);
 
-        const noteMatches = (supplier) =>
-          new RegExp(`\\bNCC${supplier.id}\\b`, "i").test(String(noteContent));
-        const receiverMatches = (supplier) => {
-          const bankNumber = String(supplier.number_bank || "").replace(/\s+/g, "");
-          const receiver = String(payload.receiver || payload.receiverAccount || "").replace(/\s+/g, "");
-          return Boolean(bankNumber && receiver && bankNumber === receiver);
-        };
-        const verifiedCandidates = candidateSuppliers.filter((supplier) =>
-          noteMatches(supplier) || receiverMatches(supplier)
-        );
-
-        if (verifiedCandidates.length === 1) {
-          const supplierId = Number(verifiedCandidates[0].id);
+        // Chỉ đạo tối cao của Master: Bỏ đối soát theo nội dung chuyển khoản, chỉ khớp theo số tiền công thức
+        if (candidateSuppliers.length === 1) {
+          const supplierId = Number(candidateSuppliers[0].id);
           const settlement = await settleSupplierDebtTransaction({
             trx,
             supplierId,

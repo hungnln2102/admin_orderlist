@@ -1,4 +1,7 @@
 # Task — thống nhất cấu trúc admin_orderlist
+## Kế hoạch Browser Profile Vault
+
+- [x] Lập kế hoạch `docs/plans/2026-11-01_remote_browser_profile_vault_plan.md` cho popup remote browser, profile Chromium mã hóa trong PostgreSQL, viewer, RBAC, lock và tiêu chí nghiệm thu.
 
 Tài liệu tham chiếu kiến trúc: **`docs/STRUCTURE-SINGLE-DIRECTION.md`**.
 

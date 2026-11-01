@@ -210,6 +210,17 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
         .orWhereILike(O_COLS.CUSTOMER, `%${trimmedSearch}%`)
         .orWhereILike(O_COLS.CONTACT, `%${trimmedSearch}%`)
         .orWhereILike(O_COLS.INFORMATION_ORDER, `%${trimmedSearch}%`)
+        .orWhereILike(O_COLS.SLOT, `%${trimmedSearch}%`)
+        .orWhereILike(O_COLS.NOTE, `%${trimmedSearch}%`)
+        .orWhereILike(O_COLS.ID_PRODUCT, `%${trimmedSearch}%`)
+        .orWhereIn(O_COLS.ID_PRODUCT, function () {
+          this.select(db.raw(`CAST(${TABLES.VARIANT}.${COLS.VARIANT.ID} AS VARCHAR)`))
+            .from(TABLES.VARIANT)
+            .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.${COLS.PRODUCT.ID}`, `${TABLES.VARIANT}.${COLS.VARIANT.PRODUCT_ID}`)
+            .whereILike(`${TABLES.VARIANT}.${COLS.VARIANT.DISPLAY_NAME}`, `%${trimmedSearch}%`)
+            .orWhereILike(`${TABLES.VARIANT}.${COLS.VARIANT.VARIANT_NAME}`, `%${trimmedSearch}%`)
+            .orWhereILike(`${TABLES.PRODUCT}.${COLS.PRODUCT.PACKAGE_NAME}`, `%${trimmedSearch}%`);
+        })
         .orWhereIn(O_COLS.SUPPLY_ID, function () {
           this.select(COLS.SUPPLIER.ID)
             .from(TABLES.SUPPLIER)

@@ -56,3 +56,33 @@ test("Knex search clause correctly constructs supplier subqueries", () => {
   ]);
 });
 
+test("Knex full-field search clause correctly includes variant, product, slot and note", () => {
+  const trimmedSearch = "Adobe";
+  const query = db(TABLES.ORDER_LIST).where((builder) => {
+    builder
+      .whereILike(O_COLS.ID_ORDER, `%${trimmedSearch}%`)
+      .orWhereILike(O_COLS.CUSTOMER, `%${trimmedSearch}%`)
+      .orWhereILike(O_COLS.CONTACT, `%${trimmedSearch}%`)
+      .orWhereILike(O_COLS.INFORMATION_ORDER, `%${trimmedSearch}%`)
+      .orWhereILike(O_COLS.SLOT, `%${trimmedSearch}%`)
+      .orWhereILike(O_COLS.NOTE, `%${trimmedSearch}%`)
+      .orWhereILike(O_COLS.ID_PRODUCT, `%${trimmedSearch}%`)
+      .orWhereIn(O_COLS.ID_PRODUCT, function () {
+        this.select(db.raw(`CAST(${TABLES.VARIANT}.${COLS.VARIANT.ID} AS VARCHAR)`))
+          .from(TABLES.VARIANT)
+          .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.${COLS.PRODUCT.ID}`, `${TABLES.VARIANT}.${COLS.VARIANT.PRODUCT_ID}`)
+          .whereILike(`${TABLES.VARIANT}.${COLS.VARIANT.DISPLAY_NAME}`, `%${trimmedSearch}%`)
+          .orWhereILike(`${TABLES.VARIANT}.${COLS.VARIANT.VARIANT_NAME}`, `%${trimmedSearch}%`)
+          .orWhereILike(`${TABLES.PRODUCT}.${COLS.PRODUCT.PACKAGE_NAME}`, `%${trimmedSearch}%`);
+      });
+  });
+
+  const sql = query.toSQL().sql;
+  assert.match(sql, /slot/i);
+  assert.match(sql, /note/i);
+  assert.match(sql, /id_product/i);
+  assert.match(sql, /variant/i);
+  assert.match(sql, /display_name/i);
+  assert.match(sql, /variant_name/i);
+  assert.match(sql, /package_name/i);
+});
