@@ -10,6 +10,8 @@ const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
 const { resolveOrdersWithCatalogPrices } = require("./batchPaymentService");
+const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
+const { extractSlotSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
 
 const getReceiptTable = () => db(TABLES.PAYMENT_RECEIPT);
 
@@ -215,7 +217,16 @@ async function allocateReceipt(receiptId, payload) {
         throw new Error(`Đơn hàng ${code} đang ở trạng thái ${order.status}, không thể phân bổ thanh toán.`);
       }
 
-      const orderPrice = Number(order.price || order.gross_selling_price || 0);
+      let orderPrice = Number(order.price || order.gross_selling_price || 0);
+      const isRenewal = [ORDER_STATUS.RENEW_REQUIRED, "Cần Gia Hạn"].includes(order.status);
+      if (isRenewal) {
+        const { catalogBasePrice } = await resolveOrderCatalogPricing(trx, order);
+        if (catalogBasePrice > 0) {
+          const suffix = extractSlotSuffix(order) || 0;
+          const dynamicPrice = applySuffixToPrice(catalogBasePrice, suffix);
+          orderPrice = Math.max(orderPrice, dynamicPrice, catalogBasePrice);
+        }
+      }
       if (orderPrice > 0 && allocAmount > orderPrice) {
         throw new Error(`Số tiền phân bổ (${allocAmount.toLocaleString("vi-VN")} ₫) vượt quá giá trị đơn hàng (${orderPrice.toLocaleString("vi-VN")} ₫). Vui lòng nhập tối đa ${orderPrice.toLocaleString("vi-VN")} ₫.`);
       }
@@ -391,20 +402,30 @@ async function getMatchableOrders({ q = "", limit = 50 } = {}) {
 
   const enrichedRows = await resolveOrdersWithCatalogPrices(db, rows);
 
-  return enrichedRows.map((r) => ({
-    id: Number(r.id),
-    orderCode: r.id_order,
-    orderPrefix: r.orderPrefix || "MAVL",
-    catalogBasePrice: Number(r.catalogBasePrice || r.price || 0),
-    displayName: r.display_name || "",
-    variantName: r.variant_name || "",
-    customer: r.customer || "",
-    price: Number(r.price || 0),
-    status: r.status,
-    orderDate: r.order_date,
-    informationOrder: r.information_order || "",
-    productId: r.id_product || "",
-  }));
+  return enrichedRows.map((r) => {
+    const isRenew = [ORDER_STATUS.RENEW_REQUIRED, "Cần Gia Hạn"].includes(r.status);
+    const suffix = extractSlotSuffix(r) || 0;
+    const basePrice = Number(r.catalogBasePrice || 0);
+    const dynamicPrice = isRenew && basePrice > 0 ? applySuffixToPrice(basePrice, suffix) : Number(r.price || 0);
+    const effectivePrice = Math.max(Number(r.price || 0), dynamicPrice);
+
+    return {
+      id: Number(r.id),
+      id_order: r.id_order,
+      orderCode: r.id_order,
+      orderPrefix: r.orderPrefix || "MAVL",
+      catalogBasePrice: Number(r.catalogBasePrice || r.price || 0),
+      displayName: r.display_name || "",
+      variantName: r.variant_name || "",
+      customer: r.customer || "",
+      price: effectivePrice,
+      gross_selling_price: basePrice > 0 ? basePrice : effectivePrice,
+      status: r.status,
+      orderDate: r.order_date,
+      informationOrder: r.information_order || "",
+      productId: r.id_product || "",
+    };
+  });
 }
 
 // ────────────── createInvoice ──────────────

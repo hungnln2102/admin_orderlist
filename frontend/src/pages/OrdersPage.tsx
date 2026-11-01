@@ -372,10 +372,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       setProductSuppliersCatalog([]);
     }
 
-    const matchedSupplier = allSuppliersCatalog.find(
+    const suppliersPool = allSuppliersCatalog.length > 0 ? allSuppliersCatalog : [];
+    const matchedSupplier = suppliersPool.find(
       (s) => String(s.id) === String(order.supply_id) || (s.supplier_name || s.ncc_name) === order.supply_id
     );
-    const supplierName = (matchedSupplier ? (matchedSupplier.supplier_name || matchedSupplier.ncc_name) : null) || (order.supply_id ? String(order.supply_id) : "") || "";
+    const resolvedSupplierName =
+      (order.supplier_name && order.supplier_name.trim() && !/^\d+$/.test(order.supplier_name) ? order.supplier_name : null) ||
+      (matchedSupplier ? (matchedSupplier.supplier_name || matchedSupplier.ncc_name) : null) ||
+      "";
+    const supplierName = resolvedSupplierName || (order.supply_id ? String(order.supply_id) : "") || "";
 
     const resolvedVariantName = order.variant_name || matchedProd?.package_product || matchedProd?.san_pham || prodIdOrName;
     const resolvedDisplayName = order.display_name || matchedProd?.san_pham || "";
@@ -389,6 +394,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       variant_name: resolvedVariantName,
       display_name: resolvedDisplayName,
       supply_id: supplierName,
+      supplier_name: resolvedSupplierName || supplierName,
       price: Number(order.price || 0),
       gross_selling_price: Number(order.gross_selling_price || order.price || 0),
       cost: Number(order.cost || 0),

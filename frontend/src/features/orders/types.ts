@@ -52,6 +52,7 @@ export interface OrderFormData {
   variant_name?: string;
   display_name?: string;
   supply_id: string;
+  supplier_name?: string; // Tên hiển thị NCC
   price: number;
   gross_selling_price: number;
   cost: number;

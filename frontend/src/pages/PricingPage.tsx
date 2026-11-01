@@ -166,7 +166,7 @@ export const PricingPage: React.FC = () => {
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productForm),
+        body: JSON.stringify({ ...productForm, san_pham: productForm.name, package_product: productForm.variant_name }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -205,7 +205,7 @@ export const PricingPage: React.FC = () => {
       const res = await fetch(`/api/products/${editingItem.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productForm),
+        body: JSON.stringify({ ...productForm, san_pham: productForm.name, package_product: productForm.variant_name }),
       });
       const data = await res.json();
       if (res.ok) {

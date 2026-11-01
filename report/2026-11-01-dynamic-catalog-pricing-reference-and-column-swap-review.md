@@ -49,3 +49,4 @@
 - [`frontend/src/features/orders/types.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/orders/types.ts)
 - [`frontend/src/features/pricing/components/PricingTable.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/pricing/components/PricingTable.tsx)
 - [`frontend/src/features/pricing/components/PricingCreateEditModal.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/pricing/components/PricingCreateEditModal.tsx)
+

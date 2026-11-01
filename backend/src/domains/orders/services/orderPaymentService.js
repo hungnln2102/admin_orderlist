@@ -235,6 +235,11 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     updateFields.order_date = newOrderDate;
     updateFields.expired_at = newExpiredAt;
     updateFields.days = newDays;
+
+    if (amount > 0) {
+      updateFields.price = amount;
+      updateFields.gross_selling_price = amount;
+    }
   }
 
   // Cập nhật Đơn hàng trong transaction

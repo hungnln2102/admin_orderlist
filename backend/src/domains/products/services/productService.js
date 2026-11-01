@@ -326,7 +326,9 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
     promo_price: getOldPrice(3),
     student_price: getOldPrice(4),
   };
-  const { san_pham, package_product, base_price, retail_price, ctv_price, student_price, promo_price, is_active } = data;
+  const san_pham = data.san_pham !== undefined ? data.san_pham : data.name;
+  const package_product = data.package_product !== undefined ? data.package_product : data.variant_name;
+  const { base_price, retail_price, ctv_price, student_price, promo_price, is_active } = data;
 
   const updateFields = { [V_COLS.UPDATED_AT]: trx.fn.now() };
   if (san_pham !== undefined) updateFields[V_COLS.DISPLAY_NAME] = san_pham;

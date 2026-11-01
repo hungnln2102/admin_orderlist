@@ -76,7 +76,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
           const exact = json.data.find(
-            (o: any) => String(o.id_order || "").toUpperCase() === targetCode.trim().toUpperCase()
+            (o: any) => String(o.id_order || o.orderCode || "").toUpperCase() === targetCode.trim().toUpperCase()
           );
           if (exact) {
             setMatchedOrder(exact);

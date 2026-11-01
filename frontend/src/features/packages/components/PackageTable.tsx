@@ -289,39 +289,61 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                                       <Zap className="w-4 h-4" />
                                     </div>
 
-                                    <div className="text-xs font-bold text-white truncate max-w-full" title={assignment?.customerContact || assignment?.customerName || `Slot ${slotNum}`}>
-                                      {assignment?.customerContact || assignment?.customerName || `Slot ${slotNum}`}
-                                    </div>
-
-                                    {assignment?.orderCode && (
-                                      <div className="text-[10px] font-bold text-amber-400/90 tracking-wide mt-0.5 truncate max-w-full">
-                                        ĐƠN: {assignment.orderCode}
+                                    {/* 1. MÃ ĐƠN */}
+                                    {isUsed ? (
+                                      <div
+                                        className="text-xs font-mono font-extrabold text-amber-300 tracking-wide truncate max-w-full"
+                                        title={assignment?.orderCode ? `Mã đơn: ${assignment.orderCode}` : undefined}
+                                      >
+                                        {assignment?.orderCode
+                                          ? assignment.orderCode.startsWith("#") || assignment.orderCode.startsWith("ĐƠN")
+                                            ? assignment.orderCode
+                                            : `#${assignment.orderCode}`
+                                          : "ĐÃ DÙNG"}
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs font-bold text-emerald-300 font-mono">
+                                        Slot {slotNum}
                                       </div>
                                     )}
 
-                                    {assignment?.customerName && (
-                                      <div className="text-[10px] text-slate-400 truncate max-w-full">
-                                        {assignment.customerName}
+                                    {/* 2. TÊN KHÁCH */}
+                                    {isUsed ? (
+                                      <div
+                                        className="text-[11px] font-bold text-white truncate max-w-full mt-0.5"
+                                        title={
+                                          assignment?.customerContact
+                                            ? `${assignment.customerName || "Khách"} (${assignment.customerContact})`
+                                            : assignment?.customerName
+                                        }
+                                      >
+                                        {assignment?.customerName || assignment?.customerContact || "Khách hàng"}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[10px] font-bold text-emerald-400/90 uppercase tracking-widest mt-0.5">
+                                        AVAILABLE
+                                      </div>
+                                    )}
+
+                                    {/* 3. SLOT */}
+                                    {isUsed && (
+                                      <div
+                                        className="text-[10px] font-bold text-amber-400/80 font-mono tracking-wider uppercase mt-1 truncate max-w-full"
+                                        title={assignment?.slotLabel && assignment.slotLabel !== item.accountInfo ? assignment.slotLabel : `Slot ${slotNum}`}
+                                      >
+                                        {assignment?.slotLabel &&
+                                        assignment.slotLabel !== item.accountInfo &&
+                                        !assignment.slotLabel.includes("@")
+                                          ? assignment.slotLabel
+                                          : `Slot ${slotNum}`}
                                       </div>
                                     )}
 
                                     {/* Hiển thị số GB mỗi slot đang mua */}
                                     {assignment?.capacity && (
-                                      <span className="mt-1.5 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold tracking-wide">
+                                      <span className="mt-1 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9.5px] font-mono font-bold tracking-wide">
                                         {assignment.capacity} GB
                                       </span>
-                                    )}
-
-                                    {!assignment && isUsed && (
-                                      <div className="text-[10px] font-bold text-amber-400/80 uppercase tracking-widest mt-1">
-                                        ĐÃ DÙNG
-                                      </div>
-                                    )}
-
-                                    {!isUsed && (
-                                      <div className="text-[10px] font-bold text-emerald-400/90 uppercase tracking-widest mt-1">
-                                        AVAILABLE
-                                      </div>
                                     )}
                                   </div>
                                 );

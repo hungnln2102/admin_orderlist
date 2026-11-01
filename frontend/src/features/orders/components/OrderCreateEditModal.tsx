@@ -361,7 +361,22 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Nhà Cung Cấp (NCC)" : "Chọn Nhà Cung Cấp (NCC) *"}</label>
                 {isEdit ? (
                   <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-purple-300 font-bold flex items-center min-h-[38px]">
-                    {formData.supply_id || "Chưa có NCC"}
+                    {(() => {
+                      if (formData.supplier_name && formData.supplier_name.trim() && !/^\d+$/.test(formData.supplier_name)) {
+                        return formData.supplier_name;
+                      }
+                      const rawVal = formData.supply_id;
+                      const matched =
+                        allSuppliersCatalog.find(
+                          (s) => String(s.id) === String(rawVal) || (s.supplier_name || s.ncc_name) === rawVal
+                        ) ||
+                        productSuppliersCatalog.find(
+                          (s) => String(s.supplier_id) === String(rawVal) || (s.supplier_name || s.ncc_name) === rawVal
+                        );
+                      if (matched) return matched.supplier_name || matched.ncc_name;
+                      if (rawVal && !/^\d+$/.test(rawVal)) return rawVal;
+                      return "Chưa có NCC";
+                    })()}
                   </div>
                 ) : (
                   <SearchableSupplierDropdown
