@@ -72,3 +72,4 @@ Bổ sung 3 thẻ bộ lọc trạng thái sản phẩm trực quan trên trang 
 ## 4. Kết Luận & Nghiệm Thu
 
 Tính năng 3 thẻ trạng thái Bảng Giá Niêm Yết đã hoàn thiện đầy đủ theo đúng yêu cầu và hình ảnh hướng dẫn của Master. Code sạch sẽ, tuân thủ nghiêm ngặt chuẩn kiến trúc `AGENTS.md`.
+
