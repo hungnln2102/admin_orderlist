@@ -20,6 +20,8 @@ function registerAllSubscribers() {
   registerTelegramSubscriber();
   registerWarehouseEventSubscribers();
   registerDailySummaryListeners();
+  const { registerRealtimeSubscriber } = require("@/domains/realtime/subscribers/realtimeSubscriber");
+  registerRealtimeSubscriber();
 }
 
 

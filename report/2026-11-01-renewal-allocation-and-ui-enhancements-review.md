@@ -45,4 +45,54 @@
 2. **Frontend Build:**
    - `npm run build --prefix frontend` biên dịch thành công, TypeScript type check sạch sẽ.
 3. **Trạng Thái Nghiệm Thu:**
-   - **HOÀN THÀNH VÀ SẴN SÀNG TRIỂN KHAI LÊN PRODUCTION**.
+   - **CHƯA NGHIỆM THU - KHÔNG TRIỂN KHAI PRODUCTION**. Có lỗi P1 về số tiền gia hạn/phân bổ và rủi ro P1 cloud browser; xem mục review bổ sung.
+
+---
+
+## 3. Review Bổ Sung - 2026-11-01
+
+### Phạm vi đã rà soát
+
+- Commit `8d974213`, `ed44ab53` và cấu hình runtime hiện tại đến `HEAD`.
+- Luồng xác định giá Catalog, gợi ý đơn có thể phân bổ, phân bổ biên lai, chốt gia hạn và cấu hình cloud browser.
+
+### Phát hiện
+
+#### P1 - Giá Catalog giảm không trở thành giá có thẩm quyền cho đơn gia hạn
+
+`invoiceService.allocateReceipt()` lấy giá lịch sử rồi dùng `Math.max(giá_lịch_sử, giá_catalog_mới)`; `getMatchableOrders()` cũng trả `effectivePrice` theo cùng quy tắc. Ví dụ đơn cũ 200.004 đ, Catalog mới 150.004 đ: API vẫn hiển thị/cho phép tối đa 200.004 đ thay vì chốt 150.004 đ. Điều này mâu thuẫn mục tiêu đối chiếu giá Catalog mới, tạo khả năng thu thừa và khiến frontend/backend dùng hai giá khác nhau (`catalogBasePrice` và `price`).
+
+- Vị trí: `backend/src/domains/invoices/services/invoiceService.js:220`, `backend/src/domains/invoices/services/invoiceService.js:405`.
+- Cần sửa: với `RENEW_REQUIRED` có mapping Catalog hợp lệ, dùng duy nhất `applySuffixToPrice(catalogBasePrice, suffix)` làm giá phải thu; chỉ fallback sang giá lịch sử khi không tìm được mapping Catalog.
+- Cần test: Catalog giảm giá, tăng giá, thiếu mapping, và slot suffix khác 0.
+
+#### P1 - Có thể phân bổ thiếu tiền nhưng vẫn gia hạn và ghi đè giá kỳ mới
+
+Luồng phân bổ chỉ chặn `allocAmount > orderPrice`, không chặn `allocAmount < orderPrice`; sau đó gọi `processOrderPayment()`. Với đơn gia hạn, hàm này đổi trạng thái/gia hạn kỳ và ghi cả `price` lẫn `gross_selling_price` bằng đúng số tiền phân bổ. Vì vậy một allocation 1 đ có thể hoàn tất gia hạn rồi làm dữ liệu giá của kỳ mới thành 1 đ. Đây là lỗi toàn vẹn dữ liệu và doanh thu.
+
+- Vị trí: `backend/src/domains/invoices/services/invoiceService.js:230`, `backend/src/domains/invoices/services/invoiceService.js:261`, `backend/src/domains/orders/services/orderPaymentService.js:239`.
+- Cần sửa: tách phân bổ một phần khỏi thanh toán hoàn tất; chỉ gọi `processOrderPayment()` khi tổng allocation hợp lệ đạt chính xác giá phải thu (quy tắc làm tròn được định nghĩa rõ). Lưu giá chốt từ catalog/suffix, không lấy tùy ý từ payload allocation.
+- Cần test integration PostgreSQL: allocation thiếu, allocation đúng, allocation vượt, retry đồng thời và rollback receipt/order/allocation.
+
+#### P1 - Cloud browser hiện vẫn có secret fallback và sandbox bị vô hiệu hóa
+
+Compose hiện có fallback password công khai, `seccomp:unconfined` và Chromium `--no-sandbox`. Đây là rủi ro độc lập với luồng pricing nhưng vẫn chặn nghiệm thu bảo mật toàn diện.
+
+- Vị trí: `docker-compose.yml:136`, `docker-compose.yml:142`, `docker-compose.yml:143`.
+- Cần xử lý: bắt buộc `CLOUD_BROWSER_PASSWORD` từ secret store/env production đã xoay mới; kiểm thử để bỏ `seccomp:unconfined` và `--no-sandbox`; xác minh port cloud browser chỉ bind loopback trên VPS.
+
+#### P2 - Test hiện có không bao phủ API/transaction của thay đổi mới
+
+59 unit test và frontend build đều pass, nhưng test Catalog hiện chỉ mock service đồng bộ. Không có test cho `allocateReceipt()`/`getMatchableOrders()` với Catalog giảm giá hoặc allocation thiếu; vì vậy các lỗi P1 trên không bị phát hiện.
+
+### Kiểm tra đã chạy
+
+- `npm.cmd --prefix backend test`: **59/59 pass**.
+- `npm.cmd --prefix frontend run build`: **pass**.
+- `npm.cmd --prefix backend audit --omit=dev --json`: **0 vulnerability**.
+- `npm.cmd --prefix frontend audit --omit=dev --json`: **0 vulnerability**.
+- `git diff --check`: code thay đổi pass; report cũ có whitespace đã được chuẩn hóa trong lần review này.
+
+### Kết luận
+
+**CHƯA NGHIỆM THU.** Không deploy các commit pricing/allocation lên production cho đến khi hai lỗi P1 tiền tệ được sửa tại nguồn và có integration test PostgreSQL xác nhận. Các chỉnh sửa UI/NCC/bố cục bảng không có lỗi runtime được phát hiện qua build, nhưng không đủ để bù cho rủi ro tài chính và bảo mật còn mở.

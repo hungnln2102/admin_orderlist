@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
 import {
   SupplierItem,
   SupplierCostLogItem,
@@ -137,6 +138,29 @@ export const SuppliersPage: React.FC = () => {
   useEffect(() => {
     fetchSuppliersOverview();
   }, [fetchSuppliersOverview]);
+
+  // Lắng nghe sự kiện Realtime công nợ và chi phí NCC (Chỉ đạo của Master)
+  useRealtimeEvent(
+    [
+      "SUPPLIER_DEBT_PAID",
+      "SUPPLIER_COST_ADDED",
+      "SUPPLIER_COST_UPDATED",
+      "SUPPLIER_COST_DELETED",
+      "SUPPLIER_UPDATED",
+      "SUPPLIER_STATUS_TOGGLED",
+      "SUPPLIER_CREATED",
+      "SUPPLIER_DELETED",
+      "WEBHOOK_MONEY_IN",
+      "WEBHOOK_MONEY_OUT",
+    ],
+    () => {
+      fetchSuppliersOverview();
+      if (selectedSupplierDetailId !== null) {
+        fetchSupplierDetail(selectedSupplierDetailId);
+        fetchSupplierLogs(selectedSupplierDetailId);
+      }
+    }
+  );
 
   useEffect(() => {
     if (selectedSupplierDetailId !== null) {

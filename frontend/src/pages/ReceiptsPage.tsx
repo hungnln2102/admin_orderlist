@@ -22,6 +22,7 @@ import { AllocateReceiptModal } from "../features/invoices/components/AllocateRe
 import { CreateReceiptModal } from "../features/invoices/components/CreateReceiptModal";
 import { PendingBatchesModal } from "../features/invoices/components/PendingBatchesModal";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
+import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
 
 interface InvoiceReceipt {
   id: number;
@@ -124,6 +125,19 @@ export const ReceiptsPage: React.FC = () => {
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
+
+  // Lắng nghe sự kiện Realtime nạp biên lai tiền về (Chỉ đạo của Master)
+  useRealtimeEvent(
+    [
+      "WEBHOOK_MONEY_IN",
+      "ORDER_PAID",
+      "ORDER_RENEWED",
+      "SUPPLIER_DEBT_PAID",
+    ],
+    () => {
+      fetchInvoices();
+    }
+  );
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);

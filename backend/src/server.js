@@ -122,6 +122,7 @@ app.use("/api", requireAuthenticatedUser, requireAdmin);
 app.use("/api", requireTrustedMutationOrigin);
 
 // Domain Routers
+app.use("/api/realtime", require("@/domains/realtime/routes"));
 app.use("/api/orders", require("@/domains/orders/routes"));
 app.use("/api/products", require("@/domains/products/routes"));
 app.use("/api/suppliers", require("@/domains/suppliers/routes"));

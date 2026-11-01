@@ -1686,6 +1686,8 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
       emitOrderEvent(trx, EVENTS.ORDER_RENEWED, {
         orderId: updatedOrder.id,
         id_order: updatedOrder.id_order,
+        id_product: updatedOrder.id_product,
+        price: payAmount,
         customer: updatedOrder.customer,
         newOrderDate: updatedOrder.order_date,
         newExpiredAt: updatedOrder.expired_at,

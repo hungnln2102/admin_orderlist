@@ -753,12 +753,28 @@ const getPackageProducts = async () => {
     const slotAssignments = matchingOrders.map((ord, idx) => {
       const v = ord.id_product ? variantMap.get(String(ord.id_product)) : null;
       const capacity = extractCapacityFromVariant(v?.variant_name, v?.display_name);
+
+      const targetUser = r.account_info ? String(r.account_info).trim().toLowerCase() : "";
+      const isMatchedBySlot = Boolean(ord.slot && String(ord.slot).toLowerCase().includes(targetUser));
+
+      // Chỉ đạo tối cao của Master:
+      // Nếu match đơn hàng với cột slot thì lấy ở đây là information, và ngược lại
+      let resolvedSlotLabel = `Slot ${idx + 1}`;
+      if (isMatchedBySlot) {
+        resolvedSlotLabel = ord.information_order || ord.slot || `Slot ${idx + 1}`;
+      } else {
+        resolvedSlotLabel = ord.slot || ord.information_order || `Slot ${idx + 1}`;
+      }
+
       return {
         slotNumber: idx + 1,
         orderCode: ord.id_order || `ĐƠN #${ord.id}`,
         customerName: ord.customer || "",
-        customerContact: ord.contact || ord.information_order || "",
-        slotLabel: ord.slot || `Slot ${idx + 1}`,
+        customerContact: ord.contact || "",
+        informationOrder: ord.information_order || "",
+        orderSlot: ord.slot || "",
+        matchedBy: isMatchedBySlot ? "slot" : "information",
+        slotLabel: resolvedSlotLabel,
         capacity: capacity || null,
       };
     });

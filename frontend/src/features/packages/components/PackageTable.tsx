@@ -325,17 +325,13 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                                       </div>
                                     )}
 
-                                    {/* 3. SLOT */}
+                                    {/* 3. SLOT / THÔNG TIN VỊ TRÍ (Đảo slot/information theo chỉ đạo Master) */}
                                     {isUsed && (
                                       <div
-                                        className="text-[10px] font-bold text-amber-400/80 font-mono tracking-wider uppercase mt-1 truncate max-w-full"
-                                        title={assignment?.slotLabel && assignment.slotLabel !== item.accountInfo ? assignment.slotLabel : `Slot ${slotNum}`}
+                                        className="text-[10px] font-bold text-amber-400/90 font-mono tracking-wide mt-1 truncate max-w-full"
+                                        title={assignment?.slotLabel || `Slot ${slotNum}`}
                                       >
-                                        {assignment?.slotLabel &&
-                                        assignment.slotLabel !== item.accountInfo &&
-                                        !assignment.slotLabel.includes("@")
-                                          ? assignment.slotLabel
-                                          : `Slot ${slotNum}`}
+                                        {assignment?.slotLabel || `Slot ${slotNum}`}
                                       </div>
                                     )}
 

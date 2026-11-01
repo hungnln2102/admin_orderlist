@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ShoppingBag, Plus } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
 import {
   Order,
   OrdersPageProps,
@@ -53,6 +54,22 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     fetchOrders,
     refreshOrders,
   } = useOrders(initialTab);
+
+  // Lắng nghe sự kiện Realtime làm mới đơn hàng lập tức (Chỉ đạo của Master)
+  useRealtimeEvent(
+    [
+      "ORDER_CREATED",
+      "ORDER_UPDATED",
+      "ORDER_DELETED",
+      "ORDER_PAID",
+      "ORDER_RENEWED",
+      "ORDER_EXPIRED",
+      "WEBHOOK_MONEY_IN",
+    ],
+    () => {
+      refreshOrders();
+    }
+  );
 
   const {
     productsCatalog,

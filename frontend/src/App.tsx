@@ -4,15 +4,18 @@ import { AppLayout } from "@/layout/AppLayout";
 import { AppRoutes } from "@/routes/AppRoutes";
 import { NotificationProvider } from "@/shared/context/NotificationContext";
 import { AuthProvider } from "@/shared/context/AuthContext";
+import { RealtimeProvider } from "@/shared/context/RealtimeContext";
 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
-          <AppLayout>
-            <AppRoutes />
-          </AppLayout>
+          <RealtimeProvider>
+            <AppLayout>
+              <AppRoutes />
+            </AppLayout>
+          </RealtimeProvider>
         </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>

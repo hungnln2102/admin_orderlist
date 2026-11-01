@@ -263,10 +263,58 @@ async function notifyOrderRenewed(orderData) {
     const { formatDateDMY, formatCurrency } = require("@/domains/notifications/telegram/builders/formatters");
     const orderCode = orderData.id_order || orderData.orderCode || "...";
     const customer = orderData.customer || "N/A";
-    const productName = orderData.productName || orderData.id_product || "N/A";
     const daysAdded = orderData.daysAdded || 30;
     const expiryDate = orderData.newExpiredAt ? formatDateDMY(orderData.newExpiredAt) : "N/A";
-    const priceStr = orderData.price ? `${formatCurrency(orderData.price)} đ` : "";
+
+    let rawProduct = orderData.id_product || orderData.productId;
+    let price = orderData.price;
+
+    // Nếu thiếu rawProduct hoặc price, query nhanh từ DB
+    if ((!rawProduct || price == null) && (orderData.id_order || orderData.orderId)) {
+      try {
+        const orderRow = await db(TABLES.ORDER_LIST)
+          .where(orderData.id_order ? { id_order: orderData.id_order } : { id: orderData.orderId })
+          .select("id_product", "price")
+          .first();
+        if (orderRow) {
+          if (!rawProduct) rawProduct = orderRow.id_product;
+          if (price == null) price = orderRow.price;
+        }
+      } catch (_dbErr) {
+        // Tiếp tục fallback
+      }
+    }
+
+    // Tra cứu chuẩn variant_name từ bảng business.variant theo chỉ đạo của Master
+    let productName = orderData.variant_name || orderData.variantName;
+    if (!productName && rawProduct) {
+      try {
+        const str = String(rawProduct).trim();
+        const num = Number(str);
+        const isNumeric = Number.isFinite(num) && num >= 1 && String(num) === str;
+        let variantRow = null;
+        if (isNumeric) {
+          variantRow = await db(TABLES.VARIANT).where("id", num).select("variant_name", "display_name").first();
+        } else {
+          variantRow = await db(TABLES.VARIANT)
+            .where("display_name", str)
+            .orWhere("variant_name", str)
+            .select("variant_name", "display_name")
+            .first();
+        }
+        if (variantRow) {
+          productName = variantRow.variant_name || variantRow.display_name;
+        }
+      } catch (_vErr) {
+        // Fallback
+      }
+    }
+
+    if (!productName || !isNaN(Number(productName))) {
+      productName = orderData.productName || (rawProduct && isNaN(Number(rawProduct)) ? rawProduct : "N/A");
+    }
+
+    const priceStr = price ? `${formatCurrency(price)} đ` : "";
 
     const lines = [
       `🎉 <b>Gia hạn đơn hàng thành công!</b>`,
