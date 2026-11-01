@@ -136,3 +136,4 @@ runMerge()
     console.error('LỖI MIGRATION (ĐÃ ROLLBACK TOÀN BỘ):', err);
     process.exit(1);
   });
+

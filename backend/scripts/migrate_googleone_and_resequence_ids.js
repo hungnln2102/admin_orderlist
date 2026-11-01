@@ -223,3 +223,4 @@ runMigration()
     console.error('LỖI MIGRATION (ĐÃ TỰ ĐỘNG ROLLBACK TOÀN BỘ):', err);
     process.exit(1);
   });
+
