@@ -21,7 +21,10 @@ Kết quả phải hiển thị `Time zone: Asia/Ho_Chi_Minh (+07, +0700)` và `
 1. Tạo file `.env` cạnh `docker-compose.yml` với `DB_USER`, `DB_PASS`, `DB_NAME` và `CLOUD_BROWSER_PASSWORD`; dùng giá trị riêng, đủ dài, sinh ngẫu nhiên.
 2. Đặt quyền tối thiểu: `chmod 600 .env backend/.env.docker` và chỉ cấp quyền đọc cho tài khoản deploy.
 3. Luân chuyển ngay mật khẩu cloud browser đã từng có trong lịch sử Compose; secret cũ không được tái sử dụng. Đồng thời luân chuyển token SePay, Telegram, Google OAuth và `SESSION_SECRET` nếu chúng đã từng được đưa vào log, backup hoặc Git.
-4. Kiểm tra trước deploy: `git ls-files '* .env'` không được trả về file secret; `git grep -n -i 'password=.*[a-z0-9]' -- docker-compose.yml` không được tìm thấy mật khẩu thật.
+4. Kiểm tra trước deploy: `git ls-files '*.env*'` chỉ được phép trả về file mẫu đã duyệt, không được có file secret; `git grep -n -i 'password=.*[a-z0-9]' -- docker-compose.yml` không được tìm thấy mật khẩu thật.
+
+
+> **Cảnh báo hiện trạng:** Compose vẫn có fallback cloud-browser cũ trong commit `4f97ca3f`. Luôn đặt `CLOUD_BROWSER_PASSWORD` bằng secret mới trên VPS và không dùng lại fallback đó. Ngoại lệ `seccomp:unconfined`/`--no-sandbox` phải được kiểm thử và loại bỏ trước khi nghiệm thu bảo mật toàn diện.
 
 ## Mạng, firewall và SSH
 

@@ -660,3 +660,36 @@ Ký hiệu: `RUNTIME` là đường chạy chính hiện tại; `MIGRATION` là 
 **CHƯA NGHIỆM THU LIVE.** Các P1 trong phạm vi mã đã được xử lý và có unit/build evidence. Tuy nhiên chưa có `TEST_DATABASE_URL` an toàn để chạy integration transaction/concurrency, nên chưa chứng minh được rollback thật trên PostgreSQL và cạnh tranh với payment/webhook.
 
 `npm audit fix --omit=dev` đã giảm audit backend từ 7 xuống 6 advisory `moderate`; phần còn lại là chuỗi transitive `google-gax`/`gcp-metadata`/`gaxios`/`rimraf`/`glob`/`minimatch`. Không dùng `--force` vì npm đề xuất downgrade breaking `nodemon` về `1.0.2`. Cần nâng có kiểm soát dependency gốc tương thích rồi chạy lại audit và toàn bộ test.
+
+
+---
+
+## Phụ lục cập nhật 2026-11-01 - Hardening dependency và triển khai
+
+### Phạm vi thực hiện
+
+- Nâng `@google-analytics/data` lên `7.3.0` và `pg` lên `8.23.1`; image backend dùng Node 22 để đáp ứng yêu cầu runtime của Google Analytics SDK.
+- Đổi deploy sang build, chờ PostgreSQL/Redis healthy, chạy migration trước rollout, rồi `up -d --remove-orphans`; bỏ `down` toàn stack và `FLUSHALL` Redis.
+- Sửa Nginx frontend proxy webhook về đúng upstream nội bộ `backend:3001`; thêm rate/connection limit, scanner map và response headers cho Nginx host.
+- Thêm `docs/operations/vps-hardening.md` cho giờ Việt Nam, secret, UFW, SSH key-only, Fail2ban, deploy, backup/restore và checklist live verification.
+
+### Kiểm tra đã chạy
+
+- `npm.cmd --prefix backend test`: **59/59 pass**.
+- `npm.cmd --prefix frontend run build`: **pass**.
+- `npm.cmd --prefix backend audit --omit=dev --json`: **0 vulnerability**.
+- `npm.cmd --prefix frontend audit --omit=dev --json`: **0 vulnerability**.
+- `npx.cmd knex migrate:list` trong `backend`: **19 completed, 0 pending**.
+- `docker compose -f docker-compose.yml config --quiet`: **pass** với các biến môi trường kiểm tra không chứa secret thật.
+- `git diff --check`: **pass** tại thời điểm kiểm tra local.
+
+### Phát hiện còn mở
+
+- **P1 - Cloud browser không an toàn nếu không override biến môi trường:** Commit `4f97ca3f` vẫn giữ fallback `CLOUD_BROWSER_PASSWORD:-mavryk_store_cloud_2026`. Giá trị này đã là secret đã biết và phải được loại bỏ hoặc bị chặn trước khi coi VPS an toàn. Không dùng lại secret này trên bất kỳ môi trường nào.
+- **P1 - Sandbox Chromium bị nới lỏng:** Commit `4f97ca3f` vẫn giữ `security_opt: seccomp:unconfined` và `CHROME_CLI=--no-sandbox`. Đây là ngoại lệ rủi ro cao cho container đăng nhập tài khoản bên thứ ba; chỉ chấp nhận tạm thời khi đã có network isolation, port loopback, mật khẩu mới và bằng chứng runtime. Cần kế hoạch kiểm thử để bỏ ngoại lệ này mà không làm hỏng browser automation.
+- **P2 - Live verification không thực hiện từ máy local:** Không có Docker daemon/SSH credential VPS trong phiên này, nên chưa xác minh được listener, UFW, SSH, TLS header, NTP hoặc khởi động Chromium thật. Báo cáo timezone VPS là bằng chứng riêng; phần hardening này chưa tái xác minh trực tiếp.
+- **P2 - Transaction integration:** Chưa có `TEST_DATABASE_URL` cô lập để chạy regression transaction/concurrency với PostgreSQL thực.
+
+### Trạng thái nghiệm thu
+
+**CHƯA NGHIỆM THU BẢO MẬT VPS TOÀN DIỆN.** Dependency production và các kiểm tra local đã sạch; tuy nhiên hai ngoại lệ cloud browser nêu trên cùng thiếu bằng chứng live khiến không thể trả lời rằng hệ thống "bảo mật ok hết". Điều kiện nghiệm thu là: xoay secret cũ, bỏ fallback/password hard-code, giảm sandbox exception sau smoke test browser, và lưu bằng chứng VPS theo `docs/operations/vps-hardening.md`.
