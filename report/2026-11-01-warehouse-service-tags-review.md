@@ -10,8 +10,10 @@
 ## 1. PHẠM VI YÊU CẦU & THỰC HIỆN
 
 Master yêu cầu:
-1. Trong modal **Chỉnh Sửa Dịch Vụ & Cấu Hình Link** và **Thêm Dịch Vụ Mới**, thay thế ô chọn Chuyên mục cố định (5 mục cũ) bằng **Tag phân loại / biến thể** linh hoạt (chọn từ các Tag có sẵn hoặc tự gõ Tag mới).
-2. Hiển thị Tag này ở cột **"Sản phẩm & Dịch vụ"** bên bảng Kho hàng (`/warehouse`).
+1. Trong modal **Chỉnh Sửa Dịch Vụ & Cấu Hình Link** và **Thêm Dịch Vụ Mới**, thay thế ô chọn Chuyên mục cố định (5 mục cũ) bằng **Tag phân loại / biến thể** linh hoạt.
+2. **Không dùng danh sách tag gợi ý chung chung**: Chỉ lấy các tag/biến thể đang lưu có sẵn của chính sản phẩm đó (từ `business.variant`, `warehouse.account_slots`, và `warehouse.product_names`).
+3. **Vẫn cho phép chỉnh sửa tự do**: Người dùng có thể click chọn nhanh tag có sẵn để điền vào ô nhập và sửa đổi tùy ý, hoặc tự gõ tag mới hoàn toàn.
+4. Hiển thị Tag này ở cột **"Sản phẩm & Dịch vụ"** bên bảng Kho hàng (`/warehouse`).
 
 ---
 
@@ -29,13 +31,14 @@ Master yêu cầu:
 ### 2.2. Tầng Giao Diện Frontend (React TSX)
 - **Modal Chỉnh Sửa Dịch Vụ (`CatalogEditModal.tsx`):**
   - Chuyển trường *"Chuyên Mục (*)"* thành *"Tag Phân Loại / Biến Thể (*)"*.
-  - Tích hợp ô nhập Tag kết hợp `<datalist>` gợi ý thông minh và khay nút bấm nhanh (Quick Tag Pills): `5Tb`, `2Tb`, `100gb`, `12 Tháng`, `6 Tháng`, `1PC Cố Định`, `Full App`, `Slot Team`, `Plus Cá Nhân`, `Gia Đình`...
-  - Cho phép người dùng bấm chọn nhanh hoặc tự gõ bất kỳ Tag mới tùy thích (Creatable Tag).
-  - Tích hợp khung **"Xem trước hiển thị"** (Live Preview) ngay trong form để Master xem trước diện mạo huy hiệu khi hiển thị ngoài bảng.
+  - **Lọc chính xác theo sản phẩm**: Chỉ tải và hiển thị các tag/biến thể thực tế đã lưu của sản phẩm đó (từ `availableTags` của backend và biến thể của sản phẩm liên kết). Loại bỏ hoàn toàn các tag gợi ý mặc định chung chung (12 tháng, 6 tháng, gia đình...).
+  - **Khay Tag Có Sẵn & Cho Phép Sửa Đổi**: Cung cấp các nút tag pill 1-click để điền nhanh vào ô text. Người dùng có thể xóa, sửa ký tự hoặc gõ tag hoàn toàn mới theo ý muốn.
+  - Tích hợp khung **"Xem trước hiển thị"** (Live Preview) ngay trong form để Master xem trước diện mạo huy hiệu khi hiển thị ngoài bảng (`• Tên Dịch Vụ [Tag]`).
 - **Modal Thêm Dịch Vụ Mới (`CatalogCreateModal.tsx`):**
-  - Bổ sung cơ chế chọn/nhập Tag tương tự như Modal chỉnh sửa.
+  - Tự động nạp danh sách tag có sẵn tương ứng ngay khi người dùng chọn một Sản phẩm Hệ thống liên kết.
+  - Cho phép người dùng chọn nhanh và chỉnh sửa tùy ý.
 - **Bảng Tài Khoản Kho Hàng (`WarehouseAccountsTable.tsx`):**
-  - Cột **"Sản phẩm & Dịch vụ"** (cả giao diện Desktop và Mobile): hiển thị tên dịch vụ kèm Tag biến thể (ví dụ: `• GOOGLE ONE 5TB [5TB]`, `• ADOBE [1PC CỐ ĐỊNH]`, `• CANVA [SLOT TEAM]`).
+  - Cột **"Sản phẩm & Dịch vụ"** (cả giao diện Desktop và Mobile): hiển thị tên dịch vụ kèm Tag biến thể (ví dụ: `• GOOGLE ONE 5TB [5TB]`, `• ADOBE [1PC CỐ ĐỊNH]`).
   - Hàng chi tiết từng slot khi mở rộng (Expanded sub-table): cột "Dịch vụ" hiển thị kèm Tag `[tag]` tương ứng.
 - **Danh Mục Dịch Vụ (`WarehouseCatalogGrid.tsx`):**
   - Dạng Lưới Thẻ (Grid Cards): hiển thị Tag badge màu tím nổi bật ngay dưới tên dịch vụ.
@@ -46,18 +49,21 @@ Master yêu cầu:
 ## 3. KIỂM THỬ & KẾT QUẢ NGHIỆM THU
 
 1. **Frontend Compilation (TypeScript & Vite):**
-   - Chạy `npm --prefix frontend run build` -> Hoàn thành trong 8.86s, 0 lỗi, 1707 modules transformed thành công.
+   - Chạy `npm --prefix frontend run build` -> Hoàn thành trong 9.40s, 0 lỗi, 1707 modules transformed thành công.
 2. **Backend Unit & Regression Tests:**
    - Chạy `npm --prefix backend test` -> **48/48 unit test pass 100%**.
 3. **Triển Khai & Kiểm Tra Thực Tế Trên VPS:**
-   - Đã push commit `040cacc0` lên nhánh `main`.
+   - Đã push commit `040cacc0` và `06566f4f` lên nhánh `main`.
    - Đã fast-forward pull trên VPS `/var/www/admin_orderlist`.
    - Đã build lại container `admin_orderlist-frontend` và restart `admin_orderlist-backend`.
-   - Đã xóa toàn bộ Redis cache và kiểm tra HTTP 200 OK trên live domain `https://admin.mavrykpremium.com`.
-   - Kiểm tra dữ liệu: tài khoản `duch60606@gmail.com` (Google One 5Tb) và các tài khoản Adobe hiển thị chuẩn Tag `[5Tb]`, `[1PC Cố Định]` trên cột "Sản phẩm & Dịch vụ".
+   - Đã xóa toàn bộ Redis cache (`FLUSHALL`) và kiểm tra HTTP 200 OK trên live domain `https://admin.mavrykpremium.com`.
+   - Kiểm tra dữ liệu thực tế trên VPS qua backend service:
+     - Dịch vụ **Adobe**: Trả về chính xác 11 biến thể có thật (`1PC Cố Định`, `Adobe 1PC Cố Định`, `Adobe 2PC Cố Định`, `Adobe 4PC Full`, `Key Full App`, `Adobe Renew`...). Không bị lẫn tag của các sản phẩm khác.
+     - Dịch vụ **Google One 100gb**: Trả về `["100gb"]`.
 
 ---
 
 ## 4. KẾT LUẬN
 - Tính năng hoạt động mượt mà, đúng yêu cầu và tiêu chí nghiệm thu của Master.
 - Không phát sinh side-effect lên các chức năng đơn hàng hay phân trang kho.
+
