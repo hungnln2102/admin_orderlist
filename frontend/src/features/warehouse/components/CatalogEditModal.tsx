@@ -273,14 +273,13 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
               <div className="relative flex-1">
                 <input
                   type="text"
-                  list="edit-product-tags-list"
                   placeholder="Nhập hoặc chọn tag của sản phẩm này (VD: 5Tb, 1PC Cố Định...)"
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value);
                     setTagActionMessage("");
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-950 border rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none font-mono text-xs sm:text-sm transition-colors ${
+                  className={`w-full px-3.5 py-2.5 bg-slate-950 border rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none font-mono text-xs sm:text-sm transition-colors [&::-webkit-calendar-picker-indicator]:hidden ${
                     isDeleteMode
                       ? "border-rose-500/80 focus:border-rose-400 shadow-sm shadow-rose-500/20"
                       : isRenameMode
@@ -288,11 +287,6 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
                       : "border-slate-700 focus:border-purple-500"
                   }`}
                 />
-                <datalist id="edit-product-tags-list">
-                  {productTags.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
               </div>
 
               {/* 2 nút nhỏ bên phải: Tick (✓) và X (✕) */}

@@ -37,6 +37,7 @@ Master yêu cầu:
       - Khi Master sửa chữ trong ô text và bấm ✓: Hệ thống gọi API đổi tên tag (`rename`) đồng bộ trên toàn hệ thống (`business.variant`, `warehouse.product_names`, `warehouse.account_slots`).
       - Khi Master xóa sạch chữ trong ô text (rỗng) và bấm ✓: Hệ thống kích hoạt logic xóa tag (`delete`), tự động xóa vĩnh viễn tag đó khỏi hệ thống và gỡ khỏi danh sách gợi ý.
     - **X (✕) - Hủy bỏ**: Khôi phục lại tag cũ, hủy toàn bộ thao tác đang làm dở.
+  - **Gỡ bỏ hoàn toàn icon mũi tên tam giác mặc định của trình duyệt**: Loại bỏ thuộc tính `list` và thẻ `<datalist>` gây ra icon tam giác đen `▼` (`::-webkit-calendar-picker-indicator`), giữ ô text luôn phẳng, sạch sẽ và hiện đại.
   - Tích hợp khung **"Xem trước hiển thị"** (Live Preview) ngay trong form để Master xem trước diện mạo huy hiệu khi hiển thị ngoài bảng (`• Tên Dịch Vụ [Tag]`).
 - **Modal Thêm Dịch Vụ Mới (`CatalogCreateModal.tsx`):**
   - Tự động nạp danh sách tag có sẵn tương ứng ngay khi người dùng chọn một Sản phẩm Hệ thống liên kết.

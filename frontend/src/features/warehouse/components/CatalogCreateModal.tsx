@@ -108,17 +108,11 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
             <div className="relative">
               <input
                 type="text"
-                list="create-product-tags-list"
                 placeholder="Nhập hoặc chọn tag của sản phẩm này (VD: 5Tb, 1PC Cố Định...)"
                 value={formData.category || ""}
                 onChange={(e) => onFormChange({ ...formData, category: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono text-xs sm:text-sm"
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono text-xs sm:text-sm [&::-webkit-calendar-picker-indicator]:hidden"
               />
-              <datalist id="create-product-tags-list">
-                {productTags.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
             </div>
 
             {/* Danh sách Tag đang lưu có sẵn của sản phẩm đó */}
