@@ -10,6 +10,7 @@
  */
 
 const { getConfigByKey, requestConfiguredApi } = require("./externalApiConfigService");
+const { readExternalResponse } = require("@/utils/safeExternalRequest");
 
 function extractOtpCode(raw) {
   if (raw == null) return null;
@@ -49,194 +50,79 @@ function collectOtpCandidates(obj, out = [], parentKey = "") {
 /**
  * 1. Lấy OTP từ HDSD (otp.hdsd.net)
  */
-async function fetchOtpFromHdsd(email) {
-  const config = (await getConfigByKey("otp_hdsd")) || {};
-  const authConfig = config.auth_config || {};
-  const baseUrl = config.base_url || "https://otp.hdsd.net";
-  const endpoint = config.endpoints?.get_otp || "/get_otp_api";
-  const token = authConfig.token || "";
-  const timeoutMs = Number(authConfig.timeoutMs) || 10000;
-
-  const url = `${baseUrl.replace(/\/+$/, "")}${endpoint}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
+async function parseJsonResponse(response) {
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/plain, */*",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    };
-    if (token) headers.Authorization = `Bearer ${token}`;
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ email }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`HDSD trả về mã HTTP ${res.status}: ${res.statusText}`);
-    }
-
-    const data = await res.json().catch(() => null);
-    if (!data) return null;
-
-    let rows = [];
-    if (Array.isArray(data)) rows = data;
-    else if (data?.data && Array.isArray(data.data)) rows = data.data;
-    else if (data?.mails && Array.isArray(data.mails)) rows = data.mails;
-
-    if (rows.length > 0) {
-      for (const row of rows) {
-        const code = extractOtpCode(row?.value ?? row?.otp ?? row?.code);
-        if (code) return code;
-      }
-    }
-
-    const candidates = collectOtpCandidates(data);
-    for (const c of candidates) {
-      const code = extractOtpCode(c);
-      if (code) return code;
-    }
+    return JSON.parse(await readExternalResponse(response));
+  } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
-/**
- * 2. Lấy OTP từ TinyHost (tinyhost.shop)
- */
+function appendQuery(endpoint, params) {
+  const query = new URLSearchParams(params);
+  return endpoint + (endpoint.includes("?") ? "&" : "?") + query.toString();
+}
+
+async function fetchOtpFromHdsd(email) {
+  const config = { base_url: "https://otp.hdsd.net", ...((await getConfigByKey("otp_hdsd")) || {}) };
+  const response = await requestConfiguredApi(config, { method: "POST", endpoint: config.endpoints?.get_otp || "/get_otp_api", body: { email }, timeoutMs: Number(config.auth_config?.timeoutMs) || 10_000 });
+  if (!response.ok) throw new Error("HDSD returned HTTP " + response.status + ".");
+  const data = await parseJsonResponse(response);
+  const rows = Array.isArray(data) ? data : (data?.data || data?.mails || []);
+  for (const row of rows) {
+    const code = extractOtpCode(row?.value ?? row?.otp ?? row?.code);
+    if (code) return code;
+  }
+  return collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
+}
+
 async function fetchOtpFromTinyHost(email) {
   const [user, domain] = String(email || "").split("@");
   if (!user || !domain) throw new Error("Email không hợp lệ để tra cứu TinyHost.");
-
-  const config = (await getConfigByKey("tinyhost")) || {};
-  const baseUrl = config.base_url || "https://tinyhost.shop";
-  const timeoutMs = Number(config.auth_config?.timeoutMs) || 15000;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const listUrl = `${baseUrl.replace(/\/+$/, "")}/api/email/${encodeURIComponent(domain)}/${encodeURIComponent(user)}/?limit=10`;
-    const res = await fetch(listUrl, { signal: controller.signal });
-    if (!res.ok) throw new Error(`TinyHost trả về HTTP ${res.status}: ${res.statusText}`);
-
-    const data = await res.json().catch(() => ({}));
-    const emails = data?.emails || [];
-    if (emails.length === 0) return null;
-
-    for (const item of emails) {
-      const rawSubject = item.subject || "";
-      const directCode = extractOtpCode(rawSubject);
-      if (directCode) return directCode;
-
-      try {
-        const detailUrl = `${baseUrl.replace(/\/+$/, "")}/api/email/${encodeURIComponent(domain)}/${encodeURIComponent(user)}/${item.id}`;
-        const detailRes = await fetch(detailUrl, { signal: controller.signal });
-        if (detailRes.ok) {
-          const detailData = await detailRes.json();
-          const body = detailData?.body || detailData?.html_body || "";
-          const bodyCode = extractOtpCode(body);
-          if (bodyCode) return bodyCode;
-        }
-      } catch {}
-    }
-    return null;
-  } finally {
-    clearTimeout(timer);
+  const config = { base_url: "https://tinyhost.shop", ...((await getConfigByKey("tinyhost")) || {}) };
+  const timeoutMs = Number(config.auth_config?.timeoutMs) || 15_000;
+  const listEndpoint = appendQuery("/api/email/" + encodeURIComponent(domain) + "/" + encodeURIComponent(user) + "/", { limit: "10" });
+  const response = await requestConfiguredApi(config, { endpoint: listEndpoint, timeoutMs });
+  if (!response.ok) throw new Error("TinyHost returned HTTP " + response.status + ".");
+  const data = await parseJsonResponse(response) || {};
+  for (const item of data.emails || []) {
+    const directCode = extractOtpCode(item.subject);
+    if (directCode) return directCode;
+    const detailResponse = await requestConfiguredApi(config, { endpoint: "/api/email/" + encodeURIComponent(domain) + "/" + encodeURIComponent(user) + "/" + encodeURIComponent(item.id), timeoutMs });
+    if (!detailResponse.ok) continue;
+    const detail = await parseJsonResponse(detailResponse);
+    const code = extractOtpCode(detail?.body || detail?.html_body);
+    if (code) return code;
   }
+  return null;
 }
 
-/**
- * 3. Lấy OTP từ Fix Ades Support (GPM API)
- */
 async function fetchOtpFromFixAdes(email) {
-  const config = (await getConfigByKey("fix_ades")) || {};
-  const baseUrl = config.base_url || "https://api-2026-02.ades.support";
-  const endpoint = config.endpoints?.read_otp || "/mail/read-otp-gpm";
-  const timeoutMs = Number(config.auth_config?.timeoutMs) || 10000;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const url = `${baseUrl.replace(/\/+$/, "")}${endpoint}?email=${encodeURIComponent(email)}`;
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (!res.ok) throw new Error(`Fix Ades trả về HTTP ${res.status}: ${res.statusText}`);
-
-    const data = await res.json().catch(() => null);
-    if (data?.data && typeof data.data === "object") {
-      const code = extractOtpCode(data.data.otp || data.data.code);
-      if (code) return code;
-    }
-
-    const candidates = collectOtpCandidates(data);
-    for (const c of candidates) {
-      const code = extractOtpCode(c);
-      if (code) return code;
-    }
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const config = { base_url: "https://api-2026-02.ades.support", ...((await getConfigByKey("fix_ades")) || {}) };
+  const endpoint = appendQuery(config.endpoints?.read_otp || "/mail/read-otp-gpm", { email });
+  const response = await requestConfiguredApi(config, { endpoint, headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs: Number(config.auth_config?.timeoutMs) || 10_000 });
+  if (!response.ok) throw new Error("Fix Ades returned HTTP " + response.status + ".");
+  const data = await parseJsonResponse(response);
+  const directCode = extractOtpCode(data?.data?.otp || data?.data?.code);
+  return directCode || collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
 }
 
-/**
- * 4. Lấy OTP từ Yuna 2FA
- */
 async function fetchOtpFromYuna(email) {
-  const config = (await getConfigByKey("yuna_2fa")) || {};
-  const baseUrl = config.base_url || "https://hub.yunagrp.com/2fa/";
-  const timeoutMs = Number(config.auth_config?.timeoutMs) || 10000;
-  const defaultToken = config.auth_config?.defaultToken || "d7c79d236dcb94c2ce0bfb3a10bf68d71ec02d08cfd07882beb4fe9152fb85cb";
-
-  let token = defaultToken;
-  try {
-    const htmlRes = await fetch(baseUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
-    if (htmlRes.ok) {
-      const htmlText = await htmlRes.text();
-      const match = htmlText.match(/<meta\s+name=["']api-token["']\s+content=["']([^"']+)["']/i);
-      if (match?.[1]) token = match[1].trim();
-    }
-  } catch {}
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const apiUrl = `${baseUrl.replace(/\/+$/, "")}/order_info?search=${encodeURIComponent(email)}`;
-    const res = await fetch(apiUrl, {
-      headers: { "X-API-Token": token },
-      signal: controller.signal,
-    });
-
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      const items = data?.items || [];
-      const matchItem = items.find((it) => String(it.name || "").toLowerCase().includes(String(email).toLowerCase()));
-      if (matchItem?.code) {
-        return extractOtpCode(matchItem.code);
-      }
-    }
-    return null;
-  } finally {
-    clearTimeout(timer);
+  const config = { base_url: "https://hub.yunagrp.com/2fa/", ...((await getConfigByKey("yuna_2fa")) || {}) };
+  const timeoutMs = Number(config.auth_config?.timeoutMs) || 10_000;
+  let token = config.auth_config?.defaultToken || "";
+  const pageResponse = await requestConfiguredApi(config, { headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs });
+  if (pageResponse.ok) {
+    const html = await readExternalResponse(pageResponse);
+    const match = html.match(/<meta\s+name=["']api-token["']\s+content=["']([^"']+)["']/i);
+    if (match?.[1]) token = match[1].trim();
   }
+  const response = await requestConfiguredApi(config, { endpoint: appendQuery(config.endpoints?.order_info || "/order_info", { search: email }), headers: token ? { "X-API-Token": token } : {}, timeoutMs });
+  if (!response.ok) return null;
+  const data = await parseJsonResponse(response);
+  const item = (data?.items || []).find((entry) => String(entry.name || "").toLowerCase().includes(String(email).toLowerCase()));
+  return extractOtpCode(item?.code);
 }
-
-/**
- * Lấy giá trị từ object theo json path (vd: data.otp hoặc items[0].code)
- */
 function getValueByPath(obj, path) {
   if (!obj || !path) return undefined;
   const normalized = path.replace(/\[(\w+)\]/g, ".$1").replace(/^\./, "");
@@ -269,7 +155,7 @@ async function fetchOtpFromDynamicConfig(config, email) {
 
     if (!res.ok) return { otp: null, extra_fields: [] };
 
-    const data = await res.json().catch(() => null);
+    const data = await parseJsonResponse(res);
     if (!data) return { otp: null, extra_fields: [] };
 
     let foundOtp = null;

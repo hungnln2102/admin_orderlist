@@ -142,6 +142,7 @@ function buildDueOrderMessage(order, index, total, bankInfo) {
   const bank = normalizeBankInfo(bankInfo);
   if (!order) return "";
   const { orderCode, productName, info, slot, customer, contact, registerDate, expiryDate, days, daysLeft, price } = extractOrderData(order);
+  const isProductActive = order.is_active !== false && order.isActive !== false;
   const priceDisplay =
     price > 0 ? `${formatCurrency(price)} VND` : "Chưa Xác Định";
 
@@ -156,15 +157,16 @@ function buildDueOrderMessage(order, index, total, bankInfo) {
     registerDate ? `📅 Ngày đăng ký: ${registerDate}` : null,
     days > 0 ? `⏱️ Thời hạn: ${days} ngày` : null,
     expiryDate ? `📆 Ngày hết hạn: ${expiryDate}` : null,
-    `💰 Giá bán: ${priceDisplay}`,
+    isProductActive ? `💰 Giá bán: ${priceDisplay}` : null,
     `——— 🤝 THÔNG TIN KHÁCH HÀNG ———`,
     `👤 Tên: ${customer}`,
     contact ? `📞 Liên hệ: ${contact}` : null,
-    `——— ℹ️ THÔNG TIN THANH TOÁN ———`,
-    bank.bankCode ? `🏦 Ngân hàng: ${bank.bankCode}` : null,
-    bank.accountNumber ? `🏧 STK: ${bank.accountNumber}` : null,
-    bank.accountHolder ? `👤 Tên: ${bank.accountHolder}` : null,
-    `ℹ️ Chuyển khoản đúng số tiền trên QR (không cần ghi nội dung chuyển khoản).`,
+    isProductActive && bank.bankCode ? `——— ℹ️ THÔNG TIN THANH TOÁN ———` : null,
+    isProductActive && bank.bankCode ? `🏦 Ngân hàng: ${bank.bankCode}` : null,
+    isProductActive && bank.accountNumber ? `🏧 STK: ${bank.accountNumber}` : null,
+    isProductActive && bank.accountHolder ? `👤 Tên: ${bank.accountHolder}` : null,
+    isProductActive ? `ℹ️ Chuyển khoản đúng số tiền trên QR (không cần ghi nội dung chuyển khoản).` : null,
+    !isProductActive ? `⚠️ Sản phẩm hiện đang tạm ngưng hoạt động. Vui lòng liên hệ shop để được hỗ trợ gia hạn.` : null,
     ``,
     `🙏 Trân trọng cảm ơn quý khách!`,
   ].filter((line) => line !== null);

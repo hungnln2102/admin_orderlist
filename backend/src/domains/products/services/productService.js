@@ -1,4 +1,4 @@
-const { db, TABLES, COLS } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 
@@ -306,104 +306,74 @@ const createProduct = async (data) => {
  * Cập nhật Sản phẩm & Bảng giá (Event: PRODUCT_UPDATED)
  * Tự động tính toán diff chi tiết (trường thay đổi, giá trị cũ/mới, summary)
  */
-const updateProduct = async (id, data) => {
+const updateProduct = async (id, data) => withTransaction(async (trx) => {
   const variantId = parseInt(id, 10);
+  const oldVariant = await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
+  if (!oldVariant) throw new Error("S?n ph?m kh?ng t?n t?i");
 
-  // 1. Lấy trạng thái hiện tại (cũ) của sản phẩm & giá tiers
-  const oldVariant = await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
-  if (!oldVariant) throw new Error("Sản phẩm không tồn tại");
-
-  const oldPrices = await db(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId });
+  const oldPrices = await trx(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId });
   const getOldPrice = (tierId) => {
-    const found = oldPrices.find((p) => p[VP_COLS.TIER_ID] === tierId);
-    return found ? parseFloat(found[VP_COLS.PRICE] || 0) : 0;
+    const found = oldPrices.find((price) => Number(price[VP_COLS.TIER_ID]) === tierId);
+    return found ? Number(found[VP_COLS.PRICE] || 0) : 0;
   };
-
   const oldState = {
     san_pham: oldVariant[V_COLS.DISPLAY_NAME] || "",
     package_product: oldVariant[V_COLS.VARIANT_NAME] || "",
-    base_price: parseFloat(oldVariant[V_COLS.BASE_PRICE] || 0),
+    base_price: Number(oldVariant[V_COLS.BASE_PRICE] || 0),
     is_active: Boolean(oldVariant[V_COLS.IS_ACTIVE]),
     ctv_price: getOldPrice(1),
     retail_price: getOldPrice(2),
     promo_price: getOldPrice(3),
     student_price: getOldPrice(4),
   };
+  const { san_pham, package_product, base_price, retail_price, ctv_price, student_price, promo_price, is_active } = data;
 
-  const {
-    san_pham,
-    package_product,
-    base_price,
-    retail_price,
-    ctv_price,
-    student_price,
-    promo_price,
-    is_active,
-  } = data;
-
-  const updateFields = { [V_COLS.UPDATED_AT]: db.fn.now() };
+  const updateFields = { [V_COLS.UPDATED_AT]: trx.fn.now() };
   if (san_pham !== undefined) updateFields[V_COLS.DISPLAY_NAME] = san_pham;
   if (package_product !== undefined) updateFields[V_COLS.VARIANT_NAME] = package_product;
   if (base_price !== undefined) updateFields[V_COLS.BASE_PRICE] = base_price || null;
   if (is_active !== undefined) updateFields[V_COLS.IS_ACTIVE] = is_active;
+  await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).update(updateFields);
 
-  await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).update(updateFields);
-
-  // Update tier prices
-  const upsertPrice = async (tierId, priceVal) => {
-    if (priceVal === undefined) return;
-    const existing = await db(TABLES.VARIANT_PRICE)
-      .where({ [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: tierId })
-      .first();
-
+  const upsertPrice = async (tierId, price) => {
+    if (price === undefined) return;
+    const criteria = { [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: tierId };
+    const existing = await trx(TABLES.VARIANT_PRICE).where(criteria).first();
     if (existing) {
-      await db(TABLES.VARIANT_PRICE)
-        .where({ [VP_COLS.VARIANT_ID]: variantId, [VP_COLS.TIER_ID]: tierId })
-        .update({ [VP_COLS.PRICE]: priceVal || 0 });
-    } else if (priceVal > 0) {
-      await db(TABLES.VARIANT_PRICE).insert({
-        [VP_COLS.VARIANT_ID]: variantId,
-        [VP_COLS.TIER_ID]: tierId,
-        [VP_COLS.PRICE]: priceVal,
-      });
+      await trx(TABLES.VARIANT_PRICE).where(criteria).update({ [VP_COLS.PRICE]: price || 0 });
+    } else if (price > 0) {
+      await trx(TABLES.VARIANT_PRICE).insert({ ...criteria, [VP_COLS.PRICE]: price });
     }
   };
-
   await upsertPrice(1, ctv_price);
   await upsertPrice(2, retail_price);
   await upsertPrice(3, promo_price);
   await upsertPrice(4, student_price);
+  await syncRenewRequiredOrdersPricing(trx, variantId);
 
-  // 2. Tính toán diff chi tiết (trường nào thay đổi, từ bao nhiêu thành bao nhiêu)
   const changes = {};
   const changedFields = [];
-  const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
   const summaryParts = [];
-
-  const checkField = (key, label, isMoney = false) => {
-    if (data[key] !== undefined && data[key] !== oldState[key]) {
-      changes[key] = { old: oldState[key], new: data[key] };
-      changedFields.push(key);
-      if (isMoney) {
-        summaryParts.push(`${label}: ${formatMoney(oldState[key])} ➔ ${formatMoney(data[key])}`);
-      } else {
-        summaryParts.push(`${label}: "${oldState[key]}" ➔ "${data[key]}"`);
-      }
-    }
+  const formatMoney = (value) => new Intl.NumberFormat("vi-VN").format(value) + " VND";
+  const trackChange = (key, label, isMoney = false) => {
+    if (data[key] === undefined || data[key] === oldState[key]) return;
+    changes[key] = { old: oldState[key], new: data[key] };
+    changedFields.push(key);
+    summaryParts.push(isMoney
+      ? label + ": " + formatMoney(oldState[key]) + " -> " + formatMoney(data[key])
+      : label + ": \"" + oldState[key] + "\" -> \"" + data[key] + "\"");
   };
-
-  checkField("san_pham", "Tên sản phẩm");
-  checkField("package_product", "Tên gói");
-  checkField("base_price", "Giá gốc", true);
-  checkField("retail_price", "Giá bán lẻ", true);
-  checkField("ctv_price", "Giá CTV", true);
-  checkField("student_price", "Giá Sinh viên", true);
-  checkField("promo_price", "Giá Khuyến mãi", true);
-
+  trackChange("san_pham", "T?n s?n ph?m");
+  trackChange("package_product", "T?n g?i");
+  trackChange("base_price", "Gi? g?c", true);
+  trackChange("retail_price", "Gi? b?n l?", true);
+  trackChange("ctv_price", "Gi? CTV", true);
+  trackChange("student_price", "Gi? sinh vi?n", true);
+  trackChange("promo_price", "Gi? khuy?n m?i", true);
   if (is_active !== undefined && Boolean(is_active) !== oldState.is_active) {
     changes.is_active = { old: oldState.is_active, new: Boolean(is_active) };
     changedFields.push("is_active");
-    summaryParts.push(`Trạng thái: ${oldState.is_active ? "Hoạt động" : "Ẩn"} ➔ ${is_active ? "Hoạt động" : "Ẩn"}`);
+    summaryParts.push("Tr?ng th?i: " + (oldState.is_active ? "Ho?t ??ng" : "?n") + " -> " + (is_active ? "Ho?t ??ng" : "?n"));
   }
 
   const updatedProductPayload = {
@@ -419,18 +389,11 @@ const updateProduct = async (id, data) => {
     changed_fields: changedFields,
     changes,
     old_values: oldState,
-    summary: summaryParts.length > 0 ? summaryParts.join("; ") : "Cập nhật sản phẩm",
+    summary: summaryParts.join("; ") || "C?p nh?t s?n ph?m",
   };
-
-  // Emit Domain Event với chi tiết diff
-  eventBus.emit(EVENTS.PRODUCT_UPDATED, updatedProductPayload);
-
+  trx.afterCommit(() => eventBus.emit(EVENTS.PRODUCT_UPDATED, updatedProductPayload));
   return updatedProductPayload;
-};
-
-/**
- * Xóa Sản phẩm (Event: PRODUCT_DELETED)
- */
+});
 const deleteProduct = async (id) => {
   const variantId = parseInt(id, 10);
 

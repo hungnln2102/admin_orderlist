@@ -157,7 +157,7 @@ function buildAuthHeaders(authConfig = {}) {
   return headers;
 }
 
-async function requestConfiguredApi(config, { method = "GET", body = null, endpoint = "" } = {}) {
+async function requestConfiguredApi(config, { method = "GET", body = null, endpoint = "", headers: extraHeaders = {}, signal = null, timeoutMs = 12_000 } = {}) {
   const endpointPath = String(endpoint || "").trim();
   if (endpointPath.startsWith("http:") || endpointPath.startsWith("https:") || endpointPath.startsWith("//")) {
     throw new Error("Endpoint must be a relative path.");
@@ -168,10 +168,16 @@ async function requestConfiguredApi(config, { method = "GET", body = null, endpo
     Accept: "application/json, text/plain, */*",
     "User-Agent": "Admin-Orderlist-V2/2.0",
     ...buildAuthHeaders(config.auth_config),
+    ...extraHeaders,
   };
   const requestMethod = String(method || "GET").toUpperCase();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12_000);
+  const abortRequest = () => controller.abort();
+  const timer = setTimeout(abortRequest, Number(timeoutMs) || 12_000);
+  if (signal) {
+    if (signal.aborted) abortRequest();
+    else signal.addEventListener("abort", abortRequest, { once: true });
+  }
   try {
     const options = { method: requestMethod, headers, signal: controller.signal };
     if (["POST", "PUT", "PATCH"].includes(requestMethod) && body !== null && body !== undefined) {
@@ -181,6 +187,7 @@ async function requestConfiguredApi(config, { method = "GET", body = null, endpo
     return await fetchSafeExternal(fullUrl, options);
   } finally {
     clearTimeout(timer);
+    if (signal) signal.removeEventListener("abort", abortRequest);
   }
 }
 

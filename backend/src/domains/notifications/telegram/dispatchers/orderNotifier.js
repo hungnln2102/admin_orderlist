@@ -104,20 +104,36 @@ async function sendBulkTelegramOrders(orders = [], config) {
     const defaultBank = includeQR ? await resolveDefaultShopBankAccount() : null;
 
     // 4. Đẩy từng đơn vào hàng đợi
+    const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
     for (let i = 0; i < deduped.length; i++) {
       let order = deduped[i];
       if (!order.productName && order.id_product) {
         const productName = await resolveProductName(order.id_product);
         order = { ...order, productName };
       }
+
+      // Tra cứu trạng thái hoạt động của sản phẩm từ Catalog
+      let isProductActive = true;
+      try {
+        const pricingInfo = await resolveOrderCatalogPricing(db, order);
+        if (pricingInfo && pricingInfo.isActive === false) {
+          isProductActive = false;
+        }
+      } catch (checkErr) {
+        // Fallback mặc định là active nếu tra cứu lỗi
+        isProductActive = true;
+      }
+
+      order = { ...order, is_active: isProductActive, isActive: isProductActive };
+
       const text = messageBuilder(order, i + 1, total, defaultBank);
       const price = Number(order.price) || 0;
 
       await enqueueOrderMessage({
         topicId,
         text,
-        bank: includeQR ? defaultBank : null,
-        price,
+        bank: (includeQR && isProductActive) ? defaultBank : null,
+        price: isProductActive ? price : 0,
       });
     }
   } catch (error) {

@@ -4,6 +4,7 @@ const { getAvailableSuffix, applySuffixToPrice, extractSlotSuffix } = require("@
 const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
+const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -1085,8 +1086,8 @@ async function updateOrder(id, payload) {
       } else if (payload.price !== undefined && Number(payload.price) > 0) {
         // Nếu payload.price gửi lên trùng khớp với price cũ của đơn (không đổi sản phẩm):
         if (existingSuffix && Math.round(Number(payload.price)) === Math.round(Number(existingOrder.price || 0))) {
-          basePrice = existingOrder.gross_selling_price != null 
-            ? Number(existingOrder.gross_selling_price) 
+          basePrice = existingOrder.gross_selling_price != null
+            ? Number(existingOrder.gross_selling_price)
             : (Number(payload.price) - existingSuffix);
         } else {
           basePrice = Number(payload.price);
@@ -1331,11 +1332,16 @@ async function renewOrder(id, payload = {}) {
     // ─────────────────────────────────────────────────────────────
     // 2. XỬ LÝ CHO ĐƠN BÁN CỦA KHÁCH HÀNG (GIỮ NGUYÊN NHƯ CŨ)
     // ─────────────────────────────────────────────────────────────
-    // Lấy đúng giá sản phẩm gia hạn (KHÔNG LÀM TRÒN!)
-    const rawBasePrice = payload.price != null 
-      ? Number(payload.price) 
-      : Number(existingOrder.gross_selling_price != null ? existingOrder.gross_selling_price : existingOrder.price || 0);
-    const basePrice = rawBasePrice;
+    // Lấy đúng giá sản phẩm gia hạn theo Catalog hiện tại (KHÔNG LÀM TRÒN!)
+    let basePrice = 0;
+    if (payload.price != null && Number(payload.price) > 0) {
+      basePrice = Number(payload.price);
+    } else {
+      const { catalogBasePrice } = await resolveOrderCatalogPricing(trx, existingOrder);
+      basePrice = catalogBasePrice > 0
+        ? catalogBasePrice
+        : Number(existingOrder.gross_selling_price != null ? existingOrder.gross_selling_price : existingOrder.price || 0);
+    }
 
     // Cấp phát 1 Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
     const suffix = await getAvailableSuffix(trx, existingOrder.id);

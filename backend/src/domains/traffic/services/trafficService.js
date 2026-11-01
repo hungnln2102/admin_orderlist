@@ -4,6 +4,24 @@ const path = require("path");
 const cache = new Map();
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+function createUnavailableTrafficData(days, reason) {
+  return {
+    source: "unavailable",
+    available: false,
+    reason,
+    domain: "mavrykpremium.com",
+    days: Number(days),
+    lastUpdated: new Date().toISOString(),
+    kpi: null,
+    trafficData: [],
+    sourceData: [],
+    topPages: [],
+    deviceData: [],
+    locationData: [],
+    newVsReturning: [],
+  };
+}
+
 /**
  * Lấy Google Analytics 4 Credentials nếu được cấu hình
  */
@@ -34,284 +52,6 @@ const getGa4Credentials = () => {
  * Phục vụ khi chưa có credentials GA4 hoặc khi kết nối Google Analytics bị gián đoạn.
  * Đảm bảo đầy đủ 5 chiều dữ liệu thống kê cho domain mavrykpremium.com.
  */
-const generateRealisticTrafficData = (days = 30) => {
-  const numDays = Math.max(1, Math.min(days, 365));
-  const now = new Date();
-
-  // Baseline hằng ngày cho shop mavrykpremium.com
-  const baseDailyVisitors = 160 + Math.floor(Math.random() * 40);
-  const basePageviewMultiplier = 3.6 + Math.random() * 0.4;
-
-  const trafficData = [];
-  let totalPageviews = 0;
-  let totalVisitors = 0;
-  let totalSessions = 0;
-
-  for (let i = numDays - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dateStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-
-    // Biến động theo ngày trong tuần: Thứ 7 và Chủ nhật lưu lượng tăng 20-30%
-    const dayOfWeek = d.getDay();
-    const weekendMultiplier = dayOfWeek === 0 || dayOfWeek === 6 ? 1.25 : 1.0;
-    
-    // Yếu tố ngẫu nhiên hàng ngày
-    const dailyRandom = 0.85 + Math.random() * 0.3;
-    const visitors = Math.round(baseDailyVisitors * weekendMultiplier * dailyRandom);
-    const sessions = Math.round(visitors * (1.3 + Math.random() * 0.2));
-    const pageviews = Math.round(sessions * (basePageviewMultiplier + (Math.random() * 0.6 - 0.3)));
-    const bounceRate = Number((38 + Math.random() * 8).toFixed(1));
-    const avgSec = Math.round(140 + Math.random() * 50);
-    const avgDuration = `${String(Math.floor(avgSec / 60)).padStart(2, "0")}m ${String(avgSec % 60).padStart(2, "0")}s`;
-
-    trafficData.push({
-      date: dateStr,
-      fullDate: d.toISOString().split("T")[0],
-      visitors,
-      sessions,
-      pageviews,
-      bounceRate,
-      avgDuration,
-    });
-
-    totalPageviews += pageviews;
-    totalVisitors += visitors;
-    totalSessions += sessions;
-  }
-
-  // Tỷ lệ khách quay lại ~32% - 38%
-  const returningRateNum = Number((34.5 + Math.random() * 4).toFixed(1));
-  const newUsers = Math.round(totalVisitors * ((100 - returningRateNum) / 100));
-  const returningUsers = totalVisitors - newUsers;
-
-  // 1. Phân bổ Nguồn lưu lượng (Traffic Sources & Channels)
-  const sourceData = [
-    {
-      name: "Google Organic (Tìm kiếm tự nhiên)",
-      channel: "Organic Search",
-      sessions: Math.round(totalSessions * 0.42),
-      users: Math.round(totalVisitors * 0.41),
-      newUsers: Math.round(newUsers * 0.44),
-      bounceRate: "37.5%",
-      share: 42.0,
-    },
-    {
-      name: "Direct (Truy cập trực tiếp / Bookmark)",
-      channel: "Direct",
-      sessions: Math.round(totalSessions * 0.26),
-      users: Math.round(totalVisitors * 0.27),
-      newUsers: Math.round(newUsers * 0.18),
-      bounceRate: "33.2%",
-      share: 26.0,
-    },
-    {
-      name: "Facebook Ads / Fanpage Mavryk",
-      channel: "Paid Social",
-      sessions: Math.round(totalSessions * 0.16),
-      users: Math.round(totalVisitors * 0.17),
-      newUsers: Math.round(newUsers * 0.22),
-      bounceRate: "46.8%",
-      share: 16.0,
-    },
-    {
-      name: "Zalo OA & Hỗ trợ CSKH",
-      channel: "Referral / Chat",
-      sessions: Math.round(totalSessions * 0.09),
-      users: Math.round(totalVisitors * 0.08),
-      newUsers: Math.round(newUsers * 0.06),
-      bounceRate: "39.4%",
-      share: 9.0,
-    },
-    {
-      name: "Tiktok & Cộng đồng Designer",
-      channel: "Social",
-      sessions: Math.round(totalSessions * 0.07),
-      users: Math.round(totalVisitors * 0.07),
-      newUsers: Math.round(newUsers * 0.10),
-      bounceRate: "51.2%",
-      share: 7.0,
-    },
-  ];
-
-  // 2. Các Trang Phổ Biến Nhất (Top Landing Pages & Products)
-  const topPages = [
-    {
-      path: "/",
-      title: "Trang chủ - Mavryk Premium Shop Bản Quyền",
-      views: Math.round(totalPageviews * 0.38),
-      users: Math.round(totalVisitors * 0.45),
-      time: "02:18",
-      bounceRate: "36.2%",
-    },
-    {
-      path: "/adobe-all-apps",
-      title: "Gói Adobe Creative Cloud Toàn Diện 12 Tháng",
-      views: Math.round(totalPageviews * 0.24),
-      users: Math.round(totalVisitors * 0.28),
-      time: "03:45",
-      bounceRate: "30.8%",
-    },
-    {
-      path: "/canva-pro",
-      title: "Nâng cấp Canva Pro Chính Chủ Vĩnh Viễn / 1 Năm",
-      views: Math.round(totalPageviews * 0.12),
-      users: Math.round(totalVisitors * 0.14),
-      time: "02:05",
-      bounceRate: "41.0%",
-    },
-    {
-      path: "/checkout",
-      title: "Trang Thanh toán & QR Ngân hàng Tự Động",
-      views: Math.round(totalPageviews * 0.09),
-      users: Math.round(totalVisitors * 0.11),
-      time: "04:30",
-      bounceRate: "16.5%",
-    },
-    {
-      path: "/chatgpt-plus",
-      title: "Tài khoản OpenAI ChatGPT Plus GPT-4o Cá Nhân",
-      views: Math.round(totalPageviews * 0.07),
-      users: Math.round(totalVisitors * 0.08),
-      time: "02:52",
-      bounceRate: "39.4%",
-    },
-    {
-      path: "/huong-dan-kich-hoat",
-      title: "Hướng dẫn kích hoạt bản quyền Adobe & Netflix",
-      views: Math.round(totalPageviews * 0.06),
-      users: Math.round(totalVisitors * 0.07),
-      time: "03:15",
-      bounceRate: "43.5%",
-    },
-    {
-      path: "/netflix-uhd",
-      title: "Gói Netflix Premium 4K UltraHD Gia Đình",
-      views: Math.round(totalPageviews * 0.04),
-      users: Math.round(totalVisitors * 0.05),
-      time: "02:20",
-      bounceRate: "45.0%",
-    },
-  ];
-
-  // 3. Cơ cấu Thiết bị & Trình duyệt (Devices & Platforms)
-  const deviceData = [
-    {
-      device: "Mobile (Điện thoại)",
-      name: "Mobile",
-      os: "iOS / Android",
-      browser: "Safari / Chrome Mobile",
-      sessions: Math.round(totalSessions * 0.64),
-      users: Math.round(totalVisitors * 0.65),
-      share: 64.0,
-      color: "#38bdf8", // Sky blue
-    },
-    {
-      device: "Desktop (Máy tính)",
-      name: "Desktop",
-      os: "Windows / macOS",
-      browser: "Chrome / Cốc Cốc / Edge",
-      sessions: Math.round(totalSessions * 0.32),
-      users: Math.round(totalVisitors * 0.31),
-      share: 32.0,
-      color: "#818cf8", // Indigo
-    },
-    {
-      device: "Tablet (Máy tính bảng)",
-      name: "Tablet",
-      os: "iPadOS / Android Tab",
-      browser: "Safari / Chrome",
-      sessions: Math.round(totalSessions * 0.04),
-      users: Math.round(totalVisitors * 0.04),
-      share: 4.0,
-      color: "#f472b6", // Pink
-    },
-  ];
-
-  // 4. Khu vực & Địa lý truy cập (Top Geographic Locations)
-  const locationData = [
-    {
-      city: "TP. Hồ Chí Minh",
-      country: "Việt Nam",
-      sessions: Math.round(totalSessions * 0.45),
-      users: Math.round(totalVisitors * 0.44),
-      share: 45.0,
-    },
-    {
-      city: "Hà Nội",
-      country: "Việt Nam",
-      sessions: Math.round(totalSessions * 0.32),
-      users: Math.round(totalVisitors * 0.33),
-      share: 32.0,
-    },
-    {
-      city: "Đà Nẵng",
-      country: "Việt Nam",
-      sessions: Math.round(totalSessions * 0.09),
-      users: Math.round(totalVisitors * 0.09),
-      share: 9.0,
-    },
-    {
-      city: "Cần Thơ",
-      country: "Việt Nam",
-      sessions: Math.round(totalSessions * 0.05),
-      users: Math.round(totalVisitors * 0.05),
-      share: 5.0,
-    },
-    {
-      city: "Hải Phòng",
-      country: "Việt Nam",
-      sessions: Math.round(totalSessions * 0.05),
-      users: Math.round(totalVisitors * 0.05),
-      share: 5.0,
-    },
-    {
-      city: "Quốc Tế & Tỉnh Khác",
-      country: "Toàn cầu",
-      sessions: Math.round(totalSessions * 0.04),
-      users: Math.round(totalVisitors * 0.04),
-      share: 4.0,
-    },
-  ];
-
-  // 5. Khách mới vs Khách quay lại
-  const newVsReturning = [
-    { name: "Khách Mới (New Visitors)", value: newUsers, share: Number((100 - returningRateNum).toFixed(1)), color: "#34d399" },
-    { name: "Khách Quay Lại (Returning)", value: returningUsers, share: returningRateNum, color: "#60a5fa" },
-  ];
-
-  const avgBounce = Number((trafficData.reduce((acc, cur) => acc + cur.bounceRate, 0) / trafficData.length).toFixed(1));
-  const avgDurationMinutes = 2;
-  const avgDurationSeconds = 42;
-
-  return {
-    source: "smart_fallback_engine",
-    domain: "mavrykpremium.com",
-    days: numDays,
-    lastUpdated: new Date().toISOString(),
-    kpi: {
-      pageviews: totalPageviews.toLocaleString("vi-VN"),
-      pageviewsChange: "+14.8%",
-      visitors: totalVisitors.toLocaleString("vi-VN"),
-      visitorsChange: "+9.2%",
-      sessions: totalSessions.toLocaleString("vi-VN"),
-      sessionsChange: "+11.5%",
-      avgDuration: `${String(avgDurationMinutes).padStart(2, "0")}m ${String(avgDurationSeconds).padStart(2, "0")}s`,
-      avgDurationChange: "+4.1%",
-      bounceRate: `${avgBounce}%`,
-      bounceRateChange: "-1.8%",
-      returningRate: `${returningRateNum}%`,
-      returningRateChange: "+3.2%",
-    },
-    trafficData,
-    sourceData,
-    topPages,
-    deviceData,
-    locationData,
-    newVsReturning,
-  };
-};
-
 /**
  * Lấy dữ liệu Traffic toàn diện
  * Ưu tiên: In-memory Cache -> Google Analytics 4 API (nếu có) -> Realistic Fallback Engine
@@ -597,6 +337,7 @@ const getTrafficStatsService = async (days = 30) => {
 
       const finalData = {
         source: "google_analytics_4",
+        available: true,
         domain: "mavrykpremium.com",
         days,
         lastUpdated: new Date().toISOString(),
@@ -618,7 +359,7 @@ const getTrafficStatsService = async (days = 30) => {
         sourceData,
         topPages,
         deviceData,
-        locationData: locationData.length > 0 ? locationData : generateRealisticTrafficData(days).locationData,
+        locationData,
         newVsReturning: [
           { name: "Khách Mới (New Visitors)", value: newUsersCount, share: Number((100 - returningRate).toFixed(1)) },
           { name: "Khách Quay Lại (Returning)", value: retUsersCount, share: returningRate },
@@ -633,9 +374,7 @@ const getTrafficStatsService = async (days = 30) => {
   }
 
   // Fallback sang Realistic Engine
-  const fallbackData = generateRealisticTrafficData(days);
-  cache.set(cacheKey, { timestamp: Date.now(), data: fallbackData });
-  return fallbackData;
+  return createUnavailableTrafficData(days, "Chưa cấu hình Google Analytics 4 credentials.");
 };
 
 module.exports = {

@@ -18,6 +18,7 @@
 const { db, TABLES, withTransaction } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getAvailableSuffix } = require("@/domains/payments/services/slotSuffixService");
+const { getOrderPrefix, resolveOrdersWithCatalogPrices } = require("@/domains/products/services/catalogPricingService");
 
 const PAYABLE_STATUSES = [
   ORDER_STATUS.UNPAID,
@@ -30,130 +31,6 @@ const PAYABLE_STATUSES = [
 
 const BATCH_ADVISORY_LOCK_ID = 1029001;
 
-/**
- * Phân tích tiền tố mã đơn hàng (MAVL, MAVC, MAVK, MAVS...)
- */
-function getOrderPrefix(idOrder) {
-  if (!idOrder) return "MAVL";
-  const upper = String(idOrder).trim().toUpperCase();
-  if (upper.startsWith("MAVC")) return "MAVC";
-  if (upper.startsWith("MAVL")) return "MAVL";
-  if (upper.startsWith("MAVK")) return "MAVK";
-  if (upper.startsWith("MAVS")) return "MAVS";
-  if (upper.startsWith("MAVT")) return "MAVT";
-  if (upper.startsWith("MAVN")) return "MAVN";
-  return "MAVL";
-}
-
-/**
- * Tra cứu giá gốc chính xác từ Bảng Giá (business.variant_price) theo tiền tố mã đơn:
- *  - MAVL (Bán lẻ)    -> tier_id = 2
- *  - MAVC (CTV)       -> tier_id = 1
- *  - MAVK (Khuyến mãi)-> tier_id = 3
- *  - MAVS (Sinh viên) -> tier_id = 4
- *  - MAVT (Quà tặng)  -> 0
- */
-async function resolveOrdersWithCatalogPrices(queryDb, orders = []) {
-  if (!orders || orders.length === 0) return [];
-
-  // Lấy danh sách id_product
-  const vIds = Array.from(
-    new Set(
-      orders
-        .map((o) => o.id_product)
-        .filter((id) => id != null && String(id).trim() !== "")
-    )
-  );
-
-  const numericVIds = vIds.map(Number).filter((n) => !isNaN(n) && n > 0);
-  const textVIds = vIds.map(String).filter((s) => isNaN(Number(s)));
-
-  let variantsQuery = queryDb(TABLES.VARIANT);
-  if (numericVIds.length > 0 && textVIds.length > 0) {
-    variantsQuery = variantsQuery.where(function () {
-      this.whereIn("id", numericVIds)
-        .orWhereIn("display_name", textVIds)
-        .orWhereIn("variant_name", textVIds);
-    });
-  } else if (numericVIds.length > 0) {
-    variantsQuery = variantsQuery.whereIn("id", numericVIds);
-  } else if (textVIds.length > 0) {
-    variantsQuery = variantsQuery.where(function () {
-      this.whereIn("display_name", textVIds).orWhereIn("variant_name", textVIds);
-    });
-  }
-
-  const variants = vIds.length > 0 ? await variantsQuery.select("id", "display_name", "variant_name", "base_price") : [];
-
-  const variantById = new Map();
-  const variantByName = new Map();
-  for (const v of variants) {
-    variantById.set(Number(v.id), v);
-    if (v.display_name) variantByName.set(String(v.display_name).toLowerCase().trim(), v);
-    if (v.variant_name) variantByName.set(String(v.variant_name).toLowerCase().trim(), v);
-  }
-
-  const variantIds = variants.map((v) => v.id);
-  const prices = variantIds.length > 0
-    ? await queryDb(TABLES.VARIANT_PRICE).whereIn("variant_id", variantIds)
-    : [];
-
-  const priceMap = new Map();
-  for (const p of prices) {
-    priceMap.set(`${p.variant_id}_${p.tier_id}`, Number(p.price || 0));
-  }
-
-  return orders.map((order) => {
-    const prefix = getOrderPrefix(order.id_order);
-    if (prefix === "MAVT") {
-      return { ...order, orderPrefix: prefix, catalogBasePrice: 0 };
-    }
-
-    const pId = Number(order.id_product);
-    let matchedVariant = !isNaN(pId) && pId > 0 ? variantById.get(pId) : null;
-    if (!matchedVariant && order.id_product) {
-      matchedVariant = variantByName.get(String(order.id_product).toLowerCase().trim());
-    }
-
-    let catalogPrice = 0;
-    if (matchedVariant) {
-      const vId = matchedVariant.id;
-      const ctv = priceMap.get(`${vId}_1`) || 0;
-      const retail = priceMap.get(`${vId}_2`) || 0;
-      const promo = priceMap.get(`${vId}_3`) || 0;
-      const student = priceMap.get(`${vId}_4`) || 0;
-      const base = Number(matchedVariant.base_price || 0);
-
-      if (prefix === "MAVC") {
-        catalogPrice = ctv > 0 ? ctv : (retail > 0 ? retail : base);
-      } else if (prefix === "MAVL") {
-        catalogPrice = retail > 0 ? retail : (ctv > 0 ? ctv : base);
-      } else if (prefix === "MAVK") {
-        catalogPrice = promo > 0 ? promo : (retail > 0 ? retail : base);
-      } else if (prefix === "MAVS") {
-        catalogPrice = student > 0 ? student : (ctv > 0 ? ctv : (retail > 0 ? retail : base));
-      } else {
-        catalogPrice = retail > 0 ? retail : base;
-      }
-    }
-
-    if (!catalogPrice || catalogPrice <= 0) {
-      catalogPrice = Number(order.gross_selling_price || order.price || 0);
-    }
-
-    return {
-      ...order,
-      orderPrefix: prefix,
-      display_name: matchedVariant?.display_name || order.display_name || null,
-      variant_name: matchedVariant?.variant_name || null,
-      catalogBasePrice: catalogPrice,
-    };
-  });
-}
-
-/**
- * Lấy Suffix khả dụng hiện tại để preview trên UI
- */
 async function getBatchSuffixPreview() {
   const suffix = await getAvailableSuffix();
   const todayStr = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10).replace(/-/g, "");

@@ -115,15 +115,16 @@ describe("Batch Payment & Slot Suffix Reconciliation Suite", () => {
       ];
 
       const mockQueryDb = (tableName) => {
-        return {
-          whereIn: () => ({
-            select: async () => mockVariants,
-            then: (fn) => fn(mockPrices),
-            whereIn: () => mockPrices,
-          }),
-          select: async () => mockVariants,
-          where: () => mockPrices,
+        const isPriceTable = String(tableName).includes("variant_price");
+        const rows = isPriceTable ? mockPrices : mockVariants;
+        const builder = {
+          where: () => builder,
+          whereILike: () => builder,
+          orWhereILike: () => builder,
+          first: async () => isPriceTable ? null : mockVariants[0],
+          then: (resolve) => resolve(rows),
         };
+        return builder;
       };
 
       const inputOrders = [

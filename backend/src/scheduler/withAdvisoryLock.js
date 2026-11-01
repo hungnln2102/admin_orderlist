@@ -12,7 +12,7 @@ const withAdvisoryLock = async (lockName, handler) => db.transaction(async (trx)
     return { skipped: true };
   }
 
-  return handler();
+  return handler(trx);
 });
 
 module.exports = { withAdvisoryLock };

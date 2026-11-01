@@ -79,6 +79,8 @@ interface LocationItem {
 
 interface TrafficApiResponse {
   source: string;
+  available?: boolean;
+  reason?: string;
   domain: string;
   days: number;
   lastUpdated: string;
@@ -244,7 +246,7 @@ export const TrafficPage: React.FC = () => {
 
   // Xuất file CSV cho tab hiện tại
   const handleExportCSV = () => {
-    if (!processedTableData.length) return;
+    if (data?.available === false || !processedTableData.length) return;
     let headers: string[] = [];
     let rows: string[][] = [];
 
@@ -320,6 +322,25 @@ export const TrafficPage: React.FC = () => {
   const visitorLine = getBezierPath(visitorPoints);
 
   const baselineY = paddingTop + usableH;
+
+  if (data?.available === false) {
+    return (
+      <div className="space-y-6 pb-12 font-sans animate-fade-in text-slate-100">
+        <GlassCard className="border-amber-500/40 bg-amber-500/10">
+          <div className="flex items-start gap-3 p-5 text-amber-100">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div>
+              <h1 className="font-bold">Google Analytics chưa khả dụng</h1>
+              <p className="mt-1 text-sm text-amber-100/80">{data.reason || "Hệ thống chưa có dữ liệu đo lường đã xác minh."}</p>
+              <button onClick={() => fetchTrafficData(days)} disabled={loading} className="mt-4 rounded-lg border border-amber-300/40 px-3 py-2 text-sm font-semibold hover:bg-amber-100/10 disabled:opacity-50">
+                {loading ? "Đang tải..." : "Thử lại"}
+              </button>
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
   const pageviewArea = pageviewPoints.length
     ? `${pageviewLine} L ${pageviewPoints[pageviewPoints.length - 1].x},${baselineY} L ${pageviewPoints[0].x},${baselineY} Z`
     : "";
@@ -347,7 +368,7 @@ export const TrafficPage: React.FC = () => {
                 <span>Dữ liệu đo lường hành vi người dùng, nguồn truy cập và hiệu suất website</span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                   <CheckCircle2 className="w-3 h-3" />
-                  {data?.source === "google_analytics_4" ? "Google Analytics 4 Live" : "Smart Fallback Engine (Active)"}
+                  Google Analytics 4 Live
                 </span>
               </p>
             </div>
