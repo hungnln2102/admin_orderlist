@@ -335,6 +335,7 @@ const COLS = {
   PRODUCT_NAMES: {
     ID: "id",
     NAME: "name",
+    CATEGORY: "category",
     PRODUCT_ID: "product_id",
     PACKAGE_NOTE: "package_note",
     SERVICE_NOTE: "service_note",

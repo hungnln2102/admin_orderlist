@@ -310,11 +310,12 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                               srv.display_name || srv.category,
                               isAvailable
                             );
+                            const tag = srv.variant_tag || (srv.category !== srv.display_name ? srv.category : "");
                             return (
                               <span
                                 key={srv.id || idx}
                                 className={`inline-flex items-center gap-1.5 text-center text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border transition-all ${brand.badgeClass}`}
-                                title={`${srv.display_name || srv.category} - ${
+                                title={`${srv.display_name || srv.category}${tag ? ` [${tag}]` : ""} - ${
                                   isAvailable ? "Tồn kho" : "Đang sử dụng"
                                 }`}
                               >
@@ -322,6 +323,11 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                   className={`w-1.5 h-1.5 rounded-full ${brand.dotClass}`}
                                 />
                                 <span>{srv.display_name || srv.category}</span>
+                                {tag && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/15 text-white border border-white/15 tracking-normal">
+                                    {tag}
+                                  </span>
+                                )}
                               </span>
                             );
                           })
@@ -581,6 +587,11 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                                           <span className="tracking-wide">
                                             {srv.display_name || srv.category}
                                           </span>
+                                          {(srv.variant_tag || (srv.category !== srv.display_name ? srv.category : "")) && (
+                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/10 text-indigo-200 border border-white/15 tracking-normal">
+                                              [{srv.variant_tag || srv.category}]
+                                            </span>
+                                          )}
                                         </div>
                                       </td>
 
@@ -866,9 +877,14 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       return (
                         <span
                           key={srv.id || idx}
-                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${brand.badgeClass}`}
+                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border inline-flex items-center gap-1 ${brand.badgeClass}`}
                         >
-                          {srv.display_name || srv.category}
+                          <span>{srv.display_name || srv.category}</span>
+                          {(srv.variant_tag || (srv.category !== srv.display_name ? srv.category : "")) && (
+                            <span className="px-1 py-0.2 rounded text-[8px] font-semibold bg-white/15 text-white border border-white/15">
+                              {srv.variant_tag || srv.category}
+                            </span>
+                          )}
                         </span>
                       );
                     })}

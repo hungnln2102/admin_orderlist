@@ -11,6 +11,7 @@ import {
   Table as TableIcon,
   Globe,
   Package,
+  Tag,
 } from "lucide-react";
 import { ServiceNameCategoryItem } from "../types";
 
@@ -77,7 +78,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
             </span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Cấu hình link đăng nhập cho từng dịch vụ và theo dõi tồn kho tự động
+            Cấu hình Tag phân loại, link đăng nhập và theo dõi tồn kho tự động cho từng dịch vụ
           </p>
         </div>
 
@@ -124,7 +125,11 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
       {viewMode === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {catalogItems.map((cat) => {
-            const total = cat.totalAccounts ?? cat.totalSlots ?? ((cat.inStockAccounts ?? cat.inStockSlots ?? 0) + (cat.reservedAccounts ?? cat.reservedSlots ?? 0));
+            const total =
+              cat.totalAccounts ??
+              cat.totalSlots ??
+              (cat.inStockAccounts ?? cat.inStockSlots ?? 0) +
+                (cat.reservedAccounts ?? cat.reservedSlots ?? 0);
             const isEmptyStock = total === 0;
             const hasLink = Boolean(cat.loginUrl && cat.loginUrl.trim());
             const isCopied = copiedId === cat.id;
@@ -137,7 +142,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                 <div className="space-y-3">
                   {/* HEADER THẺ: TÊN DỊCH VỤ & STATUS */}
                   <div className="flex items-start justify-between gap-3 min-w-0">
-                    <div className="min-w-0 flex-1 space-y-1">
+                    <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4
                           className="font-bold text-white text-sm sm:text-base truncate block"
@@ -155,12 +160,23 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                           </span>
                         )}
                       </div>
-                      <span
-                        className="text-xs text-slate-400 font-medium truncate block"
-                        title={cat.category}
-                      >
-                        {cat.category}
-                      </span>
+
+                      {/* TAG HIỂN THỊ */}
+                      {cat.category ? (
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[11px] font-semibold truncate"
+                            title={`Tag: ${cat.category}`}
+                          >
+                            <Tag className="w-3 h-3 text-purple-400 shrink-0" />
+                            <span>{cat.category}</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-500 italic block">
+                          Chưa gắn tag
+                        </span>
+                      )}
                     </div>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 ${
@@ -182,7 +198,11 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                   {/* CỘT LINK DỊCH VỤ TRÊN THẺ */}
                   <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Globe className={`w-3.5 h-3.5 shrink-0 ${hasLink ? "text-cyan-400" : "text-slate-500"}`} />
+                      <Globe
+                        className={`w-3.5 h-3.5 shrink-0 ${
+                          hasLink ? "text-cyan-400" : "text-slate-500"
+                        }`}
+                      />
                       {hasLink ? (
                         <span
                           className="font-mono text-cyan-300 text-[11px] truncate block select-all cursor-pointer hover:underline"
@@ -238,22 +258,26 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5">
                       <span className="text-slate-400 block text-[11px]">TỔNG SỐ LƯỢNG</span>
-                      <span className="text-sm sm:text-base font-bold text-blue-400">{total} Tài khoản</span>
+                      <span className="text-sm sm:text-base font-bold text-blue-400">
+                        {total} Tài khoản
+                      </span>
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5">
                       <span className="text-slate-400 block text-[11px]">CHƯA SỬ DỤNG</span>
-                      <span className="text-sm sm:text-base font-bold text-emerald-400">{cat.inStockSlots} Tài khoản</span>
+                      <span className="text-sm sm:text-base font-bold text-emerald-400">
+                        {cat.inStockSlots} Tài khoản
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* THAO TÁC (SỬA, XÓA) */}
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/80">
-                  {onDeleteCatalog && (
-                    isEmptyStock ? (
+                  {onDeleteCatalog &&
+                    (isEmptyStock ? (
                       <button
                         onClick={() => onDeleteCatalog(cat)}
-                        title="Xóa dịch vụ khỏi danh mục (Kho đang trống 0 tài khoảns)"
+                        title="Xóa dịch vụ khỏi danh mục (Kho đang trống 0 tài khoản)"
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -268,12 +292,11 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Xóa</span>
                       </button>
-                    )
-                  )}
+                    ))}
                   <button
                     onClick={() => onEditCatalog(cat)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 transition-colors cursor-pointer"
-                    title="Chỉnh sửa tên, chuyên mục và cấu hình Link"
+                    title="Chỉnh sửa tên, tag phân loại và cấu hình Link"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     <span>Sửa</span>
@@ -285,14 +308,14 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
         </div>
       )}
 
-      {/* MODE 2: DẠNG BẢNG (TABLE LIST) VỚI CỘT LINK TRỰC QUAN */}
+      {/* MODE 2: DẠNG BẢNG (TABLE LIST) VỚI CỘT TAG TRỰC QUAN */}
       {viewMode === "table" && (
         <div className="overflow-x-auto w-full rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-xl">
           <table className="w-full text-left text-xs text-slate-300 border-collapse">
             <thead>
               <tr className="bg-slate-950/90 text-[11px] font-bold uppercase tracking-wider text-purple-300/80 border-b border-slate-800">
                 <th className="px-4 py-3.5 font-semibold">Tên Dịch Vụ / Gói</th>
-                <th className="px-4 py-3.5 font-semibold">Chuyên Mục</th>
+                <th className="px-4 py-3.5 font-semibold">Tag Phân Loại / Biến Thể</th>
                 <th className="px-4 py-3.5 font-semibold">Link Đăng Nhập / Quản Trị</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Tổng Tài khoản</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Chưa Dùng</th>
@@ -302,7 +325,11 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
               {catalogItems.map((cat) => {
-                const total = cat.totalAccounts ?? cat.totalSlots ?? ((cat.inStockAccounts ?? cat.inStockSlots ?? 0) + (cat.reservedAccounts ?? cat.reservedSlots ?? 0));
+                const total =
+                  cat.totalAccounts ??
+                  cat.totalSlots ??
+                  (cat.inStockAccounts ?? cat.inStockSlots ?? 0) +
+                    (cat.reservedAccounts ?? cat.reservedSlots ?? 0);
                 const isEmptyStock = total === 0;
                 const hasLink = Boolean(cat.loginUrl && cat.loginUrl.trim());
                 const isCopied = copiedId === cat.id;
@@ -325,11 +352,18 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                       </div>
                     </td>
 
-                    {/* CHUYÊN MỤC */}
-                    <td className="px-4 py-3.5 text-slate-400">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 border border-white/5 text-[11px]">
-                        {cat.category}
-                      </span>
+                    {/* TAG PHÂN LOẠI / BIẾN THỂ */}
+                    <td className="px-4 py-3.5 text-slate-300">
+                      {cat.category ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[11px] font-semibold">
+                          <Tag className="w-3 h-3 text-purple-400 shrink-0" />
+                          <span>{cat.category}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs italic">
+                          Chưa gắn tag
+                        </span>
+                      )}
                     </td>
 
                     {/* CỘT LINK */}
@@ -376,7 +410,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                       )}
                     </td>
 
-                    {/* TỔNG TÀI KHOẢNS */}
+                    {/* TỔNG TÀI KHOẢN */}
                     <td className="px-4 py-3.5 text-center font-bold text-blue-400">
                       {total}
                     </td>
@@ -412,13 +446,13 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                           type="button"
                           onClick={() => onEditCatalog(cat)}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 transition-all cursor-pointer"
-                          title="Sửa thông tin và link"
+                          title="Sửa thông tin, tag và link"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                           <span>Sửa</span>
                         </button>
-                        {onDeleteCatalog && (
-                          isEmptyStock ? (
+                        {onDeleteCatalog &&
+                          (isEmptyStock ? (
                             <button
                               type="button"
                               onClick={() => onDeleteCatalog(cat)}
@@ -436,8 +470,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )
-                        )}
+                          ))}
                       </div>
                     </td>
                   </tr>

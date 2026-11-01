@@ -42,6 +42,7 @@ const listWarehouseAccounts = async () => {
       "ss.name_id",
       "ss.variant_tag",
       "pn.name as display_name",
+      "pn.category as catalog_tag",
       "pn.login_url as login_url",
       "ss.password",
       "ss.backup_email",
@@ -63,12 +64,13 @@ const listWarehouseAccounts = async () => {
     if (!servicesByStock.has(sId)) {
       servicesByStock.set(sId, []);
     }
+    const resolvedTag = srv.variant_tag || srv.catalog_tag || "";
     servicesByStock.get(sId).push({
       id: Number(srv.id),
       display_name: srv.display_name || "Dịch vụ",
       login_url: srv.login_url || "",
-      category: srv.display_name || "Dịch vụ",
-      variant_tag: srv.variant_tag || "",
+      category: resolvedTag || srv.display_name || "Dịch vụ",
+      variant_tag: resolvedTag,
       password: srv.password || "",
       backup_email: srv.backup_email || "",
       two_fa: srv.two_fa || "",
@@ -395,6 +397,7 @@ const listCatalogItems = async () => {
     .select(
       "pn.id",
       "pn.name",
+      "pn.category",
       "pn.login_url",
       "pn.product_id",
       "p.package_name as system_product_name"
@@ -437,7 +440,7 @@ const listCatalogItems = async () => {
     return {
       id: p.id,
       name: p.name,
-      category: p.name,
+      category: p.category || "",
       loginUrl: p.login_url || null,
       productId: p.product_id ? Number(p.product_id) : null,
       systemProductName: p.system_product_name || null,
@@ -457,9 +460,10 @@ const listCatalogItems = async () => {
  * Tạo dịch vụ mới trong danh mục
  */
 const createCatalogItem = async ({ name, category, productId = null, loginUrl = null }) => {
-  const title = (name || category || "").trim();
+  const title = (name || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
+  const resolvedCategory = category ? String(category).trim() : null;
   const resolvedProductId = productId ? Number(productId) : null;
   const resolvedLoginUrl = loginUrl ? String(loginUrl).trim() : null;
 
@@ -469,6 +473,9 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
 
   if (existing) {
     const updates = {};
+    if (resolvedCategory !== undefined && existing.category !== resolvedCategory) {
+      updates.category = resolvedCategory;
+    }
     if (resolvedLoginUrl && existing.login_url !== resolvedLoginUrl) {
       updates.login_url = resolvedLoginUrl;
     }
@@ -485,6 +492,7 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
   const [inserted] = await db(TABLES.PRODUCT_NAMES)
     .insert({
       name: title,
+      category: resolvedCategory,
       product_id: resolvedProductId,
       login_url: resolvedLoginUrl,
     })
@@ -741,7 +749,7 @@ const updateCatalogItem = async (id, payload) => {
   if (!numericId) throw new Error("ID dịch vụ không hợp lệ!");
 
   const { name, category, loginUrl, productId } = payload || {};
-  const title = (name || category || "").trim();
+  const title = (name || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
   return await db.transaction(async (trx) => {
@@ -755,6 +763,9 @@ const updateCatalogItem = async (id, payload) => {
       name: title,
       updated_at: now,
     };
+    if (category !== undefined) {
+      updateData.category = category ? String(category).trim() : null;
+    }
     if (loginUrl !== undefined) {
       updateData.login_url = loginUrl ? String(loginUrl).trim() : null;
     }
@@ -769,6 +780,7 @@ const updateCatalogItem = async (id, payload) => {
       .select(
         "pn.id",
         "pn.name",
+        "pn.category",
         "pn.login_url",
         "pn.product_id",
         "p.package_name as system_product_name"
@@ -779,6 +791,7 @@ const updateCatalogItem = async (id, payload) => {
     eventBus.emit(EVENTS.WAREHOUSE_CATALOG_UPDATED, {
       id: updated.id,
       name: updated.name,
+      category: updated.category,
       loginUrl: updated.login_url,
       productId: updated.product_id,
     });
@@ -786,7 +799,7 @@ const updateCatalogItem = async (id, payload) => {
     return {
       id: updated.id,
       name: updated.name,
-      category: updated.name,
+      category: updated.category || "",
       loginUrl: updated.login_url || null,
       productId: updated.product_id ? Number(updated.product_id) : null,
       systemProductName: updated.system_product_name || null,

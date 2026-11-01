@@ -1,6 +1,7 @@
 import React from "react";
-import { Layers, X, Package } from "lucide-react";
+import { Layers, X, Package, Tag } from "lucide-react";
 import { CatalogFormData, SystemProduct } from "../types";
+import { DEFAULT_SUGGESTED_TAGS } from "./CatalogEditModal";
 
 interface CatalogCreateModalProps {
   open: boolean;
@@ -37,9 +38,12 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
           </button>
         </div>
 
-        <div className="space-y-3 text-xs sm:text-sm">
+        <div className="space-y-3.5 text-xs sm:text-sm">
+          {/* Tên dịch vụ */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Tên Dịch Vụ / Gói (*)</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              Tên Dịch Vụ / Gói (*)
+            </label>
             <input
               type="text"
               placeholder="Ví dụ: GoogleOne 5000gb, Office 365, Mail..."
@@ -49,6 +53,7 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
             />
           </div>
 
+          {/* Sản phẩm liên kết */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
               <Package className="w-3.5 h-3.5 text-cyan-400" />
@@ -76,21 +81,78 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
             </p>
           </div>
 
+          {/* Tag Phân Loại / Biến Thể */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Chuyên Mục (*)</label>
-            <select
-              value={formData.category}
-              onChange={(e) => onFormChange({ ...formData, category: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
-            >
-              <option value="Thiết Kế Đồ Họa">Thiết Kế Đồ Họa</option>
-              <option value="Giải Trí & Phim">Giải Trí & Phim</option>
-              <option value="Trí Tuệ Nhân Tạo AI">Trí Tuệ Nhân Tạo AI</option>
-              <option value="Âm Nhạc">Âm Nhạc</option>
-              <option value="Văn Phòng & Phần Mềm">Văn Phòng & Phần Mềm</option>
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-purple-400" />
+                <span>Tag Phân Loại / Biến Thể (*)</span>
+              </label>
+              {formData.category && (
+                <span className="text-[11px] text-purple-400 font-mono">
+                  Tag: [{formData.category}]
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                list="create-suggested-tags-list"
+                placeholder="Nhập hoặc chọn tag (VD: 5Tb, 2Tb, 1PC Cố Định, Slot Team...)"
+                value={formData.category || ""}
+                onChange={(e) => onFormChange({ ...formData, category: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono text-xs sm:text-sm"
+              />
+              <datalist id="create-suggested-tags-list">
+                {DEFAULT_SUGGESTED_TAGS.map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* Quick Tag Pills */}
+            <div className="mt-2 space-y-1.5">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
+                Gợi ý tag có sẵn (Bấm chọn hoặc tự nhập mới):
+              </span>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar p-1.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+                {DEFAULT_SUGGESTED_TAGS.map((t) => {
+                  const isSelected =
+                    (formData.category || "").toLowerCase().trim() === t.toLowerCase().trim();
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => onFormChange({ ...formData, category: t })}
+                      className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-purple-600 text-white font-bold border border-purple-400 shadow-sm shadow-purple-600/30 scale-105"
+                          : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Preview Badge */}
+            <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">
+              <span className="text-slate-400 text-[11px]">Xem trước hiển thị:</span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                <span>{formData.name || "Tên dịch vụ"}</span>
+                {formData.category?.trim() && (
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/10 text-white border border-white/10 lowercase first-letter:uppercase">
+                    [{formData.category.trim()}]
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
+          {/* URL Đăng nhập */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">
               URL Trang Đăng Nhập (Tùy chọn)
@@ -100,7 +162,7 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
               placeholder="Ví dụ: https://accounts.google.com, https://netflix.com/login..."
               value={formData.loginUrl || ""}
               onChange={(e) => onFormChange({ ...formData, loginUrl: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 text-xs"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 text-xs font-mono"
             />
             <p className="text-[11px] text-slate-400 mt-1">
               💡 Dùng để tự động mở trang web với Profile Chrome riêng biệt cho từng tài khoản.

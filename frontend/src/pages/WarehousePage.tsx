@@ -86,7 +86,7 @@ export const WarehousePage: React.FC = () => {
 
   const [catalogForm, setCatalogForm] = useState<CatalogFormData>({
     name: "",
-    category: "Văn Phòng & Phần Mềm",
+    category: "",
     productId: null,
     loginUrl: "",
   });
