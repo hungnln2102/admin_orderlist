@@ -423,6 +423,7 @@ const listCatalogItems = async () => {
         .select("product_id", "variant_name")
         .whereIn("product_id", productIds)
         .whereNotNull("variant_name")
+        .where("is_active", true)
         .orderBy("variant_name", "asc")
     : [];
 
@@ -851,6 +852,7 @@ const getSystemProducts = async () => {
   const variants = await db(TABLES.VARIANT)
     .select("product_id", "variant_name")
     .whereNotNull("variant_name")
+    .where("is_active", true)
     .orderBy("variant_name", "asc");
 
   const variantsByProduct = new Map();
@@ -871,6 +873,96 @@ const getSystemProducts = async () => {
   }));
 };
 
+/**
+ * Đổi tên tag trên toàn hệ thống (business.variant, warehouse.product_names, warehouse.account_slots)
+ */
+const renameCatalogTag = async ({ productId, oldTag, newTag }) => {
+  const oldName = String(oldTag || "").trim();
+  const newName = String(newTag || "").trim();
+  if (!oldName || !newName) {
+    throw new Error("Tên tag cũ và tên tag mới không được để trống!");
+  }
+
+  return await db.transaction(async (trx) => {
+    // 1. Cập nhật trong business.variant
+    const vQuery = trx(TABLES.VARIANT)
+      .whereRaw("LOWER(TRIM(variant_name)) = ?", [oldName.toLowerCase()]);
+    if (productId) {
+      vQuery.andWhere("product_id", Number(productId));
+    }
+    await vQuery.update({
+      variant_name: newName,
+      updated_at: new Date(),
+    });
+
+    // 2. Cập nhật trong warehouse.product_names
+    await trx(TABLES.PRODUCT_NAMES)
+      .whereRaw("LOWER(TRIM(category)) = ?", [oldName.toLowerCase()])
+      .update({
+        category: newName,
+        updated_at: new Date(),
+      });
+
+    // 3. Cập nhật trong warehouse.account_slots
+    await trx(TABLES.STOCK_SERVICES)
+      .whereRaw("LOWER(TRIM(variant_tag)) = ?", [oldName.toLowerCase()])
+      .update({
+        variant_tag: newName,
+        updated_at: new Date(),
+      });
+
+    return {
+      success: true,
+      oldTag: oldName,
+      newTag: newName,
+    };
+  });
+};
+
+/**
+ * Xóa tag khỏi hệ thống (vô hiệu hóa trong business.variant, xóa khỏi warehouse.product_names và account_slots)
+ */
+const deleteCatalogTag = async ({ productId, tag }) => {
+  const targetTag = String(tag || "").trim();
+  if (!targetTag) {
+    throw new Error("Tên tag cần xóa không được để trống!");
+  }
+
+  return await db.transaction(async (trx) => {
+    // 1. Vô hiệu hóa trong business.variant (is_active = false)
+    const vQuery = trx(TABLES.VARIANT)
+      .whereRaw("LOWER(TRIM(variant_name)) = ?", [targetTag.toLowerCase()]);
+    if (productId) {
+      vQuery.andWhere("product_id", Number(productId));
+    }
+    await vQuery.update({
+      is_active: false,
+      updated_at: new Date(),
+    });
+
+    // 2. Gỡ tag trong warehouse.product_names nếu trùng
+    await trx(TABLES.PRODUCT_NAMES)
+      .whereRaw("LOWER(TRIM(category)) = ?", [targetTag.toLowerCase()])
+      .update({
+        category: null,
+        updated_at: new Date(),
+      });
+
+    // 3. Gỡ tag trong warehouse.account_slots nếu trùng
+    await trx(TABLES.STOCK_SERVICES)
+      .whereRaw("LOWER(TRIM(variant_tag)) = ?", [targetTag.toLowerCase()])
+      .update({
+        variant_tag: null,
+        updated_at: new Date(),
+      });
+
+    return {
+      success: true,
+      deletedTag: targetTag,
+    };
+  });
+};
+
 module.exports = {
   listWarehouseAccounts,
   createWarehouseAccount,
@@ -885,4 +977,6 @@ module.exports = {
   deleteCatalogItem,
   openAccountBrowser,
   getSystemProducts,
+  renameCatalogTag,
+  deleteCatalogTag,
 };

@@ -134,6 +134,28 @@ const getSystemProducts = async (req, res) => {
   }
 };
 
+const renameCatalogTag = async (req, res) => {
+  try {
+    const { productId, oldTag, newTag } = req.body || {};
+    const result = await warehouseService.renameCatalogTag({ productId, oldTag, newTag });
+    return res.json({ success: true, message: `Đã đổi tên tag thành "${newTag}" thành công!`, data: result });
+  } catch (err) {
+    console.error("[WarehouseController] renameCatalogTag error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể đổi tên tag.") });
+  }
+};
+
+const deleteCatalogTag = async (req, res) => {
+  try {
+    const { productId, tag } = req.body || {};
+    const result = await warehouseService.deleteCatalogTag({ productId, tag });
+    return res.json({ success: true, message: `Đã xóa tag "${tag}" thành công!`, data: result });
+  } catch (err) {
+    console.error("[WarehouseController] deleteCatalogTag error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể xóa tag.") });
+  }
+};
+
 module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
@@ -148,4 +170,6 @@ module.exports = {
   deleteCatalogItem,
   openAccountBrowser,
   getSystemProducts,
+  renameCatalogTag,
+  deleteCatalogTag,
 };

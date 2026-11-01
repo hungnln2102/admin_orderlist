@@ -11,6 +11,8 @@ router.put("/accounts/:id", controller.updateWarehouseAccount);
 router.get("/system-products", controller.getSystemProducts);
 router.get("/catalog", controller.getCatalogItems);
 router.post("/catalog", controller.createCatalogItem);
+router.put("/catalog/tags/rename", controller.renameCatalogTag);
+router.delete("/catalog/tags", controller.deleteCatalogTag);
 router.delete("/catalog/:id", controller.deleteCatalogItem);
 router.put("/catalog/:id", controller.updateCatalogItem);
 router.post("/accounts/:id/open-browser", controller.openAccountBrowser);

@@ -706,6 +706,10 @@ export const WarehousePage: React.FC = () => {
         isSubmitting={isUpdatingCatalog}
         onClose={() => setEditingCatalogItem(null)}
         onSubmit={handleUpdateCatalogSubmit}
+        onTagChanged={async () => {
+          invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+          await loadWarehouseData();
+        }}
       />
     </div>
   );

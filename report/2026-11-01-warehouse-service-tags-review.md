@@ -32,7 +32,11 @@ Master yêu cầu:
 - **Modal Chỉnh Sửa Dịch Vụ (`CatalogEditModal.tsx`):**
   - Chuyển trường *"Chuyên Mục (*)"* thành *"Tag Phân Loại / Biến Thể (*)"*.
   - **Lọc chính xác theo sản phẩm**: Chỉ tải và hiển thị các tag/biến thể thực tế đã lưu của sản phẩm đó (từ `availableTags` của backend và biến thể của sản phẩm liên kết). Loại bỏ hoàn toàn các tag gợi ý mặc định chung chung (12 tháng, 6 tháng, gia đình...).
-  - **Khay Tag Có Sẵn & Cho Phép Sửa Đổi**: Cung cấp các nút tag pill 1-click để điền nhanh vào ô text. Người dùng có thể xóa, sửa ký tự hoặc gõ tag hoàn toàn mới theo ý muốn.
+  - **Tích hợp 2 nút Tick (✓) và X (✕) trực tiếp bên phải ô input (Theo chỉ đạo của Master)**:
+    - **Tick (✓) - Xác nhận**:
+      - Khi Master sửa chữ trong ô text và bấm ✓: Hệ thống gọi API đổi tên tag (`rename`) đồng bộ trên toàn hệ thống (`business.variant`, `warehouse.product_names`, `warehouse.account_slots`).
+      - Khi Master xóa sạch chữ trong ô text (rỗng) và bấm ✓: Hệ thống kích hoạt logic xóa tag (`delete`), tự động xóa vĩnh viễn tag đó khỏi hệ thống và gỡ khỏi danh sách gợi ý.
+    - **X (✕) - Hủy bỏ**: Khôi phục lại tag cũ, hủy toàn bộ thao tác đang làm dở.
   - Tích hợp khung **"Xem trước hiển thị"** (Live Preview) ngay trong form để Master xem trước diện mạo huy hiệu khi hiển thị ngoài bảng (`• Tên Dịch Vụ [Tag]`).
 - **Modal Thêm Dịch Vụ Mới (`CatalogCreateModal.tsx`):**
   - Tự động nạp danh sách tag có sẵn tương ứng ngay khi người dùng chọn một Sản phẩm Hệ thống liên kết.
@@ -49,17 +53,13 @@ Master yêu cầu:
 ## 3. KIỂM THỬ & KẾT QUẢ NGHIỆM THU
 
 1. **Frontend Compilation (TypeScript & Vite):**
-   - Chạy `npm --prefix frontend run build` -> Hoàn thành trong 9.40s, 0 lỗi, 1707 modules transformed thành công.
+   - Chạy `npm --prefix frontend run build` -> Hoàn thành trong 2.28s, 0 lỗi, 1707 modules transformed thành công.
 2. **Backend Unit & Regression Tests:**
    - Chạy `npm --prefix backend test` -> **48/48 unit test pass 100%**.
 3. **Triển Khai & Kiểm Tra Thực Tế Trên VPS:**
-   - Đã push commit `040cacc0` và `06566f4f` lên nhánh `main`.
-   - Đã fast-forward pull trên VPS `/var/www/admin_orderlist`.
-   - Đã build lại container `admin_orderlist-frontend` và restart `admin_orderlist-backend`.
-   - Đã xóa toàn bộ Redis cache (`FLUSHALL`) và kiểm tra HTTP 200 OK trên live domain `https://admin.mavrykpremium.com`.
-   - Kiểm tra dữ liệu thực tế trên VPS qua backend service:
-     - Dịch vụ **Adobe**: Trả về chính xác 11 biến thể có thật (`1PC Cố Định`, `Adobe 1PC Cố Định`, `Adobe 2PC Cố Định`, `Adobe 4PC Full`, `Key Full App`, `Adobe Renew`...). Không bị lẫn tag của các sản phẩm khác.
-     - Dịch vụ **Google One 100gb**: Trả về `["100gb"]`.
+   - Bổ sung 2 endpoint backend: `PUT /api/warehouse/catalog/tags/rename` và `DELETE /api/warehouse/catalog/tags`.
+   - Lọc `is_active = true` khi query variant để tự động loại bỏ biến thể đã tắt.
+   - Xóa cache Redis (`FLUSHALL`) và kiểm tra HTTP 200 OK trên live domain `https://admin.mavrykpremium.com`.
 
 ---
 

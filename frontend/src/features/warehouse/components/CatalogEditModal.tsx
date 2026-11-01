@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Edit2, X, ExternalLink, Link2, Loader2, Package, Tag } from "lucide-react";
+import { Edit2, X, Check, ExternalLink, Link2, Loader2, Package, Tag } from "lucide-react";
 import { ServiceNameCategoryItem, SystemProduct } from "../types";
 
 interface CatalogEditModalProps {
@@ -15,6 +15,7 @@ interface CatalogEditModalProps {
     loginUrl: string;
     productId: number | null;
   }) => void;
+  onTagChanged?: () => void;
 }
 
 export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
@@ -24,6 +25,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
   isSubmitting = false,
   onClose,
   onSubmit,
+  onTagChanged,
 }) => {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -31,13 +33,25 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
   const [productId, setProductId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
+  // Quản lý tag đang chọn để sửa / xóa theo chỉ đạo của Master
+  const [selectedPillTag, setSelectedPillTag] = useState<string | null>(null);
+  const [deletedTags, setDeletedTags] = useState<Set<string>>(new Set());
+  const [renamedTags, setRenamedTags] = useState<Map<string, string>>(new Map());
+  const [isTagActionLoading, setIsTagActionLoading] = useState(false);
+  const [tagActionMessage, setTagActionMessage] = useState("");
+
   useEffect(() => {
     if (item) {
       setName(item.name || "");
-      setCategory(item.category || "");
+      const initCat = item.category || "";
+      setCategory(initCat);
+      setSelectedPillTag(initCat.trim() ? initCat.trim() : null);
       setLoginUrl(item.loginUrl || "");
       setProductId(item.productId !== undefined ? item.productId : null);
       setError("");
+      setDeletedTags(new Set());
+      setRenamedTags(new Map());
+      setTagActionMessage("");
     }
   }, [item, open]);
 
@@ -45,15 +59,24 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
   const productTags = useMemo(() => {
     const set = new Set<string>();
 
+    const addTag = (t: string | undefined | null) => {
+      if (!t || !t.trim()) return;
+      let val = t.trim();
+      if (renamedTags.has(val)) {
+        val = renamedTags.get(val)!;
+      }
+      if (!deletedTags.has(val) && !deletedTags.has(t.trim())) {
+        set.add(val);
+      }
+    };
+
     // 1. Tag từ availableTags của dịch vụ này
-    (item?.availableTags || []).forEach((t) => {
-      if (t && t.trim()) set.add(t.trim());
-    });
+    (item?.availableTags || []).forEach(addTag);
 
     // 2. Tag từ các slot tài khoản thuộc dịch vụ này
     (item?.variants || []).forEach((v) => {
-      if (v.tag && v.tag !== "Chưa gắn tag" && v.tag.trim()) {
-        set.add(v.tag.trim());
+      if (v.tag && v.tag !== "Chưa gắn tag") {
+        addTag(v.tag);
       }
     });
 
@@ -61,13 +84,87 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
     const activeProductId = productId !== null ? productId : item?.productId;
     if (activeProductId) {
       const sp = systemProducts.find((p) => p.id === activeProductId);
-      (sp?.tags || []).forEach((t) => {
-        if (t && t.trim()) set.add(t.trim());
-      });
+      (sp?.tags || []).forEach(addTag);
     }
 
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [item, productId, systemProducts]);
+  }, [item, productId, systemProducts, renamedTags, deletedTags]);
+
+  const isDeleteMode = Boolean(selectedPillTag && category.trim() === "");
+  const isRenameMode = Boolean(
+    selectedPillTag &&
+      category.trim() !== "" &&
+      category.trim().toLowerCase() !== selectedPillTag.toLowerCase()
+  );
+  const isTagActionActive = isDeleteMode || isRenameMode;
+
+  const handleConfirmTagAction = async () => {
+    if (!selectedPillTag || isTagActionLoading) return;
+    const activeProductId = productId !== null ? productId : item?.productId;
+
+    setIsTagActionLoading(true);
+    setTagActionMessage("");
+    setError("");
+
+    try {
+      if (isDeleteMode) {
+        // Master xóa hết text và bấm xác nhận (Tick) -> XÓA TAG
+        const res = await fetch("/api/warehouse/catalog/tags", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: activeProductId,
+            tag: selectedPillTag,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          throw new Error(result.error || result.message || "Lỗi khi xóa tag");
+        }
+
+        const deleted = selectedPillTag;
+        setDeletedTags((prev) => new Set(prev).add(deleted));
+        setTagActionMessage(`Đã xóa vĩnh viễn tag "${deleted}" thành công!`);
+        setSelectedPillTag(null);
+        setCategory("");
+        onTagChanged?.();
+      } else if (isRenameMode) {
+        // Master sửa chữ và bấm xác nhận (Tick) -> ĐỔI TÊN TAG
+        const oldName = selectedPillTag;
+        const newTagName = category.trim();
+        const res = await fetch("/api/warehouse/catalog/tags/rename", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: activeProductId,
+            oldTag: oldName,
+            newTag: newTagName,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          throw new Error(result.error || result.message || "Lỗi khi đổi tên tag");
+        }
+
+        setRenamedTags((prev) => new Map(prev).set(oldName, newTagName));
+        setTagActionMessage(`Đã đổi tên tag thành "${newTagName}" thành công!`);
+        setSelectedPillTag(newTagName);
+        setCategory(newTagName);
+        onTagChanged?.();
+      }
+    } catch (err: any) {
+      setError(err?.message || "Không thể thực hiện thao tác với tag.");
+    } finally {
+      setIsTagActionLoading(false);
+    }
+  };
+
+  const handleCancelTagAction = () => {
+    if (selectedPillTag) {
+      setCategory(selectedPillTag);
+      setTagActionMessage("");
+    }
+  };
 
   if (!open || !item) return null;
 
@@ -170,25 +267,102 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
                 </span>
               )}
             </div>
-            <div className="relative">
-              <input
-                type="text"
-                list="edit-product-tags-list"
-                placeholder="Nhập hoặc chọn tag của sản phẩm này (VD: 5Tb, 1PC Cố Định...)"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono text-xs sm:text-sm"
-              />
-              <datalist id="edit-product-tags-list">
-                {productTags.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
+
+            {/* Ô input với 2 nút Tick (✓) và X (✕) theo chỉ đạo của Master */}
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  list="edit-product-tags-list"
+                  placeholder="Nhập hoặc chọn tag của sản phẩm này (VD: 5Tb, 1PC Cố Định...)"
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setTagActionMessage("");
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-950 border rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none font-mono text-xs sm:text-sm transition-colors ${
+                    isDeleteMode
+                      ? "border-rose-500/80 focus:border-rose-400 shadow-sm shadow-rose-500/20"
+                      : isRenameMode
+                      ? "border-emerald-500/80 focus:border-emerald-400 shadow-sm shadow-emerald-500/20"
+                      : "border-slate-700 focus:border-purple-500"
+                  }`}
+                />
+                <datalist id="edit-product-tags-list">
+                  {productTags.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* 2 nút nhỏ bên phải: Tick (✓) và X (✕) */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleConfirmTagAction}
+                  disabled={isTagActionLoading || !isTagActionActive}
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                    isDeleteMode
+                      ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-600/30 scale-105"
+                      : isRenameMode
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-600/30 scale-105"
+                      : "bg-slate-800/40 text-slate-600 border-slate-800 cursor-not-allowed opacity-40"
+                  }`}
+                  title={
+                    isDeleteMode
+                      ? `Xác nhận: XÓA VĨNH VIỄN tag "${selectedPillTag}" khỏi hệ thống`
+                      : isRenameMode
+                      ? `Xác nhận: ĐỔI TÊN tag "${selectedPillTag}" ➔ "${category.trim()}"`
+                      : "Xác nhận (Tick)"
+                  }
+                >
+                  {isTagActionLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCancelTagAction}
+                  disabled={!isTagActionActive}
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                    isTagActionActive
+                      ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
+                      : "bg-slate-800/40 text-slate-600 border-slate-800 cursor-not-allowed opacity-40"
+                  }`}
+                  title="Hủy bỏ, khôi phục lại tag cũ"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+
+            {/* Thông báo hướng dẫn / trạng thái của nút Tick & X */}
+            {isDeleteMode && (
+              <p className="text-[11px] text-rose-400 mt-1.5 font-medium flex items-center gap-1 animate-in fade-in">
+                <span>⚠️ Ô text đang rỗng. Bấm nút</span>
+                <span className="font-bold underline text-rose-300">Tick (✓)</span>
+                <span>bên phải để XÓA VĨNH VIỄN tag "{selectedPillTag}".</span>
+              </p>
+            )}
+            {isRenameMode && (
+              <p className="text-[11px] text-emerald-400 mt-1.5 font-medium flex items-center gap-1 animate-in fade-in">
+                <span>💡 Bấm nút</span>
+                <span className="font-bold underline text-emerald-300">Tick (✓)</span>
+                <span>bên phải để đổi tên: "{selectedPillTag}" ➔ "{category.trim()}".</span>
+              </p>
+            )}
+            {tagActionMessage && (
+              <p className="text-[11px] text-cyan-400 mt-1.5 font-medium animate-in fade-in">
+                ✓ {tagActionMessage}
+              </p>
+            )}
 
             {/* Danh sách Tag đang lưu có sẵn của sản phẩm đó */}
             {productTags.length > 0 ? (
-              <div className="mt-2 space-y-1.5">
+              <div className="mt-2.5 space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
                   <span>Tag có sẵn của sản phẩm này:</span>
                   <span className="text-[10px] text-purple-400/80 font-normal lowercase">
@@ -197,18 +371,22 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar p-1.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
                   {productTags.map((t) => {
-                    const isSelected = category.toLowerCase().trim() === t.toLowerCase().trim();
+                    const isSelected = selectedPillTag?.toLowerCase().trim() === t.toLowerCase().trim();
                     return (
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setCategory(t)}
+                        onClick={() => {
+                          setCategory(t);
+                          setSelectedPillTag(t);
+                          setTagActionMessage("");
+                        }}
                         className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
                           isSelected
                             ? "bg-purple-600 text-white font-bold border border-purple-400 shadow-sm shadow-purple-600/30 scale-105"
                             : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
                         }`}
-                        title="Bấm để đưa tag này vào ô nhập và chỉnh sửa tùy ý"
+                        title="Bấm để đưa tag này vào ô nhập để dùng, sửa hoặc xóa"
                       >
                         {t}
                       </button>
