@@ -1,3 +1,4 @@
+require('module-alias/register');
 const assert = require('assert');
 const { matchBankGateway } = require('../../src/domains/wallets/services/walletService');
 

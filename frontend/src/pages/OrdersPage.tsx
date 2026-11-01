@@ -173,8 +173,19 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
           const prod = productsCatalog.find((p) => p.id === selectedProductId);
           if (prod) {
             const resolvedPrice = isGift ? 0 : resolvePriceByPrefix(prod, prefixVal);
-            updated.price = resolvedPrice;
-            updated.gross_selling_price = resolvedPrice;
+            let existingSuffix = 0;
+            if (isEditModalOpen && selectedOrder && !isGift) {
+              const p = Number(selectedOrder.price || 0);
+              const g = Number(selectedOrder.gross_selling_price || 0);
+              if (p > 0 && g > 0 && p > g && p - g >= 1 && p - g <= 100) {
+                existingSuffix = Math.round(p - g);
+              } else if (p > 0) {
+                const rem = Math.round(p) % 100;
+                existingSuffix = rem === 0 ? 100 : rem;
+              }
+            }
+            updated.price = isGift ? 0 : (existingSuffix > 0 ? resolvedPrice + existingSuffix : resolvedPrice);
+            updated.gross_selling_price = isGift ? 0 : resolvedPrice;
           }
         }
       }
@@ -209,11 +220,23 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     const baseDateStr = formData.order_date || formatDateYYYYMMDD(new Date());
     const expiryStr = calculateExpirationDate(baseDateStr, derivedDays);
 
+    let existingSuffix = 0;
+    if (isEditModalOpen && selectedOrder && !isImport) {
+      const p = Number(selectedOrder.price || 0);
+      const g = Number(selectedOrder.gross_selling_price || 0);
+      if (p > 0 && g > 0 && p > g && p - g >= 1 && p - g <= 100) {
+        existingSuffix = Math.round(p - g);
+      } else if (p > 0) {
+        const rem = Math.round(p) % 100;
+        existingSuffix = rem === 0 ? 100 : rem;
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
       id_product: prod.san_pham,
-      price: sellingPrice,
-      gross_selling_price: sellingPrice,
+      price: isImport ? 0 : (existingSuffix > 0 ? sellingPrice + existingSuffix : sellingPrice),
+      gross_selling_price: isImport ? 0 : sellingPrice,
       supply_id: "",
       cost: 0,
       days: derivedDays,

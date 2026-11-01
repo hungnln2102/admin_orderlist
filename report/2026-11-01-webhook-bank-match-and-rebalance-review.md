@@ -60,3 +60,4 @@ Thực thi qua script transaction [`backend/scripts/fix_webhook_bank_match_and_r
 ## 4. KẾT LUẬN & ĐẢM BẢO HỆ THỐNG
 - Webhook SePay từ nay trở đi sẽ tự động phân giải chính xác 100% vào tài khoản Shop theo cặp đôi **(Số tài khoản + Ngân hàng)**.
 - Tài sản cá nhân không còn bị ảnh hưởng hay phình to ảo bởi các đơn hàng của Shop.
+

@@ -1,6 +1,6 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
-const { getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
+const { getAvailableSuffix, applySuffixToPrice, extractSlotSuffix } = require("@/domains/payments/services/slotSuffixService");
 const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
@@ -718,13 +718,14 @@ async function createOrder(payload) {
     const effectivePrefix = isMavn ? "MAVN" : (VALID_ORDER_PREFIXES.includes(rawPrefix) ? rawPrefix : "MAVC");
     const id_order = payload.id_order || generateOrderCode(effectivePrefix);
     const rawPrice = Number(payload.price || 0);
+    const basePrice = payload.gross_selling_price != null ? Number(payload.gross_selling_price) : rawPrice;
     const status = payload.status || (isMavn ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID);
 
-    let finalPrice = rawPrice;
+    let finalPrice = basePrice;
     if (status === ORDER_STATUS.UNPAID || status === ORDER_STATUS.RENEW_REQUIRED) {
-      if (rawPrice > 0) {
-        const suffix = await getAvailableSuffix();
-        finalPrice = applySuffixToPrice(rawPrice, suffix);
+      if (basePrice > 0) {
+        const suffix = await getAvailableSuffix(trx);
+        finalPrice = applySuffixToPrice(basePrice, suffix);
       }
     }
 
@@ -748,7 +749,7 @@ async function createOrder(payload) {
       information_order: payload.information_order || "",
       slot: payload.slot || "",
       price: finalPrice,
-      gross_selling_price: isMavn ? 0 : (payload.gross_selling_price != null ? Number(payload.gross_selling_price) : finalPrice),
+      gross_selling_price: isMavn ? 0 : basePrice,
       cost: finalCost,
       status: isMavn ? ORDER_STATUS.PAID : status,
       was_paid: isPaid,
@@ -1061,6 +1062,9 @@ async function updateOrder(id, payload) {
       (targetCustomer && isCustomerMavryk(targetCustomer))
     );
 
+    const nextStatus = payload.status !== undefined ? payload.status : existingOrder.status;
+    const isPendingPayment = nextStatus === ORDER_STATUS.UNPAID || nextStatus === ORDER_STATUS.RENEW_REQUIRED;
+
     if (isMavn) {
       if (payload.cost !== undefined) {
         updateFields.cost = Number(payload.cost);
@@ -1069,27 +1073,51 @@ async function updateOrder(id, payload) {
       }
       updateFields.price = 0;
       updateFields.gross_selling_price = 0;
+    } else if (isPendingPayment) {
+      // Đơn bán hàng ở trạng thái chờ thanh toán / cần gia hạn:
+      // BẮT BUỘC CỐ ĐỊNH SLOT SUFFIX của đơn này (1..100)
+      const existingSuffix = extractSlotSuffix(existingOrder);
+
+      // Xác định đúng giá gốc sản phẩm (KHÔNG LÀM TRÒN!)
+      let basePrice = null;
+      if (payload.gross_selling_price !== undefined && Number(payload.gross_selling_price) > 0) {
+        basePrice = Number(payload.gross_selling_price);
+      } else if (payload.price !== undefined && Number(payload.price) > 0) {
+        // Nếu payload.price gửi lên trùng khớp với price cũ của đơn (không đổi sản phẩm):
+        if (existingSuffix && Math.round(Number(payload.price)) === Math.round(Number(existingOrder.price || 0))) {
+          basePrice = existingOrder.gross_selling_price != null 
+            ? Number(existingOrder.gross_selling_price) 
+            : (Number(payload.price) - existingSuffix);
+        } else {
+          basePrice = Number(payload.price);
+        }
+      } else {
+        basePrice = Number(existingOrder.gross_selling_price != null ? existingOrder.gross_selling_price : existingOrder.price || 0);
+      }
+
+      // Giữ nguyên đúng giá sản phẩm không làm tròn
+      if (basePrice > 0) {
+        // Cố định slot suffix: Nếu đơn đã có suffix thì giữ nguyên, chỉ cấp mới nếu đơn chưa hề có suffix
+        const suffixToUse = existingSuffix || (await getAvailableSuffix(trx, existingOrder.id));
+        updateFields.gross_selling_price = basePrice;
+        updateFields.price = applySuffixToPrice(basePrice, suffixToUse);
+      } else {
+        updateFields.gross_selling_price = 0;
+        updateFields.price = 0;
+      }
+
+      if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
     } else {
+      // Trạng thái đã thanh toán hoặc hủy (PAID, REFUNDED, CANCELED):
       if (payload.price !== undefined) updateFields.price = Number(payload.price);
       if (payload.gross_selling_price !== undefined) updateFields.gross_selling_price = Number(payload.gross_selling_price);
       if (payload.cost !== undefined) updateFields.cost = Number(payload.cost);
     }
 
     if (payload.status !== undefined) {
-      const status = payload.status;
-      updateFields.status = status;
-      if (status === ORDER_STATUS.PAID) {
+      updateFields.status = payload.status;
+      if (payload.status === ORDER_STATUS.PAID) {
         updateFields.was_paid = true;
-      }
-
-      if (status === ORDER_STATUS.UNPAID || status === ORDER_STATUS.RENEW_REQUIRED) {
-        const basePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
-        if (basePrice > 0) {
-          const suffix = await getAvailableSuffix();
-          const finalPrice = applySuffixToPrice(basePrice, suffix);
-          updateFields.price = finalPrice;
-          updateFields.gross_selling_price = finalPrice;
-        }
       }
     }
 
@@ -1303,11 +1331,14 @@ async function renewOrder(id, payload = {}) {
     // ─────────────────────────────────────────────────────────────
     // 2. XỬ LÝ CHO ĐƠN BÁN CỦA KHÁCH HÀNG (GIỮ NGUYÊN NHƯ CŨ)
     // ─────────────────────────────────────────────────────────────
-    const rawBasePrice = payload.price != null ? Number(payload.price) : Number(existingOrder.price || 0);
-    const basePrice = Math.floor(rawBasePrice / 1000) * 1000 || rawBasePrice;
+    // Lấy đúng giá sản phẩm gia hạn (KHÔNG LÀM TRÒN!)
+    const rawBasePrice = payload.price != null 
+      ? Number(payload.price) 
+      : Number(existingOrder.gross_selling_price != null ? existingOrder.gross_selling_price : existingOrder.price || 0);
+    const basePrice = rawBasePrice;
 
-    // Cấp phát Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
-    const suffix = await getAvailableSuffix();
+    // Cấp phát 1 Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
+    const suffix = await getAvailableSuffix(trx, existingOrder.id);
     const finalPrice = applySuffixToPrice(basePrice, suffix);
 
     const renewal = await calculateNewExpiry(existingOrder, { trx, days: payload.days });
@@ -1316,7 +1347,7 @@ async function renewOrder(id, payload = {}) {
     const updateFields = {
       status: ORDER_STATUS.RENEW_REQUIRED,
       price: finalPrice,
-      gross_selling_price: finalPrice,
+      gross_selling_price: basePrice,
       days,
     };
 

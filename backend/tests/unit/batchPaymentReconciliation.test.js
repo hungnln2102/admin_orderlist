@@ -16,7 +16,7 @@ describe("Batch Payment & Slot Suffix Reconciliation Suite", () => {
       assert.strictEqual(applySuffixToPrice(500000, 23), 500023);
       assert.strictEqual(applySuffixToPrice(250000, 1), 250001);
       assert.strictEqual(applySuffixToPrice(999900, 100), 1000000);
-      assert.strictEqual(applySuffixToPrice(150045, 12), 150012);
+      assert.strictEqual(applySuffixToPrice(150045, 12), 150057);
     });
   });
 

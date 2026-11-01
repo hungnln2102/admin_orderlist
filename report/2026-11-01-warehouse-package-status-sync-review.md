@@ -66,3 +66,4 @@ Thực thi qua script transaction: [`backend/scripts/sync_warehouse_status_with_
 - **Cảnh báo hết hạn:** Được tính theo thời hạn thực tế độc lập, không làm sai lệch trạng thái kho.
 
 Master chỉ cần **F5 (Reload lại trang)** trên trình duyệt tại [https://admin.mavrykpremium.com/warehouse](https://admin.mavrykpremium.com/warehouse) để xem số liệu đã được cập nhật mới nhất.
+

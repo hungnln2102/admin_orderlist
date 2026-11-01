@@ -64,3 +64,4 @@ syncWarehouseStatus().catch(err => {
   console.error('LỖI ĐỒNG BỘ (ĐÃ ROLLBACK):', err);
   process.exit(1);
 });
+

@@ -56,6 +56,7 @@ async function creditSavingsProfitTask(triggerSource = "cron_minutely", now = ne
   return withAdvisoryLock("credit_savings_profit", async () => {
     const currentTime = getVietnamTimeString(now);
     const savingsAssets = await db(TABLES.PERSONAL_SAVINGS)
+      .where("type", "SAVINGS")
       .where("profit_enabled", true)
       .where("annual_interest_rate", ">", 0)
       .select("id", "profit_credit_time", "profit_frequency", "profit_last_credited_period");
