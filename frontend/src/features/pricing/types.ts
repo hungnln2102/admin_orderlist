@@ -1,3 +1,11 @@
+export type PricingStatusTab = "all" | "active" | "inactive";
+
+export interface PricingCounts {
+  total: number;
+  active: number;
+  inactive: number;
+}
+
 export interface PricingItem {
   id: number;
   san_pham: string;

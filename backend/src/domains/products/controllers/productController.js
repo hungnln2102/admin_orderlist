@@ -3,9 +3,9 @@ const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getProductPrices = async (req, res) => {
   try {
-    const { page, limit, search, activeOnly } = req.query;
+    const { page, limit, search, activeOnly, status } = req.query;
     const isActiveOnly = activeOnly === "true" || activeOnly === "1";
-    const result = await productService.getProductPrices({ page, limit, search, activeOnly: isActiveOnly });
+    const result = await productService.getProductPrices({ page, limit, search, activeOnly: isActiveOnly, status });
     res.json(result);
   } catch (error) {
     console.error("Lỗi getProductPrices:", error);

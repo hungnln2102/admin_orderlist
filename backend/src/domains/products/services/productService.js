@@ -12,7 +12,7 @@ const P_COLS = COLS.PRODUCT;
  * Service lấy danh sách giá sản phẩm (Bảng giá Niêm yết)
  * Bao gồm Giá Gốc, Giá Bán Lẻ, Giá CTV, Giá Sinh Viên, Giá Khuyến Mãi & % Lợi Nhuận
  */
-const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly = false } = {}) => {
+const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly = false, status = "all" } = {}) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, Math.min(1000, parseInt(limit, 10) || 15));
   const offset = (pageNum - 1) * limitNum;
@@ -20,9 +20,11 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
   let whereClause = "WHERE 1=1";
   const params = [];
 
-  // Khi activeOnly = true, chỉ lấy sản phẩm đang hoạt động (dùng cho dropdown tạo đơn hàng)
-  if (activeOnly) {
+  // Lọc theo trạng thái hoạt động (Tabs: all | active | inactive)
+  if (activeOnly || status === "active") {
     whereClause += ` AND v.${V_COLS.IS_ACTIVE} = true`;
+  } else if (status === "inactive") {
+    whereClause += ` AND (v.${V_COLS.IS_ACTIVE} = false OR v.${V_COLS.IS_ACTIVE} IS NULL)`;
   }
 
   if (search && search.trim()) {
@@ -69,11 +71,27 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
     LIMIT ? OFFSET ?
   `;
 
-  const countRes = await db.raw(countSql, params);
+  const statsSql = `
+    SELECT
+      COUNT(*) AS total_count,
+      COUNT(*) FILTER (WHERE ${V_COLS.IS_ACTIVE} = true) AS active_count,
+      COUNT(*) FILTER (WHERE ${V_COLS.IS_ACTIVE} = false OR ${V_COLS.IS_ACTIVE} IS NULL) AS inactive_count
+    FROM ${TABLES.VARIANT}
+  `;
+
+  const [countRes, statsRes, dataRes] = await Promise.all([
+    db.raw(countSql, params),
+    db.raw(statsSql),
+    db.raw(dataSql, [...params, limitNum, offset]),
+  ]);
+
   const total = parseInt(countRes.rows[0]?.total || 0, 10);
   const totalPages = Math.ceil(total / limitNum) || 1;
-
-  const dataRes = await db.raw(dataSql, [...params, limitNum, offset]);
+  const counts = {
+    total: parseInt(statsRes.rows[0]?.total_count || 0, 10),
+    active: parseInt(statsRes.rows[0]?.active_count || 0, 10),
+    inactive: parseInt(statsRes.rows[0]?.inactive_count || 0, 10),
+  };
 
   const formattedData = (dataRes.rows || []).map((r) => {
     const retailPrice = parseFloat(r.retail_price || 0);
@@ -161,6 +179,7 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       total,
       totalPages,
     },
+    counts,
   };
 };
 

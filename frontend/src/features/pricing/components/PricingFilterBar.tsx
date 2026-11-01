@@ -1,5 +1,16 @@
 import React from "react";
-import { Search, RefreshCw, Download, Plus, Filter, Tag } from "lucide-react";
+import {
+  Search,
+  RefreshCw,
+  Download,
+  Plus,
+  Filter,
+  Tag,
+  Package,
+  CheckCircle2,
+  EyeOff,
+} from "lucide-react";
+import { PricingStatusTab, PricingCounts } from "../types";
 
 interface PricingFilterBarProps {
   search: string;
@@ -10,6 +21,9 @@ interface PricingFilterBarProps {
   onOpenCreateModal: () => void;
   displayCount: number;
   totalCount: number;
+  activeTab: PricingStatusTab;
+  onTabChange: (tab: PricingStatusTab) => void;
+  counts: PricingCounts;
 }
 
 export const PricingFilterBar: React.FC<PricingFilterBarProps> = ({
@@ -21,11 +35,109 @@ export const PricingFilterBar: React.FC<PricingFilterBarProps> = ({
   onOpenCreateModal,
   displayCount,
   totalCount,
+  activeTab,
+  onTabChange,
+  counts,
 }) => {
+  const PRICING_TABS = [
+    {
+      key: "all" as PricingStatusTab,
+      label: "Tổng Sản Phẩm",
+      description: "Toàn bộ danh mục bảng giá",
+      count: counts.total,
+      icon: <Package className="w-5 h-5 text-cyan-400" />,
+      iconBg: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+      gradient: "from-cyan-500/20 via-sky-500/10 to-transparent",
+      borderColor: "border-cyan-500/40",
+      ringColor: "ring-cyan-500/30",
+      activeText: "text-cyan-300",
+      badgeActive: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm",
+    },
+    {
+      key: "active" as PricingStatusTab,
+      label: "Sản Phẩm Đang Hoạt Động",
+      description: "Đang mở bán & hiển thị tạo đơn",
+      count: counts.active,
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
+      iconBg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
+      borderColor: "border-emerald-500/40",
+      ringColor: "ring-emerald-500/30",
+      activeText: "text-emerald-300",
+      badgeActive: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm",
+    },
+    {
+      key: "inactive" as PricingStatusTab,
+      label: "Sản Phẩm Ngừng Hoạt Động",
+      description: "Đã ẩn khỏi dropdown tạo đơn",
+      count: counts.inactive,
+      icon: <EyeOff className="w-5 h-5 text-amber-400" />,
+      iconBg: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      gradient: "from-amber-500/20 via-slate-500/10 to-transparent",
+      borderColor: "border-amber-500/40",
+      ringColor: "ring-amber-500/30",
+      activeText: "text-amber-300",
+      badgeActive: "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm",
+    },
+  ];
+
   return (
-    <>
+    <div className="space-y-5">
+      {/* 3 Dataset Tabs theo chỉ đạo của Master: Tổng / Đang hoạt động / Ngừng hoạt động */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        {PRICING_TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => onTabChange(tab.key)}
+              className={`relative overflow-hidden text-left p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                isActive
+                  ? `bg-slate-900 ${tab.borderColor} shadow-lg shadow-black/40 ring-1 ${tab.ringColor}`
+                  : "bg-slate-900/40 border-slate-800/60 hover:bg-slate-900/80 hover:border-slate-700/80"
+              }`}
+            >
+              {isActive && (
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${tab.gradient} pointer-events-none opacity-80`}
+                />
+              )}
+              <div className="relative z-10 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl border ${tab.iconBg}`}>
+                    {tab.icon}
+                  </div>
+                  <div>
+                    <div
+                      className={`text-sm font-black tracking-wide ${
+                        isActive ? tab.activeText : "text-slate-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                      {tab.description}
+                    </div>
+                  </div>
+                </div>
+
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-black shrink-0 ${
+                    isActive
+                      ? tab.badgeActive
+                      : "bg-slate-800 text-slate-400 border border-slate-700/50"
+                  }`}
+                >
+                  {new Intl.NumberFormat("vi-VN").format(tab.count)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md">
@@ -93,6 +205,6 @@ export const PricingFilterBar: React.FC<PricingFilterBarProps> = ({
           </span>
         </div>
       </div>
-    </>
+    </div>
   );
 };

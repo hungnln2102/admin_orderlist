@@ -13,6 +13,8 @@ import {
   PricingCreateEditModal,
   SupplierCostModal,
   PricingDeleteModal,
+  PricingStatusTab,
+  PricingCounts,
 } from "../features/pricing";
 
 export const PricingPage: React.FC = () => {
@@ -23,6 +25,8 @@ export const PricingPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const { page, setPage, resetPage } = useUrlPagination(totalPages);
   const [totalItems, setTotalItems] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<PricingStatusTab>("all");
+  const [counts, setCounts] = useState<PricingCounts>({ total: 0, active: 0, inactive: 0 });
 
   // Expandable Row state for Supplier Prices
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
@@ -68,13 +72,16 @@ export const PricingPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/products/prices?page=${page}&limit=15&search=${encodeURIComponent(search)}`
+        `/api/products/prices?page=${page}&limit=15&search=${encodeURIComponent(search)}&status=${activeTab}`
       );
       const data = await res.json();
       if (res.ok) {
         setItems(data.data || []);
         setTotalPages(data.pagination?.totalPages || 1);
         setTotalItems(data.pagination?.total || 0);
+        if (data.counts) {
+          setCounts(data.counts);
+        }
       } else {
         notify.error("Không thể tải danh sách bảng giá sản phẩm", "Lỗi Dữ Liệu");
       }
@@ -83,7 +90,12 @@ export const PricingPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, activeTab]);
+
+  const handleTabChange = (tab: PricingStatusTab) => {
+    setActiveTab(tab);
+    resetPage();
+  };
 
   const fetchAllSuppliers = useCallback(async () => {
     try {
@@ -215,9 +227,22 @@ export const PricingPage: React.FC = () => {
           `Đã chuyển "${item.san_pham}" sang ${newStatus ? "Hoạt động" : "Ẩn"}!`,
           "Cập Nhật Thành Công"
         );
-        setItems((prev) =>
-          prev.map((it) => (it.id === item.id ? { ...it, is_active: newStatus } : it))
-        );
+        setCounts((prev) => ({
+          ...prev,
+          active: newStatus ? prev.active + 1 : Math.max(0, prev.active - 1),
+          inactive: newStatus ? Math.max(0, prev.inactive - 1) : prev.inactive + 1,
+        }));
+        if (activeTab === "active" && !newStatus) {
+          setItems((prev) => prev.filter((it) => it.id !== item.id));
+          setTotalItems((prev) => Math.max(0, prev - 1));
+        } else if (activeTab === "inactive" && newStatus) {
+          setItems((prev) => prev.filter((it) => it.id !== item.id));
+          setTotalItems((prev) => Math.max(0, prev - 1));
+        } else {
+          setItems((prev) =>
+            prev.map((it) => (it.id === item.id ? { ...it, is_active: newStatus } : it))
+          );
+        }
       } else {
         notify.error(data.error || "Không thể cập nhật trạng thái", "Lỗi Cập Nhật");
       }
@@ -365,6 +390,9 @@ export const PricingPage: React.FC = () => {
         onOpenCreateModal={handleOpenCreateModal}
         displayCount={items.length}
         totalCount={totalItems}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        counts={counts}
       />
 
       {/* Main Container */}

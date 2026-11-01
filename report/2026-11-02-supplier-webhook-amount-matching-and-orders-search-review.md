@@ -34,3 +34,4 @@
    - Biên lai `#51` trạng thái: `FULLY_ALLOCATED`.
    - NCC Đỗ Thanh Hoài: `remaining_debt: 0`, `payment_status: 'Đã Thanh Toán'`.
    - Số lượng đơn có `id_product` bị thiếu: `0 đơn`.
+
