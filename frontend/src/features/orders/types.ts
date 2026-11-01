@@ -34,6 +34,7 @@ export interface Order {
     account_holder?: string;
     type?: string;
   };
+  is_variant_inactive?: boolean;
 }
 
 export type OrderDatasetKey = "active" | "import" | "expired" | "canceled";

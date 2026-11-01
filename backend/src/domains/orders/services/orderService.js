@@ -4,7 +4,7 @@ const { getAvailableSuffix, applySuffixToPrice, extractSlotSuffix } = require("@
 const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
-const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
+const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -513,9 +513,22 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
   if (neededVariantIds.size > 0) {
     const variants = await queryDb(TABLES.VARIANT)
       .whereIn("id", Array.from(neededVariantIds))
-      .select("id", "variant_name", "display_name", "product_id");
+      .select("id", "variant_name", "display_name", "product_id", "is_active", "base_price");
     for (const v of variants) {
       variantMap.set(Number(v.id), v);
+    }
+  }
+
+  // 3d. Truy vấn nạp danh sách giá tier (variant_price) trong 1 query duy nhất để đối chiếu giá Catalog
+  const variantPricesMap = new Map();
+  if (neededVariantIds.size > 0) {
+    const prices = await queryDb(TABLES.VARIANT_PRICE)
+      .whereIn("variant_id", Array.from(neededVariantIds))
+      .select("variant_id", "tier_id", "price");
+    for (const p of prices) {
+      const vId = Number(p.variant_id);
+      if (!variantPricesMap.has(vId)) variantPricesMap.set(vId, []);
+      variantPricesMap.get(vId).push(p);
     }
   }
 
@@ -549,22 +562,48 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
     const variantName = matchedVariant ? matchedVariant.variant_name : (order.id_product && isNaN(vId) ? String(order.id_product) : null);
     const displayName = matchedVariant ? matchedVariant.display_name : null;
 
+    // ĐỐI CHIẾU GIÁ CATALOG ĐỘNG CHO ĐƠN CẦN GIA HẠN (Chỉ đạo tối cao của Master)
+    const statusUpper = String(order.status || "").trim().toUpperCase();
+    const isRenewRequired = statusUpper === ORDER_STATUS.RENEW_REQUIRED || statusUpper === "CẦN GIA HẠN";
+
+    let effectivePrice = Number(order.price || 0);
+    let effectiveGrossPrice = order.gross_selling_price != null ? Number(order.gross_selling_price) : null;
+    let isVariantActive = true;
+
+    if (isRenewRequired && matchedVariant) {
+      isVariantActive = matchedVariant.is_active !== false;
+      const prices = variantPricesMap.get(vId) || [];
+      const prefix = getOrderPrefix(order.id_order);
+      const catalogBasePrice = selectCatalogPrice(prefix, matchedVariant, prices);
+      if (catalogBasePrice > 0) {
+        const suffix = extractSlotSuffix(order) || 0;
+        effectiveGrossPrice = catalogBasePrice;
+        effectivePrice = applySuffixToPrice(catalogBasePrice, suffix);
+      }
+    }
+
     const enriched = {
       ...order,
       supply_id: resolvedSupplyId,
       supplier_name: supplierName,
       variant_name: variantName,
       display_name: displayName,
+      price: effectivePrice,
+      gross_selling_price: effectiveGrossPrice,
+      is_variant_inactive: isRenewRequired && !isVariantActive,
     };
 
     const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") ||
       (Number(order.cost || 0) > 0 && String(order.status || "").toLowerCase().includes("nhập hàng"));
 
-    if (isImport && supplier && (supplier.number_bank || supplier.numberBank)) {
+    if (isRenewRequired && !isVariantActive) {
+      // Đơn hàng có sản phẩm đang không hoạt động: Lược bỏ QR và thông tin thanh toán theo chỉ đạo của Master
+      enriched.vietqr_url = null;
+    } else if (isImport && supplier && (supplier.number_bank || supplier.numberBank)) {
       const bin = supplier.bin_bank || supplier.binBank || "970422";
       const accNum = supplier.number_bank || supplier.numberBank;
       const accName = supplier.account_holder || supplier.accountHolder || supplier.supplier_name || "";
-      const amount = Math.round(Number(order.cost || order.price || 0));
+      const amount = Math.round(Number(order.cost || effectivePrice || 0));
       enriched.vietqr_url = `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`;
       enriched.bank_info = {
         bank_name: supplier.bin_bank || bin,
@@ -574,7 +613,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
         type: "supplier",
       };
     } else if (defaultShopBankInfo) {
-      const amount = Math.round(Number(order.price || 0));
+      const amount = Math.round(effectivePrice);
       enriched.vietqr_url = `https://img.vietqr.io/image/${defaultShopBankInfo.bin}-${defaultShopBankInfo.accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(defaultShopBankInfo.accName)}`;
       enriched.bank_info = {
         bank_name: defaultShopBankInfo.bankName,
@@ -702,11 +741,13 @@ async function attachVietQrToOrder(order, trx) {
 }
 
 /**
- * Lấy chi tiết đơn hàng theo ID
+ * Lấy chi tiết đơn hàng theo ID (Tự động nạp batch info & đối chiếu Catalog)
  */
 async function getOrderById(id) {
   const order = await getOrderTable().where({ id: Number(id) }).first();
-  return order ? await attachVietQrToOrder(order) : null;
+  if (!order) return null;
+  const [enriched] = await attachBatchSupplierAndQrInfo([order]);
+  return enriched || null;
 }
 
 /**

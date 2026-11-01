@@ -70,7 +70,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const fallbackAccName = order.bank_info?.account_holder ? `&accountName=${encodeURIComponent(order.bank_info.account_holder)}` : "";
   const bankBin = order.bank_info?.bank_bin || "970422";
   const bankAcc = order.bank_info?.account_number || "0378304963";
-  const vietQrUrl = order.vietqr_url || (order.id_order ? `https://img.vietqr.io/image/${bankBin}-${bankAcc}-compact2.png?amount=${amountToPay}${fallbackAccName}` : null);
+  const vietQrUrl = order.is_variant_inactive ? null : (order.vietqr_url || (order.id_order ? `https://img.vietqr.io/image/${bankBin}-${bankAcc}-compact2.png?amount=${amountToPay}${fallbackAccName}` : null));
   const sepayFallbackUrl = `https://qr.sepay.vn/img?acc=${bankAcc}&bank=${bankBin}&amount=${amountToPay}&template=compact`;
   const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(v);
 
@@ -247,6 +247,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   </div>
                   <div className="text-rose-400 font-bold text-sm">Đơn hàng đã hủy</div>
                   <p className="text-xs text-slate-400">Mã QR thanh toán không khả dụng cho đơn hàng đã hủy.</p>
+                </div>
+              ) : order.is_variant_inactive ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-center space-y-2 h-full flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <X className="w-6 h-6" />
+                  </div>
+                  <div className="text-amber-400 font-bold text-sm">Sản phẩm ngưng hoạt động</div>
+                  <p className="text-xs text-slate-400">Sản phẩm này hiện đang tạm ngưng kinh doanh trong Catalog. Không khả dụng mã QR thanh toán.</p>
                 </div>
               ) : vietQrUrl ? (
                 <div className="rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-950/30 to-slate-900/50 overflow-hidden h-full flex flex-col justify-between">

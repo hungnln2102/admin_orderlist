@@ -156,6 +156,7 @@ async function syncRenewRequiredOrdersPricing(queryDb = null, variantId = null) 
 
 module.exports = {
   getOrderPrefix,
+  selectCatalogPrice,
   resolveOrderCatalogPricing,
   resolveOrdersWithCatalogPrices,
   syncRenewRequiredOrdersPricing,

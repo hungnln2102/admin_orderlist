@@ -349,7 +349,6 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
   await upsertPrice(2, retail_price);
   await upsertPrice(3, promo_price);
   await upsertPrice(4, student_price);
-  await syncRenewRequiredOrdersPricing(trx, variantId);
 
   const changes = {};
   const changedFields = [];

@@ -52,8 +52,8 @@ export const PricingTable: React.FC<PricingTableProps> = ({
             <th className="py-3.5 px-3 w-8 text-center"></th>
             <th className="py-3.5 px-4">Sản Phẩm</th>
             <th className="py-3.5 px-3 text-right">Giá Gốc</th>
-            <th className="py-3.5 px-3 text-right">Giá Bán Lẻ</th>
             <th className="py-3.5 px-3 text-right">Giá CTV</th>
+            <th className="py-3.5 px-3 text-right">Giá Bán Lẻ</th>
             <th className="py-3.5 px-3 text-right">Giá Sinh Viên</th>
             <th className="py-3.5 px-3 text-right">Giá KM</th>
             <th className="py-3.5 px-3 text-center">Lợi Nhuận</th>
@@ -148,14 +148,14 @@ export const PricingTable: React.FC<PricingTableProps> = ({
                       {formatCurrency(item.base_price)}
                     </td>
 
-                    {/* Retail Price */}
-                    <td className="py-3.5 px-3 text-right font-bold text-cyan-300">
-                      {formatCurrency(item.retail_price)}
-                    </td>
-
                     {/* CTV Price */}
                     <td className="py-3.5 px-3 text-right font-semibold text-emerald-400">
                       {formatCurrency(item.ctv_price)}
+                    </td>
+
+                    {/* Retail Price */}
+                    <td className="py-3.5 px-3 text-right font-bold text-cyan-300">
+                      {formatCurrency(item.retail_price)}
                     </td>
 
                     {/* Student Price */}

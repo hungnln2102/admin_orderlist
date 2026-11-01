@@ -85,20 +85,20 @@ export const PricingCreateEditModal: React.FC<PricingCreateEditModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-slate-400 mb-1 font-semibold">Giá Bán Lẻ (₫)</label>
-              <input
-                type="number"
-                value={productForm.retail_price}
-                onChange={(e) => setProductForm({ ...productForm, retail_price: Number(e.target.value) })}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
-              />
-            </div>
-            <div>
               <label className="block text-slate-400 mb-1 font-semibold">Giá CTV (₫)</label>
               <input
                 type="number"
                 value={productForm.ctv_price}
                 onChange={(e) => setProductForm({ ...productForm, ctv_price: Number(e.target.value) })}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">Giá Bán Lẻ (₫)</label>
+              <input
+                type="number"
+                value={productForm.retail_price}
+                onChange={(e) => setProductForm({ ...productForm, retail_price: Number(e.target.value) })}
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
               />
             </div>
