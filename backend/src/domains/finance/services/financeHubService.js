@@ -630,8 +630,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   }
 
   const todayPoint = chartData.find((d) => d.dateStr === todayVNStr);
-  const isCurrentMonth = todayVNStr.startsWith(currentMonthStr);
-  const currentRollingBalance = isCurrentMonth
+  const isDateInRange = Boolean(todayPoint);
+  const currentRollingBalance = isDateInRange
     ? (todayPoint?.rollingBalance ?? 0)
     : (chartData[chartData.length - 1]?.rollingBalance ?? 0);
 
@@ -642,7 +642,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     endDate: endDateStr,
     breakEvenDay,
     firstDebtFreeDay,
-    currentDay: isCurrentMonth ? Number(todayVNStr.split("-")[2]) : null,
+    currentDay: todayPoint ? todayPoint.day : null,
+    todayDateStr: todayPoint?.dateStr || todayVNStr,
     currentRollingBalance,
     carriedDebtIntoToday: todayPoint?.previousDebt ?? 0,
     requiredForToday: todayPoint?.todayRequired ?? dailyBurden,

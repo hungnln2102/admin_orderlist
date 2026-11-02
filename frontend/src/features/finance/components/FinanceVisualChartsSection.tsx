@@ -52,6 +52,9 @@ export const FinanceVisualChartsSection: React.FC<Props> = ({ data }) => {
   const monthlyBurnRate = fixedCosts + debtBurden;
   const runwayMonths = monthlyBurnRate > 0 ? Math.floor(totalAssets / monthlyBurnRate) : 999;
 
+  const isYearMode = Boolean(data.month && data.month.length === 4) || ((data.dailyBreakEven?.daysInMonth || 0) > 35);
+  const periodLabel = isYearMode ? "Thực Tế Năm" : "Thực Tế Tháng";
+
   // Helper format triệu (Tr / M)
   const formatM = (num: number) => {
     if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
@@ -152,7 +155,7 @@ export const FinanceVisualChartsSection: React.FC<Props> = ({ data }) => {
               <BarChart3 className="w-4 h-4 text-cyan-400" />
               So Sánh Thu – Chi – Lãi (Cashflow Bars)
             </h4>
-            <span className="text-[10px] font-mono text-cyan-300 font-bold">Thực Tế Tháng</span>
+            <span className="text-[10px] font-mono text-cyan-300 font-bold">{periodLabel}</span>
           </div>
 
           <div className="space-y-3 py-1">
