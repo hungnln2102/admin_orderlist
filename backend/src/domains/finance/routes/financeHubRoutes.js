@@ -37,5 +37,14 @@ router.post("/personal-balance-snapshots", financeHubController.createPersonalBa
 router.put("/personal-balance-snapshots/:id", financeHubController.updatePersonalBalanceSnapshot);
 router.delete("/personal-balance-snapshots/:id", financeHubController.deletePersonalBalanceSnapshot);
 
-module.exports = router;
+// Mục tiêu & Quỹ tiết kiệm (Saving Goals & Fund)
+router.get("/saving-goals", financeHubController.getSavingGoals);
+router.post("/saving-goals", financeHubController.createSavingGoal);
+router.put("/saving-goals/:id", financeHubController.updateSavingGoal);
+router.delete("/saving-goals/:id", financeHubController.deleteSavingGoal);
+router.post("/saving-goals/:id/execute", financeHubController.executeSavingGoal);
 
+router.post("/saving-fund/deposit", financeHubController.depositSavingFund);
+router.post("/saving-fund/withdraw", financeHubController.withdrawSavingFund);
+
+module.exports = router;

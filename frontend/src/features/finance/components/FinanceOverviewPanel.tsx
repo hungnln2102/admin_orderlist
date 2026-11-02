@@ -2,19 +2,9 @@ import React, { useMemo, useState } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
 import {
-  CalendarDays,
-  CheckCircle2,
-  ChevronRight,
-  CircleDollarSign,
-  Flame,
-  Info,
-  PackageCheck,
+  Gauge,
   Sparkles,
-  Star,
-  Target,
-  TrendingDown,
   TrendingUp,
-  Zap,
 } from "lucide-react";
 import { BreakEvenMetrics, DailyBreakEvenPoint, DailyBreakEvenStats, NetWorthMetrics } from "../types";
 
@@ -39,6 +29,17 @@ function getSmoothPath(points: { x: number; y: number }[]): string {
     d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
   }
   return d;
+}
+
+/** Định dạng ngày hiển thị chuẩn mực DD/MM/YYYY */
+function formatDateDisplay(dateStr?: string, dayNum?: number): string {
+  if (!dateStr || dateStr.length < 10) return `Ngày ${dayNum || ""}`;
+  const parts = dateStr.slice(0, 10).split("-");
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return dateStr;
 }
 
 interface Props {
@@ -77,21 +78,10 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
   const [selectedDay, setSelectedDay] = useState<DailyBreakEvenPoint | null>(() => todayPoint as DailyBreakEvenPoint);
   const [hoveredPoint, setHoveredPoint] = useState<any | null>(null);
 
-  // Month label format: Tháng 10/2026
-  const monthLabel = useMemo(() => {
-    try {
-      const [year, m] = month.split("-");
-      return `Tháng ${m}/${year}`;
-    } catch {
-      return month;
-    }
-  }, [month]);
-
   // Calculations for Today's Pacing
   const todayTarget = todayPoint?.todayRequired ?? dailyBreakEven.requiredForToday;
   const todayProfit = todayPoint?.todayProfit ?? dailyBreakEven.todayProfit;
   const remainingToday = Math.max(0, todayTarget - todayProfit);
-  const todaySurplus = Math.max(0, todayProfit - todayTarget);
 
   const avgProfitPerOrder = breakEven.shopOrdersCount > 0 
     ? Math.max(50000, Math.round(breakEven.shopGrossProfit / breakEven.shopOrdersCount)) 
@@ -101,479 +91,263 @@ export const FinanceOverviewPanel: React.FC<Props> = ({
     ? Math.max(1, Math.ceil(remainingToday / avgProfitPerOrder)) 
     : 0;
 
-  // Chart computations (SVG Smooth area chart for 31 days)
+  // Chart computations
   const chartPoints = dailyBreakEven.chartData;
-  const maxDayProfit = Math.max(1, ...chartPoints.map((p) => Math.max(Math.abs(p.todayProfit), Math.abs(p.todayRequired))));
+
+  // Radial Gauge Computations
+  const gaugePercent = Math.min(100, Math.max(0, breakEven.breakEvenPercent || 0));
 
   return (
     <section className="space-y-4" aria-labelledby="finance-break-even-heading">
-
-
-      {/* 2. TWO-COLUMN RADAR: DÒNG TIỀN THEO NGÀY & NHIỆM VỤ HÔM NAY */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column (8 cols): Biểu Đồ Đường Cong Lãi/Lỗ Hòa Vốn */}
         <div className="lg:col-span-8">
-          <GlassCard className="!p-5 bg-gradient-to-br from-slate-900/90 to-slate-950/90 border-slate-800/80 rounded-2xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/70 pb-3">
+          <GlassCard className="!p-5 bg-gradient-to-br from-slate-900/90 to-slate-950/90 border-slate-800/80 rounded-2xl space-y-3 h-full flex flex-col justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
                   Đường Cong Dòng Tiền & Ngày Hòa Vốn
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
-                  <span>Quỹ đạo tích lũy từ âm đến dương so với mốc 0 ₫</span>
-                  {dailyBreakEven.breakEvenDay ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-emerald-400" />
-                      Ngày {dailyBreakEven.breakEvenDay}: Ngày hòa vốn chính thức
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                      ⏳ Đang tích lũy tiến tới hòa vốn
-                    </span>
-                  )}
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Quỹ đạo biến thiên lợi nhuận ròng qua từng ngày so với mốc 0 ₫
                 </p>
               </div>
 
               {/* Legend trực quan theo 2 vùng LÃI / LỖ */}
-              <div className="flex flex-wrap items-center gap-3 text-[11px] font-medium">
-                <span className="flex items-center gap-1.5 text-emerald-300 font-bold">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
+                <span className="flex items-center gap-1.5 text-emerald-300">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
                   Thặng dư (Lãi)
                 </span>
-                <span className="flex items-center gap-1.5 text-rose-300 font-bold">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 shadow-sm shadow-rose-400/50" />
+                <span className="flex items-center gap-1.5 text-rose-300">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-400" />
                   Thâm hụt (Âm)
                 </span>
               </div>
             </div>
 
-            {/* Interactive Coordinate SVG Chart (Số hóa bản vẽ tay của Master) */}
+            {/* Interactive Coordinate SVG Chart */}
             {(() => {
-              const svgWidth = 860;
-              const svgHeight = 240;
-              const padLeft = 65;
-              const padRight = 35;
-              const padTop = 32;
-              const padBottom = 38;
+              const svgWidth = 760;
+              const svgHeight = 190;
+              const padLeft = 55;
+              const padRight = 25;
+              const padTop = 22;
+              const padBottom = 28;
               const plotW = svgWidth - padLeft - padRight;
               const plotH = svgHeight - padTop - padBottom;
-              const zeroY = padTop + plotH / 2; // Đường Mốc 0 ₫ nằm chính giữa hệ tọa độ
+              const zeroY = padTop + plotH / 2;
 
               const daysCount = dailyBreakEven.daysInMonth || 31;
               const target = breakEven.breakEvenTarget || 1;
 
-              // Sử dụng dayNetWorth làm netVal để vẽ duy nhất 1 đường tài sản ròng
               const pointsWithNet = chartPoints.map((item) => ({
                 ...item,
                 netVal: Number(item.cumulativeProfit || 0) - target,
               }));
 
-              // Biên độ đối xứng để mốc 0 ₫ luôn ở chính giữa
               const maxAbs = Math.max(
                 1000000,
                 ...pointsWithNet.map((p) => Math.abs(p.netVal))
               ) * 1.25;
 
-              // Helper format trục Y ngắn gọn
               const formatAxisVND = (val: number) => {
                 if (val === 0) return "0 ₫";
                 const abs = Math.abs(val);
                 const sign = val > 0 ? "+" : "-";
                 if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(1)} Tỷ`;
-                if (abs >= 1e6) return `${sign}${Math.round(abs / 1e6)} Tr`;
+                if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1)} Tr`;
                 if (abs >= 1e3) return `${sign}${Math.round(abs / 1e3)}k`;
                 return `${sign}${abs} ₫`;
               };
 
-              // Tọa độ ánh xạ (X, Y)
               const mapped = pointsWithNet.map((item) => {
                 const x = padLeft + ((item.day - 1) / Math.max(1, daysCount - 1)) * plotW;
                 const y = zeroY - (item.netVal / maxAbs) * (plotH / 2);
                 return {
                   ...item,
                   x,
-                  y: Math.max(padTop + 6, Math.min(svgHeight - padBottom - 6, y)),
+                  y: Math.max(padTop + 4, Math.min(svgHeight - padBottom - 4, y)),
                 };
               });
 
-              // Tách đường đã qua (đến ngày hôm nay) và tương lai
               const pastNodes = mapped.filter((p) => p.day <= currentDay);
               const futureNodes = mapped.filter((p) => p.day >= currentDay);
 
               const pastWavePath = getSmoothPath(pastNodes);
               const futureWavePath = getSmoothPath(futureNodes);
 
-              // Area path để đổ màu
               const areaWavePath = mapped.length > 0
                 ? `${getSmoothPath(mapped)} L ${mapped[mapped.length - 1].x} ${zeroY} L ${mapped[0].x} ${zeroY} Z`
                 : "";
 
-              // Tìm điểm chạm/vượt hòa vốn
               const crossingNode = mapped.find(
                 (p) => p.cumulativeProfit >= target && target > 0 && !p.isFuture
               );
 
-              const todayNode = mapped.find((p) => p.day === currentDay);
-
               return (
                 <div 
-                  className="relative pt-1 pb-1"
+                  className="relative flex-1 flex flex-col justify-center border border-slate-800/60 rounded-xl bg-slate-950/70 p-2 overflow-hidden select-none"
                   onMouseLeave={() => setHoveredPoint(null)}
                 >
-                  {/* Tooltip Popup kiểu Binance khi hover */}
                   {hoveredPoint && (
                     <div 
-                      className="absolute z-45 pointer-events-none bg-slate-950/95 border border-cyan-500/50 shadow-2xl rounded-xl p-3 font-mono text-xs space-y-1.5 backdrop-blur-xl transition-all"
+                      className="absolute z-45 pointer-events-none bg-slate-950/95 border border-cyan-500/50 shadow-2xl rounded-xl p-2.5 font-mono text-xs space-y-1 backdrop-blur-xl transition-all"
                       style={{
                         left: `${Math.min(Math.max(hoveredPoint.x - 70, 20), svgWidth - 160)}px`,
-                        top: hoveredPoint.y < 130 ? `${hoveredPoint.y + 16}px` : `${hoveredPoint.y - 115}px`,
+                        top: hoveredPoint.y < 100 ? `${hoveredPoint.y + 16}px` : `${hoveredPoint.y - 95}px`,
                       }}
                     >
-                      <div className="text-slate-400 text-[10px] flex items-center justify-between border-b border-slate-800/80 pb-1">
-                        <span>📅 Ngày {hoveredPoint.day} ({hoveredPoint.dateStr})</span>
+                      <div className="text-slate-400 text-[10px] flex items-center justify-between border-b border-slate-800/80 pb-0.5">
+                        <span>📅 {formatDateDisplay(hoveredPoint.dateStr, hoveredPoint.day)}</span>
                         <span className="text-cyan-400 font-bold">TÀI SẢN RÒNG</span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">Số dư / Tài sản ròng:</span>
-                        <span className={`text-sm font-black ${hoveredPoint.netVal >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
-                          {formatVND(hoveredPoint.netVal)}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 pt-1 text-[10px] border-t border-slate-800/60">
-                        <div>
-                          <span className="text-slate-500">Đơn hàng:</span> <strong className="text-white">{hoveredPoint.ordersCount}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-500">Lãi ngày:</span> <strong className={hoveredPoint.todayProfit >= 0 ? "text-emerald-400" : "text-rose-400"}>{formatVND(hoveredPoint.todayProfit)}</strong>
-                        </div>
+                      <div className={`text-xs font-black ${hoveredPoint.netVal >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                        {formatVND(hoveredPoint.netVal)}
                       </div>
                     </div>
                   )}
 
-                  <div className="w-full overflow-x-auto overflow-y-hidden">
-                    <svg
-                      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                      className="w-full min-w-[680px] h-48 sm:h-56 select-none overflow-visible"
-                    >
-                      <defs>
-                        {/* ClipPath chia 2 nửa LÃI (trên trục 0) và LỖ (dưới trục 0) */}
-                        <clipPath id="profitClipZone">
-                          <rect x="0" y="0" width={svgWidth} height={zeroY} />
-                        </clipPath>
-                        <clipPath id="deficitClipZone">
-                          <rect x="0" y={zeroY} width={svgWidth} height={svgHeight - zeroY} />
-                        </clipPath>
+                  <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-56 select-none overflow-visible">
+                    <defs>
+                      <clipPath id="panelProfitClip">
+                        <rect x="0" y="0" width={svgWidth} height={zeroY} />
+                      </clipPath>
+                      <clipPath id="panelDeficitClip">
+                        <rect x="0" y={zeroY} width={svgWidth} height={svgHeight - zeroY} />
+                      </clipPath>
+                    </defs>
 
-                        {/* Gradient vùng LÃI */}
-                        <linearGradient id="profitGradArea" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.45" />
-                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.03" />
-                        </linearGradient>
+                    {/* Trục Y */}
+                    <line x1={padLeft} y1={padTop} x2={padLeft} y2={svgHeight - padBottom} stroke="#475569" strokeWidth="1.2" opacity="0.6" />
+                    <text x={padLeft - 6} y={padTop + 4} textAnchor="end" fill="#34d399" fontSize="9" fontFamily="monospace">{formatAxisVND(maxAbs)}</text>
+                    <text x={padLeft - 6} y={zeroY + 3} textAnchor="end" fill="#fbbf24" fontSize="9" fontFamily="monospace" fontWeight="bold">0 ₫</text>
+                    <text x={padLeft - 6} y={svgHeight - padBottom} textAnchor="end" fill="#fb7185" fontSize="9" fontFamily="monospace">{formatAxisVND(-maxAbs)}</text>
 
-                        {/* Gradient vùng LỖ */}
-                        <linearGradient id="deficitGradArea" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.03" />
-                          <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.45" />
-                        </linearGradient>
+                    {/* Đường mốc 0 ₫ ngang */}
+                    <line x1={padLeft} y1={zeroY} x2={svgWidth - padRight} y2={zeroY} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.8" />
 
-                        {/* Gradient Stroke đổi màu sinh động theo độ cao */}
-                        <linearGradient id="curveColorGrad" x1="0" y1="1" x2="0" y2="0">
-                          <stop offset="0%" stopColor="#f43f5e" />
-                          <stop offset="48%" stopColor="#fb7185" />
-                          <stop offset="50%" stopColor="#f59e0b" />
-                          <stop offset="52%" stopColor="#34d399" />
-                          <stop offset="100%" stopColor="#10b981" />
-                        </linearGradient>
+                    {/* Grid dóng dọc */}
+                    {[0.2, 0.4, 0.6, 0.8].map((pct, idx) => (
+                      <line key={idx} x1={padLeft + pct * plotW} y1={padTop} x2={padLeft + pct * plotW} y2={svgHeight - padBottom} stroke="#1e293b" strokeWidth="1" strokeDasharray="2 2" />
+                    ))}
 
-                        {/* Glow Filter */}
-                        <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                          <feGaussianBlur stdDeviation="3.5" result="blur" />
-                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                        </filter>
-                      </defs>
+                    {/* Area fills */}
+                    {areaWavePath && (
+                      <>
+                        <path d={areaWavePath} fill="rgba(16, 185, 129, 0.18)" clipPath="url(#panelProfitClip)" />
+                        <path d={areaWavePath} fill="rgba(244, 63, 94, 0.22)" clipPath="url(#panelDeficitClip)" />
+                      </>
+                    )}
 
-                      {/* 1. TRỤC TUNG (Y AXIS) & CÁC BỤC SỐ TỪ ÂM ĐẾN DƯƠNG */}
-                      <line
-                        x1={padLeft}
-                        y1={padTop - 5}
-                        x2={padLeft}
-                        y2={svgHeight - padBottom + 5}
-                        stroke="#475569"
-                        strokeWidth="1.5"
-                        opacity="0.7"
-                      />
+                    {/* Smooth Bézier paths */}
+                    {pastWavePath && (
+                      <path d={pastWavePath} fill="none" stroke="#f43f5e" strokeWidth="3.5" strokeLinecap="round" />
+                    )}
+                    {futureWavePath && (
+                      <path d={futureWavePath} fill="none" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeDasharray="4 4" opacity="0.7" />
+                    )}
 
-                      {/* Các bục số tọa độ trục Y từ dương xuống âm */}
-                      {(() => {
-                        const ticks = [maxAbs, maxAbs / 2, 0, -maxAbs / 2, -maxAbs];
-                        return ticks.map((val, idx) => {
-                          const y = zeroY - (val / maxAbs) * (plotH / 2);
-                          const isZero = val === 0;
-                          return (
-                            <g key={idx}>
-                              {/* Đường lưới ngang */}
-                              <line
-                                x1={padLeft}
-                                y1={y}
-                                x2={svgWidth - padRight}
-                                y2={y}
-                                stroke={isZero ? "#f59e0b" : "#334155"}
-                                strokeWidth={isZero ? 1.8 : 1}
-                                strokeDasharray={isZero ? "5 4" : "2 2"}
-                                opacity={isZero ? 0.85 : 0.3}
-                              />
-                              {/* Nhãn số tiền trên trục Y */}
-                              <text
-                                x={padLeft - 8}
-                                y={y + 3.5}
-                                textAnchor="end"
-                                fontSize="9.5"
-                                fontFamily="monospace"
-                                fontWeight={isZero ? "800" : "600"}
-                                fill={isZero ? "#fbbf24" : val > 0 ? "#34d399" : "#fb7185"}
-                              >
-                                {formatAxisVND(val)}
-                              </text>
-                            </g>
-                          );
-                        });
-                      })()}
-
-                      {/* Badge định danh mốc 0 ₫ */}
-                      <g transform={`translate(${padLeft + 6}, ${zeroY - 7})`}>
-                        <rect
-                          x="0"
-                          y="-9"
-                          width="126"
-                          height="18"
-                          rx="5"
-                          fill="#091122"
-                          fillOpacity="0.95"
-                          stroke="#f59e0b"
-                          strokeWidth="0.8"
-                          strokeOpacity="0.5"
-                        />
-                        <text
-                          x="63"
-                          y="4"
-                          textAnchor="middle"
-                          fill="#fbbf24"
-                          fontSize="9.5"
-                          fontFamily="monospace"
-                          fontWeight="800"
-                          letterSpacing="0.5"
-                        >
-                          MỐC 0 ₫ · HÒA VỐN
-                        </text>
+                    {/* Nodes tương tác */}
+                    {mapped.map((p) => (
+                      <g key={p.day} className="cursor-pointer" onMouseEnter={() => setHoveredPoint(p)} onClick={() => setSelectedDay(p)}>
+                        <circle cx={p.x} cy={p.y} r="10" fill="transparent" />
+                        {!p.isFuture && (
+                          <circle cx={p.x} cy={p.y} r={p.day === currentDay ? 5 : 3.5} fill={p.netVal >= 0 ? "#10b981" : "#f43f5e"} stroke={p.day === currentDay ? "#ffffff" : "#091122"} strokeWidth="1.5" />
+                        )}
                       </g>
+                    ))}
 
-                      {/* 3. VÙNG PHỦ MÀU DIỆN TÍCH (AREA GRADIENTS) */}
-                      {areaWavePath && (
-                        <>
-                          {/* Phủ nửa trên (LÃI) */}
-                          <path
-                            d={areaWavePath}
-                            fill="url(#profitGradArea)"
-                            clipPath="url(#profitClipZone)"
-                          />
-                          {/* Phủ nửa dưới (LỖ) */}
-                          <path
-                            d={areaWavePath}
-                            fill="url(#deficitGradArea)"
-                            clipPath="url(#deficitClipZone)"
-                          />
-                        </>
-                      )}
-
-                      {/* 4. ĐƯỜNG CONG NỐI BÉZIER UỐN LƯỢN (THE WAVE) */}
-                      {/* Đoạn thực tế đã diễn ra */}
-                      {pastWavePath && (
-                        <path
-                          d={pastWavePath}
-                          fill="none"
-                          stroke="url(#curveColorGrad)"
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          filter="url(#neonGlow)"
-                        />
-                      )}
-                      {/* Đoạn tương lai dự kiến */}
-                      {futureWavePath && (
-                        <path
-                          d={futureWavePath}
-                          fill="none"
-                          stroke="#64748b"
-                          strokeWidth="2"
-                          strokeDasharray="4 4"
-                          strokeLinecap="round"
-                          opacity="0.55"
-                        />
-                      )}
-
-                      {/* 5. CÁC ĐIỂM NGÀY TƯƠNG TÁC (INTERACTIVE DAY NODES) */}
-                      {mapped.map((p) => {
-                        const isHovered = hoveredPoint?.day === p.day;
-                        const isSelected = selectedDay?.day === p.day;
-                        const isToday = p.day === currentDay;
-
-                        return (
-                          <g
-                            key={p.day}
-                            className="cursor-pointer group"
-                            onMouseEnter={() => setHoveredPoint(p)}
-                            onClick={() => setSelectedDay(p)}
-                          >
-                            {/* Đường dóng dọc khi hover hoặc chọn */}
-                            {(isHovered || isSelected) && (
-                              <line
-                                x1={p.x}
-                                y1={padTop}
-                                x2={p.x}
-                                y2={svgHeight - padBottom}
-                                stroke="#22d3ee"
-                                strokeWidth="1.3"
-                                strokeDasharray="3 3"
-                                opacity="0.9"
-                              />
-                            )}
-
-                            {/* Số ngày ở chân trục X */}
-                            <text
-                              x={p.x}
-                              y={svgHeight - 12}
-                              textAnchor="middle"
-                              fontSize="9.5"
-                              fontFamily="monospace"
-                              fontWeight={isSelected || isToday ? "800" : "500"}
-                              fill={isSelected ? "#22d3ee" : isToday ? "#fbbf24" : "#64748b"}
-                              className="transition-colors group-hover:fill-slate-200"
-                            >
-                              {p.day}
-                            </text>
-
-                            {/* Vùng hitbox bắt click chuột to dễ bấm */}
-                            <circle
-                              cx={p.x}
-                              cy={p.y}
-                              r="12"
-                              fill="transparent"
-                            />
-
-                            {/* Dot trên đường cong */}
-                            {!p.isFuture && (
-                              <circle
-                                cx={p.x}
-                                cy={p.y}
-                                r={isSelected ? 6 : isToday ? 5 : 3.5}
-                                fill={p.netVal >= 0 ? "#10b981" : "#f43f5e"}
-                                stroke={isSelected ? "#ffffff" : isToday ? "#fbbf24" : "#091122"}
-                                strokeWidth={isSelected ? 2.5 : 1.5}
-                              />
-                            )}
-                          </g>
-                        );
-                      })}
-
-                      {/* 6. ĐIỂM HÒA VỐN 🌟 (KHI VƯỢT TRỤC 0) */}
-                      {crossingNode && (
-                        <g transform={`translate(${crossingNode.x}, ${crossingNode.y})`}>
-                          <circle r="10" fill="#10b981" fillOpacity="0.35" className="animate-ping" />
-                          <circle r="6" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                        </g>
-                      )}
-
-                      {/* 7. BEACON ĐÁNH DẤU HÔM NAY 🎯 */}
-                      {todayNode && (
-                        <g transform={`translate(${todayNode.x}, ${todayNode.y})`}>
-                          <circle r="9" fill="#f59e0b" fillOpacity="0.35" className="animate-ping" />
-                          <circle r="5" fill="#fbbf24" stroke="#ffffff" strokeWidth="1.8" />
-                        </g>
-                      )}
-                    </svg>
-                  </div>
+                    {/* Điểm hòa vốn */}
+                    {crossingNode && (
+                      <g transform={`translate(${crossingNode.x}, ${crossingNode.y})`}>
+                        <circle r="7" fill="#10b981" stroke="#ffffff" strokeWidth="2.5" />
+                        <text x="0" y="-14" textAnchor="middle" fill="#34d399" fontSize="10.5" fontFamily="monospace" fontWeight="extrabold">🌟 NGÀY HÒA VỐN ({formatDateDisplay(crossingNode.dateStr)})</text>
+                      </g>
+                    )}
+                  </svg>
                 </div>
               );
             })()}
           </GlassCard>
         </div>
 
-        {/* Right Column (4 cols): Card Nhiệm Vụ Hôm Nay (Today's Mission) */}
+        {/* Right Column (4 cols): ĐỒNG HỒ TIẾN ĐỘ HÒA VỐN (CHUẨN XÁC THEO ẢNH CỦA MASTER) */}
         <div className="lg:col-span-4">
           <GlassCard
-            glow={remainingToday === 0 ? "emerald" : "amber"}
-            className="!p-5 bg-gradient-to-br from-slate-900/90 via-[#0a1324]/90 to-slate-950/90 border-slate-800/80 rounded-2xl flex flex-col justify-between h-full space-y-4"
+            glow="amber"
+            className="!p-5 bg-gradient-to-br from-slate-900/90 via-[#0a1324]/90 to-slate-950/90 border-slate-800/80 rounded-2xl flex flex-col justify-between h-full space-y-3"
           >
             <div>
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-800/70 pb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Target className="w-4 h-4 text-cyan-400" />
-                  Nhiệm Vụ Hôm Nay
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Gauge className="w-4 h-4 text-cyan-400" />
+                  Đồng Hồ Tiến Độ Hòa Vốn
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                  Ngày {currentDay}
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  Chỉ Tiêu Tháng
                 </span>
               </div>
 
-              {/* Status & Amount */}
-              <div className="my-4">
-                <span className="text-xs text-slate-400 font-medium block">
-                  {remainingToday > 0 ? "Lợi nhuận cần bù thêm hôm nay:" : "Trạng thái hôm nay:"}
-                </span>
-                <div className={`text-2xl sm:text-3xl font-black font-mono tracking-tight mt-1 ${
-                  remainingToday > 0 ? "text-amber-300" : "text-emerald-300"
-                }`}>
-                  {remainingToday > 0 ? formatVND(remainingToday) : "ĐÃ ĐẠT CHỈ TIÊU"}
-                </div>
-                {remainingToday > 0 ? (
-                  <p className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
-                    <PackageCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>Cần chốt thêm xấp xỉ <strong className="text-white font-mono">{estimatedOrdersNeededToday} đơn</strong></span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Phần dôi dư <strong className="font-mono text-white">+{formatVND(todaySurplus)}</strong> đang làm nhẹ gánh cho các ngày tới!</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Breakdown Grid */}
-              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[10px] text-slate-500 block">Định mức gốc / ngày</span>
-                  <span className="font-mono font-semibold text-slate-200 mt-0.5 block">
-                    {formatVND(dailyBreakEven.dailyBurden)}
+              {/* Radial Circular Gauge Chart */}
+              <div className="flex items-center justify-center relative py-3">
+                <svg viewBox="0 0 160 160" className="w-36 h-36">
+                  {/* Track ngầm */}
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="62"
+                    fill="none"
+                    stroke="#1e293b"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray="320"
+                    strokeDashoffset="60"
+                    transform="rotate(135 80 80)"
+                  />
+                  {/* Active Progress */}
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="62"
+                    fill="none"
+                    stroke={breakEven.isBreakEvenPassed ? "#10b981" : "#f59e0b"}
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray="320"
+                    strokeDashoffset={320 - (260 * gaugePercent) / 100}
+                    transform="rotate(135 80 80)"
+                    className="transition-all duration-700 ease-out"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiến Độ</span>
+                  <span className={`text-2xl font-black font-mono tracking-tight mt-0.5 ${
+                    breakEven.isBreakEvenPassed ? "text-emerald-300" : "text-amber-300"
+                  }`}>
+                    {Math.round(breakEven.breakEvenPercent)}%
                   </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[10px] text-slate-500 block">Nợ hôm qua gối sang</span>
-                  <span className="font-mono font-semibold text-rose-300 mt-0.5 block">
-                    {formatVND(dailyBreakEven.carriedDebtIntoToday)}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[10px] text-slate-500 block">Tổng chỉ tiêu hôm nay</span>
-                  <span className="font-mono font-semibold text-amber-300 mt-0.5 block">
-                    {formatVND(todayTarget)}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[10px] text-slate-500 block">Đã ghi nhận hôm nay</span>
-                  <span className="font-mono font-semibold text-cyan-300 mt-0.5 block">
-                    {formatVND(todayProfit)}
+                  <span className="text-[9px] text-slate-500 font-mono mt-0.5">
+                    Đã bù {formatVND(breakEven.shopGrossProfit)} / {formatVND(breakEven.breakEvenTarget)}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Friendly Tip */}
-            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 flex items-start gap-2">
-              <Info className="w-4 h-4 shrink-0 mt-0.5 text-cyan-400" />
-              <span>
-                Mỗi đơn hàng bán ra sẽ tự động giảm số tiền cần bù theo thời gian thực mà không cần nhập liệu thủ công.
+            {/* Chỉ tiêu hôm nay (Hộp dưới đáy như trong ảnh) */}
+            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-slate-400 block font-semibold">
+                  Chỉ tiêu hôm nay ({todayPoint?.dateStr ? formatDateDisplay(todayPoint.dateStr) : `Ngày ${currentDay}`}):
+                </span>
+                <span className="text-base font-black font-mono text-amber-300">
+                  {formatVND(remainingToday)}
+                </span>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold">
+                ~{estimatedOrdersNeededToday > 0 ? estimatedOrdersNeededToday : 0} đơn hàng
               </span>
             </div>
           </GlassCard>

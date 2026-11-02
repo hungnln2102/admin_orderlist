@@ -93,6 +93,9 @@ export interface BreakEvenMetrics {
   installmentsInMonthTotal: number;
   personalDebtMonthlyTotal: number;
   monthlyDebtBurden: number;
+  totalExternalImport?: number;
+  totalMonthlyExpense?: number;
+  totalOperationalExpenses?: number;
 }
 
 export interface NetWorthBreakdown {
@@ -170,6 +173,44 @@ export interface UsdtWallet {
   isDefault: boolean;
 }
 
+// --- SAVING GOALS & FUND (MILESTONE TARGET LADDER) ---
+export interface SavingGoalItem {
+  id: number;
+  name: string;
+  targetAmount: number;
+  status: "ACTIVE" | "COMPLETED";
+  note?: string;
+  isReached: boolean;
+  isNextFocus: boolean;
+  progressPercent: number;
+  missingAmount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SavingFundTransaction {
+  id: number;
+  actionType: "DEPOSIT" | "WITHDRAW" | "EXECUTE_GOAL";
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  goalId?: number | null;
+  goalName?: string | null;
+  note?: string;
+  createdAt: string;
+}
+
+export interface SavingGoalsOverviewData {
+  currentFund: number;
+  totalGoalsCount: number;
+  activeGoalsCount: number;
+  reachedGoalsCount: number;
+  completedGoalsCount: number;
+  activeGoals: SavingGoalItem[];
+  completedGoals: SavingGoalItem[];
+  recentTransactions: SavingFundTransaction[];
+}
+
 export interface FinanceSummaryData {
   month: string;
   breakEven: BreakEvenMetrics;
@@ -180,4 +221,5 @@ export interface FinanceSummaryData {
   personalAssets: PersonalAsset[];
   shopBankAccounts: ShopBankAccount[];
   usdtWallets: UsdtWallet[];
+  savingGoals?: SavingGoalsOverviewData;
 }

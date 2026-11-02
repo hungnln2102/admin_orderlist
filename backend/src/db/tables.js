@@ -64,6 +64,8 @@ const TABLES = {
   EXTERNAL_API_CONFIGS: formatTable(SCHEMAS.SYSTEM, "external_api_configs"),
   STORE_PROFIT_EXPENSES: formatTable(SCHEMAS.FINANCE, "store_profit_expenses"),
   PERSONAL_BALANCE_SNAPSHOTS: formatTable(SCHEMAS.FINANCE, "personal_balance_snapshots"),
+  SAVING_GOALS: formatTable(SCHEMAS.FINANCE, "saving_goals"),
+  SAVING_FUND_LEDGER: formatTable(SCHEMAS.FINANCE, "saving_fund_ledger"),
 };
 
 
@@ -415,8 +417,26 @@ const COLS = {
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },
+  SAVING_GOALS: {
+    ID: "id",
+    NAME: "name",
+    TARGET_AMOUNT: "target_amount",
+    STATUS: "status",
+    NOTE: "note",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
+  SAVING_FUND_LEDGER: {
+    ID: "id",
+    ACTION_TYPE: "action_type",
+    AMOUNT: "amount",
+    BALANCE_BEFORE: "balance_before",
+    BALANCE_AFTER: "balance_after",
+    GOAL_ID: "goal_id",
+    NOTE: "note",
+    CREATED_AT: "created_at",
+  },
 };
-
 
 
 module.exports = {

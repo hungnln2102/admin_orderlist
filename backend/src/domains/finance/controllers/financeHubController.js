@@ -225,6 +225,76 @@ async function deletePersonalBalanceSnapshot(req, res, next) {
   }
 }
 
+// --- SAVING GOALS & FUND (MILESTONE TARGET LADDER) ---
+async function getSavingGoals(req, res, next) {
+  try {
+    const data = await financeHubService.getSavingGoalsOverview();
+    return res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function createSavingGoal(req, res, next) {
+  try {
+    const created = await financeHubService.createSavingGoal(req.body);
+    return res.status(201).json({ success: true, data: created });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateSavingGoal(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const updated = await financeHubService.updateSavingGoal(id, req.body);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy mục tiêu" });
+    }
+    return res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deleteSavingGoal(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    await financeHubService.deleteSavingGoal(id);
+    return res.json({ success: true, message: "Đã xóa mục tiêu" });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function executeSavingGoal(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const result = await financeHubService.executeSavingGoal(id, req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function depositSavingFund(req, res, next) {
+  try {
+    const result = await financeHubService.depositSavingFund(req.body);
+    return res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function withdrawSavingFund(req, res, next) {
+  try {
+    const result = await financeHubService.withdrawSavingFund(req.body);
+    return res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getSummary,
   getUnallocatedReceipts,
@@ -247,5 +317,11 @@ module.exports = {
   createPersonalBalanceSnapshot,
   updatePersonalBalanceSnapshot,
   deletePersonalBalanceSnapshot,
+  getSavingGoals,
+  createSavingGoal,
+  updateSavingGoal,
+  deleteSavingGoal,
+  executeSavingGoal,
+  depositSavingFund,
+  withdrawSavingFund,
 };
-
