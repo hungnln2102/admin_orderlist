@@ -77,6 +77,7 @@ services:
       - ./backend/.env.docker
     environment:
       APP_ENV: docker
+      TRUST_PROXY: "1"
       NODE_ENV: production
       TZ: Asia/Ho_Chi_Minh
     ports:

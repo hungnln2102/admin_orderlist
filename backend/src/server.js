@@ -14,7 +14,7 @@ const { getClientErrorMessage } = require("@/utils/clientError");
 
 const app = express();
 app.disable("x-powered-by");
-app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
+app.set("trust proxy", process.env.TRUST_PROXY === "0" ? false : 1);
 app.use(compression({ level: 6 }));
 const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.FRONTEND_ORIGINS || "")
