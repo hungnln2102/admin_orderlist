@@ -3,6 +3,7 @@ const { eventBus, EVENTS } = require("@/events");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE } = require("@/constants/receiptStatus");
 const { settleSupplierDebtTransaction } = require("./supplierSettlementService");
+const { getDefaultShopBank } = require("@/domains/orders/services/orderService");
 
 const S_COLS = COLS.SUPPLIER;
 const LOG_COLS = COLS.SUPPLIER_ORDER_COST_LOG;
@@ -70,8 +71,7 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
     SELECT
       COUNT(l.${LOG_COLS.ID}) AS total_orders,
       COALESCE(SUM(l.${LOG_COLS.IMPORT_COST}), 0) AS total_import_cost,
-      COALESCE(SUM(l.${LOG_COLS.REFUND_AMOUNT}), 0) AS total_refund,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_unpaid_cost
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_unpaid_cost
     FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l
     LEFT JOIN ${TABLES.SUPPLIER} s ON s.${S_COLS.ID} = l.${LOG_COLS.SUPPLY_ID}
     WHERE (s.${S_COLS.ID} != 1 AND LOWER(COALESCE(s.${S_COLS.SUPPLIER_NAME}, '')) != 'mavryk');
@@ -92,8 +92,8 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       COUNT(CASE WHEN l.${LOG_COLS.LOGGED_AT} >= DATE_TRUNC('month', CURRENT_DATE) THEN l.${LOG_COLS.ID} END) AS current_month_orders,
       COALESCE(SUM(CASE WHEN l.${LOG_COLS.LOGGED_AT} >= DATE_TRUNC('month', CURRENT_DATE) THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS current_month_cost,
       MAX(l.${LOG_COLS.LOGGED_AT}) AS last_order_date,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (l.${LOG_COLS.IMPORT_COST} - l.${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_debt
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_debt
     FROM ${TABLES.SUPPLIER} s
     LEFT JOIN ${TABLES.SUPPLIER_ORDER_COST_LOG} l ON l.${LOG_COLS.SUPPLY_ID} = s.${S_COLS.ID}
     ${whereClause}
@@ -174,7 +174,6 @@ const getSupplierCostLogs = async ({
       l.${LOG_COLS.SUPPLY_ID},
       l.${LOG_COLS.ID_ORDER},
       COALESCE(l.${LOG_COLS.IMPORT_COST}, 0) AS import_cost,
-      COALESCE(l.${LOG_COLS.REFUND_AMOUNT}, 0) AS refund_amount,
       COALESCE(l.${LOG_COLS.NCC_PAYMENT_STATUS}, '${SUPPLIER_PAYMENT_STATUS.UNPAID}') AS ncc_payment_status,
       l.${LOG_COLS.LOGGED_AT},
       s.${S_COLS.SUPPLIER_NAME}
@@ -194,7 +193,6 @@ const getSupplierCostLogs = async ({
     id_order: r[LOG_COLS.ID_ORDER],
     supplier_name: r[S_COLS.SUPPLIER_NAME] || "N/A",
     import_cost: parseFloat(r.import_cost || 0),
-    refund_amount: parseFloat(r.refund_amount || 0),
     ncc_payment_status: r.ncc_payment_status,
     logged_at: r[LOG_COLS.LOGGED_AT],
   }));
@@ -237,9 +235,8 @@ const getSupplierDetailById = async (id) => {
       COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN 1 END) AS paid_orders,
       COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN 1 END) AS unpaid_orders,
       COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.CANCELED}' OR ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.CANCEL}' THEN 1 END) AS canceled_orders,
-      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN (${LOG_COLS.IMPORT_COST} - ${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN (${LOG_COLS.IMPORT_COST} - ${LOG_COLS.REFUND_AMOUNT}) ELSE 0 END), 0) AS remaining_debt,
-      COALESCE(SUM(${LOG_COLS.REFUND_AMOUNT}), 0) AS total_refund
+      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN ${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN ${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS remaining_debt
     FROM ${TABLES.SUPPLIER_ORDER_COST_LOG}
     WHERE ${LOG_COLS.SUPPLY_ID} = ?;
   `, [supplierId]);
@@ -267,13 +264,66 @@ const getSupplierDetailById = async (id) => {
     count: parseInt(m.order_count, 10),
   }));
 
-  // VietQR URL
+  // VietQR URL & Đảo chiều tự động
   const bin = supplier[S_COLS.BIN_BANK] || "970422";
   const accNum = supplier[S_COLS.NUMBER_BANK] || "";
   const accName = supplier[S_COLS.ACCOUNT_HOLDER] || supplier[S_COLS.SUPPLIER_NAME];
-  const vietqrUrl = (!isMavryk && accNum && remainingDebt > 0)
-    ? `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${Math.max(0, remainingDebt - supplierId)}&accountName=${encodeURIComponent(accName)}`
-    : null;
+
+  let vietqrUrl = null;
+  let qrTargetType = "NONE"; // 'SUPPLIER' | 'SHOP' | 'NONE'
+  let qrBankInfo = null;
+
+  if (!isMavryk) {
+    if (remainingDebt > 0 && accNum) {
+      // Shop nợ NCC -> QR của NCC để Shop chuyển khoản trả NCC
+      const amount = Math.max(0, Math.round(remainingDebt) - supplierId);
+      vietqrUrl = `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`;
+      qrTargetType = "SUPPLIER";
+      qrBankInfo = {
+        bank_name: bankName,
+        bin_bank: bin,
+        number_bank: accNum,
+        account_holder: accName,
+      };
+    } else if (remainingDebt < 0) {
+      // NCC nợ Shop -> QR của Shop mặc định để NCC quét trả tiền Shop (BỎ DẤU TRỪ)
+      const defaultBank = await getDefaultShopBank();
+      if (defaultBank && (defaultBank.account_number || defaultBank.accountNumber)) {
+        const sAccNum = defaultBank.account_number || defaultBank.accountNumber;
+        const sBin = defaultBank.bank_bin || defaultBank.bankBin || "970422";
+        const sAccName = defaultBank.account_holder || defaultBank.accountHolder || "";
+        const absAmount = Math.abs(Math.round(remainingDebt)); // Bỏ dấu trừ để URL VietQR đúng chuẩn
+        const memo = encodeURIComponent(`NCC${supplierId} HOAN TIEN`);
+        vietqrUrl = `https://img.vietqr.io/image/${sBin}-${sAccNum}-compact2.png?amount=${absAmount}&accountName=${encodeURIComponent(sAccName)}&addInfo=${memo}`;
+        qrTargetType = "SHOP";
+        qrBankInfo = {
+          bank_name: defaultBank.bank_display_name || defaultBank.bankShortCode || sBin,
+          bin_bank: sBin,
+          number_bank: sAccNum,
+          account_holder: sAccName,
+        };
+      }
+    }
+  }
+
+  // Nạp danh sách STK ngân hàng Shop thực tế từ financial_accounts
+  let shopBankAccounts = [];
+  try {
+    const activeBanks = await db(TABLES.SHOP_BANK_ACCOUNTS)
+      .where({ account_type: "bank", is_deleted: false, is_active: true })
+      .select("id", "label", "account_number", "bank_display_name", "account_holder");
+    if (activeBanks.length > 0) {
+      shopBankAccounts = activeBanks.map((b) => ({
+        id: b.id,
+        label: b.label || `${b.account_number} • ${b.bank_display_name || 'Bank'} • ${b.account_holder}`,
+      }));
+    }
+  } catch (err) {
+    console.warn("[getSupplierDetailById] Không thể lấy shop_bank_accounts:", err.message);
+  }
+  if (shopBankAccounts.length === 0) {
+    shopBankAccounts = [{ id: 1, label: "0378304963 • MB • NGO LE NGOC HUNG (mặc định)" }];
+  }
 
   return {
     general_info: {
@@ -288,7 +338,7 @@ const getSupplierDetailById = async (id) => {
     payment_overview: {
       total_paid: totalPaid,
       remaining_debt: remainingDebt,
-      refund_amount: totalRefund,
+      refund_amount: remainingDebt < 0 ? Math.abs(remainingDebt) : 0,
       unpaid_orders_count: unpaidOrdersCount,
     },
     order_stats: {
@@ -299,14 +349,15 @@ const getSupplierDetailById = async (id) => {
     },
     unpaid_cycle: {
       amount_needed: remainingDebt,
-      refund_to_shop: totalRefund,
+      debt_direction: remainingDebt > 0 ? "SHOP_OWES_SUPPLIER" : (remainingDebt < 0 ? "SUPPLIER_OWES_SHOP" : "SETTLED"),
+      refund_to_shop: remainingDebt < 0 ? Math.abs(remainingDebt) : 0,
       debt_by_order: remainingDebt,
       amount_paid: 0,
-      payment_status: remainingDebt > 0 ? SUPPLIER_PAYMENT_STATUS.UNPAID : SUPPLIER_PAYMENT_STATUS.PAID,
-      shop_bank_accounts: [
-        { id: 1, label: "0378304963 • MB • NGO LE NGOC HUNG (mặc định)" },
-      ],
+      payment_status: remainingDebt > 0 ? SUPPLIER_PAYMENT_STATUS.UNPAID : (remainingDebt < 0 ? "NCC_OWES_SHOP" : SUPPLIER_PAYMENT_STATUS.PAID),
+      shop_bank_accounts: shopBankAccounts,
       vietqr_url: vietqrUrl,
+      qr_target_type: qrTargetType,
+      qr_bank_info: qrBankInfo,
     },
     monthly_orders: monthlyOrders,
   };
@@ -330,11 +381,40 @@ const paySupplierDebt = async (id) => {
       .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
       .forUpdate();
     const settledDebt = unpaidLogs.reduce(
-      (total, log) => total + Number(log[LOG_COLS.IMPORT_COST] || 0) - Number(log[LOG_COLS.REFUND_AMOUNT] || 0),
+      (total, log) => total + Number(log[LOG_COLS.IMPORT_COST] || 0),
       0
     );
-    if (settledDebt <= 0) {
+    if (settledDebt === 0) {
       return { success: true, alreadySettled: true, message: "Nhà cung cấp không còn công nợ chưa thanh toán." };
+    }
+
+    if (settledDebt < 0) {
+      // Trường hợp NCC nợ Shop: xác nhận thu tiền hoàn từ NCC
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+        .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
+        .update({ [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.PAID });
+
+      const collectedAmount = Math.abs(settledDebt);
+      const refundPayload = {
+        supplierId,
+        supplierName: supplier[S_COLS.SUPPLIER_NAME],
+        paidAmount: collectedAmount,
+        settledDebt,
+        isRefund: true,
+        summary: `Đã thu tiền hoàn công nợ từ NCC "${supplier[S_COLS.SUPPLIER_NAME]}": ${new Intl.NumberFormat("vi-VN").format(collectedAmount)} ₫`,
+      };
+      if (typeof trx?.afterCommit === "function") {
+        trx.afterCommit(() => eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, refundPayload));
+      } else {
+        eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, refundPayload);
+      }
+
+      return {
+        success: true,
+        isRefund: true,
+        collectedAmount,
+        message: `Đã xác nhận thu tiền hoàn tất ${new Intl.NumberFormat("vi-VN").format(collectedAmount)} ₫ từ NCC "${supplier[S_COLS.SUPPLIER_NAME]}".`,
+      };
     }
 
     const bankPaidAmount = Math.max(0, Math.round(settledDebt) - supplierId);

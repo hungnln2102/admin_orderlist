@@ -13,73 +13,73 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     case ORDER_STATUS.PAID:
     case "Đã Thanh Toán":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm shadow-emerald-500/10 whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm shadow-emerald-500/10 whitespace-nowrap max-w-full truncate">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.PROCESSING:
     case "Đang Xử Lý":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-sm shadow-blue-500/10 whitespace-nowrap">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-sm shadow-blue-500/10 whitespace-nowrap max-w-full truncate">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.RENEW_REQUIRED:
     case "Cần Gia Hạn":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/10 whitespace-nowrap">
-          <Clock className="w-3 h-3" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/10 whitespace-nowrap max-w-full truncate">
+          <Clock className="w-3 h-3 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.UNPAID:
     case "Chưa Thanh Toán":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30 shadow-sm shadow-sky-500/10 whitespace-nowrap">
-          <Clock className="w-3 h-3" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30 shadow-sm shadow-sky-500/10 whitespace-nowrap max-w-full truncate">
+          <Clock className="w-3 h-3 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.REFUNDED:
     case "Đã Hoàn":
     case "Đã Hoàn Tiền":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-pink-500/10 text-pink-400 border border-pink-500/30 shadow-sm shadow-pink-500/10 whitespace-nowrap">
-          <RefreshCw className="w-3 h-3 text-pink-400" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-pink-500/10 text-pink-400 border border-pink-500/30 shadow-sm shadow-pink-500/10 whitespace-nowrap max-w-full truncate">
+          <RefreshCw className="w-3 h-3 text-pink-400 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.REFUND_PENDING:
     case "Chưa Hoàn Tiền":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30 shadow-sm shadow-purple-500/10 whitespace-nowrap">
-          <Clock className="w-3 h-3 text-purple-300" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30 shadow-sm shadow-purple-500/10 whitespace-nowrap max-w-full truncate">
+          <Clock className="w-3 h-3 text-purple-300 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.EXPIRED:
     case "Hết Hạn":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/30 whitespace-nowrap">
-          <Clock className="w-3 h-3" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/30 whitespace-nowrap max-w-full truncate">
+          <Clock className="w-3 h-3 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     case ORDER_STATUS.CANCELED:
     case "Đã Hủy":
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 shadow-sm shadow-rose-500/10 whitespace-nowrap">
-          <XCircle className="w-3 h-3" />
-          {label}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 shadow-sm shadow-rose-500/10 whitespace-nowrap max-w-full truncate">
+          <XCircle className="w-3 h-3 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-300 border border-slate-500/30 whitespace-nowrap">
-          <AlertCircle className="w-3 h-3" />
-          {status || "Khác"}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-500/10 text-slate-300 border border-slate-500/30 whitespace-nowrap max-w-full truncate">
+          <AlertCircle className="w-3 h-3 shrink-0" />
+          <span className="truncate">{status || "Khác"}</span>
         </span>
       );
   }
@@ -88,4 +88,3 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
 export function renderStatusBadge(status: string) {
   return <StatusBadge status={status} />;
 }
-

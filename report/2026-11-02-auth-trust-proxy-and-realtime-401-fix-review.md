@@ -48,3 +48,4 @@
 - Đăng nhập thử nghiệm với header `X-Forwarded-Proto: https` trả về đầy đủ header `Set-Cookie` với các thuộc tính `Secure; HttpOnly; SameSite=Lax`.
 - Container `admin_orderlist-backend` khởi động khỏe mạnh (healthy).
 - Realtime SSE Subscriber sẵn sàng kết nối và tiếp nhận kết nối an toàn từ trình duyệt Admin.
+

@@ -102,9 +102,17 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                   </div>
 
                   <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase">HOÀN TIỀN</div>
-                    <div className="text-sm font-black text-rose-400 mt-1">
-                      {formatCurrency(supplierDetail.payment_overview.refund_amount)}
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">CÔNG NỢ RÒNG</div>
+                    <div className={`text-sm font-black mt-1 ${
+                      supplierDetail.payment_overview.remaining_debt < 0
+                        ? "text-cyan-400"
+                        : supplierDetail.payment_overview.remaining_debt > 0
+                        ? "text-rose-400"
+                        : "text-emerald-400"
+                    }`}>
+                      {supplierDetail.payment_overview.remaining_debt < 0
+                        ? `NCC nợ: ${formatCurrency(Math.abs(supplierDetail.payment_overview.remaining_debt))}`
+                        : formatCurrency(supplierDetail.payment_overview.remaining_debt)}
                     </div>
                   </div>
 
@@ -170,35 +178,60 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                 </div>
 
                 {/* Payment Box */}
-                <div className="bg-[#0b0f19] border border-indigo-500/30 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-md">
-                  <div>
-                    <div className="font-bold text-slate-200">
-                      Công nợ theo đơn:{" "}
-                      <strong className="text-amber-300">
-                        {formatCurrency(supplierDetail.unpaid_cycle.debt_by_order)}
-                      </strong>
+                {supplierDetail.unpaid_cycle.amount_needed < 0 ? (
+                  <div className="bg-[#0b0f19] border border-cyan-500/40 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-md">
+                    <div>
+                      <div className="font-bold text-cyan-300">
+                        NCC NỢ SHOP (CẦN HOÀN TRẢ):{" "}
+                        <strong className="text-cyan-400 text-sm">
+                          {formatCurrency(Math.abs(supplierDetail.unpaid_cycle.amount_needed))}
+                        </strong>
+                      </div>
+                      <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-2">
+                        <span className="text-cyan-400 font-bold uppercase">
+                          CHỜ NCC HOÀN TIỀN
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-2">
-                      <span className="text-rose-400 font-bold uppercase">
-                        {supplierDetail.unpaid_cycle.payment_status}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        ĐÃ TRẢ: {formatCurrency(supplierDetail.unpaid_cycle.amount_paid)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {supplierDetail.unpaid_cycle.amount_needed > 0 && (
                     <button
                       onClick={onPayDebtSubmit}
                       disabled={submitting}
-                      className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                      className="px-3.5 py-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
                     >
-                      {submitting ? "Đang xử lý..." : "Thanh toán"}
+                      {submitting ? "Đang xử lý..." : "Xác nhận đã nhận hoàn tiền"}
                     </button>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="bg-[#0b0f19] border border-indigo-500/30 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-md">
+                    <div>
+                      <div className="font-bold text-slate-200">
+                        Công nợ theo đơn:{" "}
+                        <strong className="text-amber-300">
+                          {formatCurrency(supplierDetail.unpaid_cycle.debt_by_order)}
+                        </strong>
+                      </div>
+                      <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-2">
+                        <span className="text-rose-400 font-bold uppercase">
+                          {supplierDetail.unpaid_cycle.payment_status}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          ĐÃ TRẢ: {formatCurrency(supplierDetail.unpaid_cycle.amount_paid)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {supplierDetail.unpaid_cycle.amount_needed > 0 && (
+                      <button
+                        onClick={onPayDebtSubmit}
+                        disabled={submitting}
+                        className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                      >
+                        {submitting ? "Đang xử lý..." : "Thanh toán cho NCC"}
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* STK CHI TRẢ Dropdown */}
                 <div>
@@ -216,7 +249,12 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
 
                 {/* VietQR Image */}
                 {supplierDetail.unpaid_cycle.vietqr_url && (
-                  <div className="pt-2 text-center">
+                  <div className="pt-2 text-center space-y-1.5">
+                    <div className="text-[11px] font-bold text-slate-300">
+                      {supplierDetail.unpaid_cycle.amount_needed < 0
+                        ? "Quét mã VietQR của Shop để NCC chuyển tiền hoàn trả:"
+                        : "Quét mã VietQR để thanh toán tiền hàng cho NCC:"}
+                    </div>
                     <div className="bg-white p-3 rounded-xl inline-block shadow-lg border border-slate-700 max-w-[220px]">
                       <img
                         src={supplierDetail.unpaid_cycle.vietqr_url}
@@ -224,6 +262,12 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                         className="w-full h-auto object-contain rounded-lg"
                       />
                     </div>
+                    {supplierDetail.unpaid_cycle.amount_needed < 0 && (
+                      <div className="text-[10px] text-cyan-400 font-medium">
+                        STK Shop nhận: {supplierDetail.unpaid_cycle.qr_bank_info?.account_holder || "SHOP"} (
+                        {supplierDetail.unpaid_cycle.qr_bank_info?.number_bank || ""})
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

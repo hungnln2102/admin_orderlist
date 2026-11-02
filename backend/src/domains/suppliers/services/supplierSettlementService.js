@@ -67,7 +67,7 @@ async function settleSupplierDebtTransaction({
     .forUpdate();
 
   const settledDebt = unpaidLogs.reduce(
-    (total, log) => total + toAmount(log[LOG_COLS.IMPORT_COST]) - toAmount(log[LOG_COLS.REFUND_AMOUNT]),
+    (total, log) => total + toAmount(log[LOG_COLS.IMPORT_COST]),
     0
   );
 

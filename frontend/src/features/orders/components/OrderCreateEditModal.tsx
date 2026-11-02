@@ -358,35 +358,22 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Nhà Cung Cấp (NCC)" : "Chọn Nhà Cung Cấp (NCC) *"}</label>
-                {isEdit ? (
-                  <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-purple-300 font-bold flex items-center min-h-[38px]">
-                    {(() => {
-                      if (formData.supplier_name && formData.supplier_name.trim() && !/^\d+$/.test(formData.supplier_name)) {
-                        return formData.supplier_name;
-                      }
-                      const rawVal = formData.supply_id;
-                      const matched =
-                        allSuppliersCatalog.find(
-                          (s) => String(s.id) === String(rawVal) || (s.supplier_name || s.ncc_name) === rawVal
-                        ) ||
-                        productSuppliersCatalog.find(
-                          (s) => String(s.supplier_id) === String(rawVal) || (s.supplier_name || s.ncc_name) === rawVal
-                        );
-                      if (matched) return matched.supplier_name || matched.ncc_name;
-                      if (rawVal && !/^\d+$/.test(rawVal)) return rawVal;
-                      return "Chưa có NCC";
-                    })()}
+                <label className="block text-slate-400 mb-1 font-medium">{isEdit ? "Nhà Cung Cấp (NCC) *" : "Chọn Nhà Cung Cấp (NCC) *"}</label>
+                <SearchableSupplierDropdown
+                  productSuppliers={productSuppliersCatalog}
+                  allSuppliers={allSuppliersCatalog}
+                  selectedSupplierName={formData.supply_id}
+                  onSelectSupplier={onSupplierChange}
+                  loadingSuppliers={loadingSuppliers}
+                  disabled={!selectedProductId && !formData.id_product}
+                />
+                {isEdit && formData.status === ORDER_STATUS.PAID && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-cyan-950/40 border border-cyan-800/40 text-[11px] text-cyan-300 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Đơn hàng Đã Thanh Toán:</strong> Khi đổi Nhà Cung Cấp, hệ thống sẽ tự động tính số ngày còn lại để tạo log hoàn tiền cho NCC cũ và tính chi phí cho NCC mới.
+                    </span>
                   </div>
-                ) : (
-                  <SearchableSupplierDropdown
-                    productSuppliers={productSuppliersCatalog}
-                    allSuppliers={allSuppliersCatalog}
-                    selectedSupplierName={formData.supply_id}
-                    onSelectSupplier={onSupplierChange}
-                    loadingSuppliers={loadingSuppliers}
-                    disabled={!selectedProductId && !formData.id_product}
-                  />
                 )}
               </div>
             </div>

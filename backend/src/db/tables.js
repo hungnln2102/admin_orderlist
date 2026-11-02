@@ -94,7 +94,6 @@ const COLS = {
     SUPPLY_ID: "supply_id",
     ID_ORDER: "id_order",
     IMPORT_COST: "import_cost",
-    REFUND_AMOUNT: "refund_amount",
     NCC_PAYMENT_STATUS: "ncc_payment_status",
     LOGGED_AT: "logged_at",
   },

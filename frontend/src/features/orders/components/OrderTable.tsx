@@ -89,17 +89,19 @@ export const OrderTable: React.FC<OrderTableProps> = ({
     <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl overflow-hidden flex flex-col w-full">
       {/* 1. Desktop & Laptop Table View */}
       <div className="hidden sm:block overflow-x-auto custom-scrollbar flex-1 min-h-[420px] w-full">
-        <table className="w-full table-fixed border-collapse text-left">
+        <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
           <thead>
             <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
-              <th className="py-3.5 px-2.5 w-10 text-center">#</th>
-              <th className={`py-3.5 px-3 ${activeTab === "import" ? "w-[20%]" : "w-[24%]"}`}>Mã Đơn & Sản Phẩm</th>
-              <th className={`py-3.5 px-3 ${activeTab === "import" ? "w-[16%]" : "w-[18%]"}`}>Khách Hàng & Liên Hệ</th>
-              <th className={`py-3.5 px-3 ${activeTab === "import" ? "w-[17%]" : "w-[19%]"}`}>Thông Tin & Slot</th>
-              <th className="py-3.5 px-2.5 w-[150px] text-center whitespace-nowrap">Ngày Đăng Ký - Hết Hạn</th>
-              <th className="py-3.5 px-2.5 w-24 text-right whitespace-nowrap">Giá Bán</th>
-              {activeTab === "import" && <th className="py-3.5 px-2.5 w-24 text-right whitespace-nowrap">Giá Nhập</th>}
-              <th className="py-3.5 px-2 w-28 text-center whitespace-nowrap">Trạng Thái</th>
+              <th className="py-3.5 px-2 w-9 sm:w-10 text-center">#</th>
+              <th className={`py-3.5 px-2.5 sm:px-3 ${activeTab === "import" ? "w-[20%]" : "w-[24%]"}`}>Mã Đơn & Sản Phẩm</th>
+              <th className={`py-3.5 px-2.5 sm:px-3 ${activeTab === "import" ? "w-[16%]" : "w-[18%]"}`}>Khách Hàng & Liên Hệ</th>
+              <th className={`py-3.5 px-2.5 sm:px-3 ${activeTab === "import" ? "w-[17%]" : "w-[19%]"}`}>Thông Tin & Slot</th>
+              <th className="py-3.5 px-2 w-[110px] text-center whitespace-nowrap">
+                <span className="hidden xl:inline">Ngày Đăng Ký - </span>Hết Hạn
+              </th>
+              <th className="py-3.5 px-2 w-24 text-right whitespace-nowrap">Giá Bán</th>
+              {activeTab === "import" && <th className="py-3.5 px-2 w-24 text-right whitespace-nowrap">Giá Nhập</th>}
+              <th className="py-3.5 px-2 w-32 text-center whitespace-nowrap">Trạng Thái</th>
               {showActions && <th className="py-3.5 px-2 w-20 text-right whitespace-nowrap">Thao Tác</th>}
             </tr>
           </thead>
@@ -132,7 +134,11 @@ export const OrderTable: React.FC<OrderTableProps> = ({
 
                 const supplierName = getSupplierDisplayName(order);
                 const remainingValue = calculateRemainingValue(order);
-                const webhookAmount = (order as any).webhook_amount ?? (order as any).latest_webhook_amount ?? 0;
+                const isPaid = order.status === ORDER_STATUS.PAID || order.status === "Đã Thanh Toán" || Boolean(order.was_paid);
+                const rawWebhookAmount = order.webhook_amount ?? (order as any).latest_webhook_amount;
+                const webhookAmount = rawWebhookAmount != null
+                  ? Number(rawWebhookAmount)
+                  : (isPaid ? Number(order.price || 0) : 0);
                 const webhookDelta = Number(webhookAmount) - Number(order.price || 0);
 
                 return (
@@ -164,10 +170,11 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Order Code Badge & Product Name */}
-                      <td className="py-3.5 px-3 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                      <td className="py-3.5 px-2.5 sm:px-3 min-w-0 overflow-hidden">
+                        <div className="flex items-center gap-1.5 mb-1 min-w-0">
                           <span
-                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${prefixConfig.badgeBg} ${prefixConfig.badgeText} ${prefixConfig.badgeBorder} shadow-sm font-mono tracking-wider`}
+                            title={`#${order.id_order}`}
+                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${prefixConfig.badgeBg} ${prefixConfig.badgeText} ${prefixConfig.badgeBorder} shadow-sm font-mono tracking-wider truncate max-w-full inline-block cursor-help`}
                           >
                             #{order.id_order}
                           </span>
@@ -181,7 +188,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Customer & Contact */}
-                      <td className="py-3.5 px-3 min-w-0">
+                      <td className="py-3.5 px-2.5 sm:px-3 min-w-0 overflow-hidden">
                         <div
                           className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors truncate"
                           title={order.customer || "Khách Vãng Lai"}
@@ -199,7 +206,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Order Information & Slot */}
-                      <td className="py-3.5 px-3 min-w-0">
+                      <td className="py-3.5 px-2.5 sm:px-3 min-w-0 overflow-hidden">
                         {order.information_order && (
                           <div
                             className="text-slate-200 truncate font-medium"
@@ -222,15 +229,20 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Registration & Expiration Dates */}
-                      <td className="py-3.5 px-2.5 text-center whitespace-nowrap">
-                        <div className="text-slate-300 font-medium flex items-center justify-center gap-1 font-mono text-[11px]">
-                          <span>{formatDateDisplay(order.order_date || order.created_at)}</span>
-                          <span className="text-slate-500 font-bold px-0.5">-</span>
-                          <span className="text-amber-300 font-semibold">{formatDateDisplay(order.expired_at)}</span>
+                      <td
+                        className="py-3.5 px-2 text-center whitespace-nowrap overflow-hidden"
+                        title={`Đăng ký: ${formatDateDisplay(order.order_date || order.created_at)} - Hết hạn: ${formatDateDisplay(order.expired_at)}`}
+                      >
+                        <div className="text-amber-300 font-semibold flex items-center justify-center font-mono text-[11px] truncate">
+                          <span className="hidden xl:inline text-slate-400 font-normal">
+                            {formatDateDisplay(order.order_date || order.created_at)}
+                            <span className="text-slate-500 font-bold px-1">-</span>
+                          </span>
+                          <span>{formatDateDisplay(order.expired_at)}</span>
                         </div>
                         {activeTab !== "canceled" && (
                           <div
-                            className={`text-[10px] font-bold mt-0.5 ${remainingDays === 0
+                            className={`text-[10px] font-bold mt-0.5 truncate ${remainingDays === 0
                                 ? "text-rose-400 font-extrabold animate-pulse"
                                 : remainingDays > 30
                                   ? "text-slate-400"
@@ -249,25 +261,25 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                       </td>
 
                       {/* Selling Price */}
-                      <td className="py-3.5 px-2.5 text-right font-bold text-emerald-400 font-mono text-xs whitespace-nowrap">
+                      <td className="py-3.5 px-2 text-right font-bold text-emerald-400 font-mono text-xs whitespace-nowrap overflow-hidden">
                         {new Intl.NumberFormat("vi-VN").format(Number(order.price || 0))} ₫
                       </td>
 
                       {/* Import Cost (Only for Import tab) */}
                       {activeTab === "import" && (
-                        <td className="py-3.5 px-2.5 text-right font-semibold text-purple-300 font-mono text-xs whitespace-nowrap">
+                        <td className="py-3.5 px-2 text-right font-semibold text-purple-300 font-mono text-xs whitespace-nowrap overflow-hidden">
                           {new Intl.NumberFormat("vi-VN").format(Number(order.cost || 0))} ₫
                         </td>
                       )}
 
                       {/* Status Badge */}
-                      <td className="py-3.5 px-2 text-center whitespace-nowrap">
+                      <td className="py-3.5 px-2 text-center whitespace-nowrap overflow-hidden">
                         {renderStatusBadge(order.status)}
                       </td>
 
                       {/* Action Buttons */}
                       {showActions && (
-                        <td className="py-3.5 px-2 text-right whitespace-nowrap">
+                        <td className="py-3.5 px-2 text-right whitespace-nowrap overflow-hidden">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => onOpenView(order)}

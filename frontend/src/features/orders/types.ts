@@ -27,6 +27,8 @@ export interface Order {
   refund?: string;
   transaction?: string;
   vietqr_url?: string;
+  was_paid?: boolean;
+  webhook_amount?: number;
   bank_info?: {
     bank_name?: string;
     bank_bin?: string;

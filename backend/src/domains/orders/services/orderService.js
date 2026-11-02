@@ -2,6 +2,7 @@ const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { getAvailableSuffix, applySuffixToPrice, extractSlotSuffix } = require("@/domains/payments/services/slotSuffixService");
 const { ORDER_STATUS, getOrderStatusLabel } = require("@/constants/orderStatus");
+const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
@@ -561,6 +562,23 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
     }
   }
 
+  // 4b. Nạp số tiền đã khớp thanh toán qua webhook/biên lai từ payment_receipt_allocations trong 1 batch query
+  const orderCodes = orders.map((o) => o.id_order).filter(Boolean);
+  const webhookAmountMap = new Map();
+  if (orderCodes.length > 0) {
+    try {
+      const allocations = await queryDb(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
+        .whereIn("target_code", orderCodes)
+        .groupBy("target_code")
+        .select("target_code", queryDb.raw("COALESCE(SUM(amount), 0)::numeric as total_allocated"));
+      for (const a of allocations) {
+        webhookAmountMap.set(a.target_code, Number(a.total_allocated || 0));
+      }
+    } catch (allocErr) {
+      console.warn("[attachBatchSupplierAndQrInfo] Không thể nạp allocations:", allocErr.message);
+    }
+  }
+
   // 5. Gắn thông tin hoàn toàn in-memory (0 extra queries)
   return orders.map((order) => {
     const resolvedSupplyId = order.supply_id || logSupplyMap.get(Number(order.id)) || null;
@@ -593,6 +611,10 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       }
     }
 
+    const isPaid = statusUpper === ORDER_STATUS.PAID || statusUpper === "ĐÃ THANH TOÁN" || Boolean(order.was_paid);
+    const allocatedAmount = webhookAmountMap.get(order.id_order);
+    const webhookAmount = allocatedAmount != null ? allocatedAmount : (isPaid ? Number(effectivePrice || order.price || 0) : 0);
+
     const enriched = {
       ...order,
       supply_id: resolvedSupplyId,
@@ -602,6 +624,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       price: effectivePrice,
       gross_selling_price: effectiveGrossPrice,
       is_variant_inactive: isRenewRequired && !isVariantActive,
+      webhook_amount: webhookAmount,
     };
 
     const isImport = String(order.id_order || "").toUpperCase().startsWith("MAVN") ||
@@ -1179,8 +1202,100 @@ async function updateOrder(id, payload) {
     if (payload.days !== undefined) updateFields.days = Number(payload.days);
     if (payload.order_date !== undefined) updateFields.order_date = payload.order_date || null;
     if (payload.expired_at !== undefined) updateFields.expired_at = payload.expired_at || null;
+    const oldSupplyId = existingOrder.supply_id ? Number(existingOrder.supply_id) : null;
+    let resolvedNewSupplyId = oldSupplyId;
     if (payload.supply_id !== undefined) {
-      updateFields.supply_id = await resolveSupplyId(trx, payload.supply_id);
+      resolvedNewSupplyId = await resolveSupplyId(trx, payload.supply_id);
+      updateFields.supply_id = resolvedNewSupplyId;
+    }
+
+    const isSupplierChanged = updateFields.supply_id !== undefined && resolvedNewSupplyId !== oldSupplyId;
+    const isOrderPaid = existingOrder.status === ORDER_STATUS.PAID || Boolean(existingOrder.was_paid);
+
+    if (isOrderPaid && isSupplierChanged) {
+      // 1. Tính số ngày còn lại của gói dịch vụ
+      const totalDays = Math.max(Number(existingOrder.days || 365), 1);
+      let remainingDays = 0;
+      const targetExpiryStr = updateFields.expired_at !== undefined ? updateFields.expired_at : existingOrder.expired_at;
+      if (targetExpiryStr) {
+        const expiry = new Date(targetExpiryStr);
+        if (!isNaN(expiry.getTime())) {
+          expiry.setHours(0, 0, 0, 0);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const diffTime = expiry.getTime() - today.getTime();
+          remainingDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+        }
+      }
+
+      // 2. Với NCC cũ (oldSupplyId): nếu là NCC ngoài (khác Mavryk/ID 1)
+      const isOldMavryk = !oldSupplyId || oldSupplyId === 1;
+      let refundOldAmount = 0;
+      if (!isOldMavryk) {
+        const oldPositiveLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+          .where({ order_list_id: existingOrder.id, supply_id: oldSupplyId })
+          .where("import_cost", ">", 0)
+          .orderBy("id", "desc")
+          .first();
+        const baseOldCost = oldPositiveLog ? Number(oldPositiveLog.import_cost || 0) : Number(existingOrder.cost || 0);
+        refundOldAmount = remainingDays > 0 ? Math.round((baseOldCost / totalDays) * remainingDays) : 0;
+
+        if (refundOldAmount > 0) {
+          await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+            order_list_id: existingOrder.id,
+            supply_id: oldSupplyId,
+            id_order: existingOrder.id_order,
+            import_cost: -refundOldAmount,
+            ncc_payment_status: SUPPLIER_PAYMENT_STATUS.UNPAID,
+            logged_at: trx.fn.now(),
+          });
+        }
+      }
+
+      // 3. Với NCC mới (resolvedNewSupplyId): nếu là NCC ngoài
+      const isNewMavryk = !resolvedNewSupplyId || resolvedNewSupplyId === 1;
+      let newProratedCost = 0;
+      if (!isNewMavryk) {
+        let newPackagePrice = null;
+        const targetProductId = updateFields.id_product !== undefined ? updateFields.id_product : existingOrder.id_product;
+        if (targetProductId) {
+          const sc = await trx(TABLES.SUPPLIER_COST)
+            .where({ variant_id: Number(targetProductId), supplier_id: resolvedNewSupplyId })
+            .first();
+          if (sc && Number(sc.price) > 0) {
+            newPackagePrice = Number(sc.price);
+          }
+        }
+        if (newPackagePrice == null) {
+          if (payload.cost !== undefined && Number(payload.cost) > 0) {
+            newPackagePrice = Number(payload.cost);
+          } else {
+            newPackagePrice = Number(existingOrder.cost || 0);
+          }
+        }
+
+        newProratedCost = remainingDays > 0 ? Math.round((newPackagePrice / totalDays) * remainingDays) : 0;
+        if (newProratedCost > 0) {
+          await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+            order_list_id: existingOrder.id,
+            supply_id: resolvedNewSupplyId,
+            id_order: existingOrder.id_order,
+            import_cost: newProratedCost,
+            ncc_payment_status: SUPPLIER_PAYMENT_STATUS.UNPAID,
+            logged_at: trx.fn.now(),
+          });
+        }
+        updateFields.cost = newProratedCost;
+      } else {
+        updateFields.cost = 0;
+      }
+    } else if (!isOrderPaid && isSupplierChanged && resolvedNewSupplyId) {
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+        .where({ order_list_id: existingOrder.id, ncc_payment_status: SUPPLIER_PAYMENT_STATUS.UNPAID })
+        .update({
+          supply_id: resolvedNewSupplyId,
+          ...(updateFields.cost !== undefined ? { import_cost: updateFields.cost } : {}),
+        });
     }
 
     const [updatedOrder] = await getOrderTable(trx)
@@ -1827,4 +1942,5 @@ module.exports = {
   processCompleteOrder,
   payOrderWithCredit,
   calculateOrderRemainingValue,
+  getDefaultShopBank,
 };

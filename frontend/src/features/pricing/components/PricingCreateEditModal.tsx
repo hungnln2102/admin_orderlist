@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus, Pencil, X, Tag, DollarSign, TrendingUp, AlertTriangle, Layers, Power, CheckCircle2, XCircle } from "lucide-react";
 import { PricingItem, ProductFormData } from "../types";
+import { CurrencyInputVN } from "@/shared/components/CurrencyInputVN";
 
 interface PricingCreateEditModalProps {
   isOpen: boolean;
@@ -126,106 +127,71 @@ export const PricingCreateEditModal: React.FC<PricingCreateEditModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* Giá Bán Lẻ (Khách Lẻ) */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                    Giá Bán Lẻ (Khách lẻ)
-                  </label>
-                  <span className="text-[11px] font-mono font-bold text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
-                    {formatVND(productForm.retail_price)}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="VD: 750000"
-                  value={productForm.retail_price || ""}
-                  onChange={(e) => setProductForm({ ...productForm, retail_price: Number(e.target.value) })}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-cyan-300 font-bold font-mono focus:outline-none focus:border-cyan-400 text-sm transition-colors"
+                <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                  Giá Bán Lẻ (Khách lẻ)
+                </label>
+                <CurrencyInputVN
+                  value={productForm.retail_price}
+                  onChange={(val) => setProductForm({ ...productForm, retail_price: val })}
+                  accentColor="cyan"
+                  placeholder="VD: 750.000"
                 />
               </div>
 
               {/* Giá CTV (Sỉ / Đại lý) */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    Giá CTV (Sỉ / Đại lý)
-                  </label>
-                  <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                    {formatVND(productForm.ctv_price)}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="VD: 650000"
-                  value={productForm.ctv_price || ""}
-                  onChange={(e) => setProductForm({ ...productForm, ctv_price: Number(e.target.value) })}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none focus:border-emerald-400 text-sm transition-colors"
+                <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Giá CTV (Sỉ / Đại lý)
+                </label>
+                <CurrencyInputVN
+                  value={productForm.ctv_price}
+                  onChange={(val) => setProductForm({ ...productForm, ctv_price: val })}
+                  accentColor="emerald"
+                  placeholder="VD: 650.000"
                 />
               </div>
 
               {/* Giá Gốc (Chi phí vốn) */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-                    Giá Gốc (Chi phí vốn)
-                  </label>
-                  <span className="text-[11px] font-mono font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
-                    {formatVND(productForm.base_price)}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="VD: 400000"
-                  value={productForm.base_price || ""}
-                  onChange={(e) => setProductForm({ ...productForm, base_price: Number(e.target.value) })}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-purple-300 font-bold font-mono focus:outline-none focus:border-purple-400 text-sm transition-colors"
+                <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                  Giá Gốc (Chi phí vốn)
+                </label>
+                <CurrencyInputVN
+                  value={productForm.base_price}
+                  onChange={(val) => setProductForm({ ...productForm, base_price: val })}
+                  accentColor="purple"
+                  placeholder="VD: 400.000"
                 />
               </div>
 
               {/* Giá Sinh Viên */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    Giá Sinh Viên (Ưu đãi)
-                  </label>
-                  <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                    {formatVND(productForm.student_price)}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="VD: 550000"
-                  value={productForm.student_price || ""}
-                  onChange={(e) => setProductForm({ ...productForm, student_price: Number(e.target.value) })}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-amber-300 font-bold font-mono focus:outline-none focus:border-amber-400 text-sm transition-colors"
+                <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  Giá Sinh Viên (Ưu đãi)
+                </label>
+                <CurrencyInputVN
+                  value={productForm.student_price}
+                  onChange={(val) => setProductForm({ ...productForm, student_price: val })}
+                  accentColor="amber"
+                  placeholder="VD: 550.000"
                 />
               </div>
 
               {/* Giá Khuyến Mãi (KM) */}
               <div className="space-y-1 sm:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                    Giá Khuyến Mãi (Flash sale / Sự kiện)
-                  </label>
-                  <span className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
-                    {formatVND(productForm.promo_price)}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="VD: 690000 (Để 0 nếu không khuyến mãi)"
-                  value={productForm.promo_price || ""}
-                  onChange={(e) => setProductForm({ ...productForm, promo_price: Number(e.target.value) })}
-                  className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3 py-2 text-rose-300 font-bold font-mono focus:outline-none focus:border-rose-400 text-sm transition-colors"
+                <label className="text-slate-300 font-semibold text-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                  Giá Khuyến Mãi (Flash sale / Sự kiện)
+                </label>
+                <CurrencyInputVN
+                  value={productForm.promo_price}
+                  onChange={(val) => setProductForm({ ...productForm, promo_price: val })}
+                  accentColor="rose"
+                  placeholder="VD: 690.000 (Để 0 nếu không khuyến mãi)"
                 />
               </div>
             </div>

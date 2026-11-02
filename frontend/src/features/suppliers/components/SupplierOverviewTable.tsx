@@ -79,7 +79,7 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Còn nợ NCC:</span>
                 <span className="font-mono font-bold text-amber-400">
-                  {formatCurrency(s.total_debt || 0)}
+                  {s.total_debt < 0 ? `NCC nợ: ${formatCurrency(Math.abs(s.total_debt))}` : formatCurrency(s.total_debt || 0)}
                 </span>
               </div>
             </div>
@@ -210,6 +210,10 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
                           <span className="inline-block px-2.5 py-1 rounded-md text-xs font-black bg-rose-500/15 text-rose-400 border border-rose-500/30">
                             {formatCurrency(s.total_debt)}
                           </span>
+                        ) : s.total_debt < 0 ? (
+                          <span className="inline-block px-2.5 py-1 rounded-md text-xs font-black bg-cyan-500/15 text-cyan-400 border border-cyan-500/30" title="NCC đang nợ tiền Shop">
+                            NCC nợ: {formatCurrency(Math.abs(s.total_debt))}
+                          </span>
                         ) : (
                           <span className="text-slate-500 font-bold">-</span>
                         )}
@@ -332,8 +336,7 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
                                         <tr>
                                           <th className="py-2.5 px-3 text-center">STT</th>
                                           <th className="py-2.5 px-4">MÃ ĐƠN HÀNG</th>
-                                          <th className="py-2.5 px-4 text-right">TIỀN NHẬP</th>
-                                          <th className="py-2.5 px-4 text-right">TIỀN HOÀN</th>
+                                          <th className="py-2.5 px-4 text-right">CHI PHÍ / CÔNG NỢ</th>
                                           <th className="py-2.5 px-4 text-center">TRẠNG THÁI TT</th>
                                           <th className="py-2.5 px-4 text-center">NGÀY GHI NHẬN</th>
                                         </tr>
@@ -350,11 +353,14 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
                                             <td className="py-2.5 px-4 font-mono font-bold text-cyan-400">
                                               {log.id_order}
                                             </td>
-                                            <td className="py-2.5 px-4 text-right font-bold text-slate-200">
-                                              {formatCurrency(log.import_cost)}
-                                            </td>
-                                            <td className="py-2.5 px-4 text-right font-semibold text-amber-400">
-                                              {formatCurrency(log.refund_amount)}
+                                            <td className="py-2.5 px-4 text-right font-bold">
+                                              {log.import_cost < 0 ? (
+                                                <span className="text-cyan-400 font-bold" title="NCC hoàn tiền">
+                                                  {formatCurrency(log.import_cost)}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-200">{formatCurrency(log.import_cost)}</span>
+                                              )}
                                             </td>
                                             <td className="py-2.5 px-4 text-center">
                                               {log.ncc_payment_status === "Đã Thanh Toán" ? (

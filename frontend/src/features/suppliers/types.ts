@@ -20,7 +20,7 @@ export interface SupplierCostLogItem {
   id_order: string;
   supplier_name: string;
   import_cost: number;
-  refund_amount: number;
+  refund_amount?: number;
   ncc_payment_status: string;
   logged_at: string;
 }
@@ -49,12 +49,20 @@ export interface SupplierDetailData {
   };
   unpaid_cycle: {
     amount_needed: number;
+    debt_direction?: "SHOP_OWES_SUPPLIER" | "SUPPLIER_OWES_SHOP" | "SETTLED";
     refund_to_shop: number;
     debt_by_order: number;
     amount_paid: number;
     payment_status: string;
     shop_bank_accounts: { id: number; label: string }[];
     vietqr_url: string | null;
+    qr_target_type?: "SUPPLIER" | "SHOP" | "NONE";
+    qr_bank_info?: {
+      bank_name?: string;
+      bin_bank?: string;
+      number_bank?: string;
+      account_holder?: string;
+    } | null;
   };
   monthly_orders: { month: string; count: number }[];
 }

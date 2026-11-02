@@ -262,7 +262,6 @@ async function processOrderPayment(trx, order, amount, options = {}) {
       supply_id: supplyId,
       id_order: updatedOrder.id_order,
       import_cost: effectiveCost,
-      refund_amount: 0,
       ncc_payment_status: "Chưa Thanh Toán",
       logged_at: trx.fn.now(),
     });

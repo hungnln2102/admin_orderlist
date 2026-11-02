@@ -118,7 +118,7 @@ async function processPaymentWebhook(payload = {}) {
           .where(`l.${COLS.SUPPLIER_ORDER_COST_LOG.NCC_PAYMENT_STATUS}`, SUPPLIER_PAYMENT_STATUS.UNPAID)
           .groupBy(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`)
           .havingRaw(
-            `COALESCE(SUM(l.${COLS.SUPPLIER_ORDER_COST_LOG.IMPORT_COST} - l.${COLS.SUPPLIER_ORDER_COST_LOG.REFUND_AMOUNT}), 0) = ? + s.${COLS.SUPPLIER.ID}`,
+            `COALESCE(SUM(l.${COLS.SUPPLIER_ORDER_COST_LOG.IMPORT_COST}), 0) = ? + s.${COLS.SUPPLIER.ID}`,
             [transferAmount]
           )
           .select(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`);
