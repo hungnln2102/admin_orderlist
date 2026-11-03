@@ -7,7 +7,7 @@
  * 4. Tài sản ròng & Nợ cá nhân + Nợ NCC (Net Worth Engine)
  */
 
-const { db, TABLES, withTransaction } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
 const { eventBus, EVENTS, recordEvent } = require("@/events");
@@ -1156,17 +1156,26 @@ async function deletePersonalAsset(id) {
 }
 
 async function payPersonalAsset(id, payload) {
-  const { financialAccountId, receiptId, amount, note } = payload;
+  const { financialAccountId, receiptId, amount, note, referenceCode, idempotencyKey } = payload;
   const numAmount = toNumber(amount);
   if (numAmount <= 0) throw new Error("Số tiền trả nợ phải lớn hơn 0");
   if (!financialAccountId && !receiptId) throw new Error("Vui lòng chọn tài khoản thanh khoản hoặc biên lai ngân hàng để trả nợ");
 
   return await withTransaction(async (trx) => {
-    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).first();
+    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
     if (!asset) throw new Error("Không tìm thấy mục nợ");
 
-    const currentAmount = toNumber(asset.amount);
-    const newAmount = Math.max(0, currentAmount - numAmount);
+    const creditAccount = await creditLedgerService.getAccountForPersonalAssetInTrx(trx, id, true);
+    if (creditAccount && !idempotencyKey && !referenceCode) throw new Error("Credit account payment cần idempotencyKey hoặc referenceCode");
+    if (creditAccount) {
+      const paymentKey = String(idempotencyKey || referenceCode);
+      const existingLedger = await trx(TABLES.CREDIT_ACCOUNT_LEDGER)
+        .where(COLS.CREDIT_ACCOUNT_LEDGER.ACCOUNT_ID, creditAccount.id)
+        .where(COLS.CREDIT_ACCOUNT_LEDGER.IDEMPOTENCY_KEY, paymentKey)
+        .first();
+      if (existingLedger) return { success: true, alreadyProcessed: true, newAmount: toNumber(asset.amount) };
+    }    const currentAmount = toNumber(asset.amount);
+    let newAmount = Math.max(0, currentAmount - numAmount);
 
     if (receiptId) {
       await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `PERSONAL_DEBT_PAY_${id}`, note || `Trả bớt nợ "${asset.name}"`);
@@ -1180,6 +1189,17 @@ async function payPersonalAsset(id, payload) {
       });
     }
 
+    let creditResult = null;
+    if (creditAccount) {
+      creditResult = await creditLedgerService.recordPaymentInTrx(trx, creditAccount.id, {
+        amount: numAmount,
+        effectiveAt: payload.effectiveAt || new Date(),
+        idempotencyKey: idempotencyKey || referenceCode,
+        sourceReference: referenceCode || (receiptId ? `receipt:${receiptId}` : null),
+        note,
+      });
+      newAmount = Math.max(0, creditResult.balances.total);
+    }
     await trx(TABLES.PERSONAL_ASSETS)
       .where("id", id)
       .update({ amount: newAmount, updated_at: trx.fn.now() });
@@ -1225,8 +1245,9 @@ async function borrowPersonalAsset(id, payload) {
       }
     }
 
+    const creditAccount = await creditLedgerService.getAccountForPersonalAssetInTrx(trx, id, true);
     const currentAmount = toNumber(asset.amount);
-    const newAmount = currentAmount + numAmount;
+    let newAmount = currentAmount + numAmount;
 
     const isDirect = Boolean(directExpense) || (!financialAccountId && !receiptId);
 
@@ -1242,7 +1263,18 @@ async function borrowPersonalAsset(id, payload) {
         note: note || `Vay thêm "${asset.name}"`,
       });
     }
-
+    let creditResult = null;
+    if (creditAccount) {
+      creditResult = await creditLedgerService.recordPrincipalInTrx(trx, creditAccount.id, {
+        amount: numAmount,
+        eventType: creditAccount.product_kind === "OVERDRAFT" ? "OVERDRAFT_DRAW" : "CARD_SPEND",
+        effectiveAt: payload.effectiveAt || new Date(),
+        idempotencyKey: payload.idempotencyKey || referenceCode || `personal-asset-draw:${id}:${financialAccountId || receiptId || "direct"}:${numAmount}:${new Date(payload.effectiveAt || Date.now()).toISOString()}`,
+        sourceReference: referenceCode || (receiptId ? `receipt:${receiptId}` : null),
+        metadata: { merchantName: merchantName || null, note: note || null },
+      });
+      newAmount = Math.max(0, creditResult.balances.total);
+    }
     await trx(TABLES.PERSONAL_ASSETS)
       .where("id", id)
       .update({ amount: newAmount, updated_at: trx.fn.now() });

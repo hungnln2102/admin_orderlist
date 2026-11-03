@@ -62,6 +62,13 @@ const TABLES = {
   PERSONAL_ASSETS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
   PERSONAL_SAVINGS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
   DEBT_PAYMENT_LOGS: formatTable(SCHEMAS.FINANCE, "debt_payment_logs"),
+  CREDIT_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "credit_accounts"),
+  CREDIT_ACCOUNT_RULE_VERSIONS: formatTable(SCHEMAS.FINANCE, "credit_account_rule_versions"),
+  CREDIT_STATEMENTS: formatTable(SCHEMAS.FINANCE, "credit_statements"),
+  CREDIT_ACCOUNT_LEDGER: formatTable(SCHEMAS.FINANCE, "credit_account_ledger"),
+  CREDIT_INTEREST_ACCRUALS: formatTable(SCHEMAS.FINANCE, "credit_interest_accruals"),
+  CREDIT_PAYMENT_ALLOCATIONS: formatTable(SCHEMAS.FINANCE, "credit_payment_allocations"),
+  CREDIT_RECONCILIATION_RECORDS: formatTable(SCHEMAS.FINANCE, "credit_reconciliation_records"),
   EXTERNAL_API_CONFIGS: formatTable(SCHEMAS.SYSTEM, "external_api_configs"),
   STORE_PROFIT_EXPENSES: formatTable(SCHEMAS.FINANCE, "store_profit_expenses"),
   PERSONAL_BALANCE_SNAPSHOTS: formatTable(SCHEMAS.FINANCE, "personal_balance_snapshots"),
@@ -474,6 +481,38 @@ const COLS = {
     REFERENCE_CODE: "reference_code",
     MERCHANT_NAME: "merchant_name",
     CREATED_AT: "created_at",
+  },
+  CREDIT_ACCOUNTS: {
+    ID: "id", PERSONAL_ASSET_ID: "personal_asset_id", PRODUCT_KIND: "product_kind", BANK_NAME: "bank_name",
+    DISPLAY_NAME: "display_name", TIMEZONE: "timezone", STATUS: "status", CURRENT_RULE_VERSION: "current_rule_version",
+    CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },
+  CREDIT_ACCOUNT_RULE_VERSIONS: {
+    ID: "id", ACCOUNT_ID: "account_id", VERSION: "version", EFFECTIVE_AT: "effective_at", CONFIG: "config",
+    EVIDENCE_REFERENCE: "evidence_reference", CREATED_AT: "created_at",
+  },
+  CREDIT_STATEMENTS: {
+    ID: "id", ACCOUNT_ID: "account_id", CYCLE_START_AT: "cycle_start_at", CYCLE_CLOSE_AT: "cycle_close_at", DUE_AT: "due_at",
+    OPENING_PRINCIPAL: "opening_principal", CLOSING_PRINCIPAL: "closing_principal", INTEREST_DUE: "interest_due", FEE_DUE: "fee_due",
+    MINIMUM_DUE: "minimum_due", TOTAL_DUE: "total_due", STATUS: "status", RULE_SNAPSHOT: "rule_snapshot",
+    SOURCE_REFERENCE: "source_reference", EXPECTED_INTEREST_COLLECTION_AT: "expected_interest_collection_at", CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },
+  CREDIT_ACCOUNT_LEDGER: {
+    ID: "id", ACCOUNT_ID: "account_id", STATEMENT_ID: "statement_id", EVENT_TYPE: "event_type", BUCKET: "bucket",
+    PRINCIPAL_DELTA: "principal_delta", INTEREST_DELTA: "interest_delta", FEE_DELTA: "fee_delta", EFFECTIVE_AT: "effective_at",
+    SOURCE_REFERENCE: "source_reference", IDEMPOTENCY_KEY: "idempotency_key", METADATA: "metadata", CREATED_AT: "created_at",
+  },
+  CREDIT_INTEREST_ACCRUALS: {
+    ID: "id", ACCOUNT_ID: "account_id", STATEMENT_ID: "statement_id", BUSINESS_DATE: "business_date", RULE_VERSION: "rule_version",
+    BASIS_AMOUNT: "basis_amount", RATE_SNAPSHOT: "rate_snapshot", INTEREST_AMOUNT: "interest_amount", LEDGER_ID: "ledger_id", CREATED_AT: "created_at",
+  },
+  CREDIT_PAYMENT_ALLOCATIONS: {
+    ID: "id", PAYMENT_LEDGER_ID: "payment_ledger_id", TARGET_LEDGER_ID: "target_ledger_id", STATEMENT_ID: "statement_id",
+    BUCKET: "bucket", AMOUNT: "amount", CREATED_AT: "created_at",
+  },
+  CREDIT_RECONCILIATION_RECORDS: {
+    ID: "id", ACCOUNT_ID: "account_id", STATEMENT_ID: "statement_id", SOURCE_KIND: "source_kind", SOURCE_REFERENCE: "source_reference",
+    EXPECTED_AMOUNT: "expected_amount", OBSERVED_AMOUNT: "observed_amount", STATUS: "status", EVIDENCE: "evidence", CREATED_AT: "created_at",
   },
 };
 

@@ -306,7 +306,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
       {/* 1. Contextual Stat Cards for Debts & Installments */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <GlassCard className="!p-4 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/20 rounded-2xl flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tiền Ngày Hôm Đó Cần Trả</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tổng Tiền Ngày Hôm Nay Cần Trả</span>
           <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-1 block">{formatVND(dailyBurden)}</span>
           <span className="text-[11px] text-slate-500 mt-1 block">Định mức ngày + Nợ gối đầu từ hôm trước</span>
         </GlassCard>

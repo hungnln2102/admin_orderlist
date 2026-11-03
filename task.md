@@ -392,3 +392,12 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] Rà soát toàn bộ workspace local về rác mã nguồn, cấu trúc thư mục, artifact bị theo dõi, dependency, kiểm thử và khả năng bảo trì; kết quả chưa nghiệm thu tại `report/2026-11-02-toan-bo-du-an-toi-uu-structure-cleanup-review.md`.
 - [x] Recheck sau dọn dẹp: xác nhận xóa mã truncate, archive script/plan và backend test pass; còn dump trong Git history, dependency mobile và lint gate phải xử lý trước nghiệm thu toàn diện. Báo cáo: `report/2026-11-02-cleanup-recheck-review.md`.
+
+---
+
+## VPBank credit ledger 2026-11-03
+
+- [x] Thiết kế migration và schema contract cho credit account ledger.
+- [x] Triển khai domain command, allocation, statement và accrual.
+- [x] Tích hợp API/scheduler và lớp tương thích Finance Hub.
+- [x] Viết test, kiểm tra schema/syntax và cập nhật báo cáo. Đã migrate sandbox cô lập `admin_orderlist_vpbank_credit_test`, pass integration ledger 5/5 (có giả lập trả từng phần nhiều ngày cho thẻ và quanh cutoff 17h cho thấu chi) và unit 66/66; vẫn CHƯA NGHIỆM THU tài chính cho đến khi đối chiếu sao kê VPBank đã che dữ liệu.

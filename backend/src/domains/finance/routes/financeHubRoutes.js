@@ -5,6 +5,7 @@
 const express = require("express");
 const router = express.Router();
 const financeHubController = require("../controllers/financeHubController");
+const creditLedgerController = require("../credit/creditLedgerController");
 
 // Tổng quan hòa vốn, KPI, dòng tiền tháng
 router.get("/summary", financeHubController.getSummary);
@@ -27,6 +28,17 @@ router.post("/installments/:id/pay", financeHubController.payInstallment);
 // Lịch sử biến động nợ & trả góp (Debt payment logs)
 router.get("/debt-payment-logs", financeHubController.getDebtPaymentLogs);
 
+// Credit account ledger - immutable accounting for VPBank card and overdraft.
+router.post("/credit-accounts", creditLedgerController.createAccount);
+router.get("/credit-accounts/:id", creditLedgerController.getAccount);
+router.post("/credit-accounts/:id/rule-versions", creditLedgerController.createRuleVersion);
+router.post("/credit-accounts/:id/principal-events", creditLedgerController.recordPrincipal);
+router.post("/credit-accounts/:id/card-statements/import", creditLedgerController.importCardStatement);
+router.post("/credit-accounts/card-statements/evaluate-due", creditLedgerController.evaluateCardDueStatements);
+router.post("/credit-accounts/:id/payments", creditLedgerController.recordPayment);
+router.post("/credit-accounts/overdraft/accrue", creditLedgerController.accrueOverdraft);
+router.post("/credit-statements/:id/overdraft-interest-collections", creditLedgerController.recordOverdraftInterestCollection);
+router.post("/credit-accounts/overdraft/close", creditLedgerController.closeOverdraft);
 // Tài sản & Nợ cá nhân (Personal assets)
 router.post("/personal-assets", financeHubController.createPersonalAsset);
 router.put("/personal-assets/:id", financeHubController.updatePersonalAsset);
