@@ -11,6 +11,8 @@
     "build:frontend": "npm --prefix frontend run build",
     "test": "npm --prefix backend run test",
     "test:backend": "npm --prefix backend run test",
+    "graph:index": "npx -y codebase-memory-mcp cli index_repository --repo-path . --persistence true",
+    "graph:arch": "npx -y codebase-memory-mcp cli get_architecture --project D-Desktop-admin-admin_orderlist",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"

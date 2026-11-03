@@ -1,0 +1,12 @@
+{
+    "schema_version": 2,
+    "commit": "248dbc55e7d3797a2f1cef82103458927e4f58a3",
+    "indexed_at": "2026-11-03T10:22:02Z",
+    "project": "D-Desktop-admin-admin_orderlist",
+    "nodes": 5404,
+    "edges": 12288,
+    "original_size": 13762560,
+    "compressed_size": 2715053,
+    "compression_level": 9,
+    "reconcile_basis": "git-clean-head"
+}
