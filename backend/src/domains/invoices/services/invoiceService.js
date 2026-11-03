@@ -291,6 +291,76 @@ async function allocateReceipt(receiptId, payload) {
           note: note ? note.trim() : (receipt.note || `Thanh toán chi phí cố định từ Biên lai #${id}`),
         });
       }
+    } else if (resolvedAllocType === "PERSONAL_DEBT" || (code && String(code).startsWith("PERSONAL_DEBT_"))) {
+      const debtId = Number(String(code).replace("PERSONAL_DEBT_", ""));
+      if (!debtId || isNaN(debtId)) {
+        throw new Error("Mã khoản nợ cá nhân không hợp lệ.");
+      }
+
+      const asset = await trx(TABLES.PERSONAL_ASSETS)
+        .where({ id: debtId })
+        .forUpdate()
+        .first();
+      if (!asset) {
+        throw new Error(`Không tìm thấy khoản nợ cá nhân #${debtId}.`);
+      }
+
+      const currentDebt = Number(asset.amount || 0);
+      const newDebt = Math.max(0, currentDebt - allocAmount);
+      await trx(TABLES.PERSONAL_ASSETS)
+        .where({ id: debtId })
+        .update({
+          amount: newDebt,
+          updated_at: trx.fn.now(),
+        });
+
+      const paymentDate = receipt.payment_date
+        ? new Date(receipt.payment_date).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+
+      await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+        target_type: "PERSONAL_DEBT",
+        target_id: debtId,
+        financial_account_id: receipt.financial_account_id || null,
+        amount: allocAmount,
+        payment_date: paymentDate,
+        note: note ? note.trim() : (receipt.note || `Trả bớt nợ "${asset.name}" từ Biên lai #${id}`),
+      });
+    } else if (resolvedAllocType === "INSTALLMENT" || (code && String(code).startsWith("INSTALLMENT_"))) {
+      const instId = Number(String(code).replace("INSTALLMENT_", ""));
+      if (!instId || isNaN(instId)) {
+        throw new Error("Mã hợp đồng trả góp không hợp lệ.");
+      }
+
+      const installment = await trx(TABLES.INSTALLMENTS)
+        .where({ id: instId })
+        .forUpdate()
+        .first();
+      if (!installment) {
+        throw new Error(`Không tìm thấy hợp đồng trả góp #${instId}.`);
+      }
+
+      const paymentDate = receipt.payment_date
+        ? new Date(receipt.payment_date).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const periodMonth = paymentDate.slice(0, 7);
+
+      const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
+        .where({ target_type: "INSTALLMENT", target_id: instId, period_month: periodMonth })
+        .first();
+      if (existingLog) {
+        throw new Error(`Kỳ ${periodMonth} của khoản trả góp "${installment.name}" đã được thanh toán trước đó, không thể thanh toán trùng lặp!`);
+      }
+
+      await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+        target_type: "INSTALLMENT",
+        target_id: instId,
+        period_month: periodMonth,
+        financial_account_id: receipt.financial_account_id || null,
+        amount: allocAmount,
+        payment_date: paymentDate,
+        note: note ? note.trim() : (receipt.note || `Thanh toán trả góp "${installment.name}" kỳ ${periodMonth} từ Biên lai #${id}`),
+      });
     } else if (resolvedAllocType === ALLOCATION_TYPE.EXTERNAL_IMPORT || resolvedAllocType === "EXTERNAL_IMPORT") {
       const expenseDate = receipt.payment_date
         ? new Date(receipt.payment_date).toISOString().slice(0, 10)

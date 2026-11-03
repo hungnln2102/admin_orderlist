@@ -88,7 +88,7 @@ async function validateProfitAccount(profitConfig) {
 
 function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency, debtAnnualInterestRate, debtDueDay, debtEndDate, debtRepaymentFrequency }) {
   const isDebt = type === "DEBT_PAYABLE" || type === "DEBT_RECEIVABLE";
-  if (!isDebt || !debtInterestEnabled) {
+  if (!isDebt) {
     return {
       debt_interest_enabled: false,
       debt_interest_frequency: null,
@@ -99,19 +99,32 @@ function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency,
     };
   }
 
-  const annualRate = Number(debtAnnualInterestRate);
-  const dueDay = Number(debtDueDay);
-  const interestFrequency = debtInterestFrequency || "DAILY";
+  const interestEnabled = Boolean(debtInterestEnabled);
+  const annualRate = interestEnabled ? Number(debtAnnualInterestRate) : null;
+  const interestFrequency = interestEnabled ? (debtInterestFrequency || "DAILY") : null;
+  if (interestEnabled) {
+    if (!Number.isFinite(annualRate) || annualRate <= 0) throw new Error("Lãi suất nợ phải lớn hơn 0");
+    if (!["DAILY", "MONTHLY"].includes(interestFrequency)) throw new Error("Chu kỳ tính lãi không hợp lệ");
+  }
+
+  const dueDay = (debtDueDay !== undefined && debtDueDay !== null && String(debtDueDay).trim() !== "") ? Number(debtDueDay) : null;
+  if (dueDay !== null && (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)) {
+    throw new Error("Ngày đến hạn phải từ 1 đến 31");
+  }
+
+  const rawEndDate = debtEndDate instanceof Date ? debtEndDate.toISOString().slice(0, 10) : String(debtEndDate || "").slice(0, 10);
+  let endDate = null;
+  if (rawEndDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEndDate)) {
+    endDate = rawEndDate;
+  }
+
   const repaymentFrequency = debtRepaymentFrequency || "MONTHLY";
-  const endDate = debtEndDate instanceof Date ? debtEndDate.toISOString().slice(0, 10) : String(debtEndDate || "").slice(0, 10);
-  if (!Number.isFinite(annualRate) || annualRate <= 0) throw new Error("Lãi suất nợ phải lớn hơn 0");
-  if (!["DAILY", "MONTHLY"].includes(interestFrequency)) throw new Error("Chu kỳ tính lãi không hợp lệ");
-  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) throw new Error("Ngày đến hạn phải từ 1 đến 31");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error("Vui lòng chọn ngày hết hạn nợ");
-  if (!DEBT_REPAYMENT_FREQUENCIES.has(repaymentFrequency)) throw new Error("Chu kỳ quy đổi nợ không hợp lệ");
+  if (repaymentFrequency && !DEBT_REPAYMENT_FREQUENCIES.has(repaymentFrequency)) {
+    throw new Error("Chu kỳ quy đổi nợ không hợp lệ");
+  }
 
   return {
-    debt_interest_enabled: true,
+    debt_interest_enabled: interestEnabled,
     debt_interest_frequency: interestFrequency,
     debt_annual_interest_rate: annualRate,
     debt_due_day: dueDay,
@@ -175,14 +188,18 @@ function calculatePersonalDebtMonthlyPayment(item) {
   if (item.type !== "DEBT_PAYABLE") return 0;
   const amount = toNumber(item.amount);
   if (amount <= 0) return 0;
+  const annualRate = Boolean(item.debt_interest_enabled) ? toNumber(item.debt_annual_interest_rate) : 0;
+
   if (!item.debt_end_date) {
-    return Math.ceil(amount / 12);
+    // Với nợ không thời hạn / thẻ tín dụng:
+    // Mức thanh toán hàng tháng ước lượng: 5% nợ gốc tối thiểu + tiền lãi phát sinh mỗi tháng
+    const monthlyInterest = (amount * annualRate) / 100 / 12;
+    return Math.max(Math.ceil(amount * 0.05 + monthlyInterest), Math.ceil(amount / 24));
   }
 
   const endDate = new Date(`${String(item.debt_end_date).slice(0, 10)}T23:59:59`);
   const remainingDays = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
   const remainingMonths = Math.max(1, Math.floor(remainingDays / 30.4375) || 1);
-  const annualRate = Boolean(item.debt_interest_enabled) ? toNumber(item.debt_annual_interest_rate) : 0;
   const estimatedTotal = amount + (amount * annualRate / 100 * remainingDays / 365);
   const dailyPayment = Math.ceil(estimatedTotal / remainingDays);
   // Nguyên tắc an toàn: Thà dôi dư chứ không để thiếu hụt nợ khi tới hạn

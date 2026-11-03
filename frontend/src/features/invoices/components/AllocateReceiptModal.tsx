@@ -10,6 +10,8 @@ import {
   Gift,
   PackagePlus,
   DollarSign,
+  CreditCard,
+  Calendar,
 } from "lucide-react";
 
 interface InvoiceReceipt {
@@ -35,7 +37,14 @@ interface AllocateReceiptModalProps {
   onSuccess: () => void;
 }
 
-type AllocationType = "ORDER" | "OPERATIONAL_EXPENSE" | "OTHER_INCOME" | "EXTERNAL_IMPORT" | "FIXED_COST";
+type AllocationType =
+  | "ORDER"
+  | "OPERATIONAL_EXPENSE"
+  | "OTHER_INCOME"
+  | "EXTERNAL_IMPORT"
+  | "FIXED_COST"
+  | "PERSONAL_DEBT"
+  | "INSTALLMENT";
 
 export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   receipt,
@@ -52,6 +61,12 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   const [fixedCosts, setFixedCosts] = useState<any[]>([]);
   const [selectedFixedCostId, setSelectedFixedCostId] = useState<string>("");
   const [loadingFixedCosts, setLoadingFixedCosts] = useState<boolean>(false);
+  const [debts, setDebts] = useState<any[]>([]);
+  const [selectedDebtId, setSelectedDebtId] = useState<string>("");
+  const [loadingDebts, setLoadingDebts] = useState<boolean>(false);
+  const [installments, setInstallments] = useState<any[]>([]);
+  const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>("");
+  const [loadingInstallments, setLoadingInstallments] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [matchedOrder, setMatchedOrder] = useState<any | null>(null);
@@ -109,6 +124,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         setImportId(generateRandomImportId());
         setSupplierName(receipt.sender || "");
         setTargetCode("");
+
         // Tự động nạp danh sách chi phí cố định để gợi ý khớp
         setLoadingFixedCosts(true);
         fetch("/api/finance/fixed-costs")
@@ -128,6 +144,39 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
           })
           .catch((err) => console.error("Lỗi nạp chi phí cố định:", err))
           .finally(() => setLoadingFixedCosts(false));
+
+        // Nạp thêm danh sách nợ & trả góp để sẵn sàng phân bổ
+        setLoadingDebts(true);
+        setLoadingInstallments(true);
+        fetch("/api/finance/summary")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((summary) => {
+            if (summary) {
+              if (Array.isArray(summary.personalAssets)) {
+                const activeDebts = summary.personalAssets.filter(
+                  (a: any) => a.type === "DEBT_PAYABLE" && Number(a.amount) > 0
+                );
+                setDebts(activeDebts);
+                if (activeDebts.length > 0) {
+                  setSelectedDebtId(String(activeDebts[0].id));
+                }
+              }
+              if (Array.isArray(summary.installments)) {
+                const activeInsts = summary.installments.filter(
+                  (inst: any) => inst.isEffective !== false
+                );
+                setInstallments(activeInsts);
+                if (activeInsts.length > 0) {
+                  setSelectedInstallmentId(String(activeInsts[0].id));
+                }
+              }
+            }
+          })
+          .catch((err) => console.error("Lỗi nạp nợ & trả góp:", err))
+          .finally(() => {
+            setLoadingDebts(false);
+            setLoadingInstallments(false);
+          });
       } else {
         setAllocationType("ORDER");
         setImportId("");
@@ -177,6 +226,16 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       return;
     }
 
+    if (allocationType === "PERSONAL_DEBT" && !selectedDebtId) {
+      setError("Vui lòng chọn Khoản nợ cá nhân cần trả bớt.");
+      return;
+    }
+
+    if (allocationType === "INSTALLMENT" && !selectedInstallmentId) {
+      setError("Vui lòng chọn Khoản trả góp cần thanh toán kỳ.");
+      return;
+    }
+
     if (allocationType === "ORDER" && !targetCode.trim()) {
       setError("Vui lòng nhập Mã đơn hàng.");
       return;
@@ -198,12 +257,23 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     setLoading(true);
 
     try {
+      const selectedDebtObj = debts.find((d) => String(d.id) === selectedDebtId);
+      const selectedInstObj = installments.find((i) => String(i.id) === selectedInstallmentId);
+
       const finalNote = allocationType === "EXTERNAL_IMPORT"
         ? `[${supplierName.trim()}] ${note.trim()}`
+        : allocationType === "PERSONAL_DEBT"
+        ? (note.trim() || `Trả bớt nợ "${selectedDebtObj?.name || selectedDebtId}"`)
+        : allocationType === "INSTALLMENT"
+        ? (note.trim() || `Thanh toán trả góp "${selectedInstObj?.name || selectedInstallmentId}"`)
         : (note.trim() || (allocationType === "OTHER_INCOME" ? "Khách tip / tặng thêm" : ""));
 
       const finalTargetCode = allocationType === "FIXED_COST"
         ? `FIXED_COST_${selectedFixedCostId}`
+        : allocationType === "PERSONAL_DEBT"
+        ? `PERSONAL_DEBT_${selectedDebtId}`
+        : allocationType === "INSTALLMENT"
+        ? `INSTALLMENT_${selectedInstallmentId}`
         : allocationType === "EXTERNAL_IMPORT"
         ? (importId.trim() || generateRandomImportId())
         : (allocationType === "ORDER" ? targetCode.trim() : null);
@@ -317,7 +387,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                 {isOut ? 'TIỀN RA NGÂN HÀNG' : 'TIỀN VÀO NGÂN HÀNG'}
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {isOut ? (
                 <>
                   {/* FIXED_COST */}
@@ -336,6 +406,60 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                     <div>
                       <div className="text-xs font-bold text-slate-200">Chi Phí Cố Định</div>
                       <div className="text-[10px] text-slate-400">Server, mặt bằng, tool</div>
+                    </div>
+                  </button>
+
+                  {/* PERSONAL_DEBT (Nợ Cá Nhân / Thẻ Tín Dụng) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllocationType("PERSONAL_DEBT");
+                      if (debts.length > 0 && !selectedDebtId) {
+                        setSelectedDebtId(String(debts[0].id));
+                        if (Number(debts[0].amount) > 0) {
+                          setAmount(String(Math.min(availableAmount, Number(debts[0].amount))));
+                        }
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      allocationType === "PERSONAL_DEBT"
+                        ? "bg-rose-500/15 border-rose-500/50 text-rose-300 shadow-md shadow-rose-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+                      <CreditCard className="w-4 h-4 text-rose-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Trả Nợ Cá Nhân</div>
+                      <div className="text-[10px] text-slate-400">Thẻ tín dụng, nợ ngoài</div>
+                    </div>
+                  </button>
+
+                  {/* INSTALLMENT (Trả Góp) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllocationType("INSTALLMENT");
+                      if (installments.length > 0 && !selectedInstallmentId) {
+                        setSelectedInstallmentId(String(installments[0].id));
+                        if (Number(installments[0].monthlyAmount) > 0) {
+                          setAmount(String(Math.min(availableAmount, Number(installments[0].monthlyAmount))));
+                        }
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      allocationType === "INSTALLMENT"
+                        ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-300 shadow-md shadow-cyan-950/40"
+                        : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+                      <Calendar className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Trả Góp Theo Kỳ</div>
+                      <div className="text-[10px] text-slate-400">Hợp đồng mua trả góp</div>
                     </div>
                   </button>
 
@@ -367,12 +491,12 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                     onClick={() => setAllocationType("OPERATIONAL_EXPENSE")}
                     className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
                       allocationType === "OPERATIONAL_EXPENSE"
-                        ? "bg-rose-500/15 border-rose-500/50 text-rose-300 shadow-md shadow-rose-950/40"
+                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-md shadow-emerald-950/40"
                         : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
                     }`}
                   >
                     <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
-                      <DollarSign className="w-4 h-4 text-rose-400" />
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-200">Chi Phí Đột Xuất</div>
@@ -452,6 +576,84 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
               )}
               <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-300">
                 💡 Khớp với Chi phí cố định sẽ bảo toàn 100% Tài Sản Ròng và không bị trừ double vào Lợi Nhuận P&L.
+              </div>
+            </div>
+          )}
+
+          {/* PERSONAL_DEBT Fields (For Trả Nợ Cá Nhân / Thẻ Tín Dụng) */}
+          {allocationType === "PERSONAL_DEBT" && (
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-300">
+                CHỌN KHOẢN NỢ CẦN TRẢ BỚT *
+              </label>
+              {loadingDebts ? (
+                <div className="p-3 bg-slate-950/60 rounded-xl text-xs text-slate-400">Đang tải danh sách khoản nợ...</div>
+              ) : debts.length === 0 ? (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300">
+                  Không có khoản nợ cá nhân nào còn dư nợ trong Trung Tâm Tài Chính.
+                </div>
+              ) : (
+                <select
+                  value={selectedDebtId}
+                  onChange={(e) => {
+                    const dId = e.target.value;
+                    setSelectedDebtId(dId);
+                    const found = debts.find((d) => String(d.id) === dId);
+                    if (found && Number(found.amount) > 0) {
+                      setAmount(String(Math.min(availableAmount, Number(found.amount))));
+                    }
+                  }}
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-rose-300 font-semibold focus:outline-none focus:border-rose-500 text-xs"
+                >
+                  <option value="">-- Chọn khoản nợ cá nhân / thẻ tín dụng --</option>
+                  {debts.map((d: any) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} • Dư nợ: {formatCurrency(d.amount)} {d.debtDueDay ? `(Hạn ngày ${d.debtDueDay})` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
+                💡 Trả bớt nợ sẽ tự động làm giảm Dư nợ trong Tài Sản Ròng (Net Worth), không tính vào chi phí Shop P&L.
+              </div>
+            </div>
+          )}
+
+          {/* INSTALLMENT Fields (For Trả Góp Theo Kỳ) */}
+          {allocationType === "INSTALLMENT" && (
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-300">
+                CHỌN HỢP ĐỒNG TRẢ GÓP CẦN THANH TOÁN *
+              </label>
+              {loadingInstallments ? (
+                <div className="p-3 bg-slate-950/60 rounded-xl text-xs text-slate-400">Đang tải danh sách trả góp...</div>
+              ) : installments.length === 0 ? (
+                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-xs text-cyan-300">
+                  Không có hợp đồng trả góp nào đang kích hoạt trong Trung Tâm Tài Chính.
+                </div>
+              ) : (
+                <select
+                  value={selectedInstallmentId}
+                  onChange={(e) => {
+                    const instId = e.target.value;
+                    setSelectedInstallmentId(instId);
+                    const found = installments.find((i) => String(i.id) === instId);
+                    if (found && Number(found.monthlyAmount) > 0) {
+                      setAmount(String(Math.min(availableAmount, Number(found.monthlyAmount))));
+                    }
+                  }}
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-cyan-300 font-semibold focus:outline-none focus:border-cyan-500 text-xs"
+                >
+                  <option value="">-- Chọn hợp đồng trả góp --</option>
+                  {installments.map((inst: any) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.name} • Đóng tháng: {formatCurrency(inst.monthlyAmount)} (Kỳ {inst.currentPeriod || 1}/{inst.totalPeriods})
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300">
+                💡 Ghi nhận kỳ thanh toán tháng và bảo toàn tính toàn vẹn của báo cáo Net Worth.
               </div>
             </div>
           )}

@@ -80,7 +80,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   const [debtInterestFrequency, setDebtInterestFrequency] = useState<"DAILY" | "MONTHLY">("DAILY");
   const [debtAnnualInterestRate, setDebtAnnualInterestRate] = useState("");
   const [debtDueDay, setDebtDueDay] = useState("15");
-  const [debtEndDate, setDebtEndDate] = useState(defaultDebtEndDate);
+  const [debtHasEndDate, setDebtHasEndDate] = useState(false);
+  const [debtEndDate, setDebtEndDate] = useState("");
   const [debtRepaymentFrequency, setDebtRepaymentFrequency] = useState<DebtRepaymentFrequency>("MONTHLY");
   const [submitting, setSubmitting] = useState(false);
 
@@ -103,7 +104,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setDebtInterestFrequency(editingItem.debtInterestFrequency || "DAILY");
       setDebtAnnualInterestRate(editingItem.debtAnnualInterestRate ? String(editingItem.debtAnnualInterestRate) : "");
       setDebtDueDay(editingItem.debtDueDay ? String(editingItem.debtDueDay) : "15");
-      setDebtEndDate(editingItem.debtEndDate || defaultDebtEndDate());
+      setDebtHasEndDate(Boolean(editingItem.debtEndDate));
+      setDebtEndDate(editingItem.debtEndDate || "");
       setDebtRepaymentFrequency(editingItem.debtRepaymentFrequency || "MONTHLY");
     } else {
       setName("");
@@ -120,7 +122,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setDebtInterestFrequency("DAILY");
       setDebtAnnualInterestRate("");
       setDebtDueDay("15");
-      setDebtEndDate(defaultDebtEndDate());
+      setDebtHasEndDate(false);
+      setDebtEndDate("");
       setDebtRepaymentFrequency("MONTHLY");
     }
   }, [editingItem, defaultType, isOpen]);
@@ -204,20 +207,32 @@ export const PersonalAssetsModal: React.FC<Props> = ({
 
   // Debt Calculations
   const debtRateValue = Number(debtAnnualInterestRate) || 0;
-  const debtRemainingDays = Math.max(
-    1,
-    Math.ceil((new Date(`${debtEndDate}T23:59:59`).getTime() - Date.now()) / 86400000)
-  );
-  const debtRemainingMonths = Math.max(1, Math.floor(debtRemainingDays / 30.4375) || 1);
+  const debtRemainingDays = debtHasEndDate && debtEndDate
+    ? Math.max(1, Math.ceil((new Date(`${debtEndDate}T23:59:59`).getTime() - Date.now()) / 86400000))
+    : null;
+  const debtRemainingMonths = debtRemainingDays
+    ? Math.max(1, Math.floor(debtRemainingDays / 30.4375) || 1)
+    : null;
+
+  const monthlyInterestAmount = debtInterestEnabled ? (amountValue * debtRateValue) / 100 / 12 : 0;
   const debtInterestAmount = debtInterestEnabled
-    ? ((amountValue * debtRateValue) / 100) * (debtRemainingDays / 365)
+    ? debtRemainingDays
+      ? ((amountValue * debtRateValue) / 100) * (debtRemainingDays / 365)
+      : monthlyInterestAmount * 12
     : 0;
-  const estimatedDebtTotal = amountValue + debtInterestAmount;
-  const debtDailyPayment = Math.ceil(estimatedDebtTotal / debtRemainingDays);
-  const debtMonthlyPayment = Math.max(
-    Math.ceil(debtDailyPayment * 30.44),
-    Math.ceil(estimatedDebtTotal / debtRemainingMonths)
-  );
+
+  const estimatedDebtTotal = debtRemainingDays ? amountValue + debtInterestAmount : amountValue;
+
+  const debtMonthlyPayment = debtRemainingDays && debtRemainingMonths
+    ? Math.max(
+        Math.ceil(Math.ceil(estimatedDebtTotal / debtRemainingDays) * 30.44),
+        Math.ceil(estimatedDebtTotal / debtRemainingMonths)
+      )
+    : Math.max(Math.ceil(amountValue * 0.05 + monthlyInterestAmount), Math.ceil(amountValue / 24));
+
+  const debtDailyPayment = debtRemainingDays
+    ? Math.ceil(estimatedDebtTotal / debtRemainingDays)
+    : Math.ceil(debtMonthlyPayment / 30);
 
   // Dynamic Theme Styling
   const theme = useMemo(() => {
@@ -291,8 +306,12 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       notify.warning("Vui lòng nhập lãi suất nợ lớn hơn 0");
       return;
     }
-    if (isDebtAsset && (!debtEndDate || Number(debtDueDay) < 1 || Number(debtDueDay) > 31)) {
-      notify.warning("Vui lòng nhập ngày đến hạn (1-31) và ngày hết hạn nợ hợp lệ");
+    if (isDebtAsset && debtDueDay && (Number(debtDueDay) < 1 || Number(debtDueDay) > 31)) {
+      notify.warning("Vui lòng nhập ngày đến hạn hàng tháng từ 1 đến 31");
+      return;
+    }
+    if (isDebtAsset && debtHasEndDate && !debtEndDate) {
+      notify.warning("Vui lòng chọn ngày dự kiến tất toán cho khoản nợ có kỳ hạn");
       return;
     }
 
@@ -312,8 +331,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
         debtInterestEnabled: isDebtAsset && debtInterestEnabled,
         debtInterestFrequency: isDebtAsset && debtInterestEnabled ? debtInterestFrequency : null,
         debtAnnualInterestRate: isDebtAsset && debtInterestEnabled ? debtRateValue : null,
-        debtDueDay: isDebtAsset ? Number(debtDueDay) : null,
-        debtEndDate: isDebtAsset ? debtEndDate : null,
+        debtDueDay: isDebtAsset && debtDueDay ? Number(debtDueDay) : null,
+        debtEndDate: (isDebtAsset && debtHasEndDate && debtEndDate) ? debtEndDate : null,
         debtRepaymentFrequency: isDebtAsset ? debtRepaymentFrequency : null,
       });
       onClose();
@@ -419,8 +438,45 @@ export const PersonalAssetsModal: React.FC<Props> = ({
               {/* 3. Debt Specific Inputs */}
               {isDebtAsset && (
                 <div className="space-y-3.5 rounded-2xl border border-rose-500/20 bg-rose-500/[0.03] p-4">
+                  {/* Debt Type Mode Selector (Term vs Open-ended/Credit Card) */}
+                  <div>
+                    <label className="mb-1.5 block text-xs text-slate-300 font-medium">Hình thức kỳ hạn nợ</label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDebtHasEndDate(false);
+                          setDebtEndDate("");
+                        }}
+                        className={`py-2 px-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          !debtHasEndDate
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <span>💳</span>
+                        <span className="truncate">Thẻ tín dụng / Nợ mở</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDebtHasEndDate(true);
+                          if (!debtEndDate) setDebtEndDate(defaultDebtEndDate());
+                        }}
+                        className={`py-2 px-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          debtHasEndDate
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <span>📅</span>
+                        <span className="truncate">Nợ có hạn tất toán</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Due day & End date */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={`grid gap-3 ${debtHasEndDate ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
                     <div>
                       <label className="mb-1.5 block text-xs text-slate-300 font-medium">Hạn thanh toán hàng tháng</label>
                       <div className="relative">
@@ -437,35 +493,46 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-1.5 block text-xs text-slate-300 font-medium">Ngày dự kiến tất toán</label>
-                      <DateInputVN
-                        value={debtEndDate}
-                        onChange={(iso) => setDebtEndDate(iso)}
-                        focusBorderClass="focus:border-rose-400"
-                      />
-                    </div>
+                    {debtHasEndDate && (
+                      <div>
+                        <label className="mb-1.5 block text-xs text-slate-300 font-medium">Ngày dự kiến tất toán</label>
+                        <DateInputVN
+                          value={debtEndDate}
+                          onChange={(iso) => setDebtEndDate(iso)}
+                          focusBorderClass="focus:border-rose-400"
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Quick Preset Duration Chips */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-slate-400 font-semibold mr-1">Kỳ hạn nhanh:</span>
-                    {[
-                      { label: "3 Tháng", months: 3 },
-                      { label: "6 Tháng", months: 6 },
-                      { label: "1 Năm", months: 12 },
-                      { label: "2 Năm", months: 24 },
-                    ].map((preset) => (
-                      <button
-                        key={preset.months}
-                        type="button"
-                        onClick={() => setQuickDuration(preset.months)}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all cursor-pointer active:scale-95"
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Quick Preset Duration Chips (Only when has end date) */}
+                  {debtHasEndDate ? (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400 font-semibold mr-1">Kỳ hạn nhanh:</span>
+                      {[
+                        { label: "3 Tháng", months: 3 },
+                        { label: "6 Tháng", months: 6 },
+                        { label: "1 Năm", months: 12 },
+                        { label: "2 Năm", months: 24 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.months}
+                          type="button"
+                          onClick={() => setQuickDuration(preset.months)}
+                          className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all cursor-pointer active:scale-95"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[11px] text-slate-400 leading-relaxed flex items-start gap-2">
+                      <span className="text-rose-400 font-bold shrink-0">ℹ️</span>
+                      <span>
+                        Nợ không thời hạn / Thẻ tín dụng: Mỗi tháng chỉ cần thanh toán tối thiểu hoặc gom đóng định kỳ vào ngày {debtDueDay || 15}, không bắt buộc thời hạn tất toán dứt điểm.
+                      </span>
+                    </div>
+                  )}
 
                   {/* Interest Rate Toggle (iOS Style Switch) */}
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2.5">
@@ -717,7 +784,9 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                       Smart Accrual HUD
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-rose-500/15 text-rose-200 border border-rose-500/30">
-                      Còn {debtRemainingDays} ngày (~{debtRemainingMonths} tháng)
+                      {debtHasEndDate && debtRemainingDays
+                        ? `Còn ${debtRemainingDays} ngày (~${debtRemainingMonths} tháng)`
+                        : "Thẻ tín dụng / Nợ linh hoạt"}
                     </span>
                   </div>
 
@@ -736,13 +805,19 @@ export const PersonalAssetsModal: React.FC<Props> = ({
 
                     <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
                       <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                        <span className="font-medium">Tổng gom đóng mỗi tháng</span>
+                        <span className="font-medium">
+                          {debtHasEndDate ? "Tổng gom đóng mỗi tháng" : "Gom trả tháng (Ước tính tối thiểu)"}
+                        </span>
                         <span className="text-[10px] text-rose-400 font-bold px-1.5 py-0.2 rounded bg-rose-400/10">Hạn ngày {debtDueDay || 15}</span>
                       </div>
                       <span className={`text-xl font-black font-mono block ${amountValue > 0 ? "text-rose-300" : "text-slate-500"}`}>
                         {amountValue > 0 ? `${debtMonthlyPayment.toLocaleString("vi-VN")} ₫` : "— ₫"}
                       </span>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">Khoản tiền cần tích lũy sẵn sàng trước kỳ thanh toán</span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">
+                        {debtHasEndDate
+                          ? "Khoản tiền cần tích lũy sẵn sàng trước kỳ thanh toán"
+                          : "Định mức tối thiểu cần trả định kỳ để không bị phạt quá hạn"}
+                      </span>
                     </div>
                   </div>
 
@@ -751,13 +826,19 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                     <div className="flex items-start gap-2">
                       <span className="text-amber-400 font-bold shrink-0">💡 Cơ chế:</span>
                       <span>
-                        Động Cơ Hòa Vốn cộng dồn <strong>{amountValue > 0 ? `${debtDailyPayment.toLocaleString("vi-VN")} ₫` : "tiền nợ"}</strong> vào mục tiêu đơn hàng mỗi ngày.
+                        {debtHasEndDate
+                          ? `Động Cơ Hòa Vốn cộng dồn ${amountValue > 0 ? `${debtDailyPayment.toLocaleString("vi-VN")} ₫` : "tiền nợ"} vào mục tiêu đơn hàng mỗi ngày.`
+                          : `Động cơ gom đều ${amountValue > 0 ? `${debtDailyPayment.toLocaleString("vi-VN")} ₫` : "tiền"} mỗi ngày để chuẩn bị đóng thẻ tín dụng trước ngày ${debtDueDay || 15}.`}
                       </span>
                     </div>
                     <div className="flex items-start gap-2 text-[11px] text-slate-400 border-t border-slate-800/70 pt-2">
-                      <span className="text-purple-400 font-bold shrink-0">🔄 Gối đầu:</span>
+                      <span className="text-purple-400 font-bold shrink-0">
+                        {debtHasEndDate ? "🔄 Gối đầu:" : "✨ Linh hoạt:"}
+                      </span>
                       <span>
-                        Hôm nay chưa đủ sẽ tự dồn sang hôm sau, bảo đảm gom đủ tiền trước ngày {debtDueDay || 15} mà không lo bị hụt vốn đột ngột.
+                        {debtHasEndDate
+                          ? `Hôm nay chưa đủ sẽ tự dồn sang hôm sau, bảo đảm gom đủ tiền trước ngày ${debtDueDay || 15} mà không lo bị hụt vốn đột ngột.`
+                          : `Khi shop có dòng tiền dôi dư có thể trích trả bớt nợ bất kỳ lúc nào mà không bị ép hạn chót.`}
                       </span>
                     </div>
                   </div>
@@ -766,11 +847,13 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                   <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
                     <div>
                       <span className="text-[11px] text-slate-300 block font-medium">
-                        {debtInterestEnabled ? "Tổng gốc + lãi cần trả:" : "Tổng nợ gốc cần trả:"}
+                        {debtInterestEnabled ? (debtHasEndDate ? "Tổng gốc + lãi cần trả:" : "Dư nợ gốc (Chưa gồm lãi):") : "Tổng nợ gốc cần trả:"}
                       </span>
                       {debtInterestEnabled && amountValue > 0 && (
                         <span className="text-[10px] text-rose-300">
-                          (Lãi: +{Math.round(debtInterestAmount).toLocaleString("vi-VN")} ₫)
+                          {debtHasEndDate
+                            ? `(Lãi: +${Math.round(debtInterestAmount).toLocaleString("vi-VN")} ₫)`
+                            : `(Lãi ước tính: ~${Math.round(monthlyInterestAmount).toLocaleString("vi-VN")} ₫ / tháng)`}
                         </span>
                       )}
                     </div>

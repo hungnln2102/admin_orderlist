@@ -17,13 +17,16 @@ const RECEIPT_STATUS = Object.freeze({
  * Loại phân bổ (Allocation Type) - Biên lai được gán cho loại nghiệp vụ nào
  */
 const ALLOCATION_TYPE = Object.freeze({
-  ORDER: "ORDER",       // Gán vào Đơn hàng
-  SUPPLIER: "SUPPLIER", // Gán vào thanh toán NCC
-  EXPENSE: "EXPENSE",   // Gán vào chi phí vận hành
+  ORDER: "ORDER",                     // Gán vào Đơn hàng
+  SUPPLIER: "SUPPLIER",               // Gán vào thanh toán NCC
+  EXPENSE: "EXPENSE",                 // Gán vào chi phí vận hành
   MONTHLY_EXPENSE: "MONTHLY_EXPENSE", // Gán vào chi phí biến đổi tháng
   EXTERNAL_IMPORT: "EXTERNAL_IMPORT", // Gán vào nhập hàng ngoài luồng
-  CREDIT: "CREDIT",     // Gán vào ví credit hoàn tiền
-  OTHER: "OTHER",       // Khác
+  FIXED_COST: "FIXED_COST",           // Gán vào Chi phí cố định
+  PERSONAL_DEBT: "PERSONAL_DEBT",     // Gán vào Khoản nợ cá nhân
+  INSTALLMENT: "INSTALLMENT",         // Gán vào Khoản trả góp
+  CREDIT: "CREDIT",                   // Gán vào ví credit hoàn tiền
+  OTHER: "OTHER",                     // Khác
 });
 
 /**
