@@ -1,5 +1,6 @@
 const { db, TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
+const systemConfigService = require("@/domains/system/services/systemConfigService");
 const { withAdvisoryLock } = require("../withAdvisoryLock");
 const { notifyZeroDaysRemaining } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
 
@@ -10,7 +11,20 @@ const TARGET_TABLE = TABLES.ORDER_LIST;
  */
 async function notifyZeroDaysTask(trigger = "cron") {
   return withAdvisoryLock("notify_zero_days", async () => {
-    console.log(`[CRON 0H] Bắt đầu rà soát đơn hàng 0 ngày còn lại (Trigger: ${trigger})...`);
+    const isEnabled = systemConfigService.get("ZERO_DAYS_NOTIFICATION_ENABLED", true);
+    if (isEnabled === false || String(isEnabled).toLowerCase() === "false") {
+      console.log(`[CRON 0-DAYS] Thông báo đơn 0 ngày đang TẮT (ZERO_DAYS_NOTIFICATION_ENABLED=false). Bỏ qua lượt chạy.`);
+      return {
+        success: true,
+        count: 0,
+        orders: [],
+        skipped: true,
+        message: "Thông báo đơn 0 ngày đang tắt trong cấu hình hệ thống.",
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    console.log(`[CRON 0-DAYS] Bắt đầu rà soát đơn hàng 0 ngày còn lại (Trigger: ${trigger})...`);
 
     try {
       const todaySql = "(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date";
@@ -24,7 +38,7 @@ async function notifyZeroDaysTask(trigger = "cron") {
       `, [ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.EXPIRED]);
 
       const orders = result.rows || [];
-      console.log(`[CRON 0H] Tìm thấy ${orders.length} đơn hàng đúng 0 ngày còn lại.`);
+      console.log(`[CRON 0-DAYS] Tìm thấy ${orders.length} đơn hàng đúng 0 ngày còn lại.`);
 
       for (const order of orders) {
         console.log(` -> Đơn #${order.id_order || order.id} (${order.customer}): Cần gia hạn ngay hôm nay (Hạn: ${order.expired_at})`);
@@ -41,7 +55,7 @@ async function notifyZeroDaysTask(trigger = "cron") {
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
-      console.error("[CRON 0H] Lỗi khi chạy task notifyZeroDaysTask:", err);
+      console.error("[CRON 0-DAYS] Lỗi khi chạy task notifyZeroDaysTask:", err);
       throw err;
     }
   });

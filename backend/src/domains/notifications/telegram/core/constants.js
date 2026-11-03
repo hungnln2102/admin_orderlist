@@ -26,9 +26,6 @@ const getConfigVal = (configKey, envVal, defaultVal = "") => {
   return String(envVal || defaultVal).trim();
 };
 
-const TELEGRAM_BOT_TOKEN = getConfigVal("TELEGRAM_BOT_TOKEN", process.env.TELEGRAM_BOT_TOKEN);
-const TELEGRAM_CHAT_ID = getConfigVal("TELEGRAM_CHAT_ID", process.env.TELEGRAM_CHAT_ID);
-
 const getBoolConfig = (configKey, envVal, defaultVal = true) => {
   const dynamicVal = systemConfigService.get(configKey);
   if (dynamicVal !== null && dynamicVal !== undefined) {
@@ -38,14 +35,7 @@ const getBoolConfig = (configKey, envVal, defaultVal = true) => {
   return String(envVal ?? defaultVal).toLowerCase() !== 'false';
 };
 
-// Các cờ kích hoạt/tắt (Đọc từ systemConfigService với fallback qua env)
-const SEND_ORDER_NOTIFICATION = getBoolConfig("SEND_ORDER_NOTIFICATION", process.env.SEND_ORDER_NOTIFICATION, true);
-const SEND_FINANCE_DELTA_NOTIFICATION = getBoolConfig("SEND_FINANCE_DELTA_NOTIFICATION", process.env.SEND_FINANCE_DELTA_NOTIFICATION, true);
-const SEND_ERROR_NOTIFICATION = getBoolConfig("SEND_ERROR_NOTIFICATION", process.env.SEND_ERROR_NOTIFICATION, true);
-const SEND_ORDER_TO_TOPIC = getBoolConfig("SEND_ORDER_TO_TOPIC", process.env.SEND_ORDER_TO_TOPIC, true);
-const SEND_ORDER_COPY_BUTTONS = getBoolConfig("SEND_ORDER_COPY_BUTTONS", process.env.SEND_ORDER_COPY_BUTTONS, true);
-
-// Topic IDs (Đọc từ systemConfigService với fallback qua env)
+// Topic IDs (Đọc động từ systemConfigService với fallback qua env)
 const getTopicId = (configKey, envVal, defaultVal) => {
   const dynamicVal = systemConfigService.get(configKey);
   if (dynamicVal !== null && dynamicVal !== undefined && String(dynamicVal).trim() !== "") {
@@ -54,38 +44,29 @@ const getTopicId = (configKey, envVal, defaultVal) => {
   return parseOptionalTopicId(envVal || defaultVal);
 };
 
-const TELEGRAM_ORDER_TOPIC_ID = getTopicId("TELEGRAM_ORDER_TOPIC_ID", process.env.TELEGRAM_ORDER_TOPIC_ID);
-const TELEGRAM_IMPORT_ORDER_TOPIC_ID = getTopicId("TELEGRAM_IMPORT_ORDER_TOPIC_ID", process.env.TELEGRAM_IMPORT_ORDER_TOPIC_ID);
-const TELEGRAM_FINANCE_TOPIC_ID = getTopicId("TELEGRAM_FINANCE_TOPIC_ID", process.env.TELEGRAM_FINANCE_TOPIC_ID, "7009");
-const ERROR_TOPIC_ID = getTopicId("TELEGRAM_SYSTEM_ALERT_TOPIC_ID", process.env.ERROR_TOPIC_ID, "6");
-const TELEGRAM_RENEWAL_TOPIC_ID = getTopicId("TELEGRAM_RENEWAL_TOPIC_ID", process.env.TELEGRAM_RENEWAL_TOPIC_ID, "2");
-const ZERO_DAYS_TOPIC_ID = getTopicId("ZERO_DAYS_TOPIC_ID", process.env.ZERO_DAYS_TOPIC_ID, "2563");
-const FOUR_DAYS_TOPIC_ID = getTopicId("FOUR_DAYS_TOPIC_ID", process.env.FOUR_DAYS_TOPIC_ID, "12");
-
-// Logic gán topic mặc định cho Đơn mới
-const ORDER_CREATED_TOPIC_ID = (() => {
-  if (Number.isFinite(TELEGRAM_ORDER_TOPIC_ID)) return TELEGRAM_ORDER_TOPIC_ID;
-  if (Number.isFinite(FOUR_DAYS_TOPIC_ID)) return FOUR_DAYS_TOPIC_ID;
-  return NaN;
-})();
-
 module.exports = {
-  HTTP_TIMEOUT_MS,
-  TELEGRAM_BOT_TOKEN,
-  TELEGRAM_CHAT_ID,
+  get HTTP_TIMEOUT_MS() { return HTTP_TIMEOUT_MS; },
+  get TELEGRAM_BOT_TOKEN() { return getConfigVal("TELEGRAM_BOT_TOKEN", process.env.TELEGRAM_BOT_TOKEN); },
+  get TELEGRAM_CHAT_ID() { return getConfigVal("TELEGRAM_CHAT_ID", process.env.TELEGRAM_CHAT_ID); },
   
-  SEND_ORDER_NOTIFICATION,
-  SEND_FINANCE_DELTA_NOTIFICATION,
-  SEND_ERROR_NOTIFICATION,
-  SEND_ORDER_TO_TOPIC,
-  SEND_ORDER_COPY_BUTTONS,
+  get SEND_ORDER_NOTIFICATION() { return getBoolConfig("SEND_ORDER_NOTIFICATION", process.env.SEND_ORDER_NOTIFICATION, true); },
+  get SEND_FINANCE_DELTA_NOTIFICATION() { return getBoolConfig("SEND_FINANCE_DELTA_NOTIFICATION", process.env.SEND_FINANCE_DELTA_NOTIFICATION, true); },
+  get SEND_ERROR_NOTIFICATION() { return getBoolConfig("SEND_ERROR_NOTIFICATION", process.env.SEND_ERROR_NOTIFICATION, true); },
+  get SEND_ORDER_TO_TOPIC() { return getBoolConfig("SEND_ORDER_TO_TOPIC", process.env.SEND_ORDER_TO_TOPIC, true); },
+  get SEND_ORDER_COPY_BUTTONS() { return getBoolConfig("SEND_ORDER_COPY_BUTTONS", process.env.SEND_ORDER_COPY_BUTTONS, true); },
   
-  TELEGRAM_ORDER_TOPIC_ID,
-  TELEGRAM_IMPORT_ORDER_TOPIC_ID,
-  TELEGRAM_FINANCE_TOPIC_ID,
-  TELEGRAM_RENEWAL_TOPIC_ID,
-  ERROR_TOPIC_ID,
-  ZERO_DAYS_TOPIC_ID,
-  FOUR_DAYS_TOPIC_ID,
-  ORDER_CREATED_TOPIC_ID,
+  get TELEGRAM_ORDER_TOPIC_ID() { return getTopicId("TELEGRAM_ORDER_TOPIC_ID", process.env.TELEGRAM_ORDER_TOPIC_ID); },
+  get TELEGRAM_IMPORT_ORDER_TOPIC_ID() { return getTopicId("TELEGRAM_IMPORT_ORDER_TOPIC_ID", process.env.TELEGRAM_IMPORT_ORDER_TOPIC_ID); },
+  get TELEGRAM_FINANCE_TOPIC_ID() { return getTopicId("TELEGRAM_FINANCE_TOPIC_ID", process.env.TELEGRAM_FINANCE_TOPIC_ID, "7009"); },
+  get TELEGRAM_RENEWAL_TOPIC_ID() { return getTopicId("TELEGRAM_RENEWAL_TOPIC_ID", process.env.TELEGRAM_RENEWAL_TOPIC_ID, "2"); },
+  get ERROR_TOPIC_ID() { return getTopicId("TELEGRAM_SYSTEM_ALERT_TOPIC_ID", process.env.ERROR_TOPIC_ID, "6"); },
+  get ZERO_DAYS_TOPIC_ID() { return getTopicId("ZERO_DAYS_TOPIC_ID", process.env.ZERO_DAYS_TOPIC_ID, "2563"); },
+  get FOUR_DAYS_TOPIC_ID() { return getTopicId("FOUR_DAYS_TOPIC_ID", process.env.FOUR_DAYS_TOPIC_ID, "12"); },
+  get ORDER_CREATED_TOPIC_ID() {
+    const orderTopic = getTopicId("TELEGRAM_ORDER_TOPIC_ID", process.env.TELEGRAM_ORDER_TOPIC_ID);
+    if (Number.isFinite(orderTopic)) return orderTopic;
+    const fourDaysTopic = getTopicId("FOUR_DAYS_TOPIC_ID", process.env.FOUR_DAYS_TOPIC_ID, "12");
+    if (Number.isFinite(fourDaysTopic)) return fourDaysTopic;
+    return NaN;
+  },
 };

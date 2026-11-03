@@ -13,10 +13,8 @@ const scheduledTasks = new Map();
 let initialized = false;
 
 const handlers = {
-  order_status_0h: async () => ({
-    update: await updateOrderStatusTask("cron_schedule"),
-    zeroDays: await notifyZeroDaysTask("cron_schedule"),
-  }),
+  order_status_0h: () => updateOrderStatusTask("cron_schedule"),
+  notify_zero_days: () => notifyZeroDaysTask("cron_schedule"),
   notify_four_days: () => notifyFourDaysTask("cron_schedule"),
   credit_savings_profit: () => creditSavingsProfitTask("cron_schedule"),
   finalize_daily_summary: () => finalizeDailySummaryTask("cron_schedule"),
