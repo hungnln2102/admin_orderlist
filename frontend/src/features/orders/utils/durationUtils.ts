@@ -112,7 +112,8 @@ export function calculateExpirationDate(baseDateInput?: string | Date | null, da
  * - Tháng: "--1m", "--3m", "--6m", "--12m", "1 tháng", "3 tháng", "6 tháng", "12 tháng"
  * - Năm: "--1y", "--2y", "1 năm", "2 năm"
  * - Ngày: "--30d", "30 ngày"...
- * - An toàn ngày cuối tháng (Ví dụ: 31/01 + 1 tháng -> 28/02 không bị tràn sang tháng 3).
+ * - Ngày hết hạn bao gồm ngày bắt đầu; ví dụ 27/10 + 1 tháng sẽ hết hạn 26/11.
+ * - An toàn ngày cuối tháng (Ví dụ: 31/01 + 1 tháng -> 27/02 không bị tràn sang tháng 3).
  */
 export function calculateExpirationDateFromStart(
   startDateInput?: string | Date | null,
@@ -166,12 +167,15 @@ export function calculateExpirationDateFromStart(
     };
   }
 
+  // targetDate is the exclusive boundary at the matching calendar date.
   const targetDate = new Date(targetYear, targetMonth - 1, targetDay, 0, 0, 0, 0);
-  const diffTime = targetDate.getTime() - start.getTime();
+  const expiryDate = new Date(targetDate);
+  expiryDate.setDate(expiryDate.getDate() - 1);
+  const diffTime = expiryDate.getTime() - start.getTime();
   const diffDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
 
   return {
-    expired_at: formatDateYYYYMMDD(targetDate),
+    expired_at: formatDateYYYYMMDD(expiryDate),
     days: diffDays,
   };
 }

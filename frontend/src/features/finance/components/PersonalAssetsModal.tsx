@@ -83,6 +83,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   const [debtHasEndDate, setDebtHasEndDate] = useState(false);
   const [debtEndDate, setDebtEndDate] = useState("");
   const [debtRepaymentFrequency, setDebtRepaymentFrequency] = useState<DebtRepaymentFrequency>("MONTHLY");
+  const [cardLastDigits, setCardLastDigits] = useState("");
+  const [bankName, setBankName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const isYieldAsset = type === "SAVINGS";
@@ -107,6 +109,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setDebtHasEndDate(Boolean(editingItem.debtEndDate));
       setDebtEndDate(editingItem.debtEndDate || "");
       setDebtRepaymentFrequency(editingItem.debtRepaymentFrequency || "MONTHLY");
+      setCardLastDigits(editingItem.cardLastDigits || "");
+      setBankName(editingItem.bankName || "");
     } else {
       setName("");
       setAmount("");
@@ -125,6 +129,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setDebtHasEndDate(false);
       setDebtEndDate("");
       setDebtRepaymentFrequency("MONTHLY");
+      setCardLastDigits("");
+      setBankName("");
     }
   }, [editingItem, defaultType, isOpen]);
 
@@ -334,6 +340,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
         debtDueDay: isDebtAsset && debtDueDay ? Number(debtDueDay) : null,
         debtEndDate: (isDebtAsset && debtHasEndDate && debtEndDate) ? debtEndDate : null,
         debtRepaymentFrequency: isDebtAsset ? debtRepaymentFrequency : null,
+        cardLastDigits: isDebtAsset ? (cardLastDigits.trim() || null) : null,
+        bankName: isDebtAsset ? (bankName.trim() || null) : null,
       });
       onClose();
     } catch (error: any) {
@@ -533,6 +541,47 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                       </span>
                     </div>
                   )}
+
+                  {/* Card Reconciliation (4 Last Digits & Bank Issuer) */}
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                        <CreditCard className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-slate-200 block">Định danh thẻ / Đối chiếu tự động</span>
+                        <span className="text-[10px] text-slate-400">Dùng cho App đọc SMS/Email tự động khớp giao dịch quẹt thẻ</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-300 font-medium">
+                          4 số cuối thẻ ngân hàng
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          placeholder="VD: 0963"
+                          value={cardLastDigits}
+                          onChange={(e) => setCardLastDigits(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                          className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono font-bold text-cyan-300 placeholder:text-slate-600 focus:border-cyan-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-300 font-medium">
+                          Ngân hàng phát hành
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="VD: VPBank, Techcombank, VIB..."
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-cyan-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Interest Rate Toggle (iOS Style Switch) */}
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2.5">

@@ -64,6 +64,38 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
       p.san_pham === formData.id_product
   );
 
+  const handleDateRangeChange = (
+    start: string,
+    end: string,
+    changedField?: "start" | "end"
+  ) => {
+    if (changedField === "end") {
+      const startDate = parseDateToMidnight(formData.order_date) || new Date();
+      const selectedEndDate = parseDateToMidnight(end) || startDate;
+      const expiredAt = selectedEndDate < startDate ? formData.order_date : end;
+      const endDate = parseDateToMidnight(expiredAt) || startDate;
+      const diffDays = Math.max(
+        1,
+        Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      );
+
+      setFormData({
+        ...formData,
+        expired_at: expiredAt,
+        days: diffDays,
+      });
+      return;
+    }
+
+    const textToMatch = `${matchedProduct?.package_product || ""} ${formData.variant_name || ""} ${formData.display_name || ""} ${matchedProduct?.san_pham || ""} ${formData.id_product || ""}`;
+    const autoCalc = calculateExpirationDateFromStart(start, textToMatch, formData.days);
+    setFormData({
+      ...formData,
+      order_date: start,
+      expired_at: autoCalc.expired_at,
+      days: autoCalc.days,
+    });
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-[#0b1329] border border-cyan-500/30 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -448,31 +480,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 startDate={formData.order_date}
                 endDate={formData.expired_at}
                 openDirection="up"
-                onChange={(start, end, changedField) => {
-                  const isStartDateChanged = changedField === "start" || (start !== formData.order_date && end === formData.expired_at);
-
-                  if (isStartDateChanged) {
-                    const textToMatch = `${matchedProduct?.package_product || ""} ${formData.variant_name || ""} ${formData.display_name || ""} ${matchedProduct?.san_pham || ""} ${formData.id_product || ""}`;
-                    const autoCalc = calculateExpirationDateFromStart(start, textToMatch, formData.days);
-                    setFormData({
-                      ...formData,
-                      order_date: start,
-                      expired_at: autoCalc.expired_at,
-                      days: autoCalc.days,
-                    });
-                  } else {
-                    const startDateObj = parseDateToMidnight(formData.order_date) || new Date();
-                    const endDateObj = parseDateToMidnight(end) || startDateObj;
-                    const diffTime = endDateObj.getTime() - startDateObj.getTime();
-                    const diffDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
-                    setFormData({
-                      ...formData,
-                      order_date: formData.order_date,
-                      expired_at: end,
-                      days: diffDays,
-                    });
-                  }
-                }}
+                onChange={handleDateRangeChange}
               />
             </div>
           </div>

@@ -73,6 +73,8 @@ export interface PersonalAsset {
   debtDueDay?: number | null;
   debtEndDate?: string | null;
   debtRepaymentFrequency?: DebtRepaymentFrequency | null;
+  cardLastDigits?: string | null;
+  bankName?: string | null;
   updatedAt?: string;
 }
 
@@ -200,6 +202,29 @@ export interface SavingFundTransaction {
   createdAt: string;
 }
 
+export type DebtPaymentTargetType =
+  | "PERSONAL_DEBT"
+  | "PERSONAL_DEBT_BORROW"
+  | "INSTALLMENT"
+  | "FIXED_COST";
+
+export interface DebtPaymentLogItem {
+  id: number;
+  targetType: DebtPaymentTargetType;
+  targetId: number;
+  targetName: string;
+  periodMonth?: string | null;
+  amount: number;
+  paymentDate: string | null;
+  note: string;
+  referenceCode?: string | null;
+  merchantName?: string | null;
+  cardLastDigits?: string | null;
+  bankName?: string | null;
+  financialAccountName?: string | null;
+  createdAt: string;
+}
+
 export interface SavingGoalsOverviewData {
   currentFund: number;
   totalGoalsCount: number;
@@ -222,4 +247,5 @@ export interface FinanceSummaryData {
   shopBankAccounts: ShopBankAccount[];
   usdtWallets: UsdtWallet[];
   savingGoals?: SavingGoalsOverviewData;
+  debtPaymentLogs?: DebtPaymentLogItem[];
 }

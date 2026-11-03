@@ -444,6 +444,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     type: r.type,
     amount: toNumber(r.amount),
     note: r.note || "",
+    cardLastDigits: r.card_last_digits || null,
+    bankName: r.bank_name || null,
     profitEnabled: Boolean(r.profit_enabled),
     profitFrequency: r.profit_frequency || null,
     annualInterestRate: toNumber(r.annual_interest_rate),
@@ -722,6 +724,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     shopBankAccounts,
     usdtWallets,
     savingGoals: await getSavingGoalsOverview(),
+    debtPaymentLogs: await getDebtPaymentLogs({ limit: 50 }),
   };
 }
 
@@ -1011,7 +1014,7 @@ async function payInstallment(id, payload) {
         financial_account_id: financialAccountId ? Number(financialAccountId) : null,
         amount: numAmount,
         payment_date: new Date().toISOString().slice(0, 10),
-        note: note || `Thanh toán kỳ ${periodMonth}`,
+        note: note ? String(note).trim() : null,
       })
       .returning("*");
 
@@ -1042,12 +1045,17 @@ async function createPersonalAsset(payload) {
     debtRepaymentFrequency: payload.debtRepaymentFrequency,
   });
 
+  const cardLastDigits = payload.cardLastDigits !== undefined ? (payload.cardLastDigits ? String(payload.cardLastDigits).trim() : null) : null;
+  const bankName = payload.bankName !== undefined ? (payload.bankName ? String(payload.bankName).trim() : null) : null;
+
   const [created] = await db(TABLES.PERSONAL_ASSETS)
     .insert({
       name: payload.name,
       type,
       amount: toNumber(payload.amount),
       note: payload.note || "",
+      card_last_digits: cardLastDigits,
+      bank_name: bankName,
       ...profitConfig,
       ...debtConfig,
     })
@@ -1059,6 +1067,8 @@ async function createPersonalAsset(payload) {
     type: created.type,
     amount: toNumber(created.amount),
     note: created.note || "",
+    cardLastDigits: created.card_last_digits || null,
+    bankName: created.bank_name || null,
     profitEnabled: Boolean(created.profit_enabled),
     profitFrequency: created.profit_frequency || null,
     annualInterestRate: toNumber(created.annual_interest_rate),
@@ -1107,6 +1117,8 @@ async function updatePersonalAsset(id, payload) {
   if (payload.type !== undefined) updateData.type = type;
   if (payload.amount !== undefined) updateData.amount = toNumber(payload.amount);
   if (payload.note !== undefined) updateData.note = payload.note;
+  if (payload.cardLastDigits !== undefined) updateData.card_last_digits = payload.cardLastDigits ? String(payload.cardLastDigits).trim() : null;
+  if (payload.bankName !== undefined) updateData.bank_name = payload.bankName ? String(payload.bankName).trim() : null;
   Object.assign(updateData, profitConfig);
   Object.assign(updateData, debtConfig);
 
@@ -1122,6 +1134,8 @@ async function updatePersonalAsset(id, payload) {
     type: updated.type,
     amount: toNumber(updated.amount),
     note: updated.note || "",
+    cardLastDigits: updated.card_last_digits || null,
+    bankName: updated.bank_name || null,
     profitEnabled: Boolean(updated.profit_enabled),
     profitFrequency: updated.profit_frequency || null,
     annualInterestRate: toNumber(updated.annual_interest_rate),
@@ -1177,7 +1191,7 @@ async function payPersonalAsset(id, payload) {
         financial_account_id: financialAccountId ? Number(financialAccountId) : null,
         amount: numAmount,
         payment_date: new Date().toISOString().slice(0, 10),
-        note: note || `Trả bớt nợ`,
+        note: note ? String(note).trim() : null,
       })
       .returning("*");
 
@@ -1186,20 +1200,39 @@ async function payPersonalAsset(id, payload) {
 }
 
 async function borrowPersonalAsset(id, payload) {
-  const { financialAccountId, receiptId, amount, note } = payload;
+  const { financialAccountId, receiptId, amount, note, merchantName, referenceCode, directExpense } = payload;
   const numAmount = toNumber(amount);
   if (numAmount <= 0) throw new Error("Số tiền vay thêm phải lớn hơn 0");
 
   return await withTransaction(async (trx) => {
-    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).first();
+    // 1. Khóa hàng row-level lock (FOR UPDATE) để bảo đảm ACID khi chạy đồng thời
+    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
     if (!asset) throw new Error("Không tìm thấy mục nợ");
+
+    // 2. Kiểm tra Idempotency nếu có mã tham chiếu (referenceCode)
+    if (referenceCode && String(referenceCode).trim()) {
+      const cleanRef = String(referenceCode).trim();
+      const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
+        .where("reference_code", cleanRef)
+        .first();
+      if (existingLog) {
+        return {
+          success: true,
+          alreadyProcessed: true,
+          newAmount: toNumber(asset.amount),
+          logId: Number(existingLog.id),
+        };
+      }
+    }
 
     const currentAmount = toNumber(asset.amount);
     const newAmount = currentAmount + numAmount;
 
+    const isDirect = Boolean(directExpense) || (!financialAccountId && !receiptId);
+
     if (receiptId) {
       await allocateReceiptInTrx(trx, receiptId, numAmount, "OTHER_INCOME", `PERSONAL_DEBT_BORROW_${id}`, note || `Vay thêm / Phát sinh nợ "${asset.name}"`);
-    } else if (financialAccountId) {
+    } else if (financialAccountId && !isDirect) {
       const { creditFinancialAccount } = require("@/domains/wallets/services/walletService");
       await creditFinancialAccount(trx, {
         accountId: Number(financialAccountId),
@@ -1214,16 +1247,133 @@ async function borrowPersonalAsset(id, payload) {
       .where("id", id)
       .update({ amount: newAmount, updated_at: trx.fn.now() });
 
-    await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+    const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
       target_type: "PERSONAL_DEBT_BORROW",
       target_id: id,
-      financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+      financial_account_id: (financialAccountId && !isDirect) ? Number(financialAccountId) : null,
       amount: numAmount,
       payment_date: new Date().toISOString().slice(0, 10),
-      note: note || `Vay thêm / Phát sinh nợ`,
-    });
+      reference_code: referenceCode ? String(referenceCode).trim() : null,
+      merchant_name: merchantName ? String(merchantName).trim() : null,
+      note: note ? String(note).trim() : null,
+    }).returning("*");
 
-    return { success: true, newAmount };
+    return { success: true, newAmount, logId: createdLog ? Number(createdLog.id) : undefined };
+  });
+}
+
+async function autoMatchCardTransaction(payload) {
+  const { cardLastDigits, bankName, amount, merchantName, referenceCode, note } = payload;
+  if (!cardLastDigits) {
+    throw new Error("Vui lòng cung cấp 4 số cuối thẻ ngân hàng để đối chiếu");
+  }
+  const numAmount = toNumber(amount);
+  if (numAmount <= 0) {
+    throw new Error("Số tiền giao dịch phải lớn hơn 0");
+  }
+
+  const cleanLastDigits = String(cardLastDigits).trim();
+  let query = db(TABLES.PERSONAL_ASSETS)
+    .where("card_last_digits", cleanLastDigits)
+    .whereIn("type", ["DEBT_PAYABLE"]);
+
+  if (bankName && bankName.trim()) {
+    query = query.whereILike("bank_name", `%${bankName.trim()}%`);
+  }
+
+  const matches = await query;
+  if (!matches || matches.length === 0) {
+    throw new Error(`Không tìm thấy thẻ ngân hàng có 4 số cuối "${cleanLastDigits}"${bankName ? ` tại ${bankName}` : ""}`);
+  }
+  if (matches.length > 1) {
+    throw new Error(`Phát hiện ${matches.length} thẻ ngân hàng có cùng 4 số cuối "${cleanLastDigits}". Vui lòng chỉ định rõ tên ngân hàng hoặc chọn thẻ cụ thể để tránh đối soát nhầm.`);
+  }
+
+  const matched = matches[0];
+
+  const borrowResult = await borrowPersonalAsset(matched.id, {
+    amount: numAmount,
+    merchantName: merchantName || null,
+    referenceCode: referenceCode || null,
+    directExpense: true,
+    note: note || `Quẹt thẻ tự động tại ${merchantName || 'cửa hàng'}`,
+  });
+
+  return {
+    success: true,
+    matchedAsset: {
+      id: Number(matched.id),
+      name: matched.name,
+      cardLastDigits: matched.card_last_digits,
+      bankName: matched.bank_name,
+    },
+    ...borrowResult,
+  };
+}
+
+async function getDebtPaymentLogs(options = {}) {
+  const { limit = 50, targetType } = options;
+
+  let query = db(TABLES.DEBT_PAYMENT_LOGS)
+    .leftJoin(TABLES.PERSONAL_ASSETS, function() {
+      this.on(`${TABLES.DEBT_PAYMENT_LOGS}.target_id`, '=', `${TABLES.PERSONAL_ASSETS}.id`)
+        .andOnIn(`${TABLES.DEBT_PAYMENT_LOGS}.target_type`, ['PERSONAL_DEBT', 'PERSONAL_DEBT_BORROW']);
+    })
+    .leftJoin(TABLES.INSTALLMENTS, function() {
+      this.on(`${TABLES.DEBT_PAYMENT_LOGS}.target_id`, '=', `${TABLES.INSTALLMENTS}.id`)
+        .andOn(`${TABLES.DEBT_PAYMENT_LOGS}.target_type`, '=', db.raw('?', ['INSTALLMENT']));
+    })
+    .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.DEBT_PAYMENT_LOGS}.financial_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
+    .select(
+      `${TABLES.DEBT_PAYMENT_LOGS}.*`,
+      `${TABLES.PERSONAL_ASSETS}.name as asset_name`,
+      `${TABLES.PERSONAL_ASSETS}.card_last_digits as asset_card_last_digits`,
+      `${TABLES.PERSONAL_ASSETS}.bank_name as asset_bank_name`,
+      `${TABLES.INSTALLMENTS}.name as installment_name`,
+      `${TABLES.FINANCIAL_ACCOUNTS}.label as financial_account_label`,
+      `${TABLES.FINANCIAL_ACCOUNTS}.bank_display_name as financial_bank_name`,
+      `${TABLES.FINANCIAL_ACCOUNTS}.account_number as financial_account_number`
+    )
+    .whereIn(`${TABLES.DEBT_PAYMENT_LOGS}.target_type`, ['PERSONAL_DEBT', 'PERSONAL_DEBT_BORROW', 'INSTALLMENT'])
+    .orderBy(`${TABLES.DEBT_PAYMENT_LOGS}.created_at`, 'desc')
+    .limit(limit);
+
+  if (targetType) {
+    query = query.where(`${TABLES.DEBT_PAYMENT_LOGS}.target_type`, targetType);
+  }
+
+  const rows = await query;
+  return rows.map((r) => {
+    let targetName = "";
+    if (r.target_type === "INSTALLMENT") {
+      targetName = r.installment_name || `Hợp đồng #${r.target_id}`;
+    } else {
+      targetName = r.asset_name || `Khoản nợ #${r.target_id}`;
+    }
+
+    let financialAccountName = null;
+    if (r.financial_account_label) {
+      financialAccountName = r.financial_account_label;
+    } else if (r.financial_bank_name || r.financial_account_number) {
+      financialAccountName = `${r.financial_bank_name || "Ngân hàng"} (${r.financial_account_number || ""})`.trim();
+    }
+
+    return {
+      id: Number(r.id),
+      targetType: r.target_type,
+      targetId: Number(r.target_id),
+      targetName,
+      periodMonth: r.period_month || null,
+      amount: toNumber(r.amount),
+      paymentDate: r.payment_date ? (typeof r.payment_date === 'string' ? r.payment_date.slice(0, 10) : new Date(r.payment_date).toISOString().slice(0, 10)) : null,
+      note: r.note || "",
+      referenceCode: r.reference_code || null,
+      merchantName: r.merchant_name || null,
+      cardLastDigits: r.asset_card_last_digits || null,
+      bankName: r.asset_bank_name || null,
+      financialAccountName,
+      createdAt: r.created_at,
+    };
   });
 }
 
@@ -1847,6 +1997,8 @@ module.exports = {
   deletePersonalAsset,
   payPersonalAsset,
   borrowPersonalAsset,
+  autoMatchCardTransaction,
+  getDebtPaymentLogs,
   getUnallocatedReceipts,
   getPersonalBalanceSnapshots,
   createPersonalBalanceSnapshot,

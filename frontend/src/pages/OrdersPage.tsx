@@ -23,8 +23,7 @@ import {
   resolvePriceByPrefix,
 } from "../features/orders/constants/orderPrefix";
 import {
-  parsePackageDuration,
-  calculateExpirationDate,
+  calculateExpirationDateFromStart,
   formatDateYYYYMMDD,
 } from "../features/orders/utils/durationUtils";
 
@@ -233,9 +232,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     await fetchSuppliersForProduct(prod.id);
 
     const textToMatch = `${prod.san_pham} ${prod.package_product || ""}`;
-    const { days: derivedDays } = parsePackageDuration(textToMatch);
     const baseDateStr = formData.order_date || formatDateYYYYMMDD(new Date());
-    const expiryStr = calculateExpirationDate(baseDateStr, derivedDays);
+    const duration = calculateExpirationDateFromStart(baseDateStr, textToMatch, formData.days);
 
     let existingSuffix = 0;
     if (isEditModalOpen && selectedOrder && !isImport) {
@@ -256,8 +254,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       gross_selling_price: isImport ? 0 : sellingPrice,
       supply_id: "",
       cost: 0,
-      days: derivedDays,
-      expired_at: expiryStr,
+      days: duration.days,
+      expired_at: duration.expired_at,
     }));
   };
 
@@ -321,7 +319,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       return;
     }
     const today = formatDateYYYYMMDD(new Date());
-    const nextYear = calculateExpirationDate(today, 365);
+    const nextYear = calculateExpirationDateFromStart(today, "--1y", 365).expired_at;
     setSelectedProductId(null);
     setProductSuppliersCatalog([]);
     setIsCustomPriceMode(false);

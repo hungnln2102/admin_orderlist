@@ -6,7 +6,19 @@ import { formatVND } from "@/shared/utils";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (mode: "INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW", payload: { financialAccountId?: number; receiptId?: number; amount: number; periodMonth?: string; note: string }) => Promise<void>;
+  onConfirm: (
+    mode: "INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW",
+    payload: {
+      financialAccountId?: number;
+      receiptId?: number;
+      amount: number;
+      periodMonth?: string;
+      note: string;
+      merchantName?: string;
+      referenceCode?: string;
+      directExpense?: boolean;
+    }
+  ) => Promise<void>;
   item?: Installment | PersonalAsset | null;
   defaultMode?: "INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW";
 }
@@ -26,7 +38,9 @@ export const DebtPaymentModal: React.FC<Props> = ({
   defaultMode = "INSTALLMENT",
 }) => {
   const [mode, setMode] = useState<"INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW">(defaultMode);
-  const [fundingSource, setFundingSource] = useState<"ACCOUNT" | "RECEIPT">("ACCOUNT");
+  const [fundingSource, setFundingSource] = useState<"DIRECT_EXPENSE" | "ACCOUNT" | "RECEIPT">("DIRECT_EXPENSE");
+  const [merchantName, setMerchantName] = useState<string>("");
+  const [referenceCode, setReferenceCode] = useState<string>("");
   const [accounts, setAccounts] = useState<LiquidityAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | "">("");
   const [unallocatedReceipts, setUnallocatedReceipts] = useState<any[]>([]);
@@ -42,19 +56,27 @@ export const DebtPaymentModal: React.FC<Props> = ({
 
     const initialMode = defaultMode;
     setMode(initialMode);
-    setFundingSource("ACCOUNT");
+    setMerchantName("");
+    setReferenceCode("");
 
     if (initialMode === "INSTALLMENT") {
+      setFundingSource("ACCOUNT");
       const inst = item as Installment;
       setAmount(String(inst.monthlyAmount || 0));
       const now = new Date();
       setPeriodMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
-      setNote(`Thanh toán trả góp "${inst.name}"`);
+      setNote("");
     } else {
       const debt = item as PersonalAsset;
       setAmount("");
-      setNote(initialMode === "DEBT_PAY" ? `Trả bớt nợ "${debt.name}"` : `Vay thêm / Phát sinh nợ "${debt.name}"`);
       setPeriodMonth("");
+      if (initialMode === "DEBT_BORROW") {
+        setFundingSource("DIRECT_EXPENSE");
+        setNote("");
+      } else {
+        setFundingSource("ACCOUNT");
+        setNote("");
+      }
     }
   }, [isOpen, item, defaultMode]);
 
@@ -122,7 +144,11 @@ export const DebtPaymentModal: React.FC<Props> = ({
   const handleModeChange = (newMode: "DEBT_PAY" | "DEBT_BORROW") => {
     setMode(newMode);
     const debt = item as PersonalAsset;
-    setNote(newMode === "DEBT_PAY" ? `Trả bớt nợ "${debt.name}"` : `Vay thêm / Phát sinh nợ "${debt.name}"`);
+    if (newMode === "DEBT_BORROW") {
+      setFundingSource("DIRECT_EXPENSE");
+    } else {
+      setFundingSource("ACCOUNT");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,11 +158,12 @@ export const DebtPaymentModal: React.FC<Props> = ({
       alert("Vui lòng nhập số tiền hợp lệ lớn hơn 0");
       return;
     }
-    if (fundingSource === "ACCOUNT" && !selectedAccountId && mode !== "DEBT_BORROW") {
-      alert("Vui lòng chọn tài khoản thanh khoản nguồn");
+    const isDirectExpense = mode === "DEBT_BORROW" && fundingSource === "DIRECT_EXPENSE";
+    if (!isDirectExpense && fundingSource === "ACCOUNT" && !selectedAccountId) {
+      alert("Vui lòng chọn tài khoản thanh khoản");
       return;
     }
-    if (fundingSource === "RECEIPT" && !selectedReceiptId) {
+    if (!isDirectExpense && fundingSource === "RECEIPT" && !selectedReceiptId) {
       alert("Vui lòng chọn biên lai ngân hàng");
       return;
     }
@@ -148,11 +175,14 @@ export const DebtPaymentModal: React.FC<Props> = ({
     try {
       setSubmitting(true);
       await onConfirm(mode, {
-        financialAccountId: fundingSource === "ACCOUNT" && selectedAccountId ? Number(selectedAccountId) : undefined,
-        receiptId: fundingSource === "RECEIPT" && selectedReceiptId ? Number(selectedReceiptId) : undefined,
+        financialAccountId: (!isDirectExpense && fundingSource === "ACCOUNT" && selectedAccountId) ? Number(selectedAccountId) : undefined,
+        receiptId: (!isDirectExpense && fundingSource === "RECEIPT" && selectedReceiptId) ? Number(selectedReceiptId) : undefined,
         amount: numAmount,
         periodMonth: periodMonth || undefined,
         note: note.trim(),
+        merchantName: isDirectExpense && merchantName.trim() ? merchantName.trim() : undefined,
+        referenceCode: isDirectExpense && referenceCode.trim() ? referenceCode.trim() : undefined,
+        directExpense: isDirectExpense,
       });
       onClose();
     } catch (err: any) {
@@ -226,8 +256,155 @@ export const DebtPaymentModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Funding Source Selection (Account vs Receipt) */}
-          {(mode === "INSTALLMENT" || mode === "DEBT_PAY" || mode === "DEBT_BORROW") && (
+          {/* Funding Source Selection */}
+          {mode === "DEBT_BORROW" ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5 text-violet-400" />
+                    Hình Thức Phát Sinh Nợ <span className="text-rose-400">*</span>
+                  </span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setFundingSource("DIRECT_EXPENSE")}
+                    className={`px-2.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      fundingSource === "DIRECT_EXPENSE"
+                        ? "bg-violet-500/20 text-violet-300 border border-violet-500/30 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Chi tiêu trực tiếp</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFundingSource("ACCOUNT")}
+                    className={`px-2.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      fundingSource === "ACCOUNT"
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span>Nhận vào ví/NH</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFundingSource("RECEIPT")}
+                    className={`px-2.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      fundingSource === "RECEIPT"
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>Khớp SePay</span>
+                  </button>
+                </div>
+              </div>
+
+              {fundingSource === "DIRECT_EXPENSE" && (
+                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-3">
+                  {(item as PersonalAsset)?.cardLastDigits && (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs">
+                      <span className="text-violet-300 font-semibold flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4 text-violet-400" />
+                        <span>Thẻ đối chiếu:</span>
+                      </span>
+                      <span className="font-mono font-bold text-white">
+                        {(item as PersonalAsset).bankName ? `${(item as PersonalAsset).bankName} ` : ""}•••• {(item as PersonalAsset).cardLastDigits}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="text-[11.5px] text-slate-400 leading-relaxed">
+                    💡 <strong className="text-slate-300">Quẹt thẻ thanh toán hóa đơn:</strong> Dư nợ thẻ sẽ tăng thêm đúng số tiền nhập. <span className="text-emerald-400 font-medium">Không làm ảnh hưởng hay cộng ảo vào bất kỳ tài khoản ngân hàng nào.</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                        Đơn vị / Hóa đơn thanh toán
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="VD: Shopee, TikTok, Tiền điện..."
+                        value={merchantName}
+                        onChange={(e) => setMerchantName(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                        Mã chuẩn chi / Giao dịch (SMS/Email)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="VD: FT243088921 hoặc để trống"
+                        value={referenceCode}
+                        onChange={(e) => setReferenceCode(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 placeholder:text-slate-600 focus:outline-none focus:border-violet-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {fundingSource === "ACCOUNT" && (
+                loadingAccounts ? (
+                  <div className="text-xs text-slate-500 py-3">Đang tải danh sách tài khoản...</div>
+                ) : accounts.length === 0 ? (
+                  <div className="text-xs text-rose-400 py-2">Không tìm thấy tài khoản ngân hàng hoặc ví nào đang hoạt động.</div>
+                ) : (
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => setSelectedAccountId(Number(e.target.value))}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.label} ({acc.detail})
+                      </option>
+                    ))}
+                  </select>
+                )
+              )}
+
+              {fundingSource === "RECEIPT" && (
+                unallocatedReceipts.length === 0 ? (
+                  <div className="text-xs text-rose-400 py-2">Không có biên lai ngân hàng nào chưa phân bổ (unallocated).</div>
+                ) : (
+                  <select
+                    value={selectedReceiptId}
+                    onChange={(e) => {
+                      const rId = Number(e.target.value);
+                      setSelectedReceiptId(rId);
+                      const found = unallocatedReceipts.find((r: any) => Number(r.id) === rId);
+                      if (found) {
+                        const avail = Number(found.unallocated_amount !== undefined ? found.unallocated_amount : found.amount);
+                        if (avail > 0) setAmount(String(avail));
+                      }
+                    }}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    {unallocatedReceipts.map((rec: any) => {
+                      const avail = Number(rec.unallocated_amount !== undefined ? rec.unallocated_amount : rec.amount);
+                      return (
+                        <option key={rec.id} value={rec.id}>
+                          [{rec.sepay_transaction_id || rec.reference_code || `REC-${rec.id}`}] {rec.sender || "Khách"} - {formatVND(avail)} (Khả dụng) - "{rec.note || ""}"
+                        </option>
+                      );
+                    })}
+                  </select>
+                )
+              )}
+            </div>
+          ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
@@ -352,7 +529,7 @@ export const DebtPaymentModal: React.FC<Props> = ({
             <div className="relative">
               <input
                 type="text"
-                placeholder="VD: Ghi chú giao dịch..."
+                placeholder={mode === "DEBT_BORROW" ? "VD: Quẹt Shopee, ăn trưa, đổ xăng, đóng tiền điện... (tùy chọn)" : mode === "DEBT_PAY" ? "VD: Trả bớt nợ chuyển khoản, tất toán nợ... (tùy chọn)" : "VD: Đóng tiền kỳ hạn thoại/laptop... (tùy chọn)"}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400"

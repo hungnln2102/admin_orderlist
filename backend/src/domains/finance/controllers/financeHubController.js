@@ -183,6 +183,15 @@ async function borrowPersonalAsset(req, res, next) {
   }
 }
 
+async function autoMatchCardTransaction(req, res, next) {
+  try {
+    const result = await financeHubService.autoMatchCardTransaction(req.body);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // --- PERSONAL BALANCE SNAPSHOTS & CIRCULAR STAT ---
 async function getPersonalBalanceSnapshots(req, res, next) {
   try {
@@ -295,6 +304,19 @@ async function withdrawSavingFund(req, res, next) {
   }
 }
 
+async function getDebtPaymentLogs(req, res, next) {
+  try {
+    const { limit, targetType } = req.query;
+    const logs = await financeHubService.getDebtPaymentLogs({
+      limit: limit ? Number(limit) : 50,
+      targetType,
+    });
+    return res.json({ success: true, logs });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getSummary,
   getUnallocatedReceipts,
@@ -313,6 +335,8 @@ module.exports = {
   deletePersonalAsset,
   payPersonalAsset,
   borrowPersonalAsset,
+  autoMatchCardTransaction,
+  getDebtPaymentLogs,
   getPersonalBalanceSnapshots,
   createPersonalBalanceSnapshot,
   updatePersonalBalanceSnapshot,

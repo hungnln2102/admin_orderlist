@@ -32,7 +32,7 @@ const {
  *
  * @param {{ topicId: string|number, text: string, bank: object|null, price: number }} opts
  */
-async function enqueueOrderMessage({ topicId, text, bank, price }) {
+async function enqueueOrderMessage({ topicId, text, bank, price, idempotencyKey = null, eventType = "GENERAL_MESSAGE" }) {
   let qrBuffer = null;
 
   if (price > 0 && bank?.accountNumber && (bank?.bankShortCode || bank?.bankBin)) {
@@ -50,20 +50,20 @@ async function enqueueOrderMessage({ topicId, text, bank, price }) {
   }
 
   if (qrBuffer) {
-    enqueueMessage({
+    return await enqueueMessage({
       chat_id: TELEGRAM_CHAT_ID,
       message_thread_id: topicId,
       photo: qrBuffer,
       caption: text,
       parse_mode: "HTML",
-    });
+    }, { idempotencyKey, eventType });
   } else {
-    enqueueMessage({
+    return await enqueueMessage({
       chat_id: TELEGRAM_CHAT_ID,
       message_thread_id: topicId,
       text,
       parse_mode: "HTML",
-    });
+    }, { idempotencyKey, eventType });
   }
 }
 
@@ -92,11 +92,15 @@ async function sendBulkTelegramOrders(orders = [], config) {
 
     // 2. Gửi Header nếu có
     if (headerMessage) {
-      enqueueMessage({
+      const todayStr = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      await enqueueMessage({
         chat_id: TELEGRAM_CHAT_ID,
         message_thread_id: topicId,
         text: headerMessage,
         parse_mode: "HTML",
+      }, {
+        idempotencyKey: `bulk_header:${topicId}:${todayStr}`,
+        eventType: "BULK_ORDER_HEADER",
       });
     }
 
@@ -105,6 +109,10 @@ async function sendBulkTelegramOrders(orders = [], config) {
 
     // 4. Đẩy từng đơn vào hàng đợi
     const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
+    let queued = 0;
+    let skipped = 0;
+    let failed = 0;
+
     for (let i = 0; i < deduped.length; i++) {
       let order = deduped[i];
       if (!order.productName && order.id_product) {
@@ -129,16 +137,44 @@ async function sendBulkTelegramOrders(orders = [], config) {
       const text = messageBuilder(order, i + 1, total, defaultBank);
       const price = Number(order.price) || 0;
 
-      await enqueueOrderMessage({
+      const orderCode = String(order?.id_order ?? order?.idOrder ?? order?.id ?? "").trim();
+      const expDateStr = order.expired_at ? new Date(order.expired_at).toISOString().slice(0, 10) : "";
+      let orderIdempotencyKey = null;
+      let eventType = "DUE_ORDER_NOTIFICATION";
+
+      if (topicId === FOUR_DAYS_TOPIC_ID) {
+        orderIdempotencyKey = `order:${orderCode}:renew_reminder:${expDateStr}`;
+        eventType = "ORDER_RENEW_REMINDER";
+      } else if (topicId === ZERO_DAYS_TOPIC_ID) {
+        orderIdempotencyKey = `order:${orderCode}:expired:${expDateStr}`;
+        eventType = "ORDER_EXPIRED";
+      } else {
+        orderIdempotencyKey = `order:${orderCode}:bulk_item:${expDateStr}`;
+      }
+
+      const enqueued = await enqueueOrderMessage({
         topicId,
         text,
         bank: (includeQR && isProductActive) ? defaultBank : null,
         price: isProductActive ? price : 0,
+        idempotencyKey: orderIdempotencyKey,
+        eventType,
       });
+
+      if (enqueued === true) {
+        queued++;
+      } else if (enqueued === false) {
+        skipped++;
+      } else {
+        failed++;
+      }
     }
+
+    return { success: true, total: deduped.length, queued, skipped, failed };
   } catch (error) {
     const logger = require("@/utils/logger");
     logger.error("[OrderNotifier] Lỗi khi sendBulkTelegramOrders", { error: error.message });
+    throw error;
   }
 }
 

@@ -68,6 +68,14 @@ test("Personal Debt - Nợ không thời hạn / Thẻ tín dụng & Phân bổ 
     assert.equal(alloc1.unallocated_amount, 400000, "Số dư chưa phân bổ của biên lai phải còn đúng 400.000 ₫");
     assert.equal(alloc1.status, "PARTIALLY_ALLOCATED", "Trạng thái biên lai phải là PARTIALLY_ALLOCATED");
 
+    // Kiểm tra getInvoices tab 'unlisted': Biên lai PARTIALLY_ALLOCATED còn dư 400k vẫn phải nằm ở tab unlisted
+    const unlistedRes = await invoiceService.getInvoices({ tab: "unlisted", limit: 100 });
+    const unlistedFound = unlistedRes.data.find((r) => Number(r.id) === Number(receiptId));
+    assert.ok(unlistedFound, "Biên lai PARTIALLY_ALLOCATED còn dư 400k phải xuất hiện ở tab unlisted");
+    assert.equal(unlistedFound.allocation_count, 1, "allocation_count phải bằng 1");
+    assert.equal(unlistedFound.allocations.length, 1, "allocations length phải bằng 1");
+    assert.equal(Number(unlistedFound.allocations[0].amount), 600000);
+
     // Kiểm tra Nợ 1 sau khi trả 600k: dư nợ phải giảm từ 800k xuống 200k
     const updatedDebt1 = await db(TABLES.PERSONAL_ASSETS).where({ id: debt1.id }).first();
     assert.equal(Number(updatedDebt1.amount), 200000, "Dư nợ khoản 1 phải giảm còn 200.000 ₫");
@@ -89,6 +97,13 @@ test("Personal Debt - Nợ không thời hạn / Thẻ tín dụng & Phân bổ 
 
     assert.equal(alloc2.unallocated_amount, 0, "Số dư chưa phân bổ của biên lai phải về 0 ₫");
     assert.equal(alloc2.status, "FULLY_ALLOCATED", "Trạng thái biên lai phải là FULLY_ALLOCATED");
+
+    // Kiểm tra getInvoices tab 'other': Biên lai đã FULLY_ALLOCATED xuất hiện ở tab other với đầy đủ allocations
+    const otherRes = await invoiceService.getInvoices({ tab: "other", limit: 100 });
+    const otherFound = otherRes.data.find((r) => Number(r.id) === Number(receiptId));
+    assert.ok(otherFound, "Biên lai FULLY_ALLOCATED nợ cá nhân phải xuất hiện ở tab other");
+    assert.equal(otherFound.allocation_count, 2, "Phải có đúng 2 mục phân bổ con");
+    assert.equal(otherFound.total_allocated, 1000000, "Tổng tiền đã phân bổ phải đúng 1.000.000 ₫");
 
     // Kiểm tra Nợ 2 sau khi trả 400k: dư nợ giảm từ 500k xuống 100k
     const updatedDebt2 = await db(TABLES.PERSONAL_ASSETS).where({ id: debt2.id }).first();

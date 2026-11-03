@@ -1,6 +1,11 @@
 require("module-alias/register");
 const express = require("express");
-const compression = require("compression");
+let compression;
+try {
+  compression = require("compression");
+} catch {
+  // compression is optional middleware
+}
 const cors = require("cors");
 const session = require("express-session");
 const PgSessionStore = require("connect-pg-simple")(session);
@@ -15,7 +20,9 @@ const { getClientErrorMessage } = require("@/utils/clientError");
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", process.env.TRUST_PROXY === "0" ? false : 1);
-app.use(compression({ level: 6 }));
+if (typeof compression === "function") {
+  app.use(compression({ level: 6 }));
+}
 const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.FRONTEND_ORIGINS || "")
   .split(",")
@@ -85,10 +92,22 @@ app.use(
   })
 );
 
-// Khởi chạy và đăng ký Event Subscribers & Cron Scheduler khi khởi động Server
+// Khởi chạy và đăng ký Event Subscribers, Cấu hình, Scheduler & Outbox Worker khi khởi động Server
 registerAllSubscribers();
-require("@/domains/system/services/systemConfigService").initCache();
-require("@/scheduler").initScheduler().catch((error) => console.error("[Scheduler] Không thể khởi tạo:", error));
+const systemConfigService = require("@/domains/system/services/systemConfigService");
+const { initScheduler } = require("@/scheduler");
+const { outboxDispatcherWorker } = require("@/domains/notifications");
+
+async function bootstrapBackgroundServices() {
+  try {
+    await systemConfigService.initCache();
+    await initScheduler();
+    outboxDispatcherWorker.start(3000);
+  } catch (error) {
+    console.error("[Bootstrap] Lỗi khởi động background services:", error);
+  }
+}
+bootstrapBackgroundServices();
 
 // Health Check Endpoint
 app.get("/api/health", async (req, res) => {

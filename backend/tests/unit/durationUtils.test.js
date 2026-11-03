@@ -90,35 +90,43 @@ function calculateExpirationDateFromStart(startDateInput, variantOrText, fallbac
   }
 
   const targetDate = new Date(targetYear, targetMonth - 1, targetDay, 0, 0, 0, 0);
-  const diffTime = targetDate.getTime() - start.getTime();
+  const expiryDate = new Date(targetDate);
+  expiryDate.setDate(expiryDate.getDate() - 1);
+  const diffTime = expiryDate.getTime() - start.getTime();
   const diffDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
 
   return {
-    expired_at: formatDateYYYYMMDD(targetDate),
+    expired_at: formatDateYYYYMMDD(expiryDate),
     days: diffDays,
   };
 }
 
-test("calculateExpirationDateFromStart: Youtube_Fam--3m starts on 2026-10-09 ends on 2027-01-09", () => {
+test("calculateExpirationDateFromStart: Youtube_Fam--3m includes the start date and ends the day before the next cycle", () => {
   const result = calculateExpirationDateFromStart("2026-10-09", "Youtube_Fam--3m");
-  assert.equal(result.expired_at, "2027-01-09");
-  assert.equal(result.days, 92);
+  assert.equal(result.expired_at, "2027-01-08");
+  assert.equal(result.days, 91);
 });
 
-test("calculateExpirationDateFromStart: 1 month package starts on 2026-10-09 ends on 2026-11-09", () => {
+test("calculateExpirationDateFromStart: 1 month package starts on 2026-10-09 and ends on 2026-11-08", () => {
   const result = calculateExpirationDateFromStart("2026-10-09", "Adobe_Renew--1m");
-  assert.equal(result.expired_at, "2026-11-09");
-  assert.equal(result.days, 31);
+  assert.equal(result.expired_at, "2026-11-08");
+  assert.equal(result.days, 30);
 });
 
-test("calculateExpirationDateFromStart: 1 year package starts on 2026-10-09 ends on 2027-10-09", () => {
+test("calculateExpirationDateFromStart: 1 year package starts on 2026-10-09 and ends on 2027-10-08", () => {
   const result = calculateExpirationDateFromStart("2026-10-09", "Canva Pro --1y");
-  assert.equal(result.expired_at, "2027-10-09");
-  assert.equal(result.days, 365);
+  assert.equal(result.expired_at, "2027-10-08");
+  assert.equal(result.days, 364);
 });
 
-test("calculateExpirationDateFromStart: End of month edge case (31/01 -> 28/02 in non-leap year)", () => {
+test("calculateExpirationDateFromStart: 27/10 + 1 month ends on 26/11", () => {
+  const result = calculateExpirationDateFromStart("2026-10-27", "Adobe_Renew2--1m");
+  assert.equal(result.expired_at, "2026-11-26");
+  assert.equal(result.days, 30);
+});
+
+test("calculateExpirationDateFromStart: End of month edge case (31/01 -> 27/02 in non-leap year)", () => {
   const result = calculateExpirationDateFromStart("2026-01-31", "--1m");
-  assert.equal(result.expired_at, "2026-02-28");
+  assert.equal(result.expired_at, "2026-02-27");
 });
 

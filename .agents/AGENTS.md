@@ -105,10 +105,17 @@ Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà)
 
 ---
 
-### Nguyên Tắc 6: Quy Trình Thiết Kế Artifact-First & Thảo Luận Lặp (Iterative Design Artifacts)
-- **Khi Master đưa ra vấn đề/ý tưởng mới (chưa có lệnh thực hiện)**: Thư ký Quy Hoạch (Lead Planner) bắt buộc phải tạo ngay một **Artifact Markdown độc lập** (phương án thiết kế, phân tích kiến trúc).
-- **Trong suốt quá trình thảo luận**: Mọi ý kiến góp ý, điều chỉnh hay bổ sung từ Master đều phải được **cập nhật liên tục, trực tiếp vào chính file Artifact đó** để làm nguồn sự thật chung.
-- **Khi có lệnh thực thi ("báo thực hiện")**: Đội ngũ Agent mới tiến hành thi công và triển khai dựa chính xác trên nội dung đã được chốt trong file Artifact đó. Nghiêm cấm tự ý code khi chưa có artifact thiết kế hoặc chưa được Master chốt.
+### Nguyên Tắc 6: Quy Trình Thiết Kế Spec-Kit (SDD) & Thảo Luận Lặp (Spec-Driven Development)
+- **Chuẩn hóa Spec-Kit (Chống vibe-coding tuyệt đối)**:
+  - Khi Master đưa ra bài toán/tính năng mới (chưa có lệnh thực hiện): Thư ký Quy Hoạch (Lead Planner) bắt buộc kích hoạt quy trình **Spec-Driven Development (SDD)** chuẩn Spec-Kit:
+    1. **Đặc tả nghiệp vụ (`spec.md`)**: Phân tích User Stories (WHAT & WHY) và định nghĩa Tiêu chí nghiệm thu (Acceptance Criteria) theo chuẩn **Gherkin** (`Given - When - Then`). Liệt kê rõ các trường hợp biên (Edge cases).
+    2. **Làm rõ điểm mù (`clarify`)**: Nêu tối đa 2-3 câu hỏi then chốt nếu có giả định ngầm hoặc thiếu thông tin.
+    3. **Kế hoạch kỹ thuật (`plan.md`)**: Thiết kế giải pháp (HOW) bám sát `dbSchema.js`, Knex transaction, React components, thực hiện **Reuse Audit** (rà soát tái sử dụng tối đa) và cắm biển **Redlines** (những điều cấm làm).
+    4. **Phân rã nhiệm vụ (`tasks.md`)**: Danh sách checklist tuần tự, có test case độc lập cho từng task.
+    5. **Kiểm toán nhất quán 3 chiều (`analyze`)**: Leader trực tiếp đối chiếu `spec.md` $\iff$ `plan.md` $\iff$ `tasks.md` để đảm bảo không thừa, không thiếu, không phình code.
+- **Trong suốt quá trình thảo luận**: Mọi ý kiến góp ý, điều chỉnh từ Master đều phải được **cập nhật liên tục, trực tiếp vào file Đặc Tả / Artifact đó** để làm nguồn sự thật duy nhất (SSOT).
+- **Khi có lệnh thực thi ("báo thực hiện" / "thực hiện đi")**: Orchestrator in khung `[PRE-FLIGHT CHECK]` xin chốt phạm vi, sau đó các Agent mới triển khai dựa chính xác trên nội dung đã được chốt. Nghiêm cấm tự ý code khi chưa có Spec hoặc chưa được Master duyệt.
+- **Nghiệm thu chuẩn Spec**: Nghiệm thu cuối cùng phải đối chiếu 1-1 với từng kịch bản Gherkin trong `spec.md`.
 
 ---
 

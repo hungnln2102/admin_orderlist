@@ -7,6 +7,10 @@ import {
   TrendingDown,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Scissors,
+  Sparkles,
   Eye,
   RefreshCw,
   ArrowUpRight,
@@ -23,6 +27,18 @@ import { CreateReceiptModal } from "../features/invoices/components/CreateReceip
 import { PendingBatchesModal } from "../features/invoices/components/PendingBatchesModal";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
+
+interface InvoiceAllocation {
+  id: number;
+  receipt_id: number;
+  allocation_type: string;
+  target_code: string | null;
+  amount: number;
+  remaining_balance: number;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+}
 
 interface InvoiceReceipt {
   id: number;
@@ -42,6 +58,9 @@ interface InvoiceReceipt {
   alloc_note?: string | null;
   order_customer: string | null;
   order_status: string | null;
+  allocations?: InvoiceAllocation[];
+  allocation_count?: number;
+  total_allocated?: number;
 }
 
 interface TabCounts {
@@ -95,6 +114,11 @@ export const ReceiptsPage: React.FC = () => {
   const [allocatingReceipt, setAllocatingReceipt] = useState<InvoiceReceipt | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isPendingBatchesOpen, setIsPendingBatchesOpen] = useState<boolean>(false);
+  const [expandedReceiptId, setExpandedReceiptId] = useState<number | null>(null);
+
+  const toggleExpand = (id: number) => {
+    setExpandedReceiptId((prev) => (prev === id ? null : id));
+  };
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -348,6 +372,7 @@ export const ReceiptsPage: React.FC = () => {
                   <>
                     <th className="py-3.5 px-4 min-w-[140px]">MÃ ĐƠN GỐC</th>
                     <th className="py-3.5 px-4 min-w-[140px]">SỐ TIỀN</th>
+                    <th className="py-3.5 px-4 min-w-[120px] text-center">SỐ BIÊN LAI GÁN</th>
                     <th className="py-3.5 px-4 min-w-[160px]">NGƯỜI GỬI</th>
                     <th className="py-3.5 px-4 min-w-[150px]">NGÀY THANH TOÁN</th>
                   </>
@@ -356,6 +381,7 @@ export const ReceiptsPage: React.FC = () => {
                   <>
                     <th className="py-3.5 px-4 min-w-[160px]">HẠNG MỤC / LOẠI GIAO DỊCH</th>
                     <th className="py-3.5 px-4 min-w-[140px]">SỐ TIỀN</th>
+                    <th className="py-3.5 px-4 min-w-[120px] text-center">SỐ BIÊN LAI GÁN</th>
                     <th className="py-3.5 px-4 min-w-[200px]">ĐỐI TÁC / NỘI DUNG</th>
                     <th className="py-3.5 px-4 min-w-[150px]">NGÀY GIAO DỊCH</th>
                   </>
@@ -364,6 +390,7 @@ export const ReceiptsPage: React.FC = () => {
                   <>
                     <th className="py-3.5 px-4 min-w-[160px]">MÃ GIAO DỊCH / REF</th>
                     <th className="py-3.5 px-4 min-w-[140px]">SỐ TIỀN CÒN DƯ</th>
+                    <th className="py-3.5 px-4 min-w-[220px]">NGUỒN GỐC BIÊN LAI</th>
                     <th className="py-3.5 px-4 min-w-[200px]">NGƯỜI GỬI / GHI CHÚ</th>
                     <th className="py-3.5 px-4 min-w-[150px]">NGÀY NHẬN TIỀN</th>
                   </>
@@ -374,7 +401,7 @@ export const ReceiptsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-16 text-center text-slate-400">
+                  <td colSpan={6} className="py-16 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                       <span>Đang tải biên lai thanh toán...</span>
@@ -383,7 +410,7 @@ export const ReceiptsPage: React.FC = () => {
                 </tr>
               ) : receipts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-16 text-center text-slate-500">
+                  <td colSpan={6} className="py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Receipt className="w-10 h-10 text-slate-600 stroke-[1.5]" />
                       <span className="text-sm font-medium">Không tìm thấy biên lai nào</span>
@@ -519,63 +546,203 @@ export const ReceiptsPage: React.FC = () => {
                     );
                   };
 
+                  const isExpanded = expandedReceiptId === receipt.id;
+
                   return (
-                    <tr
-                      key={receipt.id}
-                      className="hover:bg-slate-800/50 transition-colors group border-b border-slate-800/40"
-                    >
-                      {/* Column 1 */}
-                      <td className="py-3.5 px-4 font-mono">{renderColumn1()}</td>
+                    <React.Fragment key={receipt.id}>
+                      <tr
+                        className={`hover:bg-slate-800/50 transition-colors group border-b border-slate-800/40 ${
+                          isExpanded ? "bg-slate-800/60" : ""
+                        }`}
+                      >
+                        {/* Column 1 */}
+                        <td className="py-3.5 px-4 font-mono">{renderColumn1()}</td>
 
-                      {/* Amount */}
-                      <td className="py-3.5 px-4 font-bold font-mono">
-                        <div className="flex items-center gap-1.5">
-                          {isOut ? (
-                            <ArrowDownLeft className="w-3.5 h-3.5 text-rose-400" />
-                          ) : (
-                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
-                          )}
-                          <span className={isOut ? "text-rose-400" : "text-emerald-400"}>
-                            {formatCurrency(
-                              activeTab === "unlisted" && receipt.unallocated_amount !== undefined
-                                ? Number(receipt.unallocated_amount)
-                                : receipt.amount
+                        {/* Amount */}
+                        <td className="py-3.5 px-4 font-bold font-mono">
+                          <div className="flex items-center gap-1.5">
+                            {isOut ? (
+                              <ArrowDownLeft className="w-3.5 h-3.5 text-rose-400" />
+                            ) : (
+                              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
                             )}
-                          </span>
-                        </div>
-                      </td>
+                            <span className={isOut ? "text-rose-400" : "text-emerald-400"}>
+                              {formatCurrency(
+                                activeTab === "unlisted" && receipt.unallocated_amount !== undefined
+                                  ? Number(receipt.unallocated_amount)
+                                  : receipt.amount
+                              )}
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* Column 3 */}
-                      <td className="py-3.5 px-4">{renderColumn3()}</td>
-
-                      {/* Payment Date */}
-                      <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
-                        {formatDate(receipt.payment_date)}
-                      </td>
-
-                      {/* Action */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {(activeTab === "unlisted" || Number(receipt.unallocated_amount || 0) > 0) && (
+                        {/* Column 3: SỐ BIÊN LAI GÁN (tab orders & other) / NGUỒN GỐC (tab unlisted) */}
+                        {activeTab === "unlisted" ? (
+                          <td className="py-3.5 px-4">
+                            {receipt.status === "PARTIALLY_ALLOCATED" || (receipt.allocation_count && receipt.allocation_count > 0) ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold text-[11px]">
+                                  <Scissors className="w-3 h-3 text-amber-400" />
+                                  <span>Phần còn lại (Gốc #{receipt.id})</span>
+                                </span>
+                                <div className="text-[10.5px] text-slate-400 font-mono">
+                                  Gốc: <span className="text-slate-300 font-semibold">{formatCurrency(receipt.amount)}</span> • Đã gán: <span className="text-emerald-400 font-semibold">{formatCurrency(receipt.total_allocated || (receipt.amount - Number(receipt.unallocated_amount || 0)))}</span> ({receipt.allocation_count || 1} mục)
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold text-[11px]">
+                                <Sparkles className="w-3 h-3 text-emerald-400" />
+                                <span>Biên lai gốc mới</span>
+                              </span>
+                            )}
+                          </td>
+                        ) : (
+                          <td className="py-3.5 px-4 text-center">
                             <button
-                              onClick={() => setAllocatingReceipt(receipt)}
-                              title="Gán mã đơn hoặc phân bổ số dư"
-                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 rounded-xl border border-cyan-500/30 hover:border-cyan-500/50 transition-all shadow-sm active:scale-95 font-semibold text-xs"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(receipt.id);
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                (receipt.allocation_count || 0) > 1
+                                  ? "bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/25 shadow-sm"
+                                  : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                              }`}
+                              title="Bấm để xem danh sách các mục đã gán tương tự đơn hàng"
                             >
-                              <Link2 className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>Gán Đơn</span>
+                              <span>{receipt.allocation_count || 1} mục</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5 text-cyan-400" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                              )}
                             </button>
-                          )}
-                          <button
-                            onClick={() => setSelectedReceipt(receipt)}
-                            title="Xem chi tiết biên lai"
-                            className="inline-flex items-center justify-center p-2 bg-slate-800/80 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 rounded-xl border border-slate-700/60 hover:border-cyan-500/40 transition-all shadow-sm active:scale-95"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                          </td>
+                        )}
+
+                        {/* Column 4: Người gửi / Đối tác */}
+                        <td className="py-3.5 px-4">{renderColumn3()}</td>
+
+                        {/* Payment Date */}
+                        <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+                          {formatDate(receipt.payment_date)}
+                        </td>
+
+                        {/* Action */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {(activeTab === "unlisted" || Number(receipt.unallocated_amount || 0) > 0) && (
+                              <button
+                                onClick={() => setAllocatingReceipt(receipt)}
+                                title="Gán mã đơn hoặc phân bổ số dư"
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 rounded-xl border border-cyan-500/30 hover:border-cyan-500/50 transition-all shadow-sm active:scale-95 font-semibold text-xs cursor-pointer"
+                              >
+                                <Link2 className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>Gán Đơn</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedReceipt(receipt)}
+                              title="Xem chi tiết biên lai"
+                              className="inline-flex items-center justify-center p-2 bg-slate-800/80 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 rounded-xl border border-slate-700/60 hover:border-cyan-500/40 transition-all shadow-sm active:scale-95 cursor-pointer"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Dropdown list các lần phân bổ con (tương tự bên Đơn Hàng) */}
+                      {isExpanded && (
+                        <tr className="bg-slate-950/80 border-b border-slate-800 animate-in fade-in duration-200">
+                          <td colSpan={6} className="p-4 sm:p-5">
+                            <div className="bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-2xl space-y-3">
+                              {/* Header inside Panel */}
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Receipt className="w-4 h-4 text-cyan-400" />
+                                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                    Chi tiết các lần phân bổ của Biên lai #{receipt.id}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                    Tổng gốc: {formatCurrency(receipt.amount)}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                                    Đã phân bổ: {formatCurrency(receipt.total_allocated || receipt.amount)}
+                                  </span>
+                                </div>
+
+                                {Number(receipt.unallocated_amount || 0) > 0 && (
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="text-xs text-amber-300 font-medium">
+                                      Số dư chưa gán: <strong className="font-mono text-amber-400">{formatCurrency(Number(receipt.unallocated_amount))}</strong>
+                                    </span>
+                                    <button
+                                      onClick={() => setAllocatingReceipt(receipt)}
+                                      className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+                                    >
+                                      <Link2 className="w-3.5 h-3.5" />
+                                      <span>Phân bổ tiếp số dư này</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Table of Allocations */}
+                              {(!receipt.allocations || receipt.allocations.length === 0) ? (
+                                <div className="text-xs text-slate-500 py-3 text-center italic">
+                                  Chưa có lịch sử phân bổ chi tiết cho biên lai này.
+                                </div>
+                              ) : (
+                                <div className="overflow-x-auto custom-scrollbar">
+                                  <table className="w-full text-left text-xs">
+                                    <thead>
+                                      <tr className="text-[10.5px] uppercase font-bold text-slate-400 border-b border-slate-800/80">
+                                        <th className="py-2 px-3">Lần</th>
+                                        <th className="py-2 px-3">Loại phân bổ</th>
+                                        <th className="py-2 px-3">Đối tượng / Mã gán</th>
+                                        <th className="py-2 px-3">Số tiền đã gán</th>
+                                        <th className="py-2 px-3">Dư còn lại sau gán</th>
+                                        <th className="py-2 px-3">Thời gian</th>
+                                        <th className="py-2 px-3">Ghi chú</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/40">
+                                      {receipt.allocations.map((alloc, aIdx) => (
+                                        <tr key={alloc.id} className="hover:bg-slate-800/30">
+                                          <td className="py-2.5 px-3 font-mono text-slate-500 font-bold">#{aIdx + 1}</td>
+                                          <td className="py-2.5 px-3">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
+                                              {alloc.allocation_type}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono font-bold text-slate-200">
+                                            {alloc.target_code || "—"}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                                            {formatCurrency(alloc.amount)}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono text-slate-400">
+                                            {formatCurrency(alloc.remaining_balance)}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">
+                                            {formatDate(alloc.created_at)}
+                                          </td>
+                                          <td className="py-2.5 px-3 text-slate-300 max-w-[220px] truncate">
+                                            {alloc.note || "—"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}

@@ -112,25 +112,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <aside
         className={`fixed top-0 left-0 z-50 h-screen bg-[#070a11]/95 backdrop-blur-2xl border-r border-slate-800/80 flex flex-col transition-all duration-300 ease-in-out select-none ${
-          isCollapsed ? "lg:w-20" : "lg:w-72"
+          isCollapsed ? "lg:w-52" : "lg:w-72"
         } w-72 ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Brand Header */}
         {isCollapsed ? (
-          <div className="p-4 border-b border-slate-800/70 flex items-center justify-center">
-            <button
-              onClick={onToggleCollapse}
-              className="hidden lg:flex relative group w-11 h-11 rounded-xl items-center justify-center transition-all hover:scale-105 active:scale-95"
-              title="Mở rộng menu sidebar"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 rounded-xl blur-[3px] opacity-70 group-hover:opacity-100 transition duration-300" />
-              <div className="relative w-full h-full bg-[#0b0f19] rounded-xl border border-slate-700/60 flex items-center justify-center group-hover:bg-slate-900 transition-colors">
-                <PanelLeftOpen className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]" />
+          <div className="p-4 border-b border-slate-800/70">
+            {/* Desktop Collapsed Header */}
+            <div className="hidden lg:flex items-center justify-between w-full">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-500 p-0.5 shrink-0 shadow-md">
+                  <div className="w-full h-full bg-[#0b0f19] rounded-[9px] flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                  </div>
+                </div>
+                <div className="truncate min-w-0">
+                  <h1 className="font-black text-xs text-white tracking-wide truncate gradient-text-cyan">
+                    MAVRYK
+                  </h1>
+                </div>
               </div>
-            </button>
+              <button
+                onClick={onToggleCollapse}
+                className="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800/60 transition-colors shrink-0 cursor-pointer"
+                title="Mở rộng menu sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4 text-cyan-400" />
+              </button>
+            </div>
 
+            {/* Mobile Drawer Header (Always full on mobile) */}
             <div className="flex items-center justify-between w-full lg:hidden">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-500 p-0.5 shrink-0 shadow-md shadow-cyan-500/20">
@@ -149,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <button
                 onClick={onCloseMobile}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -176,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={onToggleCollapse}
-              className="hidden lg:flex p-2 text-slate-400 hover:text-cyan-400 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 transition-all border border-slate-800 hover:border-slate-700 active:scale-95 shadow-sm"
+              className="hidden lg:flex p-2 text-slate-400 hover:text-cyan-400 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 transition-all border border-slate-800 hover:border-slate-700 active:scale-95 shadow-sm shrink-0 cursor-pointer"
               title="Thu gọn menu sidebar"
             >
               <PanelLeftClose className="w-4.5 h-4.5" />
@@ -184,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={onCloseMobile}
-              className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60"
+              className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 shrink-0 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -245,9 +258,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                            onFocus={() => preloadRoute(item.path)}
                           title={item.name}
                           className={({ isActive }) =>
-                            `relative group flex items-center ${
-                              isCollapsed ? "justify-center px-0 py-3" : "gap-3 px-3.5 py-2.5"
-                            } rounded-xl text-xs font-semibold transition-all duration-200 select-none ${
+                            `relative group flex items-center justify-start gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 select-none ${
                               isActive
                                 ? "bg-gradient-to-r from-cyan-500/15 via-sky-500/10 to-transparent text-cyan-300 border-y border-r border-cyan-500/20 shadow-md shadow-cyan-500/5 font-bold"
                                 : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 hover:translate-x-1"
@@ -268,15 +279,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 }`}
                               />
 
-                              {!isCollapsed && (
-                                <>
-                                  <span className="truncate">{item.name}</span>
-                                  {item.badge && (
-                                    <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                                      {item.badge}
-                                    </span>
-                                  )}
-                                </>
+                              <span className="truncate flex-1 min-w-0 text-left">{item.name}</span>
+
+                              {item.badge && (!isCollapsed || isMobileOpen) && (
+                                <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0">
+                                  {item.badge}
+                                </span>
                               )}
                             </>
                           )}
@@ -291,42 +299,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User Footer Profile & System Status */}
-        <div className="p-3 border-t border-slate-800/70 bg-slate-950/60 backdrop-blur-md">
+        <div className="p-2.5 border-t border-slate-800/70 bg-slate-950/60 backdrop-blur-md">
           <div
             onClick={() => setShowProfileModal(true)}
-            className={`flex items-center cursor-pointer ${
-              isCollapsed
-                ? "flex-col gap-2 p-1"
-                : "gap-3 p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/50 hover:bg-slate-900 transition-all"
-            }`}
+            className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/50 hover:bg-slate-900 transition-all cursor-pointer"
             title="Xem thông tin tài khoản & Đổi mật khẩu"
           >
             <div className="relative shrink-0">
               <div
-                className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-400 via-sky-500 to-indigo-500 p-0.5 flex items-center justify-center font-black text-xs text-white shadow-md"
+                className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-400 via-sky-500 to-indigo-500 p-0.5 flex items-center justify-center font-black text-xs text-white shadow-md"
                 title={user?.username || "Administrator"}
               >
-                <div className="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center text-cyan-300 font-extrabold uppercase">
+                <div className="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center text-cyan-300 font-extrabold uppercase text-xs">
                   {user?.username ? user.username.charAt(0) : "A"}
                 </div>
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#070a11] shadow-sm" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#070a11] shadow-sm" />
             </div>
 
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-100 truncate flex items-center gap-1.5">
-                  <span>{user?.username || "Administrator"}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded font-mono">
-                    {user?.role || "admin"}
-                  </span>
-                </p>
-                <p className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                  Hệ Thống Online
-                </p>
-              </div>
-            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-100 truncate flex items-center gap-1.5">
+                <span className="truncate">{user?.username || "Administrator"}</span>
+              </p>
+              <p className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1 mt-0.5 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.8)] shrink-0" />
+                <span className="truncate">{user?.role || "admin"}</span>
+              </p>
+            </div>
 
             {/* Icon Button Đăng Xuất */}
             <button
@@ -334,7 +333,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 e.stopPropagation();
                 handleLogout();
               }}
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0 cursor-pointer"
               title="Đăng xuất khỏi hệ thống"
             >
               <LogOut className="w-4 h-4" />

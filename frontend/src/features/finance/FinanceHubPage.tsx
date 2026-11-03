@@ -467,6 +467,10 @@ export const FinanceHubPage: React.FC = () => {
                 }
                 monthlyDebtBurden={data.breakEven.monthlyDebtBurden ?? 0}
                 dailyBurden={data.dailyBreakEven?.dailyBurden ?? 0}
+                debtLogs={data.debtPaymentLogs}
+                onRefresh={async () => {
+                  await fetchData(month, period, year, startDate, endDate);
+                }}
                 onAddInstallment={handleAddInstallment}
                 onEditInstallment={handleEditInstallment}
                 onDeleteInstallment={handleDeleteInstallment}

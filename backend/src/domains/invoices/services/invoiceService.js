@@ -41,7 +41,13 @@ function applyOtherTabFilter(builder) {
 }
 
 function applyUnlistedTabFilter(builder) {
-  builder.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.UNALLOCATED);
+  builder.where((b) => {
+    b.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.UNALLOCATED)
+      .orWhere((b2) => {
+        b2.where(`${TABLES.PAYMENT_RECEIPT}.status`, RECEIPT_STATUS.PARTIALLY_ALLOCATED)
+          .whereRaw(`COALESCE(${TABLES.PAYMENT_RECEIPT}.unallocated_amount, 0) > 0`);
+      });
+  });
 }
 
 // ────────────── getInvoices ──────────────
@@ -149,6 +155,44 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
     .orderBy(`${TABLES.PAYMENT_RECEIPT}.id`, "desc")
     .limit(limitNum)
     .offset(offset);
+
+  // 3. Đính kèm danh sách phân bổ con (allocations) cho từng biên lai để phục vụ dropdown list
+  const receiptIds = data.map((r) => r.id);
+  if (receiptIds.length > 0) {
+    const rawAllocations = await db(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
+      .whereIn("receipt_id", receiptIds)
+      .orderBy("id", "asc");
+
+    const allocMap = {};
+    for (const alloc of rawAllocations) {
+      if (!allocMap[alloc.receipt_id]) {
+        allocMap[alloc.receipt_id] = [];
+      }
+      allocMap[alloc.receipt_id].push({
+        id: Number(alloc.id),
+        receipt_id: Number(alloc.receipt_id),
+        allocation_type: alloc.allocation_type,
+        target_code: alloc.target_code,
+        amount: Number(alloc.amount || 0),
+        remaining_balance: Number(alloc.remaining_balance || 0),
+        note: alloc.note,
+        created_by: alloc.created_by,
+        created_at: alloc.created_at,
+      });
+    }
+
+    for (const item of data) {
+      item.allocations = allocMap[item.id] || [];
+      item.allocation_count = item.allocations.length;
+      item.total_allocated = item.allocations.reduce((sum, a) => sum + a.amount, 0);
+    }
+  } else {
+    for (const item of data) {
+      item.allocations = [];
+      item.allocation_count = 0;
+      item.total_allocated = 0;
+    }
+  }
 
   return {
     data,

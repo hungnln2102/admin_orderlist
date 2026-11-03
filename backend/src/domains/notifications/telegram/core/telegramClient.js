@@ -224,37 +224,61 @@ async function processQueue() {
  * @param {boolean} options.isError Đánh dấu tin nhắn báo lỗi để xếp ưu tiên lên đầu
  * @returns {Promise}
  */
-function enqueueMessage(payload, { isError = false, eventType = 'GENERAL_MESSAGE' } = {}) {
-  return new Promise((resolve, reject) => {
-    if (process.env.NODE_ENV === "test") {
-      return resolve(false);
-    }
-    const isEnabled = systemConfigService.get("TELEGRAM_ENABLED", true);
-    if (!isEnabled) {
-      getLogger().info("[TelegramClient] Bỏ qua gửi tin: Cấu hình TELEGRAM_ENABLED đang tắt (false).");
-      return resolve(false);
-    }
-    if (!TELEGRAM_BOT_TOKEN) {
-      getLogger().warn("[TelegramClient] Skipped - No bot token config");
-      return resolve(false);
-    }
+async function enqueueMessage(payload, options = {}) {
+  const {
+    isError = false,
+    eventType = "GENERAL_MESSAGE",
+    idempotencyKey = null,
+    priority = null,
+  } = typeof options === "object" ? options : {};
 
-    if (queue.length >= MAX_QUEUE) {
-      const dropMsg = "[TelegramClient] Queue full. Dropping message.";
-      getLogger().warn(dropMsg);
-      return reject(new Error(dropMsg));
-    }
+  if (process.env.NODE_ENV === "test" && process.env.TEST_SKIP_TELEGRAM === "true") {
+    return false;
+  }
 
-    const job = { payload, resolve, reject, eventType };
+  const isEnabled = systemConfigService.get("TELEGRAM_ENABLED", true);
+  if (!isEnabled) {
+    getLogger().info("[TelegramClient] Bỏ qua gửi tin: Cấu hình TELEGRAM_ENABLED đang tắt (false).");
+    return false;
+  }
+  if (!TELEGRAM_BOT_TOKEN) {
+    getLogger().warn("[TelegramClient] Skipped - No bot token config");
+    return false;
+  }
 
-    if (isError) {
-      queue.unshift(job); // Nhảy cóc lên đầu hàng đợi
-    } else {
-      queue.push(job);
-    }
+  try {
+    const notificationHubService = require("@/domains/notifications/hub/notificationHubService");
+    const threadId = payload.message_thread_id || payload.chat_id || "";
+    const content = payload.caption || payload.text || "";
+    const hasMedia = Boolean(payload.photo);
+    const mediaBuffer = payload.photo || null;
 
-    processQueue();
-  });
+    const resolvedKey = idempotencyKey || (
+      payload._meta?.idempotencyKey ||
+      `msg:${eventType}:${threadId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`
+    );
+
+    const dispatchResult = await notificationHubService.dispatch({
+      channel: "TELEGRAM",
+      eventType,
+      idempotencyKey: resolvedKey,
+      recipient: String(threadId),
+      priority: isError ? 1 : (priority || 3),
+      renderedContent: content,
+      hasMedia,
+      mediaBuffer,
+    });
+
+    return Boolean(dispatchResult.queued);
+  } catch (hubErr) {
+    getLogger().error("[TelegramClient] Lỗi khi dispatch vào NotificationHub:", hubErr.message);
+    return false;
+  }
 }
 
-module.exports = { enqueueMessage };
+module.exports = {
+  enqueueMessage,
+  rawPostToTelegram,
+  preparePayload,
+  logNotification,
+};
