@@ -15,8 +15,10 @@ import {
   Clock,
   Zap,
   ArrowRight,
+  Mail,
 } from "lucide-react";
 import { CronSchedulerTab } from "@/features/system/components/CronSchedulerTab";
+import { VpbankMailboxTab } from "@/features/system/components/VpbankMailboxTab";
 
 interface SystemConfig {
   id: number;
@@ -31,7 +33,7 @@ interface SystemConfig {
 }
 
 export const SystemPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"general" | "expiry_alerts" | "cron" | "telegram" | "backup">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "expiry_alerts" | "cron" | "telegram" | "backup" | "mailbox">("general");
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -247,7 +249,28 @@ export const SystemPage: React.FC = () => {
           <Database className="w-4 h-4" />
           Backup & Google Drive
         </button>
+
+        {/* Tab Riêng: Mailbox VPBank (Gmail IMAP Realtime) */}
+        <button
+          onClick={() => setActiveTab("mailbox")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "mailbox"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <Mail className="w-4 h-4 text-emerald-400" />
+          <span>Mailbox VPBank</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            IMAP
+          </span>
+        </button>
       </div>
+
+      {/* Tab: VPBank Mailbox IMAP Realtime */}
+      {activeTab === "mailbox" && (
+        <VpbankMailboxTab onShowToast={(type, text) => showToast(type, text)} />
+      )}
 
       {/* Tab: Smart Cron Scheduler (Alarm UI) */}
       {activeTab === "cron" && (
@@ -632,6 +655,36 @@ export const SystemPage: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Box 3: Mailbox VPBank (Gmail IMAP & App Password) */}
+          <div className="p-6 bg-slate-900/70 rounded-2xl border border-slate-800/90 space-y-4 shadow-xl flex flex-col justify-between md:col-span-2 lg:col-span-1">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                <Mail className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    Mailbox VPBank & Gmail IMAP
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      APP PASSWORD
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Đọc email biến động số dư & sao kê thẻ tín dụng VPBank</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Quản lý tài khoản Gmail, <strong>Google App Password (16 ký tự)</strong>, chế độ Push Realtime (IMAP IDLE) và kiểm tra socket TLS trực tiếp với máy chủ Google.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setActiveTab("mailbox")}
+              className="w-full py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98 shadow-sm"
+            >
+              <Mail className="w-4 h-4 text-emerald-400" />
+              <span>Chuyển Sang Cấu Hình Mailbox VPBank</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </button>
           </div>
         </div>
       )}
