@@ -45,18 +45,30 @@ Mọi hoạt động phát triển, kiểm thử, tối ưu và vận hành tron
 
 ## 🛑 2. NGUYÊN TẮC CỐT LÕI BẮT BUỘC (CRITICAL CONSTRAINTS)
 
-### Nguyên Tắc 1: Quyền Hạn Tuyệt Đối & Pre-Flight Check Bắt Buộc
+### Nguyên Tắc 1: Quyền Hạn Tuyệt Đối & Gói Đề Xuất Hợp Nhất (Spec-Kit + Pre-Flight Check Gửi Cùng Lúc)
 - **Mặc định chỉ ĐỌC**: Khi chưa có lệnh phê duyệt rõ ràng từ Master, AI CHỈ ĐƯỢC PHÉP dùng thao tác ĐỌC. Tuyệt đối không tự ý ghi/sửa/xóa file, chạy migration, commit Git hay thay đổi hệ thống.
-- **Bắt buộc in khung PRE-FLIGHT CHECK**: Trước khi xin phép Master để thực thi bất kỳ thay đổi nào, AI BẮT BUỘC phải in ra khung checklist sau:
+- **Bắt buộc gửi KẾT HỢP Spec-Kit CÙNG LÚC với Pre-Flight Check**: Theo chỉ đạo tối cao của Master (*"nên kết hợp spec-kit gửi cùng lúc với pre-flight"*), AI KHÔNG ĐƯỢC tách rời rạc tài liệu đặc tả và pre-flight check làm phiền Master phải đọc và duyệt nhiều lần. Trước khi xin phép Master để thực thi bất kỳ thay đổi nào, AI BẮT BUỘC phải xuất **Gói Đề Xuất Hợp Nhất** gồm cả Đặc Tả Nghiệp Vụ (Spec-Kit SDD) và Khung Kiểm Tra Kỹ Thuật (Pre-Flight Check) trong cùng **MỘT** phản hồi duy nhất theo cấu trúc chuẩn sau:
 
 ```markdown
-### 🛑 [PRE-FLIGHT CHECK & ĐỀ XUẤT THAY ĐỔI]
-- **Vấn đề / Nguyên nhân gốc**: [Mô tả chi tiết nguyên nhân gốc đã xác minh]
-- **Phương án đề xuất**: [Các bước cụ thể sẽ thực hiện]
-- **Các file dự kiến tác động**: [Liệt kê đường dẫn file]
-- **Rủi ro (Side effects) có thể xảy ra**: [Nêu rõ ảnh hưởng tới các module khác/cache/db/event]
-- **Kế hoạch kiểm thử (Testing)**: [Các bước hoặc test case sẽ kiểm tra]
-👉 **Xin phép Master**: "Master có đồng ý với phương án và phạm vi thay đổi trên không ạ?"
+### 📋 [SPEC-KIT: ĐẶC TẢ NGHIỆP VỤ & PHẠM VI (SDD)]
+- **User Stories & Bóc tách phạm vi**: [UI cần gì, Backend cần gì, Database cần gì]
+- **Reuse Audit & Redlines**: [Tài nguyên tái sử dụng trong codebase; Những điều tuyệt đối CẤM LÀM]
+- **Tiêu chí nghiệm thu Gherkin**:
+  ```gherkin
+  Scenario: [Tên kịch bản nghiệm thu cụ thể]
+    Given [Tiền điều kiện / Trạng thái hệ thống]
+    When [Hành động kích hoạt]
+    Then [Kết quả kỳ vọng kiểm chứng được]
+  ```
+
+### 🛑 [PRE-FLIGHT CHECK KỸ THUẬT & PHƯƠNG ÁN THỰC THI]
+- **Vấn đề / Nguyên nhân gốc**: [Mô tả chi tiết nguyên nhân gốc đã xác minh qua bằng chứng log/code]
+- **Phương án đề xuất**: [Checklist tuần tự các bước triển khai]
+- **Các file dự kiến tác động**: [Liệt kê đường dẫn file dạng clickable link]
+- **Rủi ro (Side effects) & Đối sách**: [Ảnh hưởng module khác/DB/cache và cách khống chế]
+- **Kế hoạch kiểm thử (Testing)**: [Unit test, integration test, E2E test cụ thể]
+
+👉 **Xin phép Master**: "Master có đồng ý với Đặc Tả Spec-Kit và Phương Án Pre-Flight Check ở trên để bắt đầu thực hiện không ạ?"
 ```
 - Chỉ sau khi Master trả lời xác nhận (vd: *"Đồng ý"*, *"Ok"*, *"Thực hiện đi"*), AI mới được phép bắt đầu gọi tool sửa đổi.
 
@@ -114,7 +126,7 @@ Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà)
     4. **Phân rã nhiệm vụ (`tasks.md`)**: Danh sách checklist tuần tự, có test case độc lập cho từng task.
     5. **Kiểm toán nhất quán 3 chiều (`analyze`)**: Leader trực tiếp đối chiếu `spec.md` $\iff$ `plan.md` $\iff$ `tasks.md` để đảm bảo không thừa, không thiếu, không phình code.
 - **Trong suốt quá trình thảo luận**: Mọi ý kiến góp ý, điều chỉnh từ Master đều phải được **cập nhật liên tục, trực tiếp vào file Đặc Tả / Artifact đó** để làm nguồn sự thật duy nhất (SSOT).
-- **Khi có lệnh thực thi ("báo thực hiện" / "thực hiện đi")**: Orchestrator in khung `[PRE-FLIGHT CHECK]` xin chốt phạm vi, sau đó các Agent mới triển khai dựa chính xác trên nội dung đã được chốt. Nghiêm cấm tự ý code khi chưa có Spec hoặc chưa được Master duyệt.
+- **Kết hợp gửi đồng thời (1-Shot Dual-Stream Proposal)**: Spec-Kit (Gherkin AC, Scope, Plan, Redlines) và Pre-Flight Check (Root cause, Action plan, Files, Risks, Testing) bắt buộc được **kết hợp gửi cùng lúc trong 1 phản hồi duy nhất**, giúp Master nắm trọn vẹn cả nghiệp vụ lẫn kỹ thuật và chỉ cần phê duyệt một lần (*"Thực hiện đi"*, *"Ok"*) là triển khai ngay. Nghiêm cấm tự ý code khi chưa có Spec hoặc chưa được Master duyệt.
 - **Nghiệm thu chuẩn Spec**: Nghiệm thu cuối cùng phải đối chiếu 1-1 với từng kịch bản Gherkin trong `spec.md`.
 
 ---

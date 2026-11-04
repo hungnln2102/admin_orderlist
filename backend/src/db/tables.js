@@ -76,10 +76,18 @@ const TABLES = {
   PERSONAL_DEBIT_TRANSACTION_LOGS: formatTable(SCHEMAS.FINANCE, "personal_debit_transaction_logs"),
   SAVING_GOALS: formatTable(SCHEMAS.FINANCE, "saving_goals"),
   SAVING_FUND_LEDGER: formatTable(SCHEMAS.FINANCE, "saving_fund_ledger"),
+  BANK_INSTRUMENT_MAPPINGS: formatTable(SCHEMAS.FINANCE, "bank_instrument_mappings"),
+  EMAIL_SYNC_CHECKPOINTS: formatTable(SCHEMAS.FINANCE, "email_sync_checkpoints"),
+  EMAIL_INGESTION_RECEIPTS: formatTable(SCHEMAS.FINANCE, "email_ingestion_receipts"),
+  EMAIL_RECONCILIATION_RUNS: formatTable(SCHEMAS.FINANCE, "email_reconciliation_runs"),
 };
 
 
 const COLS = {
+  SYSTEM_CONFIGS: {
+    ID: "id", CONFIG_KEY: "config_key", CONFIG_VALUE: "config_value", DATA_TYPE: "data_type",
+    DESCRIPTION: "description", GROUP_NAME: "group_name", UPDATED_AT: "updated_at", UPDATED_BY: "updated_by",
+  },
   USERS: {
     ID: "userid",
     USERNAME: "username",
@@ -532,6 +540,33 @@ const COLS = {
   CREDIT_PAYMENT_ALLOCATIONS: {
     ID: "id", PAYMENT_LEDGER_ID: "payment_ledger_id", TARGET_LEDGER_ID: "target_ledger_id", STATEMENT_ID: "statement_id",
     BUCKET: "bucket", AMOUNT: "amount", CREATED_AT: "created_at",
+  },
+    BANK_INSTRUMENT_MAPPINGS: {
+    ID: "id", PROVIDER: "provider", INSTRUMENT_KIND: "instrument_kind", MASKED_SUFFIX: "masked_suffix",
+    CARD_HOLDER_NAME: "card_holder_name", PRODUCT_HINT: "product_hint", LINKED_CREDIT_ACCOUNT_ID: "linked_credit_account_id",
+    LINKED_FINANCIAL_ACCOUNT_ID: "linked_financial_account_id", STATUS: "status", EFFECTIVE_FROM: "effective_from",
+    EFFECTIVE_TO: "effective_to", APPROVED_BY: "approved_by", APPROVED_AT: "approved_at", CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },
+  EMAIL_SYNC_CHECKPOINTS: {
+    ID: "id", PROVIDER: "provider", MAILBOX_ALIAS: "mailbox_alias", FOLDER_NAME: "folder_name", UID_VALIDITY: "uid_validity",
+    LAST_TERMINAL_UID: "last_terminal_uid", WORKER_STATE: "worker_state", LAST_SUCCESS_AT: "last_success_at",
+    LAST_ERROR_CODE: "last_error_code", LAST_ERROR_MESSAGE: "last_error_message", CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },
+  EMAIL_INGESTION_RECEIPTS: {
+    ID: "id", PROVIDER: "provider", MAILBOX_ALIAS: "mailbox_alias", FOLDER_NAME: "folder_name", UID_VALIDITY: "uid_validity",
+    EMAIL_UID: "email_uid", MESSAGE_ID: "message_id", SENDER_ADDRESS: "sender_address", SUBJECT: "subject", RECEIVED_AT: "received_at",
+    SUBJECT_HASH: "subject_hash", BODY_HASH: "body_hash", PARSE_VERSION: "parse_version", DOCUMENT_KIND: "document_kind",
+    INSTRUMENT_KIND: "instrument_kind", INSTRUMENT_MASK: "instrument_mask", INSTRUMENT_MAPPING_ID: "instrument_mapping_id",
+    BUSINESS_KEY: "business_key", TRANSACTION_KIND: "transaction_kind", AMOUNT: "amount", STATUS: "status",
+    FAILURE_CODE: "failure_code", FAILURE_MESSAGE: "failure_message", RETRY_COUNT: "retry_count", TERMINAL_AT: "terminal_at",
+    LEDGER_ID: "ledger_id", PERSONAL_DEBIT_TRANSACTION_LOG_ID: "personal_debit_transaction_log_id", METADATA: "metadata",
+    CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },
+  EMAIL_RECONCILIATION_RUNS: {
+    ID: "id", PROVIDER: "provider", MAILBOX_ALIAS: "mailbox_alias", MODE: "mode", FROM_UID: "from_uid", TO_UID: "to_uid",
+    TOTAL_SCANNED: "total_scanned", TOTAL_APPLIED: "total_applied", TOTAL_MANUAL_REVIEW: "total_manual_review",
+    TOTAL_REJECTED: "total_rejected", TOTAL_FAILED: "total_failed", INITIATED_BY: "initiated_by", STATUS: "status",
+    SUMMARY: "summary", CREATED_AT: "created_at", COMPLETED_AT: "completed_at",
   },
   CREDIT_RECONCILIATION_RECORDS: {
     ID: "id", ACCOUNT_ID: "account_id", STATEMENT_ID: "statement_id", SOURCE_KIND: "source_kind", SOURCE_REFERENCE: "source_reference",

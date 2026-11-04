@@ -24,6 +24,7 @@ import {
   Sparkles,
   Inbox,
   ChevronDown,
+  Mail,
 } from "lucide-react";
 import {
   PersonalCategoryManageModal,
@@ -31,6 +32,7 @@ import {
   COLOR_OPTIONS,
 } from "./PersonalCategoryManageModal";
 import { PersonalTransactionCreateModal } from "./PersonalTransactionCreateModal";
+import { VpbankMailboxConfigModal } from "./VpbankMailboxConfigModal";
 
 interface Props {
   selectedDate: string | null;
@@ -87,6 +89,7 @@ export const PersonalDebitTransactionsSection: React.FC<Props> = ({
   // Modals state
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [mailboxModalOpen, setMailboxModalOpen] = useState(false);
 
   // Filter states
   const [accountFilter, setAccountFilter] = useState<string>("ALL");
@@ -260,6 +263,15 @@ export const PersonalDebitTransactionsSection: React.FC<Props> = ({
 
         {/* Nút thao tác: Ghi thu chi & Quản lý danh mục */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setMailboxModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Cấu hình tài khoản đọc mail VPBank tự động"
+          >
+            <Mail className="w-3.5 h-3.5 text-pink-400" />
+            <span className="hidden sm:inline">Mailbox VPBank</span>
+          </button>
+
           <button
             onClick={() => setCategoryModalOpen(true)}
             className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
@@ -582,6 +594,12 @@ export const PersonalDebitTransactionsSection: React.FC<Props> = ({
         categories={categories}
         accounts={accounts}
         onSuccess={handleAddTransaction}
+      />
+
+      <VpbankMailboxConfigModal
+        isOpen={mailboxModalOpen}
+        onClose={() => setMailboxModalOpen(false)}
+        onSaved={() => void loadWorkspace()}
       />
     </Container>
   );

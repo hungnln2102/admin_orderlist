@@ -103,6 +103,10 @@ async function bootstrapBackgroundServices() {
     await systemConfigService.initCache();
     await initScheduler();
     outboxDispatcherWorker.start(3000);
+    const { startWorker: startVpbankWorker } = require("@/domains/finance/workers/vpbankImapWorker");
+    void startVpbankWorker().catch((err) => {
+      console.error("[Bootstrap] Lỗi khởi động VPBank IMAP Worker:", err.message);
+    });
   } catch (error) {
     console.error("[Bootstrap] Lỗi khởi động background services:", error);
   }

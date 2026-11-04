@@ -401,3 +401,10 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Triển khai domain command, allocation, statement và accrual.
 - [x] Tích hợp API/scheduler và lớp tương thích Finance Hub.
 - [x] Viết test, kiểm tra schema/syntax và cập nhật báo cáo. Đã migrate sandbox cô lập `admin_orderlist_vpbank_credit_test`, pass integration ledger 5/5 (có giả lập trả từng phần nhiều ngày cho thẻ và quanh cutoff 17h cho thấu chi) và unit 66/66; vẫn CHƯA NGHIỆM THU tài chính cho đến khi đối chiếu sao kê VPBank đã che dữ liệu.
+## VPBank IMAP hardening 2026-11-04
+
+- [x] Thay `imap` dễ tổn thương bằng `imapflow` 2.x; Gmail IMAP buộc `secure: true` và xác thực TLS certificate.
+- [x] Mã hóa App Password bằng AES-256-GCM với `VPBANK_MAILBOX_ENCRYPTION_KEY`; migration xóa field plaintext legacy và buộc cấu hình lại password.
+- [x] Chặn sender spoofing bằng địa chỉ exact `customercare@care.vpb.com.vn` và `Authentication-Results` có DKIM pass; cursor quản lý theo `UIDVALIDITY`, `MANUAL_REVIEW` là terminal.
+- [x] Dời test ghi DB sang integration test, bắt buộc `TEST_DATABASE_URL` có tên database chứa `test`, restore mailbox config trong `finally`.
+- [/] Chưa nghiệm thu live: cần chạy migration trên sandbox, cấu hình `VPBANK_MAILBOX_ENCRYPTION_KEY`, nhập lại App Password qua UI và đối chiếu tối thiểu một email VPBank đã che dữ liệu.

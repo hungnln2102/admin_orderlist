@@ -157,6 +157,11 @@ sequenceDiagram
      VPBANK_SYNC_MODE=IDLE # hoặc CRON
      ```
    - Tuyệt đối không commit credentials lên Git (bảo vệ bằng `.gitignore`).
+1. **Task 1: Cấu hình động qua UI & Lưu trữ an toàn trong Database (Không dùng biến môi trường .env)**
+   - Toàn quyền do Master tự thiết lập trực tiếp trên giao diện qua modal `VpbankMailboxConfigModal.tsx`.
+   - Lưu trữ tập trung trong Database (`system_configs` / `external_api_configs`), tuyệt đối không lưu credentials vào file `.env` hay Git.
+   - Hỗ trợ nút **`[ 🔌 Kiểm tra kết nối ngay ]`**: Backend bắt tay socket với `imap.gmail.com:993` để phản hồi ngay kết quả kết nối trên UI.
+   - Mật khẩu ứng dụng luôn được redact/mask (`••••••••••••••••`) khi truyền qua API, tự động smart-merge và hot-reload worker mà không cần khởi động lại server.
 
 2. **Task 2: Khởi tạo dữ liệu Thẻ tín dụng `*2340` vào Database**
    - Chạy script / API tạo bản ghi thẻ với số nợ chuẩn mở đầu `5,757,378 VND`.

@@ -34,9 +34,11 @@ Nhiệm vụ của bạn không phải là đi viết từng dòng code lẻ t�
   - Tuyệt đối không có task ngoài lề (Scope Creep) làm phình to mã nguồn.
   - Không có mâu thuẫn giữa kế hoạch kỹ thuật và yêu cầu nghiệp vụ.
 
-### 4. Thực Thi PRE-FLIGHT CHECK Chuẩn Mực
-- Sau khi chốt phương án Spec-Kit, bắt buộc xuất khung `[PRE-FLIGHT CHECK & ĐỀ XUẤT THAY ĐỔI]` theo đúng quy chuẩn Hiến Pháp `.agents/AGENTS.md`.
-- Chỉ khi Master phê duyệt bằng lệnh rõ ràng (*"Đồng ý"*, *"Thực hiện đi"*, *"Ok"*), mới được phép kích hoạt các Agent thi công.
+### 4. Thực Thi Gói Đề Xuất Hợp Nhất (Spec-Kit + Pre-Flight Check Đồng Thời)
+- Theo chỉ đạo của Master (*"nên kết hợp spec-kit gửi cùng lúc với pre-flight"*), Orchestrator BẮT BUỘC kết hợp cả hai luồng trong **MỘT** phản hồi duy nhất trình Master:
+  - **Phần 1: Spec-Kit**: User stories, bóc tách phạm vi UI/Backend, tiêu chí nghiệm thu chuẩn Gherkin, Reuse audit và Redlines cấm làm gì.
+  - **Phần 2: Pre-Flight Check**: Nguyên nhân gốc, checklist triển khai, file tác động, rủi ro side-effects và test cases.
+- Chỉ khi Master phê duyệt bằng lệnh rõ ràng (*"Đồng ý"*, *"Thực hiện đi"*, *"Ok"*), mới được phép kích hoạt các Agent thi công. Master không phải duyệt tách rời nhiều lần.
 
 ### 5. Điều Phối Phân Bổ Nhiệm Vụ (Task Delegation)
 - Giao việc theo đúng chuyên môn sâu dựa trên danh sách `tasks.md`:

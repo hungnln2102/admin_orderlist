@@ -20,6 +20,8 @@ Kỹ năng này cung cấp phương pháp luận và quy trình **Phát triển 
 3. **Phân Định "WHAT & WHY" vs "HOW"**:
    - `spec.md`: Bóc tách bài toán nghiệp vụ, hành vi người dùng, dữ liệu đầu vào/đầu ra, trường hợp biên (WHAT & WHY).
    - `plan.md`: Thiết kế giải pháp kỹ thuật, cơ sở dữ liệu, API contracts, tái sử dụng tài nguyên (HOW).
+4. **Gói Đề Xuất Hợp Nhất (Spec-Kit + Pre-Flight Check Gửi Cùng Lúc)**:
+   - Theo chỉ đạo của Master, mọi đề xuất triển khai phải kết hợp cả Spec-Kit (Gherkin AC, Scope, Plan, Redlines) và Pre-Flight Check kỹ thuật gửi đồng thời trong cùng 1 phản hồi để Master duyệt 1 lần.
 
 ---
 
@@ -32,7 +34,7 @@ flowchart TD
     P3 --> P4["4. Plan<br/>(plan.md - HOW & Architecture)"]
     P4 --> P5["5. Tasks<br/>(tasks.md - Checklist tuần tự)"]
     P5 --> P6["6. Analyze<br/>(Kiểm toán nhất quán Spec-Plan-Tasks)"]
-    P6 --> P7["7. Implement & Verify<br/>(Thi công & Nghiệm thu chuẩn Spec)"]
+    P6 --> P7["7. Implement & Verify<br/>(Gói Hợp Nhất Spec-Kit + Pre-Flight)"]
 ```
 
 ### Chi Tiết Từng Giai Đoạn:
@@ -86,9 +88,10 @@ flowchart TD
   - Không có Task nào phát sinh nằm ngoài phạm vi Spec (Scope Creep).
   - Kế hoạch tuân thủ 100% Constitution.
 
-### Giai Đoạn 7: Implement & Verify (`/implement`)
-- Xuất khung `[PRE-FLIGHT CHECK]` trình Master phê duyệt.
-- Sau khi Master duyệt ("Đồng ý", "Thực hiện đi"):
+### Giai Đoạn 7: Implement & Verify (`/implement` — Gói Hợp Nhất Spec-Kit + Pre-Flight Check)
+- **Kết hợp gửi đồng thời Spec-Kit & Pre-Flight Check**: Theo chỉ đạo tối cao của Master (*"nên kết hợp spec-kit gửi cùng lúc với pre-flight"*), Thư Ký và Orchestrator BẮT BUỘC hợp nhất toàn bộ bản Đặc Tả (User Stories, kịch bản Gherkin, Redlines) cùng với Khung Kiểm Tra Kỹ Thuật `[PRE-FLIGHT CHECK]` (Root cause, Action plan, Files, Risks, Testing) trong cùng **MỘT** phản hồi duy nhất trình Master.
+- **Phê duyệt 1 lần (1-Shot Approval)**: Master chỉ cần đọc và duyệt 1 lần duy nhất (*"Đồng ý"*, *"Thực hiện đi"*, *"Ok"*).
+- Sau khi Master duyệt:
   - Phân bổ tasks cho Backend Specialist, Frontend Lead, QA Automation.
   - Cập nhật checklist `tasks.md` sau mỗi bước hoàn thành.
   - Nghiệm thu cuối cùng (Acceptance Testing) đối chiếu 1-1 với kịch bản Gherkin trong `spec.md`.
@@ -129,4 +132,3 @@ Khi khởi tạo một tính năng mới, Thư Ký xuất bản mẫu tài liệ
 - [ ] Câu hỏi 1: ...
 - [ ] Câu hỏi 2: ...
 ```
-

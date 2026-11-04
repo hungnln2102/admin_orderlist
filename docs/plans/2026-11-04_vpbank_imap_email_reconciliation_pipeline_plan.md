@@ -89,6 +89,11 @@ Mỗi email biến động của thẻ debit đã map phải tạo **một log b
 2. Raw email chỉ tồn tại trong mailbox; database chỉ giữ metadata tối thiểu, hash SHA-256 và dữ liệu parse cần audit. Bằng chứng gốc, nếu phải giữ, lưu ở kho mã hóa có phân quyền và retention được phê duyệt.
 3. Sender whitelist chỉ là bộ lọc. Email không đạt quy tắc mailbox/domain/header đã phê duyệt phải bị `REJECTED`; không coi địa chỉ `From` là bằng chứng giao dịch duy nhất.
 4. Credentials chỉ lấy từ runtime secret/env. Thiếu biến hoặc chạy ngoài production allowlist thì worker fail closed, không kết nối mailbox.
+4. Cấu hình Mailbox & App Password do Master tự thiết lập động 100% qua Giao diện (UI) và lưu trữ bảo mật trong Cơ sở dữ liệu (Database-driven config, bảng `system_configs` / `external_api_configs`), hoàn toàn KHÔNG phụ thuộc vào biến môi trường `.env`.
+   - Giao diện có popup cấu hình an toàn `VpbankMailboxConfigModal.tsx` và nút bấm `[ 🔌 Kiểm tra kết nối ngay ]` (test handshake trực tiếp với `imap.gmail.com:993` và trả về kết quả tức thì).
+   - API trả về Frontend luôn REDACT/Mask mật khẩu ứng dụng (`••••••••••••••••`), bảo đảm không lộ credential ra Network/DevTools.
+   - Hỗ trợ Smart-Merge (giữ nguyên App Password cũ nếu không nhập lại) và Hot-Reload (cập nhật in-memory cache và socket worker ngay lập tức mà không cần khởi động lại server).
+   - Thiếu cấu hình hoặc kiểm tra kết nối thất bại thì worker ở trạng thái `DISABLED`/`OFFLINE`, tuyệt đối không gọi spam mailbox.
 5. Việc loại dữ liệu nhạy cảm khỏi Git history là một thay đổi bảo mật riêng: cần phê duyệt rewrite history, xử lý remote/clone/CI backup và kiểm tra lại tất cả refs. Chỉ redact file ở HEAD không đủ.
 
 ## 4. Mô hình dữ liệu và khóa định danh
@@ -132,6 +137,7 @@ Tạo migration `20261104000001_create_email_reconciliation_pipeline.js`. Sau mi
 ### 6.1. Worker lifecycle
 
 1. `vpbankImapWorker` chỉ được start từ `bootstrapBackgroundServices()` khi `VPBANK_SYNC_ENABLED=true` và tất cả secret/config validation pass.
+1. `vpbankImapWorker` được quản lý trạng thái động từ cấu hình Database do Master thiết lập qua UI (không phụ thuộc file `.env` hay cần restart server). Khi bật tính năng và thông tin kết nối Gmail hợp lệ (đã test handshake thành công), worker mới khởi chạy socket IDLE hoặc đăng ký scheduler polling.
 2. Chỉ một worker active cho một `(provider, mailbox_alias, folder_name)`. Dùng database lease hoặc PostgreSQL advisory lock; instance không sở hữu lease chỉ báo `STANDBY` và không fetch/apply.
 3. Worker reconnect có backoff giới hạn, health state (`OFFLINE`, `CONNECTING`, `ONLINE`, `DEGRADED`) và graceful shutdown. IDLE chỉ là tín hiệu có thư mới; sau reconnect phải quét bù từ checkpoint.
 4. Khi UIDVALIDITY thay đổi, worker khóa checkpoint, mở reconciliation run `DRY_RUN`, tạo receipt theo UIDVALIDITY mới và không auto-apply cho đến khi finance owner phê duyệt phạm vi quét.
@@ -193,6 +199,15 @@ Nhờ vậy mỗi biến động debit được lưu đúng một lần, số d�
 4. Event mới `FINANCE_CARD_TRANSACTION_SYNCED` và `FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED` phải được thêm vào `backend/src/events/eventTypes.js` và danh sách lắng nghe của `backend/src/domains/realtime/subscribers/realtimeSubscriber.js`.
 5. Outbox dùng `topicKey: "FINANCE"`; không hard-code topic id. Bản ghi outbox phải được insert cùng transaction, còn SSE chỉ broadcast sau commit.
 6. `DebtsAndInstallmentsSection.tsx` chỉ hiển thị thẻ tín dụng/công nợ. Biến động thu/chi thẻ cá nhân và tài khoản debit được đặt **trực tiếp trong Tab "Tích lũy & Tài sản" (`SAVINGS_ASSETS`)** của `FinanceHubPage.tsx`, bố trí theo dạng **Side-by-Side Dual-Grid** (Bảng Trái: Lịch sử chốt số dư snapshot; Bảng Phải: Sổ biến động thu/chi cá nhân).
+4. `GET /api/finance/vpbank/mailbox-config`
+   - Lấy cấu hình mailbox hiện tại (App Password được redact/mask dạng `has_app_password: true`, `app_password_masked: "••••••••••••••••"`, email, sync_mode, is_active).
+5. `POST /api/finance/vpbank/mailbox-config`
+   - Cập nhật cấu hình mailbox (email, app_password nếu có đổi, sync_mode, is_active). Hỗ trợ smart-merge giữ nguyên password cũ nếu để trống. Tự động reload worker mà không cần restart server.
+6. `POST /api/finance/vpbank/mailbox-config/test-connection`
+   - Bắt tay socket trực tiếp với Gmail IMAP (`imap.gmail.com:993`) bằng credential gửi lên hoặc credential đang lưu trong DB, trả về kết quả thành công/thất bại và latency tức thì mà không cần ghi DB trước.
+7. Event mới `FINANCE_CARD_TRANSACTION_SYNCED` và `FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED` phải được thêm vào `backend/src/events/eventTypes.js` và danh sách lắng nghe của `backend/src/domains/realtime/subscribers/realtimeSubscriber.js`.
+8. Outbox dùng `topicKey: "FINANCE"`; không hard-code topic id. Bản ghi outbox phải được insert cùng transaction, còn SSE chỉ broadcast sau commit.
+9. `DebtsAndInstallmentsSection.tsx` chỉ hiển thị thẻ tín dụng/công nợ. Biến động thu/chi thẻ cá nhân và tài khoản debit được đặt **trực tiếp trong Tab "Tích lũy & Tài sản" (`SAVINGS_ASSETS`)** của `FinanceHubPage.tsx`, bố trí theo dạng **Side-by-Side Dual-Grid** (Bảng Trái: Lịch sử chốt số dư snapshot; Bảng Phải: Sổ biến động thu/chi cá nhân).
 
 ### 7.1. Vị trí hiển thị bắt buộc & Bố cục Side-by-Side
 
@@ -212,6 +227,7 @@ Nhờ vậy mỗi biến động debit được lưu đúng một lần, số d�
    - **Nút công cụ trên Header:**
      - `[ + Ghi Thu/Chi ]`: Mở popup ghi nhanh giao dịch tiền mặt hoặc giao dịch thủ công.
      - `[ ⚙️ Quản lý danh mục ]`: Mở modal cho Master tự thêm/sửa/ẩn danh mục và cấu hình từ khóa tự động phân loại mà không hardcode code.
+     - `[ ⚙️ Cấu hình Mailbox VPBank ]`: Mở modal `VpbankMailboxConfigModal.tsx` cho Master tự thiết lập email nhận, Google App Password, chọn chế độ sync (Realtime IDLE hoặc Polling) và bấm kiểm tra kết nối trực tiếp với Gmail ngay trên UI mà không cần gắn biến môi trường `.env`.
 
 **Refresh:** khi nhận `FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED`, frontend refetch bảng log đang mở. Nếu SSE bị mất, khi người dùng đổi tháng/lọc hoặc bấm “Làm mới” vẫn tải lại API nguồn.
 ## 8. Kế hoạch triển khai theo phase
@@ -248,6 +264,14 @@ Nhờ vậy mỗi biến động debit được lưu đúng một lần, số d�
 
 ```gherkin
 Feature: Ingestion email VPBank an toàn và idempotent
+
+  Scenario: Master tự cấu hình và kiểm tra kết nối Mailbox qua UI
+    Given Master mở modal cấu hình Mailbox VPBank trên giao diện
+    When Master nhập email, App Password và bấm "Kiểm tra kết nối ngay"
+    Then hệ thống thực hiện handshake IMAP với Gmail và hiển thị kết quả thành công tức thì
+    And khi Master bấm Lưu, cấu hình được lưu vào database an toàn với mật khẩu được bảo vệ
+    And API không trả về mật khẩu thô ra giao diện (luôn masked)
+    And worker tự động tải cấu hình mới mà không cần restart server
 
   Scenario: Hạch toán một giao dịch chi tiêu đủ định danh
     Given account đã có baseline statement được phê duyệt
@@ -326,3 +350,10 @@ Feature: Ingestion email VPBank an toàn và idempotent
 2. Security owner xác nhận xử lý lịch sử Git, secret policy và mailbox access.
 3. Kỹ thuật xác nhận migration, integration tests, health metrics, backup/replay và alerting.
 4. Bật theo account allowlist, quan sát một chu kỳ statement; nếu có chênh lệch, tắt `VPBANK_SYNC_ENABLED` và chuyển receipt mới sang `MANUAL_REVIEW`.
+
+## 4. Điều kiện vận hành bảo mật bắt buộc sau hardening
+
+- App Password Gmail **không** được lưu trong `.env`; chỉ `VPBANK_MAILBOX_ENCRYPTION_KEY` (khóa AES-256-GCM 32 byte, Base64) phải được cấp qua secret manager hoặc biến môi trường runtime an toàn.
+- Migration `20261104000004_clear_legacy_vpbank_mailbox_password.js` sẽ xóa `appPassword` plaintext cũ. Sau migration, Master phải nhập lại App Password từ UI trước khi bật worker.
+- Worker chỉ dùng `imap.gmail.com:993` với TLS certificate verification bắt buộc; không còn hỗ trợ custom host, custom port hoặc bỏ qua certificate validation.
+- Email chỉ được tự động hạch toán khi `From` chính xác là `customercare@care.vpb.com.vn` và Gmail `Authentication-Results` xác nhận `dkim=pass` với `header.d=care.vpb.com.vn`. Các email khác bị từ chối, không ghi sổ cái.

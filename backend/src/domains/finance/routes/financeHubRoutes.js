@@ -1,4 +1,4 @@
-﻿/**
+/**
  * financeHubRoutes.js
  */
 
@@ -7,6 +7,7 @@ const router = express.Router();
 const financeHubController = require("../controllers/financeHubController");
 const creditLedgerController = require("../credit/creditLedgerController");
 const personalDebitTransactionController = require("../controllers/personalDebitTransactionController");
+const vpbankMailboxController = require("../controllers/vpbankMailboxController");
 
 // Tổng quan hòa vốn, KPI, dòng tiền tháng
 router.get("/summary", financeHubController.getSummary);
@@ -40,6 +41,12 @@ router.post("/credit-accounts/:id/payments", creditLedgerController.recordPaymen
 router.post("/credit-accounts/overdraft/accrue", creditLedgerController.accrueOverdraft);
 router.post("/credit-statements/:id/overdraft-interest-collections", creditLedgerController.recordOverdraftInterestCollection);
 router.post("/credit-accounts/overdraft/close", creditLedgerController.closeOverdraft);
+
+// VPBank Mailbox Configuration & Realtime Ingestion Socket
+router.get("/vpbank/mailbox-config", vpbankMailboxController.getMailboxConfigHandler);
+router.post("/vpbank/mailbox-config", vpbankMailboxController.updateMailboxConfigHandler);
+router.post("/vpbank/mailbox-config/test-connection", vpbankMailboxController.testConnectionHandler);
+
 // Tài sản & Nợ cá nhân (Personal assets)
 router.post("/personal-assets", financeHubController.createPersonalAsset);
 router.put("/personal-assets/:id", financeHubController.updatePersonalAsset);
@@ -61,6 +68,7 @@ router.patch("/personal-debit-transactions/:id/category", personalDebitTransacti
 router.post("/personal-spending-categories", personalDebitTransactionController.createCategory);
 router.put("/personal-spending-categories/:id", personalDebitTransactionController.updateCategory);
 router.delete("/personal-spending-categories/:id", personalDebitTransactionController.archiveCategory);
+
 // Mục tiêu & Quỹ tiết kiệm (Saving Goals & Fund)
 router.get("/saving-goals", financeHubController.getSavingGoals);
 router.post("/saving-goals", financeHubController.createSavingGoal);
