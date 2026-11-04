@@ -3,6 +3,7 @@ import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { PersonalAsset } from "../types";
+import { PersonalDebitTransactionsSection } from "./PersonalDebitTransactionsSection";
 import {
   Calendar,
   History,
@@ -18,6 +19,7 @@ import {
   Trash2,
   CreditCard,
   Coins,
+  ArrowUpDown,
 } from "lucide-react";
 
 export interface DynamicAssetColumn {
@@ -96,6 +98,8 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
   const [latestComparison, setLatestComparison] = useState<LatestComparison | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"SNAPSHOT_HISTORY" | "DEBIT_TRANSACTIONS">("SNAPSHOT_HISTORY");
 
   // Form State in Modal (điền 1 lần rồi thôi)
   // Ngày hiện tại theo múi giờ Việt Nam (UTC+7) - tự động nhảy sang ngày kế tiếp khi qua 0h
@@ -436,183 +440,108 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
   }, [latestComparison]);
 
   return (
-    <div className="space-y-4 pt-2">
-      {/* 1. HERO WIDGET: STAT TRÒN BIẾN ĐỘNG & TỔNG QUAN TÀI CHÍNH */}
-      <GlassCard className="!p-5 bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border-slate-800 rounded-2xl relative overflow-hidden">
-        {/* Glow hiệu ứng nền */}
-        <div
-          className={`absolute -right-10 -top-10 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none ${
-            circularMetrics.isIncrease ? "bg-emerald-500" : "bg-rose-500"
-          }`}
-        />
-
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-          {/* Cụm trái: Stat Tròn SVG sắc nét */}
-          <div className="flex items-center gap-5">
-            {/* SVG Ring Container */}
-            <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 110 110">
-                {/* Track circle */}
-                <circle
-                  cx="55"
-                  cy="55"
-                  r="48"
-                  fill="transparent"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-slate-800"
-                />
-                {/* Dynamic colored progress circle */}
-                <circle
-                  cx="55"
-                  cy="55"
-                  r="48"
-                  fill="transparent"
-                  strokeWidth="8"
-                  strokeDasharray={2 * Math.PI * 48}
-                  strokeDashoffset={circularMetrics.hasComparison ? circularMetrics.strokeDashoffset : 2 * Math.PI * 48}
-                  strokeLinecap="round"
-                  className={`transition-all duration-1000 ease-out ${
-                    circularMetrics.isIncrease
-                      ? "stroke-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]"
-                      : "stroke-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]"
-                  }`}
-                />
-              </svg>
-
-              {/* Tâm vòng tròn: hiển thị % và icon */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                {circularMetrics.hasComparison ? (
-                  <>
-                    <div className="flex items-center justify-center">
-                      {circularMetrics.isIncrease ? (
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                      ) : (
-                        <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-                      )}
-                      <span
-                        className={`text-base font-black font-mono ml-0.5 ${
-                          circularMetrics.isIncrease ? "text-emerald-300" : "text-rose-300"
-                        }`}
-                      >
-                        {circularMetrics.isIncrease ? "+" : "-"}
-                        {circularMetrics.absPercent.toFixed(1)}%
-                      </span>
-                    </div>
-                    <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">
-                      {circularMetrics.isIncrease ? "Tăng" : "Giảm"}
-                    </span>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center">
-                    <History className="w-4 h-4 text-cyan-400 mb-0.5" />
-                    <span className="text-[10px] font-bold text-slate-400">1 Mốc Số Dư</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Thông tin mô tả bên cạnh vòng tròn */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
-                  Quản Trị Dòng Tiền & Tài Sản
-                </span>
-                <span className="text-xs text-slate-400">
-                  {snapshots.length} lần chốt
-                </span>
-              </div>
-
-              <h3 className="text-lg font-black text-white flex items-center gap-2">
-                <span>Nhật Ký Chốt Tài Chính</span>
-              </h3>
-
-              {circularMetrics.hasComparison ? (
-                <div className="space-y-1 pt-0.5">
-                  <div className="text-xs text-slate-300 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span>Tổng Tài Sản Lần Mới Nhất:</span>
-                    <span className="font-mono font-bold text-white text-sm">
-                      {formatVND(circularMetrics.latestTotal || 0)}
-                    </span>
-                    <span className="text-slate-400">({formatDateVN(circularMetrics.latestDate)})</span>
-                    <span className="text-slate-500">·</span>
-                    <span
-                      className={`font-mono font-extrabold flex items-center gap-1 ${
-                        circularMetrics.isIncrease ? "text-emerald-300" : "text-rose-300"
-                      }`}
-                    >
-                      {circularMetrics.isIncrease ? "+" : ""}
-                      {formatVND(circularMetrics.deltaAmount)} ({circularMetrics.isIncrease ? "+" : ""}
-                      {circularMetrics.percent}%)
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
-                    <span>Cá nhân: <strong className="text-emerald-300">{formatVND(circularMetrics.latestPersonal || 0)}</strong></span>
-                    <span>·</span>
-                    <span>Shop: <strong className="text-cyan-300">{formatVND(circularMetrics.latestShop || 0)}</strong></span>
-                    <span>·</span>
-                    <span className="text-slate-500">so với {formatDateVN(circularMetrics.previousDate)} ({formatVND(circularMetrics.previousTotal || 0)})</span>
-                  </div>
-                </div>
-              ) : snapshots.length === 1 ? (
-                <p className="text-xs text-slate-400">
-                  Đã ghi nhận mốc ngày {formatDateVN(snapshots[0].snapshotDate)} với Tổng Tài Sản{" "}
-                  <strong className="text-cyan-300 font-mono">{formatVND(snapshots[0].totalBalance)}</strong> (Cá nhân: {formatVND(snapshots[0].personalBalance)} · Shop: {formatVND(snapshots[0].shopBalance)}). Hãy chốt thêm 1 ngày nữa để đo lường % tăng/giảm!
-                </p>
-              ) : (
-                <p className="text-xs text-slate-400">
-                  Chưa có lịch sử chốt tài chính. Bấm nút bên phải để ghi nhận số dư hôm nay!
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Cụm phải: Nút hành động Chốt Tài Chính */}
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+    <div className="space-y-4 pt-1">
+      {/* 2. BẢNG ĐỐI SOÁT & DÒNG TIỀN VỚI 2 TABS CHUYỂN ĐỔI FULL-WIDTH */}
+      <GlassCard className="!p-4 sm:!p-5 bg-slate-900/90 border-slate-800 rounded-2xl space-y-4">
+        {/* Header với 2 Tab Chuyển Đổi Ở Đầu Form */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-800 pb-3.5 gap-3">
+          {/* Sub-tabs chuyển đổi giữa 2 bảng */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800 self-start sm:self-auto">
             <button
-              onClick={fetchSnapshots}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700/60"
-              title="Làm mới lịch sử"
+              type="button"
+              onClick={() => setActiveTab("SNAPSHOT_HISTORY")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "SNAPSHOT_HISTORY"
+                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-cyan-400" : ""}`} />
-            </button>
-
-            <button
-              onClick={() => handleOpenCreateModal()}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Chốt Tài Chính</span>
-            </button>
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* 2. BẢNG LOG MA TRẬN LỊCH SỬ SỐ DƯ (ĐIỀN 1 LẦN RỒI THÔI - GỒM 3 CỘT: CÁ NHÂN, SHOP TỰ ĐỘNG, TỔNG) */}
-      <GlassCard className="!p-4 bg-slate-900/90 border-slate-800 rounded-2xl space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 px-1">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-cyan-400" />
-            <h4 className="text-sm font-bold text-white">Lịch Sử Biến Động Số Dư Qua Các Lần Chốt</h4>
-          </div>
-          <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
-            <span>{snapshots.length} lần chốt</span>
-            {!isTodayFinalized && (
-              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                +1 live
+              <History className="w-4 h-4 text-cyan-400" />
+              <span>Lịch Sử Chốt Số Dư</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">
+                {snapshots.length}
               </span>
+              {!isTodayFinalized && (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  +1 live
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("DEBIT_TRANSACTIONS")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "DEBIT_TRANSACTIONS"
+                  ? "bg-pink-500/20 text-pink-300 border border-pink-500/30 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <ArrowUpDown className="w-4 h-4 text-pink-400" />
+              <span>Sổ Biến Động Thu / Chi Cá Nhân</span>
+              {selectedDateFilter && (
+                <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  Ngày {formatDateVN(selectedDateFilter)}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Action buttons góc phải */}
+          <div className="flex items-center gap-2 shrink-0">
+            {activeTab === "SNAPSHOT_HISTORY" && (
+              <>
+                {circularMetrics.hasComparison && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono border ${
+                      circularMetrics.isIncrease
+                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                        : "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                    }`}
+                    title={`So với lần chốt trước: ${formatVND(circularMetrics.deltaAmount)}`}
+                  >
+                    {circularMetrics.isIncrease ? (
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+                    )}
+                    <span>
+                      {circularMetrics.isIncrease ? "+" : "-"}
+                      {circularMetrics.absPercent.toFixed(1)}% so với lần trước
+                    </span>
+                  </span>
+                )}
+
+                <button
+                  onClick={fetchSnapshots}
+                  disabled={loading}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700"
+                  title="Làm mới lịch sử"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+                </button>
+                <button
+                  onClick={() => handleOpenCreateModal()}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Chốt Số Dư</span>
+                </button>
+              </>
             )}
-          </span>
+          </div>
         </div>
 
-        {loading && snapshots.length === 0 ? (
+        {/* Nội Dung Tương Ứng Với Tab */}
+        {activeTab === "SNAPSHOT_HISTORY" ? (
+          <div>
+            {loading && snapshots.length === 0 ? (
           <div className="py-12 text-center text-slate-400 flex flex-col items-center gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
             <span className="text-xs">Đang tải lịch sử số dư...</span>
           </div>
         ) : (
-          <div className="overflow-x-auto max-w-full rounded-xl border border-slate-800">
+          <div className="overflow-x-auto max-w-full rounded-xl border border-slate-800 max-h-[520px] overflow-y-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-950/80 text-slate-300 uppercase tracking-wider font-semibold border-b border-slate-800 whitespace-nowrap">
@@ -677,7 +606,8 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
               <tbody className="divide-y divide-slate-800/60 font-sans">
                 {/* DÒNG SỐ DƯ CHƯA CHỐT (LIVE REALTIME CHO NGÀY HÔM NAY - TỰ ĐỔI NGÀY QUA 0H) */}
                 {!isTodayFinalized && (
-                  <tr className="bg-gradient-to-r from-amber-500/15 via-slate-900/80 to-amber-500/10 border-b-2 border-amber-500/40 hover:bg-amber-500/20 transition-all whitespace-nowrap shadow-inner group">
+                  <tr onClick={() => { setSelectedDateFilter(currentDateVN); setActiveTab("DEBIT_TRANSACTIONS"); notify.info(`Đang xem giao dịch ngày ${formatDateVN(currentDateVN)}`); }} title="Click để xem chi tiết các khoản thu/chi của ngày hôm nay" className={`border-b-2 transition-all whitespace-nowrap shadow-inner group cursor-pointer ${selectedDateFilter === currentDateVN ? "bg-amber-500/25 border-amber-400 ring-1 ring-inset ring-amber-400/50" : "bg-gradient-to-r from-amber-500/15 via-slate-900/80 to-amber-500/10 border-amber-500/40 hover:bg-amber-500/20"}`}>
+
                     {/* Ngày chốt Live (Sticky Left) */}
                     <td className="py-3.5 px-4 font-mono font-bold text-white sticky left-0 bg-slate-900/95 z-10 border-r border-amber-500/25 shadow-md">
                       <div className="flex items-center gap-2">
@@ -764,7 +694,9 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
                     return (
                       <tr
                         key={snap.id}
-                        className="hover:bg-slate-800/25 transition-colors whitespace-nowrap"
+                        onClick={() => { setSelectedDateFilter(snap.snapshotDate); setActiveTab("DEBIT_TRANSACTIONS"); notify.info(`Đang xem giao dịch ngày ${formatDateVN(snap.snapshotDate)}`); }}
+                        title="Click để xem chi tiết các khoản thu/chi của ngày này"
+                        className={`transition-colors whitespace-nowrap cursor-pointer ${selectedDateFilter === snap.snapshotDate ? "bg-cyan-950/60 ring-1 ring-inset ring-cyan-500/50" : "hover:bg-slate-800/25"}`}
                       >
                         {/* Ngày chốt (Sticky Left) */}
                         <td className="py-3 px-4 font-mono font-bold text-white sticky left-0 bg-slate-900/90 z-10 flex items-center gap-2">
@@ -821,8 +753,18 @@ export const PersonalFinanceBalanceLogSection: React.FC<Props> = ({
             </table>
           </div>
         )}
-      </GlassCard>
 
+          </div>
+        ) : (
+          <div>
+            <PersonalDebitTransactionsSection
+              selectedDate={selectedDateFilter}
+              onClearDateFilter={() => setSelectedDateFilter(null)}
+              isFrameless
+            />
+          </div>
+        )}
+      </GlassCard>
 
       {/* 3. MODAL CHỐT TÀI CHÍNH */}
       {modalOpen && (

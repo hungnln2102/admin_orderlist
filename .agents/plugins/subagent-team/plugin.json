@@ -1,4 +1,6 @@
 {
-  "name": "antigravity-sub-agent-team",
-  "description": "Đội ngũ 7 sub-agent chuyên trách cho dự án admin_orderlist (Orchestrator, Lead Planner, Backend, Frontend, QA, Security, Finance)."
+  "name": "admin-orderlist-subagents",
+  "version": "1.0.0",
+  "description": "Đội ngũ Subagent chuyên trách và bộ kỹ năng tiêu chuẩn cho dự án admin_orderlist (Orchestrator, Lead Planner, Backend Specialist, Frontend Lead, QA Automation, Security Auditor, Finance Specialist, Spec-Kit, ACID Transaction, DB Schema).",
+  "skills": "./skills/"
 }

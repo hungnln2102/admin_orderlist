@@ -1,4 +1,4 @@
-/**
+﻿/**
  * financeHubRoutes.js
  */
 
@@ -6,6 +6,7 @@ const express = require("express");
 const router = express.Router();
 const financeHubController = require("../controllers/financeHubController");
 const creditLedgerController = require("../credit/creditLedgerController");
+const personalDebitTransactionController = require("../controllers/personalDebitTransactionController");
 
 // Tổng quan hòa vốn, KPI, dòng tiền tháng
 router.get("/summary", financeHubController.getSummary);
@@ -53,6 +54,13 @@ router.post("/personal-balance-snapshots", financeHubController.createPersonalBa
 router.put("/personal-balance-snapshots/:id", financeHubController.updatePersonalBalanceSnapshot);
 router.delete("/personal-balance-snapshots/:id", financeHubController.deletePersonalBalanceSnapshot);
 
+// Biến động thẻ debit và danh mục chi tiêu cá nhân.
+router.get("/personal-debit-transactions", personalDebitTransactionController.getWorkspace);
+router.post("/personal-debit-transactions", personalDebitTransactionController.createTransaction);
+router.patch("/personal-debit-transactions/:id/category", personalDebitTransactionController.updateTransactionCategory);
+router.post("/personal-spending-categories", personalDebitTransactionController.createCategory);
+router.put("/personal-spending-categories/:id", personalDebitTransactionController.updateCategory);
+router.delete("/personal-spending-categories/:id", personalDebitTransactionController.archiveCategory);
 // Mục tiêu & Quỹ tiết kiệm (Saving Goals & Fund)
 router.get("/saving-goals", financeHubController.getSavingGoals);
 router.post("/saving-goals", financeHubController.createSavingGoal);

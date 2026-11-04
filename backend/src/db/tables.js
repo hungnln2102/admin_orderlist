@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Quản lý tập trung Tên Bảng (TABLES), Schema (SCHEMAS) và Tên Cột (COLS) cho v2/backend.
  *
  * Mọi thay đổi về tên schema, tên bảng hoặc tên cột trong cơ sở dữ liệu sau này
@@ -72,6 +72,8 @@ const TABLES = {
   EXTERNAL_API_CONFIGS: formatTable(SCHEMAS.SYSTEM, "external_api_configs"),
   STORE_PROFIT_EXPENSES: formatTable(SCHEMAS.FINANCE, "store_profit_expenses"),
   PERSONAL_BALANCE_SNAPSHOTS: formatTable(SCHEMAS.FINANCE, "personal_balance_snapshots"),
+  PERSONAL_SPENDING_CATEGORIES: formatTable(SCHEMAS.FINANCE, "personal_spending_categories"),
+  PERSONAL_DEBIT_TRANSACTION_LOGS: formatTable(SCHEMAS.FINANCE, "personal_debit_transaction_logs"),
   SAVING_GOALS: formatTable(SCHEMAS.FINANCE, "saving_goals"),
   SAVING_FUND_LEDGER: formatTable(SCHEMAS.FINANCE, "saving_fund_ledger"),
 };
@@ -410,7 +412,28 @@ const COLS = {
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },
-  PERSONAL_ASSETS: {
+  FINANCIAL_ACCOUNT_LEDGER: {
+    ID: "id",
+    FINANCIAL_ACCOUNT_ID: "financial_account_id",
+    AMOUNT: "amount",
+    BALANCE_AFTER: "balance_after",
+    ENTRY_TYPE: "entry_type",
+    REFERENCE_TYPE: "reference_type",
+    REFERENCE_ID: "reference_id",
+    DESCRIPTION: "description",
+    METADATA: "metadata",
+    CREATED_AT: "created_at",
+  },
+  PERSONAL_SPENDING_CATEGORIES: {
+    ID: "id", CODE: "code", NAME: "name", ICON: "icon", COLOR: "color", MONTHLY_BUDGET: "monthly_budget",
+    KEYWORDS: "keywords", IS_ACTIVE: "is_active", SORT_ORDER: "sort_order", CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },
+  PERSONAL_DEBIT_TRANSACTION_LOGS: {
+    ID: "id", FINANCIAL_ACCOUNT_ID: "financial_account_id", CATEGORY_ID: "category_id", FINANCIAL_ACCOUNT_LEDGER_ID: "financial_account_ledger_id",
+    INSTRUMENT_MASK: "instrument_mask", OCCURRED_AT: "occurred_at", DIRECTION: "direction", AMOUNT: "amount", MERCHANT_NORMALIZED: "merchant_normalized",
+    CATEGORY_SOURCE: "category_source", OBSERVED_BALANCE_AFTER: "observed_balance_after", BALANCE_PROJECTION_STATUS: "balance_projection_status",
+    BUSINESS_KEY: "business_key", SOURCE: "source", NOTE: "note", METADATA: "metadata", CREATED_AT: "created_at", UPDATED_AT: "updated_at",
+  },  PERSONAL_ASSETS: {
     ID: "id",
     NAME: "name",
     TYPE: "type",

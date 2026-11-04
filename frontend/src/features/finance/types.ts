@@ -1,4 +1,4 @@
-/**
+﻿/**
  * types.ts
  * Định nghĩa kiểu dữ liệu cho Trung Tâm Tài Chính V2
  */
@@ -248,4 +248,70 @@ export interface FinanceSummaryData {
   usdtWallets: UsdtWallet[];
   savingGoals?: SavingGoalsOverviewData;
   debtPaymentLogs?: DebtPaymentLogItem[];
+}
+
+// ==========================================
+// THU / CHI CÁ NHÂN & DANH MỤC ĐỘNG (VPBANK / DEBIT)
+// ==========================================
+
+export interface PersonalSpendingCategory {
+  id: number;
+  code: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  monthlyBudget?: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  keywords?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type PersonalTransactionDirection = "INFLOW" | "OUTFLOW";
+
+export type PersonalBalanceProjectionStatus =
+  | "PROJECTED_APPLIED"
+  | "OBSERVED_APPLIED"
+  | "RECONCILIATION_ADJUSTED"
+  | "LATE_ALREADY_COVERED"
+  | "BALANCE_UNVERIFIED";
+
+export interface PersonalFinancialAccount {
+  id: number;
+  name: string;
+  accountNumberMasked?: string | null;
+  bankDisplayName?: string | null;
+  balance: number;
+}
+export interface PersonalDebitTransactionLog {
+  id: number;
+  financialAccountId?: number | null;
+  financialAccountName?: string | null;
+  instrumentMappingId?: number | null;
+  instrumentMask?: string | null;
+  occurredAt: string;
+  direction: PersonalTransactionDirection;
+  amount: number;
+  merchantNormalized: string;
+  categoryId?: number | null;
+  categoryCode?: string | null;
+  categoryName?: string | null;
+  categoryIcon?: string | null;
+  categoryColor?: string | null;
+  categorySource?: "RULE" | "MANUAL" | "UNCLASSIFIED";
+  observedBalanceAfter?: number | null;
+  balanceProjectionStatus?: PersonalBalanceProjectionStatus | null;
+  note?: string | null;
+  businessKey?: string | null;
+  source?: "VPBANK_IMAP" | "MANUAL" | "OTHER";
+  createdAt?: string;
+}
+
+export interface CategoryKeywordRule {
+  id: number;
+  categoryId: number;
+  keywordPattern: string;
+  priority: number;
+  isActive: boolean;
 }

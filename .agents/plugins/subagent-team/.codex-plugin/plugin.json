@@ -1,0 +1,35 @@
+{
+  "name": "admin-orderlist-subagents",
+  "version": "1.0.0",
+  "description": "Đội ngũ Subagent chuyên trách và bộ kỹ năng tiêu chuẩn cho dự án admin_orderlist (Orchestrator, Lead Planner, Backend Specialist, Frontend Lead, QA Automation, Security Auditor, Finance Specialist, Spec-Kit, ACID Transaction, DB Schema).",
+  "author": {
+    "name": "Master & Orchestrator Agent"
+  },
+  "homepage": "https://admin.mavrykpremium.com",
+  "license": "Proprietary",
+  "keywords": [
+    "subagents",
+    "orchestrator",
+    "lead-planner",
+    "backend-specialist",
+    "frontend-lead",
+    "qa-automation",
+    "security-auditor",
+    "finance-specialist",
+    "spec-kit",
+    "acid-review"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Admin Orderlist Subagent Team",
+    "shortDescription": "Đội ngũ 7 Subagent & Kỹ năng kỹ thuật chuẩn SSOT",
+    "longDescription": "Bộ Plugin tích hợp đầy đủ 7 Subagent (Orchestrator, Lead Planner, Backend, Frontend, QA, Security, Finance) và 5 Kỹ năng tiêu chuẩn (Spec-Kit, ACID DB Transaction, DB Schema SSOT, Task Tracking, Vietnamese Diacritics) dành cho dự án admin_orderlist.",
+    "developerName": "Admin Orderlist Team",
+    "category": "Engineering",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
+}

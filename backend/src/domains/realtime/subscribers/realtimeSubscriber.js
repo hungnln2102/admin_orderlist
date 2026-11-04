@@ -1,4 +1,4 @@
-/**
+﻿/**
  * realtimeSubscriber.js
  * Lắng nghe tất cả các Domain Events từ EventBus và đẩy trực tiếp xuống SSE Stream của Admin
  */
@@ -30,6 +30,7 @@ function registerRealtimeSubscriber() {
     // 3. Webhook Bank & SePay Events
     EVENTS.WEBHOOK_MONEY_IN,
     EVENTS.WEBHOOK_MONEY_OUT,
+    EVENTS.FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED,
 
     // 4. Product & Pricing Events
     EVENTS.PRODUCT_CREATED,
@@ -60,4 +61,3 @@ function registerRealtimeSubscriber() {
 }
 
 module.exports = { registerRealtimeSubscriber };
-

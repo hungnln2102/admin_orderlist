@@ -1,0 +1,21 @@
+{
+  "name": "admin-orderlist-local",
+  "interface": {
+    "displayName": "Admin Orderlist Local Marketplace"
+  },
+  "plugins": [
+    {
+      "name": "admin-orderlist-subagents",
+      "source": {
+        "source": "local",
+        "path": "./.agents/plugins/subagent-team"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Engineering"
+    }
+  ]
+}
+
