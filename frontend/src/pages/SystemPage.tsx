@@ -14,6 +14,7 @@ import {
   AlarmClock,
   Clock,
   Zap,
+  ArrowRight,
 } from "lucide-react";
 import { CronSchedulerTab } from "@/features/system/components/CronSchedulerTab";
 
@@ -538,72 +539,34 @@ export const SystemPage: React.FC = () => {
       {/* Tab 1: General Business Configs */}
       {activeTab === "general" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Box 1: Order Expiration Warnings */}
-          <div className="p-6 bg-slate-900/70 rounded-2xl border border-slate-800/90 space-y-4 shadow-xl">
-            <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-              <ShieldAlert className="w-5 h-5 text-amber-400" />
-              <div>
-                <h3 className="text-sm font-bold text-white">Cảnh Báo Hết Hạn Đơn Hàng (Rút Gọn)</h3>
-                <p className="text-[11px] text-slate-400">Cấu hình nhanh các tham số cảnh báo gia hạn</p>
+                    {/* Box 1: Navigation banner to Dedicated Expiry Alerts Tab */}
+          <div className="p-6 bg-slate-900/70 rounded-2xl border border-slate-800/90 space-y-4 shadow-xl flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                <ShieldAlert className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    Hạn Dùng & Cảnh Báo Đơn
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      ĐÃ TÁCH RIÊNG
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Quản trị độc lập đơn 0 ngày, đơn 4 ngày và cập nhật DB 0h</p>
+                </div>
               </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Toàn bộ cấu hình liên quan đến chu kỳ hết hạn đơn hàng (Đơn 0 ngày hết hạn hôm nay, Đơn N ngày cận hạn, giờ phát thông báo Telegram và quy trình quét DB ngầm) đã được quy tụ về một nơi duy nhất tại tab <strong>"Hạn Dùng & Cảnh Báo Đơn"</strong>.
+              </p>
             </div>
 
-            {getConfigObj("RENEWAL_WARN_DAYS") && (
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-300 block">
-                  Số ngày còn lại để cảnh báo (RENEWAL_WARN_DAYS)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={formData["RENEWAL_WARN_DAYS"] ?? 4}
-                    onChange={(e) => handleChange("RENEWAL_WARN_DAYS", e.target.value)}
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition-all font-mono"
-                  />
-                  <button
-                    onClick={() => handleSaveConfig("RENEWAL_WARN_DAYS")}
-                    disabled={savingKey === "RENEWAL_WARN_DAYS"}
-                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    {savingKey === "RENEWAL_WARN_DAYS" ? "Đang lưu..." : "Lưu"}
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 italic">
-                  {getConfigObj("RENEWAL_WARN_DAYS")?.description || "Số ngày trước khi hết hạn đơn hàng để hệ thống gắn tag Cần Gia Hạn"}
-                </p>
-              </div>
-            )}
-
-            {getConfigObj("RENEWAL_NOTIFICATION_TIME") && (
-              <div className="space-y-2 pt-2">
-                <label className="text-xs font-semibold text-slate-300 block">
-                  Thời gian thông báo (RENEWAL_NOTIFICATION_TIME)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="VD: 07:00"
-                    value={formData["RENEWAL_NOTIFICATION_TIME"] ?? "07:00"}
-                    onChange={(e) => handleChange("RENEWAL_NOTIFICATION_TIME", e.target.value)}
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition-all font-mono"
-                  />
-                  <button
-                    onClick={() => handleSaveConfig("RENEWAL_NOTIFICATION_TIME", "task_notify_four_days_7h", "time")}
-                    disabled={savingKey === "RENEWAL_NOTIFICATION_TIME"}
-                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    {savingKey === "RENEWAL_NOTIFICATION_TIME" ? "Đang lưu..." : "Lưu"}
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 italic">
-                  {getConfigObj("RENEWAL_NOTIFICATION_TIME")?.description || "Thời điểm trong ngày hệ thống tự động quét và gửi thông báo nhắc gia hạn"}
-                </p>
-              </div>
-            )}
+            <button
+              onClick={() => setActiveTab("expiry_alerts")}
+              className="w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98 shadow-sm"
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <span>Chuyển Sang Tab "Hạn Dùng & Cảnh Báo Đơn"</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </button>
           </div>
 
           {/* Box 2: Finance & Exchange Rates */}
