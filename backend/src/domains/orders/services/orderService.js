@@ -937,15 +937,22 @@ async function createOrder(payload) {
 
             if (existingService) {
               // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
+              const updateData = {
+                password: payload.warehouse_password || payload.slot || existingService.password,
+                expired_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expired_at,
+                status: "AVAILABLE",
+                service_note: payload.note || existingService.service_note,
+                updated_at: new Date(),
+              };
+              if (payload.warehouse_backup_email !== undefined && payload.warehouse_backup_email !== "") {
+                updateData.backup_email = payload.warehouse_backup_email;
+              }
+              if (payload.warehouse_two_fa !== undefined && payload.warehouse_two_fa !== "") {
+                updateData.two_fa = payload.warehouse_two_fa;
+              }
               await subTrx(TABLES.STOCK_SERVICES)
                 .where({ id: existingService.id })
-                .update({
-                  password: payload.slot || existingService.password,
-                  expired_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expired_at,
-                  status: "AVAILABLE",
-                  service_note: payload.note || existingService.service_note,
-                  updated_at: new Date(),
-                });
+                .update(updateData);
               console.log(`✅ [WarehouseSync] Đã đồng bộ dữ liệu mới cho tài khoản "${accountUsername}" từ đơn ${id_order}`);
             } else {
               // Chưa có trong kho nhưng bật lưu kho -> tạo mới
@@ -953,9 +960,9 @@ async function createOrder(payload) {
                 account_id: stockId,
                 name_id: nameId,
                 slot_index: 1,
-                password: payload.slot || null,
-                backup_email: "",
-                two_fa: null,
+                password: payload.warehouse_password || payload.slot || null,
+                backup_email: payload.warehouse_backup_email || "",
+                two_fa: payload.warehouse_two_fa || null,
                 expired_at: payload.expired_at ? new Date(payload.expired_at) : null,
                 status: "AVAILABLE",
                 service_note: payload.note || null,

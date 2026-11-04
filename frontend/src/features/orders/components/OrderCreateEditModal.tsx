@@ -1,5 +1,5 @@
-import React from "react";
-import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive } from "lucide-react";
+import React, { useState } from "react";
+import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
@@ -51,6 +51,8 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
   hasPackage = true,
   requiresStorage = false,
 }) => {
+  const [showWarehousePassword, setShowWarehousePassword] = useState(false);
+
   if (!isOpen) return null;
 
   const currentPrefix = formData.order_prefix || (isImportTab ? ORDER_PREFIX.MAVN : ORDER_PREFIX.MAVC);
@@ -192,157 +194,6 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             </div>
           )}
 
-          {/* Section: Lưu kho toggle (Only for import mode) */}
-          {isImportMode && (
-            <div className="space-y-3">
-              <div className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-b from-cyan-950/20 to-transparent p-4 backdrop-blur-xl">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
-                      <Archive className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white tracking-wide">
-                        Lưu vào Kho Hàng
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        {formData.save_to_warehouse !== false
-                          ? "Lưu thông tin tài khoản và slot vào hệ thống kho hàng."
-                          : "Chỉ tạo đơn nhập hàng bình thường (Không lưu vào kho)."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 bg-cyan-950/40 border border-cyan-500/20 rounded-xl px-3 py-1.5">
-                    <span className="text-[11px] font-semibold text-cyan-200/80">Lưu kho:</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          save_to_warehouse: formData.save_to_warehouse === false ? true : false,
-                        })
-                      }
-                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,214,0.5)]" : "bg-slate-700"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          formData.save_to_warehouse !== false ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Lưu Gói Sản Phẩm toggle & Sub-form */}
-              <div className="relative overflow-hidden rounded-xl border border-purple-500/20 bg-gradient-to-b from-purple-950/20 to-transparent p-4 backdrop-blur-xl">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300">
-                      <Archive className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white tracking-wide">
-                        Lưu Gói Sản Phẩm
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        {formData.save_to_package !== false
-                          ? "Tự động đồng bộ / tạo gói sản phẩm trong kho gói."
-                          : "Bỏ qua lưu kho gói sản phẩm."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 bg-purple-950/40 border border-purple-500/20 rounded-xl px-3 py-1.5">
-                    <span className="text-[11px] font-semibold text-purple-200/80">Lưu Gói:</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          save_to_package: formData.save_to_package === false ? true : false,
-                        })
-                      }
-                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        formData.save_to_package !== false ? "bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" : "bg-slate-700"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          formData.save_to_package !== false ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                {formData.save_to_package !== false && hasPackage === false && (
-                  <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-3">
-                    <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2 rounded-xl text-[11px] flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>Sản phẩm này chưa có Gói Sản Phẩm chính trong kho. Vui lòng cấu hình thông tin tạo gói bên dưới:</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-slate-400 mb-1 font-medium">Số Slot Gói (Tổng slot) *</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={formData.package_slots || 2}
-                          onChange={(e) => setFormData({ ...formData, package_slots: parseInt(e.target.value) || 2 })}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-400 mb-1 font-medium">Quy Tắc Khớp Đơn *</label>
-                        <select
-                          value={formData.package_match_rule || "information"}
-                          onChange={(e) => setFormData({ ...formData, package_match_rule: e.target.value })}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
-                        >
-                          <option value="information">Khớp theo Thông Tin SP</option>
-                          <option value="slot">Khớp theo Tài khoản / Slot</option>
-                          <option value="both">Khớp cả hai (Information & Slot)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {requiresStorage && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-400 mb-1 font-medium">Tài khoản liên kết (Storage Account)</label>
-                          <input
-                            type="text"
-                            placeholder="Ví dụ: storage@gmail.com"
-                            value={formData.storage_account_username || ""}
-                            onChange={(e) => setFormData({ ...formData, storage_account_username: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-400 mb-1 font-medium">Dung lượng tổng (Storage Total)</label>
-                          <input
-                            type="text"
-                            placeholder="Ví dụ: 200GB, 2TB"
-                            value={formData.storage_total || ""}
-                            onChange={(e) => setFormData({ ...formData, storage_total: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Section 2: Catalog Product & Supplier Selection */}
           <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
             <div className="font-bold text-cyan-400 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
@@ -413,16 +264,74 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
 
           {/* Section 3: Order Details */}
           <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
-            <div className="font-bold text-cyan-400 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-              Chi Tiết Đơn Hàng & Tài Khoản
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-800/60">
+              <div className="font-bold text-cyan-400 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                Chi Tiết Đơn Hàng & Tài Khoản
+              </div>
+
+              {/* 2 công tắc trượt mini cạnh thông tin sản phẩm */}
+              {isImportMode && (
+                <div className="flex items-center gap-2.5">
+                  {/* Switch Lưu Kho */}
+                  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
+                    <Archive className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-[11px] font-semibold text-slate-300">Lưu kho:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          save_to_warehouse: formData.save_to_warehouse === false ? true : false,
+                        })
+                      }
+                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,214,0.5)]" : "bg-slate-700"
+                      }`}
+                      title="Tự động đồng bộ tài khoản và mật khẩu vào hệ thống kho hàng"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          formData.save_to_warehouse !== false ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Switch Lưu Gói */}
+                  <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-lg px-2 py-1">
+                    <Package className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-[11px] font-semibold text-slate-300">Lưu gói:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          save_to_package: formData.save_to_package === false ? true : false,
+                        })
+                      }
+                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formData.save_to_package !== false ? "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "bg-slate-700"
+                      }`}
+                      title="Tự động đồng bộ gói sản phẩm trong kho gói"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          formData.save_to_package !== false ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Thông Tin Sản Phẩm *</label>
+                <label className="block text-slate-400 mb-1 font-medium">Thông Tin Sản Phẩm (Tài khoản) *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Gói 1 Tháng, 1 Năm..."
+                  placeholder="Ví dụ: noah.singh.b69642@vnglink.cc..."
                   value={formData.information_order}
                   onChange={(e) => setFormData({ ...formData, information_order: e.target.value })}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
@@ -440,6 +349,140 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 />
               </div>
             </div>
+
+            {/* Sub-form: Dữ liệu Lưu Kho Hàng */}
+            {isImportMode && formData.save_to_warehouse !== false && (
+              <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/20 space-y-2.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
+                    <Archive className="w-3.5 h-3.5 text-cyan-400" />
+                    Thông Tin Tài Khoản Lưu Kho
+                  </span>
+                  <span className="text-[10.5px] text-slate-400">
+                    Tài khoản: <strong className="text-cyan-200 font-mono">{formData.information_order || "(lấy theo Thông tin SP)"}</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {/* Mật Khẩu Kho */}
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium flex items-center gap-1">
+                      <KeyRound className="w-3 h-3 text-amber-400" />
+                      <span>Mật Khẩu Kho</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showWarehousePassword ? "text" : "password"}
+                        placeholder="Mật khẩu tài khoản..."
+                        value={formData.warehouse_password || ""}
+                        onChange={(e) => setFormData({ ...formData, warehouse_password: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-3 pr-8 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 font-mono text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowWarehousePassword(!showWarehousePassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                        title={showWarehousePassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                      >
+                        {showWarehousePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Email Backup */}
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium flex items-center gap-1">
+                      <Mail className="w-3 h-3 text-blue-400" />
+                      <span>Email Backup</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="backup_email@gmail.com"
+                      value={formData.warehouse_backup_email || ""}
+                      onChange={(e) => setFormData({ ...formData, warehouse_backup_email: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 font-mono text-xs"
+                    />
+                  </div>
+
+                  {/* Mã 2FA Secret Key */}
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span>Mã 2FA Secret Key</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="JBSWY3DPEHPK3PXP"
+                      value={formData.warehouse_two_fa || ""}
+                      onChange={(e) => setFormData({ ...formData, warehouse_two_fa: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sub-form: Cấu hình Kho Gói (Chỉ khi chưa có gói) */}
+            {isImportMode && formData.save_to_package !== false && hasPackage === false && (
+              <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-2.5 animate-in fade-in duration-150">
+                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2 rounded-xl text-[11px] flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Sản phẩm này chưa có Gói Sản Phẩm chính trong kho. Cấu hình thông tin tạo gói:</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium">Số Slot Gói (Tổng slot) *</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={formData.package_slots || 2}
+                      onChange={(e) => setFormData({ ...formData, package_slots: parseInt(e.target.value) || 2 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium">Quy Tắc Khớp Đơn *</label>
+                    <select
+                      value={formData.package_match_rule || "information"}
+                      onChange={(e) => setFormData({ ...formData, package_match_rule: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                    >
+                      <option value="information">Khớp theo Thông Tin SP</option>
+                      <option value="slot">Khớp theo Tài khoản / Slot</option>
+                      <option value="both">Khớp cả hai (Information & Slot)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {requiresStorage && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Tài khoản liên kết (Storage Account)</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: storage@gmail.com"
+                        value={formData.storage_account_username || ""}
+                        onChange={(e) => setFormData({ ...formData, storage_account_username: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Dung lượng tổng (Storage Total)</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: 200GB, 2TB"
+                        value={formData.storage_total || ""}
+                        onChange={(e) => setFormData({ ...formData, storage_total: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Pricing Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

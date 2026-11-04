@@ -71,6 +71,9 @@ export interface OrderFormData {
   package_match_rule?: string;
   storage_account_username?: string;
   storage_total?: string;
+  warehouse_password?: string;
+  warehouse_backup_email?: string;
+  warehouse_two_fa?: string;
 }
 
 export const DEFAULT_FORM_DATA: OrderFormData = {
@@ -94,6 +97,9 @@ export const DEFAULT_FORM_DATA: OrderFormData = {
   save_to_package: false,
   package_slots: 2,
   package_match_rule: "information",
+  warehouse_password: "",
+  warehouse_backup_email: "",
+  warehouse_two_fa: "",
 };
 
 export interface CatalogProduct {
