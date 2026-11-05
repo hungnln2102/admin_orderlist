@@ -1,4 +1,3 @@
-﻿const { ImapFlow } = require("imapflow");
 const { db, TABLES, COLS } = require("@/db");
 const { decryptMailboxPassword, encryptMailboxPassword } = require("./vpbankMailboxSecret");
 
@@ -7,6 +6,15 @@ const GMAIL_IMAP_HOST = "imap.gmail.com";
 const GMAIL_IMAP_PORT = 993;
 const C_CONFIG = COLS.SYSTEM_CONFIGS;
 const C_CHECKPOINT = COLS.EMAIL_SYNC_CHECKPOINTS;
+
+function getImapFlowClass() {
+  try {
+    const { ImapFlow } = require("imapflow");
+    return ImapFlow;
+  } catch (err) {
+    throw new Error("Thư viện 'imapflow' chưa được cài đặt hoặc nạp thành công: " + err.message);
+  }
+}
 
 function parseConfig(value) {
   if (!value) return {};
@@ -131,6 +139,7 @@ async function testImapConnection(credentials = {}) {
   const suppliedPassword = String(credentials.appPassword || "").trim();
   const appPassword = suppliedPassword || (stored.appPasswordEncrypted ? decryptMailboxPassword(stored.appPasswordEncrypted) : "");
   const startedAt = Date.now();
+  const ImapFlow = getImapFlowClass();
   const client = new ImapFlow(buildImapOptions({ email, appPassword }));
   try {
     await client.connect();

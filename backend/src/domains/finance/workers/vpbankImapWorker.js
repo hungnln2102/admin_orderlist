@@ -1,9 +1,17 @@
-﻿const { ImapFlow } = require("imapflow");
-const { simpleParser } = require("mailparser");
 const { db, TABLES, COLS } = require("@/db");
 const { buildImapOptions, getRawConfig } = require("../services/vpbankMailboxConfigService");
 const { ingestEmailMessage } = require("../services/vpbankEmailIngestionService");
 const { TRUSTED_SENDER_ADDRESSES } = require("../services/vpbankEmailParser");
+
+function getImapFlowClass() {
+  const { ImapFlow } = require("imapflow");
+  return ImapFlow;
+}
+
+function getSimpleParser() {
+  const { simpleParser } = require("mailparser");
+  return simpleParser;
+}
 
 const C_CHECKPOINT = COLS.EMAIL_SYNC_CHECKPOINTS;
 let activeClient = null;
@@ -32,6 +40,7 @@ async function ingestUid(client, uid, mailboxAlias, uidValidity) {
   const message = await client.fetchOne(uid, { uid: true, source: true }, { uid: true });
   if (!message?.source) return { status: "MISSING" };
 
+  const simpleParser = getSimpleParser();
   const parsed = await simpleParser(message.source);
   return ingestEmailMessage({
     uid,
@@ -42,7 +51,7 @@ async function ingestUid(client, uid, mailboxAlias, uidValidity) {
     from: parsed.from,
     date: parsed.date,
     messageId: parsed.messageId,
-    authenticationResults: parsed.headers.get("authentication-results") || "",
+    authenticationResults: parsed.headers?.get ? parsed.headers.get("authentication-results") || "" : "",
   }, {
     mailboxAlias,
     uidValidity,
@@ -115,6 +124,7 @@ function scheduleReconnect() {
 
 function startImapSession(config) {
   if (activeClient) void activeClient.logout().catch(() => undefined);
+  const ImapFlow = getImapFlowClass();
   const client = new ImapFlow(buildImapOptions(config));
   activeClient = client;
 
@@ -177,4 +187,3 @@ module.exports = {
   startWorker,
   stopWorker,
 };
-
