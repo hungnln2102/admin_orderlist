@@ -408,3 +408,5 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Chặn sender spoofing bằng địa chỉ exact `customercare@care.vpb.com.vn` và `Authentication-Results` có DKIM pass; cursor quản lý theo `UIDVALIDITY`, `MANUAL_REVIEW` là terminal.
 - [x] Dời test ghi DB sang integration test, bắt buộc `TEST_DATABASE_URL` có tên database chứa `test`, restore mailbox config trong `finally`.
 - [/] Chưa nghiệm thu live: cần chạy migration trên sandbox, cấu hình `VPBANK_MAILBOX_ENCRYPTION_KEY`, nhập lại App Password qua UI và đối chiếu tối thiểu một email VPBank đã che dữ liệu.
+- [x] **FIX-VPBANK-NEO-01** Nhận email chuyển tiền từ `vpbankonline@vpb.com.vn`: mở rộng allowlist IMAP/DKIM theo địa chỉ cụ thể, bóc tách `Số tiền trích nợ`, `Nội dung chuyển tiền` và xác định luồng chi; unit regression `VPBank Email Parser Suite` đạt 13/13.
+- [x] **FIX-RENEWAL-CATALOG-QR-01** Đồng bộ giá Catalog cho mọi đơn `RENEW_REQUIRED` trước cron chuyển trạng thái và trước cron nhắc gia hạn lúc 7:00; QR tiếp tục đọc `order.price` đã được cập nhật, giữ slot suffix và không chạm giá lịch sử của đơn `PAID`/`EXPIRED`. Unit `Catalog Renewal Pricing` đạt 6/6.

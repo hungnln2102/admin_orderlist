@@ -1,6 +1,7 @@
 const { db, TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const systemConfigService = require("@/domains/system/services/systemConfigService");
+const { syncRenewRequiredOrdersPricing } = require("@/domains/products/services/catalogPricingService");
 const { withAdvisoryLock } = require("../withAdvisoryLock");
 const { notifyFourDaysRemaining } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
 
@@ -16,6 +17,8 @@ async function notifyFourDaysTask(trigger = "cron") {
     console.log(`[CRON 7H] Bắt đầu rà soát đơn hàng còn đúng ${warnDays} ngày hết hạn (Trigger: ${trigger})...`);
 
     try {
+      const pricingSync = await syncRenewRequiredOrdersPricing();
+      console.log(`[CRON 7H] Đồng bộ ${pricingSync.updatedCount} đơn cần gia hạn theo bảng giá Catalog mới nhất.`);
       const todaySql = "(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date";
 
       // Chỉ quét các đơn còn đúng warnDays ngày (mặc định đúng 4 ngày)
@@ -41,6 +44,7 @@ async function notifyFourDaysTask(trigger = "cron") {
       return {
         success: true,
         count: orders.length,
+        pricingUpdatedCount: pricingSync.updatedCount,
         orders,
         timestamp: new Date().toISOString(),
       };

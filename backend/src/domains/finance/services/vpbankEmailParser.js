@@ -5,7 +5,14 @@
  * KhÃ´ng truy cáº­p Database, khÃ´ng lÆ°u tráº¡ng thÃ¡i (Stateless & Pure).
  */
 
-const ALLOWED_SENDER_ADDRESSES = new Set(["customercare@care.vpb.com.vn"]);
+const TRUSTED_SENDER_ADDRESSES = Object.freeze([
+  "customercare@care.vpb.com.vn",
+  "vpbankonline@vpb.com.vn",
+]);
+const TRUSTED_SENDER_DKIM_DOMAINS = new Map([
+  ["customercare@care.vpb.com.vn", /header\.(?:d|i)=@?care\.vpb\.com\.vn/],
+  ["vpbankonline@vpb.com.vn", /header\.(?:d|i)=@?vpb\.com\.vn/],
+]);
 
 function normalizeHtmlToLines(htmlOrText) {
   if (!htmlOrText) return "";
@@ -90,14 +97,15 @@ function extractSenderAddress(sender) {
   return String(match?.[1] || sender).trim().toLowerCase();
 }
 
-function isSenderAuthenticated(email) {
+function isSenderAuthenticated(sender, email) {
   const authenticationResults = String(email.authenticationResults || "").toLowerCase();
+  const expectedDkimDomain = TRUSTED_SENDER_DKIM_DOMAINS.get(extractSenderAddress(sender));
   return /dkim=pass/.test(authenticationResults)
-    && /header\.(?:d|i)=@?care\.vpb\.com\.vn/.test(authenticationResults);
+    && Boolean(expectedDkimDomain?.test(authenticationResults));
 }
 
 function isSenderValid(sender, email = {}) {
-  return ALLOWED_SENDER_ADDRESSES.has(extractSenderAddress(sender)) && isSenderAuthenticated(email);
+  return TRUSTED_SENDER_DKIM_DOMAINS.has(extractSenderAddress(sender)) && isSenderAuthenticated(sender, email);
 }
 
 /**
@@ -148,6 +156,7 @@ function parseVpbankEmail(email) {
 
   // Extract Amount
   let rawAmount = extractLineValue(linesText, [
+    /s\u1ed1 ti\u1ec1n (?:tr\u00edch n\u1ee3|ghi c\u00f3)[:\s]+([\+\-]?\s*[\d\.,]+\s*(?:VND|\u0111|USD))/i,
     /(?:sá»‘ tiá»n giao dá»‹ch|sá»‘ tiá»n thanh toÃ¡n|sá»‘ tiá»n|amount)[:\s]+([\+\-]?\s*[\d\.,]+\s*(?:VND|Ä‘|USD))/i,
     /(?:thanh toÃ¡n|chi tiÃªu|rÃºt tiá»n)\s+([\d\.,]+\s*(?:VND|Ä‘))/i,
   ]);
@@ -177,6 +186,7 @@ function parseVpbankEmail(email) {
 
   // Extract Merchant
   let merchant = extractLineValue(linesText, [
+    /n\u1ed9i dung chuy\u1ec3n ti\u1ec1n[:\s]+(.+)/i,
     /(?:Ä‘Æ¡n vá»‹ cháº¥p nháº­n thanh toÃ¡n|nÆ¡i giao dá»‹ch|táº¡i|merchant)[:\s]+(.+)/i,
     /(?:ná»™i dung giao dá»‹ch|ná»™i dung|mÃ´ táº£)[:\s]+(.+)/i,
   ]);
@@ -219,7 +229,8 @@ function parseVpbankEmail(email) {
 
   // Debit Card
   const isOutflow = /\-\s*[\d\.,]+/i.test(rawAmount || "") || /rÃºt tiá»n|thanh toÃ¡n|chuyá»ƒn tiá»n Ä‘i|chi tiÃªu/i.test(fullContent);
-  const direction = isOutflow ? "OUTFLOW" : "INFLOW";
+  let direction = isOutflow ? "OUTFLOW" : "INFLOW";
+  if (/tr\u00edch n\u1ee3/i.test(fullContent)) direction = "OUTFLOW";
 
   return {
     documentKind: "DEBIT_CARD_TRANSACTION",
@@ -240,6 +251,7 @@ function parseVpbankEmail(email) {
 }
 
 module.exports = {
+  TRUSTED_SENDER_ADDRESSES,
   extractCardSuffix,
   extractSenderAddress,
   isSenderValid,

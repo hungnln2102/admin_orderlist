@@ -1,6 +1,7 @@
 const { TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const systemConfigService = require("@/domains/system/services/systemConfigService");
+const { syncRenewRequiredOrdersPricing } = require("@/domains/products/services/catalogPricingService");
 const { withAdvisoryLock } = require("../withAdvisoryLock");
 
 const TARGET_TABLE = TABLES.ORDER_LIST;
@@ -44,10 +45,14 @@ async function updateOrderStatusTask(trigger = "cron") {
       const renewalCount = renewalResult.rowCount || renewalResult.rows?.length || 0;
       console.log(`[CRON 0H] Renewal transition completed for ${renewalCount} orders.`);
 
+      const pricingSync = await syncRenewRequiredOrdersPricing(trx);
+      console.log(`[CRON 0H] Đồng bộ ${pricingSync.updatedCount} đơn cần gia hạn theo bảng giá Catalog mới nhất.`);
+
       return {
         success: true,
         expiredCount,
         renewalCount,
+        pricingUpdatedCount: pricingSync.updatedCount,
         timestamp: new Date().toISOString(),
       };
     } catch (err) {

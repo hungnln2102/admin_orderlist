@@ -3,6 +3,7 @@ const { simpleParser } = require("mailparser");
 const { db, TABLES, COLS } = require("@/db");
 const { buildImapOptions, getRawConfig } = require("../services/vpbankMailboxConfigService");
 const { ingestEmailMessage } = require("../services/vpbankEmailIngestionService");
+const { TRUSTED_SENDER_ADDRESSES } = require("../services/vpbankEmailParser");
 
 const C_CHECKPOINT = COLS.EMAIL_SYNC_CHECKPOINTS;
 let activeClient = null;
@@ -69,8 +70,11 @@ async function checkNewEmails(client, mailboxAlias) {
       ? Number(checkpoint?.[C_CHECKPOINT.LAST_TERMINAL_UID] || 0)
       : 0;
 
-    const foundUids = await client.search({ from: "customercare@care.vpb.com.vn" }, { uid: true });
-    const pendingUids = (Array.isArray(foundUids) ? foundUids : [])
+    const foundUidGroups = await Promise.all(
+      TRUSTED_SENDER_ADDRESSES.map((sender) => client.search({ from: sender }, { uid: true })),
+    );
+    const foundUids = [...new Set(foundUidGroups.flat().map(Number))];
+    const pendingUids = foundUids
       .filter((uid) => Number(uid) > cursor)
       .sort((left, right) => Number(left) - Number(right));
 

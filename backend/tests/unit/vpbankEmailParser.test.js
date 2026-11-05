@@ -79,6 +79,31 @@ test("VPBank Email Parser Suite", async (t) => {
     assert.equal(result.isFinancial, true);
   });
 
+  await t.test("6.1. Parses VPBank NEO debit transfer email", () => {
+    const result = parseVpbankEmail({
+      subject: "VPBank NEO transaction successful",
+      from: "VPBank NEO <vpbankonline@vpb.com.vn>",
+      authenticationResults: "mx.google.com; dkim=pass header.d=vpb.com.vn;",
+      text: `
+        M\u00e3 giao d\u1ecbch: FT263091025533971
+        Ng\u00e0y, gi\u1edd giao d\u1ecbch: 05/11/2026 08:10:14
+        T\u00e0i kho\u1ea3n tr\u00edch n\u1ee3: 0378304963
+        S\u1ed1 ti\u1ec1n tr\u00edch n\u1ee3: 20,000 VND
+        T\u00e0i kho\u1ea3n ghi c\u00f3: MS00T01690343993488
+        S\u1ed1 ti\u1ec1n ghi c\u00f3: 20,000 VND
+        N\u1ed9i dung chuy\u1ec3n ti\u1ec1n: NGO LE NGOC HUNG chuyen tien
+      `,
+    });
+
+    assert.equal(result.senderValid, true);
+    assert.equal(result.documentKind, "DEBIT_CARD_TRANSACTION");
+    assert.equal(result.direction, "OUTFLOW");
+    assert.equal(result.amount, 20000);
+    assert.equal(result.referenceCode, "FT263091025533971");
+    assert.equal(result.merchantNormalized, "NGO LE NGOC HUNG chuyen tien");
+    assert.equal(result.isFinancial, true);
+  });
+
   await t.test("6. BÃ³c tÃ¡ch email biáº¿n Ä‘á»™ng sá»‘ dÆ° tháº» ghi ná»£ (DEBIT_CARD OUTFLOW)", () => {
     const email = {
       subject: "ThÃ´ng bÃ¡o biáº¿n Ä‘á»™ng sá»‘ dÆ° tÃ i khoáº£n thanh toÃ¡n",
