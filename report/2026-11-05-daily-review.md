@@ -17,7 +17,9 @@
 5. [Nhiệm vụ 5: Quy hoạch & Dọn dẹp cấu trúc thư mục docs/ và docs/plans/](#5-nhiệm-vụ-5-quy-hoạch--dọn-dẹp-cấu-trúc-thư-mục-docs-và-docsplans)
 6. [Nhiệm vụ 6: Cấu hình Logic Xóa Sản Phẩm Chống Mồ Côi Đơn Hàng & Tự Động Xóa Kèm Đơn Hết Hạn/Đã Hoàn](#6-nhiệm-vụ-6-cấu-hình-logic-xóa-sản-phẩm-chống-mồ-côi-đơn-hàng--tự-động-xóa-kèm-đơn-hết-hạnđã-hoàn)
 7. [Nhiệm vụ 7: Sửa Lỗi Nghiệp Vụ Đối Soát Webhook Đơn Cần Gia Hạn Theo Giá Catalog Mới & Gia Hạn Đơn MAVLUQXW](#7-nhiệm-vụ-7-sửa-lỗi-nghiệp-vụ-đối-soát-webhook-đơn-cần-gia-hạn-theo-giá-catalog-mới--gia-hạn-đơn-mavluqxw)
-8. [Nhiệm vụ 8: Tái Cấu Trúc Toàn Diện Đơn Gộp (Batch Payment) Qua EventBus & Cơ Chế Hoàn Tất Đơn Lỗi Chặt Chẽ](#8-nhiệm-vụ-8-tái-cấu-trúc-toàn-diện-đơn-gộp-batch-payment-qua-eventbus--cơ-chế-hoàn-tất-đơn-lỗi-chặt-chẽ)
+8. [Nhiệm vụ 8: Đồng Bộ Giá Nhập NCC (Cost) Từ Catalog Cho Đơn Cần Gia Hạn & Quản Trị Công Nợ NCC](#8-nhiệm-vụ-8-đồng-bộ-giá-nhập-ncc-cost-từ-catalog-cho-đơn-cần-gia-hạn--quản-trị-công-nợ-ncc)
+9. [Nhiệm vụ 9: Tái Cấu Trúc Toàn Diện Đơn Gộp (Batch Payment) Qua EventBus & Cơ Chế Hoàn Tất Đơn Lỗi Chặt Chẽ](#9-nhiệm-vụ-9-tái-cấu-trúc-toàn-diện-đơn-gộp-batch-payment-qua-eventbus--cơ-chế-hoàn-tất-đơn-lỗi-chặt-chẽ)
+10. [Nhiệm vụ 10: Hợp Nhất 85 File Báo Cáo Lịch Sử Thành 7 File Báo Cáo Hàng Ngày Chuẩn Hóa Duy Nhất](#10-nhiệm-vụ-10-hợp-nhất-85-file-báo-cáo-lịch-sử-thành-7-file-báo-cáo-hàng-ngày-chuẩn-hóa-duy-nhất)
 
 ---
 
@@ -330,3 +332,65 @@
 - **Database VPS xác nhận:**
   + Đơn `MAVLUQXW`: `cost = 100000.00`, `price = 350100.00`, `gross_selling_price = 350000.00`, `supply_id = 12`, `status = PAID`.
   + Log công nợ NCC `#522`: `order_list_id = 423`, `supply_id = 12`, `import_cost = 100000.00`, `ncc_payment_status = 'Chưa Thanh Toán'`.
+
+---
+
+## 9. NHIỆM VỤ 9: TÁI CẤU TRÚC TOÀN DIỆN ĐƠN GỘP (BATCH PAYMENT) QUA EVENTBUS & CƠ CHẾ HOÀN TẤT ĐƠN LỖI CHẶT CHẼ
+
+### 9.1. Bối cảnh & Nguyên nhân gốc (Root Cause)
+1. **Vấn đề nhận 2 biến động Telegram:** Khi thanh toán đơn gộp gồm 2 đơn con, SePay webhook bắn về cho batch (`+420.002 đ`), hệ thống nhận diện và đối soát thành công. Tuy nhiên, luồng gia hạn kỹ thuật từng đơn con lại bắn 2 thông báo `BIẾN ĐỘNG THÁNG` riêng rẽ lên Telegram (`+210.000 đ` và `+210.002 đ`), gây ra hiện tượng ghi nhận phân mảnh và làm phiền kênh thông báo.
+2. **Race Condition số liệu Telegram:** Cả 2 đơn cùng đọc số liệu `3.980.240 đ` và cùng cộng lên `4.190.242 đ`, khiến biến động số dư hiển thị không phản ánh bước nhảy thực tế.
+3. **Chỉ đạo của Master:**
+   - Số dư bank và doanh thu phải chốt một lần duy nhất theo mã đợt gộp SePay webhook.
+   - Tách biệt pha tài chính và pha gia hạn kỹ thuật (Two-Phase Model).
+   - Bổ sung nút hoàn thành đơn lỗi trong modal chi tiết đơn gộp: Nếu 5 đơn con có 3 pass, 2 fail thì chỉ hoàn thành 2 đơn fail mà tuyệt đối **không cộng tiền lần 2**. Nút chỉ xuất hiện khi có đơn lỗi.
+
+### 9.2. Giải pháp kỹ thuật đã triển khai (Chuẩn ACID)
+1. **Mô hình Hai Pha (Two-Phase Execution Model):**
+   - **Pha 1 (Tài chính cấp Batch):** Trong `batchPaymentService.js`, SePay webhook là nguồn sự thật (Ground Truth). Khóa hàng `batch_payment_requests` nguyên tử, ghi nhận biên lai thanh toán duy nhất cho cả batch, tính tổng doanh thu/chi phí/lợi nhuận gộp và phát sự kiện `BATCH_PAYMENT_COMPLETED` qua EventBus. Telegram chỉ gửi **DUY NHẤT 1 TIN NHẮN TÀI CHÍNH**.
+   - **Pha 2 (Kỹ thuật cấp Đơn con):** Gọi `orderService.renewOrder` với cờ `skipFinanceNotification = true` và `skipBankAdjustment = true`. Đơn con được gia hạn thời hạn sử dụng mà không can thiệp vào số dư bank.
+2. **Cơ chế Hoàn tất Đơn lỗi (`fulfillRemainingBatchOrders`):**
+   - Backend API: `POST /api/invoices/batches/:id/fulfill-remaining`.
+   - Kiểm tra bảo vệ: Chỉ quét các đơn con có trạng thái khác `PAID` (như `UNPAID`, `RENEW_REQUIRED`, `FAILED`) để gia hạn. Đơn đã `PAID` được bảo vệ 100% không bị gia hạn lặp (Idempotent).
+   - Không tạo biên lai mới, không cộng bank balance, không phát sinh biến động doanh thu.
+3. **Giao diện Frontend (`BatchDetailModal.tsx`):**
+   - Nút **"⚡ Hoàn tất đơn lỗi"** chỉ hiển thị khi `batch.status === 'PAID'` VÀ tồn tại ít nhất 1 đơn con chưa hoàn thành (`order.status !== 'PAID'`).
+   - Hiển thị badge trạng thái chi tiết cho từng đơn con trong modal.
+
+### 9.3. Kết quả kiểm thử & Nghiệm thu
+- **Unit Test:** `npm --prefix backend run test` đạt **92/92 tests PASSED** (toàn bộ 20 suites thành công 100%).
+- **Frontend Build:** `npm --prefix frontend run build` (`tsc && vite build`) hoàn thành trong 17.61s, 0 lỗi TypeScript.
+- **Triển khai VPS:** Đã commit `13b643f9`, push lên `origin main`, deploy và restart cả 2 container backend & frontend trên VPS `180.93.43.169`, container hoạt động ổn định và healthy.
+
+---
+
+## 10. NHIỆM VỤ 10: HỢP NHẤT 85 FILE BÁO CÁO LỊCH SỬ THÀNH 7 FILE BÁO CÁO HÀNG NGÀY CHUẨN HÓA DUY NHẤT
+
+### 10.1. Bối cảnh & Chỉ đạo tối cao của Master
+- Thư mục `report/` bị phân mảnh nghiêm trọng với **86 files** trải dài từ ngày 29/10 đến 05/11/2026, gây khó khăn cho việc tra cứu và quản lý lịch sử.
+- Master gửi ảnh chụp trực tiếp cây thư mục và ra lệnh:
+> *"gom lại cho tôi, mỗi ngày chỉ 1 file report duy nhất"*
+
+### 10.2. Quy trình triển khai thực tế
+1. **Xây dựng Script Tự Động Hóa Chuẩn Hóa ([scripts/consolidate_daily_reports.js](file:///d:/Desktop/admin/admin_orderlist/scripts/consolidate_daily_reports.js)):**
+   - Quét toàn bộ thư mục `report/`, nhóm theo từng ngày `YYYY-MM-DD`.
+   - Phân tích và trích xuất tiêu đề gốc của từng nhiệm vụ, bổ sung override cho các file có encoding đặc thù.
+   - Điều chỉnh phân cấp Heading Markdown (`#` -> `###`, `##` -> `###`, `###` -> `####`) nhưng bảo toàn 100% nội dung bên trong các khối mã (` ``` `).
+   - Thiết lập thẻ neo chuẩn HTML `<a id="nhiem-vu-X"></a>` để mục lục TOC điều hướng chính xác trong mọi trình đọc Markdown.
+   - Ghi nhận nguồn gốc tài liệu nguyên thủy `> *Nguồn gốc tài liệu hợp nhất:* [report/file_name](file:///...)` phục vụ truy vết lịch sử.
+2. **Thực thi Hợp Nhất & Dọn Dẹp:**
+   - Hợp nhất thành công 7 file báo cáo tổng hợp:
+     + `2026-10-29-daily-review.md`: 3 nhiệm vụ (17.9 KB)
+     + `2026-10-30-daily-review.md`: 5 nhiệm vụ (24.0 KB)
+     + `2026-10-31-daily-review.md`: 13 nhiệm vụ (70.9 KB)
+     + `2026-11-01-daily-review.md`: 17 nhiệm vụ (171.2 KB)
+     + `2026-11-02-daily-review.md`: 18 nhiệm vụ (91.8 KB)
+     + `2026-11-03-daily-review.md`: 13 nhiệm vụ (116.8 KB)
+     + `2026-11-04-daily-review.md`: 16 nhiệm vụ (97.2 KB)
+   - Xóa sạch 85 file con lẻ tẻ sau khi nội dung đã được hợp nhất toàn vẹn vào file ngày.
+
+### 10.3. Kết quả nghiệm thu
+- Thư mục `report/` hiện tại **CHÍNH XÁC CÒN ĐÚNG 8 FILES** (mỗi ngày 1 file duy nhất từ 29/10 đến 05/11).
+- Toàn bộ cấu trúc tuân thủ 100% điều luật Single Daily Report File trong hiến pháp [AGENTS.md](file:///d:/Desktop/admin/admin_orderlist/AGENTS.md).
+- Backend unit tests: **92/92 tests PASSED**.
+- Frontend build: **PASSED 100%**.
