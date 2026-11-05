@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Globe,
   Key,
@@ -33,6 +33,7 @@ import {
   ArrowRight,
   Filter,
 } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 export interface FieldMappingItem {
   key: string;
@@ -73,12 +74,49 @@ export interface DetectedField {
   is_potential_otp: boolean;
 }
 
+function getValueByPathFrontend(obj: any, path: string): any {
+  if (!obj || !path) return undefined;
+  const normalized = String(path).trim().replace(/\[(\w+)\]/g, ".$1").replace(/^\./, "");
+  const keys = normalized.split(".");
+  let curr = obj;
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (curr == null) return undefined;
+    if (Array.isArray(curr) && !/^\d+$/.test(key)) {
+      curr = curr[0]?.[key];
+    } else {
+      curr = curr[key];
+    }
+  }
+  return curr;
+}
+
+function extractJsonPathsFrontend(value: any, path = "", depth = 0): DetectedField[] {
+  if (depth > 5 || value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [{ path, value: [], type: "array (empty)", sample: "[]", is_potential_otp: false }];
+    return value.slice(0, 3).flatMap((item, index) => extractJsonPathsFrontend(item, `${path}[${index}]`, depth + 1));
+  }
+  if (typeof value !== "object") {
+    return [{
+      path,
+      value,
+      type: typeof value,
+      sample: String(value).slice(0, 100),
+      is_potential_otp: /otp|code|verify/i.test(path),
+    }];
+  }
+  return Object.entries(value).flatMap(([key, entry]) =>
+    extractJsonPathsFrontend(entry, path ? `${path}.${key}` : key, depth + 1)
+  );
+}
+
 export const ExternalApiConfigPage: React.FC = () => {
+  const notify = useNotification();
   const [configs, setConfigs] = useState<ExternalApiConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"otp" | "payment" | "notify" | "all">("otp");
   const [searchQuery, setSearchQuery] = useState("");
-  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Lưu trạng thái chỉnh sửa cục bộ cho từng card
   const [editForms, setEditForms] = useState<Record<number, ExternalApiConfig>>({});
@@ -118,23 +156,38 @@ export const ExternalApiConfigPage: React.FC = () => {
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [mappingConfigId, setMappingConfigId] = useState<number | null>(null);
   const [mappingServiceName, setMappingServiceName] = useState("");
+  const [mappingMode, setMappingMode] = useState<"api" | "paste">("api");
   const [analyzerUrl, setAnalyzerUrl] = useState("");
   const [analyzerMethod, setAnalyzerMethod] = useState<"GET" | "POST">("GET");
   const [analyzerBody, setAnalyzerBody] = useState("");
+  const [mockJsonText, setMockJsonText] = useState("");
+  const [customPathInput, setCustomPathInput] = useState("data.code");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{
     status: number;
     statusText: string;
     latency_ms: number;
+    is_json: boolean;
     data: any;
+    raw_body: string;
     detected_fields: DetectedField[];
+    target_url?: string;
   } | null>(null);
   const [currentFields, setCurrentFields] = useState<FieldMappingItem[]>([]);
   const [savingMapping, setSavingMapping] = useState(false);
+  const [copiedJson, setCopiedJson] = useState(false);
+
+  const previewExtractedValue = useMemo(() => {
+    if (!analysisResult?.is_json || !analysisResult?.data) return undefined;
+    return getValueByPathFrontend(analysisResult.data, customPathInput);
+  }, [analysisResult, customPathInput]);
 
   const showToast = (type: "success" | "error", text: string) => {
-    setToastMessage({ type, text });
-    setTimeout(() => setToastMessage(null), 4000);
+    if (type === "success") {
+      notify.success(text);
+    } else {
+      notify.error(text);
+    }
   };
 
   // 1. Tải danh sách cấu hình
@@ -344,29 +397,43 @@ export const ExternalApiConfigPage: React.FC = () => {
     }
   };
 
-  // 7. Xóa cấu hình
-  const handleDeleteConfig = async (id: number, name: string) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa cấu hình API [${name}] không?`)) return;
-    try {
-      const res = await fetch(`/api/system/external-apis/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Lỗi khi xóa.");
-      showToast("success", `Đã xóa dịch vụ [${name}] thành công!`);
-      await fetchConfigs();
-    } catch (err: any) {
-      showToast("error", err.message || "Lỗi xóa cấu hình");
-    }
+  // 7. Xóa cấu hình qua Modal xác nhận hệ thống
+  const handleDeleteConfig = (id: number, name: string) => {
+    notify.confirm({
+      title: "Xác Nhận Xóa Cấu Hình API",
+      message: `Bạn có chắc chắn muốn xóa cấu hình API [${name}] không? Thao tác này sẽ xóa vĩnh viễn cấu hình này khỏi cơ sở dữ liệu.`,
+      confirmText: "Xóa Cấu Hình",
+      cancelText: "Hủy Bỏ",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/system/external-apis/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || "Lỗi khi xóa.");
+          notify.success(`Đã xóa cấu hình [${name}] thành công!`);
+          await fetchConfigs();
+        } catch (err: any) {
+          notify.error(err.message || "Lỗi xóa cấu hình");
+        }
+      },
+    });
   };
 
   // 8. Mở modal Cấu hình trường (Dynamic Field Mapping)
   const openFieldMappingModal = (config: ExternalApiConfig) => {
     setMappingConfigId(config.id);
     setMappingServiceName(config.service_name);
-    setAnalyzerUrl(config.base_url);
-    setAnalyzerMethod(config.endpoints?.method === "POST" ? "POST" : "GET");
+    const endpoint = config.endpoints?.get_otp || config.endpoints?.read_otp || config.endpoints?.path || "";
+    const fullUrl = config.base_url + (endpoint ? `/${endpoint.replace(/^\/+/, "")}` : "");
+    setAnalyzerUrl(fullUrl);
+    const isPost = config.endpoints?.method === "POST" || config.auth_config?.method === "POST" || /get_otp_api/i.test(endpoint);
+    setAnalyzerMethod(isPost ? "POST" : "GET");
     setAnalyzerBody(JSON.stringify({ email: "demo_probe@example.com" }, null, 2));
     setCurrentFields(config.field_mapping || []);
     setAnalysisResult(null);
+    setMappingMode("api");
+    setMockJsonText(`{\n  "status": "success",\n  "data": [\n    {\n      "code": "849201",\n      "otp": "849201",\n      "date": "2026-11-05 20:20:00",\n      "content": "Your Adobe verification code is 849201"\n    }\n  ]\n}`);
+    const existingOtp = config.field_mapping?.find((f) => f.is_primary || f.key === "otp")?.path || "data.code";
+    setCustomPathInput(existingOtp);
     setShowMappingModal(true);
   };
 
@@ -380,28 +447,56 @@ export const ExternalApiConfigPage: React.FC = () => {
     try {
       setAnalyzing(true);
       setAnalysisResult(null);
+      let parsedBody = undefined;
+      if (analyzerMethod === "POST" && analyzerBody.trim()) {
+        try {
+          parsedBody = JSON.parse(analyzerBody);
+        } catch {
+          showToast("error", "Request Body không phải JSON hợp lệ. Vui lòng kiểm tra lại cú pháp!");
+          setAnalyzing(false);
+          return;
+        }
+      }
+
       const res = await fetch("/api/system/external-apis/analyze-endpoint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           config_id: mappingConfigId,
           method: analyzerMethod,
-          body: analyzerMethod === "POST" ? analyzerBody : undefined,
+          body: parsedBody,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        showToast("error", data.error || data.statusText || "Không thể phân tích API.");
+        setAnalysisResult({
+          status: data.status || res.status,
+          statusText: data.error || data.statusText || "Lỗi gọi API",
+          latency_ms: data.latency_ms || 0,
+          is_json: false,
+          data: null,
+          raw_body: data.raw_body || data.error || "Không có phản hồi từ máy chủ.",
+          detected_fields: [],
+          target_url: data.target_url || analyzerUrl,
+        });
+        showToast("error", data.error || data.statusText || "API trả về mã lỗi.");
       } else {
         setAnalysisResult({
           status: data.status,
           statusText: data.statusText,
           latency_ms: data.latency_ms,
-          data: data.data,
+          is_json: Boolean(data.is_json),
+          data: data.parsed_data,
+          raw_body: data.raw_body || "",
           detected_fields: data.detected_fields || [],
+          target_url: data.target_url || analyzerUrl,
         });
-        showToast("success", `Đã nhận kết nối (${data.latency_ms}ms) và phát hiện ${data.detected_fields?.length || 0} trường dữ liệu!`);
+        if (data.is_json) {
+          showToast("success", `Đã nhận phản hồi JSON (${data.latency_ms}ms) với ${data.detected_fields?.length || 0} trường dữ liệu!`);
+        } else {
+          showToast("error", `Phản hồi HTTP ${data.status} là HTML / Văn bản, không phải JSON!`);
+        }
       }
     } catch (err: any) {
       showToast("error", err.message || "Lỗi kết nối khi phân tích API.");
@@ -410,52 +505,124 @@ export const ExternalApiConfigPage: React.FC = () => {
     }
   };
 
-  // 10. Chọn trường gán làm Mã OTP chính
-  const handleSelectAsOtpField = (detected: DetectedField) => {
-    setCurrentFields((prev) => {
-      const filtered = prev.filter((f) => f.key !== "otp" && !f.is_primary);
-      return [
-        {
-          key: "otp",
-          label: "Mã Xác Thực (OTP)",
-          path: detected.path,
-          is_primary: true,
-          color: "cyan",
-        },
-        ...filtered,
-      ];
-    });
-    showToast("success", `Đã gán [${detected.path}] làm Mã OTP chính!`);
+  // 10. Phân tích JSON mẫu tự dán
+  const handleAnalyzeMockJson = () => {
+    try {
+      const parsed = JSON.parse(mockJsonText);
+      const fields = extractJsonPathsFrontend(parsed);
+      setAnalysisResult({
+        status: 200,
+        statusText: "Mock JSON OK",
+        latency_ms: 1,
+        is_json: true,
+        data: parsed,
+        raw_body: mockJsonText,
+        detected_fields: fields,
+      });
+      showToast("success", `Đã phân tích JSON mẫu thành công (${fields.length} trường)!`);
+    } catch (err: any) {
+      showToast("error", "Chuỗi JSON dán vào không hợp lệ: " + err.message);
+    }
   };
 
-  // 11. Thêm trường hiển thị thông thường
-  const handleAddDisplayField = (detected: DetectedField) => {
-    const parts = detected.path.replace(/\[\d+\]/g, "").split(".");
-    const rawKey = parts[parts.length - 1] || "field";
-    let autoLabel = rawKey;
-    if (/code|otp/i.test(rawKey)) autoLabel = "Mã OTP";
-    else if (/time|date|created|at/i.test(rawKey)) autoLabel = "Thời Gian";
-    else if (/subject|title/i.test(rawKey)) autoLabel = "Tiêu Đề Thư";
-    else if (/from|sender/i.test(rawKey)) autoLabel = "Người Gửi";
-    else if (/status/i.test(rawKey)) autoLabel = "Trạng Thái";
+  // 10.2. Nạp dữ liệu JSON mẫu chuẩn (khi API ngoài trả về mảng rỗng data: [])
+  const handleLoadPresetSample = () => {
+    const sample = {
+      status: "success",
+      data: [
+        {
+          code: "849201",
+          otp: "849201",
+          date: "2026-11-05 20:20:00",
+          content: "Your Adobe verification code is 849201",
+        },
+      ],
+    };
+    const fields = extractJsonPathsFrontend(sample);
+    setAnalysisResult({
+      status: 200,
+      statusText: "Dữ Liệu Mẫu Chuẩn",
+      latency_ms: 1,
+      is_json: true,
+      data: sample,
+      raw_body: JSON.stringify(sample, null, 2),
+      detected_fields: fields,
+    });
+    setCustomPathInput("data.code");
+    showToast("success", "Đã nạp mẫu dữ liệu chuẩn của HDSD (mã OTP: 849201)!");
+  };
 
-    const exists = currentFields.some((f) => f.path === detected.path);
-    if (exists) {
-      showToast("error", `Trường [${detected.path}] đã có trong danh sách!`);
+  const handleCopyJson = () => {
+    if (!analysisResult?.raw_body && !analysisResult?.data) return;
+    const str = analysisResult.raw_body || JSON.stringify(analysisResult.data, null, 2);
+    navigator.clipboard.writeText(str);
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+    showToast("success", "Đã sao chép nội dung JSON vào clipboard!");
+  };
+
+  // 11. Áp dụng JSON Path (Đặt làm OTP hoặc thêm hiển thị)
+  const handleApplyPath = (path: string, isOtp: boolean) => {
+    const targetPath = path.trim();
+    if (!targetPath) {
+      showToast("error", "Vui lòng nhập hoặc click chọn một đường dẫn JSON Path!");
       return;
     }
 
-    setCurrentFields((prev) => [
-      ...prev,
-      {
-        key: rawKey,
-        label: autoLabel,
-        path: detected.path,
-        is_primary: false,
-        color: "emerald",
-      },
-    ]);
-    showToast("success", `Đã thêm [${detected.path}] vào trường hiển thị!`);
+    if (isOtp) {
+      setCurrentFields((prev) => {
+        const filtered = prev.filter((f) => f.key !== "otp" && !f.is_primary);
+        return [
+          {
+            key: "otp",
+            label: "Mã Xác Thực (OTP)",
+            path: targetPath,
+            is_primary: true,
+            color: "cyan",
+          },
+          ...filtered,
+        ];
+      });
+      showToast("success", `Đã gán [${targetPath}] làm Mã OTP chính!`);
+    } else {
+      if (currentFields.some((f) => f.path === targetPath)) {
+        showToast("error", `Trường [${targetPath}] đã có trong danh sách!`);
+        return;
+      }
+
+      const parts = targetPath.replace(/\[\d+\]/g, "").split(".");
+      const rawKey = parts[parts.length - 1] || "field";
+      let autoLabel = rawKey;
+      if (/code|otp/i.test(rawKey)) autoLabel = "Mã OTP";
+      else if (/time|date|created|at/i.test(rawKey)) autoLabel = "Thời Gian";
+      else if (/subject|title/i.test(rawKey)) autoLabel = "Tiêu Đề Thư";
+      else if (/from|sender/i.test(rawKey)) autoLabel = "Người Gửi";
+      else if (/status/i.test(rawKey)) autoLabel = "Trạng Thái";
+
+      setCurrentFields((prev) => [
+        ...prev,
+        {
+          key: rawKey,
+          label: autoLabel,
+          path: targetPath,
+          is_primary: false,
+          color: "emerald",
+        },
+      ]);
+      showToast("success", `Đã thêm [${targetPath}] vào danh sách hiển thị!`);
+    }
+  };
+
+  // 12. Chọn trường gán làm Mã OTP chính từ chip
+  const handleSelectAsOtpField = (detected: DetectedField) => {
+    setCustomPathInput(detected.path);
+    handleApplyPath(detected.path, true);
+  };
+
+  // 13. Thêm trường hiển thị thông thường từ chip
+  const handleAddDisplayField = (detected: DetectedField) => {
+    setCustomPathInput(detected.path);
+    handleApplyPath(detected.path, false);
   };
 
   // 12. Lưu cấu hình mapping trường vào DB
@@ -507,24 +674,6 @@ export const ExternalApiConfigPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans text-slate-100">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div
-          className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 ${
-            toastMessage.type === "success"
-              ? "bg-emerald-950/95 border-emerald-500/50 text-emerald-200"
-              : "bg-rose-950/95 border-rose-500/50 text-rose-200"
-          }`}
-        >
-          {toastMessage.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-          )}
-          <span className="text-sm font-semibold">{toastMessage.text}</span>
-        </div>
-      )}
-
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
@@ -740,12 +889,12 @@ export const ExternalApiConfigPage: React.FC = () => {
             return (
               <div
                 key={config.id}
-                className={`bg-slate-900/70 border border-slate-800 rounded-3xl p-5 shadow-xl transition-all duration-200 flex flex-col justify-between backdrop-blur-md ${borderHover}`}
+                className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-xl transition-all duration-200 flex flex-col justify-between backdrop-blur-md ${borderHover}`}
               >
                 <div className="space-y-4">
-                  {/* Card Header: Icon + Name + Service Key + Online Toggle */}
+                  {/* Card Header: Icon + Name + Service Key + Online Toggle + Delete Button */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       <div className={`p-3 rounded-2xl border ${iconBg} shadow-inner shrink-0`}>
                         {isOtpType ? (
                           <Key className="w-5 h-5" />
@@ -755,10 +904,10 @@ export const ExternalApiConfigPage: React.FC = () => {
                           <Send className="w-5 h-5" />
                         )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-white tracking-tight">{config.service_name}</h3>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base font-bold text-white tracking-tight truncate">{config.service_name}</h3>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                             {config.service_key}
                           </span>
                         </div>
@@ -766,34 +915,46 @@ export const ExternalApiConfigPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Toggle Online/Offline */}
-                    <button
-                      onClick={() => {
-                        const newActive = !formData.is_active;
-                        handleFieldChange(config.id, "is_active", newActive);
-                      }}
-                      className="shrink-0 focus:outline-none transition-transform active:scale-95"
-                      title={formData.is_active ? "Đang bật (Nhấn để tắt)" : "Đang tắt (Nhấn để bật)"}
-                    >
-                      {formData.is_active ? (
-                        <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl text-[11px] font-bold">
-                          <ToggleRight className="w-5 h-5 text-emerald-400" />
-                          ONLINE
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 border border-slate-700 text-slate-400 rounded-xl text-[11px] font-bold">
-                          <ToggleLeft className="w-5 h-5 text-slate-500" />
-                          OFFLINE
-                        </div>
-                      )}
-                    </button>
+                    {/* Right: Toggle Online/Offline + Delete Button */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newActive = !formData.is_active;
+                          handleFieldChange(config.id, "is_active", newActive);
+                        }}
+                        className="focus:outline-none transition-transform active:scale-95"
+                        title={formData.is_active ? "Đang bật (Nhấn để tắt)" : "Đang tắt (Nhấn để bật)"}
+                      >
+                        {formData.is_active ? (
+                          <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl text-[11px] font-bold">
+                            <ToggleRight className="w-4 h-4 text-emerald-400" />
+                            <span>ONLINE</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 border border-slate-700 text-slate-400 rounded-xl text-[11px] font-bold">
+                            <ToggleLeft className="w-4 h-4 text-slate-500" />
+                            <span>OFFLINE</span>
+                          </div>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteConfig(config.id, config.service_name)}
+                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                        title={`Xóa cấu hình [${config.service_name}]`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Form Inputs inside the Block */}
-                  <div className="space-y-3.5">
+                  <div className="space-y-3 pt-1">
                     {/* Base URL */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
                         <span>Base URL / Endpoint Host</span>
                         <a
                           href={formData.base_url}
@@ -803,22 +964,23 @@ export const ExternalApiConfigPage: React.FC = () => {
                         >
                           Mở trang <ExternalLink className="w-3 h-3" />
                         </a>
-                      </label>
+                      </div>
                       <input
                         type="text"
                         value={formData.base_url || ""}
                         onChange={(e) => handleFieldChange(config.id, "base_url", e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono transition-all"
+                        placeholder="https://..."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono transition-all"
                       />
                     </div>
 
                     {/* API Token / Secret (Nếu có) */}
                     {formData.auth_config && (
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
                           <span>API Token / Secret Key / Fallback Token</span>
-                          <span className="text-[10px] text-slate-500">Loại: {formData.auth_config.type || "mặc định"}</span>
-                        </label>
+                          <span className="text-[10px] text-slate-500 font-mono">Loại: {formData.auth_config.type || "mặc định"}</span>
+                        </div>
                         <div className="relative">
                           <input
                             type={isTokenVisible ? "text" : "password"}
@@ -832,7 +994,7 @@ export const ExternalApiConfigPage: React.FC = () => {
                                 handleAuthConfigChange(config.id, "defaultToken", val);
                               }
                             }}
-                            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono transition-all"
                           />
                           <button
                             type="button"
@@ -850,31 +1012,35 @@ export const ExternalApiConfigPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Hiển thị Các Trường Đã Bóc Tách (Field Mapping Badges) */}
-                    {config.field_mapping && config.field_mapping.length > 0 && (
-                      <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          <span className="flex items-center gap-1.5 text-cyan-400">
-                            <Sparkles className="w-3 h-3" />
-                            Trường Dữ Liệu Bóc Tách ({config.field_mapping.length})
-                          </span>
-                          <button
-                            onClick={() => openFieldMappingModal(config)}
-                            className="text-cyan-400 hover:text-cyan-300 font-normal hover:underline"
-                          >
-                            Chỉnh sửa
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
+                    {/* Khu Vực Bóc Tách Trường Dữ Liệu (Field Mapping Hub) */}
+                    <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                          Trường Dữ Liệu Bóc Tách ({config.field_mapping?.length || 0})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openFieldMappingModal(config)}
+                          className="px-2.5 py-1 bg-cyan-600/15 hover:bg-cyan-600/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
+                          title="Mở bộ chọn bóc tách JSON cho API này"
+                        >
+                          <Sliders className="w-3 h-3 text-cyan-400" />
+                          Cấu Hình Trường
+                        </button>
+                      </div>
+
+                      {config.field_mapping && config.field_mapping.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
                           {config.field_mapping.map((fm, idx) => (
                             <span
                               key={idx}
                               className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border flex items-center gap-1 ${
                                 fm.is_primary
                                   ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300 font-bold"
-                                  : "bg-slate-900 border-slate-700 text-slate-300"
+                                  : "bg-slate-900 border-slate-800 text-slate-300"
                               }`}
-                              title={`Path: ${fm.path}`}
+                              title={`JSON Path: ${fm.path}`}
                             >
                               <Tag className="w-2.5 h-2.5 opacity-70" />
                               <span className="font-sans font-semibold">{fm.label}:</span>
@@ -882,11 +1048,15 @@ export const ExternalApiConfigPage: React.FC = () => {
                             </span>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-[11px] text-slate-500 italic">
+                          Chưa có trường nào được bóc tách. Bấm nút <b>"Cấu Hình Trường"</b> ở trên để phân tích và chọn trường tự động.
+                        </p>
+                      )}
+                    </div>
 
-                    {/* Timeout & Sender Filter */}
-                    <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Timeout & Sender Filter (2 cột) */}
+                    <div className="grid grid-cols-2 gap-3 pt-0.5">
                       <div className="space-y-1">
                         <label className="text-[10px] font-semibold text-slate-400">Timeout (ms)</label>
                         <input
@@ -894,7 +1064,7 @@ export const ExternalApiConfigPage: React.FC = () => {
                           step="1000"
                           value={formData.auth_config?.timeoutMs ?? 10000}
                           onChange={(e) => handleAuthConfigChange(config.id, "timeoutMs", Number(e.target.value))}
-                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
                         />
                       </div>
 
@@ -905,7 +1075,7 @@ export const ExternalApiConfigPage: React.FC = () => {
                           placeholder="adobe / all"
                           value={formData.auth_config?.senderFilter ?? "adobe"}
                           onChange={(e) => handleAuthConfigChange(config.id, "senderFilter", e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
                         />
                       </div>
                     </div>
@@ -913,12 +1083,12 @@ export const ExternalApiConfigPage: React.FC = () => {
                 </div>
 
                 {/* Block Footer Actions */}
-                <div className="pt-4 mt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="pt-3.5 mt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
                   {/* Ping Result Badge */}
                   <div className="flex items-center gap-2">
                     {ping ? (
                       <div
-                        className={`px-3 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1.5 ${
+                        className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1.5 ${
                           ping.reachable
                             ? "bg-emerald-950/80 border border-emerald-500/40 text-emerald-300"
                             : "bg-rose-950/80 border border-rose-500/40 text-rose-300"
@@ -935,10 +1105,12 @@ export const ExternalApiConfigPage: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                  {/* Main Action Buttons: Chỉ còn 3 nút tối giản, thẳng hàng tuyệt đối */}
+                  <div className="flex items-center gap-2 shrink-0">
                     {/* Live Test OTP Button (cho dịch vụ OTP) */}
                     {isOtpType && (
                       <button
+                        type="button"
                         onClick={() => openOtpProbeModal(config.service_key)}
                         className="px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
                         title="Mở popup thử cào OTP từ email"
@@ -948,18 +1120,9 @@ export const ExternalApiConfigPage: React.FC = () => {
                       </button>
                     )}
 
-                    {/* Nút Cấu Hình Trường Bóc Tách (Dynamic Field Selector) */}
-                    <button
-                      onClick={() => openFieldMappingModal(config)}
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
-                      title="Chọn các trường JSON muốn hiển thị từ API này"
-                    >
-                      <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                      Cấu Hình Trường
-                    </button>
-
                     {/* Ping Test Button */}
                     <button
+                      type="button"
                       onClick={() => handlePingTest(config.id)}
                       disabled={isPinging}
                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
@@ -970,24 +1133,14 @@ export const ExternalApiConfigPage: React.FC = () => {
 
                     {/* Save Button */}
                     <button
+                      type="button"
                       onClick={() => handleSaveCard(config.id)}
                       disabled={isSaving}
-                      className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-600/20 active:scale-95 disabled:opacity-50"
+                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-600/20 active:scale-95 disabled:opacity-50"
                     >
                       <Save className="w-3.5 h-3.5" />
                       {isSaving ? "Lưu..." : "Lưu"}
                     </button>
-
-                    {/* Delete Custom API button */}
-                    {config.id > 8 && (
-                      <button
-                        onClick={() => handleDeleteConfig(config.id, config.service_name)}
-                        className="p-2 text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800 rounded-xl transition-all"
-                        title="Xóa cấu hình tùy biến này"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1247,18 +1400,18 @@ export const ExternalApiConfigPage: React.FC = () => {
 
       {/* MODAL 3: BỘ CHỌN TRƯỜNG DỮ LIỆU ĐỘNG & PHÂN TÍCH CÂY JSON (DYNAMIC FIELD SELECTOR) */}
       {showMappingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-6xl w-full h-[88vh] p-5 sm:p-6 shadow-2xl relative flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
-              <div className="flex items-center gap-3.5">
-                <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-cyan-400">
-                  <Sliders className="w-6 h-6" />
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-cyan-400">
+                  <Sliders className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
                     Bộ Chọn Trường JSON & Bóc Tách Dữ Liệu
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-medium">
                       {mappingServiceName}
                     </span>
                   </h3>
@@ -1269,249 +1422,446 @@ export const ExternalApiConfigPage: React.FC = () => {
               </div>
 
               <button
+                type="button"
                 onClick={() => setShowMappingModal(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body: Scrollable */}
-            <div className="overflow-y-auto pr-1 space-y-5 flex-1">
-              {/* KHỐI 1: BỘ GỬI THỬ REQUEST TEST */}
-              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                    <Code2 className="w-4 h-4 text-cyan-400" />
-                    1. Gửi Thử API Để Lấy Cấu Trúc JSON Thực Tế
-                  </span>
-                  {analysisResult && (
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      HTTP {analysisResult.status} ({analysisResult.latency_ms}ms)
-                    </span>
-                  )}
+            {/* Modal Body: Split-View 2 Cột */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0 pt-3.5 pb-2 overflow-hidden">
+              {/* CỘT TRÁI (7 COLS / 58%): Request & Response JSON Explorer */}
+              <div className="lg:col-span-7 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
+                {/* Thanh chuyển chế độ (Mode Tabs) & Quick Preset */}
+                <div className="flex items-center justify-between bg-slate-950/80 p-1.5 rounded-xl border border-slate-800/80 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setMappingMode("api")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        mappingMode === "api"
+                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      1. Gửi Thử API Thực Tế
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMappingMode("paste")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        mappingMode === "paste"
+                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      2. Dán JSON Mẫu (Tùy Chọn)
+                    </button>
+                  </div>
+
+                  {/* Nút nạp nhanh mẫu chuẩn HDSD */}
+                  <button
+                    type="button"
+                    onClick={handleLoadPresetSample}
+                    className="px-2.5 py-1 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200 bg-cyan-950/50 hover:bg-cyan-900/50 border border-cyan-500/30 rounded-lg flex items-center gap-1 transition-all"
+                    title="Nạp cấu trúc mẫu chuẩn { status: 'success', data: [{ code, otp, date, content }] }"
+                  >
+                    <Sparkles className="w-3 h-3 text-cyan-400" />
+                    <span>Nạp Dữ Liệu Mẫu</span>
+                  </button>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <select
-                    value={analyzerMethod}
-                    onChange={(e) => setAnalyzerMethod(e.target.value as any)}
-                    className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono shrink-0"
-                  >
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                  </select>
+                {/* Form gửi request API thực tế */}
+                {mappingMode === "api" ? (
+                  <div className="bg-slate-950/60 rounded-2xl border border-slate-800/80 p-3 space-y-2.5 shrink-0">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <Code2 className="w-3.5 h-3.5 text-cyan-400" />
+                        Gửi Request Thử Đến Endpoint
+                      </span>
+                      {analysisResult && (
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold flex items-center gap-1 ${
+                            analysisResult.status >= 200 && analysisResult.status < 300
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                          }`}
+                        >
+                          HTTP {analysisResult.status} ({analysisResult.latency_ms}ms)
+                        </span>
+                      )}
+                    </div>
 
-                  <input
-                    type="text"
-                    aria-label="URL cấu hình đã lưu"
-                    value={analyzerUrl}
-                    readOnly
-                    title="Để thay đổi URL, hãy lưu cấu hình API trước khi phân tích."
-                    className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono cursor-not-allowed"
-                  />
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={analyzerMethod}
+                        onChange={(e) => setAnalyzerMethod(e.target.value as "GET" | "POST")}
+                        className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                      </select>
 
-                  <button
-                    onClick={handleAnalyzeEndpoint}
-                    disabled={analyzing}
-                    className="w-full sm:w-auto px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/20 shrink-0 disabled:opacity-50 active:scale-95"
-                  >
-                    <Sparkles className={`w-4 h-4 ${analyzing ? "animate-spin" : ""}`} />
-                    {analyzing ? "Đang phân tích..." : "⚡ Gửi Thử & Phân Tích"}
-                  </button>
+                      <input
+                        type="text"
+                        value={analyzerUrl}
+                        readOnly
+                        placeholder="https://api.example.com/..."
+                        className="flex-1 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono select-all focus:outline-none"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleAnalyzeEndpoint}
+                        disabled={analyzing}
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-cyan-600/25 active:scale-95 disabled:opacity-50 shrink-0"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${analyzing ? "animate-spin" : ""}`} />
+                        <span>{analyzing ? "Đang gửi..." : "Gửi Thử & Phân Tích"}</span>
+                      </button>
+                    </div>
+
+                    {analyzerMethod === "POST" && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>Request Body (JSON gửi kèm POST):</span>
+                          <span className="text-[10px] text-slate-500">Ví dụ: {"{\"email\": \"demo_probe@example.com\"}"}</span>
+                        </div>
+                        <textarea
+                          value={analyzerBody}
+                          onChange={(e) => setAnalyzerBody(e.target.value)}
+                          rows={2}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 font-mono text-xs text-slate-200 focus:outline-none focus:border-cyan-500 leading-snug"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Tab Dán JSON Mẫu */
+                  <div className="bg-slate-950/60 rounded-2xl border border-slate-800/80 p-3 space-y-2 shrink-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                        Dán Cấu Trúc JSON Mẫu Để Bóc Tách Trực Tiếp
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAnalyzeMockJson}
+                        className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Phân Tích JSON Này
+                      </button>
+                    </div>
+                    <textarea
+                      value={mockJsonText}
+                      onChange={(e) => setMockJsonText(e.target.value)}
+                      rows={4}
+                      className="w-full bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-cyan-300 focus:outline-none focus:border-cyan-500 leading-relaxed"
+                      placeholder='{\n  "status": "success",\n  "data": [\n    {\n      "code": "849201",\n      "otp": "849201"\n    }\n  ]\n}'
+                    />
+                  </div>
+                )}
+
+                {/* Kết quả phản hồi Raw JSON Viewer */}
+                <div className="flex-1 flex flex-col min-h-0 bg-slate-950 rounded-2xl border border-slate-800/90 overflow-hidden">
+                  <div className="flex items-center justify-between px-3.5 py-2 bg-slate-900/80 border-b border-slate-800/80 shrink-0 text-xs">
+                    <span className="font-bold flex items-center gap-1.5 text-slate-300">
+                      <Braces className="w-3.5 h-3.5 text-cyan-400" />
+                      Cây Dữ Liệu JSON Phản Hồi (Raw JSON)
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyJson}
+                        disabled={!analysisResult}
+                        className="px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center gap-1 transition-all disabled:opacity-40"
+                      >
+                        {copiedJson ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedJson ? "Đã chép" : "Sao chép JSON"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-3.5">
+                    {analysisResult ? (
+                      !analysisResult.is_json ? (
+                        <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2 text-xs">
+                          <div className="flex items-start gap-2 text-rose-300 font-bold">
+                            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                            <span>Máy chủ phản hồi HTML / Văn bản (HTTP {analysisResult.status} {analysisResult.statusText})</span>
+                          </div>
+                          <p className="text-slate-400 text-[11px]">
+                            💡 Gợi ý: Hãy bấm nút <b>"Nạp Dữ Liệu Mẫu"</b> ở trên hoặc thử chuyển phương thức sang <b>POST</b> với email hợp lệ.
+                          </p>
+                          {analysisResult.raw_body && (
+                            <pre className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-[11px] text-slate-400 font-mono max-h-48 overflow-y-auto whitespace-pre-wrap select-text">
+                              {analysisResult.raw_body}
+                            </pre>
+                          )}
+                        </div>
+                      ) : (
+                        <pre className="text-xs text-cyan-300/95 font-mono whitespace-pre leading-relaxed select-text">
+                          {JSON.stringify(analysisResult.data, null, 2)}
+                        </pre>
+                      )
+                    ) : (
+                      <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
+                        <Braces className="w-8 h-8 text-slate-600" />
+                        <p className="text-xs">
+                          Chưa có dữ liệu phản hồi. Hãy bấm <b>"Gửi Thử & Phân Tích"</b> hoặc bấm <b>"Nạp Dữ Liệu Mẫu"</b> để xem cấu trúc JSON.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* KHỐI 2: KẾT QUẢ CÂY JSON & DANH SÁCH TRƯỜNG PHÁT HIỆN */}
-              {analysisResult && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    <span className="flex items-center gap-2 text-amber-400">
-                      <Braces className="w-4 h-4" />
-                      2. Cây JSON & Các Trường Phát Hiện ({analysisResult.detected_fields.length})
+              {/* CỘT PHẢI (5 COLS / 42%): Field Picker, Configured Fields & Live Preview */}
+              <div className="lg:col-span-5 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
+                {/* KHỐI 1: BỘ CHỌN TRƯỜNG DỮ LIỆU */}
+                <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-3 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5" />
+                      Chọn Trường Dữ Liệu Bóc Tách
                     </span>
-                    <span className="text-[11px] text-slate-500 lowercase font-normal">
-                      Click vào các nút bên phải để chọn trường hiển thị
+                    <span className="text-[10px] text-slate-400">
+                      Gõ JSON Path hoặc click chip gợi ý:
                     </span>
                   </div>
 
-                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 max-h-60 overflow-y-auto space-y-2 font-mono text-xs">
-                    {analysisResult.detected_fields.length === 0 ? (
-                      <p className="text-slate-500 italic p-3 text-center">Không phát hiện trường con nào trong response.</p>
+                  {/* Input JSON Path & nút hành động */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={customPathInput}
+                        onChange={(e) => setCustomPathInput(e.target.value)}
+                        placeholder="VD: data.code hoặc data.otp"
+                        className="flex-1 bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none shadow-inner"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyPath(customPathInput, true)}
+                        className="flex-1 px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-600/20 active:scale-95 transition-all"
+                      >
+                        <span>🎯 Đặt làm OTP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyPath(customPathInput, false)}
+                        className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-cyan-600/20 active:scale-95 transition-all"
+                      >
+                        <span>➕ Thêm hiển thị</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Live Value Preview Badge */}
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs gap-2">
+                    <span className="text-slate-400 text-[11px] shrink-0">Giá trị bóc tách:</span>
+                    {previewExtractedValue !== undefined ? (
+                      <span className="font-mono px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold truncate max-w-[200px]" title={String(previewExtractedValue)}>
+                        {typeof previewExtractedValue === "object"
+                          ? JSON.stringify(previewExtractedValue)
+                          : String(previewExtractedValue)}
+                      </span>
                     ) : (
-                      analysisResult.detected_fields.map((field, idx) => (
+                      <span className="text-slate-500 italic text-[11px] truncate">
+                        (Chưa tìm thấy giá trị cho "{customPathInput}")
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quick Preset Chips khi data rỗng hoặc gợi ý thông dụng */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Các trường thông dụng (HDSD / Webmail):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { path: "data.code", label: "data.code 🎯", isOtp: true },
+                        { path: "data.otp", label: "data.otp", isOtp: true },
+                        { path: "data.date", label: "data.date", isOtp: false },
+                        { path: "data.content", label: "data.content", isOtp: false },
+                        { path: "status", label: "status", isOtp: false },
+                      ].map((chip, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setCustomPathInput(chip.path);
+                          }}
+                          className={`px-2 py-0.5 rounded-lg text-[11px] font-mono border transition-all ${
+                            customPathInput === chip.path
+                              ? "bg-cyan-500/30 text-cyan-200 border-cyan-400 shadow"
+                              : chip.isOtp
+                              ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                              : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Chips phát hiện được từ phản hồi */}
+                  {analysisResult?.detected_fields && analysisResult.detected_fields.length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t border-cyan-500/20">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Các trường phát hiện được từ JSON:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                        {analysisResult.detected_fields.map((f, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setCustomPathInput(f.path)}
+                            className={`px-2 py-0.5 rounded-lg text-[11px] font-mono border transition-all flex items-center gap-1 ${
+                              customPathInput === f.path
+                                ? "bg-cyan-500/30 text-cyan-200 border-cyan-400 shadow"
+                                : f.is_potential_otp
+                                ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                                : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                            }`}
+                            title={`Bấm để chọn: ${f.path} = ${f.sample}`}
+                          >
+                            <span>{f.path}</span>
+                            {f.is_potential_otp && (
+                              <span className="text-amber-400 text-[10px] font-bold">🎯 OTP</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* KHỐI 2: DANH SÁCH TRƯỜNG ĐÃ CẤU HÌNH */}
+                <div className="space-y-2 flex-1 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between text-xs text-slate-400 shrink-0">
+                    <span className="font-bold flex items-center gap-1.5 text-slate-200">
+                      <Tag className="w-3.5 h-3.5 text-cyan-400" />
+                      Danh Sách Trường Hiển Thị ({currentFields.length})
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Có thể chỉnh nhãn tiếng Việt
+                    </span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 min-h-[120px]">
+                    {currentFields.length === 0 ? (
+                      <div className="p-4 rounded-xl border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                        Chưa có trường nào được chọn. Hãy nhập JSON Path ở trên và bấm <b>[🎯 Đặt làm OTP]</b> hoặc <b>[➕ Thêm hiển thị]</b>.
+                      </div>
+                    ) : (
+                      currentFields.map((field, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/40 transition-colors gap-3"
+                          className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/90 flex items-center justify-between gap-2.5 hover:border-slate-700 transition-all"
                         >
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <span className="text-cyan-300 font-bold">{field.path}</span>
-                            <span className="text-slate-500 text-[10px]">({field.type})</span>
-                            <span className="text-slate-400 truncate max-w-xs text-[11px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                              = {field.sample}
-                            </span>
-                            {field.is_potential_otp && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-sans font-bold flex items-center gap-1 animate-pulse">
-                                🎯 Gợi Ý OTP
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {field.is_primary ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold shrink-0">
+                                OTP
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold shrink-0">
+                                Phụ
                               </span>
                             )}
+
+                            <div className="space-y-1 flex-1 min-w-0">
+                              <input
+                                type="text"
+                                value={field.label}
+                                onChange={(e) => {
+                                  const newLabel = e.target.value;
+                                  setCurrentFields((prev) =>
+                                    prev.map((f, i) => (i === idx ? { ...f, label: newLabel } : f))
+                                  );
+                                }}
+                                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500"
+                                placeholder="Nhãn tiếng Việt..."
+                              />
+                              <div className="font-mono text-[10px] text-cyan-400/90 truncate">
+                                {field.path}
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Nút gán làm OTP */}
-                            <button
-                              onClick={() => handleSelectAsOtpField(field)}
-                              className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-sans font-bold flex items-center gap-1 transition-all"
-                            >
-                              🎯 Đặt làm OTP
-                            </button>
-
-                            {/* Nút thêm trường hiển thị */}
-                            <button
-                              onClick={() => handleAddDisplayField(field)}
-                              className="px-2.5 py-1 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-sans font-bold flex items-center gap-1 transition-all"
-                            >
-                              ➕ Chọn hiển thị
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentFields((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="p-1.5 text-rose-400 hover:bg-rose-950/40 rounded-lg border border-transparent hover:border-rose-800 shrink-0 transition-colors"
+                            title="Xóa trường này"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       ))
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* KHỐI 3: DANH SÁCH CÁC TRƯỜNG ĐÃ CHỌN ĐỂ HIỂN THỊ (SELECTED FIELDS) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  <span className="flex items-center gap-2 text-emerald-400">
-                    <Tag className="w-4 h-4" />
-                    3. Danh Sách Trường Hiển Thị Ra Giao Diện ({currentFields.length})
-                  </span>
-                  <span className="text-[11px] text-slate-500 lowercase font-normal">
-                    Bạn có thể sửa nhãn tiếng Việt theo ý muốn
-                  </span>
-                </div>
-
-                {currentFields.length === 0 ? (
-                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-500">
-                    Chưa có trường nào được chọn. Hãy bấm nút <b>"⚡ Gửi Thử & Phân Tích"</b> ở trên rồi click chọn các trường mong muốn.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {currentFields.map((field, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${
-                          field.is_primary
-                            ? "bg-cyan-950/40 border-cyan-500/40"
-                            : "bg-slate-950 border-slate-800"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          {field.is_primary ? (
-                            <span className="px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 text-[10px] font-bold shrink-0">
-                              MÃ OTP CHÍNH
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold shrink-0">
-                              TRƯỜNG PHỤ
-                            </span>
-                          )}
-
-                          {/* Nhãn tiếng Việt cho phép sửa */}
-                          <div className="space-y-0.5 flex-1">
-                            <label className="text-[10px] text-slate-400">Nhãn hiển thị tiếng Việt:</label>
-                            <input
-                              type="text"
-                              value={field.label}
-                              onChange={(e) => {
-                                const newLabel = e.target.value;
-                                setCurrentFields((prev) =>
-                                  prev.map((f, i) => (i === idx ? { ...f, label: newLabel } : f))
-                                );
-                              }}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
-
-                          {/* Path JSON */}
-                          <div className="space-y-0.5 flex-1">
-                            <label className="text-[10px] text-slate-400">Đường dẫn JSON Path:</label>
-                            <input
-                              type="text"
-                              value={field.path}
-                              onChange={(e) => {
-                                const newPath = e.target.value;
-                                setCurrentFields((prev) =>
-                                  prev.map((f, i) => (i === idx ? { ...f, path: newPath } : f))
-                                );
-                              }}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            setCurrentFields((prev) => prev.filter((_, i) => i !== idx));
-                          }}
-                          className="p-1.5 text-rose-400 hover:bg-rose-950/40 rounded-lg border border-transparent hover:border-rose-800"
-                          title="Xóa trường này"
+                {/* KHỐI 3: XEM TRƯỚC HIỂN THỊ (LIVE CARD PREVIEW) */}
+                {currentFields.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-slate-950/90 border border-cyan-500/20 space-y-1.5 shrink-0">
+                    <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3" />
+                      Xem trước trên Thẻ API & Popup Probe:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentFields.map((f, idx) => (
+                        <div
+                          key={idx}
+                          className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 ${
+                            f.is_primary
+                              ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-200 font-bold"
+                              : "bg-slate-900 border-slate-700 text-slate-300 font-medium"
+                          }`}
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                          <span className="opacity-75 text-[11px]">{f.label}:</span>
+                          <span className="font-mono text-white text-[11px]">
+                            {f.is_primary ? "849201" : "Giá trị mẫu"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-
-              {/* KHỐI 4: XEM TRƯỚC GIAO DIỆN (LIVE PREVIEW) */}
-              {currentFields.length > 0 && (
-                <div className="p-4 rounded-2xl bg-slate-950/90 border border-cyan-500/20 space-y-2">
-                  <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Xem trước hiển thị trên Thẻ và Popup Probe:
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {currentFields.map((f, idx) => (
-                      <div
-                        key={idx}
-                        className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-2 ${
-                          f.is_primary
-                            ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-200 font-bold"
-                            : "bg-slate-900 border-slate-700 text-slate-300 font-medium"
-                        }`}
-                      >
-                        <span className="opacity-75">{f.label}:</span>
-                        <span className="font-mono text-white">
-                          {f.is_primary ? "492018" : "Giá trị mẫu"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800 shrink-0">
+            <div className="flex items-center justify-between pt-3.5 border-t border-slate-800 shrink-0">
               <span className="text-xs text-slate-400">
                 Đã cấu hình <b className="text-white">{currentFields.length}</b> trường dữ liệu
               </span>
 
               <div className="flex items-center gap-2.5">
                 <button
+                  type="button"
                   onClick={() => setShowMappingModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
                 >
                   Đóng
                 </button>
                 <button
+                  type="button"
                   onClick={handleSaveFieldMapping}
                   disabled={savingMapping}
-                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/20 active:scale-95 disabled:opacity-50"
+                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/20 active:scale-95 disabled:opacity-50 transition-all"
                 >
                   <Save className="w-4 h-4" />
                   {savingMapping ? "Đang lưu cấu hình..." : "Lưu Cấu Hình Trường"}

@@ -125,12 +125,17 @@ async function fetchOtpFromYuna(email) {
 }
 function getValueByPath(obj, path) {
   if (!obj || !path) return undefined;
-  const normalized = path.replace(/\[(\w+)\]/g, ".$1").replace(/^\./, "");
+  const normalized = String(path).trim().replace(/\[(\w+)\]/g, ".$1").replace(/^\./, "");
   const keys = normalized.split(".");
   let curr = obj;
-  for (const key of keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
     if (curr == null) return undefined;
-    curr = curr[key];
+    if (Array.isArray(curr) && !/^\d+$/.test(key)) {
+      curr = curr[0]?.[key];
+    } else {
+      curr = curr[key];
+    }
   }
   return curr;
 }
@@ -259,6 +264,7 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
 
 module.exports = {
   extractOtpCode,
+  getValueByPath,
   fetchOtpFromHdsd,
   fetchOtpFromTinyHost,
   fetchOtpFromFixAdes,

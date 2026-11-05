@@ -25,6 +25,8 @@
 12. [Nhiệm vụ 12: Xây Dựng Giao Diện Chuyên Dụng Nhận OTP (otp.mavrykpremium.com) 2 Tab Trượt Sliding Carousel](#12-nhiệm-vụ-12-xây-dựng-giao-diện-chuyên-dụng-nhận-otp-otpmavrykpremiumcom-2-tab-trượt-sliding-carousel)
 13. [Nhiệm vụ 13: Khắc Phục Lỗi Thiếu Module imapflow & Phòng Thủ Lazy-Loading Cho Backend](#13-nhiệm-vụ-13-khắc-phục-lỗi-thiếu-module-imapflow--phòng-thủ-lazy-loading-cho-backend)
 14. [Nhiệm vụ 14: Tách Rời Trang OTP Thành Dự Án Độc Lập Riêng Biệt (otp_portal) Cho Domain otp.mavrykpremium.com](#14-nhiệm-vụ-14-tách-rời-trang-otp-thành-dự-án-độc-lập-riêng-biệt-otp_portal-cho-domain-otpmavrykpremiumcom)
+15. [Nhiệm vụ 15: Khắc Phục Lỗi Thiếu node_modules / Vite Tại Thư Mục otp_portal](#15-2004-khắc-phục-lỗi-thiếu-node_modules--vite-không-được-nhận-diện-tại-otp_portal)
+16. [Nhiệm vụ 16: Nâng Cấp Bộ Chọn Trường Dữ Liệu Động: Khung JSON Viewer Trực Quan & Chọn Trường Trực Tiếp Từ JSON](#16-2110-nâng-cấp-bộ-chọn-trường-dữ-liệu-động-khung-json-viewer-trực-quan--chọn-trường-trực-tiếp-từ-json)
 
 ---
 
@@ -611,5 +613,153 @@
 - **Dự án `admin_orderlist/frontend`:** Chạy `npm run build` hoàn tất thành công trong **11.77s, 0 lỗi TypeScript**.
 - **Cấu hình Nginx sẵn sàng:** [nginx/conf.d/default.conf](file:///d:/Desktop/admin/admin_orderlist/nginx/conf.d/default.conf) đã có `otp.mavrykpremium.com` trong danh sách server_name.
 
+---
+
+## 15. [20:04] KHẮC PHỤC LỖI THIẾU NODE_MODULES / VITE KHÔNG ĐƯỢC NHẬN DIỆN TẠI OTP_PORTAL
+
+### 15.1. Bối cảnh & Nguyên nhân gốc (Root Cause)
+- **Bối cảnh:** Master khởi chạy `npm run dev` tại thư mục [otp_portal](file:///E:/Project/admin_store/otp_portal) gặp lỗi: `'vite' is not recognized as an internal or external command, operable program or batch file.`
+- **Nguyên nhân gốc:** Thư mục [otp_portal](file:///E:/Project/admin_store/otp_portal) mới được chuyển đổi/khởi tạo có sẵn [package.json](file:///E:/Project/admin_store/otp_portal/package.json) và [package-lock.json](file:///E:/Project/admin_store/otp_portal/package-lock.json) nhưng chưa chạy lệnh cài đặt thư viện (`node_modules` chưa tồn tại).
+
+### 15.2. Giải pháp thực thi & Kết quả nghiệm thu
+1. Đã xin phép Master theo quy chuẩn Spec-Kit SDD + Pre-Flight Check.
+2. Chạy `npm install` hoàn tất cài đặt 137 packages trong 14s.
+3. Chạy kiểm thử nghiệm thu `npm run build`:
+   - TypeScript (`tsc`) và Vite (`vite build`) chạy mượt mà 100% trong 1.76s.
+   - Không phát sinh bất kỳ lỗi cú pháp hay thiếu dependency nào.
+   - Server môi trường dev (`npm run dev`) sẵn sàng hoạt động.
+
+---
+
+## 16. [21:10] NÂNG CẤP BỘ CHỌN TRƯỜNG DỮ LIỆU ĐỘNG: KHUNG JSON VIEWER TRỰC QUAN & CHỌN TRƯỜNG TRỰC TIẾP TỪ JSON
+
+### 16.1. Bối cảnh & Chỉ đạo tối cao của Master
+> *"phân tích như này thì tôi biết lấy trường nào"*  
+> *"vậy nên thứ cần hiển thị ra là Json, xong user tự nhìn vào JSON đó mà chọn lấy 1 trường dữ liệu hiển thị ra là ok nhất"*  
+> *"ok thực hiện cho tôi"*
+
+### 16.2. Phân tích nguyên nhân gốc (Root Cause)
+1. **API Endpoint HDSD dùng POST:** Endpoint `https://otp.hdsd.net/get_otp_api` là Express API chỉ hỗ trợ phương thức `POST` kèm body email (`{"email": "..."}`). Modal trước đó để mặc định `GET` nên server trả về HTTP 404 HTML (`Cannot GET /get_otp_api`).
+2. **Backend gom mã lỗi HTML thành trường giả:** Khi không parse được JSON, backend tự ý gom cả trang HTML lỗi 404 thành trường `raw_text = <!DOCTYPE html>...` và frontend render nút [🎯 Đặt làm OTP] lên đoạn HTML đó.
+3. **Frontend ẩn cây JSON nguyên bản:** Giao diện chỉ hiển thị danh sách phẳng, không in ra cây JSON thật của API khiến người dùng không biết cấu trúc dữ liệu thực tế gồm những gì. Đồng thời badge HTTP 404 hiển thị màu xanh lá gây hiểu nhầm thành công.
+
+### 16.3. Giải pháp kỹ thuật đã triển khai
+1. **Backend ([externalApiConfigService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/externalApiConfigService.js)):**
+   - Nâng cấp `analyzeEndpoint`: Trả về `is_json: boolean`, `parsed_data`, `raw_body` (tối đa 20.000 ký tự), `target_url`, `status`, `statusText`.
+   - Hàm `extractJsonPaths`: Bổ sung kiểm tra an toàn cho mảng rỗng.
+2. **Backend ([otpProviderService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/otpProviderService.js)):**
+   - Nâng cấp hàm `getValueByPath`: Tự động điều hướng qua mảng đối tượng. Khi người dùng nhập `data.code` mà `data` là mảng `[{ code: "849201" }]`, hệ thống tự động bóc tách phần tử đầu tiên (`data[0].code`), giúp hỗ trợ linh hoạt cả hai cú pháp `data.code` và `data[0].code`.
+3. **Frontend ([ExternalApiConfigPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx)):**
+   - **Khung Formatted Raw JSON Viewer:** Hiển thị trực quan toàn bộ cây JSON trả về (font monospace, thụt đầu dòng rõ ràng, có thanh cuộn và cho phép bôi đen copy).
+   - **Thanh Chọn Trường JSON & Live Preview:** Cho phép gõ hoặc click vào đường dẫn JSON Path, bên cạnh lập tức hiển thị **giá trị bóc tách được từ JSON** (ví dụ: `= "849201"`). Kèm 2 nút thao tác nhanh: `[🎯 Đặt làm OTP]` và `[➕ Thêm hiển thị]`.
+   - **Clickable Quick Chips:** Liệt kê các trường bóc tách được dạng tags (có gắn nhãn gợi ý `🎯 OTP` cho các trường `code/otp/verify`). Click vào tag nào là đường dẫn tự động điền vào ô JSON Path.
+   - **Chế độ 2 Tab linh hoạt:**
+     + Tab 1: *⚡ Gửi Thử API Thực Tế* — Tự động nhận diện POST/GET theo endpoint, hiển thị full URL, hỗ trợ ô nhập JSON Request Body cho phương thức POST.
+     + Tab 2: *📋 Dán JSON Mẫu (Paste Mock JSON)* — Cho phép dán trực tiếp đoạn JSON thực tế (từ Postman/tài liệu) để phân tích và chọn trường ngay lập tức mà không cần đợi hòm thư ngoài có thư mới.
+   - **Xử lý phản hồi HTML / Mã lỗi HTTP:** Badge HTTP $\ge 400$ hiển thị màu đỏ (`rose`). Nếu server trả về HTML, giao diện hiển thị hộp cảnh báo màu đỏ giải thích rõ nguyên nhân, kèm khung xem mã lỗi HTML thực tế của server, tuyệt đối không tạo trường giả `raw_text`.
+   - **Mở khóa nút Xóa cho toàn bộ Card API:** Gỡ bỏ điều kiện hardcode `config.id > 8` tại [ExternalApiConfigPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx). Nút thùng rác đỏ `[🗑️]` giờ đây hiển thị trên mọi thẻ dịch vụ API (bao gồm Yuna Mail, Tmail, Generator.email...) kèm hộp thoại xác nhận trước khi xóa vĩnh viễn.
+   - **Tái thiết kế Card Form thẩm mỹ & Chống rớt dòng:**
+     + Đưa nút thùng rác `[🗑️]` lên góc trên bên phải Header cạnh công tắc `ONLINE`, chấm dứt hoàn toàn hiện tượng rớt dòng mồ côi xuống đáy thẻ.
+     + Chuyển nút `[Cấu Hình Trường]` vào bên trong Khung Trường Bóc Tách, loại bỏ nút trùng lặp.
+     + Tối ưu Footer chỉ còn 3 nút cốt lõi (`[⚡ Thử Lấy OTP]`, `[📡 Ping]`, `[💾 Lưu]`), căn chỉnh thẳng hàng tuyệt đối 100% không bị vỡ layout.
+   - **Đồng bộ hóa Modal Popup & Toast Hệ Thống (useNotification):** Thay thế hoàn toàn popup `window.confirm` thô kệch của trình duyệt bằng hook chuẩn `useNotification()`. Khi bấm xóa API, Modal xác nhận chuẩn Dark Glassmorphism ở giữa màn hình sẽ hiển thị kèm nút `[Xóa Cấu Hình]` màu đỏ và `[Hủy Bỏ]`. Toàn bộ thông báo thành công/thất bại được chuyển sang hệ thống Toast góc phải mượt mà của hệ thống.
+
+### 16.4. Kết quả kiểm thử & Nghiệm thu
+- **Kiểm thử Unit test logic bóc tách ([otpProviderService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/otpProviderService.js)):**
+  + `getValueByPath(testData, 'data.code')` $\rightarrow$ `"849201"` ✅
+  + `getValueByPath(testData, 'data[0].code')` $\rightarrow$ `"849201"` ✅
+  + `getValueByPath(testData, 'data.0.code')` $\rightarrow$ `"849201"` ✅
+  + `getValueByPath(testData, 'status')` $\rightarrow$ `"success"` ✅
+- **Kiểm thử Build Frontend:**
+  + Chạy `npm run build --prefix frontend`: Hoàn thành 100% trong 4.54s, **0 lỗi TypeScript, 0 lỗi cú pháp**.
+- **Tiêu chuẩn hoàn thành (DoD):** Đã giải quyết triệt để nguyên nhân gốc, đáp ứng đúng 100% chỉ đạo của Master: Người dùng nhìn trực tiếp vào cấu trúc JSON để chọn trường bóc tách, form gọn gàng thẩm mỹ không rớt dòng.
 
 
+---
+
+## 17. [21:50] Tái Thiết Kế Toàn Diện Modal 3: Bộ Chọn Trường JSON & Bóc Tách Dữ Liệu (Split-View 2 Cột)
+
+### 17.1. Bối cảnh & Yêu cầu của Master
+- **Chỉ thị của Master:** Master gửi ảnh chụp màn hình Modal 3 bị xếp chồng dọc và chỉ đạo:
+  > *"thiết kế lại cho tôi form này"*  
+  > *"thực hiện cho tôi"*
+- **Các điểm bất cập của thiết kế cũ:**
+  1. **Scroll Fatigue (Cuộn trang quá dài):** Bố cục 1 cột đơn khiến toàn bộ các khối (Gửi API, Chọn trường, Raw JSON, Danh sách trường, Live Preview) bị dồn theo chiều dọc, người dùng phải cuộn lên xuống liên tục.
+  2. **Nghịch lý luồng thị giác:** Khối chọn trường nằm *phía trên* cây JSON nguyên bản, khiến người dùng phải nhìn xuống dưới đọc JSON rồi cuộn ngược lên trên để gõ đường dẫn.
+  3. **Khó thao tác khi mảng rỗng (`data: []`):** Khi thử nghiệm với endpoint `POST https://otp.hdsd.net/get_otp_api`, do hòm thư chưa có mã mới, máy chủ trả về `{"status":"success","data":[]}`. Giao diện cũ không có chip gợi ý khiến người dùng lúng túng không biết trường nào là mã OTP.
+
+### 17.2. Kiến trúc giao diện mới: Split-View 2 Cột (Tỷ lệ 7 : 5)
+Tại file [ExternalApiConfigPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx), Modal 3 đã được tái thiết kế hoàn toàn theo chuẩn Split-Pane hiện đại (`max-w-6xl w-full h-[88vh] flex flex-col`):
+
+1. **Cột Trái (7 Cột / 58%) — Trình Thám Hiểm Request & Cây Phản Hồi JSON:**
+   - **Thanh công cụ linh hoạt:** Tab chuyển đổi giữa *1. Gửi Thử API Thực Tế* và *2. Dán JSON Mẫu*.
+   - **Nút tiện ích nhanh [✨ Nạp Dữ Liệu Mẫu]:** Tự động nạp cấu trúc mẫu chuẩn của HDSD (`{"status":"success","data":[{"code":"849201","otp":"849201","date":"..."}]}`) để cấu hình ngay lập tức mà không cần đợi API ngoài có dữ liệu thật.
+   - **Request Controller:** Cho phép chọn phương thức `GET / POST`, URL đầy đủ, và khung nhập Request Body (JSON) trực quan.
+   - **Khung Formatted Raw JSON Viewer:**
+     + Thanh tiêu đề có nút **[📋 Sao chép JSON]** (tự đổi icon tích xanh khi copy thành công).
+     + Khung xem mã nguồn JSON chuẩn Dark Glassmorphism (`bg-slate-950 text-cyan-300 font-mono`), hỗ trợ cuộn độc lập và bôi đen sao chép trực tiếp.
+     + Nếu server trả về HTML/Lỗi HTTP, hiển thị cảnh báo đỏ trực quan kèm gợi ý chuyển sang POST hoặc nạp dữ liệu mẫu.
+
+2. **Cột Phải (5 Cột / 42%) — Trung Tâm Bóc Tách Trường (Field Extractor Hub) & Live Preview:**
+   - **Khối Bộ Chọn Trường:**
+     + Ô nhập JSON Path (`customPathInput`) font monospace nổi bật.
+     + Hai nút tác vụ phân biệt màu sắc rõ nét: **[🎯 Đặt làm OTP]** (nền cam Amber gradient) và **[➕ Thêm hiển thị]** (nền xanh Cyan).
+     + **Live Value Preview Badge:** Tự động giải mã và hiển thị giá trị tương ứng từ cây JSON theo thời gian thực (ví dụ: `= "849201"`).
+     + **Quick Preset Chips:** Dãy nút bấm nhanh các trường thông dụng: `data.code 🎯`, `data.otp`, `data.date`, `data.content`, `status` giúp click 1 chạm là xong ngay cả khi mảng thực tế đang rỗng.
+     + Chips các trường tự động phát hiện được từ phản hồi JSON thật.
+   - **Khối Danh Sách Trường Đã Cấu Hình:**
+     + Danh sách cuộn độc lập, mỗi trường có nhãn phân loại (OTP / Phụ).
+     + Ô nhập cho phép sửa nhãn tiếng Việt hiển thị tùy ý.
+     + Nút thùng rác đỏ **[🗑️]** để xóa nhanh trường không mong muốn.
+   - **Khối Live Card Preview:**
+     + Hiển thị trực quan cách các trường đã chọn sẽ xuất hiện trên Thẻ API và Popup Probe (Mã OTP nổi bật, trường phụ màu xám Slate).
+
+### 17.3. Kết quả kiểm thử & Bàn giao
+- **Kiểm tra biên dịch Frontend:**
+  + Chạy `npm run build --prefix frontend`: Hoàn tất trong **4.35s**, **0 lỗi TypeScript, 0 lỗi cú pháp Vite**.
+- **Tiêu chuẩn hoàn thành (DoD):**
+  + Loại bỏ 100% tình trạng cuộn trang mệt mỏi; toàn bộ tác vụ nằm gọn trong không gian làm việc 2 cột chuyên nghiệp.
+  + Thao tác trực quan: Nhìn JSON bên trái $\rightarrow$ Chọn trường và xem kết quả bên phải $\rightarrow$ Lưu cấu hình.
+
+
+---
+
+## 18. [22:00] Khắc Phục Triệt Để Lỗi Thiếu Cột "action" Trong Bảng domain_event_store & Bảo Vệ Hàm redact() Chống Đệ Quy Vô Hạn
+
+### 18.1. Bối cảnh & Hiện tượng lỗi
+- Khi Master thực hiện thao tác **"Lưu"** hoặc **"Lưu Cấu Hình Trường"** trên trang Quản trị Cấu hình API ngoài, hệ thống ném ngoại lệ:
+  > `insert into "system_automation"."domain_event_store" ("action", "actor_id", ...) ... column "action" of relation "domain_event_store" does not exist`
+  khiến toàn bộ giao dịch cập nhật bị rollback và hiển thị modal lỗi màu đỏ.
+
+### 18.2. Phân tích nguyên nhân gốc kép (Two-Fold Root Cause)
+1. **Bảng Cơ Sở Dữ Liệu Thiếu Cột (Pending Migration):**
+   - File migration [20261105000002_upgrade_domain_event_store_audit_outbox.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261105000002_upgrade_domain_event_store_audit_outbox.js) đã được tạo để bổ sung các cột audit log (`action`, `before_state`, `after_state`, `changed_fields`, `actor_type`, `actor_id`...) nhưng **chưa được chạy vào database** (nằm trong danh sách Pending của bảng `knex_migrations_v2`).
+   - Do đó, bảng `system_automation.domain_event_store` trong PostgreSQL chỉ có 9 cột cũ, thiếu cột `action`.
+2. **Nguy cơ đệ quy vô hạn trong hàm redact():**
+   - Khi truyền `changedFields: updateData` vào `publishEventInTrx`, `updateData` chứa thuộc tính `updated_at: trx.fn.now()`. Đây là một đối tượng Knex Raw Query Builder có chứa liên kết ngược (circular reference) tới client Knex.
+   - Hàm `redact()` trong [eventStoreService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/events/eventStoreService.js) trước đó duyệt đệ quy mà không có bộ đệm `WeakSet` kiểm tra chu trình và không có giới hạn độ sâu (depth bound), dẫn đến lỗi `RangeError: Maximum call stack size exceeded`.
+
+### 18.3. Các bước khắc phục triệt để đã triển khai
+1. **Thực thi Migration Database Chuẩn Xác:**
+   - Đã chạy: `cd backend && npx knex migrate:latest --knexfile knexfile.js`.
+   - Batch 17 đã thực thi thành công cả 3 migration pending:
+     + `20261104000004_clear_legacy_vpbank_mailbox_password.js`
+     + `20261105000001_add_count_to_variant.js`
+     + `20261105000002_upgrade_domain_event_store_audit_outbox.js`
+   - Bảng `system_automation.domain_event_store` hiện đã có đầy đủ 23 cột chuẩn kiến trúc.
+2. **Gia cố phòng thủ cho hàm redact() ([eventStoreService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/events/eventStoreService.js)):**
+   - Bổ sung cơ chế phát hiện tham chiếu vòng bằng `WeakSet` (`seen.has(value)` $\rightarrow$ `"[CIRCULAR]"`).
+   - Đặt chặn độ sâu tối đa `depth > 6` $\rightarrow$ `"[MAX_DEPTH]"`.
+   - Nhận diện các đối tượng Knex Raw/QueryBuilder (`typeof value.toSQL === "function" || value.client || value._knex`) và chuyển hóa an toàn thành `"[SQL_RAW]"` thay vì duyệt đệ quy.
+3. **Làm sạch payload changedFields ([externalApiConfigService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/externalApiConfigService.js)):**
+   - Loại trừ trường `updated_at` (chứa `trx.fn.now()`) ra khỏi `changedFields` trước khi đưa vào Domain Event, chỉ lưu lại các trường dữ liệu người dùng thay đổi thực tế.
+
+### 18.4. Kết quả kiểm thử & Bàn giao
+- **Kiểm tra Schema Database:**
+  + Cột `action` và toàn bộ 14 cột mới của `domain_event_store` đã hiển thị trong `information_schema.columns` ✅
+- **Kiểm thử Unit Test Toàn Hệ Thống:**
+  + Chạy `npm test --prefix backend`: **98/98 tests pass 100% (0 lỗi, 0 fail)** ✅
+- **Kiểm thử Tích Hợp Cập Nhật & Domain Event:**
+  + Gọi trực tiếp `updateConfig(1, ...)`: Cập nhật thành công 100%, ghi sự kiện `EXTERNAL_API_CONFIG_MUTATED` với `action = "UPDATE"` và trạng thái `PUBLISHED` vào database ✅
+- **Kiểm thử Build Frontend:**
+  + Chạy `npm run build --prefix frontend`: Hoàn tất trong **4.58s, 0 lỗi TypeScript** ✅
