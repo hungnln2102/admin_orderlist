@@ -26,7 +26,9 @@ const normalizeDays = (value, frequency) => {
 };
 
 const buildCronExpression = ({ time, frequency, selectedDays }) => {
-  const [hour, minute] = time.split(":");
+  const [hourStr, minuteStr] = time.split(":");
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
   if (frequency === "hourly") return `${minute} * * * *`;
   if (frequency === "weekdays") return `${minute} ${hour} * * 1-5`;
   if (frequency === "custom" && selectedDays.length) return `${minute} ${hour} * * ${selectedDays.map((day) => day % 7).join(",")}`;

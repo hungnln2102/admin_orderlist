@@ -7,10 +7,12 @@ const { creditSavingsProfitTask } = require("./tasks/creditSavingsProfitTask");
 const { autoBackupDatabaseTask } = require("./tasks/autoBackupDatabaseTask");
 const { accrueCreditOverdraftInterestTask, closeCreditOverdraftStatementsTask, evaluateCreditCardDueStatementsTask } = require("./tasks/creditLedgerTask");
 const cronJobService = require("@/domains/system/services/cronJobService");
+const { db, TABLES } = require("@/db");
 
 const TIMEZONE = "Asia/Ho_Chi_Minh";
 const scheduledTasks = new Map();
 let initialized = false;
+let watchdogInterval = null;
 
 const handlers = {
   order_status_0h: () => updateOrderStatusTask("cron_schedule"),
@@ -114,6 +116,71 @@ async function refreshJob(id) {
   return job;
 }
 
+/**
+ * Watchdog Heartbeat: Chạy định kỳ mỗi 60 giây để bảo vệ các tác vụ hàng ngày.
+ * Nếu đến đúng giờ Master cài đặt trên Trang Hệ Thống mà node-cron bị trượt nhịp (timer drift),
+ * Watchdog sẽ tự động kích hoạt tác vụ chạy an toàn (idempotent qua cron_job_logs + withAdvisoryLock).
+ */
+async function checkAndRunMissedJobs() {
+  try {
+    const nowVn = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const currentHour = nowVn.getUTCHours();
+    const currentMinute = nowVn.getUTCMinutes();
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const dayOfWeek = nowVn.getUTCDay(); // 0: CN, 1: T2, ..., 6: T7
+
+    // Mốc bắt đầu ngày hôm nay (00:00:00 VN = 17:00:00 UTC hôm trước)
+    const todayStartVn = new Date(Date.UTC(nowVn.getUTCFullYear(), nowVn.getUTCMonth(), nowVn.getUTCDate(), 0, 0, 0, 0));
+    const todayStartUtc = new Date(todayStartVn.getTime() - 7 * 60 * 60 * 1000);
+
+    const jobs = await db(TABLES.CRON_JOBS).where("enabled", true).whereNotNull("handler_key");
+
+    for (const job of jobs) {
+      if (job.frequency !== "daily" && job.frequency !== "weekdays") continue;
+      if (job.frequency === "weekdays" && (dayOfWeek === 0 || dayOfWeek === 6)) continue;
+
+      if (!job.time || !job.time.includes(":")) continue;
+      const [jobHour, jobMinute] = job.time.split(":").map(Number);
+      const jobTotalMinutes = jobHour * 60 + jobMinute;
+      const diffMinutes = currentTotalMinutes - jobTotalMinutes;
+
+      // Cửa sổ kích hoạt: đúng phút (0) hoặc trong vòng 3 phút trễ sau mốc giờ đã cài
+      if (diffMinutes >= 0 && diffMinutes <= 3) {
+        const recentSuccess = await db(TABLES.CRON_JOB_LOGS)
+          .where("job_id", job.id)
+          .where("status", "success")
+          .where("started_at", ">=", todayStartUtc)
+          .first();
+
+        if (!recentSuccess) {
+          console.log(`[Watchdog] 🛡️ Kích hoạt bảo vệ cho tác vụ [${job.id}] (${job.name}) tại mốc ${job.time} (Độ lệch: ${diffMinutes}m)...`);
+          executeJob(job, "cron_schedule").catch((err) => {
+            console.error(`[Watchdog] Lỗi kích hoạt tác vụ ${job.id}:`, err.message);
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Watchdog] Lỗi kiểm tra nhịp chạy định kỳ:", error.message);
+  }
+}
+
+function startWatchdog() {
+  if (watchdogInterval) return;
+  watchdogInterval = setInterval(checkAndRunMissedJobs, 60000);
+  if (typeof watchdogInterval.unref === "function") {
+    watchdogInterval.unref();
+  }
+  console.log("[Scheduler] 🛡️ Watchdog Heartbeat (60s) đã được khởi động.");
+}
+
+function stopWatchdog() {
+  if (watchdogInterval) {
+    clearInterval(watchdogInterval);
+    watchdogInterval = null;
+  }
+}
+
 async function initScheduler() {
   if (initialized) return;
   const jobs = await cronJobService.listJobs();
@@ -121,6 +188,7 @@ async function initScheduler() {
   rawJobs.forEach(scheduleJob);
   initialized = true;
   console.log(`[Scheduler] Đã khởi tạo ${scheduledTasks.size} lịch tác vụ.`);
+  startWatchdog();
 }
 
 function getNextRunTime(id) {
@@ -133,4 +201,12 @@ async function runJobNow(id) {
   return executeJob(job, "manual_ui");
 }
 
-module.exports = { getNextRunTime, initScheduler, refreshJob, runJobNow };
+module.exports = {
+  getNextRunTime,
+  initScheduler,
+  refreshJob,
+  runJobNow,
+  checkAndRunMissedJobs,
+  startWatchdog,
+  stopWatchdog,
+};
