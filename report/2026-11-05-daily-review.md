@@ -25,6 +25,7 @@
 12. [Nhiệm vụ 12: Xây Dựng Giao Diện Chuyên Dụng Nhận OTP (otp.mavrykpremium.com) 2 Tab Trượt Sliding Carousel](#12-nhiệm-vụ-12-xây-dựng-giao-diện-chuyên-dụng-nhận-otp-otpmavrykpremiumcom-2-tab-trượt-sliding-carousel)
 13. [Nhiệm vụ 13: Khắc Phục Lỗi Thiếu Module imapflow & Phòng Thủ Lazy-Loading Cho Backend](#13-nhiệm-vụ-13-khắc-phục-lỗi-thiếu-module-imapflow--phòng-thủ-lazy-loading-cho-backend)
 14. [Nhiệm vụ 14: Tách Rời Trang OTP Thành Dự Án Độc Lập Riêng Biệt (otp_portal) Cho Domain otp.mavrykpremium.com](#14-nhiệm-vụ-14-tách-rời-trang-otp-thành-dự-án-độc-lập-riêng-biệt-otp_portal-cho-domain-otpmavrykpremiumcom)
+15. [Nhiệm vụ 15: Tách Bộ Luật & Đội Ngũ Subagents Thành Git Submodule Độc Lập (core-agents) Dùng Chung Đa Dự Án](#15-nhiệm-vụ-15-tách-bộ-luật--đội-ngũ-subagents-thành-git-submodule-độc-lập-core-agents-dùng-chung-đa-dự-án)
 
 ---
 
@@ -610,6 +611,55 @@
 - **Dự án mới `otp_portal`:** Chạy `npm run build` hoàn tất thành công trong **3.28s, 0 lỗi TypeScript**.
 - **Dự án `admin_orderlist/frontend`:** Chạy `npm run build` hoàn tất thành công trong **11.77s, 0 lỗi TypeScript**.
 - **Cấu hình Nginx sẵn sàng:** [nginx/conf.d/default.conf](file:///d:/Desktop/admin/admin_orderlist/nginx/conf.d/default.conf) đã có `otp.mavrykpremium.com` trong danh sách server_name.
+
+---
+
+## 15. NHIỆM VỤ 15: TÁCH BỘ LUẬT & ĐỘI NGŨ SUBAGENTS THÀNH GIT SUBMODULE ĐỘC LẬP (CORE-AGENTS) DÙNG CHUNG ĐA DỰ ÁN
+
+### 15.1. Bối cảnh & Yêu cầu của Master
+> *"giờ làm sao để 2 dự án có thể dùng chung 1 bộ luật agent hay phải copy agents từ admin sang OTP"*  
+> *"tôi chọn phương án 3"*  
+> *Repository cung cấp:* `https://github.com/hungnln2102/core-agents.git`
+
+### 15.2. Giải pháp kỹ thuật đã triển khai (Chuẩn Git Submodule SSOT)
+1. **Khởi tạo và phát hành kho lưu trữ trung tâm (`core-agents`):**
+   - Repository: `https://github.com/hungnln2102/core-agents.git`
+   - Đóng gói toàn bộ:
+     - Hiến pháp tối cao: [AGENTS.md](file:///d:/Desktop/admin/admin_orderlist/AGENTS.md)
+     - Khám phá luật tự động Antigravity: `rules/AGENTS.md`
+     - Cấu hình nạp plugin: `plugins.json`
+     - Đội ngũ 7 Subagents & 5 Kỹ năng tiêu chuẩn: [plugins/subagent-team](file:///d:/Desktop/admin/admin_orderlist/.agents/plugins/subagent-team)
+     - Bộ nạp tương thích Codex Extension: `.codex-plugin/plugin.json`
+     - Hướng dẫn vận hành: [README.md](file:///d:/Desktop/admin/core-agents/README.md)
+   - Đã push thành công lên GitHub nhánh `main` (commit `38c34d4`).
+2. **Tích hợp Git Submodule vào `admin_orderlist`:**
+   - Huỷ theo dõi thư mục `.agents` nội bộ cũ khỏi Git tree mà không làm mất dữ liệu.
+   - Nhúng submodule: `git submodule add https://github.com/hungnln2102/core-agents.git .agents`.
+   - File cấu hình [.gitmodules](file:///d:/Desktop/admin/admin_orderlist/.gitmodules) được tạo và commit gọn gàng (commit `4bad61fe`).
+3. **Tích hợp Git Submodule vào `otp_portal`:**
+   - Nhúng submodule: `git submodule add https://github.com/hungnln2102/core-agents.git .agents`.
+   - Tạo đồng bộ file [AGENTS.md](file:///d:/Desktop/admin/otp_portal/AGENTS.md) tại root của `otp_portal`.
+   - Commit hoàn tất (commit `9d62ead`).
+
+### 15.3. Hướng dẫn vận hành đa thiết bị (Máy nhà & Máy công ty)
+- **Khi clone dự án về máy mới:**
+  ```bash
+  git clone --recurse-submodules <URL_DU_AN>
+  ```
+- **Nếu đã clone từ trước hoặc thư mục `.agents` đang rỗng:**
+  ```bash
+  git submodule update --init --recursive
+  ```
+- **Khi cập nhật luật hoặc subagent mới từ repo `core-agents`:**
+  ```bash
+  git submodule update --remote --merge
+  ```
+
+### 15.4. Kết quả nghiệm thu
+- Cả hai dự án [admin_orderlist](file:///d:/Desktop/admin/admin_orderlist) và [otp_portal](file:///d:/Desktop/admin/otp_portal) đều liên kết thành công tới commit `38c34d4` của `core-agents`.
+- Cả Antigravity và Codex Extension tại cả 2 dự án đều tự động nạp đầy đủ danh sách subagents, kỹ năng và quy tắc làm việc theo chuẩn SSOT.
+- Working tree ở tất cả các repo đều sạch sẽ (`clean`), không có code rác hay xung đột.
+
 
 
 
