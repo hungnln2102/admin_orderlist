@@ -21,6 +21,7 @@ export interface PricingItem {
   min_profit_amount?: number;
   max_profit_amount?: number;
   margin: string;
+  count?: number;
   is_active: boolean;
   updated_at: string;
 }

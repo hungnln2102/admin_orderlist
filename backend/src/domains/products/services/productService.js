@@ -54,6 +54,7 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       p_retail.${VP_COLS.MARGIN_RATIO} AS retail_margin_ratio,
       p_ctv.${VP_COLS.MARGIN_RATIO} AS ctv_margin_ratio,
       sc.min_cost AS supplier_min_cost,
+      COALESCE(v.${V_COLS.COUNT}, 0) AS count,
       v.${V_COLS.UPDATED_AT}
     FROM ${TABLES.VARIANT} v
     LEFT JOIN ${TABLES.PRODUCT} p ON p.${P_COLS.ID} = v.${V_COLS.PRODUCT_ID}
@@ -166,6 +167,7 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       min_profit_amount: Math.round(minProfitAmount),
       max_profit_amount: Math.round(maxProfitAmount),
       margin: marginStr,
+      count: parseInt(r.count || 0, 10),
       is_active: Boolean(r.is_active),
       updated_at: r.updated_at,
     };

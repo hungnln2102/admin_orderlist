@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Building2,
   PlusCircle,
+  ShoppingBag,
 } from "lucide-react";
 import { PricingItem, SupplierCostItem, Supplier, EditingSupplierCostState } from "../types";
 
@@ -55,6 +56,7 @@ export const PricingTable: React.FC<PricingTableProps> = ({
           <tr>
             <th className="py-3.5 px-3 w-8 text-center"></th>
             <th className="py-3.5 px-4">Sản Phẩm</th>
+            <th className="py-3.5 px-3 text-center">Số Đơn</th>
             <th className="py-3.5 px-3 text-right">Giá Gốc</th>
             <th className="py-3.5 px-3 text-right">Giá CTV</th>
             <th className="py-3.5 px-3 text-right">Giá Bán Lẻ</th>
@@ -68,7 +70,7 @@ export const PricingTable: React.FC<PricingTableProps> = ({
         <tbody className="divide-y divide-slate-800/50 text-slate-300 font-medium">
           {loading ? (
             <tr>
-              <td colSpan={10} className="py-12 text-center text-slate-400">
+              <td colSpan={11} className="py-12 text-center text-slate-400">
                 <div className="flex flex-col items-center justify-center gap-2">
                   <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
                   <span className="text-xs">Đang tải dữ liệu bảng giá thực tế...</span>
@@ -77,7 +79,7 @@ export const PricingTable: React.FC<PricingTableProps> = ({
             </tr>
           ) : items.length === 0 ? (
             <tr>
-              <td colSpan={10} className="py-12 text-center text-slate-400">
+              <td colSpan={11} className="py-12 text-center text-slate-400">
                 <div className="flex flex-col items-center justify-center gap-2">
                   <Tag className="w-8 h-8 text-slate-600" />
                   <span className="text-xs font-semibold">Không tìm thấy sản phẩm nào</span>
@@ -145,6 +147,21 @@ export const PricingTable: React.FC<PricingTableProps> = ({
                           </div>
                         )}
                       </div>
+                    </td>
+
+                    {/* Cột Số Đơn Hàng Thành Công */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
+                          (item.count || 0) > 0
+                            ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                            : "bg-slate-800/80 text-slate-500 border-slate-700/60"
+                        }`}
+                        title={`Đã hoàn thành ${item.count || 0} đơn hàng thành công`}
+                      >
+                        <ShoppingBag className="w-3 h-3 opacity-70" />
+                        <span>{Number(item.count || 0).toLocaleString("vi-VN")}</span>
+                      </span>
                     </td>
 
                     {/* Base Price */}
@@ -277,7 +294,7 @@ export const PricingTable: React.FC<PricingTableProps> = ({
                   {/* Expandable Supplier Cost Panel */}
                   {isExpanded && (
                     <tr>
-                      <td colSpan={10} className="p-4 bg-slate-950/70 border-b border-slate-800/80">
+                      <td colSpan={11} className="p-4 bg-slate-950/70 border-b border-slate-800/80">
                         <div className="bg-[#0f172a]/90 border border-indigo-500/20 rounded-xl p-5 shadow-2xl space-y-4">
                           <h3 className="text-center text-xs font-bold text-slate-200 tracking-wide uppercase">
                             Chi tiết giá sản phẩm

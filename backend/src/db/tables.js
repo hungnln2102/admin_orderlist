@@ -127,6 +127,7 @@ const COLS = {
     FORM_ID: "form_id",
     IMAGE_URL: "image_url",
     ID_DESC: "id_desc",
+    COUNT: "count",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },

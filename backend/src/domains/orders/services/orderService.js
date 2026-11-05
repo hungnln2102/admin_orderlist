@@ -787,6 +787,20 @@ async function getOrderById(id) {
 /**
  * Tạo đơn hàng mới + phát event ORDER_CREATED (Bọc Transaction)
  */
+
+async function incrementVariantOrderCount(trx, variantId) {
+  if (!variantId) return;
+  const numId = Number(variantId);
+  if (isNaN(numId) || numId <= 0) return;
+  try {
+    await trx(TABLES.VARIANT)
+      .where({ [COLS.VARIANT.ID]: numId })
+      .increment(COLS.VARIANT.COUNT, 1);
+  } catch (err) {
+    console.error(`[incrementVariantOrderCount] Lỗi tăng số đơn cho variant ${numId}:`, err.message);
+  }
+}
+
 async function createOrder(payload) {
   return await withTransaction(async (trx) => {
     const rawPrefix = String(payload.order_prefix || "").trim().toUpperCase();
