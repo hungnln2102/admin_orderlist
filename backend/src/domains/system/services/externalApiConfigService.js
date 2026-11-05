@@ -1,5 +1,6 @@
-const { db, TABLES } = require("@/db");
+const { db, TABLES, withTransaction } = require("@/db");
 const { assertSafeExternalUrl, fetchSafeExternal, readExternalResponse } = require("@/utils/safeExternalRequest");
+const { publishEventInTrx, EVENTS } = require("@/events");
 
 const TABLE = TABLES.EXTERNAL_API_CONFIGS;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -95,59 +96,51 @@ async function validateBaseUrl(baseUrl) {
 }
 
 async function createConfig(data) {
-  if (!data?.service_key || !data?.service_name || !data?.base_url) {
-    throw new Error("service_key, service_name and base_url are required.");
-  }
-
-  const serviceKey = String(data.service_key).trim();
-  const existing = await db(TABLE).where("service_key", serviceKey).first();
-  if (existing) throw new Error(`Service key '${serviceKey}' already exists.`);
-
-  const [inserted] = await db(TABLE).insert({
-    service_key: serviceKey,
-    service_name: String(data.service_name).trim(),
-    category: data.category || "OTP",
-    description: data.description || "",
-    base_url: await validateBaseUrl(data.base_url),
-    endpoints: JSON.stringify(data.endpoints || {}),
-    auth_config: JSON.stringify(data.auth_config || {}),
-    field_mapping: JSON.stringify(data.field_mapping || []),
-    is_active: data.is_active !== false,
-    created_at: db.fn.now(),
-    updated_at: db.fn.now(),
-  }).returning("*");
-
-  clearCache();
-  return toClientConfig(parseConfigRow(inserted));
+  if (!data?.service_key || !data?.service_name || !data?.base_url) throw new Error("service_key, service_name and base_url are required.");
+  return withTransaction(async (trx) => {
+    const serviceKey = String(data.service_key).trim();
+    if (await trx(TABLE).where("service_key", serviceKey).forUpdate().first()) throw new Error(`Service key '${serviceKey}' already exists.`);
+    const [inserted] = await trx(TABLE).insert({ service_key: serviceKey, service_name: String(data.service_name).trim(), category: data.category || "OTP", description: data.description || "", base_url: await validateBaseUrl(data.base_url), endpoints: JSON.stringify(data.endpoints || {}), auth_config: JSON.stringify(data.auth_config || {}), field_mapping: JSON.stringify(data.field_mapping || []), is_active: data.is_active !== false, created_at: trx.fn.now(), updated_at: trx.fn.now() }).returning("*");
+    const config = parseConfigRow(inserted);
+    await publishEventInTrx(trx, { eventName: EVENTS.EXTERNAL_API_CONFIG_MUTATED, aggregateType: "EXTERNAL_API_CONFIG", aggregateId: inserted.id, action: "CREATE", afterState: toClientConfig(config), source: "EXTERNAL_API_CONFIG", payload: { configId: inserted.id, serviceKey, action: "CREATE" } });
+    trx.afterCommit(() => clearCache());
+    return toClientConfig(config);
+  });
 }
 
 async function updateConfig(id, data) {
-  const existing = await getInternalConfigById(id);
-  if (!existing) throw new Error(`Configuration #${id} was not found.`);
-
-  const updateData = { updated_at: db.fn.now() };
-  if (data.service_name !== undefined) updateData.service_name = String(data.service_name).trim();
-  if (data.category !== undefined) updateData.category = String(data.category).trim();
-  if (data.description !== undefined) updateData.description = String(data.description);
-  if (data.base_url !== undefined) updateData.base_url = await validateBaseUrl(data.base_url);
-  if (data.endpoints !== undefined) updateData.endpoints = JSON.stringify(data.endpoints || {});
-  if (data.auth_config !== undefined) updateData.auth_config = JSON.stringify(mergeAuthConfig(existing.auth_config, data.auth_config));
-  if (data.field_mapping !== undefined) updateData.field_mapping = JSON.stringify(data.field_mapping || []);
-  if (data.is_active !== undefined) updateData.is_active = Boolean(data.is_active);
-
-  await db(TABLE).where("id", id).update(updateData);
-  clearCache(existing.service_key);
-  return getConfigById(id);
+  return withTransaction(async (trx) => {
+    const row = await trx(TABLE).where("id", id).forUpdate().first();
+    if (!row) throw new Error(`Configuration #${id} was not found.`);
+    const existing = parseConfigRow(row);
+    const updateData = { updated_at: trx.fn.now() };
+    if (data.service_name !== undefined) updateData.service_name = String(data.service_name).trim();
+    if (data.category !== undefined) updateData.category = String(data.category).trim();
+    if (data.description !== undefined) updateData.description = String(data.description);
+    if (data.base_url !== undefined) updateData.base_url = await validateBaseUrl(data.base_url);
+    if (data.endpoints !== undefined) updateData.endpoints = JSON.stringify(data.endpoints || {});
+    if (data.auth_config !== undefined) updateData.auth_config = JSON.stringify(mergeAuthConfig(existing.auth_config, data.auth_config));
+    if (data.field_mapping !== undefined) updateData.field_mapping = JSON.stringify(data.field_mapping || []);
+    if (data.is_active !== undefined) updateData.is_active = Boolean(data.is_active);
+    const [updatedRow] = await trx(TABLE).where("id", id).update(updateData).returning("*");
+    const updated = parseConfigRow(updatedRow);
+    await publishEventInTrx(trx, { eventName: EVENTS.EXTERNAL_API_CONFIG_MUTATED, aggregateType: "EXTERNAL_API_CONFIG", aggregateId: id, action: "UPDATE", beforeState: toClientConfig(existing), afterState: toClientConfig(updated), changedFields: updateData, source: "EXTERNAL_API_CONFIG", payload: { configId: id, serviceKey: existing.service_key, action: "UPDATE" } });
+    trx.afterCommit(() => clearCache(existing.service_key));
+    return toClientConfig(updated);
+  });
 }
 
 async function deleteConfig(id) {
-  const existing = await getInternalConfigById(id);
-  if (!existing) throw new Error(`Configuration #${id} was not found.`);
-  await db(TABLE).where("id", id).delete();
-  clearCache(existing.service_key);
-  return { success: true, message: `Deleted configuration #${id}.` };
+  return withTransaction(async (trx) => {
+    const row = await trx(TABLE).where("id", id).forUpdate().first();
+    if (!row) throw new Error(`Configuration #${id} was not found.`);
+    const existing = parseConfigRow(row);
+    await trx(TABLE).where("id", id).delete();
+    await publishEventInTrx(trx, { eventName: EVENTS.EXTERNAL_API_CONFIG_MUTATED, aggregateType: "EXTERNAL_API_CONFIG", aggregateId: id, action: "DELETE", beforeState: toClientConfig(existing), source: "EXTERNAL_API_CONFIG", payload: { configId: id, serviceKey: existing.service_key, action: "DELETE" } });
+    trx.afterCommit(() => clearCache(existing.service_key));
+    return { success: true, message: `Deleted configuration #${id}.` };
+  });
 }
-
 function buildAuthHeaders(authConfig = {}) {
   const headers = {};
   const token = authConfig.token || authConfig.defaultToken || authConfig.api_key;

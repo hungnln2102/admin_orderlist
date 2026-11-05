@@ -3,6 +3,7 @@
  * Quản lý Tài khoản Thanh toán (Bank) và Ví USDT (USDT) từ DB (finance.financial_accounts)
  */
 const { db, TABLES, withTransaction } = require("@/db");
+const { EVENTS, publishEventInTrx } = require("@/events");
 
 const BANK_TABLE = TABLES.SHOP_BANK_ACCOUNTS;
 const USDT_TABLE = TABLES.USDT_WALLETS;
@@ -13,6 +14,21 @@ const toNumber = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
+async function publishAccountEvent(trx, { action, accountType, accountId, beforeState = null, afterState = null, payload = {}, reason = null }) {
+  await publishEventInTrx(trx, {
+    eventName: action === "WITHDRAW" ? EVENTS.FINANCIAL_ACCOUNT_WITHDRAWN : EVENTS.FINANCIAL_ACCOUNT_MUTATED,
+    aggregateType: "FINANCIAL_ACCOUNT",
+    aggregateId: accountId,
+    action,
+    beforeState,
+    afterState,
+    changedFields: payload.changedFields || {},
+    source: "API",
+    reason,
+    payload: { accountType, accountId: Number(accountId), ...payload },
+  });
+}
 
 // --- BANK ACCOUNTS ---
 
@@ -101,15 +117,23 @@ async function createBankAccount(payload) {
         balance: toNumber(payload.balance),
         is_deleted: false,
       })
-      .returning("id");
+      .returning("*");
 
-    return { id: inserted.id || inserted };
+    await publishAccountEvent(trx, {
+      action: "CREATE",
+      accountType: "bank",
+      accountId: inserted.id,
+      afterState: inserted,
+    });
+    return { id: inserted.id };
   });
 }
 
 async function updateBankAccount(id, payload) {
   const numericId = Number(id);
   return withTransaction(async (trx) => {
+    const beforeState = await trx(BANK_TABLE).where("id", numericId).first();
+    if (!beforeState) throw new Error("Không tìm thấy tài khoản ngân hàng");
     if (payload.accountNumber !== undefined || payload.bankShortCode !== undefined || payload.bankBin !== undefined) {
       const currentAcc = await trx(BANK_TABLE).where("id", numericId).first();
       if (currentAcc) {
@@ -157,21 +181,46 @@ async function updateBankAccount(id, payload) {
     if (payload.balance !== undefined) updateData.balance = toNumber(payload.balance);
 
     await trx(BANK_TABLE).where("account_type", "bank").where("id", numericId).update(updateData);
+    const afterState = await trx(BANK_TABLE).where("id", numericId).first();
+    await publishAccountEvent(trx, {
+      action: "UPDATE",
+      accountType: "bank",
+      accountId: numericId,
+      beforeState,
+      afterState,
+      payload: { changedFields: updateData },
+    });
     return { success: true };
   });
 }
 
 async function setDefaultBankAccount(id) {
   return withTransaction(async (trx) => {
+    const affectedBefore = await trx(BANK_TABLE).where("account_type", "bank").where("is_default", true);
     await trx(BANK_TABLE).where("account_type", "bank").update({ is_default: false });
     await trx(BANK_TABLE).where("account_type", "bank").where("id", id).update({ is_default: true, updated_at: trx.fn.now() });
+    const afterState = await trx(BANK_TABLE).where("id", id).first();
+    await publishAccountEvent(trx, {
+      action: "SET_DEFAULT",
+      accountType: "bank",
+      accountId: id,
+      beforeState: affectedBefore,
+      afterState,
+      payload: { changedFields: { is_default: true }, affectedAccountIds: affectedBefore.map((account) => account.id) },
+    });
     return { success: true };
   });
 }
 
 async function deleteBankAccount(id) {
-  await db(BANK_TABLE).where("account_type", "bank").where("id", id).update({ is_deleted: true, is_active: false });
-  return { success: true };
+  return withTransaction(async (trx) => {
+    const beforeState = await trx(BANK_TABLE).where("account_type", "bank").where("id", id).first();
+    if (!beforeState) throw new Error("Không tìm thấy tài khoản ngân hàng");
+    await trx(BANK_TABLE).where("account_type", "bank").where("id", id).update({ is_deleted: true, is_active: false, updated_at: trx.fn.now() });
+    const afterState = await trx(BANK_TABLE).where("id", id).first();
+    await publishAccountEvent(trx, { action: "DELETE", accountType: "bank", accountId: id, beforeState, afterState });
+    return { success: true };
+  });
 }
 
 async function recordBankWithdrawal(id, amount, note = "") {
@@ -191,8 +240,7 @@ async function recordBankWithdrawal(id, amount, note = "") {
       updated_at: trx.fn.now(),
     });
 
-    try {
-      await trx(BANK_LEDGER_TABLE).insert({
+    await trx(BANK_LEDGER_TABLE).insert({
         financial_account_id: id,
         entry_type: "withdraw",
         amount: numAmount,
@@ -201,9 +249,15 @@ async function recordBankWithdrawal(id, amount, note = "") {
         source_kind: "manual_withdraw",
         note: note || "Rút tiền tài khoản",
       });
-    } catch (e) {
-      // Ledger insert optional
-    }
+    await publishAccountEvent(trx, {
+      action: "WITHDRAW",
+      accountType: "bank",
+      accountId: id,
+      beforeState: account,
+      afterState: { ...account, balance: newBalance, total_withdrawn: newWithdrawn },
+      payload: { amount: numAmount, balanceAfter: newBalance, note },
+      reason: note || "Manual withdrawal",
+    });
 
     return { success: true, balanceRemaining: newBalance, totalWithdrawn: newWithdrawn };
   });
@@ -262,14 +316,22 @@ async function createUsdtWallet(payload) {
         balance: 0,
         is_deleted: false,
       })
-      .returning("id");
+      .returning("*");
 
-    return { id: inserted.id || inserted };
+    await publishAccountEvent(trx, {
+      action: "CREATE",
+      accountType: "usdt",
+      accountId: inserted.id,
+      afterState: inserted,
+    });
+    return { id: inserted.id };
   });
 }
 
 async function updateUsdtWallet(id, payload) {
   return withTransaction(async (trx) => {
+    const beforeState = await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).first();
+    if (!beforeState) throw new Error("Không tìm thấy ví USDT");
     if (payload.isDefault) {
       await trx(USDT_TABLE).where("account_type", "usdt").whereNot("id", id).update({ is_default: false });
     }
@@ -282,21 +344,46 @@ async function updateUsdtWallet(id, payload) {
     if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
 
     await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).update(updateData);
+    const afterState = await trx(USDT_TABLE).where("id", id).first();
+    await publishAccountEvent(trx, {
+      action: "UPDATE",
+      accountType: "usdt",
+      accountId: id,
+      beforeState,
+      afterState,
+      payload: { changedFields: updateData },
+    });
     return { success: true };
   });
 }
 
 async function setDefaultUsdtWallet(id) {
   return withTransaction(async (trx) => {
+    const affectedBefore = await trx(USDT_TABLE).where("account_type", "usdt").where("is_default", true);
     await trx(USDT_TABLE).where("account_type", "usdt").update({ is_default: false });
     await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).update({ is_default: true, updated_at: trx.fn.now() });
+    const afterState = await trx(USDT_TABLE).where("id", id).first();
+    await publishAccountEvent(trx, {
+      action: "SET_DEFAULT",
+      accountType: "usdt",
+      accountId: id,
+      beforeState: affectedBefore,
+      afterState,
+      payload: { changedFields: { is_default: true }, affectedAccountIds: affectedBefore.map((account) => account.id) },
+    });
     return { success: true };
   });
 }
 
 async function deleteUsdtWallet(id) {
-  await db(USDT_TABLE).where("account_type", "usdt").where("id", id).update({ is_deleted: true, is_active: false });
-  return { success: true };
+  return withTransaction(async (trx) => {
+    const beforeState = await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).first();
+    if (!beforeState) throw new Error("Không tìm thấy ví USDT");
+    await trx(USDT_TABLE).where("account_type", "usdt").where("id", id).update({ is_deleted: true, is_active: false, updated_at: trx.fn.now() });
+    const afterState = await trx(USDT_TABLE).where("id", id).first();
+    await publishAccountEvent(trx, { action: "DELETE", accountType: "usdt", accountId: id, beforeState, afterState });
+    return { success: true };
+  });
 }
 
 async function recordUsdtWithdrawal(id, amount, note = "") {
@@ -321,8 +408,7 @@ async function recordUsdtWithdrawal(id, amount, note = "") {
       updated_at: trx.fn.now(),
     });
 
-    try {
-      await trx(USDT_LEDGER_TABLE).insert({
+    await trx(USDT_LEDGER_TABLE).insert({
         financial_account_id: id,
         entry_type: "withdraw",
         amount: numAmount,
@@ -331,9 +417,15 @@ async function recordUsdtWithdrawal(id, amount, note = "") {
         source_kind: "manual_withdraw",
         note: note || "Rút tiền ví USDT",
       });
-    } catch (e) {
-      // Ledger insert optional
-    }
+    await publishAccountEvent(trx, {
+      action: "WITHDRAW",
+      accountType: "usdt",
+      accountId: id,
+      beforeState: wallet,
+      afterState: { ...wallet, balance: newBalance, total_withdrawn: newWithdrawn },
+      payload: { amount: numAmount, balanceAfter: newBalance, note },
+      reason: note || "Manual withdrawal",
+    });
 
     return { success: true, balanceRemaining: newBalance, totalWithdrawn: newWithdrawn };
   });

@@ -24,7 +24,7 @@ const { settleSupplierDebtTransaction } = require("@/domains/suppliers/services/
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
 const { extractSlotSuffix, getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
-const { eventBus, EVENTS } = require("@/events");
+const { publishEventInTrx, EVENTS } = require("@/events");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 
 
@@ -105,6 +105,24 @@ async function processPaymentWebhook(payload = {}) {
         .returning("id");
 
       const receiptId = typeof receiptIdRes === "object" ? receiptIdRes.id : receiptIdRes;
+      const receipt = await getReceiptTable(trx).where({ id: receiptId }).first();
+      await publishEventInTrx(trx, {
+        eventName: EVENTS.PAYMENT_RECEIPT_MUTATED,
+        aggregateType: "PAYMENT_RECEIPT",
+        aggregateId: receiptId,
+        action: "WEBHOOK_RECEIVED",
+        afterState: receipt,
+        source: "PAYMENT_WEBHOOK",
+        idempotencyKey: numSepayTxId || referenceCode || `receipt:${receiptId}`,
+        payload: {
+          receiptId,
+          amount: transferAmount,
+          transferType: isOutbound ? TRANSFER_TYPE.OUT : TRANSFER_TYPE.IN,
+          gateway,
+          referenceCode,
+          status: RECEIPT_STATUS.UNALLOCATED,
+        },
+      });
 
       // 3. Tiền ra (OUT) — ghi sổ cái và chỉ tất toán NCC khi khớp duy nhất.
       if (isOutbound) {
@@ -333,13 +351,31 @@ async function processPaymentWebhook(payload = {}) {
           failedOrders,
         };
 
-        if (typeof trx?.afterCommit === "function") {
-          trx.afterCommit(() => {
-            eventBus.emit(EVENTS.BATCH_PAYMENT_COMPLETED, batchEventPayload);
-          });
-        } else {
-          eventBus.emit(EVENTS.BATCH_PAYMENT_COMPLETED, batchEventPayload);
-        }
+        await publishEventInTrx(trx, {
+          eventName: EVENTS.BATCH_PAYMENT_COMPLETED,
+          aggregateType: "BATCH_PAYMENT_REQUEST",
+          aggregateId: matchedBatch.id,
+          action: "WEBHOOK_COMPLETE",
+          beforeState: matchedBatch,
+          afterState: { ...matchedBatch, status: "COMPLETED", payment_receipt_id: receiptId },
+          changedFields: { status: { old: matchedBatch.status, new: "COMPLETED" }, payment_receipt_id: { old: matchedBatch.payment_receipt_id, new: receiptId } },
+          source: "PAYMENT_WEBHOOK",
+          idempotencyKey: numSepayTxId || referenceCode || `batch:${matchedBatch.id}:receipt:${receiptId}`,
+          payload: batchEventPayload,
+        });
+
+        const updatedReceipt = await getReceiptTable(trx).where({ id: receiptId }).first();
+        await publishEventInTrx(trx, {
+          eventName: EVENTS.PAYMENT_RECEIPT_MUTATED,
+          aggregateType: "PAYMENT_RECEIPT",
+          aggregateId: receiptId,
+          action: "BATCH_ALLOCATED",
+          beforeState: receipt,
+          afterState: updatedReceipt,
+          changedFields: { status: { old: receipt.status, new: updatedReceipt.status }, unallocated_amount: { old: receipt.unallocated_amount, new: updatedReceipt.unallocated_amount } },
+          source: "PAYMENT_WEBHOOK",
+          payload: { receiptId, batchId: matchedBatch.id, batchCode: matchedBatch.batch_code, transferAmount, totalAllocated, unallocatedAmount },
+        });
 
         return {
           success: true,
@@ -477,6 +513,18 @@ async function processPaymentWebhook(payload = {}) {
         created_by: ALLOCATION_CREATOR.SYSTEM_WEBHOOK,
       });
 
+      const updatedReceipt = await getReceiptTable(trx).where({ id: receiptId }).first();
+      await publishEventInTrx(trx, {
+        eventName: EVENTS.PAYMENT_RECEIPT_MUTATED,
+        aggregateType: "PAYMENT_RECEIPT",
+        aggregateId: receiptId,
+        action: "ORDER_ALLOCATED",
+        beforeState: receipt,
+        afterState: updatedReceipt,
+        changedFields: { status: { old: receipt.status, new: updatedReceipt.status }, unallocated_amount: { old: receipt.unallocated_amount, new: updatedReceipt.unallocated_amount } },
+        source: "PAYMENT_WEBHOOK",
+        payload: { receiptId, orderId: matchedOrder.id, id_order: matchedOrder.id_order, amount: transferAmount },
+      });
       const { updatedOrder, isRenewal } = await processCompleteOrder(trx, matchedOrder, transferAmount, {
         receiptId,
         action: "WEBHOOK_PAYMENT_MATCH",

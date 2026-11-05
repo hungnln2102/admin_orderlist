@@ -57,6 +57,14 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               invalidateApiCache(["/api/orders", "/api/invoices", "/api/suppliers", "/api/dashboard"]);
             } else if (data.type.startsWith("WAREHOUSE_") || data.type.startsWith("PACKAGE_")) {
               invalidateApiCache(["/api/warehouse", "/api/products"]);
+            } else if (data.type.startsWith("FINANCE_") || data.type.startsWith("FINANCIAL_")) {
+              invalidateApiCache(["/api/finance", "/api/wallets", "/api/dashboard"]);
+            } else if (data.type.startsWith("PAYMENT_RECEIPT_") || data.type.startsWith("BATCH_PAYMENT_")) {
+              invalidateApiCache(["/api/invoices", "/api/orders"]);
+            } else if (data.type.startsWith("STORE_PROFIT_EXPENSE_")) {
+              invalidateApiCache(["/api/store-profit-expenses", "/api/dashboard"]);
+            } else if (data.type.startsWith("SYSTEM_") || data.type.startsWith("CRON_") || data.type.startsWith("EXTERNAL_API_")) {
+              invalidateApiCache(["/api/system"]);
             }
 
             // Gọi các callback đăng ký theo eventType cụ thể hoặc wildcard "*"

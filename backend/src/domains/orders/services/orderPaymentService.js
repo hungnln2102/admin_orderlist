@@ -8,7 +8,7 @@
  */
 const { db, TABLES } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
-const { eventBus, EVENTS } = require("@/events");
+const { publishEventInTrx, EVENTS } = require("@/events");
 const { getVietnamDateString } = require("@/utils/time");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 
@@ -268,8 +268,16 @@ async function processOrderPayment(trx, order, amount, options = {}) {
     supplierCostInserted = true;
   }
 
-  trx.afterCommit(() => {
-    eventBus.emit(EVENTS.ORDER_PAID, {
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.ORDER_PAID,
+    aggregateType: "ORDER",
+    aggregateId: updatedOrder.id,
+    action,
+    beforeState: order,
+    afterState: updatedOrder,
+    changedFields: updateFields,
+    source: "ORDER_PAYMENT_SERVICE",
+    payload: {
       orderId: updatedOrder.id,
       id_order: updatedOrder.id_order,
       customer: updatedOrder.customer,
@@ -281,10 +289,20 @@ async function processOrderPayment(trx, order, amount, options = {}) {
       receiptId,
       isRenewal,
       action,
-    });
+    },
+  });
 
-    if (isRenewal) {
-      eventBus.emit(EVENTS.ORDER_RENEWED, {
+  if (isRenewal) {
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.ORDER_RENEWED,
+      aggregateType: "ORDER",
+      aggregateId: updatedOrder.id,
+      action,
+      beforeState: order,
+      afterState: updatedOrder,
+      changedFields: updateFields,
+      source: "ORDER_PAYMENT_SERVICE",
+      payload: {
         orderId: updatedOrder.id,
         id_order: updatedOrder.id_order,
         id_product: updatedOrder.id_product,
@@ -295,28 +313,37 @@ async function processOrderPayment(trx, order, amount, options = {}) {
         monthsAdded,
         receiptId,
         action,
-        productName:
-          updatedOrder.product_name ||
-          updatedOrder.package_name ||
-          updatedOrder.id_product,
+        productName: updatedOrder.product_name || updatedOrder.package_name || updatedOrder.id_product,
         slot: updatedOrder.slot,
         information_order: updatedOrder.information_order,
         price: amount,
         cost: effectiveCost,
         isSupplierMavryk,
-      });
+      },
+    });
 
-      if (supplierCostInserted) {
-        eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, {
+    if (supplierCostInserted) {
+      await publishEventInTrx(trx, {
+        eventName: EVENTS.SUPPLIER_COST_ADDED,
+        aggregateType: "SUPPLIER_COST",
+        aggregateId: updatedOrder.id,
+        action: "CREATE",
+        afterState: {
+          order_list_id: updatedOrder.id,
+          supply_id: supplyId,
+          id_order: updatedOrder.id_order,
+          import_cost: effectiveCost,
+        },
+        source: "ORDER_PAYMENT_SERVICE",
+        payload: {
           cost: effectiveCost,
           supplier_id: supplyId,
           order_id: updatedOrder.id,
           id_order: updatedOrder.id_order,
-          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${effectiveCost} ₫`,
-        });
-      }
+        },
+      });
     }
-  });
+  }
 
   // Tự động đối soát và loại trừ đơn hàng khỏi các đợt gộp PENDING còn hiệu lực (nếu có)
   try {

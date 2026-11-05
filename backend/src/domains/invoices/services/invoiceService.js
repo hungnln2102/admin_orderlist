@@ -6,6 +6,7 @@
  *     → Dùng chung processOrderPayment (cập nhật trạng thái đơn, cộng ngày gia hạn, phát EventBus).
  */
 const { db, TABLES, withTransaction } = require("@/db");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
@@ -461,6 +462,31 @@ async function allocateReceipt(receiptId, payload) {
         status: "completed",
       });
     }
+
+    const updatedReceipt = {
+      ...receipt,
+      ...receiptUpdates,
+    };
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.PAYMENT_RECEIPT_MUTATED,
+      aggregateType: "PAYMENT_RECEIPT",
+      aggregateId: id,
+      action: "ALLOCATE",
+      beforeState: receipt,
+      afterState: updatedReceipt,
+      changedFields: receiptUpdates,
+      source: "API",
+      reason: note ? note.trim() : null,
+      payload: {
+        receiptId: id,
+        allocationId: typeof allocId === "object" ? allocId.id : allocId,
+        allocationType: resolvedAllocType,
+        targetCode: code,
+        amount: allocAmount,
+        remainingBalance: newUnallocated,
+        orderId: order?.id || null,
+      },
+    });
 
     return {
       allocation_id: typeof allocId === "object" ? allocId.id : allocId,

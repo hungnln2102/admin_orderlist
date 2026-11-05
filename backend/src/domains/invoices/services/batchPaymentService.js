@@ -16,11 +16,11 @@
  *  6. Khi tạo batch mới bị trùng đơn với batch cũ -> Hủy batch cũ nếu Master/Admin xác nhận.
  */
 const { db, TABLES, withTransaction } = require("@/db");
+const { eventBus, EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getAvailableSuffix } = require("@/domains/payments/services/slotSuffixService");
 const { getOrderPrefix, resolveOrdersWithCatalogPrices } = require("@/domains/products/services/catalogPricingService");
 const { calculateNewExpiry } = require("@/domains/orders/services/orderPaymentService");
-const { eventBus, EVENTS } = require("@/events");
 const { ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 
 const PAYABLE_STATUSES = [
@@ -187,6 +187,23 @@ async function createBatchPaymentRequest({
         expires_at: expiresAt,
       })
       .returning("*");
+
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.BATCH_PAYMENT_REQUEST_MUTATED,
+      aggregateType: "BATCH_PAYMENT_REQUEST",
+      aggregateId: inserted.id,
+      action: "CREATE",
+      afterState: inserted,
+      changedFields: { status: "PENDING", order_codes: codes, total_amount: totalAmount },
+      source: "API",
+      payload: {
+        batchId: inserted.id,
+        batchCode: inserted.batch_code,
+        orderCodes: codes,
+        totalAmount,
+        forceCancelledBatchIds: conflictingBatches.map((item) => item.batch.id),
+      },
+    });
 
     return {
       batch: inserted,
@@ -419,31 +436,47 @@ async function cancelBatchPaymentRequest(id, reason = "") {
     throw new Error("ID đợt gộp không hợp lệ.");
   }
 
-  const batch = await db(TABLES.BATCH_PAYMENT_REQUESTS).where({ id: batchId }).first();
-  if (!batch) {
-    throw new Error("Không tìm thấy đợt gộp thanh toán.");
-  }
+  return withTransaction(async (trx) => {
+    const batch = await trx(TABLES.BATCH_PAYMENT_REQUESTS).where({ id: batchId }).forUpdate().first();
+    if (!batch) {
+      throw new Error("Không tìm thấy đợt gộp thanh toán.");
+    }
 
-  if (batch.status !== "PENDING") {
-    throw new Error(`Đợt gộp đang ở trạng thái ${batch.status}, không thể hủy.`);
-  }
+    if (batch.status !== "PENDING") {
+      throw new Error(`Đợt gộp đang ở trạng thái ${batch.status}, không thể hủy.`);
+    }
 
-  const cancelNote = reason
-    ? `${batch.note ? batch.note + " | " : ""}Hủy bởi admin: ${reason}`
-    : batch.note;
+    const cancelNote = reason
+      ? `${batch.note ? batch.note + " | " : ""}Hủy bởi admin: ${reason}`
+      : batch.note;
+    const afterState = { ...batch, status: "CANCELED", note: cancelNote };
 
-  await db(TABLES.BATCH_PAYMENT_REQUESTS)
-    .where({ id: batchId })
-    .update({
-      status: "CANCELED",
-      note: cancelNote,
-      updated_at: db.fn.now(),
+    await trx(TABLES.BATCH_PAYMENT_REQUESTS)
+      .where({ id: batchId })
+      .update({
+        status: "CANCELED",
+        note: cancelNote,
+        updated_at: trx.fn.now(),
+      });
+
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.BATCH_PAYMENT_REQUEST_MUTATED,
+      aggregateType: "BATCH_PAYMENT_REQUEST",
+      aggregateId: batchId,
+      action: "CANCEL",
+      beforeState: batch,
+      afterState,
+      changedFields: { status: "CANCELED", note: cancelNote },
+      source: "API",
+      reason: reason || null,
+      payload: { batchId, batchCode: batch.batch_code, slotSuffix: batch.slot_suffix },
     });
 
-  return {
-    success: true,
-    message: `Đã hủy đợt gộp #${batch.batch_code} và giải phóng Slot Suffix +${batch.slot_suffix}đ.`,
-  };
+    return {
+      success: true,
+      message: `Đã hủy đợt gộp #${batch.batch_code} và giải phóng Slot Suffix +${batch.slot_suffix}đ.`,
+    };
+  });
 }
 
 /**

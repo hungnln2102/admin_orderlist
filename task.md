@@ -1,4 +1,16 @@
 # Task — thống nhất cấu trúc admin_orderlist
+
+## Audit Event Outbox — 2026-11-05
+
+- [x] Nâng cấp `domain_event_store` thành audit log + transactional outbox dùng chung.
+- [ ] Chuyển các mutation nghiệp vụ sang ghi event trong cùng transaction và phát sau commit.
+  - [x] Wallet bank/USDT: create, update, set-default, soft-delete, withdraw.
+  - [x] Invoice/batch: allocate receipt, create batch, cancel batch.
+  - [/] Orders, finance hub, product/supplier, warehouse/package, system và external import/API config.
+    - [x] Orders/payments/webhook: create, update, renew, cancel/delete, receipt allocation và batch completion.
+    - [ ] Finance hub, product/supplier, warehouse/package, system và external import/API config.
+- [ ] Mở rộng SSE/cache/listener frontend theo event domain.
+- [ ] Bổ sung test rollback, payload redaction và replay event pending.
 ## Kế hoạch Browser Profile Vault
 
 - [x] Lập kế hoạch `docs/plans/2026-11-01_remote_browser_profile_vault_plan.md` cho popup remote browser, profile Chromium mã hóa trong PostgreSQL, viewer, RBAC, lock và tiêu chí nghiệm thu.

@@ -3,8 +3,8 @@
  * Quản lý các cấu hình hệ thống bằng cơ chế Cache In-Memory và Database (Zero Downtime)
  */
 
-const { db, TABLES } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
+const { db, TABLES, withTransaction } = require("@/db");
+const { publishEventInTrx, EVENTS } = require("@/events");
 
 // In-Memory Cache lưu cấu hình để tránh query DB liên tục
 let configCache = {};
@@ -107,42 +107,45 @@ const getInteger = (key, defaultValue, min, max) => {
  * @param {string} rawValue - Giá trị dưới dạng chuỗi (Sẽ được lưu vào text)
  * @param {string} updatedBy - Tên người cập nhật (Mặc định 'ADMIN')
  */
-const set = async (key, rawValue, updatedBy = 'ADMIN') => {
-  const existing = await db(TABLES.SYSTEM_CONFIGS).where({ config_key: key }).first();
+const set = async (key, rawValue, updatedBy = 'ADMIN') => withTransaction(async (trx) => {
+  const existing = await trx(TABLES.SYSTEM_CONFIGS).where({ config_key: key }).forUpdate().first();
   if (!existing) {
-    throw new Error(`Cấu hình ${key} không tồn tại trong hệ thống.`);
+    throw new Error(`Configuration ${key} was not found.`);
   }
 
   const normalizedValue = validateValue(key, rawValue, existing.data_type);
   const oldValueParsed = parseValue(existing.config_value, existing.data_type);
   const newValueParsed = parseValue(normalizedValue, existing.data_type);
-
-  await db(TABLES.SYSTEM_CONFIGS)
-    .where({ config_key: key })
-    .update({
-      config_value: normalizedValue,
-      updated_at: db.fn.now(),
-      updated_by: updatedBy
-    });
-
-  // Cập nhật lại Cache memory
-  configCache[key] = {
-    value: newValueParsed,
-    dataType: existing.data_type,
-    group: existing.group_name
+  const changes = {
+    config_value: { old: oldValueParsed, new: newValueParsed },
+    updated_by: { old: existing.updated_by, new: updatedBy },
   };
 
-  // Phát Event để các module khác biết nếu cần
-  eventBus.emit(EVENTS.SYSTEM_CONFIG_UPDATED, {
-    key,
-    old_value: oldValueParsed,
-    new_value: newValueParsed,
-    updated_by: updatedBy,
-    summary: `Thay đổi cấu hình hệ thống: [${key}] từ '${oldValueParsed}' thành '${newValueParsed}'`
+  const [updated] = await trx(TABLES.SYSTEM_CONFIGS)
+    .where({ config_key: key })
+    .update({ config_value: normalizedValue, updated_at: trx.fn.now(), updated_by: updatedBy })
+    .returning("*");
+
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.SYSTEM_CONFIG_UPDATED,
+    aggregateType: "SYSTEM_CONFIG",
+    aggregateId: updated.id || key,
+    action: "UPDATE",
+    beforeState: existing,
+    afterState: updated,
+    changedFields: changes,
+    actorType: "ADMIN",
+    actorId: updatedBy,
+    source: "SYSTEM_CONFIG",
+    payload: { key, old_value: oldValueParsed, new_value: newValueParsed, updated_by: updatedBy },
+  });
+
+  trx.afterCommit(() => {
+    configCache[key] = { value: newValueParsed, dataType: existing.data_type, group: existing.group_name };
   });
 
   return { success: true, key, value: newValueParsed };
-};
+});
 
 /**
  * 4. Lấy toàn bộ danh sách cấu hình (Dùng cho giao diện Admin)

@@ -1,78 +1,132 @@
-const { db, TABLES } = require("@/db");
+const { db, TABLES, COLS } = require("@/db");
+const eventBus = require("./eventBus");
 
-let ensureEventStoreTablePromise = null;
+const E = COLS.DOMAIN_EVENT_STORE;
+const SENSITIVE_KEY = /password|secret|token|cookie|authorization|credential|api[_-]?key|imap|account[_-]?number|wallet[_-]?address|sender|receiver|bank[_-]?account/i;
 
-/**
- * Đảm bảo bảng lưu vết và tiếp nhận event domain_event_store tồn tại trong Database.
- */
-async function ensureEventStoreTable() {
-  if (!ensureEventStoreTablePromise) {
-    ensureEventStoreTablePromise = (async () => {
-      await db.raw(`CREATE SCHEMA IF NOT EXISTS system_automation`);
-      await db.raw(`
-        CREATE TABLE IF NOT EXISTS ${TABLES.DOMAIN_EVENT_STORE} (
-          id BIGSERIAL PRIMARY KEY,
-          event_name VARCHAR(100) NOT NULL,
-          aggregate_type VARCHAR(50) NOT NULL,
-          aggregate_id VARCHAR(100) NOT NULL,
-          payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-          status VARCHAR(20) NOT NULL DEFAULT 'PROCESSED',
-          error_message TEXT,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-      `);
+function redact(value) {
+  if (Array.isArray(value)) return value.map(redact);
+  if (!value || typeof value !== "object" || value instanceof Date) return value;
 
-      await db.raw(`
-        CREATE INDEX IF NOT EXISTS idx_domain_event_store_event_name
-        ON ${TABLES.DOMAIN_EVENT_STORE} (event_name, created_at DESC);
-      `);
-      await db.raw(`
-        CREATE INDEX IF NOT EXISTS idx_domain_event_store_aggregate
-        ON ${TABLES.DOMAIN_EVENT_STORE} (aggregate_type, aggregate_id);
-      `);
-    })().finally(() => {
-      ensureEventStoreTablePromise = null;
-    });
-  }
-  return ensureEventStoreTablePromise;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [key, SENSITIVE_KEY.test(key) ? "[REDACTED]" : redact(nestedValue)])
+  );
 }
 
-/**
- * Ghi nhận một sự kiện vào Event Store
- */
-async function recordEvent({
-  eventName,
-  aggregateType = "ORDER",
-  aggregateId,
-  payload = {},
-  status = "PROCESSED",
-  errorMessage = null,
-}) {
-  await ensureEventStoreTable();
+function buildEventRow(input, status) {
+  const payload = redact(input.payload || {});
+
+  return {
+    [E.EVENT_NAME]: input.eventName,
+    [E.AGGREGATE_TYPE]: input.aggregateType || "SYSTEM",
+    [E.AGGREGATE_ID]: String(input.aggregateId || ""),
+    [E.PAYLOAD]: JSON.stringify(payload),
+    [E.ACTION]: input.action || null,
+    [E.BEFORE_STATE]: input.beforeState == null ? null : JSON.stringify(redact(input.beforeState)),
+    [E.AFTER_STATE]: input.afterState == null ? null : JSON.stringify(redact(input.afterState)),
+    [E.CHANGED_FIELDS]: JSON.stringify(redact(input.changedFields || {})),
+    [E.ACTOR_TYPE]: input.actorType || "SYSTEM",
+    [E.ACTOR_ID]: input.actorId == null ? null : String(input.actorId),
+    [E.SOURCE]: input.source || "SYSTEM",
+    [E.REQUEST_ID]: input.requestId || null,
+    [E.CORRELATION_ID]: input.correlationId || null,
+    [E.IDEMPOTENCY_KEY]: input.idempotencyKey || null,
+    [E.REASON]: input.reason || null,
+    [E.SCHEMA_VERSION]: 1,
+    [E.STATUS]: status,
+    [E.ATTEMPTS]: 0,
+    [E.ERROR_MESSAGE]: input.errorMessage || null,
+    [E.CREATED_AT]: db.fn.now(),
+    [E.PROCESSED_AT]: null,
+    [E.PUBLISHED_AT]: null,
+  };
+}
+
+async function insertEvent(query, input, status) {
+  const [inserted] = await query(TABLES.DOMAIN_EVENT_STORE)
+    .insert(buildEventRow(input, status))
+    .returning("*");
+  return inserted;
+}
+
+async function recordEventInTrx(trx, input) {
+  if (!trx) throw new Error("recordEventInTrx requires the active database transaction");
+  if (!input?.eventName) throw new Error("eventName is required");
+  return insertEvent(trx, input, "PENDING");
+}
+
+async function markEventPublished(eventId) {
+  await db(TABLES.DOMAIN_EVENT_STORE)
+    .where({ [E.ID]: eventId })
+    .update({
+      [E.STATUS]: "PUBLISHED",
+      [E.PUBLISHED_AT]: db.fn.now(),
+      [E.PROCESSED_AT]: db.fn.now(),
+      [E.ERROR_MESSAGE]: null,
+    });
+}
+
+async function markEventDispatchFailed(eventId, error) {
+  await db(TABLES.DOMAIN_EVENT_STORE)
+    .where({ [E.ID]: eventId })
+    .increment(E.ATTEMPTS, 1)
+    .update({ [E.ERROR_MESSAGE]: error.message || String(error) });
+}
+
+async function dispatchStoredEvent(event) {
+  const payload = {
+    ...(event[E.PAYLOAD] || {}),
+    auditEventId: event[E.ID],
+    correlationId: event[E.CORRELATION_ID] || undefined,
+  };
 
   try {
-    const [inserted] = await db(TABLES.DOMAIN_EVENT_STORE)
-      .insert({
-        event_name: eventName,
-        aggregate_type: aggregateType,
-        aggregate_id: String(aggregateId || ""),
-        payload: JSON.stringify(payload),
-        status,
-        error_message: errorMessage,
-        created_at: db.fn.now(),
-        processed_at: db.fn.now(),
-      })
-      .returning("*");
-
-    return inserted;
-  } catch (err) {
-    console.error(`[EventStore] Lỗi ghi nhận event ${eventName}:`, err.message);
-    return null;
+    eventBus.emit(event[E.EVENT_NAME], payload);
+    await markEventPublished(event[E.ID]);
+  } catch (error) {
+    await markEventDispatchFailed(event[E.ID], error);
+    throw error;
   }
+}
+
+async function publishEventInTrx(trx, input) {
+  const storedEvent = await recordEventInTrx(trx, input);
+  if (typeof trx.afterCommit !== "function") {
+    throw new Error("publishEventInTrx requires a transaction with afterCommit support");
+  }
+
+  trx.afterCommit(() => dispatchStoredEvent(storedEvent).catch((error) => {
+    console.error(`[EventStore] Unable to publish ${input.eventName}:`, error.message);
+  }));
+
+  return storedEvent;
+}
+
+async function dispatchPendingEvents({ limit = 100 } = {}) {
+  const events = await db(TABLES.DOMAIN_EVENT_STORE)
+    .where({ [E.STATUS]: "PENDING" })
+    .orderBy(E.CREATED_AT, "asc")
+    .limit(Math.max(1, Math.min(Number(limit) || 100, 1000)));
+
+  for (const event of events) {
+    await dispatchStoredEvent(event);
+  }
+
+  return events.length;
+}
+
+async function recordEvent(input) {
+  if (input?.payload?.auditEventId) {
+    return { [E.ID]: input.payload.auditEventId, alreadyRecorded: true };
+  }
+  if (!input?.eventName) throw new Error("eventName is required");
+  return insertEvent(db, input, "PUBLISHED");
 }
 
 module.exports = {
-  ensureEventStoreTable,
+  dispatchPendingEvents,
+  publishEventInTrx,
   recordEvent,
+  recordEventInTrx,
+  redact,
 };
