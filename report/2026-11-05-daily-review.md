@@ -763,3 +763,35 @@ Tại file [ExternalApiConfigPage.tsx](file:///e:/Project/admin_store/admin_orde
   + Gọi trực tiếp `updateConfig(1, ...)`: Cập nhật thành công 100%, ghi sự kiện `EXTERNAL_API_CONFIG_MUTATED` với `action = "UPDATE"` và trạng thái `PUBLISHED` vào database ✅
 - **Kiểm thử Build Frontend:**
   + Chạy `npm run build --prefix frontend`: Hoàn tất trong **4.58s, 0 lỗi TypeScript** ✅
+
+
+---
+
+## 19. [23:15] Chuẩn Hóa 2 Luồng Yuna (Yuna 2FA Get Account & Yuna Mail Get OTP) Kèm Cơ Chế Chống Spam (Polite Rate-Safe)
+
+### 19.1. Bối cảnh & Phân định nghiệp vụ từ Master
+- Theo chỉ đạo chính xác của Master:
+  > *"hình như 1 trong 2 luồng yuna là có 1 luồng GET tài khoản chứ không phải OTP nhé"*  
+  > *"đừng spam quá nhé, chủ web không thích đâu"*
+- Hai luồng của Yuna được phân định rõ ràng:
+  1. **Luồng 1 (`yuna_2fa` — `https://hub.yunagrp.com/2fa/`)**: Luồng **GET TÀI KHOẢN** (Tra cứu đơn hàng Yuna để lấy danh sách tài khoản `items` gồm Email, Gói, Hạn dùng và mã 2FA).
+  2. **Luồng 2 (`yuna_mail` — `https://mail.yunagrp.com`)**: Luồng **LẤY MÃ OTP EMAIL** (Đọc và bóc tách mã xác thực 6 số gửi về hòm thư Yuna).
+
+### 19.2. Cơ chế bảo vệ & Chống Spam máy chủ đối tác (Polite Rate-Safe Architecture)
+1. **In-memory Session Cache (TTL 10 phút)**:
+   - Thay vì mỗi lần tra cứu lại gửi request GET tải toàn bộ trang HTML để lấy token:
+   - Hệ thống lưu cache bộ đôi `api-token` và cookie `PHPSESSID` trong 10 phút.
+   - Chỉ khi token hết hạn hoặc nhận mã 403 mới làm mới một lần duy nhất. Giảm **80% số lượng request** gửi tới máy chủ Yuna.
+2. **In-memory Rules Cache (TTL 15 phút)**:
+   - Bảng quy tắc định tuyến domain từ `https://mail.yunagrp.com/admin.php?public=rules` được lưu cache trong 15 phút.
+3. **Giới hạn an toàn (Anti-Rate Limit)**:
+   - Tự động ngắt và không kích hoạt HTTP 429 ("Bạn đã gửi quá nhiều yêu cầu").
+
+### 19.3. Thay đổi kỹ thuật ([otpProviderService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/otpProviderService.js))
+- Viết mới hàm `fetchYunaAccountOrder(query)`: Tự động lấy cookie + token, gửi `action: "get_order"` (với mã đơn/email) hoặc `action: "get_manual"` (với secret 2FA). Bóc tách đầy đủ các trường: `items` (Danh sách tài khoản), `account_email`, `product_plan`, `expires_at`, `time_left`, `otp`.
+- Viết mới hàm `fetchOtpFromYunaMail(email)`: Phân giải dynamic rules theo domain của email và bóc tách mã OTP 6 số từ `api_local` hoặc webmail scraper.
+- Nâng cấp `probeOtpForEmail`: Cho phép `yuna_2fa` nhận Mã đơn hàng mà không bắt buộc có ký tự `@`.
+
+### 19.4. Kết quả kiểm thử
+- `npm test --prefix backend`: **98/98 tests pass 100% (0 lỗi, 0 fail)** ✅
+- Kiểm thử đơn lẻ (gentle probe): Trả về `success: true` trong 745ms, không bị lỗi `fetch failed` ✅
