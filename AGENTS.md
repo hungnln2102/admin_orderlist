@@ -170,8 +170,12 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 
 ---
 
-## 📋 Review Reports
+## 📋 Review Reports (Quy Tắc Báo Cáo Nghiệm Thu Duy Nhất Mỗi Ngày)
 
-- Mọi lần đánh giá, code review, hoặc nghiệm thu thay đổi phải được lưu thành một file Markdown trong `report/`.
-- Tên file dùng ngày theo múi giờ `Asia/Bangkok`: `YYYY-MM-DD-<chu-de>-review.md`.
-- Báo cáo phải nêu phạm vi, trạng thái nghiệm thu, phát hiện theo mức độ, kiểm tra đã chạy, và điều kiện cần xử lý trước khi nghiệm thu nếu có.
+- **Mỗi ngày chỉ 1 file duy nhất (Single Daily Report File)**: Mọi lần đánh giá, code review, hoặc nghiệm thu thay đổi trong ngày bắt buộc phải được lưu chung vào **DUY NHẤT 1 FILE** Markdown trong `report/`.
+- **Quy chuẩn đặt tên file**: Dùng ngày theo múi giờ `Asia/Bangkok`: `report/YYYY-MM-DD-daily-review.md`.
+- **Cơ chế ghi nhận (Append Workflow)**:
+  - Nếu trong ngày chưa có file báo cáo -> Tạo mới file `report/YYYY-MM-DD-daily-review.md`.
+  - Nếu trong ngày đã có file báo cáo -> Bắt buộc **ghi nối tiếp (append / update)** một đề mục mới (`## [Thời gian] <Tên nhiệm vụ>`) vào chính file đó.
+  - **TUYỆT ĐỐI NGHIÊM CẤM** tạo các file lẻ tẻ dạng `YYYY-MM-DD-<chu-de>-review.md` làm phình to và phân mảnh thư mục `report/`.
+- **Nội dung mỗi đề mục nhiệm vụ**: Nêu rõ phạm vi, trạng thái nghiệm thu, thay đổi kỹ thuật (file diff/clickable link), kiểm tra đã chạy, và điều kiện cần xử lý trước khi nghiệm thu nếu có.
