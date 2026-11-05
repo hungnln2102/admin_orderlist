@@ -246,15 +246,18 @@ export const WarehousePage: React.FC = () => {
 
   const handleOpenBrowserForUrl = (url: string, serviceName: string) => {
     const targetUrl = url.startsWith("http") ? url : `https://${url}`;
+    if (targetUrl && navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(targetUrl).catch(() => {});
+    }
     const browserWindow = window.open(
-      targetUrl,
-      "_blank",
-      "noopener,noreferrer"
+      "/browser/",
+      "MavrykCloudBrowser",
+      "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
     );
     if (browserWindow) browserWindow.focus();
     notification.info(
-      `Đang mở trang đăng nhập ${serviceName}: ${targetUrl}`,
-      "Mở Trình Duyệt"
+      `Đang mở Trình duyệt Đám Mây cho ${serviceName}. Link (${targetUrl}) đã được sao chép vào bộ nhớ tạm để dán trong cửa sổ stream.`,
+      "Trình Duyệt Đám Mây"
     );
   };
 
@@ -292,30 +295,31 @@ export const WarehousePage: React.FC = () => {
       const rawUrl = (service.login_url || "").trim() ||
         (catalog.find((c) => c.name === service.display_name || c.name === service.category)?.loginUrl || "").trim();
 
-      if (rawUrl) {
-        const targetUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
-          ? rawUrl
-          : `https://${rawUrl}`;
+      const targetUrl = rawUrl
+        ? (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") ? rawUrl : `https://${rawUrl}`)
+        : "";
 
-        const browserWindow = window.open(
-          targetUrl,
-          "_blank",
-          "noopener,noreferrer"
-        );
-        if (browserWindow) {
-          browserWindow.focus();
-        }
-
-        notification.info(
-          `Đang mở trang đăng nhập ${service.display_name || service.category}: ${targetUrl}`,
-          "Mở Trình Duyệt"
-        );
-      } else {
-        notification.warning(
-          `Dịch vụ "${service.display_name || service.category}" chưa có link đăng nhập. Master vui lòng cấu hình link trong tab Danh Mục!`,
-          "Chưa Có Link Đăng Nhập"
-        );
+      // Tự động sao chép link đăng nhập vào bộ nhớ tạm để Master tiện dán trong cửa sổ stream nếu cần
+      if (targetUrl && navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(targetUrl).catch(() => {});
       }
+
+      // Mở cửa sổ popup Trình duyệt Đám Mây Streaming trên VPS (KasmVNC Chromium)
+      const browserWindow = window.open(
+        "/browser/",
+        "MavrykCloudBrowser",
+        "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+      );
+      if (browserWindow) {
+        browserWindow.focus();
+      }
+
+      notification.info(
+        targetUrl
+          ? `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account} (${service.display_name || service.category}). Link đăng nhập (${targetUrl}) đã được chép vào bộ nhớ tạm. Hãy thao tác trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu vĩnh viễn trên VPS.`
+          : `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account}. Hãy thao tác đăng nhập trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu vĩnh viễn trên VPS.`,
+        "Trình Duyệt Đám Mây"
+      );
 
       // 2. Gửi request backend để xác minh hoặc lưu phiên
       const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {

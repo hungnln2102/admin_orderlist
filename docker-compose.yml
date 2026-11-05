@@ -142,6 +142,7 @@ services:
       - CUSTOM_USER=admin
       - PASSWORD=${CLOUD_BROWSER_PASSWORD:-mavryk_store_cloud_2026}
       - CHROME_CLI=--no-sandbox --disable-dev-shm-usage about:blank
+      - SUBFOLDER=/browser/
     volumes:
       - ./warehouse_profiles:/config
     ports:

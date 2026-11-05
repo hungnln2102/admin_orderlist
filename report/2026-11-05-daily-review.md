@@ -21,6 +21,7 @@
 8. [Nhiệm vụ 8: Đồng Bộ Giá Nhập NCC (Cost) Từ Catalog Cho Đơn Cần Gia Hạn & Quản Trị Công Nợ NCC](#8-nhiệm-vụ-8-đồng-bộ-giá-nhập-ncc-cost-từ-catalog-cho-đơn-cần-gia-hạn--quản-trị-công-nợ-ncc)
 9. [Nhiệm vụ 9: Tái Cấu Trúc Toàn Diện Đơn Gộp (Batch Payment) Qua EventBus & Cơ Chế Hoàn Tất Đơn Lỗi Chặt Chẽ](#9-nhiệm-vụ-9-tái-cấu-trúc-toàn-diện-đơn-gộp-batch-payment-qua-eventbus--cơ-chế-hoàn-tất-đơn-lỗi-chặt-chẽ)
 10. [Nhiệm vụ 10: Hợp Nhất 85 File Báo Cáo Lịch Sử Thành 7 File Báo Cáo Hàng Ngày Chuẩn Hóa Duy Nhất](#10-nhiệm-vụ-10-hợp-nhất-85-file-báo-cáo-lịch-sử-thành-7-file-báo-cáo-hàng-ngày-chuẩn-hóa-duy-nhất)
+11. [Nhiệm vụ 11: Khôi Phục Luồng Streaming Cloud Browser & Lưu Profile Vĩnh Viễn Trên VPS](#11-nhiệm-vụ-11-khôi-phục-luồng-streaming-cloud-browser--lưu-profile-vĩnh-viễn-trên-vps)
 
 ---
 
@@ -464,3 +465,49 @@
 3. **Nghiệm thu toàn diện**:
    - Backend test: 98/98 unit tests PASSED 100%.
    - Frontend build: compile thành công 100% trong 7.09s, 0 lỗi TypeScript.
+
+---
+
+## 11. NHIỆM VỤ 11: KHÔI PHỤC LUỒNG STREAMING CLOUD BROWSER & LƯU PROFILE VĨNH VIỄN TRÊN VPS
+
+### 11.1. Bối cảnh & Câu hỏi của Master
+> *"tôi nhớ là cái phần login ở kho hàng nó là streaming mà sao giờ nó bật tab browser của tôi lên. Như vậy thì làm sao mà lưu được profile nhỉ"*  
+> *"xử lý cho tôi"*
+
+### 11.2. Nguyên nhân gốc rễ (Root Cause)
+1. **Lệch chuẩn kiến trúc từ commit `8a9c5fd4` (01/11/2026):**
+   - Khi xử lý bỏ link hardcode Adobe để hỗ trợ các dịch vụ linh hoạt (Canva, Spotify, Netflix...), file `frontend/src/pages/WarehousePage.tsx` đã thay đổi hàm `handleOpenBrowser` từ `window.open("/browser/", ...)` sang `window.open(targetUrl, "_blank")`.
+   - Điều này khiến trình duyệt client (máy tính cá nhân của Master) tự động bật một tab mới toanh trỏ thẳng ra website dịch vụ bên ngoài.
+2. **Không thể lưu Profile khi mở tab cá nhân:**
+   - Theo chính sách Same-Origin Policy và CORS của trình duyệt, toàn bộ cookie, phiên đăng nhập và local storage nằm tại máy tính cá nhân của Master, máy chủ VPS và Backend **hoàn toàn không thể đọc hay lưu được profile** này.
+   - Container `admin_orderlist-cloud-browser` (KasmVNC Chromium cổng 3088 được mount volume lưu profile `./warehouse_profiles`) bị bỏ quên và cô lập hoàn toàn.
+
+### 11.3. Giải pháp kỹ thuật đã triển khai (100% Khôi Phục Streaming)
+1. **Frontend (`frontend/src/pages/WarehousePage.tsx`):**
+   - Đã chấm dứt hoàn toàn việc gọi `window.open(targetUrl, "_blank")` ở client.
+   - Khôi phục mở cửa sổ popup Streaming Trình duyệt Đám Mây:
+     ```typescript
+     const browserWindow = window.open(
+       "/browser/",
+       "MavrykCloudBrowser",
+       "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+     );
+     ```
+   - Tự động sao chép `targetUrl` vào clipboard (`navigator.clipboard.writeText`) kèm thông báo trực quan, giúp Master dán ngay vào thanh địa chỉ của Cloud Browser nếu cần.
+   - Đồng bộ tương tự cho hàm `handleOpenBrowserForUrl` trong tab Danh mục Kho.
+2. **Cấu hình Docker Compose (`docker-compose.yml`):**
+   - Thêm biến môi trường `SUBFOLDER=/browser/` vào container `admin_orderlist-cloud-browser` (`lscr.io/linuxserver/chromium:latest`).
+   - Đảm bảo KasmVNC Chromium định tuyến nội bộ chính xác toàn bộ WebSocket (`/browser/websockify`) và static assets (`/browser/assets`).
+   - Duy trì volume persistent `./warehouse_profiles:/config` để toàn bộ cookie, session và indexedDB được lưu vĩnh viễn trên VPS.
+3. **Cấu hình Reverse Proxy Nginx (`nginx/conf.d/default.conf`):**
+   - Bổ sung định tuyến reverse proxy cho `/browser/` chuyển tiếp vào cổng `127.0.0.1:3088/browser/`.
+   - Bật chuyển tiếp WebSocket (`Upgrade $http_upgrade`, `Connection "upgrade"`).
+   - Cấu hình timeout 3600s và tắt buffer (`proxy_buffering off`) để đảm bảo streaming hình ảnh và thao tác chuột/phím mượt mà, không bị ngắt kết nối.
+
+### 11.4. Kết quả kiểm thử & Nghiệm thu
+- **Backend Tests:** Chạy `npm test --prefix backend` đạt **98/98 tests PASSED** (21/21 suites), thời gian chạy 3.63s.
+- **Frontend Build:** Chạy `npm run build --prefix frontend` (`tsc && vite build`) thành công **100% trong 7.25s, 0 lỗi TypeScript**.
+- **Tính toàn vẹn mã nguồn:** Chỉ tác động chính xác 3 file:
+  - [frontend/src/pages/WarehousePage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/WarehousePage.tsx)
+  - [docker-compose.yml](file:///d:/Desktop/admin/admin_orderlist/docker-compose.yml)
+  - [nginx/conf.d/default.conf](file:///d:/Desktop/admin/admin_orderlist/nginx/conf.d/default.conf)
