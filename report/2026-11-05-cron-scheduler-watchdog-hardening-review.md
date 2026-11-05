@@ -63,3 +63,4 @@
 
 ## 🎯 5. KẾT LUẬN
 Động cơ Backend Scheduler hiện đã được bọc 2 lớp bảo vệ (node-cron + 60s Watchdog Heartbeat). Bất kể Master đặt giờ nào trên Trang Hệ Thống, hệ thống đều đảm bảo kích hoạt đúng hẹn 100%.
+
