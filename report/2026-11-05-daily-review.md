@@ -16,6 +16,7 @@
 4. [Nhiệm vụ 4: Ban hành điều luật Single Daily Report File trong AGENTS.md](#4-nhiệm-vụ-4-ban-hành-điều-luật-single-daily-report-file)
 5. [Nhiệm vụ 5: Quy hoạch & Dọn dẹp cấu trúc thư mục docs/ và docs/plans/](#5-nhiệm-vụ-5-quy-hoạch--dọn-dẹp-cấu-trúc-thư-mục-docs-và-docsplans)
 6. [Nhiệm vụ 6: Cấu hình Logic Xóa Sản Phẩm Chống Mồ Côi Đơn Hàng & Tự Động Xóa Kèm Đơn Hết Hạn/Đã Hoàn](#6-nhiệm-vụ-6-cấu-hình-logic-xóa-sản-phẩm-chống-mồ-côi-đơn-hàng--tự-động-xóa-kèm-đơn-hết-hạnđã-hoàn)
+7. [Nhiệm vụ 7: Chuẩn Hóa Helper Phân Trang TablePagination & Thuật Toán Phân Đoạn Số Trang Thông Minh](#7-nhiệm-vụ-7-chuẩn-hóa-helper-phân-trang-tablepagination--thuật-toán-phân-đoạn-số-trang-thông-minh)
 7. [Nhiệm vụ 7: Sửa Lỗi Nghiệp Vụ Đối Soát Webhook Đơn Cần Gia Hạn Theo Giá Catalog Mới & Gia Hạn Đơn MAVLUQXW](#7-nhiệm-vụ-7-sửa-lỗi-nghiệp-vụ-đối-soát-webhook-đơn-cần-gia-hạn-theo-giá-catalog-mới--gia-hạn-đơn-mavluqxw)
 8. [Nhiệm vụ 8: Đồng Bộ Giá Nhập NCC (Cost) Từ Catalog Cho Đơn Cần Gia Hạn & Quản Trị Công Nợ NCC](#8-nhiệm-vụ-8-đồng-bộ-giá-nhập-ncc-cost-từ-catalog-cho-đơn-cần-gia-hạn--quản-trị-công-nợ-ncc)
 9. [Nhiệm vụ 9: Tái Cấu Trúc Toàn Diện Đơn Gộp (Batch Payment) Qua EventBus & Cơ Chế Hoàn Tất Đơn Lỗi Chặt Chẽ](#9-nhiệm-vụ-9-tái-cấu-trúc-toàn-diện-đơn-gộp-batch-payment-qua-eventbus--cơ-chế-hoàn-tất-đơn-lỗi-chặt-chẽ)
@@ -394,3 +395,56 @@
 - Toàn bộ cấu trúc tuân thủ 100% điều luật Single Daily Report File trong hiến pháp [AGENTS.md](file:///d:/Desktop/admin/admin_orderlist/AGENTS.md).
 - Backend unit tests: **92/92 tests PASSED**.
 - Frontend build: **PASSED 100%**.
+
+
+---
+
+## 7. NHIỆM VỤ 7: CHUẨN HÓA HELPER PHÂN TRANG TABLEPAGINATION & THUẬT TOÁN PHÂN ĐOẠN SỐ TRANG THÔNG MINH
+
+### 7.1. Bối cảnh & Yêu cầu của Master
+> *"check cho tôi hiện tại có bao nhiêu page đang sử dụng phân trang.*  
+> *thì thực hiện tạo 1 helper phân trang mới như sau:*  
+> *Góc bên trái:*  
+> *- sẽ là hiển thị (rồi tới ô dropdown số lượng) dòng*  
+> *- bên phải sẽ là các button số trang nhưng phân loại theo: 1, 2, 3,...,N-2, N-1, N.*  
+> *- Khi bấm trang 7 rồi thì sẽ hiển thị là: 1,2,...,6,7,8....,N-2, N-1, N.*  
+> *Hiểu đại khái ý của tôi chưa"*
+
+### 7.2. Kết quả khảo sát 9 màn hình đang sử dụng phân trang
+1. 🏷️ [PricingPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/PricingPage.tsx) — Bảng Giá Sản Phẩm (trang mẫu Master chụp ảnh).
+2. 📦 [OrderTable.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/orders/components/OrderTable.tsx) — Danh Sách Đơn Hàng.
+3. 🧾 [ReceiptsPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/ReceiptsPage.tsx) — Quản Lý Hóa Đơn & Thu Chi.
+4. 🏢 [WarehouseAccountsTable.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/warehouse/components/WarehouseAccountsTable.tsx) — Kho Tài Khoản & Slot.
+5. 📋 [SystemLogsPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/SystemLogsPage.tsx) — Nhật Ký Thao Tác Hệ Thống.
+6. 💳 [CreditPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/CreditPage.tsx) — Quản Trị Tín Dụng & Thấu Chi.
+7. 📥 [ExternalImportsPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/ExternalImportsPage.tsx) — Đơn Nhập Hàng Ngoại Bộ.
+8. 🤝 [SupplierOverviewTable.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/suppliers/components/SupplierOverviewTable.tsx) — Chi Phí Nhà Cung Cấp.
+9. 🌐 [TrafficPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/traffic/TrafficPage.tsx) — Thống Kê Lưu Lượng Khách Hàng.
+
+### 7.3. Giải pháp kỹ thuật đã triển khai (DRY & Reuse First)
+1. **Thuật toán sinh dải trang thông minh ([paginationUtils.ts](file:///d:/Desktop/admin/admin_orderlist/frontend/src/shared/utils/paginationUtils.ts)):**
+   - Hàm `getPaginationRange(currentPage, totalPages)`:
+     + **Trang đầu**: Luôn giữ mốc cố định `1, 2` (hoặc mở rộng `1, 2, 3, 4` khi đang ở đầu trang).
+     + **Trang giữa**: Tự động mở rộng vùng lân cận quanh trang đang chọn: `P-1, P, P+1`.
+     + **Trang cuối**: Luôn giữ mốc cố định `N-2, N-1, N`.
+     + **Khử khoảng trống (Smoothing Interpolation)**: Nếu khoảng cách giữa 2 cụm chỉ bằng 1 số (ví dụ 2 và 4), thuật toán tự điền số 3 thay vì hiển thị dấu `...` kỳ dị.
+     + **Trang nhỏ**: Khi tổng số trang $N \le 8$, tự động hiển thị đầy đủ không cần dấu `...`.
+2. **Component Phân Trang Dùng Chung ([TablePagination.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/shared/components/TablePagination.tsx)):**
+   - **Góc bên trái**:
+     + Ô Dropdown chọn số lượng dòng linh hoạt: `[ 10, 15, 20, 50, 100 ]` dòng / trang.
+     + Thông số chi tiết: `(Trang {currentPage} / {totalPages} · Tổng {totalItems} {itemName})`.
+     + Khi đổi số dòng: tự động kích hoạt callback `onPageSizeChange(newSize)` và reset về trang 1 an toàn.
+   - **Góc bên phải**:
+     + Nút `< Trước` (Disabled khi ở trang 1).
+     + Dãy số trang thông minh phân loại chuẩn Master (ví dụ $P=7, N=16 \implies [1, 2, '...', 6, 7, 8, '...', 14, 15, 16]$).
+     + Nút trang hiện tại highlight màu Cyan rực rỡ với hiệu ứng đổ bóng.
+     + Nút `Sau >` (Disabled khi ở trang cuối cùng).
+3. **Áp dụng thực tế ngay tại [PricingPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/PricingPage.tsx):**
+   - Thay thế toàn bộ 50 dòng code phân trang thủ công cũ bằng `<TablePagination ... />`.
+   - Kết nối state `pageSize` vào URL query và fetch API backend `limit=${pageSize}`.
+4. **Bộ Unit Test Thuật Toán ([paginationUtils.test.js](file:///d:/Desktop/admin/admin_orderlist/backend/tests/unit/paginationUtils.test.js)):**
+   - Kiểm thử 6/6 test cases toán học độc lập, xác nhận chính xác 100% ví dụ của Master.
+
+### 7.4. Kết quả kiểm thử & Nghiệm thu
+- **Backend Unit Test:** `npm --prefix backend run test` đạt **98/98 tests PASSED** (21/21 test suites).
+- **Frontend TypeScript Build:** `npm --prefix frontend run build` hoàn thành trong 7.94s, **0 lỗi TypeScript**.

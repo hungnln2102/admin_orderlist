@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { TablePagination } from "@/shared/components/TablePagination";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
 import {
@@ -25,6 +25,7 @@ export const PricingPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const { page, setPage, resetPage } = useUrlPagination(totalPages);
   const [totalItems, setTotalItems] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(15);
   const [activeTab, setActiveTab] = useState<PricingStatusTab>("all");
   const [counts, setCounts] = useState<PricingCounts>({ total: 0, active: 0, inactive: 0 });
 
@@ -72,7 +73,7 @@ export const PricingPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/products/prices?page=${page}&limit=15&search=${encodeURIComponent(search)}&status=${activeTab}`
+        `/api/products/prices?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&status=${activeTab}`
       );
       const data = await res.json();
       if (res.ok) {
@@ -90,10 +91,15 @@ export const PricingPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab]);
+  }, [page, pageSize, search, activeTab]);
 
   const handleTabChange = (tab: PricingStatusTab) => {
     setActiveTab(tab);
+    resetPage();
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
     resetPage();
   };
 
@@ -419,60 +425,18 @@ export const PricingPage: React.FC = () => {
           togglingId={togglingId}
         />
 
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800/60 text-xs text-slate-400">
-            <div>
-              Trang <strong className="text-slate-200">{page}</strong> / {totalPages} (Tổng {totalItems} sản phẩm)
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1 || loading}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Trước</span>
-              </button>
-
-              <div className="flex items-center gap-1 px-2">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pNum = page;
-                  if (page <= 3) {
-                    pNum = i + 1;
-                  } else if (page >= totalPages - 2) {
-                    pNum = totalPages - 4 + i;
-                  } else {
-                    pNum = page - 2 + i;
-                  }
-                  if (pNum < 1 || pNum > totalPages) return null;
-                  return (
-                    <button
-                      key={pNum}
-                      onClick={() => setPage(pNum)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
-                        pNum === page
-                          ? "bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/20"
-                          : "bg-slate-900/60 border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800"
-                      }`}
-                    >
-                      {pNum}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages || loading}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              >
-                <span>Sau</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+        {/* Pagination Footer Chuẩn Master */}
+        {totalPages > 0 && totalItems > 0 && (
+          <TablePagination
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+            totalItems={totalItems}
+            itemName="sản phẩm"
+            disabled={loading}
+          />
         )}
       </div>
 
