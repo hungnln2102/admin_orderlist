@@ -14,6 +14,7 @@
 2. [Nhiệm vụ 2: Khắc phục lỗi Scheduler Cron 7h sáng & Tích hợp 60s Watchdog Heartbeat](#2-nhiệm-vụ-2-khắc-phục-lỗi-scheduler-cron-7h-sáng--tích-hợp-watchdog-heartbeat)
 3. [Nhiệm vụ 3: Dọn dẹp rác/cache VPS (~22 GB) & Cài đặt Cron hàng ngày 23h30](#3-nhiệm-vụ-3-dọn-dẹp-ráccache-vps--cài-đặt-cron-23h30)
 4. [Nhiệm vụ 4: Ban hành điều luật Single Daily Report File trong AGENTS.md](#4-nhiệm-vụ-4-ban-hành-điều-luật-single-daily-report-file)
+5. [Nhiệm vụ 5: Quy hoạch & Dọn dẹp cấu trúc thư mục docs/ và docs/plans/](#5-nhiệm-vụ-5-quy-hoạch--dọn-dẹp-cấu-trúc-thư-mục-docs-và-docsplans)
 
 ---
 
@@ -112,3 +113,36 @@
   - Nếu đã có file: Bắt buộc ghi nối tiếp (append/update) đề mục mới (`## [Thời gian] <Tên nhiệm vụ>`) vào chính file đó.
   - **Tuyệt đối nghiêm cấm** tạo file lẻ tẻ dạng `YYYY-MM-DD-<chu-de>-review.md`.
 - **Thực thi ngay lập tức:** Toàn bộ 3 báo cáo lẻ của ngày 05/11/2026 đã được hợp nhất thành tài liệu chuẩn duy nhất này và dọn dẹp các file con.
+
+---
+
+## 5. NHIỆM VỤ 5: QUY HOẠCH & DỌN DẸP CẤU TRÚC THƯ MỤC DOCS/ VÀ DOCS/PLANS/
+
+### 5.1. Bối cảnh & Yêu cầu của Master
+- Master chụp ảnh cây thư mục `docs/plans` và `docs/` đang bị tồn đọng nhiều file plan cũ nằm rải rác ngoài thư mục gốc và yêu cầu: *"xem dọn dẹp cho tôi cái này luôn đi"*.
+
+### 5.2. Giải pháp thực hiện
+1. **Di chuyển 8 file kế hoạch đã hoàn thành vào [docs/plans/archived/](file:///d:/Desktop/admin/admin_orderlist/docs/plans/archived/):**
+   - `2026-08-07_test_specification.md`
+   - `2026-10-21_v2_runtime_configuration_hardcode_remediation_plan.md`
+   - `2026-10-21_v2_traffic_analytics_upgrade_plan.md`
+   - `2026-10-30_web_to_mobile_app_conversion_plan.md`
+   - `2026-10-31_10m_orders_1m_products_scaling_strategy.md`
+   - `2026-11-01_remote_browser_profile_vault_plan.md`
+   - `2026-11-03_vpbank-credit-and-overdraft-ledger-system-scope.md`
+   - `2026-11-03_vpbank-credit-card-and-overdraft-interest-ledger-design.md`
+2. **Cập nhật mục lục lưu trữ:**
+   - [docs/plans/archived/README.md](file:///d:/Desktop/admin/admin_orderlist/docs/plans/archived/README.md) đã bổ sung danh mục Đợt 2 (16 plans tổng cộng).
+3. **Thư mục `docs/plans/` hiện tại:**
+   - Chỉ giữ lại đúng thư mục `archived/` và duy nhất 1 file plan đang active: [2026-11-04_vpbank_imap_email_reconciliation_pipeline_plan.md](file:///d:/Desktop/admin/admin_orderlist/docs/plans/2026-11-04_vpbank_imap_email_reconciliation_pipeline_plan.md).
+4. **Quy hoạch tài liệu kiến trúc V2 cũ:**
+   - Tạo thư mục [docs/architecture/legacy/](file:///d:/Desktop/admin/admin_orderlist/docs/architecture/legacy/) và di chuyển 3 file kiến trúc V2 cũ vào đây:
+     + `V2_ARCHITECTURE.md`
+     + `V2_DATABASE_SCHEMA.md`
+     + `v2-architecture-and-account-matching.md`
+   - Thư mục gốc `docs/` trở nên sạch đẹp, chỉ gồm `architecture/`, `operations/`, `plans/` và [docs/KNOWLEDGE_BASE.md](file:///d:/Desktop/admin/admin_orderlist/docs/KNOWLEDGE_BASE.md).
+
+### 5.3. Kết quả nghiệm thu
+- Toàn bộ thao tác di chuyển thực hiện bằng `git mv` bảo toàn 100% lịch sử commit.
+- Bộ kiểm thử `npm --prefix backend run test` đạt **82/82 tests PASSED**.
+- Cây thư mục VSCode của Master hoàn toàn tinh gọn, ngăn nắp và chuyên nghiệp.
