@@ -448,3 +448,19 @@
 ### 7.4. Kết quả kiểm thử & Nghiệm thu
 - **Backend Unit Test:** `npm --prefix backend run test` đạt **98/98 tests PASSED** (21/21 test suites).
 - **Frontend TypeScript Build:** `npm --prefix frontend run build` hoàn thành trong 7.94s, **0 lỗi TypeScript**.
+
+
+### 7.5. Nâng cấp bổ sung theo chỉ đạo trực tiếp của Master (Lượt 2)
+1. **Loại bỏ phần text rườm rà**: Đã xóa hoàn toàn đoạn text `(Trang X / Y · Tổng Z...)` ở góc bên trái theo đúng khoanh vùng trong ảnh của Master. Góc trái hiện tại chỉ hiển thị duy nhất: `Hiển thị [ 15 ▼ ] dòng`.
+2. **Triển khai đồng bộ cho toàn bộ 9 màn hình dữ liệu**:
+   - 📦 **Quản lý Đơn Hàng** (`/orders`): Đã thay thế thanh phân trang cũ trong `OrderTable.tsx`, kết nối `pageSize` vào hook `useOrders.ts`.
+   - 🧾 **Hóa Đơn & Thu Chi** (`/receipts`): Đã thay thế trong `ReceiptsPage.tsx`.
+   - 🏢 **Kho Tài Khoản & Slot** (`/warehouse`): Đã thay thế trong `WarehouseAccountsTable.tsx`.
+   - 📋 **Nhật Ký Hệ Thống** (`/system-logs`): Đã thay thế trong `SystemLogsPage.tsx`.
+   - 💳 **Tín Dụng & Thấu Chi** (`/credit`): Đã thay thế trong `CreditPage.tsx`.
+   - 📥 **Đơn Nhập Hàng Ngoại Bộ** (`/external-imports`): Đã thay thế trong `ExternalImportsPage.tsx`.
+   - 🤝 **Chi Phí Nhà Cung Cấp** (`/suppliers`): Đã thay thế trong `SupplierOverviewTable.tsx`.
+   - 🌐 **Lưu Lượng Khách Hàng** (`/traffic`): Đã thay thế trong `TrafficPage.tsx`.
+3. **Nghiệm thu toàn diện**:
+   - Backend test: 98/98 unit tests PASSED 100%.
+   - Frontend build: compile thành công 100% trong 7.09s, 0 lỗi TypeScript.

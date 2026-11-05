@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
+import { TablePagination } from "@/shared/components/TablePagination";
 import { StatCard } from "@/shared/components/StatCard";
 import {
   Eye,
@@ -124,7 +125,7 @@ export const TrafficPage: React.FC = () => {
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // Hover index trên biểu đồ SVG
   const [hoveredChartIdx, setHoveredChartIdx] = useState<number | null>(null);
@@ -1037,42 +1038,18 @@ export const TrafficPage: React.FC = () => {
 
         {/* Thanh Phân Trang (Pagination) */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-800 pt-4 text-xs">
-            <span className="text-slate-400">
-              Hiển thị <span className="text-white font-mono font-bold">{(currentPage - 1) * pageSize + 1}</span> -{" "}
-              <span className="text-white font-mono font-bold">{Math.min(currentPage * pageSize, processedTableData.length)}</span> trên tổng số{" "}
-              <span className="text-white font-mono font-bold">{processedTableData.length}</span> bản ghi
-            </span>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:hover:text-slate-300 transition-all font-semibold"
-              >
-                Trước
-              </button>
-
-              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pg) => (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-7 h-7 rounded-lg font-mono text-xs font-bold transition-all ${
-                    currentPage === pg ? "bg-sky-500 text-white shadow-md shadow-sky-500/20" : "bg-slate-900 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:hover:text-slate-300 transition-all font-semibold"
-              >
-                Sau
-              </button>
-            </div>
+          <div className="pt-2">
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              className="pt-4 border-t border-slate-800"
+            />
           </div>
         )}
       </GlassCard>

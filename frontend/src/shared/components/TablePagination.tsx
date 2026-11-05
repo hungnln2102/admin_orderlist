@@ -9,8 +9,6 @@ export interface TablePaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   pageSizeOptions?: number[];
-  totalItems?: number;
-  itemName?: string;
   disabled?: boolean;
   className?: string;
 }
@@ -22,8 +20,6 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 15, 20, 50, 100],
-  totalItems,
-  itemName = "mục",
   disabled = false,
   className = "",
 }) => {
@@ -35,8 +31,8 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
     <div
       className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800/60 text-xs text-slate-400 select-none ${className}`}
     >
-      {/* Góc Bên Trái: Dropdown số lượng dòng & Thống kê tổng */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Góc Bên Trái: Dropdown số lượng dòng tinh gọn theo chỉ đạo của Master */}
+      <div className="flex items-center gap-2">
         <span className="text-slate-400">Hiển thị</span>
         {onPageSizeChange ? (
           <select
@@ -59,18 +55,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
             {pageSize}
           </span>
         )}
-        <span className="text-slate-400">dòng / trang</span>
-
-        {/* Thông tin số trang và tổng số bản ghi */}
-        <span className="text-slate-500 pl-1">
-          (Trang <strong className="text-slate-200 font-bold">{safeCurrentPage}</strong> / {safeTotalPages}
-          {totalItems !== undefined && (
-            <>
-              {" "}· Tổng <strong className="text-cyan-400 font-bold">{totalItems.toLocaleString("vi-VN")}</strong> {itemName}
-            </>
-          )}
-          )
-        </span>
+        <span className="text-slate-400">dòng</span>
       </div>
 
       {/* Góc Bên Phải: Nút phân trang thông minh chuẩn Master */}
@@ -80,7 +65,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
           type="button"
           onClick={() => onPageChange(safeCurrentPage - 1)}
           disabled={safeCurrentPage <= 1 || disabled}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 cursor-pointer"
           title="Trang trước"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -103,7 +88,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
                 type="button"
                 onClick={() => onPageChange(p)}
                 disabled={disabled}
-                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer ${
                   p === safeCurrentPage
                     ? "bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/20"
                     : "bg-slate-900/60 border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800"
@@ -121,7 +106,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
           type="button"
           onClick={() => onPageChange(safeCurrentPage + 1)}
           disabled={safeCurrentPage >= safeTotalPages || disabled}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 cursor-pointer"
           title="Trang sau"
         >
           <span>Sau</span>
@@ -131,4 +116,3 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
     </div>
   );
 };
-

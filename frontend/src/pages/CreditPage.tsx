@@ -1,3 +1,4 @@
+import { TablePagination } from "@/shared/components/TablePagination";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
@@ -169,28 +170,16 @@ export const CreditPage: React.FC = () => {
     currentPage: number,
     setPage: (p: number) => void,
   ) => {
-    if (!pagination || pagination.total_pages <= 1) return null;
+    if (!pagination || pagination.total_pages <= 0) return null;
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.06]">
-        <span className="text-xs text-zinc-500">
-          Trang {currentPage} / {pagination.total_pages} · {pagination.total} kết quả
-        </span>
-        <div className="flex gap-1">
-          <button
-            onClick={() => setPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage <= 1}
-            className="p-1 rounded hover:bg-white/10 disabled:opacity-30 transition-colors"
-          >
-            <ChevronLeft size={16} className="text-zinc-400" />
-          </button>
-          <button
-            onClick={() => setPage(Math.min(pagination.total_pages, currentPage + 1))}
-            disabled={currentPage >= pagination.total_pages}
-            className="p-1 rounded hover:bg-white/10 disabled:opacity-30 transition-colors"
-          >
-            <ChevronRight size={16} className="text-zinc-400" />
-          </button>
-        </div>
+      <div className="px-4 py-2 border-t border-white/[0.06]">
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={pagination.total_pages}
+          pageSize={10}
+          onPageChange={setPage}
+          className="pt-0 border-t-0"
+        />
       </div>
     );
   };

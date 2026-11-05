@@ -33,6 +33,7 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
   const [endDate, setEndDate] = useState<string>("");
   const [totalPages, setTotalPages] = useState<number>(1);
   const { page, setPage } = useUrlPagination(totalPages);
+  const [pageSize, setPageSize] = useState<number>(15);
   const [totalOrders, setTotalOrders] = useState<number>(0);
   const [tabCounts, setTabCounts] = useState({ active: 0, import: 0, expired: 0, canceled: 0 });
   const [serverSummary, setServerSummary] = useState<OrdersSummary | null>(null);
@@ -53,6 +54,11 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     setPage(1);
   }, [setPage]);
 
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setPage(1);
+  }, [setPage]);
+
   const fetchOrders = useCallback(async () => {
     const requestSequence = ++requestSequenceRef.current;
     setLoading(true);
@@ -60,7 +66,7 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: "15",
+        limit: String(pageSize),
         search: searchValue,
         status: statusFilterValue,
         tab: activeTabValue,
@@ -87,7 +93,7 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     } finally {
       if (requestSequence === requestSequenceRef.current) setLoading(false);
     }
-  }, [activeTabValue, page, searchValue, statusFilterValue]);
+  }, [activeTabValue, page, pageSize, searchValue, statusFilterValue]);
 
   useEffect(() => {
     void fetchOrders();
@@ -147,6 +153,8 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     setPage,
     totalPages,
     totalOrders,
+    pageSize,
+    setPageSize: handlePageSizeChange,
     tabCounts,
     summaryData,
     fetchOrders,

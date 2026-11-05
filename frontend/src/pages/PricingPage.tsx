@@ -433,8 +433,6 @@ export const PricingPage: React.FC = () => {
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={handlePageSizeChange}
-            totalItems={totalItems}
-            itemName="sản phẩm"
             disabled={loading}
           />
         )}

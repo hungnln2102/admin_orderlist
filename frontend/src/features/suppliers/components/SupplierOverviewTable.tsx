@@ -1,3 +1,4 @@
+import { TablePagination } from "@/shared/components/TablePagination";
 import React from "react";
 import {
   ChevronDown,
@@ -384,44 +385,19 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
 
                                   {/* Pagination Controls Footer for Expanded Log Table */}
                                   {totalPages > 1 && (
-                                    <div className="flex items-center justify-between px-2 pt-2 text-[11px] text-slate-400">
-                                      <div>
-                                        Hiển thị <strong>{startIndex + 1} - {Math.min(startIndex + pageSize, totalLogs)}</strong> trên {totalLogs} đơn
-                                      </div>
-
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={() =>
-                                            setSupplierPageMap((prev) => ({
-                                              ...prev,
-                                              [s.id]: Math.max(1, currentPage - 1),
-                                            }))
-                                          }
-                                          disabled={currentPage <= 1}
-                                          className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold"
-                                        >
-                                          <ChevronLeft className="w-3.5 h-3.5" />
-                                          <span>Trước</span>
-                                        </button>
-
-                                        <span className="text-slate-300 font-bold px-1">
-                                          {currentPage} / {totalPages}
-                                        </span>
-
-                                        <button
-                                          onClick={() =>
-                                            setSupplierPageMap((prev) => ({
-                                              ...prev,
-                                              [s.id]: Math.min(totalPages, currentPage + 1),
-                                            }))
-                                          }
-                                          disabled={currentPage >= totalPages}
-                                          className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold"
-                                        >
-                                          <span>Sau</span>
-                                          <ChevronRight className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
+                                    <div className="pt-2">
+                                      <TablePagination
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        pageSize={pageSize}
+                                        onPageChange={(p: number) =>
+                                          setSupplierPageMap((prev) => ({
+                                            ...prev,
+                                            [s.id]: p,
+                                          }))
+                                        }
+                                        className="pt-2 border-t-0"
+                                      />
                                     </div>
                                   )}
                                 </div>

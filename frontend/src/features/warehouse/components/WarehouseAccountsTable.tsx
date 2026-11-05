@@ -1,3 +1,4 @@
+import { TablePagination } from "@/shared/components/TablePagination";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Copy,
@@ -1158,93 +1159,17 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
 
       {/* 3. PAGINATION CONTROLS */}
       {accounts.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 pb-2 px-3 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-md">
-          {/* Items info & Page size selector */}
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <span>
-              Hiển thị{" "}
-              <strong className="text-white font-semibold">
-                {accounts.length === 0 ? 0 : startIndex + 1} - {endIndex}
-              </strong>{" "}
-              trong tổng số{" "}
-              <strong className="text-indigo-300 font-semibold">{accounts.length}</strong>{" "}
-              tài khoản
-            </span>
-
-            <div className="flex items-center gap-1.5 ml-2 border-l border-white/10 pl-3">
-              <span className="text-[11px] text-slate-400">Mỗi trang:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="bg-slate-900 border border-slate-700/80 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500 cursor-pointer"
-              >
-                <option value={10}>10 dòng</option>
-                <option value={20}>20 dòng</option>
-                <option value={50}>50 dòng</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Page buttons */}
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-white/5 bg-slate-900/90 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
-                title="Trang trước"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Trước</span>
-              </button>
-
-              <div className="flex items-center gap-1">
-                {getPageNumbers().map((pageNum, idx) => {
-                  if (pageNum === "...") {
-                    return (
-                      <span
-                        key={`ellipsis_${idx}`}
-                        className="px-2 text-slate-500 text-xs select-none"
-                      >
-                        ...
-                      </span>
-                    );
-                  }
-                  const num = pageNum as number;
-                  const isActive = num === currentPage;
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setCurrentPage(num)}
-                      className={`min-w-[32px] h-8 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                        isActive
-                          ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/30 scale-105"
-                          : "bg-slate-900/90 text-slate-400 hover:text-white hover:bg-slate-800 border-white/5"
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-white/5 bg-slate-900/90 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
-                title="Trang tiếp"
-              >
-                <span className="hidden sm:inline">Tiếp</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+        <div className="pt-2">
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize: number) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       )}
     </div>

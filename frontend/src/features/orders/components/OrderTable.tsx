@@ -1,3 +1,4 @@
+import { TablePagination } from "@/shared/components/TablePagination";
 import React, { useState } from "react";
 import {
   Eye,
@@ -34,6 +35,7 @@ interface OrderTableProps {
   totalPages: number;
   totalOrders: number;
   onPageChange: (newPage: number) => void;
+  onPageSizeChange?: (newPageSize: number) => void;
   onOpenView: (order: Order) => void;
   onOpenEdit: (order: Order) => void;
   onOpenDelete: (order: Order) => void;
@@ -54,6 +56,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
   totalPages,
   totalOrders,
   onPageChange,
+  onPageSizeChange,
   onOpenView,
   onOpenEdit,
   onOpenDelete,
@@ -600,34 +603,17 @@ export const OrderTable: React.FC<OrderTableProps> = ({
         )}
       </div>
 
-      {/* Pagination Footer */}
-      <div className="p-4 bg-slate-900/90 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-        <div>
-          Hiển thị <span className="font-bold text-white">{orders.length}</span> trên tổng số{" "}
-          <span className="font-bold text-white">{totalOrders}</span> đơn hàng
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            className="p-2 bg-slate-800 border border-slate-700/80 rounded-xl text-slate-300 hover:text-white hover:border-cyan-500/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          <span className="px-3 py-1 bg-slate-800/80 border border-slate-700/50 rounded-xl font-bold text-cyan-300">
-            Trang {page} / {totalPages || 1}
-          </span>
-
-          <button
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            className="p-2 bg-slate-800 border border-slate-700/80 rounded-xl text-slate-300 hover:text-white hover:border-cyan-500/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Pagination Footer Chuẩn Master */}
+      <div className="p-4 bg-slate-900/90 border-t border-slate-800">
+        <TablePagination
+          currentPage={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          disabled={loading}
+          className="pt-0 border-t-0"
+        />
       </div>
     </div>
   );

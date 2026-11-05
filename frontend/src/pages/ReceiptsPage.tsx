@@ -26,6 +26,7 @@ import { AllocateReceiptModal } from "../features/invoices/components/AllocateRe
 import { CreateReceiptModal } from "../features/invoices/components/CreateReceiptModal";
 import { PendingBatchesModal } from "../features/invoices/components/PendingBatchesModal";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
+import { TablePagination } from "@/shared/components/TablePagination";
 import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
 
 interface InvoiceAllocation {
@@ -109,6 +110,7 @@ export const ReceiptsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("all"); // 'all' | 'in' | 'out'
+  const [pageSize, setPageSize] = useState<number>(15);
   const { page, setPage, resetPage } = useUrlPagination(pagination.totalPages);
   const [selectedReceipt, setSelectedReceipt] = useState<InvoiceReceipt | null>(null);
   const [allocatingReceipt, setAllocatingReceipt] = useState<InvoiceReceipt | null>(null);
@@ -120,12 +122,17 @@ export const ReceiptsPage: React.FC = () => {
     setExpandedReceiptId((prev) => (prev === id ? null : id));
   };
 
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    resetPage();
+  };
+
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: "15",
+        limit: String(pageSize),
         tab: activeTab,
         search: search.trim(),
         type: typeFilter,
@@ -750,31 +757,17 @@ export const ReceiptsPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Controls */}
-        <div className="px-5 py-3.5 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <div>
-            Hiển thị <span className="font-semibold text-slate-200">{receipts.length}</span> /{" "}
-            <span className="font-semibold text-slate-200">{pagination.totalOrders}</span> kết quả
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="p-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="font-mono text-slate-300 px-2">
-              Trang {pagination.page} / {pagination.totalPages}
-            </span>
-            <button
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="p-1.5 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Pagination Controls Chuẩn Master */}
+        <div className="p-4 bg-slate-900/90 border-t border-slate-800">
+          <TablePagination
+            currentPage={page}
+            totalPages={pagination.totalPages}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+            disabled={loading}
+            className="pt-0 border-t-0"
+          />
         </div>
       </div>
 

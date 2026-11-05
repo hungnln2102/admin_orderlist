@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
+import { TablePagination } from "@/shared/components/TablePagination";
 
 interface PaymentAccount {
   id: number;
@@ -86,7 +87,7 @@ export const ExternalImportsPage: React.FC = () => {
     totalCount: 0,
   });
   const [loading, setLoading] = useState<boolean>(true);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState<number>(20);
   const { page, setPage, resetPage } = useUrlPagination(Math.ceil(items.length / pageSize) || 1);
   const pagedItems = items.slice((page - 1) * pageSize, page * pageSize);
 
@@ -646,13 +647,18 @@ export const ExternalImportsPage: React.FC = () => {
       </div>
 
 
-      {!loading && items.length > pageSize && (
-        <div className="flex items-center justify-between gap-3 px-1 text-xs text-slate-400">
-          <span>Trang {page} / {Math.ceil(items.length / pageSize)}</span>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setPage((current) => current - 1)} disabled={page <= 1} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Trước</button>
-            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= Math.ceil(items.length / pageSize)} className="px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-40">Sau</button>
-          </div>
+      {!loading && items.length > 0 && (
+        <div className="pt-2">
+          <TablePagination
+            currentPage={page}
+            totalPages={Math.ceil(items.length / pageSize) || 1}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              resetPage();
+            }}
+          />
         </div>
       )}
       {/* Modal Tạo Mới */}

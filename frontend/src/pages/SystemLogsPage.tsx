@@ -1,3 +1,4 @@
+import { TablePagination } from "@/shared/components/TablePagination";
 import React, { useEffect, useState } from "react";
 import { 
   ShieldCheck, 
@@ -175,7 +176,7 @@ export const SystemLogsPage: React.FC = () => {
 
   // Filters
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [aggregateType, setAggregateType] = useState("");
   const [status, setStatus] = useState("");
@@ -534,27 +535,20 @@ export const SystemLogsPage: React.FC = () => {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1 || loading}
-                className="flex items-center gap-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" /> Trang trước
-              </button>
-              
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                Trang <strong className="text-slate-900 dark:text-white">{page}</strong> / {totalPages}
-              </span>
-
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages || loading}
-                className="flex items-center gap-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                Trang sau <ChevronRight className="w-4 h-4" />
-              </button>
+            {/* Pagination Chuẩn Master */}
+            <div className="p-4 bg-slate-900/90 border-t border-slate-800">
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                pageSize={limit}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize: number) => {
+                  setLimit(newSize);
+                  setPage(1);
+                }}
+                disabled={loading}
+                className="pt-0 border-t-0"
+              />
             </div>
           </div>
         </>

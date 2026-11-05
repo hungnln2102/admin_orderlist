@@ -48,6 +48,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     setPage,
     totalPages,
     totalOrders,
+    pageSize,
+    setPageSize,
     tabCounts,
     summaryData,
     fetchOrders,
@@ -617,6 +619,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         page={page}
         totalPages={totalPages}
         totalOrders={totalOrders}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
         onPageChange={(newPage) => setPage(newPage)}
         onOpenView={handleOpenView}
         onOpenEdit={handleOpenEdit}
