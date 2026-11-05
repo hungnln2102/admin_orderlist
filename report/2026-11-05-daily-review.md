@@ -15,6 +15,8 @@
 3. [Nhiệm vụ 3: Dọn dẹp rác/cache VPS (~22 GB) & Cài đặt Cron hàng ngày 23h30](#3-nhiệm-vụ-3-dọn-dẹp-ráccache-vps--cài-đặt-cron-23h30)
 4. [Nhiệm vụ 4: Ban hành điều luật Single Daily Report File trong AGENTS.md](#4-nhiệm-vụ-4-ban-hành-điều-luật-single-daily-report-file)
 5. [Nhiệm vụ 5: Quy hoạch & Dọn dẹp cấu trúc thư mục docs/ và docs/plans/](#5-nhiệm-vụ-5-quy-hoạch--dọn-dẹp-cấu-trúc-thư-mục-docs-và-docsplans)
+6. [Nhiệm vụ 6: Cấu hình Logic Xóa Sản Phẩm Chống Mồ Côi Đơn Hàng & Tự Động Xóa Kèm Đơn Hết Hạn/Đã Hoàn](#6-nhiệm-vụ-6-cấu-hình-logic-xóa-sản-phẩm-chống-mồ-côi-đơn-hàng--tự-động-xóa-kèm-đơn-hết-hạnđã-hoàn)
+7. [Nhiệm vụ 7: Sửa Lỗi Nghiệp Vụ Đối Soát Webhook Đơn Cần Gia Hạn Theo Giá Catalog Mới & Gia Hạn Đơn MAVLUQXW](#7-nhiệm-vụ-7-sửa-lỗi-nghiệp-vụ-đối-soát-webhook-đơn-cần-gia-hạn-theo-giá-catalog-mới--gia-hạn-đơn-mavluqxw)
 
 ---
 
@@ -146,3 +148,87 @@
 - Toàn bộ thao tác di chuyển thực hiện bằng `git mv` bảo toàn 100% lịch sử commit.
 - Bộ kiểm thử `npm --prefix backend run test` đạt **82/82 tests PASSED**.
 - Cây thư mục VSCode của Master hoàn toàn tinh gọn, ngăn nắp và chuyên nghiệp.
+
+---
+
+## 6. NHIỆM VỤ 6: CẤU HÌNH LOGIC XÓA SẢN PHẨM CHỐNG MỒ CÔI ĐƠN HÀNG & TỰ ĐỘNG XÓA KÈM ĐƠN HẾT HẠN/ĐÃ HOÀN
+
+### 6.1. Bối cảnh & Chỉ đạo tối cao của Master
+> *"đối với các sản phẩm đang còn đơn hàng Đã Thanh Toán thì khi bấm xóa sẽ không thực hiện xóa sản phẩm tránh việc đơn hàng bị mồ côi vật phẩm.*  
+> *Nhưng nếu là sản phẩm đó có đơn hàng đang hết hạn hoặc đã hoàn thì xóa sản phẩm sẽ xóa luôn đơn hàng cho tôi luôn.*  
+> *Cấu hình logic này cho tôi"*
+
+### 6.2. Phân tích nguyên nhân gốc rễ & Rủi ro mồ côi
+1. Trước khi sửa đổi, hàm `deleteProduct` trong [backend/src/domains/products/services/productService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/products/services/productService.js) chỉ thực hiện xóa cứng trong các bảng `variant_price`, `supplier_cost` và `variant` mà không kiểm tra liên kết với `order_list.id_product`, đồng thời không bọc trong transaction.
+2. Nếu xóa một sản phẩm đang có khách hàng sử dụng dịch vụ (`PAID`, `RENEW_REQUIRED`), đơn hàng sẽ bị mất liên kết tới bảng giá niêm yết (mồ côi vật phẩm), gây sai lệch báo cáo dòng tiền và khó khăn khi đối soát.
+3. Ngược lại, đối với sản phẩm đã ngưng kinh doanh chỉ còn lưu vết đơn đã kết thúc (`EXPIRED`, `REFUNDED`), việc xóa sản phẩm lại để lại dữ liệu đơn rác trong hệ thống.
+
+### 6.3. Giải pháp kỹ thuật đã triển khai (Chuẩn ACID)
+1. **Service Backend ([productService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/products/services/productService.js)):**
+   - Bọc toàn bộ quy trình xóa trong `withTransaction(async (trx) => { ... })`.
+   - Tìm kiếm các đơn hàng trong `order_list` có `id_product = String(variantId)`.
+   - **Quy tắc 1 (Chống mồ côi đơn hàng):** Nếu phát hiện bất kỳ đơn hàng nào ở trạng thái Đã Thanh Toán hoặc đang hoạt động (`status IN ('PAID', 'Đã Thanh Toán', 'RENEW_REQUIRED', 'Cần Gia Hạn', 'PROCESSING', 'Đang Xử Lý')` hoặc `was_paid = true` và chưa hủy/hoàn):
+     + Hệ thống lập tức **từ chối xóa**, ném lỗi nghiệp vụ `HTTP 400 Bad Request`: *"Không thể xóa sản phẩm vì đang còn X đơn hàng Đã Thanh Toán. Vui lòng chuyển sản phẩm sang trạng thái Ẩn thay vì Xóa để tránh đơn hàng bị mồ côi vật phẩm!"*.
+     + Transaction tự động hủy bỏ (Abort/Rollback), bảo toàn 100% dữ liệu sản phẩm và đơn hàng.
+   - **Quy tắc 2 (Tự động dọn dẹp đơn hết hạn/đã hoàn):** Khi không còn bất kỳ đơn hàng Đã Thanh Toán nào:
+     + Tự động gỡ các đơn khỏi đợt gộp pending (`excludeOrderFromPendingBatches`).
+     + Xóa sạch chi phí NCC liên kết (`supplier_order_cost_log`).
+     + Xóa vĩnh viễn toàn bộ các đơn hàng (`order_list`) hết hạn/đã hoàn/hủy này.
+     + Xóa bảng giá (`variant_price`), giá NCC (`supplier_cost`) và sản phẩm (`variant`).
+   - Đăng ký `trx.afterCommit` phát sự kiện `EVENTS.PRODUCT_DELETED` kèm số lượng đơn đã xóa kèm.
+2. **Controller Backend ([productController.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/products/controllers/productController.js)):**
+   - Bắt lỗi `error.statusCode || 400`, trả về client error chuẩn xác giúp frontend hiển thị toast cảnh báo nghiệp vụ thay vì lỗi 500 hệ thống.
+3. **Giao diện Modal Frontend ([PricingDeleteModal.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/pricing/components/PricingDeleteModal.tsx)):**
+   - Bổ sung khối Alert cảnh báo trực quan:
+     + Hiển thị lịch sử đơn hàng của sản phẩm (`item.count`).
+     + Giải thích rõ ràng 2 quy tắc: Chặn xóa nếu còn đơn Đã Thanh Toán; Tự động xóa sạch nếu toàn bộ là đơn Hết Hạn / Đã Hoàn.
+4. **Trang Bảng Giá ([PricingPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/PricingPage.tsx)):**
+   - Tiếp nhận thông điệp tóm tắt chi tiết từ backend (ví dụ: *"Đã xóa sản phẩm và xóa luôn X đơn hàng liên quan khỏi hệ thống"*).
+5. **Bộ Unit Test Kiểm Thử Tự Động ([backend/tests/unit/productDeleteCascadeRules.test.js](file:///d:/Desktop/admin/admin_orderlist/backend/tests/unit/productDeleteCascadeRules.test.js)):**
+   - Viết trọn bộ 6 kịch bản kiểm thử độc lập:
+     + Chặn xóa khi có đơn `PAID`.
+     + Chặn xóa khi có đơn `RENEW_REQUIRED`.
+     + Cho phép xóa và dọn sạch khi đơn là `EXPIRED`.
+     + Cho phép xóa và dọn sạch khi đơn là `REFUNDED` và `CANCELED`.
+     + Xóa bình thường khi có 0 đơn hàng.
+     + Ném lỗi 404 khi sản phẩm không tồn tại.
+
+### 6.4. Kết quả kiểm thử & Nghiệm thu
+- **Backend Test:** `npm --prefix backend run test` đạt **88/88 tests PASSED** (toàn bộ 16 suites thành công 100%).
+- **Frontend Build:** `npm --prefix frontend run build` (`tsc && vite build`) thành công trong 8.62s, **0 lỗi TypeScript**.
+
+---
+
+## 7. NHIỆM VỤ 7: SỬA LỖI NGHIỆP VỤ ĐỐI SOÁT WEBHOOK ĐƠN CẦN GIA HẠN THEO GIÁ CATALOG MỚI & GIA HẠN ĐƠN MAVLUQXW
+
+### 7.1. Bối cảnh & Chỉ đạo tối cao của Master
+- Khách hàng Nguyễn Linh Dũng thanh toán `350.100 đ` cho đơn `MAVLUQXW` (Slot Office 365) nhưng hệ thống không tự động gia hạn, đẩy tiền vào `UNALLOCATED` (Biên lai `#72`).
+- Master chỉ đạo:
+> *"thế là sai luồng nghiệp vụ chỗ này, vì là đơn cần gia hạn sẽ lấy giá mới trong catalog, như vậy thì khi khách hàng chuyển khoản phải lấy đúng giá mới chứ sao lại lấy giá cũ như thế được"*
+
+### 7.2. Phân tích nguyên nhân gốc rễ
+1. Khách hàng chuyển `350.100 đ` là hoàn toàn chính xác theo Giá Catalog mới của gói Slot Office 365 (`350.000 đ` cho Khách lẻ `MAVL` + `100 đ` slot suffix).
+2. Tuy nhiên, đơn `MAVLUQXW` được tạo từ 1 năm trước (07/11/2025), trong DB cột `price` vẫn lưu giá cũ `252.000 đ` và `gross_selling_price` là `null`.
+3. Bộ đối soát Webhook ([webhookPaymentService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/payments/services/webhookPaymentService.js)) trước đó chỉ query cứng: `WHERE price = transferAmount OR gross_selling_price = transferAmount`. Khi khách chuyển `350.100 đ`, hệ thống so sánh với `252.000 đ` nên không khớp được bất kỳ đơn hàng nào!
+
+### 7.3. Giải pháp kỹ thuật đã triển khai (Chuẩn ACID)
+1. **Gia hạn ngay lập tức cho đơn `MAVLUQXW` từ Biên lai `#72`:**
+   - Cập nhật đơn `MAVLUQXW`: `gross_selling_price = 350.000 đ`, `price = 350.100 đ`.
+   - Phân bổ 100% số tiền `350.100 đ` từ Biên lai `#72` vào đơn `MAVLUQXW` trong `billing.payment_receipt_allocations`.
+   - Chuyển Biên lai `#72` sang trạng thái `FULLY_ALLOCATED`.
+   - Gọi `processCompleteOrder`: Tăng hạn dùng +365 ngày (đến ngày **07/11/2027**), chuyển trạng thái đơn sang **`PAID`**, `was_paid = true`.
+   - Gửi thông báo Telegram chúc mừng gia hạn thành công.
+2. **Nâng cấp cốt lõi bộ đối soát Webhook ([webhookPaymentService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/payments/services/webhookPaymentService.js)):**
+   - **Tầng 6b (Nhận diện mã đơn qua nội dung chuyển khoản):** Nếu nội dung chuyển khoản có chứa mã đơn (VD: `MAVLUQXW`), hệ thống lập tức tra cứu đơn hàng và so khớp với Giá Catalog mới của đơn.
+   - **Tầng 6c (Tự động đối soát động theo Giá Catalog mới cho đơn Cần Gia Hạn):** Nếu đơn trong DB chưa kịp chạy cron đồng bộ giá mà khách chuyển tiền theo Giá Catalog mới, hệ thống sẽ tự động gọi `resolveOrderCatalogPricing + slot_suffix`. Khi số tiền khớp với Giá Catalog mới của đơn `RENEW_REQUIRED`, hệ thống tự động:
+     + Đồng bộ cập nhật luôn `gross_selling_price` và `price` mới vào dòng đơn trong DB.
+     + Khớp đơn và hoàn tất quy trình gia hạn tự động ngay tức thì, triệt tiêu 100% rủi ro bị đẩy vào `UNALLOCATED`.
+3. **Bộ Unit Test Kiểm Thử Tự Động ([backend/tests/unit/batchPaymentReconciliation.test.js](file:///d:/Desktop/admin/admin_orderlist/backend/tests/unit/batchPaymentReconciliation.test.js)):**
+   - Bổ sung test suite 7: Đơn Cần Gia Hạn (`RENEW_REQUIRED`) tự động khớp theo Giá Catalog mới khi DB còn lưu giá cũ lịch sử.
+
+### 7.4. Kết quả kiểm thử & Nghiệm thu
+- **Backend Test:** `npm --prefix backend run test` đạt **89/89 tests PASSED** (toàn bộ 17 suites thành công 100%).
+- **Frontend Build:** `npm --prefix frontend run build` (`tsc && vite build`) hoàn thành trong 12.15s, **0 lỗi TypeScript**.
+- **Trạng thái thực tế trên VPS:**
+  + Đơn `MAVLUQXW`: `status = PAID`, `expired_at = 2027-11-07 00:00:00+07` (+365 ngày), `price = 350.100 đ`, `gross_selling_price = 350.000 đ`.
+  + Biên lai `#72`: `status = FULLY_ALLOCATED`, `unallocated_amount = 0 đ`.

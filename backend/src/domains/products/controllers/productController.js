@@ -156,7 +156,8 @@ const deleteProduct = async (req, res) => {
     res.json({ message: "Xóa sản phẩm thành công", data: result });
   } catch (error) {
     console.error("Lỗi deleteProduct:", error);
-    res.status(500).json({ error: getClientErrorMessage(error, "Xóa sản phẩm thất bại") });
+    const statusCode = error.statusCode || 400;
+    res.status(statusCode).json({ error: getClientErrorMessage(error, "Xóa sản phẩm thất bại") });
   }
 };
 

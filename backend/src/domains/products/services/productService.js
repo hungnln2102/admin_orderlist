@@ -7,6 +7,7 @@ const VP_COLS = COLS.VARIANT_PRICE;
 const SC_COLS = COLS.SUPPLIER_COST;
 const S_COLS = COLS.SUPPLIER;
 const P_COLS = COLS.PRODUCT;
+const O_COLS = COLS.ORDER_LIST;
 
 /**
  * Service lấy danh sách giá sản phẩm (Bảng giá Niêm yết)
@@ -416,28 +417,94 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
   trx.afterCommit(() => eventBus.emit(EVENTS.PRODUCT_UPDATED, updatedProductPayload));
   return updatedProductPayload;
 });
-const deleteProduct = async (id) => {
+const deleteProduct = async (id) => withTransaction(async (trx) => {
   const variantId = parseInt(id, 10);
+  if (!variantId) {
+    const err = new Error("ID sản phẩm không hợp lệ");
+    err.statusCode = 400;
+    throw err;
+  }
 
-  const variant = await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
-  if (!variant) throw new Error("Sản phẩm không tồn tại");
+  const variant = await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
+  if (!variant) {
+    const err = new Error("Sản phẩm không tồn tại");
+    err.statusCode = 404;
+    throw err;
+  }
 
-  await db(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId }).del();
-  await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.VARIANT_ID]: variantId }).del();
-  await db(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).del();
+  // 1. Kiểm tra toàn bộ đơn hàng liên quan tới sản phẩm (id_product trỏ tới variantId)
+  const variantIdStr = String(variantId);
+  const linkedOrders = await trx(TABLES.ORDER_LIST)
+    .where({ [O_COLS.ID_PRODUCT]: variantIdStr })
+    .orWhereRaw("CAST(?? AS TEXT) = ?", [O_COLS.ID_PRODUCT, variantIdStr]);
+
+  // 2. Phân loại đơn hàng Đã Thanh Toán (Active / Paid)
+  const activeOrders = linkedOrders.filter((o) => {
+    const st = String(o[O_COLS.STATUS] || "").trim().toUpperCase();
+    const isPaid = st === ORDER_STATUS.PAID || st === "ĐÃ THANH TOÁN";
+    const isRenew = st === ORDER_STATUS.RENEW_REQUIRED || st === "CẦN GIA HẠN";
+    const isProcessing = st === ORDER_STATUS.PROCESSING || st === "ĐANG XỬ LÝ";
+    const wasPaidActive = Boolean(o[O_COLS.WAS_PAID]) && !["EXPIRED", "HẾT HẠN", "REFUNDED", "ĐÃ HOÀN TIỀN", "CANCELED", "ĐÃ HỦY"].includes(st);
+    return isPaid || isRenew || isProcessing || wasPaidActive;
+  });
+
+  // Nếu còn đơn hàng Đã Thanh Toán -> Tuyệt đối CHẶN XÓA để tránh đơn hàng mồ côi
+  if (activeOrders.length > 0) {
+    const err = new Error(
+      `Không thể xóa sản phẩm "${variant[V_COLS.DISPLAY_NAME]}" vì đang còn ${activeOrders.length} đơn hàng Đã Thanh Toán (hoặc đang hoạt động). Vui lòng chuyển sản phẩm sang trạng thái Ẩn thay vì Xóa để tránh đơn hàng bị mồ côi vật phẩm!`
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // 3. Nếu không còn đơn Đã Thanh Toán, tiến hành xóa sản phẩm và xóa sạch các đơn hàng liên quan (hết hạn/đã hoàn/hủy)
+  let deletedOrdersCount = 0;
+  if (linkedOrders.length > 0) {
+    const { excludeOrderFromPendingBatches } = require("@/domains/invoices/services/batchPaymentService");
+    const orderIds = linkedOrders.map((o) => o[O_COLS.ID]).filter(Boolean);
+
+    // Gỡ từng đơn khỏi các đợt gộp pending nếu có
+    for (const order of linkedOrders) {
+      if (order[O_COLS.ID_ORDER]) {
+        try {
+          await excludeOrderFromPendingBatches(trx, order[O_COLS.ID_ORDER], "Xóa sản phẩm đi kèm đơn hàng hết hạn/đã hoàn");
+        } catch (ex) {
+          console.warn(`[deleteProduct] Không thể exclude đơn #${order[O_COLS.ID_ORDER]} khỏi batch:`, ex.message);
+        }
+      }
+    }
+
+    // Xóa chi phí NCC liên kết trong supplier_order_cost_log (phòng trường hợp DB thiếu FK cascade)
+    await trx(TABLES.SUPPLIER_ORDER_COST_LOG).whereIn("order_list_id", orderIds).del();
+
+    // Xóa toàn bộ các đơn hàng liên quan
+    deletedOrdersCount = await trx(TABLES.ORDER_LIST).whereIn(O_COLS.ID, orderIds).del();
+  }
+
+  // 4. Xóa các bảng liên quan đến variant
+  await trx(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId }).del();
+  await trx(TABLES.SUPPLIER_COST).where({ [SC_COLS.VARIANT_ID]: variantId }).del();
+  await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).del();
+
+  const summary = deletedOrdersCount > 0
+    ? `Đã xóa hoàn toàn sản phẩm "${variant[V_COLS.DISPLAY_NAME]}" (${variant[V_COLS.VARIANT_NAME]}) và xóa luôn ${deletedOrdersCount} đơn hàng (hết hạn/đã hoàn) liên quan khỏi hệ thống`
+    : `Đã xóa hoàn toàn sản phẩm "${variant[V_COLS.DISPLAY_NAME]}" (${variant[V_COLS.VARIANT_NAME]}) khỏi hệ thống`;
 
   const deletedPayload = {
     id: variantId,
     san_pham: variant[V_COLS.DISPLAY_NAME],
     variant_name: variant[V_COLS.VARIANT_NAME],
-    summary: `Đã xóa hoàn toàn sản phẩm "${variant[V_COLS.DISPLAY_NAME]}" (${variant[V_COLS.VARIANT_NAME]}) khỏi hệ thống`,
+    deleted_orders_count: deletedOrdersCount,
+    summary,
   };
 
-  // Emit Domain Event
-  eventBus.emit(EVENTS.PRODUCT_DELETED, deletedPayload);
+  // 5. Emit Domain Event sau khi transaction đã commit thành công
+  trx.afterCommit(() => {
+    eventBus.emit(EVENTS.PRODUCT_DELETED, deletedPayload);
+  });
 
   return deletedPayload;
-};
+});
 
 /**
  * Thêm giá nhập của Nhà Cung Cấp (NCC) cho sản phẩm (Event: SUPPLIER_COST_ADDED)

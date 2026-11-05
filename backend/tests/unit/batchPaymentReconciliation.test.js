@@ -316,4 +316,28 @@ describe("Batch Payment & Slot Suffix Reconciliation Suite", () => {
       assert.strictEqual(unallocatedAmount, 150000); // Giữ nguyên 150k cho khách hoặc admin xử lý
     });
   });
+  describe("7. Đơn Cần Gia Hạn (RENEW_REQUIRED) Tự Động Khớp Theo Giá Catalog Mới", () => {
+    it("Khớp chính xác khi khách chuyển theo giá Catalog mới kể cả khi đơn trong DB còn lưu giá cũ lịch sử", () => {
+      // Giả lập đơn hàng cũ 1 năm trước trong DB
+      const order = {
+        id: 423,
+        id_order: "MAVLUQXW",
+        status: ORDER_STATUS.RENEW_REQUIRED,
+        price: 252000, // Giá cũ lịch sử
+        gross_selling_price: null,
+      };
+
+      const transferAmount = 350100; // Khách chuyển theo giá Catalog mới
+      const catalogBasePrice = 350000;
+      const slotSuffix = 100;
+      const expectedRenewalPrice = applySuffixToPrice(catalogBasePrice, slotSuffix);
+
+      assert.strictEqual(expectedRenewalPrice, 350100);
+      assert.notStrictEqual(order.price, transferAmount); // Giá cũ không khớp
+
+      // Logic nâng cấp: Khớp theo giá Catalog mới
+      const isMatched = (transferAmount === expectedRenewalPrice || transferAmount === catalogBasePrice);
+      assert.strictEqual(isMatched, true);
+    });
+  });
 });

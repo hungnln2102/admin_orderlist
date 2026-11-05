@@ -289,11 +289,11 @@ export const PricingPage: React.FC = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        notify.success("Xóa sản phẩm thành công! Đã phát event PRODUCT_DELETED", "Thành Công");
+        notify.success(data.data?.summary || data.message || "Xóa sản phẩm thành công! Đã phát event PRODUCT_DELETED", "Thành Công");
         setDeletingItem(null);
         fetchPricingData();
       } else {
-        notify.error(data.error || "Xóa sản phẩm thất bại", "Lỗi Thao Tác");
+        notify.error(data.error || "Xóa sản phẩm thất bại", "Từ Chối Thao Tác");
       }
     } catch (err) {
       notify.error("Lỗi khi kết nối máy chủ", "Lỗi Hệ Thống");

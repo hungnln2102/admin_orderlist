@@ -22,6 +22,9 @@ const { processCompleteOrder } = require("@/domains/orders/services/orderService
 const { creditFinancialAccount, debitFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { settleSupplierDebtTransaction } = require("@/domains/suppliers/services/supplierSettlementService");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
+const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
+const { extractSlotSuffix, getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
+
 
 // Các trạng thái đơn hàng hợp lệ cần thanh toán
 const PAYABLE_STATUSES = [
@@ -303,8 +306,9 @@ async function processPaymentWebhook(payload = {}) {
         };
       }
 
-      // 6. Nếu không khớp đợt gộp nào: Tìm đơn hàng lẻ theo SỐ TIỀN THỰC CHUYỂN
-      const matchedOrder = await getOrderTable(trx)
+      // 6. Nếu không khớp đợt gộp nào: Tìm đơn hàng lẻ
+      // 6a. Tìm theo SỐ TIỀN THỰC CHUYỂN lưu trong DB
+      let matchedOrder = await getOrderTable(trx)
         .where((builder) => {
           builder.where("price", transferAmount).orWhere("gross_selling_price", transferAmount);
         })
@@ -313,6 +317,85 @@ async function processPaymentWebhook(payload = {}) {
         .forUpdate()
         .skipLocked()
         .first();
+
+      // 6b. Đối soát nâng cao: Nếu nội dung chuyển khoản có chứa mã đơn hàng (VD: MAVLUQXW, MAVK12345...)
+      if (!matchedOrder && noteContent) {
+        const orderCodeMatch = String(noteContent).match(/\b(MAV[A-Z0-9]{5,10})\b/i);
+        if (orderCodeMatch) {
+          const extractedCode = orderCodeMatch[1].toUpperCase();
+          const candidateByCode = await getOrderTable(trx)
+            .where("id_order", extractedCode)
+            .whereIn("status", PAYABLE_STATUSES)
+            .forUpdate()
+            .skipLocked()
+            .first();
+
+          if (candidateByCode) {
+            const isRenew = [ORDER_STATUS.RENEW_REQUIRED, "Cần Gia Hạn"].includes(candidateByCode.status);
+            if (isRenew) {
+              const { catalogBasePrice } = await resolveOrderCatalogPricing(trx, candidateByCode);
+              const suffix = extractSlotSuffix(candidateByCode) || await getAvailableSuffix(trx, candidateByCode.id);
+              const expectedPrice = catalogBasePrice > 0 ? applySuffixToPrice(catalogBasePrice, suffix) : Number(candidateByCode.price || 0);
+
+              if (
+                transferAmount === expectedPrice ||
+                transferAmount === catalogBasePrice ||
+                transferAmount === Number(candidateByCode.price) ||
+                transferAmount === Number(candidateByCode.gross_selling_price)
+              ) {
+                matchedOrder = candidateByCode;
+                if (catalogBasePrice > 0) {
+                  await getOrderTable(trx)
+                    .where({ id: candidateByCode.id })
+                    .update({
+                      gross_selling_price: catalogBasePrice,
+                      price: expectedPrice,
+                    });
+                  matchedOrder.gross_selling_price = catalogBasePrice;
+                  matchedOrder.price = expectedPrice;
+                }
+              }
+            } else if (
+              transferAmount === Number(candidateByCode.price) ||
+              transferAmount === Number(candidateByCode.gross_selling_price)
+            ) {
+              matchedOrder = candidateByCode;
+            }
+          }
+        }
+      }
+
+      // 6c. Nâng cấp cốt lõi (Chỉ đạo của Master): Đơn CẦN GIA HẠN (RENEW_REQUIRED) bắt buộc lấy GIÁ CATALOG MỚI NHẤT
+      // Nếu khách chuyển tiền theo giá Catalog mới mà trong DB đơn chưa kịp cập nhật giá -> Tự động tính giá Catalog và khớp ngay
+      if (!matchedOrder) {
+        const renewCandidates = await getOrderTable(trx)
+          .whereIn("status", [ORDER_STATUS.RENEW_REQUIRED, "Cần Gia Hạn"])
+          .orderBy("id", "desc")
+          .forUpdate()
+          .skipLocked();
+
+        for (const candidate of renewCandidates) {
+          const { catalogBasePrice } = await resolveOrderCatalogPricing(trx, candidate);
+          if (catalogBasePrice > 0) {
+            const suffix = extractSlotSuffix(candidate) || await getAvailableSuffix(trx, candidate.id);
+            const expectedRenewalPrice = applySuffixToPrice(catalogBasePrice, suffix);
+
+            if (transferAmount === expectedRenewalPrice || transferAmount === catalogBasePrice) {
+              matchedOrder = candidate;
+              // Đồng bộ luôn giá Catalog mới vào đơn hàng trong DB
+              await getOrderTable(trx)
+                .where({ id: candidate.id })
+                .update({
+                  gross_selling_price: catalogBasePrice,
+                  price: expectedRenewalPrice,
+                });
+              matchedOrder.gross_selling_price = catalogBasePrice;
+              matchedOrder.price = expectedRenewalPrice;
+              break;
+            }
+          }
+        }
+      }
 
       // KHÔNG KHỚP ĐƠN NÀO — Giữ Biên lai ở UNALLOCATED
       if (!matchedOrder) {
