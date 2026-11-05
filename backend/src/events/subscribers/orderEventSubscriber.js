@@ -156,6 +156,18 @@ function registerOrderEventSubscribers() {
     });
   });
 
+  // Lắng nghe sự kiện Thanh toán Đợt gộp đơn thành công
+  eventBus.on(EVENTS.BATCH_PAYMENT_COMPLETED, async (data) => {
+    console.log(`📦 [EventSubscriber] Tiếp nhận event BATCH_PAYMENT_COMPLETED cho đợt gộp #${data.batchCode} (${data.batchId})`);
+    await recordEvent({
+      eventName: EVENTS.BATCH_PAYMENT_COMPLETED,
+      aggregateType: "BATCH_PAYMENT",
+      aggregateId: data.batchCode || String(data.batchId),
+      payload: data,
+      status: "PROCESSED",
+    });
+  });
+
   // Lắng nghe sự kiện Gia hạn hoàn tất (Webhook khớp gia hạn)
   eventBus.on(EVENTS.ORDER_RENEWED, async (data) => {
     console.log(`🔄 [EventSubscriber] Tiếp nhận event ORDER_RENEWED cho đơn #${data.orderId} (${data.id_order})`);

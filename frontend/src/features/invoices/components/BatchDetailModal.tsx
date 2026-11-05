@@ -48,6 +48,7 @@ interface BatchDetailData {
     expires_at: string;
     created_at: string;
     created_by?: string;
+    payment_receipt_id?: number | string | null;
   };
   orders: BatchOrderDetail[];
   bank: {
@@ -75,6 +76,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const [data, setData] = useState<BatchDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [fulfilling, setFulfilling] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -162,6 +164,41 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     }
   };
 
+  const handleFulfillRemaining = async () => {
+    if (!data?.batch) return;
+    const isBatchPaid = Boolean(data.batch.payment_receipt_id) || data.batch.status === "COMPLETED";
+    const failedOrders = (data.orders || []).filter(
+      (o) => o.status !== "PAID" && o.status !== "Đã Thanh Toán"
+    );
+    if (!isBatchPaid || failedOrders.length === 0) return;
+
+    const confirmMsg = `Master có chắc chắn muốn hoàn tất gia hạn cho ${failedOrders.length} đơn còn lại trong đợt gộp #${data.batch.batch_code}?\n(Tài chính sẽ được giữ nguyên 100%, không bị cộng trùng tiền).`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setFulfilling(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/invoices/batches/${data.batch.id}/fulfill-remaining`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const resJson = await res.json();
+      if (!res.ok) {
+        throw new Error(resJson.error || "Không thể hoàn tất các đơn còn lại.");
+      }
+      setSuccessMessage(resJson.message || `Đã hoàn tất gia hạn cho ${failedOrders.length} đơn còn lại thành công!`);
+      await fetchDetail();
+      if (onCancelSuccess) onCancelSuccess();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hoàn tất các đơn còn lại.";
+      setErrorMessage(msg);
+    } finally {
+      setFulfilling(false);
+    }
+  };
+
   const buildPaymentMessage = () => {
     if (!data) return "";
     const { batch, bank } = data;
@@ -188,6 +225,12 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const batch = data?.batch;
   const orders = data?.orders || [];
   const bank = data?.bank;
+
+  const isBatchPaid = Boolean(batch?.payment_receipt_id) || batch?.status === "COMPLETED";
+  const failedOrders = orders.filter(
+    (o) => o.status !== "PAID" && o.status !== "Đã Thanh Toán"
+  );
+  const showFulfillButton = isBatchPaid && failedOrders.length > 0;
 
   const getPrefixBadge = (prefix?: string) => {
     switch (prefix) {
@@ -283,6 +326,17 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
                     <span>Đơn Lẻ Trong Đợt Gộp ({orders.length})</span>
+                    {isBatchPaid && (
+                      showFulfillButton ? (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-medium">
+                          Còn {failedOrders.length} đơn lỗi/chờ xử lý
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-medium">
+                          ✅ Đã hoàn tất {orders.length}/{orders.length}
+                        </span>
+                      )
+                    )}
                   </span>
                   <div className="text-right">
                     <span className="text-xs text-slate-400">Tổng gốc: </span>
@@ -487,6 +541,27 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                     </button>
                   </div>
 
+                  {/* Nút Hoàn Tất Các Đơn Bị Lỗi (Chỉ xuất hiện khi batch đã nhận tiền nhưng có đơn bị lỗi/chưa sang PAID) */}
+                  {showFulfillButton && (
+                    <button
+                      type="button"
+                      onClick={handleFulfillRemaining}
+                      disabled={fulfilling}
+                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-950/40 disabled:opacity-50"
+                    >
+                      {fulfilling ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                          <span>Đang hoàn tất các đơn còn lại...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Hoàn Tất Các Đơn Bị Lỗi ({failedOrders.length} đơn)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                   {/* Cancel batch button (Only if PENDING) */}
                   {batch.status === "PENDING" && (
                     <button

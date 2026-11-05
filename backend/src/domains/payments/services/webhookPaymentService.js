@@ -24,6 +24,8 @@ const { settleSupplierDebtTransaction } = require("@/domains/suppliers/services/
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
 const { extractSlotSuffix, getAvailableSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
+const { eventBus, EVENTS } = require("@/events");
+const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 
 
 // Các trạng thái đơn hàng hợp lệ cần thanh toán
@@ -229,8 +231,18 @@ async function processPaymentWebhook(payload = {}) {
         // Lọc danh sách các đơn con còn chờ thanh toán (PAYABLE)
         const activePayableOrders = subOrders.filter((o) => PAYABLE_STATUSES.includes(o.status));
 
+        // 1. Tính toán chi phí nhập hàng tổng hợp cho đợt gộp (loại trừ Mavryk)
+        let totalBatchCost = 0;
+        for (const subOrder of subOrders) {
+          const isMavryk = await isMavrykSupplier(trx, subOrder);
+          if (!isMavryk) {
+            totalBatchCost += Number(subOrder.cost || 0);
+          }
+        }
+
         let totalAllocated = 0;
         const updatedOrders = [];
+        const failedOrders = [];
 
         for (let i = 0; i < subOrders.length; i++) {
           const subOrder = subOrders[i];
@@ -264,20 +276,33 @@ async function processPaymentWebhook(payload = {}) {
             created_by: ALLOCATION_CREATOR.SYSTEM_WEBHOOK,
           });
 
-          const { updatedOrder, isRenewal } = await processCompleteOrder(trx, subOrder, allocAmount, {
-            receiptId,
-            action: "BATCH_WEBHOOK_PAYMENT_MATCH",
-          });
+          // Bọc độc lập việc gia hạn kỹ thuật cho từng đơn con
+          try {
+            const { updatedOrder, isRenewal } = await processCompleteOrder(trx, subOrder, allocAmount, {
+              receiptId,
+              action: "BATCH_WEBHOOK_PAYMENT_MATCH",
+              skipFinanceNotification: true,
+              isBatch: true,
+            });
 
-          updatedOrders.push({
-            id: updatedOrder.id,
-            id_order: updatedOrder.id_order,
-            customer: updatedOrder.customer,
-            amount: allocAmount,
-            previousStatus: subOrder.status,
-            newStatus: updatedOrder.status,
-            isRenewal,
-          });
+            updatedOrders.push({
+              id: updatedOrder.id,
+              id_order: updatedOrder.id_order,
+              customer: updatedOrder.customer,
+              amount: allocAmount,
+              previousStatus: subOrder.status,
+              newStatus: updatedOrder.status,
+              isRenewal,
+            });
+          } catch (err) {
+            console.error(`[WebhookBatch] Lỗi gia hạn đơn con #${subOrder.id_order} trong đợt gộp:`, err.message);
+            failedOrders.push({
+              id: subOrder.id,
+              id_order: subOrder.id_order,
+              customer: subOrder.customer,
+              error: err.message,
+            });
+          }
         }
 
         // Cập nhật trạng thái và số dư Biên lai (nếu có đơn đã thanh toán trước thì giữ tiền thừa ở unallocated)
@@ -293,6 +318,29 @@ async function processPaymentWebhook(payload = {}) {
             unallocated_amount: unallocatedAmount,
           });
 
+        // Bắn DUY NHẤT 1 sự kiện cấp Đợt Gộp qua EventBus sau khi commit transaction!
+        const batchEventPayload = {
+          batchId: matchedBatch.id,
+          batchCode: matchedBatch.batch_code,
+          receiptId,
+          transferAmount,
+          totalRevenue: transferAmount,
+          totalCost: totalBatchCost,
+          transactionDate: payload.transactionDate,
+          customerName: matchedBatch.customer_name,
+          ordersCount: subOrders.length,
+          orders: updatedOrders,
+          failedOrders,
+        };
+
+        if (typeof trx?.afterCommit === "function") {
+          trx.afterCommit(() => {
+            eventBus.emit(EVENTS.BATCH_PAYMENT_COMPLETED, batchEventPayload);
+          });
+        } else {
+          eventBus.emit(EVENTS.BATCH_PAYMENT_COMPLETED, batchEventPayload);
+        }
+
         return {
           success: true,
           matched: true,
@@ -303,6 +351,7 @@ async function processPaymentWebhook(payload = {}) {
           amount: transferAmount,
           ordersCount: updatedOrders.length,
           orders: updatedOrders,
+          failedOrders,
         };
       }
 

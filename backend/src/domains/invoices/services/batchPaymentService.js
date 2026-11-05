@@ -19,6 +19,9 @@ const { db, TABLES, withTransaction } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getAvailableSuffix } = require("@/domains/payments/services/slotSuffixService");
 const { getOrderPrefix, resolveOrdersWithCatalogPrices } = require("@/domains/products/services/catalogPricingService");
+const { calculateNewExpiry } = require("@/domains/orders/services/orderPaymentService");
+const { eventBus, EVENTS } = require("@/events");
+const { ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
 
 const PAYABLE_STATUSES = [
   ORDER_STATUS.UNPAID,
@@ -443,6 +446,152 @@ async function cancelBatchPaymentRequest(id, reason = "") {
   };
 }
 
+/**
+ * Hoàn tất các đơn còn lại trong đợt gộp (khi có đơn bị lỗi gia hạn kỹ thuật).
+ * TUYỆT ĐỐI KHÔNG CỘNG TIỀN / KHÔNG CỘNG SỐ DƯ BANK / KHÔNG CỘNG DOANH THU.
+ */
+async function fulfillRemainingBatchOrders(batchIdOrCode) {
+  return await withTransaction(async (trx) => {
+    let query = trx(TABLES.BATCH_PAYMENT_REQUESTS);
+    if (!isNaN(Number(batchIdOrCode))) {
+      query = query.where({ id: Number(batchIdOrCode) });
+    } else {
+      query = query.where({ batch_code: String(batchIdOrCode).trim() });
+    }
+
+    const batch = await query.forUpdate().first();
+    if (!batch) {
+      throw new Error("Không tìm thấy đợt gộp đơn.");
+    }
+
+    // Đợt gộp phải có biên lai hoặc đã được đánh dấu COMPLETED (tiền đã vào)
+    const isPaid = batch.status === "COMPLETED" || Boolean(batch.payment_receipt_id);
+    if (!isPaid) {
+      throw new Error(`Đợt gộp #${batch.batch_code} chưa được thanh toán (trạng thái: ${batch.status}).`);
+    }
+
+    const orderCodes = Array.isArray(batch.order_codes)
+      ? batch.order_codes
+      : JSON.parse(batch.order_codes || "[]");
+
+    const subOrders = await trx(TABLES.ORDER_LIST)
+      .whereIn("id_order", orderCodes)
+      .forUpdate();
+
+    // Lọc ra các đơn CHƯA hoàn tất (status !== PAID)
+    const pendingOrders = subOrders.filter(
+      (o) => o.status !== ORDER_STATUS.PAID && o.status !== "Đã Thanh Toán"
+    );
+
+    if (pendingOrders.length === 0) {
+      return {
+        success: true,
+        message: `Tất cả ${subOrders.length} đơn trong đợt gộp #${batch.batch_code} đều đã ở trạng thái Đã Thanh Toán.`,
+        fulfilledCount: 0,
+        totalOrders: subOrders.length,
+      };
+    }
+
+    const fulfilledOrders = [];
+    for (const order of pendingOrders) {
+      const isRenewal = [ORDER_STATUS.RENEW_REQUIRED, "Cần Gia Hạn"].includes(order.status);
+      const updateFields = {
+        status: ORDER_STATUS.PAID,
+        was_paid: true,
+      };
+
+      let newOrderDate = null;
+      let newExpiredAt = null;
+      let renewalDays = Number(order.days || 365);
+      let monthsAdded = 1;
+
+      if (isRenewal) {
+        const renewal = await calculateNewExpiry(order, { trx });
+        newOrderDate = renewal.newOrderDate;
+        newExpiredAt = renewal.newExpiredAt;
+        renewalDays = renewal.days;
+        monthsAdded = renewal.monthsAdded;
+
+        updateFields.order_date = newOrderDate;
+        updateFields.expired_at = newExpiredAt;
+        updateFields.days = renewalDays;
+      }
+
+      const [updatedOrder] = await trx(TABLES.ORDER_LIST)
+        .where({ id: order.id })
+        .update(updateFields)
+        .returning("*");
+
+      // Đảm bảo có phân bổ biên lai nếu chưa có
+      if (batch.payment_receipt_id) {
+        const existingAlloc = await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
+          .where({
+            receipt_id: batch.payment_receipt_id,
+            target_code: order.id_order,
+          })
+          .first();
+
+        if (!existingAlloc) {
+          const allocInfo = (Array.isArray(batch.order_allocations)
+            ? batch.order_allocations
+            : JSON.parse(batch.order_allocations || "[]")
+          ).find((a) => a.orderCode === order.id_order);
+
+          const allocAmount = allocInfo ? Number(allocInfo.basePrice || 0) : Number(order.price || 0);
+          await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).insert({
+            receipt_id: batch.payment_receipt_id,
+            allocation_type: ALLOCATION_TYPE.ORDER,
+            target_code: order.id_order,
+            amount: allocAmount,
+            remaining_balance: 0,
+            note: `Bổ sung phân bổ Đơn gộp #${batch.batch_code} (${order.id_order})`,
+            created_by: ALLOCATION_CREATOR.ADMIN_MANUAL,
+          });
+        }
+      }
+
+      // Phát sự kiện gia hạn kỹ thuật (chúc mừng gia hạn, cập nhật kho)
+      // TUYỆT ĐỐI KHÔNG PHÁT ORDER_PAID CÓ TIỀN HAY BATCH_PAYMENT_COMPLETED!
+      if (isRenewal) {
+        trx.afterCommit(() => {
+          eventBus.emit(EVENTS.ORDER_RENEWED, {
+            orderId: updatedOrder.id,
+            id_order: updatedOrder.id_order,
+            id_product: updatedOrder.id_product,
+            price: Number(updatedOrder.price || 0),
+            customer: updatedOrder.customer,
+            newOrderDate: updatedOrder.order_date,
+            newExpiredAt: updatedOrder.expired_at,
+            daysAdded: renewalDays,
+            monthsAdded,
+            action: "BATCH_RETRY_FULFILLMENT",
+          });
+        });
+      }
+
+      fulfilledOrders.push(updatedOrder.id_order);
+    }
+
+    if (batch.status !== "COMPLETED") {
+      await trx(TABLES.BATCH_PAYMENT_REQUESTS)
+        .where({ id: batch.id })
+        .update({
+          status: "COMPLETED",
+          updated_at: trx.fn.now(),
+        });
+    }
+
+    return {
+      success: true,
+      batchCode: batch.batch_code,
+      message: `Đã hoàn tất gia hạn kỹ thuật cho ${fulfilledOrders.length} đơn (${fulfilledOrders.join(", ")}) trong đợt gộp #${batch.batch_code}. Tài chính giữ nguyên 100%.`,
+      fulfilledCount: fulfilledOrders.length,
+      fulfilledOrders,
+      totalOrders: subOrders.length,
+    };
+  });
+}
+
 module.exports = {
   getOrderPrefix,
   resolveOrdersWithCatalogPrices,
@@ -452,4 +601,5 @@ module.exports = {
   getBatchPaymentRequests,
   getBatchPaymentDetail,
   cancelBatchPaymentRequest,
+  fulfillRemainingBatchOrders,
 };

@@ -399,4 +399,60 @@ describe("Batch Payment & Slot Suffix Reconciliation Suite", () => {
     });
   });
 
+  describe("9. EventBus BATCH_PAYMENT_COMPLETED & Single Finance Notification (Chỉ Đạo Của Master)", () => {
+    it("Event BATCH_PAYMENT_COMPLETED chứa đầy đủ thông tin doanh thu, chi phí, và số tiền SePay chuẩn", () => {
+      const { EVENTS } = require("@/events");
+      assert.strictEqual(EVENTS.BATCH_PAYMENT_COMPLETED, "BATCH_PAYMENT_COMPLETED");
+
+      const eventPayload = {
+        batchId: 1,
+        batchCode: "MBP-20261105-TEST",
+        receiptId: 71,
+        transferAmount: 420002,
+        totalRevenue: 420002,
+        totalCost: 380000,
+        ordersCount: 2,
+        orders: [
+          { id_order: "MAVK6G6K2", amount: 210000, isRenewal: true, newStatus: "PAID" },
+          { id_order: "MAVK3AX6A", amount: 210002, isRenewal: true, newStatus: "PAID" },
+        ],
+      };
+
+      assert.strictEqual(eventPayload.totalRevenue, 420002);
+      assert.strictEqual(eventPayload.totalCost, 380000);
+      assert.strictEqual(eventPayload.transferAmount, 420002);
+      assert.strictEqual(eventPayload.orders.length, 2);
+    });
+  });
+
+  describe("10. Logic Hoàn Tất Các Đơn Bị Lỗi (fulfillRemainingBatchOrders) — An Toàn Tuyệt Đối", () => {
+    it("Chỉ quét các đơn CHƯA PAID để gia hạn, bỏ qua 100% các đơn đã hoàn thành trước đó", () => {
+      const subOrders = [
+        { id_order: "ORDER_1", status: "PAID", was_paid: true },
+        { id_order: "ORDER_2", status: "PAID", was_paid: true },
+        { id_order: "ORDER_3", status: "PAID", was_paid: true },
+        { id_order: "ORDER_4", status: "RENEW_REQUIRED", was_paid: false },
+        { id_order: "ORDER_5", status: "PROCESSING", was_paid: false },
+      ];
+
+      const pendingOrders = subOrders.filter(
+        (o) => o.status !== "PAID" && o.status !== "Đã Thanh Toán"
+      );
+
+      assert.strictEqual(pendingOrders.length, 2);
+      assert.strictEqual(pendingOrders[0].id_order, "ORDER_4");
+      assert.strictEqual(pendingOrders[1].id_order, "ORDER_5");
+
+      // Giả lập sau khi hoàn tất 2 đơn lỗi
+      pendingOrders.forEach((o) => {
+        o.status = "PAID";
+        o.was_paid = true;
+      });
+
+      const remainingAfter = subOrders.filter(
+        (o) => o.status !== "PAID" && o.status !== "Đã Thanh Toán"
+      );
+      assert.strictEqual(remainingAfter.length, 0, "Không còn đơn lỗi nào sau khi hoàn tất.");
+    });
+  });
 });

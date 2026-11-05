@@ -1875,6 +1875,8 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
       status: updatedOrder.status,
       isRenewal,
       action: options.action || "COMPLETED",
+      skipFinanceNotification: Boolean(options.skipFinanceNotification),
+      isBatch: Boolean(options.isBatch),
     });
 
     if (isRenewal) {

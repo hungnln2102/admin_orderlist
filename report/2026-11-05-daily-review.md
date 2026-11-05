@@ -17,6 +17,7 @@
 5. [Nhiệm vụ 5: Quy hoạch & Dọn dẹp cấu trúc thư mục docs/ và docs/plans/](#5-nhiệm-vụ-5-quy-hoạch--dọn-dẹp-cấu-trúc-thư-mục-docs-và-docsplans)
 6. [Nhiệm vụ 6: Cấu hình Logic Xóa Sản Phẩm Chống Mồ Côi Đơn Hàng & Tự Động Xóa Kèm Đơn Hết Hạn/Đã Hoàn](#6-nhiệm-vụ-6-cấu-hình-logic-xóa-sản-phẩm-chống-mồ-côi-đơn-hàng--tự-động-xóa-kèm-đơn-hết-hạnđã-hoàn)
 7. [Nhiệm vụ 7: Sửa Lỗi Nghiệp Vụ Đối Soát Webhook Đơn Cần Gia Hạn Theo Giá Catalog Mới & Gia Hạn Đơn MAVLUQXW](#7-nhiệm-vụ-7-sửa-lỗi-nghiệp-vụ-đối-soát-webhook-đơn-cần-gia-hạn-theo-giá-catalog-mới--gia-hạn-đơn-mavluqxw)
+8. [Nhiệm vụ 8: Tái Cấu Trúc Toàn Diện Đơn Gộp (Batch Payment) Qua EventBus & Cơ Chế Hoàn Tất Đơn Lỗi Chặt Chẽ](#8-nhiệm-vụ-8-tái-cấu-trúc-toàn-diện-đơn-gộp-batch-payment-qua-eventbus--cơ-chế-hoàn-tất-đơn-lỗi-chặt-chẽ)
 
 ---
 
@@ -232,6 +233,67 @@
 - **Trạng thái thực tế trên VPS:**
   + Đơn `MAVLUQXW`: `status = PAID`, `expired_at = 2027-11-07 00:00:00+07` (+365 ngày), `price = 350.100 đ`, `gross_selling_price = 350.000 đ`.
   + Biên lai `#72`: `status = FULLY_ALLOCATED`, `unallocated_amount = 0 đ`.
+
+---
+
+## 8. NHIỆM VỤ 8: TÁI CẤU TRÚC TOÀN DIỆN ĐƠN GỘP (BATCH PAYMENT) QUA EVENTBUS & CƠ CHẾ HOÀN TẤT ĐƠN LỖI CHẶT CHẼ
+
+### 8.1. Bối cảnh & Chỉ đạo tối cao của Master
+- Khi khách hàng Hoàng Triều Giang thanh toán `420.002 đ` cho đợt gộp gồm 2 đơn (`MAVK6G6K2` và `MAVK3AX6A`), bot Telegram gửi ra 2 tin nhắn Biến Động Tháng riêng lẻ và số liệu `before --> after` bị nhảy trùng số `4.190.242` do race condition.
+- Master chỉ đạo:
+> *"đây là đơn hàng gộp lại thanh toán 1 lần, nhưng tại sao không tính toán cộng tiền 1 lần luôn mà phải chia thành 2 biến động tháng làm gì"*  
+> *"vấn đề ở đây, số dư bank sẽ phải luôn luôn lấy webhook sepay làm chuẩn"*  
+> *"nhưng tôi nhớ là, nếu mà đơn gộp thì webhook đi đến mã đơn gộp đó => đúng tiền => tính toán tổng nhập, tổng lợi nhuận => sau đó cộng số dư bank, cộng doanh thu, cộng lợi nhuận, cộng nhập hàng là xong phần tài chính. rồi lúc đó có thể chạy luôn luồng tự động gia hạn đơn hàng là xong mà. Như thế là nó sẽ đâu bao giờ lệch tài chính. Nhưng cũng phải chừa 1 đường lui nếu như 1 trong 2 cái bị lỗi thì phải có cách nào chạy lại"*  
+> *"nhưng hình như mấy nay đang thiết kế hệ thống mà không bắn event bus à"*  
+> *"tại sao đã tạo đơn gộp rồi, thì mọi thứ chỉ cần vào đơn gộp bấm là được mà. 5 đơn con trong 1 đơn gộp thì chỉ cần 3 đơn pass, 2 đơn failer thì vào đơn gộp bấm hoàn thành thì sẽ tự động hoàn thành 2 đơn fail mà. Nhưng lúc này không được cộng tiền nữa. Logic chỗ này phải chặt chẽ"*  
+> *"nhưng nút hoàn thành chỉ xuất hiện khi 2 đơn kia lỗi thanh toán thôi nhé."*
+
+### 8.2. Kiến trúc giải pháp kỹ thuật đã triển khai chuẩn mực
+
+#### 1. Định nghĩa Domain Event mới trên EventBus (`eventTypes.js`):
+- Thêm `BATCH_PAYMENT_COMPLETED: "BATCH_PAYMENT_COMPLETED"` vào hệ thống sự kiện cốt lõi.
+
+#### 2. Tách bạch 2 Pha trong Webhook (`webhookPaymentService.js`):
+- **Pha 1 (Tài chính đợt gộp):**
+  - Tiền vào ngân hàng MB Bank tăng đúng `transferAmount` của SePay (`+420.002 đ`).
+  - Tính tổng chi phí nhập (`totalBatchCost`) của các đơn con (loại trừ NCC Mavryk).
+  - Phân bổ biên lai cho từng đơn con trong `payment_receipt_allocations`.
+  - Đăng ký `trx.afterCommit` phát DUY NHẤT 1 sự kiện `BATCH_PAYMENT_COMPLETED` qua EventBus.
+- **Pha 2 (Thực thi gia hạn từng đơn con):**
+  - Duyệt qua từng đơn con để tăng hạn dùng, chuyển sang `PAID`.
+  - Bọc độc lập `try / catch`: Nếu 1 đơn thành công và 1 đơn lỗi, đơn lỗi không làm rollback đợt gộp, đơn thành công vẫn được gia hạn.
+  - Gắn cờ `skipFinanceNotification: true` và `isBatch: true` để triệt tiêu 100% việc bắn tin nhắn biến động tài chính phân mảnh.
+
+#### 3. Subscriber Tài chính tập trung (`dailySummaryService.js`):
+- Lắng nghe `BATCH_PAYMENT_COMPLETED`:
+  - Tích luỹ 1 lần vào `daily_revenue_summary` với tổng doanh thu và tổng chi phí của cả đợt gộp.
+  - Gửi **DUY NHẤT 1 TIN NHẮN TELEGRAM BIẾN ĐỘNG THÁNG**:
+    - Doanh thu: `... --> ... (+totalAmount)`
+    - Nhập hàng: `... --> ... (+totalCost)`
+    - Lợi nhuận: `... --> ... (+profit)`
+    - Số dư bank shop: Phản ánh đúng mức tăng theo SePay: `before --> after (+transferAmount)`.
+    - Nguồn: `webhook.batchPayment:${batchCode} (${orderCodes})`.
+- Bỏ qua sự kiện `ORDER_PAID` đơn lẻ nếu có cờ `skipFinanceNotification` hoặc `isBatch`.
+
+#### 4. Đường lui an toàn: API `POST /api/invoices/batches/:id/fulfill-remaining` (`batchPaymentService.js`):
+- Quét các đơn con trong đợt gộp:
+  - Bỏ qua các đơn đã `PAID` (Idempotent).
+  - Chỉ gia hạn kỹ thuật cho các đơn chưa `PAID` (tăng hạn dùng, chuyển `PAID`).
+- **REDLINE BẤT BIẾN:** Tuyệt đối không cộng thêm tiền vào tài khoản ngân hàng, không cộng doanh thu vào `daily_revenue_summary`, không phát tin nhắn tài chính lần 2.
+
+#### 5. Giao diện tập trung tại Modal Chi Tiết Đơn Gộp (`BatchDetailModal.tsx`):
+- Hiển thị tiến độ hoàn thành các đơn con (`X/Y đơn`).
+- **Điều kiện hiển thị chặt chẽ theo chỉ đạo của Master:**
+  `const showFulfillButton = isBatchPaid && failedOrders.length > 0;`
+  - Nếu tất cả các đơn đều `PAID` (hoặc batch `PENDING`): **ẨN NÚT**.
+  - CHỈ KHI batch đã nhận tiền nhưng có đơn con bị lỗi/chưa sang `PAID`: **XUẤT HIỆN NÚT** `⚡ Hoàn Tất Các Đơn Bị Lỗi (X đơn)`.
+  - Khi Master bấm hoàn tất: Gọi API, gia hạn thành công $\rightarrow$ nút **TỰ ĐỘNG BIẾN MẤT** ngay lập tức.
+
+### 8.3. Kết quả kiểm thử & Nghiệm thu
+- **Backend Test:** `npm --prefix backend run test` đạt **92/92 tests PASSED** (toàn bộ 20 suites thành công 100%).
+  - Bổ sung Test Suite 9: Kiểm thử cấu trúc sự kiện `BATCH_PAYMENT_COMPLETED` qua EventBus.
+  - Bổ sung Test Suite 10: Kiểm thử logic lọc đơn lỗi và an toàn tài chính tuyệt đối của `fulfillRemainingBatchOrders`.
+- **Frontend Build:** `npm --prefix frontend run build` (`tsc && vite build`) hoàn thành trong 7.79s, **0 lỗi TypeScript**.
 
 
 ---

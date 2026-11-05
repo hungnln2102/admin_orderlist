@@ -55,6 +55,12 @@ function registerDailySummaryListeners() {
   // 1. Đơn hàng thanh toán thành công hoặc gia hạn thành công -> Cộng doanh thu + 1 đơn
   eventBus.on(EVENTS.ORDER_PAID, async (data) => {
     try {
+      // Nếu đơn thuộc đợt gộp (Batch) hoặc có cờ bỏ qua -> Không xử lý riêng lẻ để tránh nhân đôi tài chính/spam Telegram
+      if (data.skipFinanceNotification || data.isBatch) {
+        console.log(`📊 [DailySummary] Bỏ qua ORDER_PAID cho đơn #${data.id_order} (Đơn thuộc Đợt Gộp, tài chính sẽ được hạch toán tập trung tại BATCH_PAYMENT_COMPLETED).`);
+        return;
+      }
+
       const amount = Number(data.amount || data.price || data.gross_selling_price || 0);
       
       // Kiểm tra nếu NCC là Mavryk (Chủ shop) -> Chi phí nhập hàng = 0, cộng thẳng vào lợi nhuận
@@ -97,6 +103,42 @@ function registerDailySummaryListeners() {
       });
     } catch (err) {
       console.error("[DailySummary] Lỗi xử lý ORDER_PAID:", err.message);
+    }
+  });
+
+  // 1b. Sự kiện Đợt gộp đơn thanh toán thành công (BATCH_PAYMENT_COMPLETED) -> Hạch toán tài chính tập trung 1 lần
+  eventBus.on(EVENTS.BATCH_PAYMENT_COMPLETED, async (data) => {
+    try {
+      const totalAmount = Number(data.transferAmount || data.totalRevenue || data.total_amount || data.totalAmount || 0);
+      const totalCost = Number(data.totalCost || 0);
+      const profit = totalAmount - totalCost;
+      const dateStr = getVietnamDateString(data.transactionDate || data.updated_at || new Date());
+      const orderCount = Array.isArray(data.orders) ? data.orders.length : Number(data.ordersCount || 1);
+
+      console.log(`📊 [DailySummary] Nhận BATCH_PAYMENT_COMPLETED (#${data.batchCode}): +${totalAmount} ₫ doanh thu, +${totalCost} ₫ chi phí, +${orderCount} đơn (Ngày: ${dateStr})`);
+
+      await accumulateDailySummary(dateStr, {
+        earned_revenue: totalAmount,
+        total_shop_cost: totalCost,
+        dashboard_orders_count: orderCount,
+      });
+
+      const subOrderCodes = Array.isArray(data.orders)
+        ? data.orders.map((o) => o.id_order || o.orderCode).filter(Boolean).join(", ")
+        : (data.orderCodes || "");
+
+      // Bắn DUY NHẤT 1 thông báo Telegram Biến Động Tháng cho toàn bộ đợt gộp
+      // Số dư bank shop tăng đúng bằng số tiền Webhook SePay (transferAmount)
+      await financeNotifier.notifyFinanceMonthlyDelta({
+        monthKey: getVietnamMonthString(dateStr),
+        revenueDelta: totalAmount,
+        importDelta: totalCost,
+        profitDelta: profit,
+        bankBalanceDelta: totalAmount,
+        context: `webhook.batchPayment:${data.batchCode}${subOrderCodes ? ` (${subOrderCodes})` : ""}`,
+      });
+    } catch (err) {
+      console.error("[DailySummary] Lỗi xử lý BATCH_PAYMENT_COMPLETED:", err.message);
     }
   });
 

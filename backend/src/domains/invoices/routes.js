@@ -136,5 +136,16 @@ router.post("/batches/:id/cancel", async (req, res) => {
   }
 });
 
+// POST /api/invoices/batches/:id/fulfill-remaining - Hoàn tất các đơn con còn lại trong đợt gộp (không cộng tiền)
+router.post("/batches/:id/fulfill-remaining", async (req, res) => {
+  try {
+    const result = await batchPaymentService.fulfillRemainingBatchOrders(req.params.id);
+    res.json(result);
+  } catch (err) {
+    console.error("[Invoices API] Lỗi hoàn tất các đơn còn lại trong đợt gộp:", err);
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể hoàn tất các đơn còn lại.") });
+  }
+});
+
 module.exports = router;
 
