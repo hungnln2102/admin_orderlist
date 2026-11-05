@@ -1522,13 +1522,17 @@ async function renewOrder(id, payload = {}) {
     // ─────────────────────────────────────────────────────────────
     // Lấy đúng giá sản phẩm gia hạn theo Catalog hiện tại (KHÔNG LÀM TRÒN!)
     let basePrice = 0;
+    let catalogCost = null;
     if (payload.price != null && Number(payload.price) > 0) {
       basePrice = Number(payload.price);
     } else {
-      const { catalogBasePrice } = await resolveOrderCatalogPricing(trx, existingOrder);
+      const { catalogBasePrice, catalogCostPrice } = await resolveOrderCatalogPricing(trx, existingOrder);
       basePrice = catalogBasePrice > 0
         ? catalogBasePrice
         : Number(existingOrder.gross_selling_price != null ? existingOrder.gross_selling_price : existingOrder.price || 0);
+      if (catalogCostPrice != null && Number.isFinite(catalogCostPrice) && catalogCostPrice > 0) {
+        catalogCost = catalogCostPrice;
+      }
     }
 
     // Cấp phát 1 Slot Suffix (1..100) khả dụng không bị trùng cho số tiền này
@@ -1544,6 +1548,12 @@ async function renewOrder(id, payload = {}) {
       gross_selling_price: basePrice,
       days,
     };
+
+    if (payload.cost != null && Number.isFinite(Number(payload.cost))) {
+      updateFields.cost = Number(payload.cost);
+    } else if (catalogCost != null) {
+      updateFields.cost = catalogCost;
+    }
 
     if (payload.note !== undefined) updateFields.note = payload.note;
     if (payload.supply_id !== undefined) updateFields.supply_id = payload.supply_id ? Number(payload.supply_id) : null;
@@ -1803,6 +1813,12 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
       updateFields.order_date = newOrderDate;
       updateFields.expired_at = newExpiredAt;
       updateFields.days = renewalDays;
+
+      // Tra cứu và đồng bộ giá nhập mới nhất của NCC từ Catalog
+      const { catalogCostPrice } = await resolveOrderCatalogPricing(trx, order);
+      if (catalogCostPrice != null && Number.isFinite(catalogCostPrice) && catalogCostPrice > 0) {
+        updateFields.cost = catalogCostPrice;
+      }
     }
 
     const [updatedOrder] = await getOrderTable(trx)
@@ -1813,6 +1829,38 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
     const payAmount = amount != null ? Number(amount) : Number(updatedOrder.price || 0);
     const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
     const effectiveCost = isSupplierMavryk ? 0 : Number(updatedOrder.cost || 0);
+    const supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
+
+    // Quản lý công nợ NCC khi gia hạn thành công (chu kỳ mới, chỉ áp dụng cho NCC ngoài)
+    if (isRenewal && !isSupplierMavryk && supplyId && effectiveCost > 0) {
+      const existingCostLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
+        .where({
+          order_list_id: updatedOrder.id,
+          supply_id: supplyId,
+        })
+        .andWhere(trx.raw("logged_at >= CURRENT_DATE"))
+        .first();
+
+      if (!existingCostLog) {
+        await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+          order_list_id: updatedOrder.id,
+          supply_id: supplyId,
+          id_order: updatedOrder.id_order,
+          import_cost: effectiveCost,
+          ncc_payment_status: "Chưa Thanh Toán",
+          logged_at: trx.fn.now(),
+        });
+
+        const formatCostMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+        emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
+          cost: effectiveCost,
+          supplier_id: supplyId,
+          order_id: updatedOrder.id,
+          id_order: updatedOrder.id_order,
+          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${formatCostMoney(effectiveCost)}`,
+        });
+      }
+    }
 
     emitOrderEvent(trx, EVENTS.ORDER_PAID, {
       orderId: updatedOrder.id,

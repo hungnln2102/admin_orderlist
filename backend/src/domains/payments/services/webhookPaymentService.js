@@ -375,20 +375,25 @@ async function processPaymentWebhook(payload = {}) {
           .skipLocked();
 
         for (const candidate of renewCandidates) {
-          const { catalogBasePrice } = await resolveOrderCatalogPricing(trx, candidate);
+          const { catalogBasePrice, catalogCostPrice } = await resolveOrderCatalogPricing(trx, candidate);
           if (catalogBasePrice > 0) {
             const suffix = extractSlotSuffix(candidate) || await getAvailableSuffix(trx, candidate.id);
             const expectedRenewalPrice = applySuffixToPrice(catalogBasePrice, suffix);
 
             if (transferAmount === expectedRenewalPrice || transferAmount === catalogBasePrice) {
               matchedOrder = candidate;
-              // Đồng bộ luôn giá Catalog mới vào đơn hàng trong DB
+              // Đồng bộ luôn giá Catalog mới (cả giá bán và giá nhập NCC) vào đơn hàng trong DB
+              const syncRenewalData = {
+                gross_selling_price: catalogBasePrice,
+                price: expectedRenewalPrice,
+              };
+              if (catalogCostPrice != null && Number.isFinite(catalogCostPrice) && catalogCostPrice > 0) {
+                syncRenewalData.cost = catalogCostPrice;
+                matchedOrder.cost = catalogCostPrice;
+              }
               await getOrderTable(trx)
                 .where({ id: candidate.id })
-                .update({
-                  gross_selling_price: catalogBasePrice,
-                  price: expectedRenewalPrice,
-                });
+                .update(syncRenewalData);
               matchedOrder.gross_selling_price = catalogBasePrice;
               matchedOrder.price = expectedRenewalPrice;
               break;

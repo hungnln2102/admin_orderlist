@@ -232,3 +232,39 @@
 - **Trạng thái thực tế trên VPS:**
   + Đơn `MAVLUQXW`: `status = PAID`, `expired_at = 2027-11-07 00:00:00+07` (+365 ngày), `price = 350.100 đ`, `gross_selling_price = 350.000 đ`.
   + Biên lai `#72`: `status = FULLY_ALLOCATED`, `unallocated_amount = 0 đ`.
+
+
+---
+
+## 8. NHIỆM VỤ 8: ĐỒNG BỘ GIÁ NHẬP NCC (COST) TỪ CATALOG CHO ĐƠN CẦN GIA HẠN & QUẢN TRỊ CÔNG NỢ NCC
+
+### 8.1. Bối cảnh & Chỉ đạo tối cao của Master
+- Sau khi hoàn thành việc đồng bộ giá bán lẻ/CTV (`price`, `gross_selling_price`) theo Catalog mới cho đơn gia hạn, Master tiếp tục chỉ đạo sâu sắc và toàn diện:
+> *"Giá bán thì sửa rồi nhưng mà giá nhập của NCC thì sao. Cũng phải lấy giá mới nhất từ catalog chứ"*
+
+### 8.2. Phân tích nguyên nhân gốc rễ
+1. Bảng `business.supplier_cost` lưu trữ giá nhập hiện hành của từng nhà cung cấp cho mỗi biến thể sản phẩm (`variant_id`, `supplier_id`, `price`).
+2. Tuy nhiên, trước đây hàm `resolveOrderCatalogPricing`, hàm `renewOrder` ([orderService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/orders/services/orderService.js)) và luồng Webhook chỉ đồng bộ giá bán mà bỏ quên giá vốn (`cost`), khiến đơn hàng khi gia hạn chu kỳ mới vẫn mang giá nhập lịch sử từ các năm trước.
+3. Hậu quả thực tế:
+   - Đơn `MAVLUQXW`: Biến thể `131` (`Slot Office 365 / Office365_Add--12m`) có NCC Tài (`supply_id = 12`) với giá nhập mới nhất trong Catalog là `100.000 đ` (cập nhật ngày 03/11/2026).
+   - Nhưng trên đơn hàng, `cost` vẫn lưu `80.000 đ` (từ tháng 11/2025). Lợi nhuận kỳ mới bị tính lệch `20.000 đ` và công nợ NCC không được ghi nhận đúng số tiền thực tế.
+
+### 8.3. Giải pháp kỹ thuật đã triển khai (Chuẩn ACID)
+1. **Nâng cấp [catalogPricingService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/products/services/catalogPricingService.js):**
+   - Mở rộng `resolveOrderCatalogPricing`: Tự động tra cứu `supplier_cost` theo `variant_id` và `supply_id` của đơn hàng để lấy `catalogCostPrice`. Nếu đơn chưa chỉ định NCC thì lấy giá nhập thấp nhất trong Catalog của variant đó.
+   - Nâng cấp `syncRenewRequiredOrdersPricing`: Khi quét đồng bộ các đơn `RENEW_REQUIRED`, tự động cập nhật cả `cost = catalogCostPrice` vào `business.order_list`.
+2. **Nâng cấp [orderService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/orders/services/orderService.js):**
+   - Trong `renewOrder`: Khi đưa đơn sang trạng thái `RENEW_REQUIRED`, tự động cập nhật `cost = catalogCostPrice`.
+   - Trong `processCompleteOrder`: Khi hoàn tất gia hạn đơn sang `PAID`, cập nhật `cost` theo giá Catalog mới và đối với NCC ngoài (`!isSupplierMavryk && supplyId && cost > 0`), tự động ghi nhận 1 bản ghi vào `business.supplier_order_cost_log` (`import_cost = cost`, `ncc_payment_status = 'Chưa Thanh Toán'`) và phát sinh event `EVENTS.SUPPLIER_COST_ADDED`.
+3. **Nâng cấp [webhookPaymentService.js](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/payments/services/webhookPaymentService.js):**
+   - Tại tầng 6c, khi tự động khớp tiền cho đơn gia hạn, đồng bộ luôn cả `cost = catalogCostPrice` vào đơn hàng trong database.
+4. **Cập nhật dữ liệu thực tế đơn `MAVLUQXW` trên VPS:**
+   - Cập nhật `cost = 100.000 đ` trong `business.order_list`.
+   - Tạo bản ghi công nợ NCC Tài `#522` trong `business.supplier_order_cost_log`: `import_cost = 100.000 đ`, `ncc_payment_status = 'Chưa Thanh Toán'`.
+
+### 8.4. Kết quả kiểm thử & Nghiệm thu
+- **Unit Test:** `npm --prefix backend run test` đạt **90/90 tests PASSED** (toàn bộ 18 suites thành công 100%).
+- **Frontend Build:** `npm --prefix frontend run build` (`tsc && vite build`) hoàn thành trong 8.23s, **0 lỗi compile**.
+- **Database VPS xác nhận:**
+  + Đơn `MAVLUQXW`: `cost = 100000.00`, `price = 350100.00`, `gross_selling_price = 350000.00`, `supply_id = 12`, `status = PAID`.
+  + Log công nợ NCC `#522`: `order_list_id = 423`, `supply_id = 12`, `import_cost = 100000.00`, `ncc_payment_status = 'Chưa Thanh Toán'`.

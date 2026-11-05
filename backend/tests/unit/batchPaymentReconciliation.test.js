@@ -340,4 +340,63 @@ describe("Batch Payment & Slot Suffix Reconciliation Suite", () => {
       assert.strictEqual(isMatched, true);
     });
   });
+
+  describe("8. Tự Động Tra Cứu và Đồng Bộ Giá Nhập NCC (catalogCostPrice) Từ Catalog", () => {
+    it("resolveOrderCatalogPricing trả về đúng catalogCostPrice từ supplier_cost theo variant và supplier_id", async () => {
+      const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
+      const { TABLES } = require("@/db");
+
+      const mockOrder = {
+        id: 423,
+        id_order: "MAVLUQXW",
+        id_product: 131,
+        supply_id: 12,
+        cost: 80000,
+      };
+
+      const mockVariant = {
+        id: 131,
+        variant_name: "Slot Office 365",
+        display_name: "Office365_Add--12m",
+        base_price: 350000,
+        is_active: true,
+      };
+
+      const mockSupplierCosts = [
+        { id: 178, variant_id: 131, supplier_id: 12, price: 100000 },
+        { id: 296, variant_id: 131, supplier_id: 15, price: 150000 },
+      ];
+
+      const mockDb = (tableName) => {
+        const queryObj = {
+          where: () => queryObj,
+          andWhere: (suppCriteria) => ({
+            first: async () => mockSupplierCosts.find(sc => sc.supplier_id === suppCriteria.supplier_id) || null,
+          }),
+          orderBy: () => ({
+            first: async () => mockSupplierCosts[0],
+          }),
+          first: async () => {
+            if (tableName === TABLES.VARIANT) return mockVariant;
+            if (tableName === TABLES.SUPPLIER_COST) return mockSupplierCosts[0];
+            return null;
+          },
+          then: (resolve) => {
+            if (tableName === TABLES.VARIANT_PRICE) {
+              resolve([{ tier_id: 2, price: 350000 }]);
+              return;
+            }
+            resolve([]);
+          },
+        };
+        return queryObj;
+      };
+
+      const pricing = await resolveOrderCatalogPricing(mockDb, mockOrder);
+      assert.strictEqual(pricing.catalogBasePrice, 350000, "Giá bán catalog lẻ phải là 350.000 đ");
+      assert.strictEqual(pricing.catalogCostPrice, 100000, "Giá nhập NCC Tài phải là 100.000 đ (thay vì giá cũ 80.000 đ)");
+      assert.strictEqual(pricing.supplierId, 12, "NCC phải là 12 (Tài)");
+    });
+  });
+
 });

@@ -5,6 +5,7 @@ const { extractSlotSuffix, getAvailableSuffix, applySuffixToPrice } = require("@
 const O_COLS = COLS.ORDER_LIST;
 const V_COLS = COLS.VARIANT;
 const VP_COLS = COLS.VARIANT_PRICE;
+const SC_COLS = COLS.SUPPLIER_COST;
 
 function getOrderPrefix(idOrder) {
   if (!idOrder) return "MAVL";
@@ -62,23 +63,43 @@ async function findCatalogVariant(queryDb, order) {
 
 async function resolveOrderCatalogPricing(queryDb, order) {
   if (!order) {
-    return { catalogBasePrice: 0, isActive: true, variantId: null, displayName: null, variantName: null };
-  }
-
-  const prefix = getOrderPrefix(order[O_COLS.ID_ORDER]);
-  if (prefix === "MAVT") {
-    return { catalogBasePrice: 0, isActive: true, variantId: null, displayName: null, variantName: null };
-  }
-
-  const dbClient = queryDb || db;
-  const variant = await findCatalogVariant(dbClient, order);
-  if (!variant) {
     return {
-      catalogBasePrice: getFallbackPrice(order),
+      catalogBasePrice: 0,
+      catalogCostPrice: 0,
       isActive: true,
       variantId: null,
       displayName: null,
       variantName: null,
+      supplierId: null,
+    };
+  }
+
+  const prefix = getOrderPrefix(order[O_COLS.ID_ORDER]);
+  if (prefix === "MAVT") {
+    return {
+      catalogBasePrice: 0,
+      catalogCostPrice: 0,
+      isActive: true,
+      variantId: null,
+      displayName: null,
+      variantName: null,
+      supplierId: null,
+    };
+  }
+
+  const dbClient = queryDb || db;
+  const variant = await findCatalogVariant(dbClient, order);
+  const fallbackCost = Number(order?.[O_COLS.COST] || 0);
+
+  if (!variant) {
+    return {
+      catalogBasePrice: getFallbackPrice(order),
+      catalogCostPrice: fallbackCost,
+      isActive: true,
+      variantId: null,
+      displayName: null,
+      variantName: null,
+      supplierId: order?.[O_COLS.SUPPLY_ID] ? Number(order[O_COLS.SUPPLY_ID]) : null,
     };
   }
 
@@ -86,12 +107,40 @@ async function resolveOrderCatalogPricing(queryDb, order) {
     .where({ [VP_COLS.VARIANT_ID]: variant[V_COLS.ID] });
   const catalogBasePrice = selectCatalogPrice(prefix, variant, Array.isArray(prices) ? prices : []) || getFallbackPrice(order);
 
+  // Tra cứu giá nhập mới nhất của NCC từ catalog (supplier_cost)
+  let catalogCostPrice = fallbackCost;
+  let resolvedSupplierId = order?.[O_COLS.SUPPLY_ID] ? Number(order[O_COLS.SUPPLY_ID]) : null;
+
+  try {
+    let scQuery = dbClient(TABLES.SUPPLIER_COST).where({ [SC_COLS.VARIANT_ID]: variant[V_COLS.ID] });
+    if (resolvedSupplierId && typeof scQuery.andWhere === "function") {
+      scQuery = scQuery.andWhere({ [SC_COLS.SUPPLIER_ID]: resolvedSupplierId });
+    } else if (typeof scQuery.orderBy === "function") {
+      scQuery = scQuery.orderBy(SC_COLS.PRICE, "asc");
+    }
+
+    if (scQuery && typeof scQuery.first === "function") {
+      const supplierCostRow = await scQuery.first();
+      if (supplierCostRow && Number.isFinite(Number(supplierCostRow[SC_COLS.PRICE]))) {
+        catalogCostPrice = Number(supplierCostRow[SC_COLS.PRICE]);
+        if (!resolvedSupplierId) {
+          resolvedSupplierId = Number(supplierCostRow[SC_COLS.SUPPLIER_ID]);
+        }
+      }
+    }
+  } catch (err) {
+    // Fallback an toàn nếu môi trường test hoặc query supplier_cost gặp lỗi
+    catalogCostPrice = fallbackCost;
+  }
+
   return {
     catalogBasePrice,
+    catalogCostPrice,
     isActive: variant[V_COLS.IS_ACTIVE] !== false,
     variantId: variant[V_COLS.ID],
     displayName: variant[V_COLS.DISPLAY_NAME] || null,
     variantName: variant[V_COLS.VARIANT_NAME] || null,
+    supplierId: resolvedSupplierId,
   };
 }
 
@@ -104,6 +153,7 @@ async function resolveOrdersWithCatalogPrices(queryDb, orders = []) {
       display_name: pricing.displayName || order.display_name || null,
       variant_name: pricing.variantName || null,
       catalogBasePrice: pricing.catalogBasePrice,
+      catalogCostPrice: pricing.catalogCostPrice,
     };
   }));
 }
@@ -127,28 +177,38 @@ async function syncRenewRequiredOrdersPricing(queryDb = null, variantId = null) 
     O_COLS.INFORMATION_ORDER,
     O_COLS.PRICE,
     O_COLS.GROSS_SELLING_PRICE,
+    O_COLS.COST,
+    O_COLS.SUPPLY_ID,
     O_COLS.STATUS,
   );
   let updatedCount = 0;
 
   for (const order of orders) {
-    const { catalogBasePrice } = await resolveOrderCatalogPricing(dbClient, order);
+    const { catalogBasePrice, catalogCostPrice } = await resolveOrderCatalogPricing(dbClient, order);
     if (catalogBasePrice <= 0) continue;
 
     const suffix = extractSlotSuffix(order) || await getAvailableSuffix(dbClient, order[O_COLS.ID]);
     const price = applySuffixToPrice(catalogBasePrice, suffix);
+    const isCostSame = catalogCostPrice == null || Number(order[O_COLS.COST] || 0) === catalogCostPrice;
+
     if (
       Number(order[O_COLS.GROSS_SELLING_PRICE] || 0) === catalogBasePrice
       && Number(order[O_COLS.PRICE] || 0) === price
+      && isCostSame
     ) continue;
+
+    const updateData = {
+      [O_COLS.GROSS_SELLING_PRICE]: catalogBasePrice,
+      [O_COLS.PRICE]: price,
+    };
+    if (catalogCostPrice != null && Number.isFinite(catalogCostPrice)) {
+      updateData[O_COLS.COST] = catalogCostPrice;
+    }
 
     updatedCount += await dbClient(TABLES.ORDER_LIST)
       .whereIn(O_COLS.STATUS, [ORDER_STATUS.RENEW_REQUIRED, "Cần Gia Hạn"])
       .where({ [O_COLS.ID]: order[O_COLS.ID] })
-      .update({
-        [O_COLS.GROSS_SELLING_PRICE]: catalogBasePrice,
-        [O_COLS.PRICE]: price,
-      });
+      .update(updateData);
   }
 
   return { success: true, updatedCount };
