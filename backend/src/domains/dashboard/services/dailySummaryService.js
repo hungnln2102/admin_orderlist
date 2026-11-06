@@ -149,20 +149,15 @@ function registerDailySummaryListeners() {
     console.log(`🔄 [DailySummary] Nhận ORDER_RENEWED: đơn #${data.id_order} gia hạn +${data.daysAdded} ngày (Hết hạn mới: ${data.newExpiredAt})`);
   });
 
-  // 3. Thanh toán công nợ NCC -> Tăng chi phí nhập hàng
+  // Thanh toán công nợ NCC chỉ làm giảm số dư ngân hàng; giá vốn đã ghi nhận khi đơn được thanh toán.
   eventBus.on(EVENTS.SUPPLIER_DEBT_PAID, async (data) => {
     try {
       const amount = Number(data.amount || 0);
       const date = getVietnamDateString();
-      console.log(`📊 [DailySummary] Nhận SUPPLIER_DEBT_PAID: +${amount} ₫ tiền thanh toán NCC (Ngày: ${date})`);
-
-      await accumulateDailySummary(date, {
-        total_shop_cost: amount,
-      });
+      console.log(`📊 [DailySummary] Nhận SUPPLIER_DEBT_PAID: -${amount} ₫ số dư ngân hàng, không ghi thêm chi phí nhập hàng (Ngày: ${date})`);
 
       await financeNotifier.notifyFinanceMonthlyDelta({
         monthKey: getVietnamMonthString(date),
-        importDelta: amount,
         bankBalanceDelta: -amount,
         context: data.summary || `Thanh toán công nợ NCC ${data.supplier_name}: ${amount} đ`,
       });
@@ -170,7 +165,6 @@ function registerDailySummaryListeners() {
       console.error("[DailySummary] Lỗi xử lý SUPPLIER_DEBT_PAID:", err.message);
     }
   });
-
   // 4. Tiền hoàn / Đơn hủy -> Cộng hoàn tiền + 1 đơn hủy
   eventBus.on(EVENTS.ORDER_CANCELED_REFUNDED, async (data) => {
     try {

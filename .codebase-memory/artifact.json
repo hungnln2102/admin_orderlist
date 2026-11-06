@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "0ac2ebcc4fdb984ac3d5ba04cfad4aa85fef0f1c",
-    "indexed_at": "2026-11-05T16:13:46Z",
+    "commit": "ef26d1572cd3ad8ccbf20b03b6d61fd8e21449fe",
+    "indexed_at": "2026-11-06T12:21:05Z",
     "project": "E-Project-admin_store-admin_orderlist",
-    "nodes": 4948,
-    "edges": 6315,
-    "original_size": 11141120,
-    "compressed_size": 1954903,
+    "nodes": 4987,
+    "edges": 6468,
+    "original_size": 11468800,
+    "compressed_size": 2014677,
     "compression_level": 3
 }

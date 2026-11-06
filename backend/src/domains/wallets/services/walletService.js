@@ -1,4 +1,4 @@
-/**
+﻿/**
  * walletService.js (V2)
  * Quản lý Tài khoản Thanh toán (Bank) và Ví USDT (USDT) từ DB (finance.financial_accounts)
  */
@@ -72,7 +72,7 @@ async function listBankAccounts() {
   }));
 }
 
-async function syncBankInstrumentMappingInTrx(trx, { accountId, cardLastDigits, bankDisplayName, bankShortCode, accountHolder }) {
+async function syncBankInstrumentMappingInTrx(trx, { accountId, accountNumber, cardLastDigits, bankDisplayName, bankShortCode, accountHolder }) {
   if (!TABLES.BANK_INSTRUMENT_MAPPINGS) return;
   const numericId = Number(accountId);
   const cleanDigits = cardLastDigits ? String(cardLastDigits).trim() : null;
@@ -91,7 +91,8 @@ async function syncBankInstrumentMappingInTrx(trx, { accountId, cardLastDigits, 
         .where("id", existing.id)
         .update({
           provider,
-          masked_suffix: cleanDigits,
+          account_number: accountNumber ? String(accountNumber).replace(/\D/g, "") || null : null,
+        masked_suffix: cleanDigits,
           card_holder_name: accountHolder ? String(accountHolder).trim() : existing.card_holder_name,
           product_hint: bankDisplayName || existing.product_hint,
           status: "ACTIVE",
@@ -100,6 +101,7 @@ async function syncBankInstrumentMappingInTrx(trx, { accountId, cardLastDigits, 
     } else {
       await trx(TABLES.BANK_INSTRUMENT_MAPPINGS).insert({
         provider,
+        account_number: accountNumber ? String(accountNumber).replace(/\D/g, "") || null : null,
         instrument_kind: "DEBIT_CARD",
         masked_suffix: cleanDigits,
         card_holder_name: accountHolder ? String(accountHolder).trim() : null,
@@ -172,6 +174,7 @@ async function createBankAccount(payload) {
     if (payload.cardLastDigits) {
       await syncBankInstrumentMappingInTrx(trx, {
         accountId: inserted.id,
+        accountNumber: inserted.account_number,
         cardLastDigits: payload.cardLastDigits,
         bankDisplayName: payload.bankDisplayName,
         bankShortCode: payload.bankShortCode,
@@ -246,6 +249,7 @@ async function updateBankAccount(id, payload) {
     if (payload.cardLastDigits !== undefined) {
       await syncBankInstrumentMappingInTrx(trx, {
         accountId: numericId,
+        accountNumber: updateData.account_number || beforeState.account_number,
         cardLastDigits: updateData.card_last_digits,
         bankDisplayName: updateData.bank_display_name || beforeState.bank_display_name,
         bankShortCode: updateData.bank_short_code || beforeState.bank_short_code,

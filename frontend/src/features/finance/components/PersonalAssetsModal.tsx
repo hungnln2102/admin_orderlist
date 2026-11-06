@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DebtRepaymentFrequency, PersonalAsset, PersonalAssetType, ProfitDestination, ProfitFrequency } from "../types";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DebtKind, DebtRepaymentFrequency, PersonalAsset, PersonalAssetType, ProfitDestination, ProfitFrequency } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { DateInputVN } from "@/shared/components/DateInputVN";
 import {
@@ -83,6 +83,9 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   const [debtHasEndDate, setDebtHasEndDate] = useState(false);
   const [debtEndDate, setDebtEndDate] = useState("");
   const [debtRepaymentFrequency, setDebtRepaymentFrequency] = useState<DebtRepaymentFrequency>("MONTHLY");
+  const [debtKind, setDebtKind] = useState<DebtKind>("PERSONAL_EXTERNAL");
+  const [debtInitialLimit, setDebtInitialLimit] = useState("");
+  const [debtAccountNumber, setDebtAccountNumber] = useState("");
   const [cardLastDigits, setCardLastDigits] = useState("");
   const [bankName, setBankName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -109,6 +112,9 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setDebtHasEndDate(Boolean(editingItem.debtEndDate));
       setDebtEndDate(editingItem.debtEndDate || "");
       setDebtRepaymentFrequency(editingItem.debtRepaymentFrequency || "MONTHLY");
+      setDebtKind(editingItem.debtKind || "PERSONAL_EXTERNAL");
+      setDebtInitialLimit(editingItem.debtInitialLimit ? String(editingItem.debtInitialLimit) : "");
+      setDebtAccountNumber(editingItem.debtAccountNumber || "");
       setCardLastDigits(editingItem.cardLastDigits || "");
       setBankName(editingItem.bankName || "");
     } else {
@@ -129,6 +135,9 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       setDebtHasEndDate(false);
       setDebtEndDate("");
       setDebtRepaymentFrequency("MONTHLY");
+      setDebtKind("PERSONAL_EXTERNAL");
+      setDebtInitialLimit("");
+      setDebtAccountNumber("");
       setCardLastDigits("");
       setBankName("");
     }
@@ -308,6 +317,10 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       notify.warning("Vui lòng chọn tài khoản nhận tiền sinh lời");
       return;
     }
+    if (isDebtAsset && debtKind !== "PERSONAL_EXTERNAL" && Number(debtInitialLimit) <= 0) {
+      notify.warning("Vui lòng nhập hạn mức ban đầu lớn hơn 0");
+      return;
+    }
     if (isDebtAsset && debtInterestEnabled && debtRateValue <= 0) {
       notify.warning("Vui lòng nhập lãi suất nợ lớn hơn 0");
       return;
@@ -334,7 +347,10 @@ export const PersonalAssetsModal: React.FC<Props> = ({
         profitDestination: isYieldAsset && profitEnabled ? profitDestination : null,
         profitAccountId: isYieldAsset && profitEnabled && profitAccountId ? Number(profitAccountId) : null,
         profitCreditTime: isYieldAsset && profitEnabled ? profitCreditTime : null,
-        debtInterestEnabled: isDebtAsset && debtInterestEnabled,
+        debtKind: type === "DEBT_PAYABLE" ? debtKind : null,
+        debtInitialLimit: type === "DEBT_PAYABLE" && debtKind !== "PERSONAL_EXTERNAL" ? Number(debtInitialLimit) : null,
+        debtAccountNumber: type === "DEBT_PAYABLE" ? (debtAccountNumber.replace(/\D/g, "") || null) : null,
+        debtInterestEnabled: isDebtAsset && debtKind !== "PERSONAL_EXTERNAL" && debtInterestEnabled,
         debtInterestFrequency: isDebtAsset && debtInterestEnabled ? debtInterestFrequency : null,
         debtAnnualInterestRate: isDebtAsset && debtInterestEnabled ? debtRateValue : null,
         debtDueDay: isDebtAsset && debtDueDay ? Number(debtDueDay) : null,
@@ -554,6 +570,23 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                       </div>
                     </div>
 
+                    {type === "DEBT_PAYABLE" && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                        <label className="text-[11px] text-slate-300 font-medium">Loại sổ nợ
+                          <select value={debtKind} onChange={(event) => setDebtKind(event.target.value as DebtKind)} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none">
+                            <option value="PERSONAL_EXTERNAL">Nợ cá nhân ngoài, không lãi</option>
+                            <option value="CREDIT_CARD">Thẻ tín dụng</option>
+                            <option value="OVERDRAFT">Thấu chi</option>
+                          </select>
+                        </label>
+                        <label className="text-[11px] text-slate-300 font-medium">{debtKind === "PERSONAL_EXTERNAL" ? "STK đối chiếu (nếu có)" : "Hạn mức ban đầu"}
+                          <input type={debtKind === "PERSONAL_EXTERNAL" ? "text" : "number"} min="0" value={debtKind === "PERSONAL_EXTERNAL" ? debtAccountNumber : debtInitialLimit} onChange={(event) => debtKind === "PERSONAL_EXTERNAL" ? setDebtAccountNumber(event.target.value.replace(/\D/g, "")) : setDebtInitialLimit(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
+                        </label>
+                        {debtKind !== "PERSONAL_EXTERNAL" && <label className="text-[11px] text-slate-300 font-medium">STK trích nợ để đối chiếu
+                          <input type="text" value={debtAccountNumber} onChange={(event) => setDebtAccountNumber(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
+                        </label>}
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                       <div>
                         <label className="mb-1 block text-[11px] text-slate-300 font-medium">

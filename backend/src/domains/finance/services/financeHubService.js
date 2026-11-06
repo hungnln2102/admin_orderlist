@@ -1,4 +1,4 @@
-/**
+﻿/**
  * financeHubService.js
  * Quản lý tính toán tài chính toàn diện:
  * 1. Chi phí cố định (Fixed costs)
@@ -11,6 +11,7 @@ const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
 const { eventBus, EVENTS, recordEvent } = require("@/events");
+const { publishEventInTrx } = require("@/events");
 const creditLedgerService = require("../credit/creditLedgerService");
 
 const toNumber = (val) => {
@@ -21,6 +22,50 @@ const toNumber = (val) => {
 const PROFIT_FREQUENCIES = new Set(["DAILY", "MONTHLY", "YEARLY"]);
 const PROFIT_DESTINATIONS = new Set(["REINVEST", "CASH_BANK", "SHOP_BALANCE", "OTHER"]);
 const DEBT_REPAYMENT_FREQUENCIES = new Set(["DAILY", "MONTHLY"]);
+
+function isDebtProfile(asset) {
+  return asset?.type === "DEBT_PAYABLE";
+}
+
+async function publishDebtProfileMutationInTrx(trx, { action, beforeState = null, afterState = null, changedFields = {} }) {
+  const profile = afterState || beforeState;
+  if (!isDebtProfile(beforeState) && !isDebtProfile(afterState)) return;
+
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.FINANCE_DEBT_PROFILE_MUTATED,
+    aggregateType: "PERSONAL_DEBT_PROFILE",
+    aggregateId: profile.id,
+    action,
+    beforeState,
+    afterState,
+    changedFields,
+    source: "FINANCE_HUB",
+    payload: {
+      personalAssetId: Number(profile.id),
+      debtKind: profile.debt_kind || null,
+      action,
+    },
+  });
+}
+
+async function publishPersonalDebtLedgerMutationInTrx(trx, { action, asset, log, balanceAfter }) {
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.FINANCE_DEBT_LEDGER_MUTATED,
+    aggregateType: "PERSONAL_DEBT",
+    aggregateId: asset.id,
+    action,
+    afterState: { amount: balanceAfter },
+    source: "FINANCE_HUB",
+    payload: {
+      personalAssetId: Number(asset.id),
+      debtPaymentLogId: Number(log.id),
+      debtKind: asset.debt_kind || "PERSONAL_EXTERNAL",
+      amount: toNumber(log.amount),
+      balanceAfter: toNumber(balanceAfter),
+      action,
+    },
+  });
+}
 
 function normalizeProfitConfig({ type, profitEnabled, profitFrequency, annualInterestRate, profitDestination, profitAccountId, profitCreditTime }) {
   if (!profitEnabled) {
@@ -87,10 +132,13 @@ async function validateProfitAccount(profitConfig) {
   }
 }
 
-function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency, debtAnnualInterestRate, debtDueDay, debtEndDate, debtRepaymentFrequency }) {
+function normalizeDebtConfig({ type, debtKind, debtInitialLimit, debtAccountNumber, debtInterestEnabled, debtInterestFrequency, debtAnnualInterestRate, debtDueDay, debtEndDate, debtRepaymentFrequency }) {
   const isDebt = type === "DEBT_PAYABLE" || type === "DEBT_RECEIVABLE";
   if (!isDebt) {
     return {
+      debt_kind: null,
+      debt_initial_limit: null,
+      debt_account_number: null,
       debt_interest_enabled: false,
       debt_interest_frequency: null,
       debt_annual_interest_rate: null,
@@ -100,7 +148,18 @@ function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency,
     };
   }
 
-  const interestEnabled = Boolean(debtInterestEnabled);
+  const kind = type === "DEBT_RECEIVABLE" ? null : String(debtKind || "PERSONAL_EXTERNAL");
+  if (kind && !["PERSONAL_EXTERNAL", "CREDIT_CARD", "OVERDRAFT"].includes(kind)) {
+    throw new Error("Loại sổ nợ không hợp lệ");
+  }
+  const initialLimit = kind === "CREDIT_CARD" || kind === "OVERDRAFT" ? Number(debtInitialLimit) : null;
+  if (initialLimit !== null && (!Number.isFinite(initialLimit) || initialLimit <= 0)) {
+    throw new Error("Hạn mức ban đầu phải lớn hơn 0");
+  }
+  const accountNumber = debtAccountNumber === undefined || debtAccountNumber === null
+    ? null
+    : String(debtAccountNumber).replace(/\D/g, "") || null;
+  const interestEnabled = kind === "PERSONAL_EXTERNAL" ? false : Boolean(debtInterestEnabled);
   const annualRate = interestEnabled ? Number(debtAnnualInterestRate) : null;
   const interestFrequency = interestEnabled ? (debtInterestFrequency || "DAILY") : null;
   if (interestEnabled) {
@@ -112,19 +171,15 @@ function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency,
   if (dueDay !== null && (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)) {
     throw new Error("Ngày đến hạn phải từ 1 đến 31");
   }
-
   const rawEndDate = debtEndDate instanceof Date ? debtEndDate.toISOString().slice(0, 10) : String(debtEndDate || "").slice(0, 10);
-  let endDate = null;
-  if (rawEndDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEndDate)) {
-    endDate = rawEndDate;
-  }
-
+  const endDate = rawEndDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEndDate) ? rawEndDate : null;
   const repaymentFrequency = debtRepaymentFrequency || "MONTHLY";
-  if (repaymentFrequency && !DEBT_REPAYMENT_FREQUENCIES.has(repaymentFrequency)) {
-    throw new Error("Chu kỳ quy đổi nợ không hợp lệ");
-  }
+  if (!DEBT_REPAYMENT_FREQUENCIES.has(repaymentFrequency)) throw new Error("Chu kỳ quy đổi nợ không hợp lệ");
 
   return {
+    debt_kind: kind,
+    debt_initial_limit: initialLimit,
+    debt_account_number: accountNumber,
     debt_interest_enabled: interestEnabled,
     debt_interest_frequency: interestFrequency,
     debt_annual_interest_rate: annualRate,
@@ -133,7 +188,6 @@ function normalizeDebtConfig({ type, debtInterestEnabled, debtInterestFrequency,
     debt_repayment_frequency: repaymentFrequency,
   };
 }
-
 /**
  * Tính toán trạng thái kỳ của một khoản trả góp tại một tháng mục tiêu YYYY-MM
  * @param {Object} item - Bản ghi installments
@@ -1038,6 +1092,9 @@ async function createPersonalAsset(payload) {
   await validateProfitAccount(profitConfig);
   const debtConfig = normalizeDebtConfig({
     type,
+    debtKind: payload.debtKind,
+    debtInitialLimit: payload.debtInitialLimit,
+    debtAccountNumber: payload.debtAccountNumber,
     debtInterestEnabled: Boolean(payload.debtInterestEnabled),
     debtInterestFrequency: payload.debtInterestFrequency,
     debtAnnualInterestRate: payload.debtAnnualInterestRate,
@@ -1049,7 +1106,8 @@ async function createPersonalAsset(payload) {
   const cardLastDigits = payload.cardLastDigits !== undefined ? (payload.cardLastDigits ? String(payload.cardLastDigits).trim() : null) : null;
   const bankName = payload.bankName !== undefined ? (payload.bankName ? String(payload.bankName).trim() : null) : null;
 
-  const [created] = await db(TABLES.PERSONAL_ASSETS)
+  const created = await withTransaction(async (trx) => {
+    const [row] = await trx(TABLES.PERSONAL_ASSETS)
     .insert({
       name: payload.name,
       type,
@@ -1061,6 +1119,9 @@ async function createPersonalAsset(payload) {
       ...debtConfig,
     })
     .returning("*");
+    await publishDebtProfileMutationInTrx(trx, { action: "CREATE", afterState: row });
+    return row;
+  });
 
   return {
     id: Number(created.id),
@@ -1082,12 +1143,16 @@ async function createPersonalAsset(payload) {
     debtDueDay: created.debt_due_day ? Number(created.debt_due_day) : null,
     debtEndDate: created.debt_end_date || null,
     debtRepaymentFrequency: created.debt_repayment_frequency || null,
+    debtKind: created.debt_kind || null,
+    debtInitialLimit: toNumber(created.debt_initial_limit),
+    debtAccountNumber: created.debt_account_number || null,
   };
 }
 
 async function updatePersonalAsset(id, payload) {
-  const existing = await db(TABLES.PERSONAL_ASSETS).where("id", id).first();
-  if (!existing) return null;
+  return await withTransaction(async (trx) => {
+    const existing = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
+    if (!existing) return null;
 
   const type = payload.type !== undefined ? payload.type : existing.type;
   const profitEnabled = payload.profitEnabled !== undefined
@@ -1105,6 +1170,9 @@ async function updatePersonalAsset(id, payload) {
   await validateProfitAccount(profitConfig);
   const debtConfig = normalizeDebtConfig({
     type,
+    debtKind: payload.debtKind !== undefined ? payload.debtKind : existing.debt_kind,
+    debtInitialLimit: payload.debtInitialLimit !== undefined ? payload.debtInitialLimit : existing.debt_initial_limit,
+    debtAccountNumber: payload.debtAccountNumber !== undefined ? payload.debtAccountNumber : existing.debt_account_number,
     debtInterestEnabled: payload.debtInterestEnabled !== undefined ? Boolean(payload.debtInterestEnabled) : Boolean(existing.debt_interest_enabled),
     debtInterestFrequency: payload.debtInterestFrequency !== undefined ? payload.debtInterestFrequency : existing.debt_interest_frequency,
     debtAnnualInterestRate: payload.debtAnnualInterestRate !== undefined ? payload.debtAnnualInterestRate : existing.debt_annual_interest_rate,
@@ -1113,7 +1181,7 @@ async function updatePersonalAsset(id, payload) {
     debtRepaymentFrequency: payload.debtRepaymentFrequency !== undefined ? payload.debtRepaymentFrequency : existing.debt_repayment_frequency,
   });
 
-  const updateData = { updated_at: db.fn.now() };
+    const updateData = { updated_at: trx.fn.now() };
   if (payload.name !== undefined) updateData.name = payload.name;
   if (payload.type !== undefined) updateData.type = type;
   if (payload.amount !== undefined) updateData.amount = toNumber(payload.amount);
@@ -1123,13 +1191,19 @@ async function updatePersonalAsset(id, payload) {
   Object.assign(updateData, profitConfig);
   Object.assign(updateData, debtConfig);
 
-  const [updated] = await db(TABLES.PERSONAL_ASSETS)
+    const [updated] = await trx(TABLES.PERSONAL_ASSETS)
     .where("id", id)
     .update(updateData)
     .returning("*");
 
-  if (!updated) return null;
-  return {
+    if (!updated) return null;
+    await publishDebtProfileMutationInTrx(trx, {
+      action: "UPDATE",
+      beforeState: existing,
+      afterState: updated,
+      changedFields: updateData,
+    });
+    return {
     id: Number(updated.id),
     name: updated.name,
     type: updated.type,
@@ -1149,11 +1223,21 @@ async function updatePersonalAsset(id, payload) {
     debtDueDay: updated.debt_due_day ? Number(updated.debt_due_day) : null,
     debtEndDate: updated.debt_end_date || null,
     debtRepaymentFrequency: updated.debt_repayment_frequency || null,
+    debtKind: updated.debt_kind || null,
+    debtInitialLimit: toNumber(updated.debt_initial_limit),
+    debtAccountNumber: updated.debt_account_number || null,
   };
+  });
 }
 
 async function deletePersonalAsset(id) {
-  return await db(TABLES.PERSONAL_ASSETS).where("id", id).del();
+  return await withTransaction(async (trx) => {
+    const existing = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
+    if (!existing) return 0;
+    const deleted = await trx(TABLES.PERSONAL_ASSETS).where("id", id).del();
+    await publishDebtProfileMutationInTrx(trx, { action: "DELETE", beforeState: existing });
+    return deleted;
+  });
 }
 
 async function payPersonalAsset(id, payload) {
@@ -1216,6 +1300,15 @@ async function payPersonalAsset(id, payload) {
       })
       .returning("*");
 
+    if (!creditAccount) {
+      await publishPersonalDebtLedgerMutationInTrx(trx, {
+        action: "PAYMENT",
+        asset,
+        log: createdLog,
+        balanceAfter: newAmount,
+      });
+    }
+
     return { success: true, newAmount, logId: Number(createdLog.id) };
   });
 }
@@ -1261,6 +1354,14 @@ async function borrowPersonalAssetInTrx(trx, id, payload) {
     merchant_name: merchantName ? String(merchantName).trim() : null,
     note: note ? String(note).trim() : null,
   }).returning("*");
+  if (!creditAccount) {
+    await publishPersonalDebtLedgerMutationInTrx(trx, {
+      action: "BORROW",
+      asset,
+      log: createdLog,
+      balanceAfter: newAmount,
+    });
+  }
   return { success: true, newAmount, logId: createdLog ? Number(createdLog.id) : undefined };
 }
 

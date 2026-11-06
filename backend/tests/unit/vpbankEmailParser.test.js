@@ -167,7 +167,28 @@ test("VPBank Email Parser Suite", async (t) => {
     assert.equal(result.availableLimitObserved, 17870822);
     assert.equal(result.referenceCode, "630906039965");
   });
-});
+
+  await t.test("7. parses the full debit account number for transfer reconciliation", () => {
+    const result = parseVpbankEmail({
+      subject: "VPBank thong bao giao dich thanh cong",
+      from: "customercare@care.vpb.com.vn",
+      authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
+      text: [
+        "Ma giao dich: FT2631154771090/VPB2611062501127952",
+        "Tai khoan trich no: 9183400998",
+        "So tien trich no: 607,410 VND",
+        "Ten nguoi huong: CTY CP SHOPEEPAY",
+        "Noi dung chuyen tien: NGO LE NGOC HUNG chuyen tien",
+        "Ngay, gio giao dich: 06/11/2026 18:36:01",
+      ].join("\n"),
+    });
+
+    assert.equal(result.sourceAccountNumber, "9183400998");
+    assert.equal(result.direction, "OUTFLOW");
+    assert.equal(result.amount, 607410);
+    assert.equal(result.referenceCode, "FT2631154771090");
+    assert.equal(result.isFinancial, true);
+  });});
 
 
 

@@ -1,9 +1,9 @@
 # BÁO CÁO NGHIỆM THU TỔNG HỢP HÀNG NGÀY — 06/11/2026
 
-> **Ngày thực hiện:** 06/11/2026 (Múi giờ `Asia/Bangkok`, UTC+7)  
-> **Chủ nhân tối cao phê duyệt:** 👑 **Master (Sếp)**  
-> **Tổng chỉ huy kỹ thuật:** 👑 **Orchestrator Agent**  
-> **Trạng thái:** ✅ **HOÀN THÀNH 100% — PRODUCTION READY**  
+> **Ngày thực hiện:** 06/11/2026 (Múi giờ `Asia/Bangkok`, UTC+7)
+> **Chủ nhân tối cao phê duyệt:** 👑 **Master (Sếp)**
+> **Tổng chỉ huy kỹ thuật:** 👑 **Orchestrator Agent**
+> **Trạng thái:** ✅ **HOÀN THÀNH 100% — PRODUCTION READY**
 > **Tài liệu nguồn sự thật (SSOT):** [report/2026-11-06-daily-review.md](file:///d:/Desktop/admin/admin_orderlist/report/2026-11-06-daily-review.md)
 
 ---
@@ -109,11 +109,11 @@
 ## 4. [09:55] CHUẨN HÓA KIẾN TRÚC ĐỌC OTP YUNA MAIL: TÍCH HỢP 5 API PROXY TRỰC TIẾP & 2 LUỒNG WEBMAIL CHUYỂN TIẾP
 
 ### 4.1. Bối cảnh & Chỉ đạo của Master
-> *"nó có 7 trường và 2 trường mở link đúng không. Vậy tích hợp trước 5 trường gửi thẳng OTP trước.*  
-> *Đối với trường mở link thì mình cũng đang có sẵn 2 API generator với tmail rồi đúng không.*  
-> *Bóc tách 2 link này rồi lấy đúng cái OTP là xong.*  
-> *Thế thì chỉ cần bọc vào if mà chạy thôi là khỏe nhất*  
-> *if {1} = ... else if {2} = .... else ...."*  
+> *"nó có 7 trường và 2 trường mở link đúng không. Vậy tích hợp trước 5 trường gửi thẳng OTP trước.*
+> *Đối với trường mở link thì mình cũng đang có sẵn 2 API generator với tmail rồi đúng không.*
+> *Bóc tách 2 link này rồi lấy đúng cái OTP là xong.*
+> *Thế thì chỉ cần bọc vào if mà chạy thôi là khỏe nhất*
+> *if {1} = ... else if {2} = .... else ...."*
 > *"thực hiện cho tôi"*
 
 ### 4.2. Khảo sát & Phân tích nguyên nhân gốc (Root Cause)
@@ -153,8 +153,8 @@
 ## 5. [10:05] TÍCH HỢP API ADES SUPPORT (ONLY-OTP) KÈM CƠ CHẾ CẤP TOKEN PHIÊN TỰ ĐỘNG (ZERO-AUTH)
 
 ### 5.1. Bối cảnh & Chỉ đạo của Master
-> *Link API:* `https://api-2026-02.ades.support/ades-support/only-otp?email=netlink.port.8315%40colegiomontealto.us`  
-> *Link Web:* `https://var.ctv.ac/only-otp`  
+> *Link API:* `https://api-2026-02.ades.support/ades-support/only-otp?email=netlink.port.8315%40colegiomontealto.us`
+> *Link Web:* `https://var.ctv.ac/only-otp`
 > *"thực hiện cho tôi"*
 
 ### 5.2. Khảo sát & Dịch ngược kỹ thuật (Reverse Engineering)
@@ -192,8 +192,8 @@
 ## 6. [10:30] KHO TRƯỜNG DỮ LIỆU CÓ SẴN (OPT-IN PRESET FIELD CATALOG) & BÓC TÁCH METADATA ĐỘNG THEO CẤU HÌNH NGƯỜI DÙNG
 
 ### 6.1. Bối cảnh & Yêu cầu của Master
-> *"hình như mỗi API đều có trường thời gian mà. tại sao không lấy thêm trường thời gian ra hoặc là phải thêm cho tôi một số trường để người dùng có thể tận dụng sử dụng"*  
-> *"nhưng cũng không phải mặc định là gắn hết, mà là phải có trường để sẵn, người dùng thích chọn thì chọn vô"*  
+> *"hình như mỗi API đều có trường thời gian mà. tại sao không lấy thêm trường thời gian ra hoặc là phải thêm cho tôi một số trường để người dùng có thể tận dụng sử dụng"*
+> *"nhưng cũng không phải mặc định là gắn hết, mà là phải có trường để sẵn, người dùng thích chọn thì chọn vô"*
 > *"ok thực hiện cho tôi"*
 
 ### 6.2. Thiết kế Giải Pháp UI/UX No-Code ([ExternalApiConfigPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx))
@@ -248,8 +248,8 @@
 ## 7. [10:45] TÁI THIẾT KẾ TOÀN DIỆN GIAO DIỆN TRANG QUẢN TRỊ DỊCH VỤ OTP (100% OTP DEDICATED UI)
 
 ### 7.1. Bối cảnh & Chỉ đạo của Master
-> Ảnh chụp khoanh đỏ toàn bộ Header, Stat Cards và thanh Tab Filters kèm chỉ đạo:  
-> *"cái này chỉ cấu hình OTP thôi nên thiết kế lại cho tôi"*  
+> Ảnh chụp khoanh đỏ toàn bộ Header, Stat Cards và thanh Tab Filters kèm chỉ đạo:
+> *"cái này chỉ cấu hình OTP thôi nên thiết kế lại cho tôi"*
 > *"thiết kế lại toàn bộ giao diện page đó luôn cho tôi"*
 
 ### 7.2. Các cải tiến giao diện đã hoàn thành ([ExternalApiConfigPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx))
@@ -292,7 +292,7 @@
 ## 8. [10:50] TRIỆT TIÊU THANH SCROLL & TÁI THIẾT KẾ TOOLBAR ĐIỀU KHIỂN THEO CHUẨN SEGMENTED CONTROL
 
 ### 8.1. Bối cảnh & Chỉ đạo của Master
-> Ảnh chụp khoanh thanh cuộn ngang trình duyệt màu trắng/xám xuất hiện dưới thanh bar kèm chỉ đạo:  
+> Ảnh chụp khoanh thanh cuộn ngang trình duyệt màu trắng/xám xuất hiện dưới thanh bar kèm chỉ đạo:
 > *"thanh bar này tôi chưa ưng...thiết kế lại cho tôi. Tôi không muốn thanh scrool"*
 
 ### 8.2. Phân tích nguyên nhân & Giải pháp triển khai ([ExternalApiConfigPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx))
@@ -323,8 +323,8 @@
 ## 9. [11:15] CHUẨN HÓA KIỂM THỬ API THEO KIẾN TRÚC POSTMAN (HỖ TRỢ QUERY PARAMS CHO GET & REQUEST BODY CHO POST, FIX LỖI HTTP 404 KHI PHÂN TÍCH CỔNG ADES)
 
 ### 9.1. Bối cảnh & Chỉ đạo của Master
-> Master chỉ đạo:  
-> *"thế phải chuẩn GET POST để có thể test chứ. Chứ giờ kiểm thử phân tích mà toàn 404 thì sao mà test được"*  
+> Master chỉ đạo:
+> *"thế phải chuẩn GET POST để có thể test chứ. Chứ giờ kiểm thử phân tích mà toàn 404 thì sao mà test được"*
 > Kèm ảnh chụp thực tế màn hình modal bóc tách trường: khi gửi thử API Ades Support bị trả về HTTP 404 (`Cannot POST /mail/read-otp-gpm`) vì giao diện cũ bắt buộc người dùng phải chọn POST mới có ô gõ email.
 
 ### 9.2. Phân tích nguyên nhân gốc & Sự thật dữ liệu
@@ -365,9 +365,9 @@
 ## 10. [11:42] THIẾT KẾ SUB-PAGE CẤU HÌNH MẪU THÔNG BÁO VỚI BIẾN ĐỘNG & BỘ XEM TRƯỚC ĐA THIẾT BỊ (WEB & MOBILE PREVIEW)
 
 ### 10.1. Bối cảnh & Chỉ đạo của Master
-> Master chỉ đạo:  
-> 1. *"giờ có các trường rồi, trong page đó tôi muốn chia thành 1 page nữa là page nội dung hiển thị"*  
-> 2. Kèm 2 ảnh chụp mẫu tùy chỉnh tin nhắn (chuẩn SePay): *"đây tôi cho bạn xem 1 mẫu tùy chỉnh tin nhắn. Thay vì phải cố định"*  
+> Master chỉ đạo:
+> 1. *"giờ có các trường rồi, trong page đó tôi muốn chia thành 1 page nữa là page nội dung hiển thị"*
+> 2. Kèm 2 ảnh chụp mẫu tùy chỉnh tin nhắn (chuẩn SePay): *"đây tôi cho bạn xem 1 mẫu tùy chỉnh tin nhắn. Thay vì phải cố định"*
 > 3. *"không cần cột phải nhất định là điện thoại. mà tùy biến web hoặc mobile"*
 
 ### 10.2. Các giải pháp kỹ thuật đã triển khai ([ExternalApiConfigPage.tsx](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx))
@@ -428,10 +428,10 @@
 ## 11. [17:10] LƯU TRỮ VÀ TÍCH HỢP TRỌN BỘ THIẾT KẾ GIAO DIỆN LỄ HỘI VÀO DỰ ÁN OTP_PORTAL
 
 ### 11.1. Bối cảnh & Chỉ đạo của Master
-> Master chỉ đạo:  
-> 1. *"khoan, thay vì sửa form thì sửa luôn thẳng giao diện web OTP luôn là được nhỉ"*  
-> 2. Gửi file `le-hoi-themes.zip` làm kiến trúc chuẩn mực.  
-> 3. *"giờ không làm demo form nữa. mà tôi muốn demo luôn cả cái page otp_portal luôn. Thiết kế giao diện của nó theo đúng từng ngày lễ luôn"*  
+> Master chỉ đạo:
+> 1. *"khoan, thay vì sửa form thì sửa luôn thẳng giao diện web OTP luôn là được nhỉ"*
+> 2. Gửi file `le-hoi-themes.zip` làm kiến trúc chuẩn mực.
+> 3. *"giờ không làm demo form nữa. mà tôi muốn demo luôn cả cái page otp_portal luôn. Thiết kế giao diện của nó theo đúng từng ngày lễ luôn"*
 > 4. *"lưu các bản thiết kế vào dự án otp_portal cho tôi nhé"*
 
 ### 11.2. Các giải pháp kỹ thuật đã triển khai trong dự án [`otp_portal`](file:///D:/Desktop/admin/otp_portal)
@@ -450,9 +450,151 @@
    - **[`src/components/FestivalBackground.tsx`](file:///D:/Desktop/admin/otp_portal/src/components/FestivalBackground.tsx):** React Component điều khiển Canvas 60fps (cánh hoa mai lật 3D, bụi vàng, đom đóm, dơi bay, tuyết rơi) kết hợp lớp cảnh SVG chân thực, hoạt động như background layer độc lập (`pointer-events: none`).
 
 ### 11.3. Kết quả nghiệm thu & Bằng chứng kiểm thử
-- **Kiểm thử biên dịch Vite & TypeScript trong `otp_portal`:**  
-  `npm run build` hoàn tất xuất sắc trong **6.03s**:  
-  `dist/index.html 1.14 kB`, `dist/assets/index-BVBm3m3R.css 26.30 kB`, `dist/assets/index-XQnkic5z.js 186.49 kB`.  
+- **Kiểm thử biên dịch Vite & TypeScript trong `otp_portal`:**
+  `npm run build` hoàn tất xuất sắc trong **6.03s**:
+  `dist/index.html 1.14 kB`, `dist/assets/index-BVBm3m3R.css 26.30 kB`, `dist/assets/index-XQnkic5z.js 186.49 kB`.
   **0 lỗi TypeScript, 0 cảnh báo.**
 - **Tiêu chuẩn hoàn thành (DoD):** Toàn bộ bản thiết kế và mã nguồn mẫu đã được lưu trữ an toàn, có cấu trúc trong dự án `D:\Desktop\admin\otp_portal`, sẵn sàng chạy trực tiếp độc lập hoặc nhúng vào ứng dụng chính.
 
+
+---
+
+## [19:11] Sổ nợ hợp nhất và đối soát email VPBank theo STK nguồn
+
+### Phạm vi
+- Bổ sung ba loại sổ nợ: `PERSONAL_EXTERNAL`, `CREDIT_CARD`, `OVERDRAFT`; nợ cá nhân ngoài mặc định không tính lãi và có thể trả từng phần.
+- Bổ sung `debt_initial_limit`, `debt_account_number` và `source_account_number` để phân biệt hạn mức, dư nợ và STK dùng đối soát.
+- Email VPBank giao dịch chuyển khoản ưu tiên đối chiếu chính xác `Tài khoản trích nợ`; 4 số cuối thẻ chỉ còn là fallback tương thích cũ.
+
+### Thay đổi kỹ thuật
+- `backend/src/db/migrations/20261106000003_add_unified_debt_profiles_and_bank_account_mapping.js`: migration profile sổ nợ, STK mapping, receipt source account và unique index chống map trùng STK hoạt động.
+- `backend/src/domains/finance/services/vpbankEmailParser.js`: parse STK từ trường `Tài khoản trích nợ` / `Debit Account`.
+- `backend/src/domains/finance/services/vpbankEmailIngestionService.js`: resolve theo STK trước, hạch toán credit/overdraft vào immutable ledger hoặc tài khoản cá nhân vào personal debit log trong cùng transaction.
+- `backend/src/domains/finance/credit/creditLedgerService.js`: mỗi principal/payment cập nhật ngay `personal_assets.amount` của account liên kết trong transaction; log/ledger là bằng chứng, không phải tác vụ đọc lại sau đó.
+- `backend/src/domains/finance/services/financeHubService.js` và `frontend/src/features/finance/components/PersonalAssetsModal.tsx`: lưu/chọn loại nợ, hạn mức ban đầu và STK đối chiếu.
+
+### Kiểm tra đã chạy
+- `node --check` cho migration và các module backend bị tác động: pass.
+- `node --test backend/tests/unit/vpbankEmailParser.test.js`: 14/14 pass; có fixture STK `9183400998` từ email chuyển khoản.
+- `npm.cmd --prefix backend run test`: 99/99 pass.
+- `npm.cmd --prefix frontend run build`: pass.
+- `git diff --check`: pass.
+
+### Trạng thái nghiệm thu
+- **Chưa nghiệm thu live.** Chưa chạy migration trên isolated `TEST_DATABASE_URL`, chưa chạy integration VPBank mới với PostgreSQL, và chưa đối soát email/statement VPBank đã che dữ liệu. Không bật worker production chỉ dựa vào các kiểm tra trên.
+
+
+---
+
+## [19:35] Tái thiết kế toàn diện giao diện OTP Portal theo chuẩn bản sắc lễ hội Luxury Glassmorphism
+
+### Phạm vi
+- Chuyển đổi toàn diện giao diện Web [otp_portal](file:///E:/Project/admin_store/otp_portal) sang kiến trúc đa chủ đề lễ hội dựa trên thiết kế mẫu đã duyệt trong `designs/otp_portal_festivals.html` và `designs/le-hoi-themes`.
+- Đồng bộ hóa 100% logic API và nghiệp vụ sẵn có: Adobe CC (Lấy tài khoản, Nhận OTP 6 số), Netflix Premium (Link xác minh Hộ gia đình, Mã TV 6 số, OTP email).
+- Tích hợp thanh điều hướng nổi `festival-dock` hỗ trợ chuyển đổi tức thì giữa 7 chủ đề: Tết Cổ Truyền, Giỗ Tổ Hùng Vương, Tết Trung Thu, Đêm Halloween, Giáng Sinh, Tôn Vinh Phái Đẹp, và chế độ Hiện Đại (Modern Cyber).
+
+### Thay đổi kỹ thuật
+- [index.html](file:///E:/Project/admin_store/otp_portal/index.html): Nạp bộ font chữ nghệ thuật Google Fonts (`Be Vietnam Pro`, `Noto Serif Display`, `Playfair Display`, `Lobster`, `Cormorant Garamond`, `Cinzel`, `Plus Jakarta Sans`).
+- [src/styles/festival-themes.css](file:///E:/Project/admin_store/otp_portal/src/styles/festival-themes.css): Hoàn thiện hệ thống biến CSS theo từng ngày lễ, lớp noise texture SVG, định kiểu khung ô số OTP (`.otp-container`, `.otp-digit`), nút bấm CTA hoàng gia (`.btn-cta`), thanh dock điều hướng (`.festival-dock`, `.dock-item`) và các badge ngày lễ.
+- [src/components/FestivalBackground.tsx](file:///E:/Project/admin_store/otp_portal/src/components/FestivalBackground.tsx): Bổ sung chủ đề `modern`, quản lý Canvas particle engine 60fps (cánh mai vàng, bụi Đông Sơn, đom đóm rằm, đàn dơi lượn, tuyết rơi, hoa hồng, cyber dust), mặt trăng 3D lồi lõm `fractalNoise`, đèn lồng đung đưa và silhouette chân cảnh.
+- [src/App.tsx](file:///E:/Project/admin_store/otp_portal/src/App.tsx): Tái cấu trúc toàn bộ giao diện thành Luxury Glassmorphism; tích hợp dynamic festival greetings, 6-digit PIN block to rõ, nút bấm sao chép 1-click, quản lý lưu chủ đề vào `localStorage`, modal Hướng Dẫn chi tiết và responsive di động 100%.
+
+### Kiểm tra đã chạy
+- `npm --prefix ../otp_portal run build`: Biên dịch TypeScript và Vite hoàn tất xuất sắc trong 5.58s; **0 lỗi TypeScript, 0 cảnh báo**.
+- `git -C ../otp_portal status`: Xác nhận chỉ thay đổi 4 files trong phạm vi; không làm ảnh hưởng tới các file đang làm dở của Master tại `admin_orderlist`.
+
+### Trạng thái nghiệm thu
+- **Đã hoàn thành và sẵn sàng nghiệm thu giao diện (Ready for Acceptance).**
+
+## [20:15] Thiết Kế Lại Đồng Bộ Bảy Chủ Đề Lễ Hội OTP Portal
+
+- **Phạm vi:** Thiết kế lại lớp minh họa cho toàn bộ bảy chủ đề: Tết Cổ Truyền, Giỗ Tổ Hùng Vương, Tết Trung Thu, Đêm Halloween, Giáng Sinh, Ngày Phụ Nữ và Hiện Đại.
+- **Thay đổi kỹ thuật:** Thêm `src/components/FestivalArt.tsx` với bảy SVG illustration nguyên gốc; ghép lớp art vào `src/components/FestivalBackground.tsx`; bổ sung animation, responsive sizing và `prefers-reduced-motion` tại `src/styles/festival-themes.css`.
+- **Bảo toàn contract:** Không thay đổi handler, validation, state hay request tới `/api/public/otp/*` trong `src/App.tsx`.
+- **Kiểm tra đã chạy:** `npm run build` pass; Playwright render desktop Tết, mobile Halloween, smoke click đủ bảy theme; console không có error.
+- **Trạng thái nghiệm thu:** ĐẠT về build, interaction và responsive smoke. Artwork dùng SVG nội bộ thay vì ảnh raster nhằm giữ chất lượng, tốc độ tải và không có rủi ro bản quyền; cần review thị giác cuối cùng trên màn hình người dùng nếu muốn tinh chỉnh gu thẩm mỹ.
+
+
+---
+
+## [20:50] Tích hợp bộ tranh nền điện ảnh 16:9 lấp đầy hai bên sườn theo từng chủ đề lễ hội
+
+### Phạm vi
+- Tạo và tích hợp toàn diện 7 tranh nền nghệ thuật điện ảnh (Cinematic Widescreen 16:9) cho 7 chủ đề lễ hội tại [otp_portal](file:///E:/Project/admin_store/otp_portal).
+- Khắc phục triệt để vấn đề hai bên sườn màn hình bị trống, đưa các hình ảnh văn hóa đặc trưng vào 2 bên trái/phải:
+  + **Giỗ Tổ Hùng Vương (`gio-to`)**: Quần thể Đền Hùng núi Nghĩa Lĩnh, thềm bậc uy nghiêm, mây khói linh thiêng và ánh kim Đông Sơn.
+  + **Tết Cổ Truyền (`tet`)**: Dàn đèn lồng đỏ cung đình, cành đào, liễn đỏ may mắn, cánh mai vàng lật 3D rơi lượn.
+  + **Tết Trung Thu (`trung-thu`)**: Cung trăng rằm vàng rực, lầu vọng nguyệt, đèn hoa đăng, đom đóm dạ quang.
+  + **Đêm Halloween (`halloween`)**: Lâu đài gothic ma mị, cụm bí ngô Jack-o'-Lantern rực lửa, trăng quỷ và đàn dơi bay lượn.
+  + **Giáng Sinh (`giang-sinh`)**: Ngôi nhà tuyết ấm cúng đèn vàng, rừng thông tuyết bách diệp và tuyết rơi đa tầng.
+  + **Ngày Phụ Nữ (`phu-nu`)**: Vườn hoa hồng nhung kiêu sa, chai nước hoa ngọc ngà và cánh hoa hồng rơi êm đềm.
+  + **Hiện Đại (`modern`)**: Trung tâm máy chủ Cyber Data Center, ánh sáng neon công nghệ tương lai.
+
+### Thay đổi kỹ thuật
+- [public/backgrounds/](file:///E:/Project/admin_store/otp_portal/public/backgrounds/): Lưu trữ 7 file hình ảnh chất lượng cao 1920x1080 (`bg-gio-to.png`, `bg-tet.png`, `bg-trung-thu.png`, `bg-halloween.png`, `bg-giang-sinh.png`, `bg-phu-nu.png`, `bg-modern.png`).
+- [src/styles/festival-themes.css](file:///E:/Project/admin_store/otp_portal/src/styles/festival-themes.css): Thiết lập bố cục đa lớp cho `body` gồm:
+  1. Lớp ánh sáng dạ quang `var(--bg-art)`
+  2. Lớp Vignette trung tâm `radial-gradient(circle at 50% 45%, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.76) 100%)` bảo đảm form OTP luôn nổi bật và đọc chữ chuẩn AAA.
+  3. Lớp hình nền tranh điện ảnh `var(--bg-img)` theo từng `[data-theme]`
+  4. Lớp chuyển màu fallback `linear-gradient`
+- Dọn dẹp các thẻ unstyled thừa, đưa cấu trúc trang về chuẩn không bị tràn cuộn.
+
+### Kiểm tra đã chạy
+- `npm --prefix ../otp_portal run build`: **0 lỗi TypeScript, 0 cảnh báo**.
+- Playwright E2E Visual Verification: Đã chụp màn hình thực tế cả 7 chủ đề ở độ phân giải 1080p, xác nhận cả 2 bên sườn đều hiển thị đầy đủ hình ảnh tráng lệ, form trung tâm rõ nét và thanh dock chuyển đổi mượt mà.
+
+### Trạng thái nghiệm thu
+- **Đã hoàn thành xuất sắc và sẵn sàng bàn giao (Ready for Acceptance).**
+
+
+---
+
+## [20:50] Tích hợp bộ tranh nền điện ảnh 16:9 lấp đầy hai bên sườn theo từng chủ đề lễ hội
+
+### Phạm vi
+- Tạo và tích hợp toàn diện 7 tranh nền nghệ thuật điện ảnh (Cinematic Widescreen 16:9) cho 7 chủ đề lễ hội tại [otp_portal](file:///E:/Project/admin_store/otp_portal).
+- Khắc phục triệt để vấn đề hai bên sườn màn hình bị trống, đưa các hình ảnh văn hóa đặc trưng vào 2 bên trái/phải:
+  + **Giỗ Tổ Hùng Vương (`gio-to`)**: Quần thể Đền Hùng núi Nghĩa Lĩnh, thềm bậc uy nghiêm, mây khói linh thiêng và ánh kim Đông Sơn.
+  + **Tết Cổ Truyền (`tet`)**: Dàn đèn lồng đỏ cung đình, cành đào, liễn đỏ may mắn, cánh mai vàng lật 3D rơi lượn.
+  + **Tết Trung Thu (`trung-thu`)**: Cung trăng rằm vàng rực, lầu vọng nguyệt, đèn hoa đăng, đom đóm dạ quang.
+  + **Đêm Halloween (`halloween`)**: Lâu đài gothic ma mị, cụm bí ngô Jack-o'-Lantern rực lửa, trăng quỷ và đàn dơi bay lượn.
+  + **Giáng Sinh (`giang-sinh`)**: Ngôi nhà tuyết ấm cúng đèn vàng, rừng thông tuyết bách diệp và tuyết rơi đa tầng.
+  + **Ngày Phụ Nữ (`phu-nu`)**: Vườn hoa hồng nhung kiêu sa, chai nước hoa ngọc ngà và cánh hoa hồng rơi êm đềm.
+  + **Hiện Đại (`modern`)**: Trung tâm máy chủ Cyber Data Center, ánh sáng neon công nghệ tương lai.
+
+### Thay đổi kỹ thuật
+- [public/backgrounds/](file:///E:/Project/admin_store/otp_portal/public/backgrounds/): Lưu trữ 7 file hình ảnh chất lượng cao 1920x1080 (`bg-gio-to.png`, `bg-tet.png`, `bg-trung-thu.png`, `bg-halloween.png`, `bg-giang-sinh.png`, `bg-phu-nu.png`, `bg-modern.png`).
+- [src/styles/festival-themes.css](file:///E:/Project/admin_store/otp_portal/src/styles/festival-themes.css): Thiết lập bố cục đa lớp cho `body` gồm:
+  1. Lớp ánh sáng dạ quang `var(--bg-art)`
+  2. Lớp Vignette trung tâm `radial-gradient(circle at 50% 45%, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.76) 100%)` bảo đảm form OTP luôn nổi bật và đọc chữ chuẩn AAA.
+  3. Lớp hình nền tranh điện ảnh `var(--bg-img)` theo từng `[data-theme]`
+  4. Lớp chuyển màu fallback `linear-gradient`
+- Dọn dẹp các thẻ unstyled thừa, đưa cấu trúc trang về chuẩn không bị tràn cuộn.
+
+### Kiểm tra đã chạy
+- `npm --prefix ../otp_portal run build`: **0 lỗi TypeScript, 0 cảnh báo**.
+- Playwright E2E Visual Verification: Đã chụp màn hình thực tế cả 7 chủ đề ở độ phân giải 1080p, xác nhận cả 2 bên sườn đều hiển thị đầy đủ hình ảnh tráng lệ, form trung tâm rõ nét và thanh dock chuyển đổi mượt mà.
+
+### Trạng thái nghiệm thu
+- **Đã hoàn thành xuất sắc và sẵn sàng bàn giao (Ready for Acceptance).**
+
+
+---
+
+## [21:10] Khắc phục cộng trùng chi phí nhập hàng khi thanh toán NCC
+
+### Phạm vi
+- Truy vết luồng ghi nhận giá vốn khi đơn thanh toán và luồng tất toán công nợ NCC qua `SUPPLIER_DEBT_PAID`.
+
+### Thay đổi kỹ thuật
+- [dailySummaryService.js](file:///E:/Project/admin_store/admin_orderlist/backend/src/domains/dashboard/services/dailySummaryService.js): giữ event tất toán NCC cho realtime/audit và thông báo số dư ngân hàng, nhưng không còn cộng `total_shop_cost` hoặc gửi `importDelta`. Giá vốn chỉ ghi nhận khi đơn hàng/gia hạn được thanh toán.
+- [supplierDebtPaymentAccounting.test.js](file:///E:/Project/admin_store/admin_orderlist/backend/tests/unit/supplierDebtPaymentAccounting.test.js): regression test khẳng định tất toán NCC không ghi vào tổng chi phí ngày, chỉ phát `bankBalanceDelta` âm.
+
+### Kiểm tra đã chạy
+- `node --check src/domains/dashboard/services/dailySummaryService.js`: pass.
+- `node --check tests/unit/supplierDebtPaymentAccounting.test.js`: pass.
+- `node --test tests/unit/supplierDebtPaymentAccounting.test.js`: 1/1 pass.
+- `git diff --check -- backend/src/domains/dashboard/services/dailySummaryService.js backend/tests/unit/supplierDebtPaymentAccounting.test.js`: pass.
+
+### Trạng thái nghiệm thu
+- **Đã nghiệm thu local:** Trả NCC không còn cộng trùng Nhập hàng; chỉ phản ánh giảm số dư ngân hàng.

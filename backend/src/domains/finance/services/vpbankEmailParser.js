@@ -155,6 +155,15 @@ function extractMerchant(lines, isCreditCard, isPaymentToCard) {
   return "Giao dich the ghi no";
 }
 
+function extractDebitAccountNumber(lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/tai khoan trich no|debit account/i.test(normalizeForMatch(lines[index]))) continue;
+    const candidates = [lines[index], lines[index + 1]].filter(Boolean).join(" ");
+    const match = candidates.match(/\b\d{6,20}\b/);
+    if (match) return match[0];
+  }
+  return null;
+}
 function parseVpbankEmail(email) {
   const subject = String(email.subject || "").trim();
   const rawSender = email.from ? (typeof email.from === "object" ? (email.from.text || email.from.value?.[0]?.address) : String(email.from)) : "";
@@ -194,16 +203,17 @@ function parseVpbankEmail(email) {
   }
   const merchant = extractMerchant(lines, isCreditCard, isPaymentToCard).replace(/\s+/g, " ").trim();
   const maskedSuffix = extractCardSuffix(fullContent);
+  const sourceAccountNumber = extractDebitAccountNumber(lines);
   const rawAvailable = extractAdjacentAmount(lines, /han muc kha dung sau thanh toan|han muc kha dung con lai|han muc sau thanh toan|han muc con lai|han muc kha dung|so du kha dung sau giao dich|so du kha dung con lai|so du kha dung|so du con lai|so du tai khoan|available limit|available balance/);
   const observedBalance = parseVNDAmount(rawAvailable);
 
   if (isCreditCard) {
-    return { documentKind: "CREDIT_CARD_TRANSACTION", instrumentKind: "CREDIT_CARD", maskedSuffix, transactionKind: isPaymentToCard ? "CARD_PAYMENT" : "CARD_SPEND", amount, occurredAt, merchantNormalized: merchant, referenceCode: referenceCode || null, availableLimitObserved: observedBalance, observedBalanceAfter: null, confidence: amount && maskedSuffix ? "HIGH" : "MEDIUM", senderValid, isFinancial: Boolean(amount && amount > 0) };
+    return { documentKind: "CREDIT_CARD_TRANSACTION", instrumentKind: "CREDIT_CARD", maskedSuffix, sourceAccountNumber, transactionKind: isPaymentToCard ? "CARD_PAYMENT" : "CARD_SPEND", amount, occurredAt, merchantNormalized: merchant, referenceCode: referenceCode || null, availableLimitObserved: observedBalance, observedBalanceAfter: null, confidence: amount && (maskedSuffix || sourceAccountNumber) ? "HIGH" : "MEDIUM", senderValid, isFinancial: Boolean(amount && amount > 0) };
   }
 
   const isOutflow = /-\s*[\d.,]+/.test(rawAmount || "") || /rut tien|thanh toan|chuyen tien di|chi tieu/.test(normalizedContent);
   const direction = /trich no/.test(normalizedContent) ? "OUTFLOW" : (isOutflow ? "OUTFLOW" : "INFLOW");
-  return { documentKind: "DEBIT_CARD_TRANSACTION", instrumentKind: maskedSuffix ? "DEBIT_CARD" : "UNKNOWN", maskedSuffix, transactionKind: direction, direction, amount, occurredAt, merchantNormalized: merchant, referenceCode: referenceCode || null, observedBalanceAfter: observedBalance, availableLimitObserved: null, confidence: amount && maskedSuffix ? "HIGH" : "MEDIUM", senderValid, isFinancial: Boolean(amount && amount > 0) };
+  return { documentKind: "DEBIT_CARD_TRANSACTION", instrumentKind: maskedSuffix ? "DEBIT_CARD" : "UNKNOWN", maskedSuffix, sourceAccountNumber, transactionKind: direction, direction, amount, occurredAt, merchantNormalized: merchant, referenceCode: referenceCode || null, observedBalanceAfter: observedBalance, availableLimitObserved: null, confidence: amount && (maskedSuffix || sourceAccountNumber) ? "HIGH" : "MEDIUM", senderValid, isFinancial: Boolean(amount && amount > 0) };
 }
 
 module.exports = { TRUSTED_SENDER_ADDRESSES, extractCardSuffix, extractSenderAddress, isSenderValid, normalizeHtmlToLines, parseDateTimeVN, parseVNDAmount, parseVpbankEmail };

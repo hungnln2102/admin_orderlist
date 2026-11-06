@@ -47,6 +47,7 @@ export type ProfitFrequency = "DAILY" | "MONTHLY" | "YEARLY";
 export type ProfitDestination = "REINVEST" | "CASH_BANK" | "SHOP_BALANCE" | "OTHER";
 
 export type DebtRepaymentFrequency = "DAILY" | "MONTHLY";
+export type DebtKind = "PERSONAL_EXTERNAL" | "CREDIT_CARD" | "OVERDRAFT";
 
 export type PersonalAssetType =
   | "SAVINGS"
@@ -73,6 +74,9 @@ export interface PersonalAsset {
   debtDueDay?: number | null;
   debtEndDate?: string | null;
   debtRepaymentFrequency?: DebtRepaymentFrequency | null;
+  debtKind?: DebtKind | null;
+  debtInitialLimit?: number | null;
+  debtAccountNumber?: string | null;
   cardLastDigits?: string | null;
   bankName?: string | null;
   updatedAt?: string;

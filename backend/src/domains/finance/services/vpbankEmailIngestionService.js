@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VPBank Email Ingestion Service
  * 
  * Äiá»u phá»‘i luá»“ng xá»­ lÃ½ email giao dá»‹ch ngÃ¢n hÃ ng theo chuáº©n ACID:
@@ -7,7 +7,6 @@
 
 const crypto = require("crypto");
 const { db, TABLES, COLS, withTransaction } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
 const { parseVpbankEmail } = require("./vpbankEmailParser");
 const { recordPrincipalInTrx, recordPaymentInTrx } = require("../credit/creditLedgerService");
 const { recordPersonalDebitTransactionInTrx } = require("./personalDebitTransactionService");
@@ -49,34 +48,48 @@ async function getOrCreateCheckpointInTrx(trx, { provider = "VPBANK_GMAIL", mail
   return checkpoint;
 }
 
-async function resolveInstrumentMappingInTrx(trx, { instrumentKind, maskedSuffix }) {
+function normalizeAccountNumber(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits || null;
+}
+
+async function resolveInstrumentMappingInTrx(trx, { instrumentKind, maskedSuffix, sourceAccountNumber }) {
+  const accountNumber = normalizeAccountNumber(sourceAccountNumber);
+  const baseQuery = trx(TABLES.BANK_INSTRUMENT_MAPPINGS).where({
+    [C_MAP.PROVIDER]: "VPBANK",
+    [C_MAP.STATUS]: "ACTIVE",
+  });
+  if (accountNumber) {
+    const exact = await baseQuery.clone().where(C_MAP.ACCOUNT_NUMBER, accountNumber).first();
+    if (exact) return exact;
+  }
   if (!maskedSuffix) return null;
   const cleanSuffix = String(maskedSuffix).replace(/^\*/, "").trim();
-  return trx(TABLES.BANK_INSTRUMENT_MAPPINGS)
-    .where({
-      [C_MAP.PROVIDER]: "VPBANK",
-      [C_MAP.INSTRUMENT_KIND]: instrumentKind,
-      [C_MAP.STATUS]: "ACTIVE",
-    })
+  return baseQuery
+    .where(C_MAP.INSTRUMENT_KIND, instrumentKind)
     .where((builder) => {
       builder.where(C_MAP.MASKED_SUFFIX, cleanSuffix).orWhere(C_MAP.MASKED_SUFFIX, `*${cleanSuffix}`);
     })
     .first();
 }
 
-async function resolvePersonalDebtAssetInTrx(trx, { maskedSuffix }) {
+async function resolvePersonalDebtAssetInTrx(trx, { maskedSuffix, sourceAccountNumber }) {
+  const accountNumber = normalizeAccountNumber(sourceAccountNumber);
+  if (accountNumber) {
+    const assets = await trx(TABLES.PERSONAL_ASSETS)
+      .where({ [C_ASSET.TYPE]: "DEBT_PAYABLE", [C_ASSET.DEBT_ACCOUNT_NUMBER]: accountNumber })
+      .forUpdate();
+    if (assets.length === 1) return assets[0];
+    if (assets.length > 1) return null;
+  }
   if (!maskedSuffix) return null;
   const cleanSuffix = String(maskedSuffix).replace(/^\*/, "").trim();
   const assets = await trx(TABLES.PERSONAL_ASSETS)
-    .where({
-      [C_ASSET.TYPE]: "DEBT_PAYABLE",
-      [C_ASSET.CARD_LAST_DIGITS]: cleanSuffix,
-    })
+    .where({ [C_ASSET.TYPE]: "DEBT_PAYABLE", [C_ASSET.CARD_LAST_DIGITS]: cleanSuffix })
     .whereILike(C_ASSET.BANK_NAME, "%VPBank%")
     .forUpdate();
   return assets.length === 1 ? assets[0] : null;
 }
-
 function observedValueNote(parsed) {
   if (Number.isFinite(Number(parsed.availableLimitObserved))) {
     return `H\u1ea1n m\u1ee9c c\u00f2n l\u1ea1i: ${Number(parsed.availableLimitObserved).toLocaleString("vi-VN")} VND`;
@@ -89,7 +102,7 @@ function observedValueNote(parsed) {
 
 function canRecordPersonalDebtMovement(parsed) {
   return (parsed.instrumentKind === "CREDIT_CARD" && parsed.transactionKind === "CARD_SPEND")
-    || (parsed.instrumentKind === "DEBIT_CARD" && parsed.direction === "OUTFLOW");
+    || (parsed.direction === "OUTFLOW" && Boolean(parsed.sourceAccountNumber || parsed.maskedSuffix));
 }
 
 /**
@@ -154,6 +167,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
         [C_REC.DOCUMENT_KIND]: parsed.documentKind,
         [C_REC.INSTRUMENT_KIND]: parsed.instrumentKind,
         [C_REC.INSTRUMENT_MASK]: parsed.maskedSuffix ? `*${parsed.maskedSuffix}` : null,
+        [C_REC.SOURCE_ACCOUNT_NUMBER]: normalizeAccountNumber(parsed.sourceAccountNumber),
         [C_REC.STATUS]: "PARSED",
         [C_REC.AMOUNT]: parsed.amount || null,
       })
@@ -202,16 +216,28 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
   }
 
   // 6. TÃ¬m mapping tháº» trong database
-  const mapping = await resolveInstrumentMappingInTrx(trx, {
+  // Resolve the full debit account first; suffix matching remains legacy fallback only.
+  const resolvedDebtAsset = await resolvePersonalDebtAssetInTrx(trx, {
+    maskedSuffix: parsed.maskedSuffix,
+    sourceAccountNumber: parsed.sourceAccountNumber,
+  });
+  const personalDebtAsset = resolvedDebtAsset
+    && !["CREDIT_CARD", "OVERDRAFT"].includes(resolvedDebtAsset[C_ASSET.DEBT_KIND])
+    ? resolvedDebtAsset
+    : null;
+  let mapping = await resolveInstrumentMappingInTrx(trx, {
     instrumentKind: parsed.instrumentKind,
     maskedSuffix: parsed.maskedSuffix,
+    sourceAccountNumber: parsed.sourceAccountNumber,
   });
-
-  // A personal debt record is a valid direct target only for an outgoing draw/spend.
-  const personalDebtAsset = mapping ? null : await resolvePersonalDebtAssetInTrx(trx, {
-    maskedSuffix: parsed.maskedSuffix,
-  });
-
+  if (resolvedDebtAsset && ["CREDIT_CARD", "OVERDRAFT"].includes(resolvedDebtAsset[C_ASSET.DEBT_KIND])) {
+    const linkedCreditAccount = await trx(TABLES.CREDIT_ACCOUNTS)
+      .where(COLS.CREDIT_ACCOUNTS.PERSONAL_ASSET_ID, resolvedDebtAsset[C_ASSET.ID])
+      .first();
+    if (linkedCreditAccount) {
+      mapping = { ...(mapping || {}), linked_credit_account_id: linkedCreditAccount.id };
+    }
+  }
   if (!mapping && (!personalDebtAsset || !canRecordPersonalDebtMovement(parsed))) {
     const failureCode = personalDebtAsset ? "PAYMENT_SOURCE_ACCOUNT_REQUIRED" : "UNMAPPED_BANK_INSTRUMENT";
     await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
@@ -238,8 +264,8 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
 
   // 7. Táº¡o businessKey duy nháº¥t chá»‘ng háº¡ch toÃ¡n 2 láº§n
   const businessKey = parsed.referenceCode
-    ? `${parsed.instrumentKind}:${parsed.maskedSuffix}:${parsed.referenceCode}`
-    : `${parsed.instrumentKind}:${parsed.maskedSuffix}:${parsed.occurredAt}:${parsed.amount}`;
+    ? `${parsed.instrumentKind}:${parsed.sourceAccountNumber || parsed.maskedSuffix}:${parsed.referenceCode}`
+    : `${parsed.instrumentKind}:${parsed.sourceAccountNumber || parsed.maskedSuffix}:${parsed.occurredAt}:${parsed.amount}`;
 
   let ledgerId = null;
   let personalDebitLogId = null;
@@ -265,43 +291,33 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
       ].filter(Boolean).join(" | "),
     });
     personalDebtPaymentLogId = debtResult.logId;
-  } else if (parsed.instrumentKind === "CREDIT_CARD") {
-    const creditAccountId = mapping.linked_credit_account_id;
-    if (parsed.transactionKind === "CARD_SPEND") {
-      const res = await recordPrincipalInTrx(trx, creditAccountId, {
-        amount: parsed.amount,
-        eventType: "CARD_SPEND",
-        effectiveAt: parsed.occurredAt,
-        sourceReference: parsed.referenceCode || `VPB_EMAIL_${emailUid}`,
-        idempotencyKey: businessKey,
-        metadata: {
-          merchant: parsed.merchantNormalized,
-          emailUid,
-          receiptId,
-        },
-      });
-      ledgerId = res.ledgerId;
-    } else if (parsed.transactionKind === "CARD_PAYMENT") {
-      const res = await recordPaymentInTrx(trx, creditAccountId, {
+  } else if (mapping?.linked_credit_account_id) {
+    const creditAccountId = Number(mapping.linked_credit_account_id);
+    const creditAccount = await trx(TABLES.CREDIT_ACCOUNTS)
+      .where(COLS.CREDIT_ACCOUNTS.ID, creditAccountId)
+      .first();
+    if (!creditAccount) throw new Error("Mapped credit account không tồn tại");
+    const isPayment = parsed.transactionKind === "CARD_PAYMENT" || parsed.direction === "INFLOW";
+    const res = isPayment
+      ? await recordPaymentInTrx(trx, creditAccountId, {
         amount: parsed.amount,
         effectiveAt: parsed.occurredAt,
         sourceReference: parsed.referenceCode || `VPB_EMAIL_${emailUid}`,
         idempotencyKey: businessKey,
         note: `VPBank Email: ${parsed.merchantNormalized}`,
-      });
-      ledgerId = res.paymentLedgerId || res.ledgerId;
-    }
-
-    trx.afterCommit(() => {
-      eventBus.emit(EVENTS.FINANCE_CARD_TRANSACTION_SYNCED, {
-        creditAccountId,
-        ledgerId,
+      })
+      : await recordPrincipalInTrx(trx, creditAccountId, {
         amount: parsed.amount,
-        transactionKind: parsed.transactionKind,
+        eventType: creditAccount.product_kind === "OVERDRAFT" ? "OVERDRAFT_DRAW" : "CARD_SPEND",
+        effectiveAt: parsed.occurredAt,
+        sourceReference: parsed.referenceCode || `VPB_EMAIL_${emailUid}`,
+        idempotencyKey: businessKey,
+        metadata: { merchant: parsed.merchantNormalized, emailUid, receiptId, sourceAccountNumber: parsed.sourceAccountNumber || null },
       });
-    });
-  } else if (parsed.instrumentKind === "DEBIT_CARD") {
-    const financialAccountId = mapping.linked_financial_account_id;
+    ledgerId = res.ledger?.id || res.ledgerId || null;
+
+  } else if (mapping?.linked_financial_account_id) {
+    const financialAccountId = Number(mapping.linked_financial_account_id);
     const res = await recordPersonalDebitTransactionInTrx(trx, {
       financialAccountId,
       direction: parsed.direction,
@@ -311,12 +327,13 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
       observedBalanceAfter: parsed.observedBalanceAfter,
       businessKey,
       source: "VPBANK_EMAIL_SYNC",
-      instrumentMask: `VPBank *${parsed.maskedSuffix}`,
+      instrumentMask: parsed.sourceAccountNumber ? `VPBank ${parsed.sourceAccountNumber}` : `VPBank *${parsed.maskedSuffix}`,
       note: parsed.referenceCode ? `Ref: ${parsed.referenceCode}` : null,
     });
     personalDebitLogId = res.transaction.id;
+  } else {
+    throw new Error("Mapped bank instrument has no valid target");
   }
-
   // 9. Cáº­p nháº­t Receipt thÃ nh APPLIED
   await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
     .where("id", receiptId)

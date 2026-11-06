@@ -1,5 +1,7 @@
 const { TABLES, COLS, withTransaction } = require("@/db");
 
+const { EVENTS, publishEventInTrx } = require("@/events");
+
 const PRODUCT_KINDS = new Set(["CREDIT_CARD", "OVERDRAFT"]);
 const PAYMENT_BUCKETS = ["FEE", "POSTED_INTEREST", "REVOLVING_PRINCIPAL", "GRACE_PRINCIPAL"];
 
@@ -105,6 +107,15 @@ async function getBalancesInTrx(trx, accountId, effectiveAt = null) {
   return { principal, interest, fee, total: principal + interest + fee };
 }
 
+async function syncPersonalAssetDebtBalanceInTrx(trx, account, balances) {
+  if (!account.personal_asset_id) return;
+  await trx(TABLES.PERSONAL_ASSETS)
+    .where(COLS.PERSONAL_ASSETS.ID, account.personal_asset_id)
+    .update({
+      [COLS.PERSONAL_ASSETS.AMOUNT]: Math.max(0, asNumber(balances.total)),
+      [COLS.PERSONAL_ASSETS.UPDATED_AT]: trx.fn.now(),
+    });
+}
 async function insertLedgerInTrx(trx, input) {
   const existing = await trx(TABLES.CREDIT_ACCOUNT_LEDGER)
     .where(COLS.CREDIT_ACCOUNT_LEDGER.ACCOUNT_ID, input.accountId)
@@ -125,6 +136,24 @@ async function insertLedgerInTrx(trx, input) {
     [COLS.CREDIT_ACCOUNT_LEDGER.IDEMPOTENCY_KEY]: input.idempotencyKey,
     [COLS.CREDIT_ACCOUNT_LEDGER.METADATA]: input.metadata || {},
   }).returning("*");
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.FINANCE_DEBT_LEDGER_MUTATED,
+    aggregateType: "CREDIT_ACCOUNT",
+    aggregateId: input.accountId,
+    action: input.eventType,
+    afterState: ledger,
+    source: "CREDIT_LEDGER",
+    payload: {
+      creditAccountId: Number(input.accountId),
+      ledgerId: Number(ledger.id),
+      eventType: input.eventType,
+      bucket: input.bucket,
+      principalDelta: asNumber(input.principalDelta),
+      interestDelta: asNumber(input.interestDelta),
+      feeDelta: asNumber(input.feeDelta),
+      effectiveAt: input.effectiveAt,
+    },
+  });
   return { ledger, alreadyProcessed: false };
 }
 
@@ -217,6 +246,7 @@ async function recordPrincipalInTrx(trx, accountId, payload) {
     metadata: payload.metadata || {},
   });
   const balances = await getBalancesInTrx(trx, account.id);
+  await syncPersonalAssetDebtBalanceInTrx(trx, account, balances);
   return { ledger, alreadyProcessed, balances };
 }
 
@@ -250,7 +280,11 @@ async function recordPaymentInTrx(trx, accountId, payload) {
     .where(COLS.CREDIT_ACCOUNT_LEDGER.ACCOUNT_ID, account.id)
     .where(COLS.CREDIT_ACCOUNT_LEDGER.IDEMPOTENCY_KEY, String(payload.idempotencyKey))
     .first();
-  if (existing) return { ledger: existing, alreadyProcessed: true, balances: await getBalancesInTrx(trx, account.id) };
+  if (existing) {
+    const balances = await getBalancesInTrx(trx, account.id);
+    await syncPersonalAssetDebtBalanceInTrx(trx, account, balances);
+    return { ledger: existing, alreadyProcessed: true, balances };
+  }
 
   let remaining = amount;
   let principalPaid = 0;
@@ -294,6 +328,7 @@ async function recordPaymentInTrx(trx, accountId, payload) {
   }
 
   const balances = await getBalancesInTrx(trx, account.id);
+  await syncPersonalAssetDebtBalanceInTrx(trx, account, balances);
   return { ledger, alreadyProcessed: false, allocations, unallocatedAmount: remaining, balances };
 }
 
