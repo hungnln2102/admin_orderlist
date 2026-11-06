@@ -226,6 +226,32 @@ export const DebtPaymentModal: React.FC<Props> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Target Debt Card / Account Banner */}
+          {!isInstallment && (
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Khoản nợ áp dụng:</div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    {item.name}
+                    {(item as PersonalAsset).cardLastDigits && (
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-cyan-300 border border-slate-700">
+                        {(item as PersonalAsset).bankName || "VPBank"} •••• {(item as PersonalAsset).cardLastDigits}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] text-slate-400">Dư nợ hiện tại</div>
+                <div className="text-xs font-mono font-bold text-rose-400">{formatVND((item as PersonalAsset).amount)}</div>
+              </div>
+            </div>
+          )}
+
           {/* Mode Switcher for Personal Debt */}
           {!isInstallment && (
             <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
