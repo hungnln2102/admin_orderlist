@@ -2,7 +2,7 @@
  * Migration thêm cột card_last_digits vào bảng finance.financial_accounts
  * Giúp lưu trữ 4 số cuối thẻ ATM/Debit gắn với tài khoản ngân hàng để đối soát giao dịch
  */
-const { FINANCE_SCHEMA } = require("../tables");
+const FINANCE_SCHEMA = process.env.DB_SCHEMA_FINANCE || "finance";
 
 exports.up = async function (knex) {
   await knex.raw(`
