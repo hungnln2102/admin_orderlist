@@ -4,12 +4,16 @@ const eventBus = require("./eventBus");
 const E = COLS.DOMAIN_EVENT_STORE;
 const SENSITIVE_KEY = /password|secret|token|cookie|authorization|credential|api[_-]?key|imap|account[_-]?number|wallet[_-]?address|sender|receiver|bank[_-]?account/i;
 
-function redact(value) {
-  if (Array.isArray(value)) return value.map(redact);
+function redact(value, depth = 0, seen = new WeakSet()) {
+  if (depth > 6) return "[MAX_DEPTH]";
+  if (Array.isArray(value)) return value.map((item) => redact(item, depth + 1, seen));
   if (!value || typeof value !== "object" || value instanceof Date) return value;
+  if (typeof value.toSQL === "function" || value.client || value._knex) return "[SQL_RAW]";
+  if (seen.has(value)) return "[CIRCULAR]";
+  seen.add(value);
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, nestedValue]) => [key, SENSITIVE_KEY.test(key) ? "[REDACTED]" : redact(nestedValue)])
+    Object.entries(value).map(([key, nestedValue]) => [key, SENSITIVE_KEY.test(key) ? "[REDACTED]" : redact(nestedValue, depth + 1, seen)])
   );
 }
 

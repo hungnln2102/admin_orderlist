@@ -124,7 +124,8 @@ async function updateConfig(id, data) {
     if (data.is_active !== undefined) updateData.is_active = Boolean(data.is_active);
     const [updatedRow] = await trx(TABLE).where("id", id).update(updateData).returning("*");
     const updated = parseConfigRow(updatedRow);
-    await publishEventInTrx(trx, { eventName: EVENTS.EXTERNAL_API_CONFIG_MUTATED, aggregateType: "EXTERNAL_API_CONFIG", aggregateId: id, action: "UPDATE", beforeState: toClientConfig(existing), afterState: toClientConfig(updated), changedFields: updateData, source: "EXTERNAL_API_CONFIG", payload: { configId: id, serviceKey: existing.service_key, action: "UPDATE" } });
+    const { updated_at: _ignoredUpdatedAt, ...cleanChangedFields } = updateData;
+    await publishEventInTrx(trx, { eventName: EVENTS.EXTERNAL_API_CONFIG_MUTATED, aggregateType: "EXTERNAL_API_CONFIG", aggregateId: id, action: "UPDATE", beforeState: toClientConfig(existing), afterState: toClientConfig(updated), changedFields: cleanChangedFields, source: "EXTERNAL_API_CONFIG", payload: { configId: id, serviceKey: existing.service_key, action: "UPDATE" } });
     trx.afterCommit(() => clearCache(existing.service_key));
     return toClientConfig(updated);
   });
@@ -206,7 +207,10 @@ async function testApiConnection(id) {
 
 function extractJsonPaths(value, path = "", depth = 0) {
   if (depth > 5 || value === null || value === undefined) return [];
-  if (Array.isArray(value)) return value.slice(0, 5).flatMap((item, index) => extractJsonPaths(item, `${path}[${index}]`, depth + 1));
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [{ path, type: "array (empty)", sample: "[]", is_potential_otp: false }];
+    return value.slice(0, 5).flatMap((item, index) => extractJsonPaths(item, `${path}[${index}]`, depth + 1));
+  }
   if (typeof value !== "object") return [{ path, type: typeof value, sample: isSecretKey(path) ? "[REDACTED]" : String(value).slice(0, 120), is_potential_otp: /otp|code|verify/i.test(path) }];
   return Object.entries(value).flatMap(([key, entry]) => extractJsonPaths(entry, path ? `${path}.${key}` : key, depth + 1));
 }
@@ -222,11 +226,14 @@ async function analyzeEndpoint({ configId, method, body } = {}) {
   try {
     const response = await requestConfiguredApi(config, { method: requestMethod, body, endpoint });
     const text = await readExternalResponse(response);
-    let data;
+    let data = null;
+    let isJson = false;
     try {
       data = JSON.parse(text);
+      isJson = true;
     } catch {
-      data = { raw_text: text.slice(0, 5000) };
+      data = null;
+      isJson = false;
     }
     return {
       success: true,
@@ -234,10 +241,24 @@ async function analyzeEndpoint({ configId, method, body } = {}) {
       statusText: response.statusText || String(response.status),
       latency_ms: Date.now() - startedAt,
       contentType: response.headers.get("content-type") || "",
-      detected_fields: extractJsonPaths(data),
+      is_json: isJson,
+      parsed_data: data,
+      raw_body: (text || "").slice(0, 20000),
+      detected_fields: isJson && data ? extractJsonPaths(data) : [],
+      target_url: config.base_url + (endpoint ? `/${endpoint.replace(/^\/+/, "")}` : ""),
     };
   } catch (error) {
-    return { success: false, status: 0, statusText: error.message, latency_ms: Date.now() - startedAt, detected_fields: [] };
+    return {
+      success: false,
+      status: 0,
+      statusText: error.message,
+      latency_ms: Date.now() - startedAt,
+      is_json: false,
+      parsed_data: null,
+      raw_body: "",
+      detected_fields: [],
+      target_url: config.base_url + (endpoint ? `/${endpoint.replace(/^\/+/, "")}` : ""),
+    };
   }
 }
 

@@ -107,30 +107,235 @@ async function fetchOtpFromFixAdes(email) {
   return directCode || collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
 }
 
-async function fetchOtpFromYuna(email) {
-  const config = { base_url: "https://hub.yunagrp.com/2fa/", ...((await getConfigByKey("yuna_2fa")) || {}) };
-  const timeoutMs = Number(config.auth_config?.timeoutMs) || 10_000;
-  let token = config.auth_config?.defaultToken || "";
-  const pageResponse = await requestConfiguredApi(config, { headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs });
-  if (pageResponse.ok) {
-    const html = await readExternalResponse(pageResponse);
-    const match = html.match(/<meta\s+name=["']api-token["']\s+content=["']([^"']+)["']/i);
-    if (match?.[1]) token = match[1].trim();
+/* ── YunaGRP Polite & Anti-Spam Caches ────────────────────────── */
+// 1. Session Cache cho Yuna 2FA Center (hub.yunagrp.com/2fa/) - TTL 10 phút
+let yunaSessionCache = {
+  token: null,
+  cookie: null,
+  expiresAt: 0,
+};
+
+// 2. Rules Cache cho Yuna Mail (mail.yunagrp.com) - TTL 15 phút
+let yunaRulesCache = {
+  rules: null,
+  expiresAt: 0,
+};
+
+/**
+ * Lấy token và cookie phiên làm việc từ https://hub.yunagrp.com/2fa/
+ * Lưu cache 10 phút để không gửi request liên tục làm phiền máy chủ đối tác.
+ */
+async function getYuna2FaSession(config, timeoutMs = 10000) {
+  const now = Date.now();
+  if (yunaSessionCache.token && yunaSessionCache.expiresAt > now) {
+    return yunaSessionCache;
   }
-  const response = await requestConfiguredApi(config, { endpoint: appendQuery(config.endpoints?.order_info || "/order_info", { search: email }), headers: token ? { "X-API-Token": token } : {}, timeoutMs });
-  if (!response.ok) return null;
-  const data = await parseJsonResponse(response);
-  const item = (data?.items || []).find((entry) => String(entry.name || "").toLowerCase().includes(String(email).toLowerCase()));
-  return extractOtpCode(item?.code);
+
+  const pageResponse = await requestConfiguredApi(config, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+    timeoutMs,
+  });
+
+  if (!pageResponse.ok) {
+    return { token: null, cookie: null };
+  }
+
+  const rawCookie = pageResponse.headers.get("set-cookie") || "";
+  const cookiePart = rawCookie ? rawCookie.split(";")[0] : "";
+  const html = await readExternalResponse(pageResponse);
+  const match = html.match(/<meta\s+name=["']api-token["']\s+content=["']([^"']+)["']/i);
+  const token = match?.[1] ? match[1].trim() : "";
+
+  yunaSessionCache = {
+    token,
+    cookie: cookiePart,
+    expiresAt: now + 10 * 60 * 1000, // 10 phút
+  };
+
+  return yunaSessionCache;
+}
+
+/**
+ * 4. Luồng Yuna 2FA Center (hub.yunagrp.com/2fa/):
+ * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
+ * - Hoặc tra cứu mã 2FA từ secret (get_manual)
+ */
+async function fetchYunaAccountOrder(queryInput) {
+  if (!queryInput) return { otp: null, extra_fields: [] };
+  const query = String(queryInput).trim();
+
+  const config = {
+    base_url: "https://hub.yunagrp.com/2fa/",
+    ...((await getConfigByKey("yuna_2fa")) || {}),
+  };
+  const timeoutMs = Number(config.auth_config?.timeoutMs) || 12_000;
+
+  try {
+    const session = await getYuna2FaSession(config, timeoutMs);
+    if (!session.token) {
+      return { otp: null, extra_fields: [], error: "Không thể lấy token xác thực từ Yuna 2FA." };
+    }
+
+    const form = new URLSearchParams();
+    const isBase32Secret = /^[A-Z2-7]{16,32}$/i.test(query);
+
+    if (isBase32Secret) {
+      form.append("action", "get_manual");
+      form.append("secret", query);
+    } else {
+      form.append("action", "get_order");
+      form.append("order_code", query);
+    }
+
+    const headers = {
+      "X-API-Token": session.token,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    };
+    if (session.cookie) {
+      headers["Cookie"] = session.cookie;
+    }
+
+    const response = await requestConfiguredApi(config, {
+      method: "POST",
+      body: form.toString(),
+      headers,
+      timeoutMs,
+    });
+
+    if (response.status === 403) {
+      // Invalidate session cache if 403
+      yunaSessionCache = { token: null, cookie: null, expiresAt: 0 };
+    }
+
+    const data = await parseJsonResponse(response);
+    if (!data) return { otp: null, extra_fields: [] };
+
+    let foundOtp = extractOtpCode(data.code) || null;
+    const extraFields = [];
+
+    // Nếu là get_manual: có code và time_left
+    if (data.code) {
+      extraFields.push({ key: "code", label: "Mã 2FA / OTP", value: String(data.code), path: "code" });
+    }
+    if (data.time_left !== undefined) {
+      extraFields.push({ key: "time_left", label: "Thời gian còn lại (s)", value: String(data.time_left), path: "time_left" });
+    }
+
+    // Nếu là get_order: trả về danh sách tài khoản (items)
+    if (Array.isArray(data.items) && data.items.length > 0) {
+      extraFields.push({
+        key: "items",
+        label: "Danh Sách Tài Khoản",
+        value: JSON.stringify(data.items),
+        path: "items",
+      });
+
+      // Lấy tài khoản đầu tiên
+      const primaryItem = data.items[0];
+      if (primaryItem.name) {
+        extraFields.push({ key: "account_email", label: "Email Tài Khoản", value: String(primaryItem.name), path: "items[0].name" });
+      }
+      if (primaryItem.group) {
+        extraFields.push({ key: "product_plan", label: "Gói Dịch Vụ", value: String(primaryItem.group), path: "items[0].group" });
+      }
+      if (primaryItem.expires_at_str) {
+        extraFields.push({ key: "expires_at", label: "Hạn Sử Dụng", value: String(primaryItem.expires_at_str), path: "items[0].expires_at_str" });
+      }
+      if (primaryItem.code && !foundOtp) {
+        foundOtp = extractOtpCode(primaryItem.code);
+        extraFields.push({ key: "otp", label: "Mã OTP 2FA", value: String(primaryItem.code), path: "items[0].code" });
+      }
+    }
+
+    return { otp: foundOtp, extra_fields: extraFields, raw_data: data };
+  } catch (err) {
+    return { otp: null, extra_fields: [], error: err.message };
+  }
+}
+
+/**
+ * 5. Luồng Yuna Mail Rules & Scraper (mail.yunagrp.com):
+ * - Tự động tải routing rules từ https://mail.yunagrp.com/admin.php?public=rules (Cache 15 phút)
+ * - Với action api_local -> gọi https://mail.yunagrp.com/api.php?email={email}
+ * - Với action api_hdsd -> chuyển tiếp sang HDSD
+ */
+async function fetchOtpFromYunaMail(email) {
+  if (!email || !String(email).includes("@")) return null;
+  const cleanEmail = String(email).trim().toLowerCase();
+  const domain = cleanEmail.split("@")[1];
+  const now = Date.now();
+
+  try {
+    // 1. Lấy danh sách rules với cache 15 phút (chống gọi liên tục làm phiền Yuna)
+    let rules = yunaRulesCache.rules;
+    if (!rules || yunaRulesCache.expiresAt < now) {
+      const config = {
+        base_url: "https://mail.yunagrp.com",
+        ...((await getConfigByKey("yuna_mail")) || {}),
+      };
+      const rulesRes = await requestConfiguredApi(config, {
+        endpoint: "/admin.php?public=rules",
+        headers: { "User-Agent": "Mozilla/5.0" },
+        timeoutMs: 10_000,
+      });
+
+      if (rulesRes.ok) {
+        const rulesData = await parseJsonResponse(rulesRes);
+        if (rulesData?.success && Array.isArray(rulesData.rules)) {
+          rules = rulesData.rules;
+          yunaRulesCache = { rules, expiresAt: now + 15 * 60 * 1000 };
+        }
+      }
+    }
+
+    const matchedRule = (rules || []).find((r) => r.domain === domain && r.enabled !== false);
+    const action = matchedRule ? matchedRule.action : "api_local";
+
+    if (action === "api_hdsd") {
+      return await fetchOtpFromHdsd(cleanEmail);
+    }
+
+    // Mặc định hoặc api_local: Gọi API Mail Yuna
+    const mailConfig = {
+      base_url: "https://mail.yunagrp.com",
+      ...((await getConfigByKey("yuna_mail")) || {}),
+    };
+    const response = await requestConfiguredApi(mailConfig, {
+      endpoint: `/api.php?email=${encodeURIComponent(cleanEmail)}`,
+      headers: { "User-Agent": "Mozilla/5.0" },
+      timeoutMs: 10_000,
+    });
+
+    if (response.ok) {
+      const data = await parseJsonResponse(response);
+      const code = data?.data?.latest?.extracted_code || data?.otp || data?.code;
+      if (code) return extractOtpCode(code);
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOtpFromYuna(email) {
+  const result = await fetchYunaAccountOrder(email);
+  return result?.otp || null;
 }
 function getValueByPath(obj, path) {
   if (!obj || !path) return undefined;
-  const normalized = path.replace(/\[(\w+)\]/g, ".$1").replace(/^\./, "");
+  const normalized = String(path).trim().replace(/\[(\w+)\]/g, ".$1").replace(/^\./, "");
   const keys = normalized.split(".");
   let curr = obj;
-  for (const key of keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
     if (curr == null) return undefined;
-    curr = curr[key];
+    if (Array.isArray(curr) && !/^\d+$/.test(key)) {
+      curr = curr[0]?.[key];
+    } else {
+      curr = curr[key];
+    }
   }
   return curr;
 }
@@ -201,14 +406,19 @@ async function fetchOtpFromDynamicConfig(config, email) {
 }
 
 /**
- * Hàm điều phối chung: Probe OTP cho bất kỳ email và dịch vụ nào
+ * Hàm điều phối chung: Probe OTP hoặc thông tin tài khoản cho bất kỳ dịch vụ nào
  */
 async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
-  if (!email || !String(email).includes("@")) {
+  if (!email) {
+    throw new Error("Vui lòng cung cấp email hoặc mã đơn hàng cần kiểm tra.");
+  }
+
+  const queryInput = String(email).trim();
+  if (serviceKey !== "yuna_2fa" && !queryInput.includes("@")) {
     throw new Error("Vui lòng cung cấp email hợp lệ (vd: user@domain.com).");
   }
 
-  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanEmail = queryInput.toLowerCase();
   const startTime = Date.now();
   let otp = null;
   let sourceUsed = serviceKey;
@@ -224,10 +434,16 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
     case "fix_ades":
       otp = await fetchOtpFromFixAdes(cleanEmail);
       break;
-    case "yuna_2fa":
-    case "yuna_mail":
-      otp = await fetchOtpFromYuna(cleanEmail);
+    case "yuna_2fa": {
+      const yunaRes = await fetchYunaAccountOrder(queryInput);
+      otp = yunaRes.otp;
+      extraFields = yunaRes.extra_fields || [];
       break;
+    }
+    case "yuna_mail": {
+      otp = await fetchOtpFromYunaMail(cleanEmail);
+      break;
+    }
     default: {
       const customConfig = await getConfigByKey(serviceKey);
       if (customConfig) {
@@ -245,23 +461,37 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
 
   const durationMs = Date.now() - startTime;
 
+  let message = "";
+  if (serviceKey === "yuna_2fa") {
+    message = extraFields.length > 0
+      ? `Đã lấy thông tin tài khoản thành công! (${extraFields.length} trường)`
+      : (otp ? `Đã lấy mã 2FA [${otp}] thành công!` : "Không tìm thấy thông tin đơn hàng hoặc mã 2FA.");
+  } else {
+    message = otp
+      ? `Đã tìm thấy mã OTP [${otp}] thành công!`
+      : "Chưa có thư mới hoặc chưa lấy được mã OTP trong hộp thư.";
+  }
+
   return {
     success: true,
-    email: cleanEmail,
+    email: queryInput,
     service_key: sourceUsed,
     otp: otp || null,
-    found: Boolean(otp),
+    found: Boolean(otp || extraFields.length > 0),
     duration_ms: durationMs,
     extra_fields: extraFields,
-    message: otp ? `Đã tìm thấy mã OTP [${otp}] thành công!` : "Chưa có thư mới hoặc chưa lấy được mã OTP trong hộp thư.",
+    message,
   };
 }
 
 module.exports = {
   extractOtpCode,
+  getValueByPath,
   fetchOtpFromHdsd,
   fetchOtpFromTinyHost,
   fetchOtpFromFixAdes,
+  fetchYunaAccountOrder,
+  fetchOtpFromYunaMail,
   fetchOtpFromYuna,
   probeOtpForEmail,
 };
