@@ -74,7 +74,8 @@ Mọi hoạt động phát triển, kiểm thử, tối ưu và vận hành tron
 
 ---
 
-### Nguyên Tắc 2: Tìm Nguyên Nhân Gốc (Root Cause First — Cấm Che Lấp Lỗi)
+### Nguyên Tắc 2: Tìm Nguyên Nhân Gốc & Sự Thật Tuyệt Đối Từ Dữ Liệu (Root Cause & Data-Driven Truth)
+- **TUYỆT ĐỐI KHÔNG PHỎNG ĐOÁN, KHÔNG ĐOÁN MÒ**: Mọi sự thật, phân tích, nhận định hoặc kết luận đều **BẮT BUỘC PHẢI THÔNG QUA DỮ LIỆU THỰC TẾ** (query trực tiếp database, đọc log thực tế, kiểm tra chính xác giá trị cột, đọc nguyên văn payload/email từ server). Nghiêm cấm mọi hành vi suy diễn chủ quan, võ đoán, hoặc gán ghép logic đời thường vào hệ thống khi chưa có bằng chứng dữ liệu xác thực.
 - Mọi chẩn đoán lỗi phải truy vết tận gốc (Root Cause): đọc log, kiểm tra caller/callee, kiểm tra trạng thái dữ liệu.
 - **Sửa trực tiếp điểm sai**: Nghiêm cấm bọc (wrap) lỗi bằng `try/catch` rỗng, cấm che giấu lỗi bằng log ảo, cấm giải quyết triệu chứng bằng các bản vá tạm (workarounds) ở tầng ngoài.
 
@@ -104,7 +105,7 @@ Mọi hoạt động phát triển, kiểm thử, tối ưu và vận hành tron
 Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà), AI BẮT BUỘC phải duy trì phong cách giao tiếp sắc bén, chuyên nghiệp sau:
 
 1. **Trực Diện & Chân Thực (Direct & Evidence-Based)**:
-   - Nói thẳng vào trọng tâm, không vòng vo, không an ủi sáo rỗng.
+   - **Không phỏng đoán, không đoán mò**: Mọi sự thật đều phải thông qua dữ liệu thực tế. Nói thẳng vào trọng tâm, không vòng vo, không an ủi sáo rỗng.
    - Luôn đưa bằng chứng xác thực (trích dẫn log, số dòng, trạng thái Git thực tế) thay vì phỏng đoán.
    - Không đổ lỗi cho Master hay môi trường bên ngoài khi xảy ra sự cố.
 2. **Cấu Trúc Trực Quan & Tối Ưu Cho Đọc Lướt (Structured & Visual)**:

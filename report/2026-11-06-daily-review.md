@@ -11,6 +11,7 @@
 ## 📑 MỤC LỤC CÁC NHIỆM VỤ ĐÃ THỰC THI TRONG NGÀY
 
 1. [Nhiệm vụ 1: [08:40] Khắc Phục Giao Dịch 320.251 đ Ghi Nhầm Vào Thấu Chi VpBank Về Thẻ Tín Dụng & Gia Cố Banner Nhận Diện Nợ](#1-0840-khắc-phục-giao-dịch-320251-đ-ghi-nhầm-vào-thấu-chi-vpbank-về-thẻ-tín-dụng--gia-cố-banner-nhận-diện-nợ)
+2. [Nhiệm vụ 2: [09:05] Khắc Cốt Hiến Pháp: Tuyệt Đối Không Phỏng Đoán, Đoán Mò — Mọi Sự Thật Đều Phải Thông Qua Dữ Liệu](#2-0905-khắc-cốt-hiến-pháp-tuyệt-đối-không-phỏng-đoán-đoán-mò--mọi-sự-thật-đều-phải-thông-qua-dữ-liệu)
 
 ---
 
@@ -40,3 +41,28 @@
 - **Database VPS:** Dòng log ID 3 đã trỏ chính xác về `target_id = 2` (`Thẻ Tín Dụng`). Dư nợ 2 tài khoản đã cân bằng chính xác theo số liệu thực tế.
 - **Frontend Build (`npm run build`):** Biên dịch hoàn tất trong 7.68s, **0 lỗi TypeScript, 0 lỗi cú pháp**.
 - **Tiêu chuẩn hoàn thành (DoD):** Bảng "3. Nhật Ký Biến Động Nợ & Trả Góp" trên Web hiển thị dòng 320.251 đ thuộc về `Thẻ Tín Dụng VPBank **** 2340`.
+
+
+---
+
+## 2. [09:05] KHẮC CỐT HIẾN PHÁP: TUYỆT ĐỐI KHÔNG PHỎNG ĐOÁN, ĐOÁN MÒ — MỌI SỰ THẬT ĐỀU PHẢI THÔNG QUA DỮ LIỆU
+
+### 2.1. Chỉ thị tối cao của Master
+> *"lưu vào bộ luật: Không phỏng đoán, không đoán mò. Mọi sự thật đều phải thông qua dữ liệu"*
+
+### 2.2. Bối cảnh & Bài học xương máu
+- Trong quá trình phân tích email biến động số dư VPBank, AI thấy email chứa nội dung *"Thẻ ghi nợ/4541xxxx8181"* và thấy tài khoản cá nhân có STK *0378304963*. AI đã tự ý suy đoán theo logic ngân hàng đời thường rằng thẻ Debit 8181 là thẻ gắn với STK 0378304963.
+- Master đã chấn chỉnh nghiêm khắc: *"8181 là tôi đang gắn cho thấu chi mà, 2340 là thẻ tín dụng, nhưng tại sao lí do ở đâu bạn bảo 8181 là của stk 0378304963, nội dung này bạn lấy từ đâu. Hay là dữ liệu đang lưu sai"*.
+- Dữ liệu trong database hoàn toàn không sai (`personal_assets` lưu đúng Thấu chi 8181, Thẻ tín dụng 2340). Sai sót hoàn toàn do AI suy diễn chủ quan mà không căn cứ vào liên kết dữ liệu thực tế.
+
+### 2.3. Cập nhật Hiến pháp AGENTS.md (Single Source of Truth)
+Đã cập nhật đồng bộ vào **AGENTS.md** (cả repo gốc và submodule `core-agents` dùng chung toàn bộ dự án):
+1. **Nguyên Tắc 2 (Sự Thật Tuyệt Đối Từ Dữ Liệu — Root Cause & Data-Driven Truth):**
+   - **TUYỆT ĐỐI KHÔNG PHỎNG ĐOÁN, KHÔNG ĐOÁN MÒ**: Mọi sự thật, phân tích, nhận định hoặc kết luận đều **BẮT BUỘC PHẢI THÔNG QUA DỮ LIỆU THỰC TẾ** (query trực tiếp database, đọc log thực tế, kiểm tra chính xác giá trị cột, đọc nguyên văn payload/email từ server).
+   - Nghiêm cấm mọi hành vi suy diễn chủ quan, võ đoán, hoặc gán ghép logic đời thường vào hệ thống khi chưa có bằng chứng dữ liệu xác thực.
+2. **Nguyên Tắc 5 (Chuẩn Mực Giao Tiếp — Direct & Evidence-Based):**
+   - **Không phỏng đoán, không đoán mò**: Mọi sự thật đều phải thông qua dữ liệu thực tế. Nói thẳng vào trọng tâm, đưa bằng chứng xác thực (câu query DB, log thực tế, mã hash) thay vì phỏng đoán.
+
+### 2.4. Trạng thái phân phối & Đồng bộ
+- Submodule `core-agents`: Commit `dc67268` đã push lên GitHub `https://github.com/hungnln2102/core-agents.git`.
+- Repo `admin_orderlist`: Cập nhật `AGENTS.md` và con trỏ submodule.
