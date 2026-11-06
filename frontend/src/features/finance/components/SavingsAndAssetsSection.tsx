@@ -78,6 +78,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
     usdtAmount?: number;
     note?: string;
     profitRate?: number;
+    cardLastDigits?: string | null;
     rawItem: any;
   }
 
@@ -95,6 +96,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
         accountNumber: acc.accountNumber || "-",
         accountHolder: acc.accountHolder || "",
         amount: Number(acc.balance || 0),
+        cardLastDigits: acc.cardLastDigits || null,
         rawItem: acc,
       });
     });
@@ -157,6 +159,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
         amount: item.amount,
         note: item.note && !item.note.startsWith("Chủ TK:") ? item.note : undefined,
         profitRate: item.profitEnabled ? item.annualInterestRate : undefined,
+        cardLastDigits: (item as any).cardLastDigits || (item as any).card_last_digits || null,
         rawItem: item,
       });
     });
@@ -436,9 +439,16 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                       {/* Cột 3: STK / Địa Chỉ */}
                       <td className="py-3 px-4">
                         <div className="space-y-0.5">
-                          <span className="font-mono font-bold text-white text-xs block truncate max-w-[220px]" title={acc.accountNumber}>
-                            {acc.accountNumber}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-white text-xs block truncate max-w-[220px]" title={acc.accountNumber}>
+                              {acc.accountNumber}
+                            </span>
+                            {acc.cardLastDigits && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-slate-800 text-cyan-300 border border-slate-700 whitespace-nowrap" title="4 số cuối thẻ ATM / Debit">
+                                Thẻ: •••• {acc.cardLastDigits}
+                              </span>
+                            )}
+                          </div>
                           {acc.accountHolder && (
                             <span className="text-[11px] text-slate-400 font-mono block truncate max-w-[220px]" title={acc.accountHolder}>
                               {acc.accountHolder.startsWith("Chủ TK:") ? acc.accountHolder : `Chủ TK: ${acc.accountHolder}`}

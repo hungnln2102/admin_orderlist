@@ -68,6 +68,7 @@ export const PaymentWalletsPage: React.FC = () => {
     accountScope: "SHOP",
     isDefault: false,
     isActive: true,
+    cardLastDigits: "",
   });
 
   const fetchBankAccounts = useCallback(async () => {
@@ -162,6 +163,7 @@ export const PaymentWalletsPage: React.FC = () => {
       accountScope: "SHOP",
       isDefault: false,
       isActive: true,
+      cardLastDigits: "",
     });
     setModalOpen(true);
   };
@@ -184,6 +186,7 @@ export const PaymentWalletsPage: React.FC = () => {
         accountScope: bank.accountScope || "SHOP",
         isDefault: bank.isDefault,
         isActive: bank.isActive,
+        cardLastDigits: bank.cardLastDigits || "",
       });
     } else {
       const usdt = item as UsdtWalletItem;
@@ -226,6 +229,8 @@ export const PaymentWalletsPage: React.FC = () => {
             bankBin: formData.bankBin,
             qrNotePrefix: formData.qrNotePrefix,
             label: formData.label,
+            accountScope: formData.accountScope,
+            cardLastDigits: formData.cardLastDigits ? formData.cardLastDigits.trim() : null,
             isDefault: formData.isDefault,
             isActive: formData.isActive,
           }),

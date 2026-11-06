@@ -12,6 +12,7 @@
 
 1. [Nhiệm vụ 1: [08:40] Khắc Phục Giao Dịch 320.251 đ Ghi Nhầm Vào Thấu Chi VpBank Về Thẻ Tín Dụng & Gia Cố Banner Nhận Diện Nợ](#1-0840-khắc-phục-giao-dịch-320251-đ-ghi-nhầm-vào-thấu-chi-vpbank-về-thẻ-tín-dụng--gia-cố-banner-nhận-diện-nợ)
 2. [Nhiệm vụ 2: [09:05] Khắc Cốt Hiến Pháp: Tuyệt Đối Không Phỏng Đoán, Đoán Mò — Mọi Sự Thật Đều Phải Thông Qua Dữ Liệu](#2-0905-khắc-cốt-hiến-pháp-tuyệt-đối-không-phỏng-đoán-đoán-mò--mọi-sự-thật-đều-phải-thông-qua-dữ-liệu)
+3. [Nhiệm vụ 3: [09:30] Bổ Sung Trường 4 Số Cuối Thẻ ATM/Debit Vào Tài Khoản Ngân Hàng & Tự Động Định Tuyến Đối Soát](#3-0930-bổ-sung-trường-4-số-cuối-thẻ-atmdebit-vào-tài-khoản-ngân-hàng--tự-động-định-tuyến-đối-soát)
 
 ---
 
@@ -66,3 +67,36 @@
 ### 2.4. Trạng thái phân phối & Đồng bộ
 - Submodule `core-agents`: Commit `dc67268` đã push lên GitHub `https://github.com/hungnln2102/core-agents.git`.
 - Repo `admin_orderlist`: Cập nhật `AGENTS.md` và con trỏ submodule.
+
+---
+
+## 3. [09:30] BỔ SUNG TRƯỜNG 4 SỐ CUỐI THẺ ATM/DEBIT VÀO TÀI KHOẢN NGÂN HÀNG & TỰ ĐỘNG ĐỊNH TUYẾN ĐỐI SOÁT
+
+### 3.1. Bối cảnh & Chỉ đạo của Master
+> *"giờ thực hiện fix vấn đề tài khoản cá nhân không có dữ liệu 4 số cuối đi"*
+
+### 3.2. Nguyên nhân gốc rễ (Root Cause)
+- Modal "Chỉnh Sửa Tài Khoản Ngân Hàng" (`WalletCreateEditModal.tsx` và `PersonalBankAccountModal.tsx`) chỉ hỗ trợ STK, Chủ TK, Ngân hàng, Ghi chú, Phạm vi tài khoản; hoàn toàn thiếu ô nhập số đuôi thẻ ATM / Debit.
+- Bảng `finance.financial_accounts` chưa có cột `card_last_digits` để lưu trữ dữ liệu này.
+- Bảng `finance.bank_instrument_mappings` chưa có cơ chế tự động đồng bộ khi tạo/sửa tài khoản ngân hàng thanh toán.
+
+### 3.3. Giải pháp kỹ thuật đã triển khai (Chuẩn ACID)
+1. **Database Migration (`20261106000001_add_card_last_digits_to_financial_accounts.js`):**
+   - Thêm cột `card_last_digits VARCHAR(10) NULL` vào `finance.financial_accounts`.
+   - Tạo index `idx_financial_accounts_card_last_digits` tối ưu hóa tra cứu.
+2. **Schema & Tables (`tables.js`):**
+   - Khai báo `CARD_LAST_DIGITS: "card_last_digits"` trong `COLS.FINANCIAL_ACCOUNTS`.
+3. **Backend Service (`walletService.js`):**
+   - `listBankAccounts()`: Trả về `cardLastDigits`.
+   - `createBankAccount()` & `updateBankAccount()`: Lưu `card_last_digits`.
+   - Tự động UPSERT/đồng bộ trạng thái sang `finance.bank_instrument_mappings` (`instrument_kind = 'DEBIT_CARD'`) trong cùng transaction ACID.
+4. **Email Ingestion (`vpbankEmailIngestionService.js`):**
+   - Hàm `resolveInstrumentMappingInTrx` chuẩn hoá khớp linh hoạt cả suffix sạch (`8181`) và suffix có tiền tố sao (`*8181`).
+5. **Frontend UI & Components:**
+   - [`WalletCreateEditModal.tsx`](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/payment-wallets/components/WalletCreateEditModal.tsx): Bổ sung ô nhập "4 Số Cuối Thẻ ATM / Debit" (max 4 số, font-mono, số tự nhiên).
+   - [`PersonalBankAccountModal.tsx`](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/finance/components/PersonalBankAccountModal.tsx): Bổ sung ô nhập tương tự cho modal tài khoản cá nhân trong Finance Hub.
+   - [`BankAccountsTable.tsx`](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/payment-wallets/components/BankAccountsTable.tsx) & [`SavingsAndAssetsSection.tsx`](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/finance/components/SavingsAndAssetsSection.tsx): Hiển thị badge `Thẻ: •••• [cardLastDigits]` cạnh STK khi tài khoản có thẻ.
+
+### 3.4. Kết quả kiểm thử & Nghiệm thu
+- **Backend Unit Tests:** 98/98 tests pass.
+- **Frontend Build (`npm run build`):** Biên dịch thành công trong 9.44s, **0 lỗi TypeScript, 0 lỗi cú pháp**.

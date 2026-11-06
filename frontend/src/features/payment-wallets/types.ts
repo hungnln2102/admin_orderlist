@@ -15,6 +15,7 @@ export interface BankAccountItem {
   totalReceived: number;
   totalWithdrawn: number;
   balanceRemaining: number;
+  cardLastDigits?: string | null;
 }
 
 export interface UsdtWalletItem {
@@ -42,6 +43,7 @@ export interface WalletFormData {
   accountScope: "SHOP" | "PERSONAL";
   isDefault: boolean;
   isActive: boolean;
+  cardLastDigits?: string;
 }
 
 export interface WalletTarget {

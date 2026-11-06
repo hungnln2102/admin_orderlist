@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VPBank Email Ingestion Service
  * 
  * Äiá»u phá»‘i luá»“ng xá»­ lÃ½ email giao dá»‹ch ngÃ¢n hÃ ng theo chuáº©n ACID:
@@ -49,12 +49,15 @@ async function getOrCreateCheckpointInTrx(trx, { provider = "VPBANK_GMAIL", mail
 
 async function resolveInstrumentMappingInTrx(trx, { instrumentKind, maskedSuffix }) {
   if (!maskedSuffix) return null;
+  const cleanSuffix = String(maskedSuffix).replace(/^\*/, "").trim();
   return trx(TABLES.BANK_INSTRUMENT_MAPPINGS)
     .where({
       [C_MAP.PROVIDER]: "VPBANK",
       [C_MAP.INSTRUMENT_KIND]: instrumentKind,
-      [C_MAP.MASKED_SUFFIX]: maskedSuffix,
       [C_MAP.STATUS]: "ACTIVE",
+    })
+    .where((builder) => {
+      builder.where(C_MAP.MASKED_SUFFIX, cleanSuffix).orWhere(C_MAP.MASKED_SUFFIX, `*${cleanSuffix}`);
     })
     .first();
 }

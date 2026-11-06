@@ -94,19 +94,35 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
-                <select
-                  value={formData.bankDisplayName}
-                  onChange={handleBankSelect}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
-                >
-                  {POPULAR_BANKS.map((b) => (
-                    <option key={b.shortCode} value={b.name}>
-                      {b.name} ({b.shortCode})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
+                  <select
+                    value={formData.bankDisplayName}
+                    onChange={handleBankSelect}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+                  >
+                    {POPULAR_BANKS.map((b) => (
+                      <option key={b.shortCode} value={b.name}>
+                        {b.name} ({b.shortCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    4 Số Cuối Thẻ ATM / Debit
+                    <span className="text-[10px] text-slate-500 ml-1 font-normal">(Tùy chọn)</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="VD: 8181"
+                    value={formData.cardLastDigits || ""}
+                    onChange={(e) => onFormChange({ ...formData, cardLastDigits: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-cyan-300 font-mono font-bold focus:border-cyan-500 focus:outline-none placeholder:text-slate-600"
+                  />
+                </div>
               </div>
 
               <div>

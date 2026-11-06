@@ -61,8 +61,13 @@ export const BankAccountsTable: React.FC<BankAccountsTableProps> = ({
                       {index + 1}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-bold text-cyan-300 text-sm">{item.accountNumber}</span>
+                        {item.cardLastDigits && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-cyan-300 border border-slate-700" title="4 số cuối thẻ ATM / Debit">
+                            Thẻ: •••• {item.cardLastDigits}
+                          </span>
+                        )}
                         {item.accountScope === "PERSONAL" ? (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
                             💳 Cá nhân

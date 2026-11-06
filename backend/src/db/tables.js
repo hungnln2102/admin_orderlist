@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Quản lý tập trung Tên Bảng (TABLES), Schema (SCHEMAS) và Tên Cột (COLS) cho v2/backend.
  *
  * Mọi thay đổi về tên schema, tên bảng hoặc tên cột trong cơ sở dữ liệu sau này
@@ -275,6 +275,7 @@ const COLS = {
     TOTAL_RECEIVED: "total_received",
     IS_DELETED: "is_deleted",
     NOTES: "notes",
+    CARD_LAST_DIGITS: "card_last_digits",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },

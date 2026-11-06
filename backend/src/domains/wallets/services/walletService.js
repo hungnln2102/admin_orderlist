@@ -49,6 +49,7 @@ async function listBankAccounts() {
       "total_withdrawn as totalWithdrawn",
       "total_received as totalReceived",
       "balance as balanceRemaining",
+      "card_last_digits as cardLastDigits",
       "created_at as createdAt",
       "updated_at as updatedAt"
     )
@@ -65,9 +66,57 @@ async function listBankAccounts() {
     totalWithdrawn: toNumber(r.totalWithdrawn),
     totalReceived: toNumber(r.totalReceived),
     balanceRemaining: toNumber(r.balanceRemaining),
+    cardLastDigits: r.cardLastDigits || null,
     isDefault: Boolean(r.isDefault),
     isActive: Boolean(r.isActive),
   }));
+}
+
+async function syncBankInstrumentMappingInTrx(trx, { accountId, cardLastDigits, bankDisplayName, bankShortCode, accountHolder }) {
+  if (!TABLES.BANK_INSTRUMENT_MAPPINGS) return;
+  const numericId = Number(accountId);
+  const cleanDigits = cardLastDigits ? String(cardLastDigits).trim() : null;
+
+  if (cleanDigits) {
+    const bankCode = String(bankShortCode || bankDisplayName || "VPB").toUpperCase();
+    const provider = bankCode.includes("VPB") || bankCode.includes("VPBANK") ? "VPBANK" : (bankShortCode || "OTHER").toUpperCase();
+
+    const existing = await trx(TABLES.BANK_INSTRUMENT_MAPPINGS)
+      .where("linked_financial_account_id", numericId)
+      .where("instrument_kind", "DEBIT_CARD")
+      .first();
+
+    if (existing) {
+      await trx(TABLES.BANK_INSTRUMENT_MAPPINGS)
+        .where("id", existing.id)
+        .update({
+          provider,
+          masked_suffix: cleanDigits,
+          card_holder_name: accountHolder ? String(accountHolder).trim() : existing.card_holder_name,
+          product_hint: bankDisplayName || existing.product_hint,
+          status: "ACTIVE",
+          updated_at: trx.fn.now(),
+        });
+    } else {
+      await trx(TABLES.BANK_INSTRUMENT_MAPPINGS).insert({
+        provider,
+        instrument_kind: "DEBIT_CARD",
+        masked_suffix: cleanDigits,
+        card_holder_name: accountHolder ? String(accountHolder).trim() : null,
+        product_hint: bankDisplayName || null,
+        linked_financial_account_id: numericId,
+        status: "ACTIVE",
+      });
+    }
+  } else {
+    await trx(TABLES.BANK_INSTRUMENT_MAPPINGS)
+      .where("linked_financial_account_id", numericId)
+      .where("instrument_kind", "DEBIT_CARD")
+      .update({
+        status: "INACTIVE",
+        updated_at: trx.fn.now(),
+      });
+  }
 }
 
 async function createBankAccount(payload) {
@@ -115,9 +164,20 @@ async function createBankAccount(payload) {
         total_withdrawn: 0,
         total_received: 0,
         balance: toNumber(payload.balance),
+        card_last_digits: payload.cardLastDigits ? String(payload.cardLastDigits).trim() : null,
         is_deleted: false,
       })
       .returning("*");
+
+    if (payload.cardLastDigits) {
+      await syncBankInstrumentMappingInTrx(trx, {
+        accountId: inserted.id,
+        cardLastDigits: payload.cardLastDigits,
+        bankDisplayName: payload.bankDisplayName,
+        bankShortCode: payload.bankShortCode,
+        accountHolder: payload.accountHolder,
+      });
+    }
 
     await publishAccountEvent(trx, {
       action: "CREATE",
@@ -179,8 +239,19 @@ async function updateBankAccount(id, payload) {
     if (payload.isDefault !== undefined) updateData.is_default = Boolean(payload.isDefault);
     if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
     if (payload.balance !== undefined) updateData.balance = toNumber(payload.balance);
+    if (payload.cardLastDigits !== undefined) updateData.card_last_digits = payload.cardLastDigits ? String(payload.cardLastDigits).trim() : null;
 
     await trx(BANK_TABLE).where("account_type", "bank").where("id", numericId).update(updateData);
+
+    if (payload.cardLastDigits !== undefined) {
+      await syncBankInstrumentMappingInTrx(trx, {
+        accountId: numericId,
+        cardLastDigits: updateData.card_last_digits,
+        bankDisplayName: updateData.bank_display_name || beforeState.bank_display_name,
+        bankShortCode: updateData.bank_short_code || beforeState.bank_short_code,
+        accountHolder: updateData.account_holder || beforeState.account_holder,
+      });
+    }
     const afterState = await trx(BANK_TABLE).where("id", numericId).first();
     await publishAccountEvent(trx, {
       action: "UPDATE",

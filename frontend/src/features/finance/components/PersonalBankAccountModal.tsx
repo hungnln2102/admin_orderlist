@@ -43,6 +43,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
     qrNotePrefix: "PERS",
     label: "",
     balance: "",
+    cardLastDigits: "",
   });
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
           qrNotePrefix: editingItem.qrNotePrefix || editingItem.qr_note_prefix || "PERS",
           label: (editingItem.label && editingItem.label !== "Tài khoản cá nhân") ? editingItem.label : "",
           balance: formatAmountInput(String(editingItem.amount !== undefined ? editingItem.amount : (editingItem.balance !== undefined ? editingItem.balance : 0))),
+          cardLastDigits: editingItem.cardLastDigits || editingItem.card_last_digits || "",
         });
       } else {
         setFormData({
@@ -68,6 +70,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
           qrNotePrefix: "PERS",
           label: "",
           balance: "",
+          cardLastDigits: "",
         });
       }
     }
@@ -106,6 +109,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          cardLastDigits: formData.cardLastDigits ? formData.cardLastDigits.trim() : null,
           balance: parseAmountInput(formData.balance),
           accountScope: "PERSONAL",
           isActive: true,
@@ -164,19 +168,35 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
-            <select
-              value={formData.bankDisplayName}
-              onChange={handleBankSelect}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
-            >
-              {POPULAR_BANKS.map((b) => (
-                <option key={b.shortCode} value={b.name}>
-                  {b.name} ({b.shortCode})
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
+              <select
+                value={formData.bankDisplayName}
+                onChange={handleBankSelect}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+              >
+                {POPULAR_BANKS.map((b) => (
+                  <option key={b.shortCode} value={b.name}>
+                    {b.name} ({b.shortCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                4 Số Cuối Thẻ ATM / Debit
+                <span className="text-[10px] text-slate-500 ml-1 font-normal">(Tùy chọn)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={4}
+                placeholder="VD: 8181"
+                value={formData.cardLastDigits}
+                onChange={(e) => setFormData({ ...formData, cardLastDigits: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-cyan-300 font-mono font-bold focus:border-cyan-500 focus:outline-none placeholder:text-slate-600"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
