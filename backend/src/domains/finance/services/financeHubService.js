@@ -396,7 +396,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     .select(
       db.raw("COALESCE(SUM(dashboard_orders_count), 0)::int as count"),
       db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as total_revenue"),
-      db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost")
+      db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost"),
+      db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as total_refund")
     )
     .first();
 
@@ -419,8 +420,9 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   const shopOrdersCount = Number(summaryStats?.count || 0);
   const shopRevenue = toNumber(summaryStats?.total_revenue || 0);
   const shopCogs = toNumber(summaryStats?.total_cost || 0);
-  // Lợi nhuận gộp đã trừ chi phí nhập ngoài luồng của Shop và chi phí biến đổi:
-  const shopGrossProfit = shopRevenue - shopCogs - totalOperationalExpenses;
+  const shopRefunds = toNumber(summaryStats?.total_refund || 0);
+  // Operating profit includes COGS, refunds, and posted operating expenses.
+  const shopGrossProfit = shopRevenue - shopCogs - shopRefunds - totalOperationalExpenses;
 
   // 4. Động cơ Điểm Hòa Vốn (Break-even Engine)
   const breakEvenTarget = activeFixedCostsTotal + monthlyDebtBurden;
@@ -737,6 +739,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       shopGrossProfit,
       shopRevenue,
       shopCogs,
+      shopRefunds,
       shopOrdersCount,
       netProfit,
       breakEvenPercent,

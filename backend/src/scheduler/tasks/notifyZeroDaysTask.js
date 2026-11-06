@@ -33,9 +33,9 @@ async function notifyZeroDaysTask(trigger = "cron") {
         SELECT *, (expired_at::date - ${todaySql}) AS days_left
         FROM ${TARGET_TABLE}
         WHERE (expired_at::date - ${todaySql}) = 0
-          AND status IN (?, ?)
+          AND status = ?
         ORDER BY id DESC;
-      `, [ORDER_STATUS.RENEW_REQUIRED, ORDER_STATUS.EXPIRED]);
+      `, [ORDER_STATUS.RENEW_REQUIRED]);
 
       const orders = result.rows || [];
       console.log(`[CRON 0-DAYS] Tìm thấy ${orders.length} đơn hàng đúng 0 ngày còn lại.`);

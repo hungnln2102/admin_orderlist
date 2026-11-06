@@ -69,19 +69,18 @@ async function notifyFinanceMonthlyDelta({
     const finalMonthKey = monthKey || new Date().toISOString().slice(0, 7);
 
     // 1. Lấy tổng các chỉ số tháng hiện tại từ daily_revenue_summary
-    const summaryRows = await db(TABLES.DAILY_REVENUE_SUMMARY)
-      .whereRaw("summary_date::text LIKE ?", [`${finalMonthKey}%`])
-      .select(
-        db.raw("COALESCE(SUM(earned_revenue), 0) as total_revenue"),
-        db.raw("COALESCE(SUM(total_shop_cost), 0) as total_import"),
-        db.raw("COALESCE(SUM(revenue_reversed), 0) as total_refund")
-      )
-      .first();
-
-    const totalRevenue = Number(summaryRows?.total_revenue || 0);
-    const totalImport = Number(summaryRows?.total_import || 0);
-    const totalRefund = Number(summaryRows?.total_refund || 0);
-    const totalProfit = totalRevenue - totalImport - totalRefund;
+    // FinanceHub owns the canonical monthly profit formula, including fixed costs and debt burden.
+    const { getFinanceSummary } = require("@/domains/finance/services/financeHubService");
+    const financeSummary = await getFinanceSummary(finalMonthKey);
+    const breakEven = financeSummary?.breakEven || {};
+    const totalRevenue = Number(breakEven.shopRevenue || 0);
+    const totalImport = Number(breakEven.shopCogs || 0);
+    const totalRefund = Number(breakEven.shopRefunds || 0);
+    const totalProfit = Number(breakEven.netProfit || 0);
+    const totalOperationalExpenses = Number(breakEven.totalOperationalExpenses || 0);
+    const totalFixedCosts = Number(breakEven.activeFixedCostsTotal || 0);
+    const monthlyDebtBurden = Number(breakEven.monthlyDebtBurden || 0);
+    const monthlyObligations = Number(breakEven.breakEvenTarget || 0);
     const totalTax = 0;
     const totalOffFlow = 0;
 
@@ -114,9 +113,14 @@ async function notifyFinanceMonthlyDelta({
       `_________________ BIẾN ĐỘNG THÁNG ${finalMonthKey} _________________`,
       ``,
       buildFlowLine("📊 Doanh thu tháng", totalRevenue, revenueDelta),
-      buildFlowLine("💰 Lợi nhuận tháng", totalProfit, effectiveProfitDelta),
+      buildFlowLine("💰 Lợi nhuận ròng tháng", totalProfit, effectiveProfitDelta),
+      buildFlowLine("📈 Lợi nhuận hoạt động", Number(breakEven.shopGrossProfit || 0), effectiveProfitDelta),
       buildFlowLine("📦 Nhập hàng tháng", totalImport, importDelta),
       buildFlowLine("🔄 Hoàn tiền tháng", totalRefund, refundDelta),
+      buildFlowLine("🧾 Chi phí vận hành tháng", totalOperationalExpenses, 0),
+      buildFlowLine("🏠 Chi phí cố định tháng", totalFixedCosts, 0),
+      buildFlowLine("💳 Nợ và trả góp tháng", monthlyDebtBurden, 0),
+      buildFlowLine("🎯 Nghĩa vụ tháng", monthlyObligations, 0),
       buildFlowLine("📄 Tiền thuế tháng", totalTax, taxDelta),
       buildFlowLine("💵 Tiền ngoài luồng tháng", totalOffFlow, offFlowDelta),
       `🏦 Số dư bank shop: ${bankLine}`,
