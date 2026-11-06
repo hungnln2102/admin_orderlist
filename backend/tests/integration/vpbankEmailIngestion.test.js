@@ -19,6 +19,8 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
     const originalConfig = await db(TABLES.SYSTEM_CONFIGS).where(COLS.SYSTEM_CONFIGS.CONFIG_KEY, configKey).first();
     let accountId;
     let mappingId;
+    let creditDebtAssetId;
+    let replayDebtAssetId;
     try {
       process.env.VPBANK_MAILBOX_ENCRYPTION_KEY = crypto.randomBytes(32).toString("base64");
       await saveMailboxConfig({ email: "test.vpbank@gmail.com", appPassword: "abcd efgh ijkl mnop", isActive: false });
@@ -58,8 +60,74 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
       const resetCheckpoint = await db(TABLES.EMAIL_SYNC_CHECKPOINTS).where("mailbox_alias", "test.vpbank@gmail.com").first();
       assert.equal(resetCheckpoint.uid_validity, "test-uid-validity-2");
       assert.equal(Number(resetCheckpoint.last_terminal_uid), 1);
+
+      const [creditDebtAsset] = await db(TABLES.PERSONAL_ASSETS).insert({
+        name: "VPBank Credit Card 2340",
+        type: "DEBT_PAYABLE",
+        amount: 6568258,
+        bank_name: "VPBank",
+        card_last_digits: "2340",
+      }).returning("id");
+      creditDebtAssetId = creditDebtAsset.id || creditDebtAsset;
+      const creditEmail = {
+        uid: 99903,
+        uidValidity: "test-uid-validity-2",
+        subject: "VPBank xin thong bao bien dong so du The tin dung cua Quy khach",
+        from: "customercare@care.vpb.com.vn",
+        authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
+        text: [
+          "- 63,550 VND",
+          "So tien thay doi / Changed Amount",
+          "FOODY",
+          "Noi dung / Transaction Content",
+          "17,870,822 VND",
+          "Han muc con lai / Available Limit",
+          "VISA *2340",
+          "06/11/2026 13:13:37",
+          "630906039965",
+          "Ma giao dich / Transaction Code",
+        ].join("\n"),
+      };
+      const [creditFirst, creditSecond] = await Promise.all([
+        ingestEmailMessage(creditEmail, { mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity-2" }),
+        ingestEmailMessage(creditEmail, { mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity-2" }),
+      ]);
+      assert.equal([creditFirst.status, creditSecond.status].every((status) => status === "APPLIED"), true);
+      const creditAssetAfter = await db(TABLES.PERSONAL_ASSETS).where("id", creditDebtAssetId).first();
+      assert.equal(Number(creditAssetAfter.amount), 6631808);
+      const creditReceipt = await db(TABLES.EMAIL_INGESTION_RECEIPTS).where("email_uid", 99903).first();
+      assert.equal(creditReceipt.status, "APPLIED");
+      assert.ok(creditReceipt.personal_debt_payment_log_id);
+      const debtLog = await db(TABLES.DEBT_PAYMENT_LOGS).where("id", creditReceipt.personal_debt_payment_log_id).first();
+      assert.equal(debtLog.reference_code, "630906039965");
+      assert.match(debtLog.note, /Hạn mức còn lại: 17[.]870[.]822 VND/);
+
+      const replayEmail = { ...creditEmail, uid: 99904, text: creditEmail.text.replace("*2340", "*6789").replace("630906039965", "630906039966") };
+      const awaitingMapping = await ingestEmailMessage(replayEmail, { mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity-2" });
+      assert.equal(awaitingMapping.status, "MANUAL_REVIEW");
+      const [replayDebtAsset] = await db(TABLES.PERSONAL_ASSETS).insert({
+        name: "VPBank Replay Card 6789",
+        type: "DEBT_PAYABLE",
+        amount: 100000,
+        bank_name: "VPBank",
+        card_last_digits: "6789",
+      }).returning("id");
+      replayDebtAssetId = replayDebtAsset.id || replayDebtAsset;
+      const replayed = await ingestEmailMessage(replayEmail, {
+        mailboxAlias: "test.vpbank@gmail.com",
+        uidValidity: "test-uid-validity-2",
+        reprocessManualReview: true,
+      });
+      assert.equal(replayed.status, "APPLIED");
+      const replayedAsset = await db(TABLES.PERSONAL_ASSETS).where("id", replayDebtAssetId).first();
+      assert.equal(Number(replayedAsset.amount), 163550);
     } finally {
-      await db(TABLES.EMAIL_INGESTION_RECEIPTS).whereIn("email_uid", [99901, 99902, 1]).del();
+      await db(TABLES.EMAIL_INGESTION_RECEIPTS).whereIn("email_uid", [99901, 99902, 99903, 99904, 1]).del();
+      if (creditDebtAssetId || replayDebtAssetId) {
+        await db(TABLES.DEBT_PAYMENT_LOGS).whereIn("reference_code", ["630906039965", "630906039966"]).del();
+      }
+      if (creditDebtAssetId) await db(TABLES.PERSONAL_ASSETS).where("id", creditDebtAssetId).del();
+      if (replayDebtAssetId) await db(TABLES.PERSONAL_ASSETS).where("id", replayDebtAssetId).del();
       if (mappingId) await db(TABLES.BANK_INSTRUMENT_MAPPINGS).where("id", mappingId).del();
       if (accountId) {
         await db(TABLES.PERSONAL_DEBIT_TRANSACTION_LOGS).where("financial_account_id", accountId).del();

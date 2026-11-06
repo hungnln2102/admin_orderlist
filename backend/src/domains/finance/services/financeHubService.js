@@ -11,6 +11,7 @@ const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
 const { eventBus, EVENTS, recordEvent } = require("@/events");
+const creditLedgerService = require("../credit/creditLedgerService");
 
 const toNumber = (val) => {
   const n = Number(val);
@@ -1219,79 +1220,52 @@ async function payPersonalAsset(id, payload) {
   });
 }
 
-async function borrowPersonalAsset(id, payload) {
+async function borrowPersonalAssetInTrx(trx, id, payload) {
   const { financialAccountId, receiptId, amount, note, merchantName, referenceCode, directExpense } = payload;
   const numAmount = toNumber(amount);
-  if (numAmount <= 0) throw new Error("Số tiền vay thêm phải lớn hơn 0");
-
-  return await withTransaction(async (trx) => {
-    // 1. Khóa hàng row-level lock (FOR UPDATE) để bảo đảm ACID khi chạy đồng thời
-    const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
-    if (!asset) throw new Error("Không tìm thấy mục nợ");
-
-    // 2. Kiểm tra Idempotency nếu có mã tham chiếu (referenceCode)
-    if (referenceCode && String(referenceCode).trim()) {
-      const cleanRef = String(referenceCode).trim();
-      const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
-        .where("reference_code", cleanRef)
-        .first();
-      if (existingLog) {
-        return {
-          success: true,
-          alreadyProcessed: true,
-          newAmount: toNumber(asset.amount),
-          logId: Number(existingLog.id),
-        };
-      }
-    }
-
-    const creditAccount = await creditLedgerService.getAccountForPersonalAssetInTrx(trx, id, true);
-    const currentAmount = toNumber(asset.amount);
-    let newAmount = currentAmount + numAmount;
-
-    const isDirect = Boolean(directExpense) || (!financialAccountId && !receiptId);
-
-    if (receiptId) {
-      await allocateReceiptInTrx(trx, receiptId, numAmount, "OTHER_INCOME", `PERSONAL_DEBT_BORROW_${id}`, note || `Vay thêm / Phát sinh nợ "${asset.name}"`);
-    } else if (financialAccountId && !isDirect) {
-      const { creditFinancialAccount } = require("@/domains/wallets/services/walletService");
-      await creditFinancialAccount(trx, {
-        accountId: Number(financialAccountId),
-        amount: numAmount,
-        sourceKind: "personal_debt_borrow",
-        sourceId: `${id}_${Date.now()}`,
-        note: note || `Vay thêm "${asset.name}"`,
-      });
-    }
-    let creditResult = null;
-    if (creditAccount) {
-      creditResult = await creditLedgerService.recordPrincipalInTrx(trx, creditAccount.id, {
-        amount: numAmount,
-        eventType: creditAccount.product_kind === "OVERDRAFT" ? "OVERDRAFT_DRAW" : "CARD_SPEND",
-        effectiveAt: payload.effectiveAt || new Date(),
-        idempotencyKey: payload.idempotencyKey || referenceCode || `personal-asset-draw:${id}:${financialAccountId || receiptId || "direct"}:${numAmount}:${new Date(payload.effectiveAt || Date.now()).toISOString()}`,
-        sourceReference: referenceCode || (receiptId ? `receipt:${receiptId}` : null),
-        metadata: { merchantName: merchantName || null, note: note || null },
-      });
-      newAmount = Math.max(0, creditResult.balances.total);
-    }
-    await trx(TABLES.PERSONAL_ASSETS)
-      .where("id", id)
-      .update({ amount: newAmount, updated_at: trx.fn.now() });
-
-    const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
-      target_type: "PERSONAL_DEBT_BORROW",
-      target_id: id,
-      financial_account_id: (financialAccountId && !isDirect) ? Number(financialAccountId) : null,
+  if (numAmount <= 0) throw new Error("So tien vay them phai lon hon 0");
+  const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
+  if (!asset) throw new Error("Khong tim thay muc no");
+  const durableReference = String(referenceCode || payload.idempotencyKey || "").trim() || null;
+  if (durableReference) {
+    const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS).where("reference_code", durableReference).first();
+    if (existingLog) return { success: true, alreadyProcessed: true, newAmount: toNumber(asset.amount), logId: Number(existingLog.id) };
+  }
+  const creditAccount = await creditLedgerService.getAccountForPersonalAssetInTrx(trx, id, true);
+  const isDirect = Boolean(directExpense) || (!financialAccountId && !receiptId);
+  if (receiptId) {
+    await allocateReceiptInTrx(trx, receiptId, numAmount, "OTHER_INCOME", "PERSONAL_DEBT_BORROW_" + id, note || "Phat sinh no " + asset.name);
+  } else if (financialAccountId && !isDirect) {
+    await creditFinancialAccount(trx, { accountId: Number(financialAccountId), amount: numAmount, sourceKind: "personal_debt_borrow", sourceId: String(id) + "_" + Date.now(), note: note || "Vay them " + asset.name });
+  }
+  let newAmount = toNumber(asset.amount) + numAmount;
+  if (creditAccount) {
+    const creditResult = await creditLedgerService.recordPrincipalInTrx(trx, creditAccount.id, {
       amount: numAmount,
-      payment_date: new Date().toISOString().slice(0, 10),
-      reference_code: referenceCode ? String(referenceCode).trim() : null,
-      merchant_name: merchantName ? String(merchantName).trim() : null,
-      note: note ? String(note).trim() : null,
-    }).returning("*");
+      eventType: creditAccount.product_kind === "OVERDRAFT" ? "OVERDRAFT_DRAW" : "CARD_SPEND",
+      effectiveAt: payload.effectiveAt || new Date(),
+      idempotencyKey: payload.idempotencyKey || durableReference || ["personal-asset-draw", id, financialAccountId || receiptId || "direct", numAmount, new Date(payload.effectiveAt || Date.now()).toISOString()].join(":"),
+      sourceReference: durableReference || (receiptId ? "receipt:" + receiptId : null),
+      metadata: { merchantName: merchantName || null, note: note || null },
+    });
+    newAmount = Math.max(0, creditResult.balances.total);
+  }
+  await trx(TABLES.PERSONAL_ASSETS).where("id", id).update({ amount: newAmount, updated_at: trx.fn.now() });
+  const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+    target_type: "PERSONAL_DEBT_BORROW",
+    target_id: id,
+    financial_account_id: (financialAccountId && !isDirect) ? Number(financialAccountId) : null,
+    amount: numAmount,
+    payment_date: new Date(payload.effectiveAt || Date.now()).toISOString().slice(0, 10),
+    reference_code: durableReference,
+    merchant_name: merchantName ? String(merchantName).trim() : null,
+    note: note ? String(note).trim() : null,
+  }).returning("*");
+  return { success: true, newAmount, logId: createdLog ? Number(createdLog.id) : undefined };
+}
 
-    return { success: true, newAmount, logId: createdLog ? Number(createdLog.id) : undefined };
-  });
+async function borrowPersonalAsset(id, payload) {
+  return withTransaction((trx) => borrowPersonalAssetInTrx(trx, id, payload));
 }
 
 async function autoMatchCardTransaction(payload) {
@@ -2029,6 +2003,7 @@ module.exports = {
   deletePersonalAsset,
   payPersonalAsset,
   borrowPersonalAsset,
+  borrowPersonalAssetInTrx,
   autoMatchCardTransaction,
   getDebtPaymentLogs,
   getUnallocatedReceipts,

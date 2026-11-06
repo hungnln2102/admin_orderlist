@@ -11,10 +11,12 @@ const { eventBus, EVENTS } = require("@/events");
 const { parseVpbankEmail } = require("./vpbankEmailParser");
 const { recordPrincipalInTrx, recordPaymentInTrx } = require("../credit/creditLedgerService");
 const { recordPersonalDebitTransactionInTrx } = require("./personalDebitTransactionService");
+const { borrowPersonalAssetInTrx } = require("./financeHubService");
 
 const C_REC = COLS.EMAIL_INGESTION_RECEIPTS;
 const C_CHK = COLS.EMAIL_SYNC_CHECKPOINTS;
 const C_MAP = COLS.BANK_INSTRUMENT_MAPPINGS;
+const C_ASSET = COLS.PERSONAL_ASSETS;
 
 function sha256(str) {
   if (!str) return null;
@@ -62,6 +64,34 @@ async function resolveInstrumentMappingInTrx(trx, { instrumentKind, maskedSuffix
     .first();
 }
 
+async function resolvePersonalDebtAssetInTrx(trx, { maskedSuffix }) {
+  if (!maskedSuffix) return null;
+  const cleanSuffix = String(maskedSuffix).replace(/^\*/, "").trim();
+  const assets = await trx(TABLES.PERSONAL_ASSETS)
+    .where({
+      [C_ASSET.TYPE]: "DEBT_PAYABLE",
+      [C_ASSET.CARD_LAST_DIGITS]: cleanSuffix,
+    })
+    .whereILike(C_ASSET.BANK_NAME, "%VPBank%")
+    .forUpdate();
+  return assets.length === 1 ? assets[0] : null;
+}
+
+function observedValueNote(parsed) {
+  if (Number.isFinite(Number(parsed.availableLimitObserved))) {
+    return `H\u1ea1n m\u1ee9c c\u00f2n l\u1ea1i: ${Number(parsed.availableLimitObserved).toLocaleString("vi-VN")} VND`;
+  }
+  if (Number.isFinite(Number(parsed.observedBalanceAfter))) {
+    return `S\u1ed1 d\u01b0 quan s\u00e1t: ${Number(parsed.observedBalanceAfter).toLocaleString("vi-VN")} VND`;
+  }
+  return null;
+}
+
+function canRecordPersonalDebtMovement(parsed) {
+  return (parsed.instrumentKind === "CREDIT_CARD" && parsed.transactionKind === "CARD_SPEND")
+    || (parsed.instrumentKind === "DEBIT_CARD" && parsed.direction === "OUTFLOW");
+}
+
 /**
  * Xá»­ lÃ½ má»™t email message trong Knex Transaction
  */
@@ -85,7 +115,10 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     })
     .first();
 
-  if (existingReceipt && (existingReceipt.status === "APPLIED" || existingReceipt.status === "REJECTED" || existingReceipt.status === "MANUAL_REVIEW")) {
+  const canReprocessManualReview = options.reprocessManualReview
+    && existingReceipt?.status === "MANUAL_REVIEW"
+    && existingReceipt?.failure_code === "UNMAPPED_BANK_INSTRUMENT";
+  if (existingReceipt && !canReprocessManualReview && (existingReceipt.status === "APPLIED" || existingReceipt.status === "REJECTED" || existingReceipt.status === "MANUAL_REVIEW")) {
     return {
       status: existingReceipt.status,
       alreadyProcessed: true,
@@ -174,12 +207,18 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     maskedSuffix: parsed.maskedSuffix,
   });
 
-  if (!mapping) {
+  // A personal debt record is a valid direct target only for an outgoing draw/spend.
+  const personalDebtAsset = mapping ? null : await resolvePersonalDebtAssetInTrx(trx, {
+    maskedSuffix: parsed.maskedSuffix,
+  });
+
+  if (!mapping && (!personalDebtAsset || !canRecordPersonalDebtMovement(parsed))) {
+    const failureCode = personalDebtAsset ? "PAYMENT_SOURCE_ACCOUNT_REQUIRED" : "UNMAPPED_BANK_INSTRUMENT";
     await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
       .where("id", receiptId)
       .update({
         [C_REC.STATUS]: "MANUAL_REVIEW",
-        [C_REC.FAILURE_CODE]: "UNMAPPED_BANK_INSTRUMENT",
+        [C_REC.FAILURE_CODE]: failureCode,
         [C_REC.TERMINAL_AT]: trx.fn.now(),
         [C_REC.UPDATED_AT]: trx.fn.now(),
       });
@@ -191,7 +230,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     }
     return {
       status: "MANUAL_REVIEW",
-      failureCode: "UNMAPPED_BANK_INSTRUMENT",
+      failureCode,
       maskedSuffix: parsed.maskedSuffix,
       receiptId,
     };
@@ -204,9 +243,29 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
 
   let ledgerId = null;
   let personalDebitLogId = null;
+  let personalDebtPaymentLogId = null;
 
   // 8. Háº¡ch toÃ¡n theo Loáº¡i Dá»¥ng Cá»¥ (Credit Card vs Debit Card)
-  if (parsed.instrumentKind === "CREDIT_CARD") {
+  if (personalDebtAsset) {
+    const debtBusinessKey = parsed.referenceCode
+      ? `PERSONAL_DEBT:${personalDebtAsset[C_ASSET.ID]}:${parsed.referenceCode}`
+      : `VPBANK_EMAIL_${receiptId}`;
+    const observations = observedValueNote(parsed);
+    const debtResult = await borrowPersonalAssetInTrx(trx, personalDebtAsset[C_ASSET.ID], {
+      amount: parsed.amount,
+      merchantName: parsed.merchantNormalized,
+      effectiveAt: parsed.occurredAt,
+      referenceCode: parsed.referenceCode || debtBusinessKey,
+      idempotencyKey: debtBusinessKey,
+      directExpense: true,
+      note: [
+        `VPBank email ${parsed.transactionKind || parsed.direction || "OUTFLOW"}`,
+        parsed.merchantNormalized || null,
+        observations,
+      ].filter(Boolean).join(" | "),
+    });
+    personalDebtPaymentLogId = debtResult.logId;
+  } else if (parsed.instrumentKind === "CREDIT_CARD") {
     const creditAccountId = mapping.linked_credit_account_id;
     if (parsed.transactionKind === "CARD_SPEND") {
       const res = await recordPrincipalInTrx(trx, creditAccountId, {
@@ -263,11 +322,18 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     .where("id", receiptId)
     .update({
       [C_REC.STATUS]: "APPLIED",
-      [C_REC.INSTRUMENT_MAPPING_ID]: mapping.id,
+      [C_REC.INSTRUMENT_MAPPING_ID]: mapping ? mapping.id : null,
       [C_REC.BUSINESS_KEY]: businessKey,
       [C_REC.TRANSACTION_KIND]: parsed.transactionKind,
       [C_REC.LEDGER_ID]: ledgerId,
       [C_REC.PERSONAL_DEBIT_TRANSACTION_LOG_ID]: personalDebitLogId,
+      [C_REC.PERSONAL_DEBT_PAYMENT_LOG_ID]: personalDebtPaymentLogId,
+      [C_REC.FAILURE_CODE]: null,
+      [C_REC.FAILURE_MESSAGE]: null,
+      [C_REC.METADATA]: {
+        availableLimitObserved: parsed.availableLimitObserved || null,
+        observedBalanceAfter: parsed.observedBalanceAfter || null,
+      },
       [C_REC.TERMINAL_AT]: trx.fn.now(),
       [C_REC.UPDATED_AT]: trx.fn.now(),
     });
@@ -291,6 +357,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     businessKey,
     ledgerId,
     personalDebitLogId,
+    personalDebtPaymentLogId,
     amount: parsed.amount,
   };
 }

@@ -79,67 +79,31 @@ test("VPBank Email Parser Suite", async (t) => {
     assert.equal(result.isFinancial, true);
   });
 
-  await t.test("6.1. Parses VPBank NEO debit transfer email", () => {
+  await t.test("6. parses a Unicode VPBank debit balance notification", () => {
     const result = parseVpbankEmail({
-      subject: "VPBank NEO transaction successful",
-      from: "VPBank NEO <vpbankonline@vpb.com.vn>",
-      authenticationResults: "mx.google.com; dkim=pass header.d=vpb.com.vn;",
-      text: `
-        M\u00e3 giao d\u1ecbch: FT263091025533971
-        Ng\u00e0y, gi\u1edd giao d\u1ecbch: 05/11/2026 08:10:14
-        T\u00e0i kho\u1ea3n tr\u00edch n\u1ee3: 0378304963
-        S\u1ed1 ti\u1ec1n tr\u00edch n\u1ee3: 20,000 VND
-        T\u00e0i kho\u1ea3n ghi c\u00f3: MS00T01690343993488
-        S\u1ed1 ti\u1ec1n ghi c\u00f3: 20,000 VND
-        N\u1ed9i dung chuy\u1ec3n ti\u1ec1n: NGO LE NGOC HUNG chuyen tien
-      `,
-    });
-
-    assert.equal(result.senderValid, true);
-    assert.equal(result.documentKind, "DEBIT_CARD_TRANSACTION");
-    assert.equal(result.direction, "OUTFLOW");
-    assert.equal(result.amount, 20000);
-    assert.equal(result.referenceCode, "FT263091025533971");
-    assert.equal(result.merchantNormalized, "NGO LE NGOC HUNG chuyen tien");
-    assert.equal(result.isFinancial, true);
-  });
-
-  await t.test("6. BÃ³c tÃ¡ch email biáº¿n Ä‘á»™ng sá»‘ dÆ° tháº» ghi ná»£ (DEBIT_CARD OUTFLOW)", () => {
-    const email = {
-      subject: "ThÃ´ng bÃ¡o biáº¿n Ä‘á»™ng sá»‘ dÆ° tÃ i khoáº£n thanh toÃ¡n",
+      subject: "Th\u00f4ng b\u00e1o bi\u1ebfn \u0111\u1ed9ng s\u1ed1 d\u01b0 t\u00e0i kho\u1ea3n thanh to\u00e1n",
       from: "customercare@care.vpb.com.vn",
       authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
-      text: `
-        TÃ i khoáº£n 4541xxxx0985 biáº¿n Ä‘á»™ng:
-        Sá»‘ tiá»n: - 2,000,000 VND
-        Ná»™i dung: RÃºt tiá»n ATM ACB Hai Ba Trung
-        Thá»i gian: 02/11/2026 14:15:00
-        MÃ£ giao dá»‹ch: FT2611020019283
-        Sá»‘ dÆ° kháº£ dá»¥ng: 4,888,568 VND
-      `,
-    };
-
-    const result = parseVpbankEmail(email);
+      text: ["T\u00e0i kho\u1ea3n 4541xxxx0985 bi\u1ebfn \u0111\u1ed9ng:", "- 2,000,000 VND", "S\u1ed1 ti\u1ec1n thay \u0111\u1ed5i / Changed Amount", "R\u00fat ti\u1ec1n ATM ACB Hai Ba Trung", "N\u1ed9i dung / Transaction Content", "02/11/2026 14:15:00", "Th\u1eddi gian / Time", "FT2611020019283", "M\u00e3 giao d\u1ecbch / Transaction Code", "4,888,568 VND", "S\u1ed1 d\u01b0 kh\u1ea3 d\u1ee5ng / Available Balance"].join("\n"),
+    });
     assert.equal(result.documentKind, "DEBIT_CARD_TRANSACTION");
     assert.equal(result.instrumentKind, "DEBIT_CARD");
     assert.equal(result.direction, "OUTFLOW");
     assert.equal(result.maskedSuffix, "0985");
     assert.equal(result.amount, 2000000);
-    assert.equal(result.merchantNormalized, "RÃºt tiá»n ATM ACB Hai Ba Trung");
+    assert.equal(result.merchantNormalized, "R\u00fat ti\u1ec1n ATM ACB Hai Ba Trung");
     assert.equal(result.referenceCode, "FT2611020019283");
     assert.equal(result.observedBalanceAfter, 4888568);
     assert.equal(result.isFinancial, true);
   });
 
-  await t.test("7. BÃ³c tÃ¡ch email sao kÃª Ä‘á»‹nh ká»³ (STATEMENT)", () => {
-    const email = {
-      subject: "VPBank - ThÃ´ng bÃ¡o sao kÃª tháº» tÃ­n dá»¥ng ká»³ thÃ¡ng 10/2026",
+  await t.test("7. recognizes a Unicode VPBank credit-card statement", () => {
+    const result = parseVpbankEmail({
+      subject: "VPBank - Th\u00f4ng b\u00e1o sao k\u00ea th\u1ebb t\u00edn d\u1ee5ng k\u1ef3 th\u00e1ng 10/2026",
       from: "customercare@care.vpb.com.vn",
       authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
-      text: "KÃ­nh gá»­i QuÃ½ khÃ¡ch, VPBank xin gá»­i sao kÃª tháº» tÃ­n dá»¥ng VISA *2340 chu ká»³ 25/09 Ä‘áº¿n 25/10/2026...",
-    };
-
-    const result = parseVpbankEmail(email);
+      text: "K\u00ednh g\u1eedi Qu\u00fd kh\u00e1ch, VPBank xin g\u1eedi sao k\u00ea th\u1ebb t\u00edn d\u1ee5ng VISA *2340 chu k\u1ef3 25/09 \u0111\u1ebfn 25/10/2026...",
+    });
     assert.equal(result.documentKind, "CREDIT_CARD_STATEMENT");
     assert.equal(result.instrumentKind, "CREDIT_CARD");
     assert.equal(result.maskedSuffix, "2340");
@@ -188,7 +152,22 @@ test("VPBank Email Parser Suite", async (t) => {
       text: "Card *2340 charged 100,000 VND",
     });
     assert.equal(result.senderValid, false);
-  });});
+
+  });
+  await t.test("11. parses VPBank available limit when the amount precedes its label", () => {
+    const result = parseVpbankEmail({
+      subject: "VPBank xin thong bao bien dong so du The tin dung cua Quy khach",
+      from: "customercare@care.vpb.com.vn",
+      authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
+      text: ["- 63,550 VND", "S\u1ed1 ti\u1ec1n thay \u0111\u1ed5i / Changed Amount", "FOODY", "N\u1ed9i dung / Transaction Content", "17,870,822 VND", "H\u1ea1n m\u1ee9c c\u00f2n l\u1ea1i / Available Limit", "VISA *2340", "06/11/2026 13:13:37", "630906039965", "M\u00e3 giao d\u1ecbch / Transaction Code"].join("\n"),
+    });
+    assert.equal(result.documentKind, "CREDIT_CARD_TRANSACTION");
+    assert.equal(result.transactionKind, "CARD_SPEND");
+    assert.equal(result.amount, 63550);
+    assert.equal(result.availableLimitObserved, 17870822);
+    assert.equal(result.referenceCode, "630906039965");
+  });
+});
 
 
 

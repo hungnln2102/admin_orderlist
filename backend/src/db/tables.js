@@ -575,7 +575,7 @@ const COLS = {
     INSTRUMENT_KIND: "instrument_kind", INSTRUMENT_MASK: "instrument_mask", INSTRUMENT_MAPPING_ID: "instrument_mapping_id",
     BUSINESS_KEY: "business_key", TRANSACTION_KIND: "transaction_kind", AMOUNT: "amount", STATUS: "status",
     FAILURE_CODE: "failure_code", FAILURE_MESSAGE: "failure_message", RETRY_COUNT: "retry_count", TERMINAL_AT: "terminal_at",
-    LEDGER_ID: "ledger_id", PERSONAL_DEBIT_TRANSACTION_LOG_ID: "personal_debit_transaction_log_id", METADATA: "metadata",
+    LEDGER_ID: "ledger_id", PERSONAL_DEBIT_TRANSACTION_LOG_ID: "personal_debit_transaction_log_id", PERSONAL_DEBT_PAYMENT_LOG_ID: "personal_debt_payment_log_id", METADATA: "metadata",
     CREATED_AT: "created_at", UPDATED_AT: "updated_at",
   },
   EMAIL_RECONCILIATION_RUNS: {

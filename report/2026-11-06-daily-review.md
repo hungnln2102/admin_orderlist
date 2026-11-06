@@ -15,6 +15,7 @@
 3. [Nhiệm vụ 3: [09:30] Bổ Sung Trường 4 Số Cuối Thẻ ATM/Debit Vào Tài Khoản Ngân Hàng & Tự Động Định Tuyến Đối Soát](#3-0930-bổ-sung-trường-4-số-cuối-thẻ-atmdebit-vào-tài-khoản-ngân-hàng--tự-động-định-tuyến-đối-soát)
 4. [Nhiệm vụ 4: [09:55] Chuẩn Hóa Kiến Trúc Đọc OTP Yuna Mail: Tích Hợp 5 API Proxy Trực Tiếp & 2 Luồng Webmail Chuyển Tiếp](#4-0955-chuẩn-hóa-kiến-trúc-đọc-otp-yuna-mail-tích-hợp-5-api-proxy-trực-tiếp--2-luồng-webmail-chuyển-tiếp)
 5. [Nhiệm vụ 5: [10:05] Tích Hợp API Ades Support (Only-OTP) Kèm Cơ Chế Cấp Token Phiên Tự Động (Zero-Auth)](#5-1005-tích-hợp-api-ades-support-only-otp-kèm-cơ-chế-cấp-token-phiên-tự-động-zero-auth)
+6. [Nhiệm vụ 6: [17:10] Lưu Trữ Và Tích Hợp Trọn Bộ Thiết Kế Giao Diện Lễ Hội Vào Dự Án OTP_PORTAL](#11-1710-lưu-trữ-và-tích-hợp-trọn-bộ-thiết-kế-giao-diện-lễ-hội-vào-dự-án-otp_portal)
 
 ---
 
@@ -389,3 +390,69 @@
 - **Kiểm thử biên dịch Frontend:** `npm run build --prefix frontend` thành công 100% trong 5.63s (Vite build sạch sẽ, 0 lỗi, 0 warning).
 - **Kiểm thử Backend Unit Test:** `npm test --prefix backend` vượt qua toàn bộ **98/98 tests pass 100% (0 lỗi, 0 fail)**.
 - **Tiêu chuẩn hoàn thành (DoD):** Đáp ứng 100% chỉ đạo của Master: trang đã được chia làm 2 sub-pages, cột trái hỗ trợ chèn biến động vào template, cột phải cho phép tùy biến linh hoạt giữa chế độ xem Web và Mobile thời gian thực.
+
+## [2026-11-06] Kiểm thử luồng đọc IMAP VPBank
+
+- **Phạm vi:** Kiểm thử chỉ đọc luồng cấu hình mailbox, kết nối IMAP, checkpoint, receipt, mapping ngân hàng và sổ cái; không replay email hay ghi dữ liệu production.
+- **Kết quả:** Mailbox chưa cấu hình (`email = null`), `isActive = false`; `email_sync_checkpoints`, `email_ingestion_receipts` và `bank_instrument_mappings` không có bản ghi. Worker không có thông tin để kết nối Gmail hay map thẻ, nên không thể ghi nhận biến động thẻ tín dụng.
+- **Kiểm tra đã chạy:** `backend` unit test pass `98/98`; riêng `VPBank Email Parser Suite` pass `13/13`. Integration test VPBank không chạy vì thiếu `TEST_DATABASE_URL`; runner chặn đúng để không sử dụng `DATABASE_URL` vận hành.
+- **Bằng chứng mã:** Worker khởi động chỉ khi có mailbox active trong `backend/src/domains/finance/workers/vpbankImapWorker.js:160`; giao dịch thẻ tín dụng cần mapping `CREDIT_CARD` trong `backend/src/domains/finance/services/vpbankEmailIngestionService.js:171`.
+- **Điều kiện cần xử lý trước nghiệm thu live:** Cấu hình Gmail App Password, bật worker, tạo mapping thẻ tín dụng 4 số cuối sang `credit_account`, và cấu hình sandbox `TEST_DATABASE_URL` trước khi chạy integration.
+
+## [2026-11-06] Kiểm tra VPS luồng IMAP VPBank
+
+- **Phạm vi:** SSH read-only vào VPS; kiểm tra container backend/PostgreSQL, log VPBank, cấu hình mailbox, checkpoint, receipt, mapping và tài khoản credit. Không restart container, không replay email, không ghi DB.
+- **Runtime:** `admin_orderlist-backend` healthy. Mailbox production có App Password mã hóa, `isActive = true`, `syncMode = IDLE`; test IMAP TLS thành công trong 2.68 giây. Checkpoint có UID 19159 nhưng lần khởi động 13:27 ICT ghi `ETIMEDOUT`; không có log VPBank mới trong 30 phút.
+- **Nguyên nhân thẻ tín dụng không ghi nhận:** Production không có bản ghi nào trong `finance.credit_accounts`, chỉ có mapping `DEBIT_CARD *0985`. Không có mapping `CREDIT_CARD *2340`, nên 304 receipt dừng `MANUAL_REVIEW / UNMAPPED_BANK_INSTRUMENT`; các receipt thẻ `*2340` không có `ledger_id`.
+- **Số liệu đối chiếu:** 304 `MANUAL_REVIEW / UNMAPPED_BANK_INSTRUMENT`; 184 `REJECTED / NON_FINANCIAL_DOCUMENT`. Email thẻ tín dụng gần nhất tại 13:13 ICT ngày 2026-11-06, số tiền 63,550 VND, vẫn bị manual review.
+- **Điều kiện khắc phục:** Tạo `credit_account` VPBank hợp lệ, tạo mapping ACTIVE `CREDIT_CARD` cho `*2340`, sau đó thực hiện replay có kiểm soát các receipt terminal. Không tự ý reset checkpoint hay xóa receipt.
+
+## [2026-11-06] Hoàn tất mã nguồn ghi nhật ký nợ cá nhân từ IMAP VPBank
+
+- **Phạm vi:** Thay vì yêu cầu `credit_account`, email VPBank được phép ghi trực tiếp vào nhật ký biến động nợ có sẵn khi và chỉ khi khớp duy nhất tài sản nợ VPBank theo `card_last_digits`; chỉ chấp nhận `CARD_SPEND` thẻ tín dụng hoặc `OUTFLOW` thấu chi/debit. Sao kê và email thanh toán vẫn giữ manual review để không tự suy diễn dư nợ tuyệt đối hoặc ghi giảm nợ hai lần.
+- **Thay đổi kỹ thuật:** Parser đọc được `Available Limit` khi số tiền đứng trước nhãn; ingestion gọi `borrowPersonalAssetInTrx` trong transaction hiện hữu, dùng `reference_code` chống trùng và lưu liên kết receipt -> `debt_payment_logs` qua migration `20261106000002_add_email_receipt_personal_debt_log.js`. Receipt cũ `UNMAPPED_BANK_INSTRUMENT` chỉ được xử lý lại khi truyền rõ `reprocessManualReview: true`.
+- **Đối soát mẫu:** Email `VISA *2340`, mã `630906039965`, chi tiêu `63.550 VND`, hạn mức còn lại quan sát `17.870.822 VND` được parser trích đúng; hạn mức chỉ được ghi chú/metadata, không bị dùng để suy ra hoặc ghi đè dư nợ khi chưa có tổng hạn mức đã xác minh.
+- **Kiểm tra đã chạy:** `node --check` cho service, migration và integration test; parser unit `13/13`; toàn bộ `backend npm test` pass. Integration VPBank không chạy vì không có `TEST_DATABASE_URL`; test được mở rộng để kiểm tra tăng nợ đúng một lần, receipt-linked log, và replay có chủ đích.
+- **Chưa nghiệm thu live:** Chưa chạy migration/deploy hay ghi dữ liệu production. Trước khi nghiệm thu cần deploy, replay riêng receipt UID `19159`, rồi xác minh receipt `APPLIED`, đúng một log mang `reference_code=630906039965`, và số dư nợ chỉ tăng đúng `63.550 VND`.
+
+## [2026-11-06] Triển khai và đối soát live receipt VPBank UID 19159
+
+- **Triển khai:** Đồng bộ năm file backend đúng đường dẫn, build lại backend không dùng cache, chạy Knex `Batch 18` với migration `20261106000002_add_email_receipt_personal_debt_log.js`, khởi động lại riêng backend. Health endpoint trả `database: connected`; container `admin_orderlist-backend` healthy.
+- **Chốt an toàn trước ghi:** Script một lần xác nhận receipt ID `488` vẫn là `MANUAL_REVIEW / UNMAPPED_BANK_INSTRUMENT`; đọc trực tiếp IMAP UID `19159` và chỉ tiếp tục khi parser xác nhận `VISA *2340`, mã `630906039965`, số tiền `63.550 VND`; đồng thời xác nhận tồn tại duy nhất tài sản nợ VPBank `card_last_digits=2340`.
+- **Kết quả ghi thực tế:** Receipt `488` chuyển `APPLIED`, liên kết `personal_debt_payment_log_id=7`; `debt_payment_logs.reference_code=630906039965`, số tiền `63.550 VND`, merchant `FOODY`; dư nợ tài sản thẻ tín dụng tăng `6.568.258 -> 6.631.808 VND` đúng một lần.
+- **Dữ liệu quan sát:** Email có hạn mức còn lại `17.870.822 VND`; hệ thống lưu nó trong note `Hạn mức còn lại: 17.870.822 VND`, không dùng giá trị này để ghi đè dư nợ vì chưa có tổng hạn mức/sao kê đã xác minh.
+- **Giới hạn kiểm thử:** `backend npm test` và parser `13/13` pass; integration VPBank chưa chạy do không có `TEST_DATABASE_URL` cô lập. Không bulk replay 304 receipt cũ và không reset checkpoint.
+
+---
+
+## 11. [17:10] LƯU TRỮ VÀ TÍCH HỢP TRỌN BỘ THIẾT KẾ GIAO DIỆN LỄ HỘI VÀO DỰ ÁN OTP_PORTAL
+
+### 11.1. Bối cảnh & Chỉ đạo của Master
+> Master chỉ đạo:  
+> 1. *"khoan, thay vì sửa form thì sửa luôn thẳng giao diện web OTP luôn là được nhỉ"*  
+> 2. Gửi file `le-hoi-themes.zip` làm kiến trúc chuẩn mực.  
+> 3. *"giờ không làm demo form nữa. mà tôi muốn demo luôn cả cái page otp_portal luôn. Thiết kế giao diện của nó theo đúng từng ngày lễ luôn"*  
+> 4. *"lưu các bản thiết kế vào dự án otp_portal cho tôi nhé"*
+
+### 11.2. Các giải pháp kỹ thuật đã triển khai trong dự án [`otp_portal`](file:///D:/Desktop/admin/otp_portal)
+1. **Khởi tạo thư mục thiết kế vĩnh viễn [`designs/`](file:///D:/Desktop/admin/otp_portal/designs):**
+   - **[`otp_portal_festivals.html`](file:///D:/Desktop/admin/otp_portal/designs/otp_portal_festivals.html):** Trang Web OTP Portal toàn màn hình độc lập, chuẩn Luxury Glassmorphism, 100% không dùng emoji hệ điều hành (`🦁`, `🌸`, `🏛️`, `🥮`) và không dùng lồng đèn CSS kẹo mút thô kệch. Hỗ trợ chuyển đổi mượt mà 60fps giữa 6 ngày lễ lớn:
+     + 🧧 **Tết Cổ Truyền (Xuân Bính Ngọ)**: Cánh hoa mai vàng lật xoay 3D, dàn đèn lồng SVG (`#lantern`) đung đưa theo gió, mái đình làng cổ (`#g-dinh`).
+     + 🏛️ **Giỗ Tổ Hùng Vương (10/3 Âm Lịch)**: Hào khí Đông Sơn, mái đình Đền Hùng uy nghiêm, hạt bụi vàng Tiên Rồng bay lên từ mặt đất.
+     + 🥮 **Tết Trung Thu (Rằm Tháng Tám)**: Mặt trăng 3D siêu thực với SVG filter vân lồi lõm (`fractalNoise`), đom đóm vàng lập lòe bay trong gió đêm, mái nhà sum vầy (`#g-house`).
+     + 🎃 **Đêm Huyền Bí Halloween**: Trăng khuyết rực lửa, đàn dơi bóng đêm chao liệng vỗ cánh.
+     + 🎄 **Giáng Sinh & Năm Mới**: Bầu trời tuyết rơi lãng mạn đa tầng, rừng thông tuyết bách diệp (`#g-pine`).
+     + 🌸 **Tôn Vinh Phái Đẹp (8/3 & 20/10)**: Cánh hoa hồng bay nhẹ nhàng, tông màu hồng ngọc trang nhã.
+   - **[`le-hoi-themes/`](file:///D:/Desktop/admin/otp_portal/designs/le-hoi-themes):** Lưu trữ trọn vẹn source gốc của Master (`index.html`, `css/base.css`, `css/themes/*.css`, `js/fx.js`, `js/theme.js`, `assets/`).
+   - **[`designs/README.md`](file:///D:/Desktop/admin/otp_portal/designs/README.md):** Tài liệu hướng dẫn sử dụng và tích hợp.
+2. **Tích hợp Component React & Theme Stylesheet vào Codebase React Vite:**
+   - **[`src/styles/festival-themes.css`](file:///D:/Desktop/admin/otp_portal/src/styles/festival-themes.css):** Khai báo hệ thống biến màu sắc CSS (`--bg1`, `--bg2`, `--accent`, `--btn`, `--glow`, `--lan-a`, `--lan-b`, `--moon-a`, `--moon-b`) và các lớp scene (`.festival-moon`, `.festival-lanterns`, `.festival-ground`).
+   - **[`src/components/FestivalBackground.tsx`](file:///D:/Desktop/admin/otp_portal/src/components/FestivalBackground.tsx):** React Component điều khiển Canvas 60fps (cánh hoa mai lật 3D, bụi vàng, đom đóm, dơi bay, tuyết rơi) kết hợp lớp cảnh SVG chân thực, hoạt động như background layer độc lập (`pointer-events: none`).
+
+### 11.3. Kết quả nghiệm thu & Bằng chứng kiểm thử
+- **Kiểm thử biên dịch Vite & TypeScript trong `otp_portal`:**  
+  `npm run build` hoàn tất xuất sắc trong **6.03s**:  
+  `dist/index.html 1.14 kB`, `dist/assets/index-BVBm3m3R.css 26.30 kB`, `dist/assets/index-XQnkic5z.js 186.49 kB`.  
+  **0 lỗi TypeScript, 0 cảnh báo.**
+- **Tiêu chuẩn hoàn thành (DoD):** Toàn bộ bản thiết kế và mã nguồn mẫu đã được lưu trữ an toàn, có cấu trúc trong dự án `D:\Desktop\admin\otp_portal`, sẵn sàng chạy trực tiếp độc lập hoặc nhúng vào ứng dụng chính.
+
