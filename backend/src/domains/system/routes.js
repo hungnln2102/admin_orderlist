@@ -208,6 +208,8 @@ router.post("/external-apis/analyze-endpoint", sensitiveOperationRateLimiter, as
     const result = await externalApiConfigService.analyzeEndpoint({
       configId: Number(req.body?.config_id),
       method: req.body?.method,
+      endpoint: req.body?.endpoint,
+      email: req.body?.email,
       body: req.body?.body,
     });
     res.json(result);

@@ -215,16 +215,73 @@ function extractJsonPaths(value, path = "", depth = 0) {
   return Object.entries(value).flatMap(([key, entry]) => extractJsonPaths(entry, path ? `${path}.${key}` : key, depth + 1));
 }
 
-async function analyzeEndpoint({ configId, method, body } = {}) {
+async function analyzeEndpoint({ configId, method, endpoint, email, body } = {}) {
   if (!Number.isInteger(configId) || configId <= 0) throw new Error("A valid saved configuration is required.");
   const config = await getInternalConfigById(configId);
   if (!config) throw new Error(`Configuration #${configId} was not found.`);
 
-  const endpoint = config.endpoints?.get_otp || config.endpoints?.read_otp || config.endpoints?.path || "";
-  const requestMethod = method || config.endpoints?.method || "GET";
+  const targetEmail = String(email || body?.email || "").trim();
   const startedAt = Date.now();
+
+  // 1. Nếu là cổng Fix Ades Support (có Bearer Token và 2 headers chuyên biệt):
+  if (config.service_key === "fix_ades" && targetEmail) {
+    try {
+      const { fetchOtpFromFixAdes } = require("./otpProviderService");
+      const probeRes = await fetchOtpFromFixAdes(targetEmail, { includeDetails: true });
+      const rawPayload = probeRes?.rawData || probeRes;
+      const jsonText = JSON.stringify(rawPayload, null, 2);
+      return {
+        success: true,
+        status: 200,
+        statusText: "OK (Ades Authenticated Session)",
+        latency_ms: Date.now() - startedAt,
+        contentType: "application/json; charset=utf-8",
+        is_json: true,
+        parsed_data: rawPayload,
+        raw_body: jsonText,
+        detected_fields: extractJsonPaths(rawPayload),
+        target_url: `${config.base_url}/ades-support/only-otp?email=${encodeURIComponent(targetEmail)}`,
+      };
+    } catch (err) {
+      // Fallback xuống request thông thường nếu có lỗi provider
+    }
+  }
+
+  // 2. Xử lý Endpoint và Method chuẩn cho các API thông thường
+  let endpointPath = String(
+    endpoint ||
+      config.endpoints?.only_otp ||
+      config.endpoints?.get_otp ||
+      config.endpoints?.read_otp ||
+      config.endpoints?.path ||
+      ""
+  ).trim();
+
+  const requestMethod = String(method || config.endpoints?.method || "GET").toUpperCase();
+  let requestBody = body;
+
+  // Nếu là GET, tự động chuyển email hoặc params thành Query String
+  if (requestMethod === "GET") {
+    requestBody = null; // GET không gửi body
+    if (targetEmail && !endpointPath.includes("email=")) {
+      const sep = endpointPath.includes("?") ? "&" : "?";
+      endpointPath = `${endpointPath}${sep}email=${encodeURIComponent(targetEmail)}`;
+    }
+  }
+
+  const extraHeaders = {};
+  if (config.base_url.includes("ades.support") || config.service_key === "fix_ades") {
+    extraHeaders["X-Feature-Code"] = "only-otp";
+    extraHeaders["X-App-Key"] = "ades-otp-mail";
+  }
+
   try {
-    const response = await requestConfiguredApi(config, { method: requestMethod, body, endpoint });
+    const response = await requestConfiguredApi(config, {
+      method: requestMethod,
+      body: requestBody,
+      endpoint: endpointPath,
+      headers: extraHeaders,
+    });
     const text = await readExternalResponse(response);
     let data = null;
     let isJson = false;
@@ -245,7 +302,7 @@ async function analyzeEndpoint({ configId, method, body } = {}) {
       parsed_data: data,
       raw_body: (text || "").slice(0, 20000),
       detected_fields: isJson && data ? extractJsonPaths(data) : [],
-      target_url: config.base_url + (endpoint ? `/${endpoint.replace(/^\/+/, "")}` : ""),
+      target_url: config.base_url + (endpointPath ? `/${endpointPath.replace(/^\/+/, "")}` : ""),
     };
   } catch (error) {
     return {
@@ -257,7 +314,7 @@ async function analyzeEndpoint({ configId, method, body } = {}) {
       parsed_data: null,
       raw_body: "",
       detected_fields: [],
-      target_url: config.base_url + (endpoint ? `/${endpoint.replace(/^\/+/, "")}` : ""),
+      target_url: config.base_url + (endpointPath ? `/${endpointPath.replace(/^\/+/, "")}` : ""),
     };
   }
 }

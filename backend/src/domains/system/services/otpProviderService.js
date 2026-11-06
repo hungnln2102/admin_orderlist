@@ -63,20 +63,28 @@ function appendQuery(endpoint, params) {
   return endpoint + (endpoint.includes("?") ? "&" : "?") + query.toString();
 }
 
-async function fetchOtpFromHdsd(email) {
+async function fetchOtpFromHdsd(email, { includeDetails = false } = {}) {
   const config = { base_url: "https://otp.hdsd.net", ...((await getConfigByKey("otp_hdsd")) || {}) };
   const response = await requestConfiguredApi(config, { method: "POST", endpoint: config.endpoints?.get_otp || "/get_otp_api", body: { email }, timeoutMs: Number(config.auth_config?.timeoutMs) || 10_000 });
   if (!response.ok) throw new Error("HDSD returned HTTP " + response.status + ".");
   const data = await parseJsonResponse(response);
   const rows = Array.isArray(data) ? data : (data?.data || data?.mails || []);
+  let foundCode = null;
   for (const row of rows) {
     const code = extractOtpCode(row?.value ?? row?.otp ?? row?.code);
-    if (code) return code;
+    if (code) {
+      foundCode = code;
+      break;
+    }
   }
-  return collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
+  if (!foundCode) foundCode = collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
+  if (includeDetails) {
+    return { otp: foundCode, rawData: data };
+  }
+  return foundCode;
 }
 
-async function fetchOtpFromTinyHost(email) {
+async function fetchOtpFromTinyHost(email, { includeDetails = false } = {}) {
   const [user, domain] = String(email || "").split("@");
   if (!user || !domain) throw new Error("Email không hợp lệ để tra cứu TinyHost.");
   const config = { base_url: "https://tinyhost.shop", ...((await getConfigByKey("tinyhost")) || {}) };
@@ -85,26 +93,134 @@ async function fetchOtpFromTinyHost(email) {
   const response = await requestConfiguredApi(config, { endpoint: listEndpoint, timeoutMs });
   if (!response.ok) throw new Error("TinyHost returned HTTP " + response.status + ".");
   const data = await parseJsonResponse(response) || {};
+  let foundCode = null;
   for (const item of data.emails || []) {
     const directCode = extractOtpCode(item.subject);
-    if (directCode) return directCode;
+    if (directCode) {
+      foundCode = directCode;
+      break;
+    }
     const detailResponse = await requestConfiguredApi(config, { endpoint: "/api/email/" + encodeURIComponent(domain) + "/" + encodeURIComponent(user) + "/" + encodeURIComponent(item.id), timeoutMs });
     if (!detailResponse.ok) continue;
     const detail = await parseJsonResponse(detailResponse);
     const code = extractOtpCode(detail?.body || detail?.html_body);
-    if (code) return code;
+    if (code) {
+      foundCode = code;
+      break;
+    }
   }
-  return null;
+  if (includeDetails) {
+    return { otp: foundCode, rawData: data };
+  }
+  return foundCode;
 }
 
-async function fetchOtpFromFixAdes(email) {
+/* ── Ades Support Auto-Token & Only-OTP Cache ───────────────── */
+let adesSessionCache = {
+  token: null,
+  expiresAt: 0,
+};
+
+async function getAdesSessionToken(config, timeoutMs = 10_000) {
+  const now = Date.now();
+  if (adesSessionCache.token && adesSessionCache.expiresAt > now + 30_000) {
+    return adesSessionCache.token;
+  }
+
+  try {
+    const tokenRes = await requestConfiguredApi(config, {
+      method: "POST",
+      endpoint: "/ades-support/auth/token",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      timeoutMs,
+    });
+
+    if (!tokenRes.ok) return null;
+    const data = await parseJsonResponse(tokenRes);
+    const token = data?.data?.token;
+    const expiresIn = Number(data?.data?.expiresIn) || 600;
+
+    if (token) {
+      adesSessionCache = {
+        token,
+        expiresAt: now + expiresIn * 1000,
+      };
+      return token;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOtpFromFixAdes(email, { includeDetails = false } = {}) {
+  if (!email) return null;
+  const cleanEmail = String(email).trim().toLowerCase();
   const config = { base_url: "https://api-2026-02.ades.support", ...((await getConfigByKey("fix_ades")) || {}) };
-  const endpoint = appendQuery(config.endpoints?.read_otp || "/mail/read-otp-gpm", { email });
-  const response = await requestConfiguredApi(config, { endpoint, headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs: Number(config.auth_config?.timeoutMs) || 10_000 });
-  if (!response.ok) throw new Error("Fix Ades returned HTTP " + response.status + ".");
+  const timeoutMs = Number(config.auth_config?.timeoutMs) || 12_000;
+
+  // 1. Tự động lấy/tái sử dụng Bearer Token (hạn 10 phút, không cần nhập thủ công)
+  let token = await getAdesSessionToken(config, timeoutMs);
+
+  // 2. Gọi endpoint chuyên dụng Only-OTP (/ades-support/only-otp)
+  const endpointPath = config.endpoints?.only_otp || "/ades-support/only-otp";
+  const endpointWithQuery = appendQuery(endpointPath, { email: cleanEmail });
+
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "X-Feature-Code": "only-otp",
+    "X-App-Key": "ades-otp-mail",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let response = await requestConfiguredApi(config, {
+    method: "GET",
+    endpoint: endpointWithQuery,
+    headers,
+    timeoutMs,
+  });
+
+  // Nếu token hết hạn (401), tự động xóa cache và thử cấp mới token 1 lần
+  if (response.status === 401) {
+    adesSessionCache = { token: null, expiresAt: 0 };
+    token = await getAdesSessionToken(config, timeoutMs);
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+      response = await requestConfiguredApi(config, {
+        method: "GET",
+        endpoint: endpointWithQuery,
+        headers,
+        timeoutMs,
+      });
+    }
+  }
+
+  // 3. Fallback sang endpoint cũ nếu endpoint mới trả mã lỗi khác
+  if (!response.ok) {
+    const fallbackEndpoint = appendQuery(config.endpoints?.read_otp || "/mail/read-otp-gpm", { email: cleanEmail });
+    const fallbackRes = await requestConfiguredApi(config, { endpoint: fallbackEndpoint, headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs }).catch(() => null);
+    if (fallbackRes?.ok) {
+      const fbData = await parseJsonResponse(fallbackRes);
+      const fbOtp = extractOtpCode(fbData?.data?.otp || fbData?.data?.code);
+      if (includeDetails) return { otp: fbOtp, rawData: fbData };
+      return fbOtp;
+    }
+    throw new Error("Fix Ades returned HTTP " + response.status + ".");
+  }
+
   const data = await parseJsonResponse(response);
-  const directCode = extractOtpCode(data?.data?.otp || data?.data?.code);
-  return directCode || collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
+  // Định dạng chuẩn: { status: 200, success: true, data: { success: true, otp: "699211", emailSubject: "...", emailDate: "..." } }
+  const directCode = extractOtpCode(data?.data?.otp || data?.data?.code || data?.otp);
+  const otp = directCode || collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
+  if (includeDetails) {
+    return { otp, rawData: data };
+  }
+  return otp;
 }
 
 /* ── YunaGRP Polite & Anti-Spam Caches ────────────────────────── */
@@ -255,12 +371,80 @@ async function fetchYunaAccountOrder(queryInput) {
 }
 
 /**
- * 5. Luồng Yuna Mail Rules & Scraper (mail.yunagrp.com):
+ * 5. Luồng Yuna Mail Hub & Aggregator (mail.yunagrp.com):
  * - Tự động tải routing rules từ https://mail.yunagrp.com/admin.php?public=rules (Cache 15 phút)
- * - Với action api_local -> gọi https://mail.yunagrp.com/api.php?email={email}
- * - Với action api_hdsd -> chuyển tiếp sang HDSD
+ * - Tích hợp 5 API gửi thẳng JSON (api_getadobe, api_hdsd, api_local, api_mailtm, api_trackmail)
+ * - Tích hợp 2 link webmail chuyển tiếp (generator.email, tmail)
  */
-async function fetchOtpFromYunaMail(email) {
+async function callYunaProxy(config, endpoint, email, timeoutMs = 10_000, includeDetails = false) {
+  try {
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Yuna-Version": "©2026 YunaGRP Panel V3.12.1",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    };
+    const response = await requestConfiguredApi(config, {
+      method: "POST",
+      endpoint,
+      body: { email },
+      headers,
+      timeoutMs,
+    });
+    if (!response.ok) return includeDetails ? { otp: null, rawData: null } : null;
+    const payload = await parseJsonResponse(response);
+    if (!payload || payload.status !== true || !payload.data) return includeDetails ? { otp: null, rawData: payload } : null;
+
+    const data = payload.data;
+    const latest = data.latest;
+    let directCode = null;
+    if (latest) {
+      directCode = extractOtpCode(latest.value || latest.extracted_code || latest.code || latest.otp);
+    }
+
+    if (!directCode && Array.isArray(data.history) && data.history.length > 0) {
+      for (const item of data.history) {
+        const c = extractOtpCode(item.value || item.extracted_code || item.code || item.otp || item.subject);
+        if (c) {
+          directCode = c;
+          break;
+        }
+      }
+    }
+
+    if (includeDetails) {
+      return { otp: directCode, rawData: payload };
+    }
+    return directCode;
+  } catch {
+    return includeDetails ? { otp: null, rawData: null } : null;
+  }
+}
+
+async function fetchOtpFromWebmail(targetUrl, timeoutMs = 10_000) {
+  try {
+    const res = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    // 1. Tìm theo ngữ cảnh xác minh mã OTP 6 số
+    const contextualMatch = html.match(/(?:adobe|verification\s*code|mã\s*xác\s*minh|mã\s*xác\s*thực|mã\s*otp|otp\s*code)[^0-9]{1,50}(\d{6})/i);
+    if (contextualMatch?.[1]) return contextualMatch[1];
+    // 2. Tìm thẻ chứa class hoặc id liên quan tới otp/code
+    const tagMatch = html.match(/(?:class|id)=["'][^"']*(?:otp|code|verify)[^"']*["'][^>]*>[\s\r\n]*(\d{4,8})[\s\r\n]*</i);
+    if (tagMatch?.[1]) return tagMatch[1];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOtpFromYunaMail(email, { includeDetails = false } = {}) {
   if (!email || !String(email).includes("@")) return null;
   const cleanEmail = String(email).trim().toLowerCase();
   const domain = cleanEmail.split("@")[1];
@@ -292,30 +476,56 @@ async function fetchOtpFromYunaMail(email) {
     const matchedRule = (rules || []).find((r) => r.domain === domain && r.enabled !== false);
     const action = matchedRule ? matchedRule.action : "api_local";
 
-    if (action === "api_hdsd") {
-      return await fetchOtpFromHdsd(cleanEmail);
-    }
-
-    // Mặc định hoặc api_local: Gọi API Mail Yuna
     const mailConfig = {
       base_url: "https://mail.yunagrp.com",
       ...((await getConfigByKey("yuna_mail")) || {}),
     };
-    const response = await requestConfiguredApi(mailConfig, {
-      endpoint: `/api.php?email=${encodeURIComponent(cleanEmail)}`,
-      headers: { "User-Agent": "Mozilla/5.0" },
-      timeoutMs: 10_000,
-    });
 
-    if (response.ok) {
-      const data = await parseJsonResponse(response);
-      const code = data?.data?.latest?.extracted_code || data?.otp || data?.code;
-      if (code) return extractOtpCode(code);
+    let resObj = null;
+
+    // Rẽ nhánh tuần tự theo chỉ đạo của Master:
+    if (action === "api_getadobe") {
+      // 1. GetAdobe: gọi POST /api-getadobe.php
+      resObj = await callYunaProxy(mailConfig, "/api-getadobe.php", cleanEmail, 10_000, true);
+    } else if (action === "api_hdsd") {
+      // 2. HDSD: gọi POST /api-hdsd.php, nếu chưa có thì fallback sang fetchOtpFromHdsd
+      resObj = await callYunaProxy(mailConfig, "/api-hdsd.php", cleanEmail, 10_000, true);
+      if (!resObj?.otp) {
+        const fb = await fetchOtpFromHdsd(cleanEmail, { includeDetails: true }).catch(() => null);
+        if (fb?.otp) resObj = fb;
+      }
+    } else if (action === "api_local") {
+      // 3. Local NNM: gọi POST /api-nnm.php
+      resObj = await callYunaProxy(mailConfig, "/api-nnm.php", cleanEmail, 10_000, true);
+    } else if (action === "api_mailtm") {
+      // 4. MailTM: gọi POST /api-mailtm.php
+      resObj = await callYunaProxy(mailConfig, "/api-mailtm.php", cleanEmail, 10_000, true);
+    } else if (action === "api_trackmail") {
+      // 5. Outlook/Hotmail: gọi POST /outlook-api.php
+      resObj = await callYunaProxy(mailConfig, "/outlook-api.php", cleanEmail, 10_000, true);
+    } else if (action === "redirect_email" || action === "redirect_fixed") {
+      // 6 & 7. Chuyển hướng Webmail (generator.email & tmail)
+      const targetTemplate = matchedRule?.target || "";
+      const targetUrl = targetTemplate
+        .replace(/\{email\}/g, cleanEmail)
+        .replace(/\{email_encoded\}/g, encodeURIComponent(cleanEmail))
+        .replace(/\{domain\}/g, domain);
+
+      if (targetUrl) {
+        const otpCode = await fetchOtpFromWebmail(targetUrl);
+        resObj = { otp: otpCode, rawData: { target_url: targetUrl, otp: otpCode } };
+      }
+    } else {
+      // Fallback: Thử gọi api-getadobe.php
+      resObj = await callYunaProxy(mailConfig, "/api-getadobe.php", cleanEmail, 10_000, true);
     }
 
-    return null;
+    if (includeDetails) {
+      return { otp: resObj?.otp || null, rawData: resObj?.rawData || null };
+    }
+    return resObj?.otp || null;
   } catch {
-    return null;
+    return includeDetails ? { otp: null, rawData: null } : null;
   }
 }
 
@@ -423,25 +633,38 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
   let otp = null;
   let sourceUsed = serviceKey;
   let extraFields = [];
+  let probeRawData = null;
 
   switch (serviceKey) {
-    case "otp_hdsd":
-      otp = await fetchOtpFromHdsd(cleanEmail);
+    case "otp_hdsd": {
+      const res = await fetchOtpFromHdsd(cleanEmail, { includeDetails: true });
+      otp = res?.otp || null;
+      probeRawData = res?.rawData;
       break;
-    case "tinyhost":
-      otp = await fetchOtpFromTinyHost(cleanEmail);
+    }
+    case "tinyhost": {
+      const res = await fetchOtpFromTinyHost(cleanEmail, { includeDetails: true });
+      otp = res?.otp || null;
+      probeRawData = res?.rawData;
       break;
-    case "fix_ades":
-      otp = await fetchOtpFromFixAdes(cleanEmail);
+    }
+    case "fix_ades": {
+      const res = await fetchOtpFromFixAdes(cleanEmail, { includeDetails: true });
+      otp = res?.otp || null;
+      probeRawData = res?.rawData;
       break;
+    }
     case "yuna_2fa": {
       const yunaRes = await fetchYunaAccountOrder(queryInput);
       otp = yunaRes.otp;
+      probeRawData = yunaRes.raw_data;
       extraFields = yunaRes.extra_fields || [];
       break;
     }
     case "yuna_mail": {
-      otp = await fetchOtpFromYunaMail(cleanEmail);
+      const res = await fetchOtpFromYunaMail(cleanEmail, { includeDetails: true });
+      otp = res?.otp || null;
+      probeRawData = res?.rawData;
       break;
     }
     default: {
@@ -451,11 +674,49 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
         otp = dynamicResult.otp;
         extraFields = dynamicResult.extra_fields || [];
       } else {
-        otp = await fetchOtpFromHdsd(cleanEmail).catch(() => null);
-        if (!otp) otp = await fetchOtpFromFixAdes(cleanEmail).catch(() => null);
-        if (!otp) otp = await fetchOtpFromTinyHost(cleanEmail).catch(() => null);
+        const r1 = await fetchOtpFromHdsd(cleanEmail, { includeDetails: true }).catch(() => null);
+        if (r1?.otp) {
+          otp = r1.otp;
+          probeRawData = r1.rawData;
+        } else {
+          const r2 = await fetchOtpFromFixAdes(cleanEmail, { includeDetails: true }).catch(() => null);
+          if (r2?.otp) {
+            otp = r2.otp;
+            probeRawData = r2.rawData;
+          }
+        }
       }
       break;
+    }
+  }
+
+  // ĐỐI CHIẾU VỚI CẤU HÌNH field_mapping:
+  // CHỈ BÓC TÁCH & HIỂN THỊ CÁC TRƯỜNG MÀ NGƯỜI DÙNG THỰC SỰ ĐÃ CHỌN TRONG CẤU HÌNH
+  const serviceConfig = await getConfigByKey(serviceKey);
+  const configuredFields = Array.isArray(serviceConfig?.field_mapping) ? serviceConfig.field_mapping : [];
+
+  if (probeRawData && configuredFields.length > 0) {
+    for (const field of configuredFields) {
+      if (field.is_primary || field.key === "otp") continue;
+      if (extraFields.some((ef) => ef.path === field.path || ef.key === field.key)) continue;
+
+      const rawVal = getValueByPath(probeRawData, field.path);
+      if (rawVal !== undefined && rawVal !== null && rawVal !== "") {
+        let displayVal = typeof rawVal === "object" ? JSON.stringify(rawVal) : String(rawVal);
+        // Định dạng thời gian GMT+7 thân thiện nếu là trường ngày giờ
+        if (/date|time|created_at/i.test(field.key) || /date|time/i.test(field.path)) {
+          const parsed = Date.parse(displayVal);
+          if (!isNaN(parsed) && !/^\d{4,8}$/.test(displayVal)) {
+            displayVal = new Date(parsed).toLocaleString("vi-VN", { timeZone: "Asia/Bangkok" });
+          }
+        }
+        extraFields.push({
+          key: field.key || field.path,
+          label: field.label || field.key,
+          value: displayVal,
+          path: field.path,
+        });
+      }
     }
   }
 
