@@ -5,6 +5,7 @@ const cronJobService = require("./services/cronJobService");
 const systemLogService = require("./services/systemLogService");
 const externalApiConfigService = require("./services/externalApiConfigService");
 const otpProviderService = require("./services/otpProviderService");
+const totpController = require("./controllers/totpController");
 const { requireAdmin } = require("@/domains/auth/middleware/requireAdmin");
 const { sensitiveOperationRateLimiter } = require("./middleware/sensitiveOperationRateLimiter");
 const scheduler = require("@/scheduler");
@@ -228,5 +229,8 @@ router.post("/external-apis/test-otp", sensitiveOperationRateLimiter, async (req
     res.status(400).json({ success: false, error: err.message });
   }
 });
+
+// POST /api/system/totp/generate - Generate Google Authenticator code from request-only Base32 secret.
+router.post("/totp/generate", sensitiveOperationRateLimiter, totpController.generate);
 
 module.exports = router;

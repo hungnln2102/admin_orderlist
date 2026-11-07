@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldAlert,
+  KeyRound,
   Send,
   ToggleLeft,
   ToggleRight,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { CronSchedulerTab } from "@/features/system/components/CronSchedulerTab";
 import { VpbankMailboxTab } from "@/features/system/components/VpbankMailboxTab";
+import { TotpGeneratorTab } from "@/features/system/components/TotpGeneratorTab";
 
 interface SystemConfig {
   id: number;
@@ -33,7 +35,7 @@ interface SystemConfig {
 }
 
 export const SystemPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"general" | "expiry_alerts" | "cron" | "telegram" | "backup" | "mailbox">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "expiry_alerts" | "cron" | "telegram" | "backup" | "mailbox" | "totp">("general");
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -252,6 +254,17 @@ export const SystemPage: React.FC = () => {
 
         {/* Tab Riêng: Mailbox VPBank (Gmail IMAP Realtime) */}
         <button
+          onClick={() => setActiveTab("totp")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "totp"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <KeyRound className="w-4 h-4 text-cyan-400" />
+          Sinh mã TOTP
+        </button>
+        <button
           onClick={() => setActiveTab("mailbox")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "mailbox"
@@ -267,6 +280,10 @@ export const SystemPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Tab: TOTP Generator */}
+      {activeTab === "totp" && (
+        <TotpGeneratorTab onShowToast={(type, message) => showToast(type, message)} />
+      )}
       {/* Tab: VPBank Mailbox IMAP Realtime */}
       {activeTab === "mailbox" && (
         <VpbankMailboxTab onShowToast={(type, text) => showToast(type, text)} />

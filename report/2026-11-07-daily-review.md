@@ -961,3 +961,30 @@
   - `npx.cmd knex migrate:list` -> 37 completed, 0 pending.
   - Bảo vệ dữ liệu của Master: Giữ nguyên 100% các file code dở chưa commit trên workspace.
 - **Trạng thái nghiệm thu:** ĐÃ HOÀN THÀNH 100% (PASSED & SYNCED).
+
+
+---
+
+## [2026-11-07 23:51] Deploy Phiên Bản Mới Nhất & Kiểm Tra Toàn Bộ Migrations Trên VPS Production
+
+- **Phạm vi nhiệm vụ:**
+  - Đồng bộ commit mới nhất [`bdcdc1f1`](file:///e:/Project/admin_store/admin_orderlist) lên máy chủ VPS (`180.93.43.169`, `/var/www/admin_orderlist`).
+  - Rebuild Docker images với BuildKit cache (`backend`, `frontend`, `postgres`).
+  - Thực thi toàn bộ pending migrations trước khi rolling update container.
+  - Rolling update không gián đoạn dịch vụ (`docker compose up -d --remove-orphans`).
+  - Tái nạp cấu hình Host Nginx (`sudo nginx -s reload`).
+- **Kiểm tra toàn bộ hệ thống Migrations (37 files):**
+  - **Trạng thái Knex**: **37/37 migration đã hoàn tất 100% (0 pending)**.
+  - **Batch 20 run: 3 migrations**:
+    1. `20261107000001_create_package_slot_daily_logs.js` (Bảng `warehouse.package_slot_daily_logs` + cột `finance.daily_revenue_summary.slot_vacant_cost`).
+    2. `20261107000002_receipt_shop_profit.js` (Bảng `finance.profit_obligation_snapshots` + các cột foreign key phân bổ lợi nhuận).
+    3. `20261107000003_add_otp_portal_theme_config.js` (Khởi tạo config `OTP_PORTAL_THEME` cho giao diện lễ hội).
+- **Trạng thái Containers & Health Check VPS:**
+  - `admin_orderlist-backend`: `Up (healthy)` - Port `127.0.0.1:3001`, `127.0.0.1:5000`.
+  - `admin_orderlist-frontend`: `Up` - Port `127.0.0.1:8081`.
+  - `admin_orderlist-postgres`: `Up (healthy)` - Port `127.0.0.1:5432`.
+  - `admin_orderlist-redis`: `Up (healthy)` - Port `127.0.0.1:6379`.
+  - `admin_orderlist-cloud-browser`: `Up` - Port `127.0.0.1:3088`.
+  - Health check nội bộ: `{"status":"ok","version":"2.0.0","database":"connected"}`.
+  - Health check Cloudflare Production: `https://admin.mavrykpremium.com/api/health` -> `HTTP/2 200 OK`.
+- **Trạng thái nghiệm thu:** ĐÃ HOÀN THÀNH 100% (DEPLOYED & HEALTHY).
