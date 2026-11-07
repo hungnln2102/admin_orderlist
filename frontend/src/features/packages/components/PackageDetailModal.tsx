@@ -15,6 +15,7 @@ import {
   Mail,
   ShieldAlert,
   Layers,
+  Zap,
 } from "lucide-react";
 import { PackageItem } from "../types";
 
@@ -374,6 +375,8 @@ export const PackageDetailModal: React.FC<PackageDetailModalProps> = ({ item, on
               </span>
               <p className="font-semibold text-cyan-300 text-xs">{matchRuleLabel}</p>
             </div>
+
+
 
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 col-span-2 sm:col-span-3">
               <span className="text-slate-500 text-[11px] flex items-center gap-1 mb-1">

@@ -7,6 +7,7 @@ import { DebtsAndInstallmentsSection } from "./components/DebtsAndInstallmentsSe
 import { FixedCostList } from "./components/FixedCostList";
 import { SavingsAndAssetsSection } from "./components/SavingsAndAssetsSection";
 import { SavingGoalsSection } from "./components/SavingGoalsSection";
+import { WarehouseFinanceSection } from "./components/WarehouseFinanceSection";
 import { DateRangePicker } from "@/shared/components/DateRangePicker";
 import {
   Calendar,
@@ -20,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
+  Boxes,
 } from "lucide-react";
 
 export type FinanceTabKey =
@@ -27,7 +29,8 @@ export type FinanceTabKey =
   | "DEBTS_INSTALLMENTS"
   | "FIXED_COSTS"
   | "SAVINGS_ASSETS"
-  | "SAVING_GOALS";
+  | "SAVING_GOALS"
+  | "WAREHOUSE_FINANCE";
 
 export const FinanceHubPage: React.FC = () => {
   const [period, setPeriod] = useState<"week" | "month" | "year" | "custom">("month");
@@ -416,6 +419,19 @@ export const FinanceHubPage: React.FC = () => {
           <Target className="w-4 h-4 text-cyan-400" />
           <span>Mục Tiêu Tương Lai</span>
         </button>
+
+        {/* Tab 6: Tài Chính Kho (Chỉ Đạo Master - Chỉ Thể Hiện Tài Chính) */}
+        <button
+          onClick={() => setActiveTab("WAREHOUSE_FINANCE")}
+          className={`px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "WAREHOUSE_FINANCE"
+              ? "bg-gradient-to-r from-cyan-500/30 to-indigo-500/30 text-white border border-cyan-500/50 shadow-lg shadow-cyan-500/20 font-bold"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+          }`}
+        >
+          <Boxes className="w-4 h-4 text-cyan-400" />
+          <span>Tài Chính Kho</span>
+        </button>
       </div>
 
       {/* Error Alert */}
@@ -517,6 +533,13 @@ export const FinanceHubPage: React.FC = () => {
                 data={data.savingGoals}
                 onRefresh={() => fetchData(month, period, year, startDate, endDate)}
               />
+            </div>
+          )}
+
+          {/* TAB 6: TÀI CHÍNH KHO (CHỈ THỂ HIỆN TÀI CHÍNH THEO CHỈ ĐẠO CỦA MASTER) */}
+          {activeTab === "WAREHOUSE_FINANCE" && (
+            <div className="animate-in fade-in duration-200">
+              <WarehouseFinanceSection />
             </div>
           )}
         </div>

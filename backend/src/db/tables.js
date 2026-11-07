@@ -34,7 +34,9 @@ const TABLES = {
   PACKAGE_PRODUCT: formatTable(SCHEMAS.WAREHOUSE, "package_products"),
   PRODUCT_STOCKS: formatTable(SCHEMAS.PRODUCT, "product_stocks"),
   PRODUCT_KEYS: formatTable(SCHEMAS.WAREHOUSE, "accounts"),
+  ACCOUNTS: formatTable(SCHEMAS.WAREHOUSE, "accounts"),
   STOCK_SERVICES: formatTable(SCHEMAS.WAREHOUSE, "account_slots"),
+  ACCOUNT_SLOTS: formatTable(SCHEMAS.WAREHOUSE, "account_slots"),
   PRODUCT_NAMES: formatTable(SCHEMAS.WAREHOUSE, "product_names"),
   ORDER_LIST: formatTable(SCHEMAS.ORDERS, "order_list"),
   PAYMENT_RECEIPT: formatTable(SCHEMAS.RECEIPT, "payment_receipt"),
@@ -62,6 +64,7 @@ const TABLES = {
   PERSONAL_ASSETS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
   PERSONAL_SAVINGS: formatTable(SCHEMAS.FINANCE, "personal_assets"),
   DEBT_PAYMENT_LOGS: formatTable(SCHEMAS.FINANCE, "debt_payment_logs"),
+  PROFIT_OBLIGATION_SNAPSHOTS: formatTable(SCHEMAS.FINANCE, "profit_obligation_snapshots"),
   CREDIT_ACCOUNTS: formatTable(SCHEMAS.FINANCE, "credit_accounts"),
   CREDIT_ACCOUNT_RULE_VERSIONS: formatTable(SCHEMAS.FINANCE, "credit_account_rule_versions"),
   CREDIT_STATEMENTS: formatTable(SCHEMAS.FINANCE, "credit_statements"),
@@ -80,6 +83,7 @@ const TABLES = {
   EMAIL_SYNC_CHECKPOINTS: formatTable(SCHEMAS.FINANCE, "email_sync_checkpoints"),
   EMAIL_INGESTION_RECEIPTS: formatTable(SCHEMAS.FINANCE, "email_ingestion_receipts"),
   EMAIL_RECONCILIATION_RUNS: formatTable(SCHEMAS.FINANCE, "email_reconciliation_runs"),
+  PACKAGE_SLOT_DAILY_LOGS: formatTable(SCHEMAS.WAREHOUSE, "package_slot_daily_logs"),
 };
 
 
@@ -218,6 +222,8 @@ const COLS = {
   },
   PAYMENT_RECEIPT: {
     ID: "id",
+    FINANCIAL_ACCOUNT_ID: "financial_account_id",
+    SHOP_OUT_EXPENSE_ID: "shop_out_expense_id",
     ID_ORDER: "id_order",
     PAYMENT_DATE: "payment_date",
     AMOUNT: "amount",
@@ -234,6 +240,8 @@ const COLS = {
   },
   PAYMENT_RECEIPT_ALLOCATIONS: {
     ID: "id",
+    PROFIT_COVERED_AMOUNT: "profit_covered_amount",
+    PROFIT_SNAPSHOT_ID: "profit_snapshot_id",
     RECEIPT_ID: "receipt_id",
     ALLOCATION_TYPE: "allocation_type",
     TARGET_CODE: "target_code",
@@ -256,6 +264,10 @@ const COLS = {
     STATUS: "status",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
+  },
+  PROFIT_OBLIGATION_SNAPSHOTS: {
+    ID: "id", TARGET_TYPE: "target_type", TARGET_ID: "target_id",
+    PERIOD_MONTH: "period_month", AMOUNT: "amount", CREATED_AT: "created_at",
   },
   FINANCIAL_ACCOUNTS: {
     ID: "id",
@@ -521,6 +533,7 @@ const COLS = {
   },
   DEBT_PAYMENT_LOGS: {
     ID: "id",
+    RECEIPT_ALLOCATION_ID: "receipt_allocation_id",
     TARGET_TYPE: "target_type",
     TARGET_ID: "target_id",
     PERIOD_MONTH: "period_month",
@@ -592,6 +605,35 @@ const COLS = {
   CREDIT_RECONCILIATION_RECORDS: {
     ID: "id", ACCOUNT_ID: "account_id", STATEMENT_ID: "statement_id", SOURCE_KIND: "source_kind", SOURCE_REFERENCE: "source_reference",
     EXPECTED_AMOUNT: "expected_amount", OBSERVED_AMOUNT: "observed_amount", STATUS: "status", EVIDENCE: "evidence", CREATED_AT: "created_at",
+  },
+  PACKAGE_SLOT_DAILY_LOGS: {
+    ID: "id",
+    LOG_DATE: "log_date",
+    PACKAGE_PRODUCT_ID: "package_product_id",
+    IMPORT_ORDER_ID: "import_order_id",
+    IMPORT_ORDER_CODE: "import_order_code",
+    ACCOUNT_USERNAME: "account_username",
+    TOTAL_SLOTS: "total_slots",
+    OCCUPIED_SLOTS: "occupied_slots",
+    VACANT_SLOTS: "vacant_slots",
+    COST_PER_SLOT_DAY: "cost_per_slot_day",
+    VACANT_COST: "vacant_cost",
+    NOTE: "note",
+    METADATA: "metadata",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
+  DAILY_REVENUE_SUMMARY: {
+    ID: "id",
+    SUMMARY_DATE: "summary_date",
+    EARNED_REVENUE: "earned_revenue",
+    TOTAL_SHOP_COST: "total_shop_cost",
+    SLOT_VACANT_COST: "slot_vacant_cost",
+    REVENUE_REVERSED: "revenue_reversed",
+    DASHBOARD_ORDERS_COUNT: "dashboard_orders_count",
+    DASHBOARD_CANCELED_COUNT: "dashboard_canceled_count",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
   },
 };
 

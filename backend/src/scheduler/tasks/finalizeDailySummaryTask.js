@@ -5,6 +5,7 @@
  */
 const { db, TABLES } = require("@/db");
 const { withAdvisoryLock } = require("../withAdvisoryLock");
+const { calculateDailySlotCostTask } = require("./calculateDailySlotCostTask");
 
 async function finalizeDailySummaryTask(triggeredBy = "cron_2355") {
   return withAdvisoryLock("finalize_daily_summary", async () => {
@@ -29,6 +30,13 @@ async function finalizeDailySummaryTask(triggeredBy = "cron_2355") {
         console.log(`✅ [DailySummary] Đã khởi tạo sẵn dòng thống kê sạch cho ngày ${todayStr}`);
       } else {
         console.log(`ℹ️ [DailySummary] Dòng thống kê cho ngày ${todayStr} đã tồn tại`);
+      }
+
+      // Tự động tính toán và chốt chi phí slot trống cho ngày hôm nay
+      try {
+        await calculateDailySlotCostTask("finalize_daily_summary", todayStr);
+      } catch (slotErr) {
+        console.warn(`[DailySummary] Lỗi tính chi phí slot ngày ${todayStr}:`, slotErr.message);
       }
 
       // Tự động dọn dẹp log cũ hơn 7 ngày theo chỉ đạo của Master

@@ -9,10 +9,11 @@
 
 const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
-const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
+const { allocateReceiptInTrx } = require("@/domains/invoices/services/invoiceService");
 const { eventBus, EVENTS, recordEvent } = require("@/events");
 const { publishEventInTrx } = require("@/events");
 const creditLedgerService = require("../credit/creditLedgerService");
+const { getMonthlyObligations, snapshotObligation, receiptMonth } = require("./profitObligationService");
 
 const toNumber = (val) => {
   const n = Number(val);
@@ -239,28 +240,6 @@ function calculateInstallmentState(item, targetMonth) {
   }
 }
 
-function calculatePersonalDebtMonthlyPayment(item) {
-  if (item.type !== "DEBT_PAYABLE") return 0;
-  const amount = toNumber(item.amount);
-  if (amount <= 0) return 0;
-  const annualRate = Boolean(item.debt_interest_enabled) ? toNumber(item.debt_annual_interest_rate) : 0;
-
-  if (!item.debt_end_date) {
-    // Với nợ không thời hạn / thẻ tín dụng:
-    // Mức thanh toán hàng tháng ước lượng: 5% nợ gốc tối thiểu + tiền lãi phát sinh mỗi tháng
-    const monthlyInterest = (amount * annualRate) / 100 / 12;
-    return Math.max(Math.ceil(amount * 0.05 + monthlyInterest), Math.ceil(amount / 24));
-  }
-
-  const endDate = new Date(`${String(item.debt_end_date).slice(0, 10)}T23:59:59`);
-  const remainingDays = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
-  const remainingMonths = Math.max(1, Math.floor(remainingDays / 30.4375) || 1);
-  const estimatedTotal = amount + (amount * annualRate / 100 * remainingDays / 365);
-  const dailyPayment = Math.ceil(estimatedTotal / remainingDays);
-  // Nguyên tắc an toàn: Thà dôi dư chứ không để thiếu hụt nợ khi tới hạn
-  return Math.max(Math.ceil(dailyPayment * 30.44), Math.ceil(estimatedTotal / remainingMonths));
-}
-
 /**
  * Tổng hợp toàn bộ bức tranh tài chính tháng (Break-even + Net worth + Cashflow)
  */
@@ -330,9 +309,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     };
   });
 
-  const activeFixedCostsTotal = fixedCosts
-    .filter((f) => f.isActive)
-    .reduce((sum, f) => sum + f.amount, 0);
+  const monthlyObligationsSnapshot = await getMonthlyObligations(currentMonthStr);
+  const activeFixedCostsTotal = monthlyObligationsSnapshot.fixedCosts;
 
   const unpaidFixedCostsTotal = fixedCosts
     .filter((f) => f.isActive && !f.isPaidThisMonth)
@@ -381,13 +359,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     };
   });
 
-  const personalDebtRows = await db(TABLES.PERSONAL_ASSETS)
-    .where("type", "DEBT_PAYABLE")
-    .select("type", "amount", "debt_interest_enabled", "debt_annual_interest_rate", "debt_end_date", "debt_repayment_frequency");
-  const personalDebtMonthlyTotal = personalDebtRows.reduce((sum, item) => sum + calculatePersonalDebtMonthlyPayment(item), 0);
-  const scheduledInstallmentsMonthlyTotal = installmentRows
-    .filter((item) => Boolean(item.is_active) && item.status !== "COMPLETED")
-    .reduce((sum, item) => sum + toNumber(item.monthly_amount), 0);
+  const personalDebtMonthlyTotal = monthlyObligationsSnapshot.personalDebt;
+  const scheduledInstallmentsMonthlyTotal = monthlyObligationsSnapshot.installments;
   const monthlyDebtBurden = scheduledInstallmentsMonthlyTotal + personalDebtMonthlyTotal;
 
   // 3. Doanh thu & Lợi nhuận gộp từ đơn hàng Shop trong khoảng thời gian
@@ -408,14 +381,14 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     .where(`${TABLES.STORE_PROFIT_EXPENSES}.status`, "completed")
     .select(
       db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_external_import`),
-      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_monthly_expense`),
-      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_all_expenses`)
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') AND (${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_monthly_expense`),
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR (${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import')) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_all_expenses`)
     )
     .first();
 
   const totalExternalImport = toNumber(expenseStats?.total_external_import || 0);
   const totalMonthlyExpense = toNumber(expenseStats?.total_monthly_expense || 0);
-  const totalOperationalExpenses = totalExternalImport + totalMonthlyExpense;
+  const totalOperationalExpenses = toNumber(expenseStats?.total_all_expenses || 0);
 
   const shopOrdersCount = Number(summaryStats?.count || 0);
   const shopRevenue = toNumber(summaryStats?.total_revenue || 0);
@@ -453,8 +426,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       .select(
         db.raw(`TO_CHAR(${TABLES.STORE_PROFIT_EXPENSES}.expense_date, 'YYYY-MM-DD') as day_str`),
         db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_external_import`),
-        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_monthly_expense`),
-        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_total_expense`)
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') AND (${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_monthly_expense`),
+        db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR (${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import')) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as daily_total_expense`)
       )
       .groupByRaw(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date`),
   ]);
@@ -857,12 +830,16 @@ async function deleteFixedCost(id) {
 async function payFixedCost(id, payload = {}) {
   const { periodMonth, receiptId, financialAccountId, amount, note } = payload;
   return await withTransaction(async (trx) => {
-    const fixedCost = await trx(TABLES.FIXED_COSTS).where("id", id).first();
+    if (receiptId) await trx(TABLES.PAYMENT_RECEIPT).where(COLS.PAYMENT_RECEIPT.ID, Number(receiptId)).forUpdate().first();
+    const fixedCost = await trx(TABLES.FIXED_COSTS).where("id", id).forUpdate().first();
     if (!fixedCost) throw new Error("Không tìm thấy chi phí cố định");
 
     const now = new Date();
     const targetMonth = periodMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const numAmount = toNumber(amount) || toNumber(fixedCost.amount);
+    if (numAmount <= 0) throw new Error("Invalid fixed cost payment amount");
+    await snapshotObligation(trx, "FIXED_COST", fixedCost, targetMonth);
+    let receiptAllocation = null;
 
     const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
       .where({ target_type: "FIXED_COST", target_id: id, period_month: targetMonth })
@@ -873,13 +850,14 @@ async function payFixedCost(id, payload = {}) {
     }
 
     if (receiptId) {
-      await allocateReceiptInTrx(
+      receiptAllocation = await allocateReceiptInTrx(
         trx,
         receiptId,
         numAmount,
         "FIXED_COST",
         `FIXED_COST_${id}`,
-        note || `Thanh toán chi phí cố định "${fixedCost.name}" tháng ${targetMonth}`
+        note || `Thanh toán chi phí cố định "${fixedCost.name}" tháng ${targetMonth}`,
+        { type: "FIXED_COST", target: fixedCost, periodMonth: targetMonth }
       );
     } else if (financialAccountId) {
       await debitFinancialAccount(trx, {
@@ -894,9 +872,10 @@ async function payFixedCost(id, payload = {}) {
     const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS)
       .insert({
         target_type: "FIXED_COST",
+        [COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]: receiptAllocation?.allocationId || null,
         target_id: id,
         period_month: targetMonth,
-        financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+        financial_account_id: receiptAllocation?.financialAccountId || (financialAccountId ? Number(financialAccountId) : null),
         amount: numAmount,
         payment_date: new Date().toISOString().slice(0, 10),
         note: note || `Thanh toán chi phí cố định tháng ${targetMonth}`,
@@ -922,6 +901,8 @@ async function cancelFixedCostPayment(id, payload = {}) {
     if (!existingLog) {
       throw new Error(`Không tìm thấy giao dịch thanh toán tháng ${targetMonth} của khoản chi phí này`);
     }
+
+    if (existingLog[COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]) throw new Error("Receipt-backed payment cannot be reversed as a bank refund");
 
     if (existingLog.financial_account_id) {
       const { creditFinancialAccount } = require("@/domains/wallets/services/walletService");
@@ -1041,8 +1022,11 @@ async function payInstallment(id, payload) {
   if (!periodMonth) throw new Error("Vui lòng chỉ định kỳ tháng thanh toán (YYYY-MM)");
 
   return await withTransaction(async (trx) => {
-    const installment = await trx(TABLES.INSTALLMENTS).where("id", id).first();
+    if (receiptId) await trx(TABLES.PAYMENT_RECEIPT).where(COLS.PAYMENT_RECEIPT.ID, Number(receiptId)).forUpdate().first();
+    const installment = await trx(TABLES.INSTALLMENTS).where("id", id).forUpdate().first();
     if (!installment) throw new Error("Không tìm thấy hợp đồng trả góp");
+    await snapshotObligation(trx, "INSTALLMENT", installment, periodMonth);
+    let receiptAllocation = null;
 
     const existingLog = await trx(TABLES.DEBT_PAYMENT_LOGS)
       .where({ target_type: "INSTALLMENT", target_id: id, period_month: periodMonth })
@@ -1053,7 +1037,7 @@ async function payInstallment(id, payload) {
     }
 
     if (receiptId) {
-      await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `INSTALLMENT_${id}`, note || `Thanh toán trả góp "${installment.name}" kỳ ${periodMonth}`);
+      receiptAllocation = await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `INSTALLMENT_${id}`, note || `Thanh toán trả góp "${installment.name}" kỳ ${periodMonth}`, { type: "INSTALLMENT", target: installment, periodMonth });
     } else {
       await debitFinancialAccount(trx, {
         accountId: Number(financialAccountId),
@@ -1067,9 +1051,10 @@ async function payInstallment(id, payload) {
     const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS)
       .insert({
         target_type: "INSTALLMENT",
+        [COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]: receiptAllocation?.allocationId || null,
         target_id: id,
         period_month: periodMonth,
-        financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+        financial_account_id: receiptAllocation?.financialAccountId || (financialAccountId ? Number(financialAccountId) : null),
         amount: numAmount,
         payment_date: new Date().toISOString().slice(0, 10),
         note: note ? String(note).trim() : null,
@@ -1250,6 +1235,7 @@ async function payPersonalAsset(id, payload) {
   if (!financialAccountId && !receiptId) throw new Error("Vui lòng chọn tài khoản thanh khoản hoặc biên lai ngân hàng để trả nợ");
 
   return await withTransaction(async (trx) => {
+    if (receiptId) await trx(TABLES.PAYMENT_RECEIPT).where(COLS.PAYMENT_RECEIPT.ID, Number(receiptId)).forUpdate().first();
     const asset = await trx(TABLES.PERSONAL_ASSETS).where("id", id).forUpdate().first();
     if (!asset) throw new Error("Không tìm thấy mục nợ");
 
@@ -1262,11 +1248,18 @@ async function payPersonalAsset(id, payload) {
         .where(COLS.CREDIT_ACCOUNT_LEDGER.IDEMPOTENCY_KEY, paymentKey)
         .first();
       if (existingLedger) return { success: true, alreadyProcessed: true, newAmount: toNumber(asset.amount) };
-    }    const currentAmount = toNumber(asset.amount);
+    }
+    const paymentReceipt = receiptId ? await trx(TABLES.PAYMENT_RECEIPT).where(COLS.PAYMENT_RECEIPT.ID, Number(receiptId)).first() : null;
+    const paymentMonth = receiptMonth(paymentReceipt || { payment_date: new Date() });
+    if (asset.type !== "DEBT_PAYABLE") throw new Error("Invalid debt target");
+    await snapshotObligation(trx, "PERSONAL_DEBT", asset, paymentMonth);
+    let receiptAllocation = null;
+    const currentAmount = toNumber(asset.amount);
+    if (numAmount > currentAmount) throw new Error("Debt payment exceeds outstanding balance");
     let newAmount = Math.max(0, currentAmount - numAmount);
 
     if (receiptId) {
-      await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `PERSONAL_DEBT_PAY_${id}`, note || `Trả bớt nợ "${asset.name}"`);
+      receiptAllocation = await allocateReceiptInTrx(trx, receiptId, numAmount, "OPERATIONAL_EXPENSE", `PERSONAL_DEBT_PAY_${id}`, note || `Trả bớt nợ "${asset.name}"`, { type: "PERSONAL_DEBT", target: asset });
     } else {
       await debitFinancialAccount(trx, {
         accountId: Number(financialAccountId),
@@ -1295,8 +1288,9 @@ async function payPersonalAsset(id, payload) {
     const [createdLog] = await trx(TABLES.DEBT_PAYMENT_LOGS)
       .insert({
         target_type: "PERSONAL_DEBT",
+        [COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]: receiptAllocation?.allocationId || null,
         target_id: id,
-        financial_account_id: financialAccountId ? Number(financialAccountId) : null,
+        financial_account_id: receiptAllocation?.financialAccountId || (financialAccountId ? Number(financialAccountId) : null),
         amount: numAmount,
         payment_date: new Date().toISOString().slice(0, 10),
         note: note ? String(note).trim() : null,
@@ -1485,37 +1479,6 @@ async function getDebtPaymentLogs(options = {}) {
       createdAt: r.created_at,
     };
   });
-}
-
-async function allocateReceiptInTrx(trx, receiptId, allocAmount, allocType, targetCode, note) {
-  const receipt = await trx(TABLES.PAYMENT_RECEIPT)
-    .where({ id: Number(receiptId) })
-    .forUpdate()
-    .first();
-  if (!receipt) throw new Error("Không tìm thấy biên lai thanh toán");
-  const currentUnallocated = Number(receipt.unallocated_amount ?? receipt.amount ?? 0);
-  if (allocAmount > currentUnallocated) {
-    throw new Error(`Số tiền phân bổ vượt quá số dư khả dụng của biên lai (${currentUnallocated.toLocaleString("vi-VN")} ₫)`);
-  }
-  const newUnallocated = currentUnallocated - allocAmount;
-  const newStatus = newUnallocated <= 0 ? "FULLY_ALLOCATED" : "PARTIALLY_ALLOCATED";
-
-  await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).insert({
-    receipt_id: receipt.id,
-    allocation_type: allocType,
-    target_code: targetCode ? String(targetCode) : null,
-    amount: allocAmount,
-    remaining_balance: newUnallocated,
-    note: note || null,
-    created_by: "ADMIN",
-  });
-
-  await trx(TABLES.PAYMENT_RECEIPT)
-    .where({ id: receipt.id })
-    .update({
-      unallocated_amount: newUnallocated,
-      status: newStatus,
-    });
 }
 
 async function getUnallocatedReceipts() {

@@ -141,6 +141,21 @@ app.post(
   require("@/domains/webhooks/services/sepayAuth").requireSepayApiKey,
   require("@/domains/webhooks/controllers/webhookController").handleSePayWebhook
 );
+// Public API cho OTP Portal đọc cấu hình theme hiện hành
+app.get("/api/public/theme", async (req, res) => {
+  try {
+    const raw = systemConfigService.get("OTP_PORTAL_THEME");
+    let config = { mode: "auto", theme: null };
+    if (raw) {
+      config = typeof raw === "string" ? JSON.parse(raw) : raw;
+    }
+    return res.json({ success: true, config });
+  } catch (err) {
+    console.error("[Public Theme API] Error:", err.message);
+    return res.json({ success: true, config: { mode: "auto", theme: null } });
+  }
+});
+
 app.use("/api", requireAuthenticatedUser, requireAdmin);
 app.use("/api", requireTrustedMutationOrigin);
 

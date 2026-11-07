@@ -21,6 +21,7 @@ async function accumulateDailySummary(dateStr, fields = {}) {
 
   const addRev = Number(fields.earned_revenue || 0);
   const addCost = Number(fields.total_shop_cost || 0);
+  const addSlotCost = Number(fields.slot_vacant_cost || 0);
   const addRefund = Number(fields.revenue_reversed || 0);
   const addOrders = Number(fields.dashboard_orders_count || 0);
   const addCanceled = Number(fields.dashboard_canceled_count || 0);
@@ -30,6 +31,7 @@ async function accumulateDailySummary(dateStr, fields = {}) {
       summary_date: date,
       earned_revenue: addRev,
       total_shop_cost: addCost,
+      slot_vacant_cost: addSlotCost,
       revenue_reversed: addRefund,
       dashboard_orders_count: addOrders,
       dashboard_canceled_count: addCanceled,
@@ -40,6 +42,7 @@ async function accumulateDailySummary(dateStr, fields = {}) {
       .update({
         earned_revenue: db.raw("COALESCE(earned_revenue, 0) + ?", [addRev]),
         total_shop_cost: db.raw("COALESCE(total_shop_cost, 0) + ?", [addCost]),
+        slot_vacant_cost: db.raw("COALESCE(slot_vacant_cost, 0) + ?", [addSlotCost]),
         revenue_reversed: db.raw("COALESCE(revenue_reversed, 0) + ?", [addRefund]),
         dashboard_orders_count: db.raw("COALESCE(dashboard_orders_count, 0) + ?", [addOrders]),
         dashboard_canceled_count: db.raw("COALESCE(dashboard_canceled_count, 0) + ?", [addCanceled]),

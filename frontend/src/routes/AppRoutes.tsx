@@ -20,6 +20,7 @@ const TrafficPage = React.lazy(routeLoaders["/traffic"]);
 const ExternalImportsPage = React.lazy(routeLoaders["/external-imports"]);
 const SystemLogsPage = React.lazy(routeLoaders["/system-logs"]);
 const ExternalApiConfigPage = React.lazy(routeLoaders["/external-api-config"]);
+const OtpThemeConfigPage = React.lazy(routeLoaders["/otp-theme-config"]);
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -102,6 +103,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="/payment-accounts" element={<Navigate to="/shop-bank-accounts" replace />} />
           <Route path="/usdt-wallets" element={<Navigate to="/shop-bank-accounts" replace />} />
           <Route path="/external-api-config" element={<ExternalApiConfigPage />} />
+          <Route path="/otp-theme-config" element={<OtpThemeConfigPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

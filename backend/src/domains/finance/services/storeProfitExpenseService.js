@@ -3,7 +3,7 @@
  * Quản lý chi phí nhập hàng ngoài luồng (external_import) và chi phí biến đổi phát sinh trong tháng (monthly_expense).
  */
 const { db, TABLES, withTransaction } = require("@/db");
-const { accumulateDailySummary } = require("@/domains/dashboard/services/dailySummaryService");
+const { assertEditableExpense } = require("./receiptProfitService");
 const { financeNotifier } = require("@/domains/notifications/telegram");
 const { getVietnamDateString, getVietnamMonthString } = require("@/utils/time");
 
@@ -176,6 +176,7 @@ async function createExpense(payload) {
     shop_bank_account_id,
   } = payload || {};
 
+  if (payment_receipt_id) throw new Error("Use receipt allocation for receipt-backed expenses");
   const numAmount = toNumber(amount);
   if (numAmount <= 0) throw new Error("Số tiền chi phí phải lớn hơn 0 ₫");
 
@@ -230,10 +231,6 @@ async function createExpense(payload) {
       const dateStr = getVietnamDateString(created.expense_date);
       const monthKey = getVietnamMonthString(dateStr);
 
-      await accumulateDailySummary(dateStr, {
-        total_shop_cost: numAmount,
-      });
-
       await financeNotifier.notifyFinanceMonthlyDelta({
         monthKey,
         importDelta: numAmount,
@@ -265,6 +262,7 @@ async function updateExpense(id, payload) {
       .first();
 
     if (!existing) throw new Error("Không tìm thấy bản ghi chi phí để cập nhật");
+    await assertEditableExpense(trx, existing);
 
     let oldAccountScope = null;
     if (existing.shop_bank_account_id) {
@@ -371,8 +369,6 @@ async function updateExpense(id, payload) {
       const dateStr = getVietnamDateString(updated.expense_date);
       const monthKey = getVietnamMonthString(dateStr);
 
-      await accumulateDailySummary(dateStr, { total_shop_cost: costDelta });
-
       await financeNotifier.notifyFinanceMonthlyDelta({
         monthKey,
         importDelta: costDelta,
@@ -402,6 +398,7 @@ async function deleteExpense(id) {
       .first();
 
     if (!existing) throw new Error("Không tìm thấy bản ghi chi phí để xóa");
+    await assertEditableExpense(trx, existing);
 
     let accountScope = null;
     if (existing.shop_bank_account_id) {
@@ -434,8 +431,6 @@ async function deleteExpense(id) {
       const amt = toNumber(existing.amount);
       const dateStr = getVietnamDateString(existing.expense_date);
       const monthKey = getVietnamMonthString(dateStr);
-
-      await accumulateDailySummary(dateStr, { total_shop_cost: -amt });
 
       await financeNotifier.notifyFinanceMonthlyDelta({
         monthKey,

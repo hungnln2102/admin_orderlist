@@ -39,3 +39,8 @@ assert.strictEqual(matchBankGateway('TPBank', tpbAccount), true, 'TPBank must ma
 assert.strictEqual(matchBankGateway('TPBank', mbAccount), false, 'TPBank must NOT match MB account');
 
 console.log('✅ ALL TESTS PASSED FOR matchBankGateway!');
+
+assert.strictEqual(matchBankGateway('Vietcombank', mbAccount), false);
+assert.strictEqual(matchBankGateway('Techcombank', mbAccount), false);
+assert.strictEqual(matchBankGateway('Sacombank', mbAccount), false);
+assert.strictEqual(matchBankGateway('Vietcombank', { bank_short_code: 'VCB' }), true);

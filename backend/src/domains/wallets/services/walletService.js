@@ -528,19 +528,9 @@ async function getUsdtExchangeRate() {
  */
 function matchBankGateway(gateway, account) {
   if (!gateway || !account) return false;
-  const cleanGw = String(gateway).toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (!cleanGw) return false;
-
-  const shortCode = String(account.bank_short_code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const label = String(account.label || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const displayName = String(account.bank_display_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  // 1. So khớp trực tiếp hoặc chứa nhau giữa shortCode, label, displayName
-  if (shortCode && (cleanGw === shortCode || cleanGw.includes(shortCode) || shortCode.includes(cleanGw))) return true;
-  if (label && (cleanGw === label || cleanGw.includes(label) || label.includes(cleanGw))) return true;
-  if (displayName && (cleanGw === displayName || cleanGw.includes(displayName) || displayName.includes(cleanGw))) return true;
-
-  // 2. Tra cứu Alias các ngân hàng phổ biến tại Việt Nam
+  const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cleanGateway = normalize(gateway);
+  if (!cleanGateway) return false;
   const BANK_ALIASES = [
     { code: "mb", aliases: ["mb", "mbbank", "militarybank", "quandoi"] },
     { code: "vpb", aliases: ["vpb", "vpbank", "vietnamthinhvuong", "thinhvuong"] },
@@ -557,18 +547,16 @@ function matchBankGateway(gateway, account) {
     { code: "msb", aliases: ["msb", "hanghai"] },
     { code: "hdb", aliases: ["hdb", "hdbank", "phattrien"] },
   ];
-
-  for (const group of BANK_ALIASES) {
-    const isGwMatched = group.aliases.some((alias) => cleanGw.includes(alias));
-    if (isGwMatched) {
-      const isAccMatched = group.aliases.some((alias) =>
-        shortCode.includes(alias) || label.includes(alias) || displayName.includes(alias)
-      );
-      if (isAccMatched) return true;
-    }
-  }
-
-  return false;
+  const aliases = BANK_ALIASES.flatMap((group) => group.aliases.map((alias) => ({ alias, code: group.code })))
+    .sort((left, right) => right.alias.length - left.alias.length);
+  const resolveCode = (value) => aliases.find(({ alias }) => value === alias || (alias.length > 3 && value.includes(alias)))?.code;
+  const gatewayCode = resolveCode(cleanGateway);
+  const shortCode = normalize(account.bank_short_code);
+  const displayName = normalize(account.bank_display_name);
+  const label = normalize(account.label);
+  const accountCode = resolveCode(shortCode) || resolveCode(displayName) || resolveCode(label);
+  if (gatewayCode && accountCode) return gatewayCode === accountCode;
+  return [shortCode, displayName, label].some((value) => value && value === cleanGateway);
 }
 
 async function resolveFinancialAccount(trxContext, {
@@ -763,6 +751,7 @@ async function debitFinancialAccount(trxContext, {
   accountId = null,
   gateway = null,
   accountScope = null,
+  allowNegativeBalance = false,
   amount,
   sourceKind = "payment_receipt",
   sourceId = null,
@@ -805,7 +794,7 @@ async function debitFinancialAccount(trxContext, {
 
     const currentBalance = toNumber(lockedAccount.balance);
     const newBalance = currentBalance - numAmount;
-    if (newBalance < 0) {
+    if (newBalance < 0 && !allowNegativeBalance) {
       throw new Error(`Số dư tài khoản không đủ (Hiện có: ${currentBalance.toLocaleString("vi-VN")} ₫, muốn trừ: ${numAmount.toLocaleString("vi-VN")} ₫). Ví/Tài khoản không thể âm!`);
     }
     const currentWithdrawn = toNumber(lockedAccount.total_withdrawn);
@@ -819,24 +808,19 @@ async function debitFinancialAccount(trxContext, {
         updated_at: trx.fn.now(),
       });
 
-    let ledgerId = null;
-    try {
-      const [insertedLedger] = await trx(BANK_LEDGER_TABLE)
-        .insert({
-          financial_account_id: lockedAccount.id,
-          entry_type: "receipt_out",
-          amount: numAmount,
-          balance_after: newBalance,
-          reference_type: String(sourceKind),
-          reference_id: sourceId ? String(sourceId) : null,
-          description: note || `Webhook tiền ra: -${numAmount} ₫`,
-          metadata: JSON.stringify({ signed_amount: -numAmount }),
-        })
-        .returning("id");
-      ledgerId = insertedLedger?.id || insertedLedger;
-    } catch (e) {
-      console.warn("[WalletService] Bỏ qua lỗi ghi sổ cái:", e.message);
-    }
+    const [insertedLedger] = await trx(BANK_LEDGER_TABLE)
+      .insert({
+        financial_account_id: lockedAccount.id,
+        entry_type: "receipt_out",
+        amount: numAmount,
+        balance_after: newBalance,
+        reference_type: String(sourceKind),
+        reference_id: sourceId ? String(sourceId) : null,
+        description: note || `Webhook tiền ra: -${numAmount} ₫`,
+        metadata: JSON.stringify({ signed_amount: -numAmount }),
+      })
+      .returning("id");
+    const ledgerId = insertedLedger?.id || insertedLedger;
 
     console.log(
       `💸 [WalletService] Đã trừ -${numAmount.toLocaleString("vi-VN")} ₫ từ TK #${lockedAccount.id} (${lockedAccount.account_number || lockedAccount.label}). Số dư mới: ${newBalance.toLocaleString("vi-VN")} ₫`

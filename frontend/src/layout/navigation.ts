@@ -10,10 +10,10 @@ import {
   Building2,
   PackagePlus,
   Warehouse,
-  Landmark,
   ShieldCheck,
   Sliders,
-  Settings
+  Settings,
+  Sparkles
 } from "lucide-react";
 
 export interface MenuItem {
@@ -65,8 +65,8 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Cấu hình Hệ thống", path: "/system-config", icon: Settings },
       { name: "Nhật ký Hoạt động", path: "/system-logs", icon: ShieldCheck },
-      { name: "Tài khoản Shop Bank", path: "/shop-bank-accounts", icon: Landmark },
       { name: "Cấu hình API bên thứ 3", path: "/external-api-config", icon: Sliders },
+      { name: "Cấu hình Theme OTP", path: "/otp-theme-config", icon: Sparkles },
     ],
   },
 ];

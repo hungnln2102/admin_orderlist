@@ -1,4 +1,5 @@
 const { db, TABLES } = require("@/db");
+const { getMonthlyObligations } = require("@/domains/finance/services/profitObligationService");
 
 /**
  * Trả về dải thời gian và thông số bộ lọc
@@ -107,15 +108,6 @@ function getMonthKeysInRange(start, end) {
   return keys;
 }
 
-function isInstallmentActiveInMonth(item, monthKey) {
-  if (!item.is_active || item.status === "COMPLETED") return false;
-
-  const [startYear, startMonth] = String(item.start_period).split("-").map(Number);
-  const [targetYear, targetMonth] = monthKey.split("-").map(Number);
-  const monthDiff = (targetYear - startYear) * 12 + targetMonth - startMonth;
-  return monthDiff >= 0 && monthDiff < Number(item.total_periods || 0);
-}
-
 async function getExpensesForRange(start, end) {
   const startDateStr = start.toISOString().slice(0, 10);
   const endDateStr = end.toISOString().slice(0, 10);
@@ -125,9 +117,9 @@ async function getExpensesForRange(start, end) {
     .whereRaw(`${TABLES.STORE_PROFIT_EXPENSES}.expense_date >= ? AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_date <= ?`, [startDateStr, endDateStr])
     .where(`${TABLES.STORE_PROFIT_EXPENSES}.status`, "completed")
     .select(
-      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_expenses`),
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR (${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import')) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_expenses`),
       db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('external_import', 'mavn_import') AND ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_external_import`),
-      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_monthly_expense`)
+      db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.STORE_PROFIT_EXPENSES}.expense_type IN ('monthly_expense', 'withdraw_profit') AND (${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR ${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as total_monthly_expense`)
     )
     .first();
 
@@ -139,22 +131,8 @@ async function getExpensesForRange(start, end) {
 }
 
 async function getFinanceCostsForRange(start, end) {
-  const [fixedCostRow, installmentRows] = await Promise.all([
-    db(TABLES.FIXED_COSTS)
-      .where("is_active", true)
-      .sum({ total: "amount" })
-      .first(),
-    db(TABLES.INSTALLMENTS)
-      .select("monthly_amount", "total_periods", "start_period", "status", "is_active"),
-  ]);
-
-  const monthlyFixedCosts = Number(fixedCostRow?.total || 0);
-  return getMonthKeysInRange(start, end).reduce((total, monthKey) => {
-    const monthlyInstallments = installmentRows
-      .filter((item) => isInstallmentActiveInMonth(item, monthKey))
-      .reduce((sum, item) => sum + Number(item.monthly_amount || 0), 0);
-    return total + monthlyFixedCosts + monthlyInstallments;
-  }, 0);
+  const months = await Promise.all(getMonthKeysInRange(start, end).map((month) => getMonthlyObligations(month)));
+  return months.reduce((total, costs) => total + costs.fixedCosts + costs.installments + costs.personalDebt, 0);
 }
 
 /**
@@ -271,11 +249,12 @@ async function getDashboardSummary(params = {}) {
         )
         .orderBy("summary_date", "asc"),
       db(TABLES.STORE_PROFIT_EXPENSES)
+        .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
         .whereBetween("expense_date", [startDateStr, endDateStr])
         .where("status", "completed")
         .select(
           db.raw("TO_CHAR(expense_date, 'YYYY-MM-DD') as day_key"),
-          db.raw("COALESCE(SUM(amount), 0)::numeric as expense_total")
+          db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR (${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import')) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as expense_total`)
         )
         .groupBy("expense_date"),
     ]);
@@ -368,6 +347,13 @@ async function getDashboardSummary(params = {}) {
       .groupBy("month_num")
       .orderBy("month_num", "asc");
 
+    const monthlyExpenses = await db(TABLES.STORE_PROFIT_EXPENSES)
+      .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
+      .whereBetween("expense_date", [yearStartStr, yearEndStr])
+      .where(`${TABLES.STORE_PROFIT_EXPENSES}.status`, "completed")
+      .select(db.raw("EXTRACT(MONTH FROM expense_date)::integer as month_num"), db.raw(`COALESCE(SUM(CASE WHEN ${TABLES.FINANCIAL_ACCOUNTS}.account_scope = 'SHOP' OR (${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id IS NULL AND ${TABLES.STORE_PROFIT_EXPENSES}.expense_type NOT IN ('external_import', 'mavn_import')) THEN ${TABLES.STORE_PROFIT_EXPENSES}.amount ELSE 0 END), 0)::numeric as expense_total`))
+      .groupBy("month_num");
+    const expensesByMonth = new Map(monthlyExpenses.map((row) => [row.month_num, Number(row.expense_total)]));
     const monthlyMap = new Map();
     monthlyRows.forEach((r) => {
       monthlyMap.set(r.month_num, {
@@ -381,6 +367,9 @@ async function getDashboardSummary(params = {}) {
 
     for (let m = 1; m <= 12; m++) {
       const d = monthlyMap.get(m) || { orders: 0, canceled: 0, revenue: 0, cost: 0, profit: 0 };
+      const monthlyExpense = expensesByMonth.get(m) || 0;
+      d.cost += monthlyExpense;
+      d.profit -= monthlyExpense;
       chartData.push({
         label: `T${m}`,
         fullDate: `Tháng ${m}/${targetYear}`,

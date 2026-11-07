@@ -12,6 +12,7 @@ import {
   Globe,
   Package,
   Tag,
+  Boxes,
 } from "lucide-react";
 import { ServiceNameCategoryItem } from "../types";
 
@@ -21,6 +22,7 @@ interface WarehouseCatalogGridProps {
   onEditCatalog: (item: ServiceNameCategoryItem) => void;
   onDeleteCatalog?: (item: ServiceNameCategoryItem) => void;
   onOpenBrowserWithUrl?: (url: string, serviceName: string) => void;
+  onTogglePackage?: (item: ServiceNameCategoryItem) => void;
 }
 
 export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
@@ -29,6 +31,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
   onEditCatalog,
   onDeleteCatalog,
   onOpenBrowserWithUrl,
+  onTogglePackage,
 }) => {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -269,6 +272,37 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {/* CHẾ ĐỘ TẠO GÓI KHO TỰ ĐỘNG (CHỈ ĐẠO CỦA MASTER) */}
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <Boxes className={`w-3.5 h-3.5 ${cat.isPackage ? "text-cyan-400" : "text-slate-500"}`} />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-200 block">Tạo Gói Kho</span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {cat.isPackage ? "Tự động tạo gói khi nhập" : "Không tạo gói"}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePackage?.(cat);
+                      }}
+                      disabled={!onTogglePackage}
+                      className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                        cat.isPackage ? "bg-cyan-500 shadow-sm shadow-cyan-500/30" : "bg-slate-800"
+                      }`}
+                      title={cat.isPackage ? "Đang bật tạo gói kho. Bấm để tắt." : "Đang tắt tạo gói kho. Bấm để bật."}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform ${
+                          cat.isPackage ? "translate-x-4" : ""
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* THAO TÁC (SỬA, XÓA) */}
@@ -317,6 +351,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                 <th className="px-4 py-3.5 font-semibold">Tên Dịch Vụ / Gói</th>
                 <th className="px-4 py-3.5 font-semibold">Tag Phân Loại / Biến Thể</th>
                 <th className="px-4 py-3.5 font-semibold">Link Đăng Nhập / Quản Trị</th>
+                <th className="px-4 py-3.5 font-semibold text-center">Gói Kho</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Tổng Tài khoản</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Chưa Dùng</th>
                 <th className="px-4 py-3.5 font-semibold text-center">Trạng Thái</th>
@@ -408,6 +443,24 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                           <span>+ Cài link</span>
                         </button>
                       )}
+                    </td>
+
+                    {/* GÓI KHO SWITCH */}
+                    <td className="px-4 py-3.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onTogglePackage?.(cat)}
+                        disabled={!onTogglePackage}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                          cat.isPackage
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30"
+                            : "bg-slate-800 text-slate-500 border border-slate-700 hover:text-slate-300"
+                        }`}
+                        title={cat.isPackage ? "Đang BẬT tạo gói kho. Bấm để tắt." : "Đang TẮT tạo gói kho. Bấm để bật."}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${cat.isPackage ? "bg-cyan-400 shadow-sm shadow-cyan-400" : "bg-slate-600"}`} />
+                        <span>{cat.isPackage ? "BẬT" : "TẮT"}</span>
+                      </button>
                     </td>
 
                     {/* TỔNG TÀI KHOẢN */}

@@ -51,7 +51,7 @@ export const PackageManagementPage: React.FC = () => {
     totalSlots: 2,
     supplier: "Mavryk",
     costPrice: 95000,
-    expiredAt: "2026-12-31",
+    expiredAt: "",
     note: "",
     matchRule: "information",
   });

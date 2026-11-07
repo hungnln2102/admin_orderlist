@@ -5,6 +5,7 @@ const { notifyFourDaysTask } = require("./tasks/notifyFourDaysTask");
 const { finalizeDailySummaryTask } = require("./tasks/finalizeDailySummaryTask");
 const { creditSavingsProfitTask } = require("./tasks/creditSavingsProfitTask");
 const { autoBackupDatabaseTask } = require("./tasks/autoBackupDatabaseTask");
+const { calculateDailySlotCostTask } = require("./tasks/calculateDailySlotCostTask");
 const { accrueCreditOverdraftInterestTask, closeCreditOverdraftStatementsTask, evaluateCreditCardDueStatementsTask } = require("./tasks/creditLedgerTask");
 const cronJobService = require("@/domains/system/services/cronJobService");
 const { db, TABLES } = require("@/db");
@@ -24,6 +25,7 @@ const handlers = {
   credit_overdraft_accrual: () => accrueCreditOverdraftInterestTask("cron_schedule"),
   credit_overdraft_statement_close: () => closeCreditOverdraftStatementsTask("cron_schedule"),
   credit_card_due_evaluation: () => evaluateCreditCardDueStatementsTask("cron_schedule"),
+  calculate_daily_slot_costs: () => calculateDailySlotCostTask("cron_schedule"),
 };
 
 const serializeResult = (result) => JSON.stringify(result ?? { success: true });

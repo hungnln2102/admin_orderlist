@@ -318,7 +318,7 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       return;
     }
     if (isDebtAsset && debtKind !== "PERSONAL_EXTERNAL" && Number(debtInitialLimit) <= 0) {
-      notify.warning("Vui lòng nhập hạn mức ban đầu lớn hơn 0");
+      notify.warning(debtKind === "CREDIT_CARD" ? "Vui lòng nhập hạn mức tín dụng lớn hơn 0" : "Vui lòng nhập hạn mức thấu chi lớn hơn 0");
       return;
     }
     if (isDebtAsset && debtInterestEnabled && debtRateValue <= 0) {
@@ -579,8 +579,8 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                             <option value="OVERDRAFT">Thấu chi</option>
                           </select>
                         </label>
-                        <label className="text-[11px] text-slate-300 font-medium">{debtKind === "PERSONAL_EXTERNAL" ? "STK đối chiếu (nếu có)" : "Hạn mức ban đầu"}
-                          <input type={debtKind === "PERSONAL_EXTERNAL" ? "text" : "number"} min="0" value={debtKind === "PERSONAL_EXTERNAL" ? debtAccountNumber : debtInitialLimit} onChange={(event) => debtKind === "PERSONAL_EXTERNAL" ? setDebtAccountNumber(event.target.value.replace(/\D/g, "")) : setDebtInitialLimit(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
+                        <label className="text-[11px] text-slate-300 font-medium">{debtKind === "PERSONAL_EXTERNAL" ? "STK đối chiếu (nếu có)" : debtKind === "CREDIT_CARD" ? "Hạn mức tín dụng" : "Hạn mức thấu chi"}
+                          <input type={debtKind === "PERSONAL_EXTERNAL" ? "text" : "number"} min={debtKind === "PERSONAL_EXTERNAL" ? undefined : "1"} required={debtKind !== "PERSONAL_EXTERNAL"} value={debtKind === "PERSONAL_EXTERNAL" ? debtAccountNumber : debtInitialLimit} onChange={(event) => debtKind === "PERSONAL_EXTERNAL" ? setDebtAccountNumber(event.target.value.replace(/\D/g, "")) : setDebtInitialLimit(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
                         </label>
                         {debtKind !== "PERSONAL_EXTERNAL" && <label className="text-[11px] text-slate-300 font-medium">STK trích nợ để đối chiếu
                           <input type="text" value={debtAccountNumber} onChange={(event) => setDebtAccountNumber(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />

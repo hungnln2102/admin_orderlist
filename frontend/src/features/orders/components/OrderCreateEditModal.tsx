@@ -250,14 +250,14 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                   loadingSuppliers={loadingSuppliers}
                   disabled={!selectedProductId && !formData.id_product}
                 />
-                {isEdit && formData.status === ORDER_STATUS.PAID && (
+                {/* {isEdit && formData.status === ORDER_STATUS.PAID && (
                   <div className="mt-2 p-2.5 rounded-lg bg-cyan-950/40 border border-cyan-800/40 text-[11px] text-cyan-300 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                     <span>
                       <strong>Đơn hàng Đã Thanh Toán:</strong> Khi đổi Nhà Cung Cấp, hệ thống sẽ tự động tính số ngày còn lại để tạo log hoàn tiền cho NCC cũ và tính chi phí cho NCC mới.
                     </span>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </div>

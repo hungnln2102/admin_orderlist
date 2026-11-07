@@ -8,11 +8,11 @@ import {
   Coins,
   CreditCard,
   Edit2,
-  ExternalLink,
   Landmark,
   PiggyBank,
   Plus,
   Sparkles,
+  Star,
   Trash2,
   TrendingUp,
   Wallet,
@@ -20,7 +20,6 @@ import {
 import { PersonalAssetsModal } from "./PersonalAssetsModal";
 import { PersonalBankAccountModal } from "./PersonalBankAccountModal";
 import { PersonalFinanceBalanceLogSection } from "./PersonalFinanceBalanceLogSection";
-import { useNavigate } from "react-router-dom";
 
 interface Props {
   assets: PersonalAsset[];
@@ -30,7 +29,7 @@ interface Props {
   onAdd: (payload: any) => Promise<void>;
   onEdit: (id: number, payload: any) => Promise<void>;
   onDelete: (item: any) => Promise<void>;
-  onRefresh?: () => void;
+  onRefresh?: () => void | Promise<void>;
 }
 
 export const SavingsAndAssetsSection: React.FC<Props> = ({
@@ -44,7 +43,6 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   onRefresh,
 }) => {
 
-  const navigate = useNavigate();
   const notify = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
   const [bankModalOpen, setBankModalOpen] = useState(false);
@@ -52,6 +50,7 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
   const [editingBankItem, setEditingBankItem] = useState<any | null>(null);
   const [modalDefaultType, setModalDefaultType] = useState<PersonalAssetType>("SAVINGS");
   const [accountFilter, setAccountFilter] = useState<"ALL" | "SHOP" | "PERSONAL">("ALL");
+  const [settingDefaultBankId, setSettingDefaultBankId] = useState<number | null>(null);
 
   const savingsList = assets.filter(
     (a) => a.type === "SAVINGS" || a.type === "CASH_BANK" || a.type === "GOLD_INVESTMENT"
@@ -198,6 +197,25 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
     }
   };
 
+  const handleSetDefaultShopBank = async (accountId: number) => {
+    if (settingDefaultBankId !== null) return;
+
+    setSettingDefaultBankId(accountId);
+    try {
+      const res = await fetch(`/api/wallets/shop-bank-accounts/${accountId}/set-default`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Không thể đặt tài khoản nhận tiền đơn.");
+
+      notify.success("Đã đặt tài khoản nhận tiền đơn mặc định.", "Cập Nhật Thành Công");
+      await onRefresh?.();
+    } catch (err: any) {
+      notify.error(err.message || "Không thể cập nhật tài khoản nhận tiền đơn.", "Lỗi");
+    } finally {
+      setSettingDefaultBankId(null);
+    }
+  };
+
   const handleSave = async (payload: any) => {
     try {
       if (editingItem) {
@@ -336,14 +354,6 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
                 <span className="sm:hidden">+ Sổ</span>
               </button>
 
-              <button
-                onClick={() => navigate("/shop-bank-accounts")}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
-                title="Đến trang quản lý cấu hình các tài khoản ngân hàng shop"
-              >
-                <span>Ví Shop</span>
-                <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-              </button>
             </div>
           </div>
         </div>
@@ -474,14 +484,23 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
 
                       {/* Cột 5: Thao Tác */}
                       <td className="py-3 px-4 text-center">
-                        {isShop ? (
+                        {acc.subType === "SHOP_BANK" ? (
                           <button
-                            onClick={() => navigate("/shop-bank-accounts")}
-                            className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer inline-flex items-center gap-1 text-[11px] font-semibold"
-                            title="Quản lý cấu hình tại Ví Shop"
+                            type="button"
+                            onClick={() => handleSetDefaultShopBank(acc.rawItem.id)}
+                            disabled={Boolean(acc.rawItem.isDefault) || settingDefaultBankId !== null}
+                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer disabled:cursor-default disabled:opacity-100 ${
+                              acc.rawItem.isDefault
+                                ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                                : "border-slate-700 bg-slate-800/70 text-slate-400 hover:border-cyan-400/50 hover:bg-cyan-400/10 hover:text-cyan-300"
+                            }`}
+                            title={
+                              acc.rawItem.isDefault
+                                ? "Tài khoản mặc định nhận tiền đơn"
+                                : "Đặt làm tài khoản nhận tiền đơn"
+                            }
                           >
-                            <span>Ví Shop</span>
-                            <ExternalLink className="w-3 h-3" />
+                            <Star className="w-3.5 h-3.5" fill={acc.rawItem.isDefault ? "currentColor" : "none"} />
                           </button>
                         ) : (
                           <div className="flex items-center justify-center gap-1">

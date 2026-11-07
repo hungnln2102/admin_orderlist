@@ -1527,6 +1527,82 @@ async function renewOrder(id, payload = {}) {
         action: "RENEW_IMPORT",
       });
 
+      // D. Đồng bộ ngày hết hạn và liên kết sang Kho Gói Sản Phẩm (warehouse.package_products & warehouse.account_slots)
+      try {
+        const infoAcc = String(updatedOrder.information_order || "").trim().toLowerCase();
+        if (infoAcc) {
+          // 1. Tìm tài khoản kho tương ứng theo account_username hoặc đã liên kết id_order
+          const matchedAcc = await trx(TABLES.PRODUCT_KEYS)
+            .whereRaw("LOWER(TRIM(account_username)) = ?", [infoAcc])
+            .orWhere("id_order", updatedOrder.id_order)
+            .first();
+
+          if (matchedAcc) {
+            // Cập nhật id_order vào warehouse.accounts nếu chưa có
+            await trx(TABLES.PRODUCT_KEYS)
+              .where({ id: matchedAcc.id })
+              .update({
+                id_order: updatedOrder.id_order,
+                updated_at: trx.fn.now(),
+              });
+
+            // 2. Tìm các gói trong Kho Gói Sản Phẩm thuộc tài khoản này
+            const pkgProducts = await trx(TABLES.PACKAGE_PRODUCT)
+              .where({ account_id: matchedAcc.id });
+
+            if (pkgProducts.length > 0) {
+              // Cập nhật giá vốn gói nếu có chi phí gia hạn mới
+              if (renewCost > 0) {
+                await trx(TABLES.PACKAGE_PRODUCT)
+                  .where({ account_id: matchedAcc.id })
+                  .update({
+                    cost: renewCost,
+                    updated_at: trx.fn.now(),
+                  });
+              }
+
+              // 3. Cập nhật ngày hết hạn cho các vị trí/slot TRỐNG (AVAILABLE) của gói trong kho
+              // Giữ nguyên tuyệt đối hạn của các slot khách đang thuê (IN_USE)
+              await trx(TABLES.ACCOUNT_SLOTS)
+                .where({ account_id: matchedAcc.id })
+                .whereIn("status", ["AVAILABLE", "available"])
+                .update({
+                  expired_at: renewal.newExpiredAt,
+                  days: renewal.days,
+                  updated_at: trx.fn.now(),
+                });
+
+              for (const pkg of pkgProducts) {
+                await emitOrderEvent(trx, EVENTS.PACKAGE_PRODUCT_UPDATED, {
+                  packageId: pkg.id,
+                  accountId: matchedAcc.id,
+                  accountUsername: matchedAcc.account_username,
+                  importOrderCode: updatedOrder.id_order,
+                  newExpiredAt: updatedOrder.expired_at,
+                  newOrderDate: updatedOrder.order_date,
+                  cost: renewCost,
+                  action: "RENEW_PACKAGE_IMPORT",
+                });
+              }
+            }
+          }
+        }
+      } catch (whSyncErr) {
+        console.error("[OrderService] Lỗi đồng bộ Kho Gói Sản Phẩm khi gia hạn MAVN:", whSyncErr.message);
+      }
+
+      // E. Kích hoạt tính lại chi phí slot trong ngày sau khi commit
+      if (typeof trx.afterCommit === "function") {
+        trx.afterCommit(async () => {
+          try {
+            const slotCostService = require("@/domains/warehouse/services/slotCostService");
+            await slotCostService.calculateDailySlotCosts();
+          } catch (calcErr) {
+            console.warn("[OrderService] Tự động tính lại chi phí slot sau gia hạn gặp lỗi:", calcErr.message);
+          }
+        });
+      }
+
       return updatedOrder;
     }
 

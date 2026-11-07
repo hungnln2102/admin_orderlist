@@ -56,6 +56,8 @@ export interface ServiceNameCategoryItem {
   loginUrl?: string | null;
   productId?: number | null;
   systemProductName?: string | null;
+  isPackage?: boolean;
+  requiresStorage?: boolean;
   totalSlots?: number;
   inStockSlots: number;
   reservedSlots: number;
@@ -77,6 +79,11 @@ export interface WarehouseAccountFormData {
   twoFa: string;
   expiresAt: string;
   note: string;
+  createPackage?: boolean;
+  hasLinkedAccount?: boolean;
+  linkedAccountRole?: "storage" | "main";
+  linkedAccountId?: number | null;
+  storageTotal?: string;
 }
 
 export interface CatalogFormData {

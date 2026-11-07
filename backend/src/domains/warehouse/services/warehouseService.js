@@ -107,6 +107,10 @@ const createWarehouseAccount = async (payload) => {
     note,
     variantTag,
     services = [],
+    createPackage = false,
+    linkedAccountRole = "storage", // "storage" | "main" (Chỉ đạo của Master)
+    linkedAccountId = null,
+    storageTotal = null,
   } = payload;
 
   if (!account || !String(account).trim()) {
@@ -190,6 +194,62 @@ const createWarehouseAccount = async (payload) => {
           updated_at: now,
         });
       }
+    }
+
+    // Nếu Master chọn tạo Gói Kho cho tài khoản này
+    if (createPackage) {
+      const slotName = serviceName || category || "Dịch vụ";
+      let pnRecord = await trx(TABLES.PRODUCT_NAMES)
+        .whereRaw("LOWER(name) = ?", [String(slotName).trim().toLowerCase()])
+        .first();
+
+      if (!pnRecord) {
+        const [createdPn] = await trx(TABLES.PRODUCT_NAMES)
+          .insert({
+            name: String(slotName).trim(),
+            is_package: true,
+          })
+          .returning("*");
+        pnRecord = createdPn;
+      } else if (!pnRecord.is_package) {
+        await trx(TABLES.PRODUCT_NAMES)
+          .where("id", pnRecord.id)
+          .update({ is_package: true, updated_at: now });
+      }
+
+      // Xác định rõ vai trò tài khoản liên kết (Chỉ đạo của Master: không mặc định là dung lượng)
+      let resolvedMainAccountId = stockId;
+      let resolvedStorageAccountId = null;
+
+      if (linkedAccountId) {
+        const parsedLinkedId = Number(linkedAccountId);
+        if (linkedAccountRole === "main") {
+          // Master chọn tài khoản liên kết từ kho là TÀI KHOẢN CHÍNH
+          resolvedMainAccountId = parsedLinkedId;
+          resolvedStorageAccountId = stockId; // tài khoản mới tạo là tài khoản phụ/dung lượng
+        } else {
+          // Mặc định hoặc Master chọn tài khoản liên kết là TÀI KHOẢN DUNG LƯỢNG
+          resolvedMainAccountId = stockId; // tài khoản mới tạo là tài khoản chính
+          resolvedStorageAccountId = parsedLinkedId;
+        }
+      }
+
+      const lowerName = String(slotName).toLowerCase();
+      const defaultSlots = lowerName.includes("youtube") ? 5 : lowerName.includes("adobe") ? 2 : lowerName.includes("netflix") ? 5 : 2;
+
+      // TUYỆT ĐỐI KHÔNG LƯU id_order theo chỉ đạo của Master
+      await trx(TABLES.PACKAGE_PRODUCT).insert({
+        product_name_id: pnRecord.id,
+        account_id: resolvedMainAccountId,
+        storage_account_id: resolvedStorageAccountId,
+        storage_total: storageTotal ? String(storageTotal).trim() : null,
+        supplier: "Mavryk",
+        cost: 0,
+        slot: defaultSlots,
+        package_note: note || null,
+        created_at: now,
+        updated_at: now,
+      });
     }
 
     const result = { id: stockId, account: normalizedAccount };
@@ -400,6 +460,8 @@ const listCatalogItems = async () => {
       "pn.category",
       "pn.login_url",
       "pn.product_id",
+      "pn.is_package",
+      "pn.requires_storage",
       "p.package_name as system_product_name"
     )
     .orderBy("pn.id", "asc");
@@ -477,6 +539,8 @@ const listCatalogItems = async () => {
       loginUrl: p.login_url || null,
       productId: p.product_id ? Number(p.product_id) : null,
       systemProductName: p.system_product_name || null,
+      isPackage: Boolean(p.is_package),
+      requiresStorage: Boolean(p.requires_storage),
       totalAccounts: stats.total,
       inStockAccounts: stats.inStock,
       reservedAccounts: stats.reserved,
@@ -635,6 +699,10 @@ const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } 
     if (pName && pName.login_url) {
       customUrl = pName.login_url;
     }
+  }
+
+  if (!customUrl) {
+    throw new Error(`Dịch vụ ${resolvedServiceName || "này"} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng trước khi mở trình duyệt.`);
   }
 
   const launchResult = await browserLauncherService.launchAccountBrowser({
@@ -963,6 +1031,74 @@ const deleteCatalogTag = async ({ productId, tag }) => {
   });
 };
 
+/**
+ * Tra cứu ngày hết hạn từ đơn nhập hàng MAVN theo email tài khoản
+ * TUYỆT ĐỐI KHÔNG LƯU id_order theo chỉ đạo của Master
+ */
+const syncOrderDateByEmail = async (email) => {
+  if (!email || !String(email).trim()) {
+    throw new Error("Email cần tra cứu không được để trống!");
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  const order = await db(TABLES.ORDER_LIST)
+    .where("id_order", "like", "MAVN%")
+    .where((builder) => {
+      builder
+        .whereRaw("LOWER(information_order) LIKE ?", [`%${cleanEmail}%`])
+        .orWhereRaw("LOWER(customer) LIKE ?", [`%${cleanEmail}%`]);
+    })
+    .orderBy("order_date", "desc")
+    .orderBy("expired_at", "desc")
+    .first();
+
+  if (!order) {
+    return {
+      found: false,
+      message: `Không tìm thấy đơn hàng nhập MAVN nào chứa email: ${cleanEmail}`,
+    };
+  }
+
+  let expiredAtStr = "";
+  if (order.expired_at) {
+    if (typeof order.expired_at === "string") {
+      expiredAtStr = order.expired_at.slice(0, 10);
+    } else if (order.expired_at instanceof Date) {
+      const vn = new Date(order.expired_at.getTime() + 7 * 3600 * 1000);
+      expiredAtStr = vn.toISOString().slice(0, 10);
+    }
+  }
+
+  return {
+    found: true,
+    expiredAt: expiredAtStr,
+    orderCode: order.id_order,
+    orderDate: order.order_date,
+    days: order.days,
+    cost: Number(order.cost || 0),
+    message: `Đã tìm thấy đơn nhập #${order.id_order} (Hạn: ${expiredAtStr})`,
+  };
+};
+
+/**
+ * Bật/tắt chế độ tự động tạo Gói Kho cho Dịch Vụ (Chỉ đạo của Master)
+ */
+const toggleCatalogPackage = async (id, isPackage) => {
+  const numericId = Number(id);
+  if (!numericId) throw new Error("ID dịch vụ không hợp lệ!");
+
+  const existing = await db(TABLES.PRODUCT_NAMES).where("id", numericId).first();
+  if (!existing) throw new Error(`Không tìm thấy dịch vụ kho với ID ${numericId}`);
+
+  const nextVal = typeof isPackage === "boolean" ? isPackage : !existing.is_package;
+  await db(TABLES.PRODUCT_NAMES).where("id", numericId).update({
+    is_package: nextVal,
+    updated_at: new Date(),
+  });
+
+  return { id: numericId, isPackage: nextVal };
+};
+
 module.exports = {
   listWarehouseAccounts,
   createWarehouseAccount,
@@ -979,4 +1115,6 @@ module.exports = {
   getSystemProducts,
   renameCatalogTag,
   deleteCatalogTag,
+  syncOrderDateByEmail,
+  toggleCatalogPackage,
 };

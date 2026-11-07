@@ -131,7 +131,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
             ) : (
               orders.map((order, idx) => {
                 const prefixConfig = getOrderPrefixConfig(order.id_order);
-                const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name);
+                const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name, order.display_name);
                 const remainingDays = calculateRemainingDays(order);
                 const isExpanded = expandedRowId === order.id;
 
@@ -335,8 +335,16 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                                     activeTab === "import"
                                   );
 
-                                  // Đối với đơn nhập hàng và trạng thái là cần gia hạn: chỉ hiển thị 1 button duy nhất là "Gia Hạn"
-                                  if (isImport && order.status === ORDER_STATUS.RENEW_REQUIRED) {
+                                  // Đối với đơn nhập hàng (MAVN/Mavryk) ở trạng thái cần gia hạn hoặc hết hạn: hiển thị button "Gia Hạn"
+                                  const isMavnRenewable = isImport && (
+                                    order.status === ORDER_STATUS.RENEW_REQUIRED ||
+                                    order.status === ORDER_STATUS.EXPIRED ||
+                                    order.status === "EXPIRED" ||
+                                    order.status === "Hết Hạn" ||
+                                    activeTab === "expired"
+                                  ) && order.status !== ORDER_STATUS.PAID && order.status !== ORDER_STATUS.CANCELED;
+
+                                  if (isMavnRenewable) {
                                     return (
                                       onRenewOrder && (
                                         <button
@@ -384,7 +392,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                                           Thanh Toán
                                         </button>
                                       )}
-                                      {onRenewOrder && order.status === ORDER_STATUS.RENEW_REQUIRED && (
+                                      {onRenewOrder && (order.status === ORDER_STATUS.RENEW_REQUIRED || (isImport && (order.status === ORDER_STATUS.EXPIRED || activeTab === "expired"))) && (
                                         <button
                                           onClick={() => onRenewOrder(order)}
                                           className="px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 rounded-full shadow-md shadow-amber-900/30 transition-all cursor-pointer active:scale-95"
@@ -490,7 +498,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
         ) : (
           orders.map((order) => {
             const prefixConfig = getOrderPrefixConfig(order.id_order);
-            const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name);
+            const displayProduct = getDisplayProductName(order.id_product, productsCatalog, order.variant_name || order.display_name, order.display_name);
             const remainingDays = calculateRemainingDays(order);
 
             return (

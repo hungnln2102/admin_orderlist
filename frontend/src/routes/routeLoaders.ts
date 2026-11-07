@@ -19,6 +19,7 @@ export const routeLoaders: Record<string, RouteImporter> = {
   "/system-logs": () => import("@/pages/SystemLogsPage").then((module) => ({ default: module.SystemLogsPage })),
   "/shop-bank-accounts": () => import("@/pages/PaymentWalletsPage").then((module) => ({ default: module.PaymentWalletsPage })),
   "/external-api-config": () => import("@/pages/ExternalApiConfigPage").then((module) => ({ default: module.ExternalApiConfigPage })),
+  "/otp-theme-config": () => import("@/pages/OtpThemeConfigPage").then((module) => ({ default: module.OtpThemeConfigPage })),
 };
 
 const preloadedPaths = new Set<string>();

@@ -82,6 +82,11 @@ export const WarehousePage: React.FC = () => {
     twoFa: "",
     expiresAt: "",
     note: "",
+    createPackage: false,
+    hasLinkedAccount: false,
+    linkedAccountRole: "storage",
+    linkedAccountId: null,
+    storageTotal: "",
   });
 
   const [catalogForm, setCatalogForm] = useState<CatalogFormData>({
@@ -244,8 +249,37 @@ export const WarehousePage: React.FC = () => {
     }
   };
 
+  const handleTogglePackage = async (item: ServiceNameCategoryItem) => {
+    try {
+      const nextVal = !item.isPackage;
+      const res = await fetch(`/api/warehouse/catalog/${item.id}/toggle-package`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPackage: nextVal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể cập nhật cấu hình gói kho");
+      }
+      notification.success(
+        `Đã ${nextVal ? "BẬT" : "TẮT"} chế độ tự động tạo gói kho cho dịch vụ "${item.name}"!`,
+        "Cập Nhật Dịch Vụ"
+      );
+      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
+      await loadWarehouseData();
+    } catch (err: any) {
+      console.error("Lỗi toggle package:", err);
+      notification.error(err.message || "Lỗi cập nhật cấu hình gói kho");
+    }
+  };
+
   const handleOpenBrowserForUrl = (url: string, serviceName: string) => {
-    const targetUrl = url.startsWith("http") ? url : `https://${url}`;
+    const rawUrl = url.trim();
+    if (!rawUrl) {
+      notification.warning(`Dịch vụ ${serviceName} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng.`, "Thiếu đường link");
+      return;
+    }
+    const targetUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
     if (targetUrl && navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(targetUrl).catch(() => {});
     }
@@ -298,6 +332,14 @@ export const WarehousePage: React.FC = () => {
       const targetUrl = rawUrl
         ? (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") ? rawUrl : `https://${rawUrl}`)
         : "";
+
+      if (!targetUrl) {
+        notification.warning(
+          `Dịch vụ ${service.display_name || service.category} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng.`,
+          "Thiếu đường link"
+        );
+        return;
+      }
 
       // Tự động sao chép link đăng nhập vào bộ nhớ tạm để Master tiện dán trong cửa sổ stream nếu cần
       if (targetUrl && navigator?.clipboard?.writeText) {
@@ -620,6 +662,7 @@ export const WarehousePage: React.FC = () => {
           onEditCatalog={(cat) => setEditingCatalogItem(cat)}
           onDeleteCatalog={(cat) => setDeletingCatalogItem(cat)}
           onOpenBrowserWithUrl={handleOpenBrowserForUrl}
+          onTogglePackage={handleTogglePackage}
         />
       )}
 
@@ -628,6 +671,7 @@ export const WarehousePage: React.FC = () => {
         open={isAccountModalOpen}
         formData={accountForm}
         catalogItems={catalog}
+        existingAccounts={accounts}
         onClose={() => setIsAccountModalOpen(false)}
         onFormChange={setAccountForm}
         onSubmit={async () => {
@@ -643,6 +687,22 @@ export const WarehousePage: React.FC = () => {
             }
             notification.success("Đã tạo mới tài khoản kho thành công!", "Tạo tài khoản");
             setIsAccountModalOpen(false);
+            setAccountForm({
+              account: "",
+              serviceName: catalog[0]?.name || "Adobe (1PC Cố Định)",
+              category: catalog[0]?.category || "Adobe (1PC Cố Định)",
+              variantTag: "",
+              password: "",
+              backupEmail: "",
+              twoFa: "",
+              expiresAt: "",
+              note: "",
+              createPackage: false,
+              hasLinkedAccount: false,
+              linkedAccountRole: "storage",
+              linkedAccountId: null,
+              storageTotal: "",
+            });
             invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
             await loadWarehouseData();
           } catch (err: any) {

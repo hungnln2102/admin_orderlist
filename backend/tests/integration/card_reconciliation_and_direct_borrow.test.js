@@ -21,6 +21,8 @@ test("Card Reconciliation & Direct Bill Borrowing - Đối chiếu 4 số cuối
     note: "Thẻ tín dụng test đối chiếu",
     cardLastDigits: cardDigits,
     bankName: bank,
+    debtKind: "CREDIT_CARD",
+    debtInitialLimit: 6000000,
     debtInterestEnabled: false,
     debtDueDay: 15,
     debtEndDate: null,
@@ -29,6 +31,24 @@ test("Card Reconciliation & Direct Bill Borrowing - Đối chiếu 4 số cuối
   assert.ok(cardDebt.id, "Tạo thẻ tín dụng thành công");
   assert.equal(cardDebt.cardLastDigits, cardDigits);
   assert.equal(cardDebt.bankName, bank);
+  assert.equal(cardDebt.debtKind, "CREDIT_CARD");
+  assert.equal(cardDebt.debtInitialLimit, 6000000);
+  assert.equal(cardDebt.amount, 1000000, "Credit limit must not change initial debt");
+
+  const overdraftDebt = await financeHubService.createPersonalAsset({
+    name: `Overdraft Test ${suffix}`,
+    type: "DEBT_PAYABLE",
+    amount: 250000,
+    note: "Overdraft limit test",
+    debtKind: "OVERDRAFT",
+    debtInitialLimit: 3000000,
+    debtInterestEnabled: false,
+    debtDueDay: 15,
+    debtEndDate: null,
+  });
+  assert.equal(overdraftDebt.debtKind, "OVERDRAFT");
+  assert.equal(overdraftDebt.debtInitialLimit, 3000000);
+  assert.equal(overdraftDebt.amount, 250000, "Overdraft limit must not change initial debt");
 
   // Tạo 1 tài khoản ngân hàng giả lập để kiểm tra số dư KHÔNG bị thay đổi
   const [testBankAcc] = await db(TABLES.FINANCIAL_ACCOUNTS)
@@ -152,6 +172,7 @@ test("Card Reconciliation & Direct Bill Borrowing - Đối chiếu 4 số cuối
     // Dọn dẹp dữ liệu test
     await db(TABLES.DEBT_PAYMENT_LOGS).where({ target_type: "PERSONAL_DEBT_BORROW", target_id: cardDebt.id }).del();
     await financeHubService.deletePersonalAsset(cardDebt.id);
+    await financeHubService.deletePersonalAsset(overdraftDebt.id);
     await db(TABLES.FINANCIAL_ACCOUNTS).where({ id: bankAccId }).del();
   }
 });

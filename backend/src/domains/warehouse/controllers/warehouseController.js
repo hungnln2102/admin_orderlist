@@ -1,4 +1,7 @@
-const warehouseService = require("../services/warehouseService");
+﻿const warehouseService = require("../services/warehouseService");
+const slotCostService = require("../services/slotCostService");
+const slotCostLogService = require("../services/slotCostLogService");
+const slotCostBackfillService = require("../services/slotCostBackfillService");
 const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getWarehouseAccounts = async (req, res) => {
@@ -156,6 +159,70 @@ const deleteCatalogTag = async (req, res) => {
   }
 };
 
+const getSlotDailyLogs = async (req, res) => {
+  try {
+    const { packageId, importOrderId, date, fromDate, toDate, page, limit } = req.query || {};
+    const result = await slotCostLogService.listSlotDailyLogs({
+      packageId,
+      importOrderId,
+      date,
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] getSlotDailyLogs error:", err);
+    return res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải lịch sử chi phí slot.") });
+  }
+};
+
+const calculateSlotDailyCosts = async (req, res) => {
+  try {
+    const { date, dryRun } = req.body || {};
+    const result = await slotCostService.calculateDailySlotCosts(date, { dryRun: Boolean(dryRun) });
+    return res.json({ success: true, message: "Tính toán chi phí slot hoàn tất!", data: result });
+  } catch (err) {
+    console.error("[WarehouseController] calculateSlotDailyCosts error:", err);
+    return res.status(500).json({ error: getClientErrorMessage(err, "Lỗi khi tính toán chi phí slot.") });
+  }
+};
+
+const backfillSlotDailyCosts = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.body || {};
+    const result = await slotCostBackfillService.backfillSlotCosts({ fromDate, toDate });
+    return res.json({ success: true, message: "Hồi tố chi phí slot hoàn tất!", data: result });
+  } catch (err) {
+    console.error("[WarehouseController] backfillSlotDailyCosts error:", err);
+    return res.status(500).json({ error: getClientErrorMessage(err, "Lỗi khi hồi tố chi phí slot.") });
+  }
+};
+
+const syncOrderDate = async (req, res) => {
+  try {
+    const { email } = req.query || {};
+    const result = await warehouseService.syncOrderDateByEmail(email);
+    return res.json(result);
+  } catch (err) {
+    console.error("[WarehouseController] syncOrderDate error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể tra cứu ngày hết hạn đơn hàng.") });
+  }
+};
+
+const toggleCatalogPackage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isPackage } = req.body || {};
+    const result = await warehouseService.toggleCatalogPackage(id, isPackage);
+    return res.json({ success: true, message: "Đã cập nhật chế độ tạo gói kho!", data: result });
+  } catch (err) {
+    console.error("[WarehouseController] toggleCatalogPackage error:", err);
+    return res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật chế độ tạo gói kho.") });
+  }
+};
+
 module.exports = {
   getWarehouseAccounts,
   createWarehouseAccount,
@@ -172,4 +239,9 @@ module.exports = {
   getSystemProducts,
   renameCatalogTag,
   deleteCatalogTag,
+  getSlotDailyLogs,
+  calculateSlotDailyCosts,
+  backfillSlotDailyCosts,
+  syncOrderDate,
+  toggleCatalogPackage,
 };

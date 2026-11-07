@@ -1,6 +1,7 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
+const { getVietnamDateString } = require("@/utils/time");
 
 const V_COLS = COLS.VARIANT;
 const VP_COLS = COLS.VARIANT_PRICE;
@@ -758,6 +759,72 @@ const getPackageProducts = async () => {
     return null;
   };
 
+  const todayStr = getVietnamDateString();
+  const pkgIds = rows.map((r) => Number(r.id)).filter(Boolean);
+
+  let accumulatedMap = new Map();
+  let todayLogMap = new Map();
+
+  if (pkgIds.length > 0) {
+    try {
+      const statsRows = await db(TABLES.PACKAGE_SLOT_DAILY_LOGS)
+        .whereIn("package_product_id", pkgIds)
+        .groupBy("package_product_id")
+        .select(
+          "package_product_id",
+          db.raw("COALESCE(SUM(vacant_cost), 0)::numeric as total_vacant_cost")
+        );
+      accumulatedMap = new Map(
+        statsRows.map((s) => [Number(s.package_product_id), Number(s.total_vacant_cost || 0)])
+      );
+
+      const todayRows = await db(TABLES.PACKAGE_SLOT_DAILY_LOGS)
+        .where("log_date", todayStr)
+        .whereIn("package_product_id", pkgIds)
+        .select("package_product_id", "import_order_code", "cost_per_slot_day", "vacant_slots", "vacant_cost");
+      todayLogMap = new Map(
+        todayRows.map((t) => [Number(t.package_product_id), t])
+      );
+    } catch (logErr) {
+      console.warn("[ProductService] Không thể tải thống kê package_slot_daily_logs:", logErr.message);
+    }
+  }
+
+  // Lấy các đơn nhập hàng MAVN khớp theo tài khoản (cả đơn active hôm nay và đơn mới nhất)
+  let mavnOrderByAccount = new Map();
+  let latestMavnByAccount = new Map();
+  if (targetAccounts.length > 0) {
+    try {
+      const allMavnOrders = await db(TABLES.ORDER_LIST)
+        .where("id_order", "ilike", "MAVN%")
+        .andWhere("cost", ">", 0)
+        .andWhereRaw("LOWER(COALESCE(status, '')) NOT IN ('cancel', 'canceled', 'đã hủy')")
+        .select("id", "id_order", "cost", "days", "information_order", "order_date", "expired_at")
+        .orderBy("id", "desc");
+
+      for (const ord of allMavnOrders) {
+        const accKey = String(ord.information_order || "").trim().toLowerCase();
+        if (accKey) {
+          // 1. Lưu đơn MAVN mới nhất của tài khoản (để lấy hạn thực tế, giá vốn, mã đơn nhập)
+          if (!latestMavnByAccount.has(accKey)) {
+            latestMavnByAccount.set(accKey, ord);
+          }
+
+          // 2. Lưu đơn MAVN đang còn hiệu lực tại ngày hôm nay (để tính chi phí slot phát sinh hôm nay)
+          const orderDateStr = ord.order_date ? getVietnamDateString(ord.order_date) : null;
+          const expiredAtStr = ord.expired_at ? getVietnamDateString(ord.expired_at) : null;
+          const isStarted = !orderDateStr || orderDateStr <= todayStr;
+          const isNotExpired = !expiredAtStr || expiredAtStr >= todayStr;
+          if (isStarted && isNotExpired && !mavnOrderByAccount.has(accKey)) {
+            mavnOrderByAccount.set(accKey, ord);
+          }
+        }
+      }
+    } catch (mavnErr) {
+      console.warn("[ProductService] Không thể tải danh sách đơn nhập MAVN:", mavnErr.message);
+    }
+  }
+
   return rows.map((r) => {
     const matchRule = (r.match_rule || "information").toLowerCase();
     const matchingOrders = ordersList.filter((o) => {
@@ -874,34 +941,70 @@ const getPackageProducts = async () => {
     }
     const remainingCapacity = capacityLimit && capacityLimit > 0 ? Math.max(0, capacityLimit - capacityUsed) : null;
 
-    return {
-      id: r.id,
-      productName: r.product_name || "",
-      category: r.category || r.product_name || "Khác",
-      requiresStorage: Boolean(r.category_requires_storage),
-      name: r.product_name || (r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`),
-      accountInfo: r.account_info,
-      password: r.password || null,
-      twoFa: r.two_fa || null,
-      backupEmail: r.backup_email || null,
-      storageAccountInfo: r.storage_account_info || null,
-      storagePassword: r.storage_password || null,
-      storageTwoFa: r.storage_two_fa || null,
-      storageBackupEmail: r.storage_backup_email || null,
-      storageTotal: r.storage_total || null,
-      capacityLimit: capacityLimit || null,
-      capacityUsed: capacityLimit ? capacityUsed : null,
-      remainingCapacity: capacityLimit ? remainingCapacity : null,
-      usedSlots,
-      totalSlots,
-      supplier: r.supplier,
-      costPrice: parseFloat(r.cost_price || 0),
-      expiredAt: "2026-12-31",
-      note: r.package_note || "",
-      matchRule: r.match_rule || "information",
-      status: usedSlots >= totalSlots ? "expired" : usedSlots > 0 ? "warning" : "active",
-      slotAssignments,
-    };
+        const targetUser = r.account_info ? String(r.account_info).trim().toLowerCase() : "";
+        const activeMavn = mavnOrderByAccount.get(targetUser) || null;
+        const latestMavn = latestMavnByAccount.get(targetUser) || null;
+        const effectiveMavn = activeMavn || latestMavn;
+        const todayLog = todayLogMap.get(Number(r.id)) || null;
+
+        // Gói có đơn nhập MAVN: lấy mã đơn từ log hôm nay hoặc đơn active hoặc đơn MAVN gần nhất
+        const importOrderCode = todayLog?.import_order_code || activeMavn?.id_order || latestMavn?.id_order || null;
+        const hasMavnOrder = Boolean(importOrderCode);
+
+        const costPrice = hasMavnOrder
+          ? Number(effectiveMavn?.cost || r.cost_price || 0)
+          : parseFloat(r.cost_price || 0);
+
+        const importDays = hasMavnOrder ? Math.max(1, Number(effectiveMavn?.days || 30)) : 30;
+
+        let costPerSlotDay = 0;
+        let todayVacantCost = 0;
+
+        // Chỉ tính chi phí slot phát sinh hôm nay nếu đơn MAVN đang còn active
+        if (activeMavn && totalSlots > 0 && costPrice > 0) {
+          costPerSlotDay = todayLog?.cost_per_slot_day !== undefined
+            ? Number(todayLog.cost_per_slot_day)
+            : Math.round((costPrice / (totalSlots * importDays)) * 100) / 100;
+
+          const vacantSlots = Math.max(0, totalSlots - usedSlots);
+          todayVacantCost = todayLog?.vacant_cost !== undefined
+            ? Number(todayLog.vacant_cost)
+            : Math.round(vacantSlots * costPerSlotDay * 100) / 100;
+        }
+
+        return {
+          id: r.id,
+          productName: r.product_name || "",
+          category: r.category || r.product_name || "Khác",
+          requiresStorage: Boolean(r.category_requires_storage),
+          name: r.product_name || (r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`),
+          accountInfo: r.account_info,
+          password: r.password || null,
+          twoFa: r.two_fa || null,
+          backupEmail: r.backup_email || null,
+          storageAccountInfo: r.storage_account_info || null,
+          storagePassword: r.storage_password || null,
+          storageTwoFa: r.storage_two_fa || null,
+          storageBackupEmail: r.storage_backup_email || null,
+          storageTotal: r.storage_total || null,
+          capacityLimit: capacityLimit || null,
+          capacityUsed: capacityLimit ? capacityUsed : null,
+          remainingCapacity: capacityLimit ? remainingCapacity : null,
+          usedSlots,
+          totalSlots,
+          supplier: r.supplier,
+          costPrice,
+          expiredAt: effectiveMavn?.expired_at ? getVietnamDateString(effectiveMavn.expired_at) : null,
+          note: r.package_note || "",
+          matchRule: r.match_rule || "information",
+          status: usedSlots >= totalSlots ? "expired" : usedSlots > 0 ? "warning" : "active",
+          slotAssignments,
+          costPerSlotDay,
+          vacantSlots: Math.max(0, totalSlots - usedSlots),
+          todayVacantCost,
+          totalAccumulatedVacantCost: Number(accumulatedMap.get(Number(r.id)) || 0),
+          importOrderCode,
+        };
   });
 };
 
@@ -1239,7 +1342,7 @@ const createPackageProduct = async (payload) => {
     totalSlots: inserted.slot,
     supplier: inserted.supplier,
     costPrice: parseFloat(inserted.cost || 0),
-    expiredAt: "2026-12-31",
+    expiredAt: payload.expiredAt || null,
     note: inserted.package_note || "",
     matchRule: inserted.match_rule || "information",
     status: "active",
@@ -1340,7 +1443,7 @@ const updatePackageProduct = async (id, payload) => {
     totalSlots: updated.slot,
     supplier: updated.supplier,
     costPrice: parseFloat(updated.cost || 0),
-    expiredAt: payload.expiredAt || "2026-12-31",
+    expiredAt: payload.expiredAt || null,
     note: updated.package_note || "",
     matchRule: updated.match_rule || "information",
     status: (payload.usedSlots || 0) >= updated.slot ? "expired" : "active",

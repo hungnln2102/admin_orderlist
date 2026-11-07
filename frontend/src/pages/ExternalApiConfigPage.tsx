@@ -43,6 +43,11 @@ import {
   Italic,
   Link2,
   RotateCcw,
+  Film,
+  KeyRound,
+  ArrowLeft,
+  User,
+  Lock,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 
@@ -285,7 +290,11 @@ export const ExternalApiConfigPage: React.FC = () => {
   // State cho Sub-Page 2: Cấu Hình Mẫu Tin Nhắn & Nội Dung Hiển Thị
   const [templateMode, setTemplateMode] = useState<"default" | "custom">("custom");
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState<number>(0);
-  const [previewDevice, setPreviewDevice] = useState<"web" | "mobile">("mobile");
+  const [previewDevice, setPreviewDevice] = useState<"web" | "mobile">("web");
+  const [webPreviewTab, setWebPreviewTab] = useState<"adobe" | "netflix">("adobe");
+  const [webPreviewSubForm, setWebPreviewSubForm] = useState<0 | 1>(1); // 0: Lấy Tài Khoản, 1: Nhận OTP
+  const [webPreviewNetflixSubTab, setWebPreviewNetflixSubTab] = useState<0 | 1 | 2>(0); // 0: Link TV, 1: Mã 6 số, 2: OTP Login
+  const [copiedPreviewKey, setCopiedPreviewKey] = useState<string | null>(null);
   const [showVariableDropdown, setShowVariableDropdown] = useState(false);
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplateItem[]>(() => {
     try {
@@ -378,6 +387,15 @@ export const ExternalApiConfigPage: React.FC = () => {
     } else {
       notify.error(text);
     }
+  };
+
+  const handleCopyPreviewText = (text: string, keyName: string, successMsg: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPreviewKey(keyName);
+    showToast("success", successMsg);
+    setTimeout(() => {
+      setCopiedPreviewKey((prev) => (prev === keyName ? null : prev));
+    }, 2000);
   };
 
   // 1. Tải danh sách cấu hình
@@ -1794,93 +1812,509 @@ export const ExternalApiConfigPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 1. KHI CHỌN GIAO DIỆN WEB (WEB DASHBOARD / NOTIFICATION CARD) */}
+            {/* 1. KHI CHỌN GIAO DIỆN WEB (CHUẨN 100% GIAO DIỆN otp_portal CỦA MASTER) */}
             {previewDevice === "web" ? (
               <div className="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in duration-150">
                 {/* Web Browser Top Bar */}
-                <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center gap-3">
+                <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
                     <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
                     <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
                   </div>
                   <div className="flex-1 max-w-sm bg-slate-900 border border-slate-800/80 rounded-lg px-3 py-1 text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
-                    <Globe className="w-3 h-3 text-cyan-400" />
-                    <span className="truncate">https://mavryk.store/admin/notifications/preview</span>
+                    <Globe className="w-3 h-3 text-amber-400" />
+                    <span className="truncate">https://otp.mavrykpremium.com/portal/verify-session</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Trực Tuyến</span>
                   </div>
                 </div>
 
-                {/* Vùng Thẻ Thông Báo Web */}
-                <div className="p-6 space-y-4">
-                  <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-slate-800 space-y-4 shadow-xl">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                          <Zap className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>Mavryk OTP System Alert</span>
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              MỚI NHẬN
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">Vừa nhận xong • Trực tiếp từ cổng API</div>
-                        </div>
-                      </div>
-
-                      {/* Nút Sao chép OTP 1-click */}
+                {/* Vùng Thẻ Thông Báo Web: HIỂN THỊ DUY NHẤT 1 GIAO DIỆN CHI TIẾT THEO CHỈ ĐẠO CỦA MASTER */}
+                <div className="p-4 sm:p-6 bg-gradient-to-b from-[#0d0714] via-[#120a1d] to-[#0a0512] flex flex-col items-center justify-center min-h-[500px]">
+                  <div className="w-full max-w-md bg-gradient-to-b from-[#1f1335]/95 via-[#180e2b]/95 to-[#120922]/95 border border-amber-500/30 rounded-3xl p-5 shadow-[0_15px_45px_rgba(0,0,0,0.7),0_0_35px_rgba(245,158,11,0.12)] space-y-4 text-white">
+                    {/* Header Dịch Vụ: Adobe vs Netflix */}
+                    <div className="flex p-1 bg-black/40 border border-amber-500/20 rounded-xl">
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText("699211");
-                          showToast("success", "Đã sao chép mã OTP: 699211!");
-                        }}
-                        className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-cyan-600/25 active:scale-95 transition-all"
+                        onClick={() => setWebPreviewTab("adobe")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          webPreviewTab === "adobe"
+                            ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_2px_12px_rgba(245,158,11,0.35)]"
+                            : "text-slate-400 hover:text-white"
+                        }`}
                       >
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Sao chép OTP</span>
+                        <span className="w-4 h-4 rounded bg-black/20 flex items-center justify-center text-[10px] font-black">
+                          A
+                        </span>
+                        <span>Adobe</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setWebPreviewTab("netflix")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          webPreviewTab === "netflix"
+                            ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_2px_12px_rgba(245,158,11,0.35)]"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <Film className="w-3.5 h-3.5" />
+                        <span>Netflix</span>
                       </button>
                     </div>
 
-                    {/* Khối Mã OTP Siêu To Nổi Bật */}
-                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MÃ XÁC THỰC OTP</div>
-                        <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-400 font-mono tracking-widest mt-1">
-                          699211
-                        </div>
-                      </div>
-                      <div className="text-right text-[11px] text-slate-400 space-y-0.5">
-                        <div>Hiệu lực: <span className="text-emerald-400 font-bold">5 phút</span></div>
-                        <div className="text-[10px] text-slate-500 font-mono">netlink.port.8315...</div>
-                      </div>
-                    </div>
+                    {/* ========================================================================= */}
+                    {/* 1. KHI CHỌN ADOBE: ĐƠN LẬP 1 GIAO DIỆN DUY NHẤT                           */}
+                    {/* ========================================================================= */}
+                    {webPreviewTab === "adobe" && (
+                      <div className="space-y-3.5">
+                        <div className="flex items-center justify-between pb-2 border-b border-amber-500/15">
+                          <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
+                            Adobe Creative Cloud
+                          </span>
 
-                    {/* Nội dung thông báo theo template */}
-                    <div className="space-y-1.5">
-                      <div className="text-xs font-bold text-slate-300">Nội dung thông báo chi tiết:</div>
-                      <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
-                        {previewRenderedText.replace(/<\/?(b|i|code|a[^>]*)>/gi, "")}
+                          <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-lg text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => setWebPreviewSubForm(0)}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-bold transition-all ${
+                                webPreviewSubForm === 0
+                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              <KeyRound className="w-3 h-3" />
+                              <span>Lấy Tài Khoản</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setWebPreviewSubForm(1)}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-bold transition-all ${
+                                webPreviewSubForm === 1
+                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              <Zap className="w-3 h-3" />
+                              <span>Nhận OTP</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* HIỂN THỊ ĐƠN LẬP FORM 1 (NHẬN OTP) HOẶC FORM 0 (LẤY TÀI KHOẢN) */}
+                        {webPreviewSubForm === 1 ? (
+                          /* FORM 1: NHẬN OTP (MÃ SỐ TO RÕ, NÚT SAO CHÉP, KHÔNG CÓ KHỐI CHI TIẾT THỪA) */
+                          <div className="space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
+                              <input
+                                type="text"
+                                readOnly
+                                value="netlink.port.8315@colegiomontealto.us"
+                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100/90 font-mono focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setWebPreviewSubForm(0)}
+                                className="px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/20 bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-1 transition-all"
+                              >
+                                <ArrowLeft className="w-3 h-3" />
+                                <span>Lấy Tài Khoản</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_3px_15px_rgba(245,158,11,0.3)] hover:brightness-110 active:scale-98 transition-all"
+                              >
+                                <Zap className="w-3.5 h-3.5 fill-current" />
+                                <span>Lấy Mã OTP Adobe</span>
+                              </button>
+                            </div>
+
+                            {/* Khối Kết Quả OTP */}
+                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2.5 shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                                MÃ XÁC MINH ADOBE CỦA BẠN
+                              </div>
+
+                              <div
+                                onClick={() =>
+                                  handleCopyPreviewText("699211", "otp_digits", "Đã sao chép mã OTP: 699211!")
+                                }
+                                className="flex items-center justify-center gap-2 cursor-pointer py-1"
+                                title="Bấm vào để sao chép mã ngay"
+                              >
+                                {["6", "9", "9", "2", "1", "1"].map((digit, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="w-10 h-12 rounded-xl bg-gradient-to-b from-black/80 to-black/95 border border-amber-500/50 flex items-center justify-center text-2xl font-black text-amber-300 font-mono shadow-[0_0_12px_rgba(245,158,11,0.25)] hover:scale-105 transition-transform"
+                                  >
+                                    {digit}
+                                  </div>
+                                ))}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyPreviewText("699211", "otp_button", "Đã sao chép mã OTP: 699211!")
+                                }
+                                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(245,158,11,0.3)] hover:brightness-110 active:scale-98 transition-all"
+                              >
+                                {copiedPreviewKey === "otp_button" || copiedPreviewKey === "otp_digits" ? (
+                                  <>
+                                    <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
+                                    <span>ĐÃ SAO CHÉP MÃ (699211)!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                                    <span>SAO CHÉP MÃ XÁC THỰC (699211)</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* FORM 0: LẤY TÀI KHOẢN (KẾT QUẢ DẠNG TEXT CÓ DÒNG MẬT KHẨU THEO YÊU CẦU MASTER) */
+                          <div className="space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
+                              <input
+                                type="text"
+                                readOnly
+                                value="customer.order.2026@gmail.com"
+                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100/90 font-mono focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_3px_15px_rgba(245,158,11,0.3)] hover:brightness-110 active:scale-98 transition-all"
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                                <span>Tra Cứu Tài Khoản</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setWebPreviewSubForm(1)}
+                                className="px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/20 bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-1 transition-all"
+                              >
+                                <span>Lấy OTP</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            {/* Khối Kết Quả Tài Khoản Text Đầy Đủ Dòng Mật Khẩu */}
+                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 space-y-2 text-xs shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
+                              <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                                <span className="font-bold text-slate-300 uppercase flex items-center gap-1 text-[11px]">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>TÀI KHOẢN ĐƯỢC CẤP</span>
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                  ĐANG HOẠT ĐỘNG
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5 text-[11px]">
+                                {/* Dòng 1: Email Cấp */}
+                                <div className="flex items-center justify-between p-2 rounded-lg border border-amber-500/20 bg-black/40">
+                                  <div className="truncate max-w-[240px] font-mono text-amber-100 font-bold">
+                                    netlink.port.8315@colegiomontealto.us
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCopyPreviewText(
+                                        "netlink.port.8315@colegiomontealto.us",
+                                        "acc_email",
+                                        "Đã chép Email Adobe!"
+                                      )
+                                    }
+                                    className="p-1 rounded border border-amber-500/30 hover:bg-amber-500/20 text-amber-400 transition-all"
+                                    title="Sao chép Email"
+                                  >
+                                    {copiedPreviewKey === "acc_email" ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+
+                                {/* Dòng 2: MẬT KHẨU (Chuẩn Master yêu cầu) */}
+                                <div className="flex items-center justify-between p-2 rounded-lg border border-amber-500/20 bg-black/40">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 text-[10px] uppercase font-semibold">
+                                      Mật khẩu:
+                                    </span>
+                                    <span className="font-mono font-bold text-amber-300">
+                                      Mavryk@2026!#
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCopyPreviewText(
+                                        "Mavryk@2026!#",
+                                        "acc_pass",
+                                        "Đã chép Mật khẩu Adobe!"
+                                      )
+                                    }
+                                    className="p-1 rounded border border-amber-500/30 hover:bg-amber-500/20 text-amber-400 transition-all"
+                                    title="Sao chép Mật khẩu"
+                                  >
+                                    {copiedPreviewKey === "acc_pass" ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+
+                                {/* Dòng 3: Gói & Hạn dùng */}
+                                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
+                                  <span>Gói: Adobe All Apps 1 Năm</span>
+                                  <span>Hạn: 04/11/2027</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    )}
+
+                    {/* ========================================================================= */}
+                    {/* 2. KHI CHỌN NETFLIX: ĐƠN LẬP 1 GIAO DIỆN DUY NHẤT                         */}
+                    {/* ========================================================================= */}
+                    {webPreviewTab === "netflix" && (
+                      <div className="space-y-3.5 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between pb-2 border-b border-amber-500/15">
+                          <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+                            Netflix Premium Cổng Tự Động
+                          </span>
+
+                          <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-lg text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setWebPreviewNetflixSubTab(0)}
+                              className={`px-2 py-0.5 rounded font-bold transition-all ${
+                                webPreviewNetflixSubTab === 0
+                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              Link TV
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setWebPreviewNetflixSubTab(1)}
+                              className={`px-2 py-0.5 rounded font-bold transition-all ${
+                                webPreviewNetflixSubTab === 1
+                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              Mã 6 Số
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setWebPreviewNetflixSubTab(2)}
+                              className={`px-2 py-0.5 rounded font-bold transition-all ${
+                                webPreviewNetflixSubTab === 2
+                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              OTP Login
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Subform Netflix: Link TV */}
+                        {webPreviewNetflixSubTab === 0 && (
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
+                              <input
+                                type="text"
+                                readOnly
+                                value="premium.family@netflix.com"
+                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100 font-mono focus:outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_3px_15px_rgba(245,158,11,0.3)]"
+                            >
+                              <Zap className="w-3.5 h-3.5 fill-current" />
+                              <span>Lấy Link Xác Minh TV / Hộ Gia Đình</span>
+                            </button>
+
+                            <div className="p-3 rounded-xl border border-amber-500/30 bg-black/65 space-y-2">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>LINK XÁC MINH SẴN SÀNG</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-normal">Hết hạn: 15p</span>
+                              </div>
+                              <div className="flex items-center justify-between p-2 rounded-lg border border-amber-500/20 bg-black/40">
+                                <span className="font-mono text-[11px] text-amber-200 truncate max-w-[240px]">
+                                  https://www.netflix.com/account/travel/verify?token=nf_99182a...
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopyPreviewText(
+                                      "https://www.netflix.com/account/travel/verify?token=nf_99182a",
+                                      "nf_link",
+                                      "Đã sao chép link Netflix!"
+                                    )
+                                  }
+                                  className="p-1 rounded border border-amber-500/30 hover:bg-amber-500/20 text-amber-400"
+                                >
+                                  {copiedPreviewKey === "nf_link" ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Subform Netflix: Mã 6 Số */}
+                        {webPreviewNetflixSubTab === 1 && (
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
+                              <input
+                                type="text"
+                                readOnly
+                                value="premium.family@netflix.com"
+                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100 font-mono focus:outline-none"
+                              />
+                            </div>
+                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2.5 shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                                MÃ XÁC MINH 6 SỐ NETFLIX
+                              </div>
+                              <div className="flex items-center justify-center gap-2 py-1">
+                                {["4", "8", "1", "0", "9", "3"].map((digit, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="w-10 h-12 rounded-xl bg-black/90 border border-amber-500/50 flex items-center justify-center text-2xl font-black text-amber-300 font-mono"
+                                  >
+                                    {digit}
+                                  </div>
+                                ))}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyPreviewText(
+                                    "481093",
+                                    "nf_6digit",
+                                    "Đã sao chép mã Netflix: 481093!"
+                                  )
+                                }
+                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2"
+                              >
+                                <Copy className="w-4 h-4" />
+                                <span>SAO CHÉP MÃ XÁC THỰC (481093)</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Subform Netflix: OTP Login 4 Số */}
+                        {webPreviewNetflixSubTab === 2 && (
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
+                              <input
+                                type="text"
+                                readOnly
+                                value="premium.family@netflix.com"
+                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100 font-mono focus:outline-none"
+                              />
+                            </div>
+                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2.5 shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                                MÃ ĐĂNG NHẬP 4 SỐ NETFLIX
+                              </div>
+                              <div className="flex items-center justify-center gap-2 py-1">
+                                {["7", "2", "9", "5"].map((digit, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="w-10 h-12 rounded-xl bg-black/90 border border-amber-500/50 flex items-center justify-center text-2xl font-black text-amber-300 font-mono"
+                                  >
+                                    {digit}
+                                  </div>
+                                ))}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyPreviewText(
+                                    "7295",
+                                    "nf_4digit",
+                                    "Đã sao chép mã đăng nhập: 7295!"
+                                  )
+                                }
+                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2"
+                              >
+                                <Copy className="w-4 h-4" />
+                                <span>SAO CHÉP MÃ ĐĂNG NHẬP (7295)</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Chân Thẻ Bảo Mật SSL */}
+                    <div className="pt-1 flex items-center justify-center gap-1.5 text-[11px] text-amber-400/80">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Bảo mật 256–Bit SSL</span>
                     </div>
+                  </div>
+
+                  {/* Footer Ghi Chú Bên Dưới Thẻ Web */}
+                  <div className="mt-4 text-center text-[10px] text-slate-500 space-y-1">
+                    <div>📺 Mở link TV trên cùng Wi-Fi • 🎧 Hỗ trợ 24/7 trực tuyến</div>
+                    <div>© 2026 Mavryk Premium • Cổng Dịch Vụ Khách Hàng</div>
                   </div>
                 </div>
               </div>
             ) : (
-              /* 2. KHI CHỌN GIAO DIỆN MOBILE (IPHONE SMARTPHONE TELEGRAM PREVIEW - CHUẨN ẢNH MASTER) */
+              /* 2. KHI CHỌN GIAO DIỆN MOBILE (IPHONE SMARTPHONE PREVIEW - CHUẨN GIAO DIỆN otp_portal CỦA MASTER) */
               <div className="flex justify-center">
-                <div className="w-[330px] sm:w-[350px] bg-[#0c1017] rounded-[48px] p-3.5 border-[6px] border-slate-700/80 shadow-2xl relative select-none">
-                  {/* Loa thoại & Dynamic Island iPhone */}
-                  <div className="absolute top-5 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-full z-20 flex items-center justify-between px-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-950/60" />
+                <div className="w-[330px] sm:w-[360px] bg-[#0c1017] rounded-[50px] p-3 border-[6px] border-slate-700/80 shadow-2xl relative select-none">
+                  {/* Dynamic Island iPhone */}
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-30 flex items-center justify-between px-2.5">
+                    <div className="w-2 h-2 rounded-full bg-slate-900 border border-slate-800" />
+                    <div className="w-2 h-2 rounded-full bg-blue-950/60" />
                   </div>
 
                   {/* Màn hình điện thoại iPhone */}
-                  <div className="bg-[#17212b] rounded-[38px] overflow-hidden flex flex-col h-[540px] text-white font-sans text-xs relative">
+                  <div className="bg-[#0e0717] rounded-[40px] overflow-hidden flex flex-col h-[600px] text-white font-sans text-xs relative border border-slate-800/80">
                     {/* Status Bar: Giờ 9:41, Pin, Sóng */}
-                    <div className="pt-3 px-6 pb-2 flex items-center justify-between text-[11px] font-semibold text-slate-300 shrink-0">
+                    <div className="pt-3 px-6 pb-1.5 flex items-center justify-between text-[11px] font-semibold text-slate-300 shrink-0 bg-[#0e0717]/90 z-20">
                       <span>9:41</span>
                       <div className="flex items-center gap-1.5 text-[10px]">
                         <span>5G</span>
@@ -1890,62 +2324,456 @@ export const ExternalApiConfigPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Telegram Header */}
-                    <div className="px-4 py-2 bg-[#242f3d] flex items-center justify-between border-b border-[#17212b] shrink-0">
-                      <div className="flex items-center gap-1.5 text-[#64b5f6] font-medium text-xs">
-                        <span>‹ Chats</span>
+                    {/* Mobile Safari URL Bar */}
+                    <div className="px-3 py-1.5 bg-[#150a24] border-b border-amber-500/15 flex items-center gap-2 shrink-0 z-20">
+                      <div className="flex-1 bg-black/50 border border-amber-500/20 rounded-lg px-2.5 py-1 text-[10px] font-mono text-slate-300 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                          <span className="truncate">otp.mavrykpremium.com</span>
+                        </div>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
                       </div>
-                      <div className="text-center">
-                        <div className="font-bold text-white text-xs">Mavryk Store Data</div>
-                        <div className="text-[10px] text-slate-400">bot</div>
-                      </div>
-                      <div className="w-6" />
+                      <RefreshCw className="w-3 h-3 text-slate-400 shrink-0" />
                     </div>
 
-                    {/* Vùng hiển thị tin nhắn Telegram */}
-                    <div className="flex-1 p-3.5 overflow-y-auto space-y-3 bg-[radial-gradient(#1f2936_1px,transparent_1px)] [background-size:16px_16px]">
-                      {/* Bong bóng tin nhắn Telegram của Bot */}
-                      <div className="flex items-end gap-2 max-w-[92%]">
-                        {/* Avatar Bot */}
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0 shadow">
-                          M
-                        </div>
-
-                        <div className="bg-[#242f3d] p-3 rounded-2xl rounded-bl-xs text-xs text-slate-100 shadow-md space-y-2 border border-slate-700/40">
-                          {/* Tên Bot Telegram */}
-                          <div className="font-bold text-[#e57373] text-[11px]">
-                            Mavryk OTP Bot
+                    {/* Nội dung trang Web otp_portal bên trong iPhone (Có thể cuộn) */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gradient-to-b from-[#120722] via-[#1a0c30] to-[#0a0414] [scrollbar-width:none]">
+                      {/* Brand Header */}
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center font-black text-slate-950 text-[10px] shadow-sm">
+                            M
                           </div>
-
-                          {/* Nội dung tin nhắn đã thay thế biến */}
-                          <div className="whitespace-pre-wrap leading-relaxed text-[11.5px] font-sans break-words">
-                            {previewRenderedText}
-                          </div>
-
-                          {/* Thời gian và tích xanh ✓✓ */}
-                          <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 pt-0.5">
-                            <span>14:55</span>
-                            <CheckCheck className="w-3 h-3 text-[#64b5f6]" />
+                          <div>
+                            <div className="text-[10px] font-black tracking-wider text-amber-200 uppercase leading-none">
+                              MAVRYK PREMIUM
+                            </div>
+                            <div className="text-[8px] text-slate-400 leading-none mt-0.5">Cổng Kích Hoạt Tự Động</div>
                           </div>
                         </div>
+                        <span className="px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          ● Trực Tuyến
+                        </span>
+                      </div>
+
+                      {/* Festival Title Stage Mobile */}
+                      <div className="text-center py-1 space-y-1">
+                        <div className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300 tracking-wider">
+                          ✨ RẰM THÁNG TÁM ĐOÀN VIÊN
+                        </div>
+                        <div className="text-base font-bold text-amber-100 font-serif leading-tight">
+                          Đêm hội trăng rằm
+                        </div>
+                        <div className="text-[10px] text-slate-400 italic">
+                          Trăng tròn sum vầy, hội ngộ bình an.
+                        </div>
+                      </div>
+
+                      {/* Mobile Card: Single-Interface Tương Tác Giống 100% Web */}
+                      <div className="bg-gradient-to-b from-[#1e1133]/90 via-[#170c29]/95 to-[#10071e]/95 border border-amber-500/30 rounded-2xl p-3 space-y-3 shadow-lg">
+                        {/* Service Switcher Tabs: Adobe vs Netflix */}
+                        <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => setWebPreviewTab("adobe")}
+                            className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${
+                              webPreviewTab === "adobe"
+                                ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            <span className="w-3.5 h-3.5 rounded bg-black/20 flex items-center justify-center text-[9px] font-black">
+                              A
+                            </span>
+                            <span>Adobe</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setWebPreviewTab("netflix")}
+                            className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${
+                              webPreviewTab === "netflix"
+                                ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            <Film className="w-3 h-3" />
+                            <span>Netflix</span>
+                          </button>
+                        </div>
+
+                        {/* Adobe Subform Mobile */}
+                        {webPreviewTab === "adobe" && (
+                          <div className="space-y-2.5">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/15">
+                              <span className="text-[10px] font-bold text-amber-200/90 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                Adobe CC
+                              </span>
+
+                              <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-md text-[9px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setWebPreviewSubForm(0)}
+                                  className={`px-2 py-0.5 rounded font-bold transition-all ${
+                                    webPreviewSubForm === 0
+                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                      : "text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  Lấy TK
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setWebPreviewSubForm(1)}
+                                  className={`px-2 py-0.5 rounded font-bold transition-all ${
+                                    webPreviewSubForm === 1
+                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                      : "text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  Nhận OTP
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* CHỈ HIỂN THỊ ĐƠN LẬP 1 FORM DUY NHẤT */}
+                            {webPreviewSubForm === 1 ? (
+                              /* Mobile Form 1: Nhận OTP */
+                              <div className="space-y-2.5 animate-in fade-in duration-150">
+                                <div className="relative">
+                                  <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400/60" />
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value="netlink.port.8315@colegiomontealto.us"
+                                    className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-8 pr-2 py-2 text-[10px] text-amber-100 font-mono focus:outline-none truncate"
+                                  />
+                                </div>
+
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setWebPreviewSubForm(0)}
+                                    className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold border border-amber-500/20 bg-white/5 text-slate-300 flex items-center gap-0.5"
+                                  >
+                                    <ArrowLeft className="w-3 h-3" />
+                                    <span>TK</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-[10px] flex items-center justify-center gap-1 shadow-md hover:brightness-110 active:scale-98 transition-all"
+                                  >
+                                    <Zap className="w-3 h-3 fill-current" />
+                                    <span>Lấy Mã OTP Adobe</span>
+                                  </button>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2 shadow-md">
+                                  <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                                    MÃ XÁC MINH ADOBE
+                                  </div>
+
+                                  <div
+                                    onClick={() =>
+                                      handleCopyPreviewText("699211", "m_otp_digits", "Đã sao chép mã OTP: 699211!")
+                                    }
+                                    className="flex items-center justify-center gap-1.5 cursor-pointer py-0.5"
+                                    title="Bấm vào để sao chép mã ngay"
+                                  >
+                                    {["6", "9", "9", "2", "1", "1"].map((digit, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="w-8 h-10 rounded-lg bg-black/90 border border-amber-500/50 flex items-center justify-center text-lg font-black text-amber-300 font-mono shadow-sm"
+                                      >
+                                        {digit}
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCopyPreviewText("699211", "m_otp_btn", "Đã sao chép mã OTP: 699211!")
+                                    }
+                                    className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px] uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                  >
+                                    {copiedPreviewKey === "m_otp_btn" || copiedPreviewKey === "m_otp_digits" ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-slate-950 stroke-[3]" />
+                                        <span>ĐÃ SAO CHÉP MÃ!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3 text-slate-950 stroke-[2.5]" />
+                                        <span>SAO CHÉP MÃ (699211)</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Mobile Form 0: Lấy Tài Khoản (Dạng Text có dòng mật khẩu) */
+                              <div className="space-y-2.5 animate-in fade-in duration-150">
+                                <div className="relative">
+                                  <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400/60" />
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value="customer.order.2026@gmail.com"
+                                    className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-8 pr-2 py-2 text-[10px] text-amber-100 font-mono focus:outline-none truncate"
+                                  />
+                                </div>
+
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-[10px] flex items-center justify-center gap-1 shadow-md hover:brightness-110 active:scale-98 transition-all"
+                                  >
+                                    <KeyRound className="w-3 h-3" />
+                                    <span>Tra Cứu</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setWebPreviewSubForm(1)}
+                                    className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold border border-amber-500/20 bg-white/5 text-slate-300 flex items-center gap-0.5"
+                                  >
+                                    <span>OTP</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                <div className="p-2.5 rounded-xl border border-amber-500/30 bg-black/65 space-y-1.5 text-[10px] shadow-md">
+                                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
+                                    <span className="font-bold text-slate-300 uppercase flex items-center gap-1 text-[9px]">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                      <span>TÀI KHOẢN CẤP</span>
+                                    </span>
+                                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                      HOẠT ĐỘNG
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1 text-[9.5px]">
+                                    {/* Dòng Email */}
+                                    <div className="flex items-center justify-between p-1.5 rounded-lg border border-amber-500/20 bg-black/40">
+                                      <span className="truncate max-w-[190px] font-mono text-amber-100 font-bold">
+                                        netlink.port.8315@colegiomontealto.us
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleCopyPreviewText(
+                                            "netlink.port.8315@colegiomontealto.us",
+                                            "m_acc_email",
+                                            "Đã chép Email Adobe!"
+                                          )
+                                        }
+                                        className="p-0.5 text-amber-400"
+                                      >
+                                        {copiedPreviewKey === "m_acc_email" ? (
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                        ) : (
+                                          <Copy className="w-3 h-3" />
+                                        )}
+                                      </button>
+                                    </div>
+
+                                    {/* Dòng MẬT KHẨU */}
+                                    <div className="flex items-center justify-between p-1.5 rounded-lg border border-amber-500/20 bg-black/40">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-400 text-[8.5px] uppercase font-semibold">
+                                          Mật khẩu:
+                                        </span>
+                                        <span className="font-mono font-bold text-amber-300">
+                                          Mavryk@2026!#
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleCopyPreviewText(
+                                            "Mavryk@2026!#",
+                                            "m_acc_pass",
+                                            "Đã chép Mật khẩu Adobe!"
+                                          )
+                                        }
+                                        className="p-0.5 text-amber-400"
+                                      >
+                                        {copiedPreviewKey === "m_acc_pass" ? (
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                        ) : (
+                                          <Copy className="w-3 h-3" />
+                                        )}
+                                      </button>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[8.5px] text-slate-400 px-0.5">
+                                      <span>Adobe All Apps 1 Năm</span>
+                                      <span>Hạn: 04/11/2027</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Netflix Mobile */}
+                        {webPreviewTab === "netflix" && (
+                          <div className="space-y-2.5 animate-in fade-in duration-150">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/15">
+                              <span className="text-[10px] font-bold text-amber-200/90 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                Netflix
+                              </span>
+
+                              <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-md text-[8.5px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setWebPreviewNetflixSubTab(0)}
+                                  className={`px-1.5 py-0.5 rounded font-bold ${
+                                    webPreviewNetflixSubTab === 0
+                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                      : "text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  Link TV
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setWebPreviewNetflixSubTab(1)}
+                                  className={`px-1.5 py-0.5 rounded font-bold ${
+                                    webPreviewNetflixSubTab === 1
+                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                      : "text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  Mã 6 Số
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setWebPreviewNetflixSubTab(2)}
+                                  className={`px-1.5 py-0.5 rounded font-bold ${
+                                    webPreviewNetflixSubTab === 2
+                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
+                                      : "text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  OTP
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Netflix Mobile Subforms */}
+                            {webPreviewNetflixSubTab === 0 && (
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value="premium.family@netflix.com"
+                                  className="w-full bg-black/45 border border-amber-500/25 rounded-xl px-2.5 py-1.5 text-[10px] text-amber-100 font-mono truncate"
+                                />
+                                <button
+                                  type="button"
+                                  className="w-full py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px]"
+                                >
+                                  Lấy Link Xác Minh TV
+                                </button>
+                                <div className="p-2 rounded-xl border border-amber-500/30 bg-black/65 flex items-center justify-between text-[9px]">
+                                  <span className="font-mono text-amber-200 truncate max-w-[190px]">
+                                    netflix.com/verify?token=...
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCopyPreviewText(
+                                        "https://www.netflix.com/account/travel/verify?token=nf_99182a",
+                                        "m_nf_link",
+                                        "Đã sao chép link Netflix!"
+                                      )
+                                    }
+                                    className="p-0.5 text-amber-400"
+                                  >
+                                    {copiedPreviewKey === "m_nf_link" ? (
+                                      <Check className="w-3 h-3 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {webPreviewNetflixSubTab === 1 && (
+                              <div className="space-y-2 text-center">
+                                <div className="text-[9px] font-bold text-amber-400">MÃ 6 SỐ NETFLIX</div>
+                                <div className="flex justify-center gap-1">
+                                  {["4", "8", "1", "0", "9", "3"].map((d, i) => (
+                                    <div
+                                      key={i}
+                                      className="w-7 h-9 rounded-md bg-black/90 border border-amber-500/50 flex items-center justify-center font-bold text-base text-amber-300 font-mono"
+                                    >
+                                      {d}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopyPreviewText("481093", "m_nf_6", "Đã sao chép mã Netflix: 481093!")
+                                  }
+                                  className="w-full py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px]"
+                                >
+                                  SAO CHÉP MÃ (481093)
+                                </button>
+                              </div>
+                            )}
+
+                            {webPreviewNetflixSubTab === 2 && (
+                              <div className="space-y-2 text-center">
+                                <div className="text-[9px] font-bold text-amber-400">MÃ ĐĂNG NHẬP NETFLIX</div>
+                                <div className="flex justify-center gap-1">
+                                  {["7", "2", "9", "5"].map((d, i) => (
+                                    <div
+                                      key={i}
+                                      className="w-8 h-9 rounded-md bg-black/90 border border-amber-500/50 flex items-center justify-center font-bold text-base text-amber-300 font-mono"
+                                    >
+                                      {d}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopyPreviewText("7295", "m_nf_4", "Đã sao chép mã đăng nhập: 7295!")
+                                  }
+                                  className="w-full py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px]"
+                                >
+                                  SAO CHÉP MÃ (7295)
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="pt-0.5 flex items-center justify-center gap-1 text-[9px] text-amber-400/80">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>Bảo mật 256–Bit SSL</span>
+                        </div>
+                      </div>
+
+                      {/* Footer Ghi Chú Mobile */}
+                      <div className="text-center text-[8.5px] text-slate-500 space-y-0.5 pt-1 pb-3">
+                        <div>📺 Mở link TV trên cùng Wi-Fi • 🎧 Hỗ trợ 24/7</div>
+                        <div>© 2026 Mavryk Premium</div>
                       </div>
                     </div>
 
-                    {/* Thanh nhập tin nhắn Telegram ở đáy iPhone */}
-                    <div className="p-2.5 bg-[#242f3d] border-t border-[#17212b] flex items-center gap-2 shrink-0">
-                      <button type="button" className="text-slate-400 hover:text-white p-1">
-                        <ExternalLink className="w-4 h-4 rotate-45" />
-                      </button>
-                      <div className="flex-1 bg-[#17212b] rounded-full px-3 py-1.5 text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Message</span>
-                      </div>
-                      <button type="button" className="text-[#64b5f6] hover:text-[#90caf9] p-1">
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Vạch Home Indicator */}
-                    <div className="pb-1 pt-1.5 flex justify-center bg-[#242f3d]">
+                    {/* Vạch Home Indicator iPhone */}
+                    <div className="pb-1 pt-1 flex justify-center bg-[#0e0717] shrink-0 border-t border-slate-900">
                       <div className="w-28 h-1 bg-slate-500 rounded-full" />
                     </div>
                   </div>

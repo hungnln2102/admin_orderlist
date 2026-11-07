@@ -5,7 +5,8 @@
  *   - allocateReceipt(): Phân bổ số dư biên lai bằng tay (gán mã đơn, chi phí, credit...).
  *     → Dùng chung processOrderPayment (cập nhật trạng thái đơn, cộng ngày gia hạn, phát EventBus).
  */
-const { db, TABLES, withTransaction } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
+const { syncReceiptProfit, coverReceiptObligation } = require("@/domains/finance/services/receiptProfitService");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
@@ -15,6 +16,54 @@ const { resolveOrderCatalogPricing } = require("@/domains/products/services/cata
 const { extractSlotSuffix, applySuffixToPrice } = require("@/domains/payments/services/slotSuffixService");
 
 const getReceiptTable = () => db(TABLES.PAYMENT_RECEIPT);
+
+// Shared by Finance Hub payment commands so all receipt mutations keep one transaction contract.
+async function allocateReceiptInTrx(trx, receiptId, allocAmount, allocType, targetCode, note, obligation = null) {
+  if (!Number.isFinite(allocAmount) || allocAmount <= 0) {
+    throw new Error("Invalid receipt allocation amount");
+  }
+
+  const receipt = await trx(TABLES.PAYMENT_RECEIPT)
+    .where({ id: Number(receiptId) })
+    .forUpdate()
+    .first();
+  if (!receipt) throw new Error("Kh?ng t?m th?y bi?n lai thanh to?n");
+
+  const currentUnallocated = Number(receipt.unallocated_amount ?? receipt.amount ?? 0);
+  if (allocAmount > currentUnallocated) {
+    throw new Error(`S? ti?n ph?n b? v??t qu? s? d? kh? d?ng c?a bi?n lai (${currentUnallocated.toLocaleString("vi-VN")} ?)`);
+  }
+
+  const newUnallocated = currentUnallocated - allocAmount;
+  const newStatus = newUnallocated <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.PARTIALLY_ALLOCATED;
+  const [insertedAllocation] = await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
+    .insert({
+      receipt_id: receipt.id,
+      allocation_type: allocType,
+      target_code: targetCode ? String(targetCode) : null,
+      amount: allocAmount,
+      remaining_balance: newUnallocated,
+      note: note || null,
+      created_by: ALLOCATION_CREATOR.ADMIN,
+    })
+    .returning("id");
+  const allocationId = typeof insertedAllocation === "object" ? insertedAllocation.id : insertedAllocation;
+
+  if (obligation) {
+    if (receipt.transfer_type !== "out") throw new Error("Debt payment requires an outgoing receipt");
+    await coverReceiptObligation(trx, receipt, allocationId, obligation.type, obligation.target, obligation.periodMonth);
+  }
+
+  await trx(TABLES.PAYMENT_RECEIPT)
+    .where({ id: receipt.id })
+    .update({
+      unallocated_amount: newUnallocated,
+      status: newStatus,
+    });
+  await syncReceiptProfit(trx, receipt.id);
+
+  return { allocationId, financialAccountId: receipt.financial_account_id };
+}
 
 // ────────────── Tab Filter Helpers ──────────────
 
@@ -226,7 +275,7 @@ async function allocateReceipt(receiptId, payload) {
   }
 
   const allocAmount = Number(amount);
-  if (isNaN(allocAmount) || allocAmount <= 0) {
+  if (!Number.isFinite(allocAmount) || allocAmount <= 0) {
     throw new Error("Số tiền phân bổ phải lớn hơn 0 ₫.");
   }
 
@@ -248,6 +297,16 @@ async function allocateReceipt(receiptId, payload) {
     const newStatus = newUnallocated <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.PARTIALLY_ALLOCATED;
     const resolvedAllocType = allocation_type || ALLOCATION_TYPE.ORDER;
     const code = target_code ? target_code.trim() : null;
+    if (receipt.shop_out_expense_id && [ALLOCATION_TYPE.ORDER, "OTHER_INCOME"].includes(resolvedAllocType)) {
+      throw new Error("Outgoing receipt cannot be allocated as income");
+    }
+    const receiptAccount = receipt.financial_account_id
+      ? await trx(TABLES.FINANCIAL_ACCOUNTS).where(COLS.FINANCIAL_ACCOUNTS.ID, receipt.financial_account_id).first()
+      : null;
+    const postExpense = receiptAccount ? receiptAccount.account_scope === "SHOP" : !receipt.sepay_transaction_id;
+    if (receipt.sepay_transaction_id && receipt.transfer_type === "out" && !receiptAccount) {
+      throw new Error("Webhook receipt account must be resolved before allocation");
+    }
 
     let order = null;
     if (resolvedAllocType === ALLOCATION_TYPE.ORDER) {
@@ -288,6 +347,8 @@ async function allocateReceipt(receiptId, payload) {
       created_by: created_by || ALLOCATION_CREATOR.ADMIN,
     }).returning("id");
 
+    const allocationId = typeof allocId === "object" ? allocId.id : allocId;
+
     // 2. Cập nhật số dư và trạng thái Biên lai gốc
     const receiptUpdates = {
       unallocated_amount: newUnallocated,
@@ -312,7 +373,11 @@ async function allocateReceipt(receiptId, payload) {
     // 4. Nếu gán cho Chi Phí Cố Định: Ghi nhận thanh toán vào DEBT_PAYMENT_LOGS (KHÔNG ghi vào STORE_PROFIT_EXPENSES để chống double-counting)
     if (resolvedAllocType === "FIXED_COST" || (code && String(code).startsWith("FIXED_COST_"))) {
       const fixedCostId = Number(String(code).replace("FIXED_COST_", ""));
-      if (fixedCostId && !isNaN(fixedCostId)) {
+      if (!fixedCostId || !Number.isFinite(fixedCostId)) throw new Error("Invalid fixed cost target");
+      {
+        const fixedCost = await trx(TABLES.FIXED_COSTS).where("id", fixedCostId).forUpdate().first();
+        if (!fixedCost) throw new Error("Fixed cost not found");
+        await coverReceiptObligation(trx, receipt, allocationId, "FIXED_COST", fixedCost);
         const paymentDate = receipt.payment_date
           ? new Date(receipt.payment_date).toISOString().slice(0, 10)
           : new Date().toISOString().slice(0, 10);
@@ -327,6 +392,7 @@ async function allocateReceipt(receiptId, payload) {
         }
 
         await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+          [COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]: allocationId,
           target_type: "FIXED_COST",
           target_id: fixedCostId,
           period_month: periodMonth,
@@ -350,7 +416,10 @@ async function allocateReceipt(receiptId, payload) {
         throw new Error(`Không tìm thấy khoản nợ cá nhân #${debtId}.`);
       }
 
+      if (asset.type !== "DEBT_PAYABLE") throw new Error("Invalid debt target");
+      await coverReceiptObligation(trx, receipt, allocationId, "PERSONAL_DEBT", asset);
       const currentDebt = Number(asset.amount || 0);
+      if (allocAmount > currentDebt) throw new Error("Debt payment exceeds outstanding balance");
       const newDebt = Math.max(0, currentDebt - allocAmount);
       await trx(TABLES.PERSONAL_ASSETS)
         .where({ id: debtId })
@@ -364,6 +433,7 @@ async function allocateReceipt(receiptId, payload) {
         : new Date().toISOString().slice(0, 10);
 
       await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+        [COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]: allocationId,
         target_type: "PERSONAL_DEBT",
         target_id: debtId,
         financial_account_id: receipt.financial_account_id || null,
@@ -384,6 +454,7 @@ async function allocateReceipt(receiptId, payload) {
       if (!installment) {
         throw new Error(`Không tìm thấy hợp đồng trả góp #${instId}.`);
       }
+      await coverReceiptObligation(trx, receipt, allocationId, "INSTALLMENT", installment);
 
       const paymentDate = receipt.payment_date
         ? new Date(receipt.payment_date).toISOString().slice(0, 10)
@@ -398,6 +469,7 @@ async function allocateReceipt(receiptId, payload) {
       }
 
       await trx(TABLES.DEBT_PAYMENT_LOGS).insert({
+        [COLS.DEBT_PAYMENT_LOGS.RECEIPT_ALLOCATION_ID]: allocationId,
         target_type: "INSTALLMENT",
         target_id: instId,
         period_month: periodMonth,
@@ -406,7 +478,7 @@ async function allocateReceipt(receiptId, payload) {
         payment_date: paymentDate,
         note: note ? note.trim() : (receipt.note || `Thanh toán trả góp "${installment.name}" kỳ ${periodMonth} từ Biên lai #${id}`),
       });
-    } else if (resolvedAllocType === ALLOCATION_TYPE.EXTERNAL_IMPORT || resolvedAllocType === "EXTERNAL_IMPORT") {
+    } else if (postExpense && (resolvedAllocType === ALLOCATION_TYPE.EXTERNAL_IMPORT || resolvedAllocType === "EXTERNAL_IMPORT")) {
       const expenseDate = receipt.payment_date
         ? new Date(receipt.payment_date).toISOString().slice(0, 10)
         : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -431,7 +503,7 @@ async function allocateReceipt(receiptId, payload) {
               monthKey: getVietnamMonthString(expenseDate),
               revenueDelta: 0,
               importDelta: allocAmount,
-              profitDelta: -allocAmount,
+              profitDelta: receipt.shop_out_expense_id ? 0 : -allocAmount,
               bankBalanceDelta: 0,
               context: `allocation.externalImport:#${id}${code ? ` (${code})` : ""}`,
             }).catch((e) => console.error("[InvoiceService] Lỗi gửi thông báo external_import:", e.message));
@@ -441,11 +513,11 @@ async function allocateReceipt(receiptId, payload) {
         }
       });
     } else if (
-      resolvedAllocType === ALLOCATION_TYPE.MONTHLY_EXPENSE ||
+      postExpense && (resolvedAllocType === ALLOCATION_TYPE.MONTHLY_EXPENSE ||
       resolvedAllocType === ALLOCATION_TYPE.EXPENSE ||
       resolvedAllocType === "MONTHLY_EXPENSE" ||
       resolvedAllocType === "EXPENSE" ||
-      resolvedAllocType === "OPERATIONAL_EXPENSE"
+      resolvedAllocType === "OPERATIONAL_EXPENSE")
     ) {
       const expenseDate = receipt.payment_date
         ? new Date(receipt.payment_date).toISOString().slice(0, 10)
@@ -462,6 +534,8 @@ async function allocateReceipt(receiptId, payload) {
         status: "completed",
       });
     }
+
+    await syncReceiptProfit(trx, id);
 
     const updatedReceipt = {
       ...receipt,
@@ -848,6 +922,7 @@ async function completeBatchPayment({ orderCodes = [], financialAccountId, gatew
 module.exports = {
   getInvoices,
   allocateReceipt,
+  allocateReceiptInTrx,
   getMatchableOrders,
   createInvoice,
   completeBatchPayment,

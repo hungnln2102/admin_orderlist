@@ -194,7 +194,8 @@ export function formatDateDisplay(dateStr?: string): string {
 export function getDisplayProductName(
   idProduct?: number | string,
   productsCatalog: CatalogProduct[] = [],
-  fallbackName?: string
+  fallbackName?: string,
+  displayName?: string
 ): string {
   if (!idProduct && !fallbackName) return "";
   const str = String(idProduct || "").trim();
@@ -223,13 +224,14 @@ export function getDisplayProductName(
     }
   }
 
+  variantName = fallbackName?.trim() || variantName;
+
   // Nếu không tìm thấy tên biến thể hoặc kết quả là số thuần túy (ID chưa khớp catalog)
   if (!variantName || /^\d+$/.test(variantName)) {
-    if (fallbackName && fallbackName.trim() && !/^\d+$/.test(fallbackName)) return fallbackName.trim();
     if (/^\d+$/.test(str)) return `Sản phẩm #${str}`;
   }
 
-  const { durationText } = parsePackageDuration(rawName);
+  const { durationText } = parsePackageDuration(displayName ?? rawName);
   if (durationText && variantName) {
     if (variantName.toLowerCase().includes(durationText.toLowerCase())) {
       return variantName;

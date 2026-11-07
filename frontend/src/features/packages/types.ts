@@ -33,6 +33,11 @@ export interface PackageItem {
   matchRule?: "information" | "slot" | "both";
   status: "active" | "warning" | "expired";
   slotAssignments?: SlotAssignment[];
+  costPerSlotDay?: number;
+  vacantSlots?: number;
+  todayVacantCost?: number;
+  totalAccumulatedVacantCost?: number;
+  importOrderCode?: string | null;
 }
 
 export interface CategorySummary {
