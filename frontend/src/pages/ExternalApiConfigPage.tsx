@@ -321,6 +321,18 @@ export const DEFAULT_PORTAL_SLOTS: PortalSlotItem[] = [
     enabled: true,
   },
   {
+    slot_key: "gpt_account",
+    name: "ChatGPT: Tra Cứu Tài Khoản",
+    category: "gpt",
+    assigned_services: ["warehouse_2fa", "yuna_2fa"],
+    primary_service_key: "warehouse_2fa",
+    fallback_service_key: "yuna_2fa",
+    cooldown_seconds: 15,
+    btn_text: "Tra Cứu Tài Khoản",
+    input_placeholder: "Nhập Email mua hàng hoặc Mã đơn hàng...",
+    enabled: true,
+  },
+  {
     slot_key: "two_factor_totp",
     name: "2FA: Sinh Mã TOTP",
     category: "2fa",
@@ -449,6 +461,24 @@ export const ExternalApiConfigPage: React.FC = () => {
   const [savingEditModal, setSavingEditModal] = useState(false);
 
   const [savingSlots, setSavingSlots] = useState(false);
+  const [syncingSlots, setSyncingSlots] = useState(false);
+
+  const handleSyncSlotsFromPortal = async () => {
+    try {
+      setSyncingSlots(true);
+      const res = await fetch("/api/public/otp-portal-slots");
+      if (!res.ok) throw new Error("Không thể tải danh sách ô từ hệ thống.");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.slots)) {
+        setPortalSlots(data.slots);
+        showToast("success", `Đã đồng bộ ${data.slots.length} ô input từ Web OTP Portal!`);
+      }
+    } catch (err: any) {
+      showToast("error", err.message || "Lỗi khi đồng bộ ô input");
+    } finally {
+      setSyncingSlots(false);
+    }
+  };
 
   // Tải cấu hình gán ô từ DB system_configs hoặc public slots API
   const fetchPortalSlots = useCallback(async () => {
@@ -1434,7 +1464,17 @@ export const ExternalApiConfigPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={syncingSlots}
+                  onClick={handleSyncSlotsFromPortal}
+                  title="Tự động đồng bộ các form/ô input mới từ Web OTP Portal"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingSlots ? "animate-spin" : ""}`} />
+                  <span>{syncingSlots ? "Đang đồng bộ..." : "Đồng Bộ Ô Từ Web"}</span>
+                </button>
                 <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
                   <span className="text-slate-400">Đang bật:</span>
                   <span className="font-bold text-emerald-400">

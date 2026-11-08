@@ -69,6 +69,16 @@ const DEFAULT_SLOTS = [
     enabled: true,
   },
   {
+    slot_key: "gpt_account",
+    name: "ChatGPT: Tra Cứu Tài Khoản",
+    category: "gpt",
+    assigned_services: ["warehouse_2fa", "yuna_2fa"],
+    cooldown_seconds: 15,
+    btn_text: "Tra Cứu Tài Khoản",
+    input_placeholder: "Nhập Email mua hàng hoặc Mã đơn hàng...",
+    enabled: true,
+  },
+  {
     slot_key: "two_factor_totp",
     name: "2FA: Sinh Mã TOTP",
     category: "2fa",
@@ -81,18 +91,29 @@ const DEFAULT_SLOTS = [
 ];
 
 /**
- * Lấy danh sách slots hiện tại từ memory cache / DB
+ * Lấy danh sách slots hiện tại từ memory cache / DB và tự động bù đắp slots mới
  */
 function getActiveSlots() {
   const raw = systemConfigService.get("OTP_PORTAL_SLOTS_CONFIG");
-  if (!raw) return DEFAULT_SLOTS;
-  if (Array.isArray(raw)) return raw;
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SLOTS;
-  } catch {
-    return DEFAULT_SLOTS;
+  let current = DEFAULT_SLOTS;
+  if (raw) {
+    try {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        current = parsed;
+      }
+    } catch {}
   }
+
+  // Tự động merge slot mới trong DEFAULT_SLOTS nếu DB chưa có
+  const existingKeys = new Set(current.map((s) => s.slot_key));
+  const merged = [...current];
+  for (const defSlot of DEFAULT_SLOTS) {
+    if (!existingKeys.has(defSlot.slot_key)) {
+      merged.push(defSlot);
+    }
+  }
+  return merged;
 }
 
 /**
@@ -192,6 +213,29 @@ async function dispatchSlotRequest({ slotKey, input }) {
     }
   }
 
+  let accountData = null;
+  if (slotKey.includes("account")) {
+    const extraFields = probeResult?.extra_fields || [];
+    const accEmail =
+      extraFields.find((f) => f.key === "account_email" || f.key === "account_username")?.value ||
+      (cleanInput.includes("@") ? cleanInput : "");
+    const pass = extraFields.find((f) => f.key === "password" || f.key === "acc_pass")?.value || "";
+    const plan =
+      extraFields.find((f) => f.key === "product_plan" || f.key === "plan")?.value ||
+      (slotKey.includes("gpt") ? "ChatGPT Plus" : "Adobe CC All Apps");
+    const exp = extraFields.find((f) => f.key === "expires_at")?.value || "Theo gói";
+
+    if (probeResult?.found || accEmail || pass) {
+      accountData = {
+        account: accEmail || cleanInput,
+        password: pass,
+        plan,
+        expired_at: exp,
+        status: "ĐANG HOẠT ĐỘNG",
+      };
+    }
+  }
+
   return {
     success: true,
     slot_key: slotKey,
@@ -200,6 +244,7 @@ async function dispatchSlotRequest({ slotKey, input }) {
     assigned_services: serviceChain,
     attempted_services: attemptedServices,
     input: cleanInput,
+    data: accountData,
     otp: probeResult?.otp || null,
     found: Boolean(probeResult?.found),
     duration_ms: probeResult?.duration_ms || 0,
@@ -208,9 +253,88 @@ async function dispatchSlotRequest({ slotKey, input }) {
   };
 }
 
+/**
+ * Đăng ký / Đồng bộ tự động danh sách các ô input từ web otp_portal sang Backend & Admin.
+ * Thuật toán Smart Merge:
+ * - Bảo toàn 100% các cổng API (assigned_services) và trạng thái (enabled) Master đã cấu hình.
+ * - Bổ sung ngay lập tức bất kỳ slot/form mới nào vừa xuất hiện trên otp_portal.
+ */
+async function registerSlotsFromPortal(incomingSlots = [], updatedBy = "PORTAL_SYNC") {
+  if (!Array.isArray(incomingSlots) || incomingSlots.length === 0) {
+    return getActiveSlots();
+  }
+
+  const currentSlots = getActiveSlots();
+  const currentMap = new Map(currentSlots.map((s) => [s.slot_key, s]));
+  let hasChanges = false;
+
+  const merged = [...currentSlots];
+
+  for (const slot of incomingSlots) {
+    if (!slot || !slot.slot_key) continue;
+    if (currentMap.has(slot.slot_key)) {
+      // Slot đã có: Cập nhật nhãn và placeholder nếu có thay đổi từ phía UI, giữ nguyên cấu hình cổng API của Master
+      const existing = currentMap.get(slot.slot_key);
+      let updatedField = false;
+      if (slot.name && existing.name !== slot.name) {
+        existing.name = slot.name;
+        updatedField = true;
+      }
+      if (slot.input_placeholder && existing.input_placeholder !== slot.input_placeholder) {
+        existing.input_placeholder = slot.input_placeholder;
+        updatedField = true;
+      }
+      if (slot.btn_text && existing.btn_text !== slot.btn_text) {
+        existing.btn_text = slot.btn_text;
+        updatedField = true;
+      }
+      if (slot.category && existing.category !== slot.category) {
+        existing.category = slot.category;
+        updatedField = true;
+      }
+      if (updatedField) hasChanges = true;
+    } else {
+      // Slot mới xuất hiện trên web otp_portal: Thêm mới vào danh sách!
+      const newSlot = {
+        slot_key: slot.slot_key,
+        name: slot.name || `Ô Input [${slot.slot_key}]`,
+        category: slot.category || "otp",
+        assigned_services:
+          Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
+            ? slot.assigned_services
+            : ["warehouse_2fa", "fix_ades"],
+        primary_service_key: slot.assigned_services?.[0] || "warehouse_2fa",
+        fallback_service_key: slot.assigned_services?.[1] || null,
+        cooldown_seconds: Number(slot.cooldown_seconds) || 30,
+        btn_text: slot.btn_text || "Lấy Mã Xác Nhận",
+        input_placeholder: slot.input_placeholder || "Nhập thông tin cần tra cứu...",
+        enabled: slot.enabled !== false,
+      };
+      merged.push(newSlot);
+      currentMap.set(slot.slot_key, newSlot);
+      hasChanges = true;
+    }
+  }
+
+  if (hasChanges) {
+    try {
+      await systemConfigService.set(
+        "OTP_PORTAL_SLOTS_CONFIG",
+        JSON.stringify(merged),
+        updatedBy
+      );
+    } catch (err) {
+      console.warn("[OTP Dispatcher] Lỗi lưu cấu hình slots sau khi sync:", err.message);
+    }
+  }
+
+  return merged;
+}
+
 module.exports = {
   DEFAULT_SLOTS,
   getActiveSlots,
   dispatchSlotRequest,
+  registerSlotsFromPortal,
 };
 

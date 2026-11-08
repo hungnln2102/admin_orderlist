@@ -170,6 +170,23 @@ app.get("/api/public/otp-portal-slots", async (req, res) => {
   }
 });
 
+// Tự động đồng bộ & đăng ký slots từ web otp_portal sang Backend & Admin
+app.post(["/api/public/otp-portal-slots/register", "/api/public/otp-portal-slots/sync"], async (req, res) => {
+  try {
+    const incomingSlots = req.body?.slots || req.body;
+    const updatedBy = req.session?.user?.username || "PORTAL_SYNC";
+    const mergedSlots = await otpPortalDispatcher.registerSlotsFromPortal(incomingSlots, updatedBy);
+    return res.json({
+      success: true,
+      message: `Đã đồng bộ ${mergedSlots.length} ô input từ Web OTP Portal thành công!`,
+      slots: mergedSlots,
+    });
+  } catch (err) {
+    console.error("[Public OTP Slots Sync API] Error:", err.message);
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+});
+
 // Dispatcher trung tâm cho mọi ô input trên OTP Portal & Live Test Admin
 app.post("/api/public/otp/probe-slot", async (req, res) => {
   try {
@@ -196,8 +213,18 @@ app.post("/api/public/otp/adobe/code", async (req, res) => {
 
 app.post("/api/public/otp/adobe/account", async (req, res) => {
   try {
-    const input = req.body?.email || req.body?.order_code || req.body?.input;
+    const input = req.body?.email || req.body?.order_code || req.body?.search || req.body?.input;
     const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "adobe_account", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/gpt/account", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.order_code || req.body?.search || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "gpt_account", input });
     return res.json(result);
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
