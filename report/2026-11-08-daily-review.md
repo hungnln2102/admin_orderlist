@@ -656,3 +656,35 @@
   - **Bảo toàn dữ liệu**: Giữ nguyên vẹn 100% các file code chưa commit của Master.
 
 - **Trạng thái nghiệm thu:** Hoàn tất xuất sắc 100% theo chỉ đạo của Master.
+
+
+---
+
+## [22:05] Hoàn Tất Commit, Push Git & Deploy Production Cả 2 Dự Án Lên VPS (root@180.93.43.169)
+
+- **Phạm vi tác động:**
+  - Kho mã nguồn & Production Host: VPS `root@180.93.43.169`
+  - Dự án Frontend Client: [`otp_portal`](file:///e:/Project/admin_store/otp_portal)
+  - Dự án Quản trị & Backend: [`admin_orderlist`](file:///e:/Project/admin_store/admin_orderlist)
+
+- **Chi tiết triển khai & Source Control:**
+  1. **Git Commit & Push:**
+     - `otp_portal`: Commit `42b8472` (*feat(gpt): add gpt sub-tabs (account & otp) and slots auto-discovery registry*) đã push thành công lên `origin/main`.
+     - `admin_orderlist`: Commit `11c00936` (*feat: implement OTP portal slot dispatcher service*) đã push thành công lên `origin/main`.
+     - Cả 2 kho Git làm việc cục bộ đều sạch 100% (clean working tree).
+  2. **Production Deployment `otp_portal`:**
+     - Build gói production Vite (`dist/`) tối ưu hóa.
+     - Nén và đồng bộ sang thư mục web root máy chủ Nginx `/var/www/otp_portal/dist/`.
+     - Phân quyền tệp `chown -R www-data:www-data /var/www/otp_portal/dist`.
+  3. **Production Deployment `admin_orderlist`:**
+     - SSH vào VPS `/var/www/admin_orderlist`, kéo code mới nhất từ nhánh `main`.
+     - Thực thi `docker compose build backend frontend && docker compose up -d backend frontend`.
+     - Cả 2 container `admin_orderlist-backend` và `admin_orderlist-frontend` đã được rebuild và recreate thành công trong trạng thái Healthy.
+
+- **Kết quả nghiệm thu trực tiếp trên Production (Live Verification):**
+  - **Backend Health Check**: `http://127.0.0.1:3001/api/health` $\rightarrow$ `{"status":"ok","version":"2.0.0","database":"connected"}`.
+  - **Slot Dispatcher Live API**: `http://127.0.0.1:3001/api/public/otp-portal-slots` $\rightarrow$ Trả về đủ 8 slots hoạt động, bao gồm cả slot mới `gpt_account` và `gpt_otp`.
+  - **Production OTP Portal URL**: `https://mavrykpremium.com/otp/` $\rightarrow$ HTTP 200 OK (Cloudflare CDN / Nginx phục vụ phiên bản mới).
+  - **Production Admin API URL**: `https://admin.mavrykpremium.com/api/public/otp-portal-slots` $\rightarrow$ HTTP 200 OK (Phản hồi dữ liệu JSON chuẩn xác).
+
+- **Trạng thái nghiệm thu:** ĐÃ HOÀN TẤT TRIỂN KHAI VÀ VẬN HÀNH 100% TRÊN TOÀN HỆ THỐNG.
