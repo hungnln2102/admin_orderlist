@@ -1,8 +1,8 @@
-﻿/**
+/**
  * VPBank Email Ingestion Service
  * 
- * Äiá»u phá»‘i luá»“ng xá»­ lÃ½ email giao dá»‹ch ngÃ¢n hÃ ng theo chuáº©n ACID:
- * Checkpoint -> Parse -> Resolve Mapping -> Ghi Sá»• CÃ¡i (Credit / Debit) -> Outbox & Domain Event.
+ * Điều phối luồng xử lý email giao dịch ngân hàng theo chuẩn ACID:
+ * Checkpoint -> Parse -> Resolve Mapping -> Ghi Sổ Cái (Credit / Debit) -> Outbox & Domain Event.
  */
 
 const crypto = require("crypto");
@@ -106,7 +106,7 @@ function canRecordPersonalDebtMovement(parsed) {
 }
 
 /**
- * Xá»­ lÃ½ má»™t email message trong Knex Transaction
+ * Xử lý một email message trong Knex Transaction
  */
 async function processEmailMessageInTrx(trx, emailData, options = {}) {
   const provider = options.provider || "VPBANK_GMAIL";
@@ -117,7 +117,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
 
   const checkpoint = await getOrCreateCheckpointInTrx(trx, { provider, mailboxAlias, folderName, uidValidity });
 
-  // 1. Kiá»ƒm tra tÃ­nh Idempotency trÃªn receipt identity
+  // 1. Kiểm tra tính Idempotency trên receipt identity
   const existingReceipt = await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
     .where({
       [C_REC.PROVIDER]: provider,
@@ -139,7 +139,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     };
   }
 
-  // 2. Cháº¡y bá»™ bÃ³c tÃ¡ch Pure Parser
+  // 2. Chạy bộ bóc tách Pure Parser
   const parsed = parseVpbankEmail(emailData);
   const subject = String(emailData.subject || "").trim();
   const bodyText = String(emailData.text || emailData.html || "").trim();
@@ -147,7 +147,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
   const bodyHash = sha256(bodyText);
   const rawSender = emailData.from ? (typeof emailData.from === "object" ? (emailData.from.text || emailData.from.value?.[0]?.address) : String(emailData.from)) : "";
 
-  // 3. Khá»Ÿi táº¡o / cáº­p nháº­t receipt dáº¡ng PARSED
+  // 3. Khởi tạo / cập nhật receipt dạng PARSED
   let receiptId = existingReceipt ? existingReceipt.id : null;
   if (!receiptId) {
     const [newRec] = await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
@@ -175,7 +175,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     receiptId = newRec.id || newRec;
   }
 
-  // 4. Náº¿u khÃ´ng pháº£i giao dá»‹ch tÃ i chÃ­nh hoáº·c ngÆ°á»i gá»­i giáº£ máº¡o -> REJECTED
+  // 4. Nếu không phải giao dịch tài chính hoặc người gửi giả mạo -> REJECTED
   if (!parsed.isFinancial || !parsed.senderValid) {
     const failureCode = !parsed.senderValid ? "INVALID_SENDER" : "NON_FINANCIAL_DOCUMENT";
     await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
@@ -187,7 +187,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
         [C_REC.UPDATED_AT]: trx.fn.now(),
       });
 
-    // Advance terminal uid náº¿u UID nÃ y lá»›n hÆ¡n
+    // Advance terminal uid nếu UID này lớn hơn
     if (emailUid > Number(checkpoint[C_CHK.LAST_TERMINAL_UID])) {
       await trx(TABLES.EMAIL_SYNC_CHECKPOINTS)
         .where(C_CHK.ID, checkpoint[C_CHK.ID])
@@ -196,7 +196,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     return { status: "REJECTED", failureCode, receiptId };
   }
 
-  // 5. Náº¿u lÃ  sao kÃª Ä‘á»‹nh ká»³ -> MANUAL_REVIEW (yÃªu cáº§u Master kiá»ƒm tra vÃ  import báº±ng nÃºt chuyÃªn dá»¥ng)
+  // 5. Nếu là sao kê định kỳ -> MANUAL_REVIEW (yêu cầu Master kiểm tra và import bằng nút chuyên dụng)
   if (parsed.requiresManualStatementImport) {
     await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
       .where("id", receiptId)
@@ -215,7 +215,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     return { status: "MANUAL_REVIEW", failureCode: "STATEMENT_REQUIRES_MANUAL_IMPORT", receiptId };
   }
 
-  // 6. TÃ¬m mapping tháº» trong database
+  // 6. Tìm mapping thẻ trong database
   // Resolve the full debit account first; suffix matching remains legacy fallback only.
   const resolvedDebtAsset = await resolvePersonalDebtAssetInTrx(trx, {
     maskedSuffix: parsed.maskedSuffix,
@@ -262,7 +262,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     };
   }
 
-  // 7. Táº¡o businessKey duy nháº¥t chá»‘ng háº¡ch toÃ¡n 2 láº§n
+  // 7. Tạo businessKey duy nhất chống hạch toán 2 lần
   const businessKey = parsed.referenceCode
     ? `${parsed.instrumentKind}:${parsed.sourceAccountNumber || parsed.maskedSuffix}:${parsed.referenceCode}`
     : `${parsed.instrumentKind}:${parsed.sourceAccountNumber || parsed.maskedSuffix}:${parsed.occurredAt}:${parsed.amount}`;
@@ -271,7 +271,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
   let personalDebitLogId = null;
   let personalDebtPaymentLogId = null;
 
-  // 8. Háº¡ch toÃ¡n theo Loáº¡i Dá»¥ng Cá»¥ (Credit Card vs Debit Card)
+  // 8. Hạch toán theo Loại Dụng Cụ (Credit Card vs Debit Card)
   if (personalDebtAsset) {
     const debtBusinessKey = parsed.referenceCode
       ? `PERSONAL_DEBT:${personalDebtAsset[C_ASSET.ID]}:${parsed.referenceCode}`
@@ -334,7 +334,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
   } else {
     throw new Error("Mapped bank instrument has no valid target");
   }
-  // 9. Cáº­p nháº­t Receipt thÃ nh APPLIED
+  // 9. Cập nhật Receipt thành APPLIED
   await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
     .where("id", receiptId)
     .update({
@@ -355,7 +355,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
       [C_REC.UPDATED_AT]: trx.fn.now(),
     });
 
-  // 10. Cáº­p nháº­t checkpoint terminal UID
+  // 10. Cập nhật checkpoint terminal UID
   if (emailUid > Number(checkpoint[C_CHK.LAST_TERMINAL_UID])) {
     await trx(TABLES.EMAIL_SYNC_CHECKPOINTS)
       .where(C_CHK.ID, checkpoint[C_CHK.ID])

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, CreditCard, Check, AlertCircle, Search, DollarSign } from "lucide-react";
 import { Order } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { ordersApiClient } from "../api/ordersApiClient";
 
 interface CreditNote {
   id: number;
@@ -80,19 +81,10 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/orders/${order.id}/pay-credit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credit_note_id: selected.id }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        notify.success(`Thanh toán đơn #${order.id_order} bằng credit ${selected.credit_code} thành công! Đã chuyển sang Đang Xử Lý.`);
-        onSuccess();
-        onClose();
-      } else {
-        throw new Error(data.error || "Không thể thanh toán bằng credit.");
-      }
+      await ordersApiClient.payOrderWithCredit(order.id, selected.id);
+      notify.success(`Thanh toán đơn #${order.id_order} bằng credit ${selected.credit_code} thành công! Đã chuyển sang Đang Xử Lý.`);
+      onSuccess();
+      onClose();
     } catch (err: any) {
       console.error("Lỗi thanh toán bằng credit:", err);
       notify.error(err.message || "Lỗi hệ thống khi thanh toán bằng credit.");

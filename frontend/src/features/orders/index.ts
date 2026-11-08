@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./api/ordersApiClient";
 export * from "./constants/orderStatus";
 export * from "./constants/orderPrefix";
 export * from "./utils/durationUtils";

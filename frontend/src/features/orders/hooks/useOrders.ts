@@ -3,6 +3,7 @@ import { Order, OrderDatasetKey, calculateRemainingValue } from "../types";
 import { ORDER_STATUS } from "../constants/orderStatus";
 import { formatDateYYYYMMDD } from "../utils/durationUtils";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
+import { ordersApiClient } from "../api/ordersApiClient";
 
 type OrdersSummary = {
   totalRevenue: number;
@@ -64,31 +65,24 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     setLoading(true);
 
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(pageSize),
+      const data = await ordersApiClient.getOrders({
+        page,
+        limit: pageSize,
         search: searchValue,
         status: statusFilterValue,
         tab: activeTabValue,
-        includeStats: "true",
+        includeStats: true,
       });
-      const res = await fetch(`/api/orders?${params.toString()}`, { credentials: "include" });
-      const data = await res.json();
       if (requestSequence !== requestSequenceRef.current) return;
-
-      if (!res.ok) {
-        console.error("Lỗi lấy danh sách đơn:", data.error);
-        return;
-      }
 
       setOrders(data.data || []);
       setTotalPages(data.pagination?.totalPages || 1);
       setTotalOrders(data.pagination?.total || 0);
       if (data.tabCounts) setTabCounts(data.tabCounts);
       if (data.summary) setServerSummary(data.summary);
-    } catch (err) {
+    } catch (err: any) {
       if (requestSequence === requestSequenceRef.current) {
-        console.error("Lỗi kết nối API:", err);
+        console.error("Lỗi lấy danh sách đơn:", err?.message || err);
       }
     } finally {
       if (requestSequence === requestSequenceRef.current) setLoading(false);

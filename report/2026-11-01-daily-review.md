@@ -35,97 +35,97 @@
 
 > *Nguồn gốc tài liệu hợp nhất:* [report/2026-11-01-catalog-renewal-pricing-and-inactive-notifications-review.md](file:///d:/Desktop/admin/admin_orderlist/report/2026-11-01-catalog-renewal-pricing-and-inactive-notifications-review.md)
 
-> **Thá»i gian thá»±c hiá»‡n (UTC+7):** 2026-11-01 15:30
-> **NgÆ°á»i thá»±c hiá»‡n:** Orchestrator Agent & Äá»™i NgÅ© Subagents
-> **NgÆ°á»i phÃª duyá»‡t:** ðŸ‘‘ Master (Sáº¿p)
-> **Pháº¡m vi tÃ¡c Ä‘á»™ng:** `backend` (orders, products, scheduler, notifications telegram), `frontend` (OrdersPage), `database` (PostgreSQL VPS).
+> **Thời gian thực hiện (UTC+7):** 2026-11-01 15:30
+> **Người thực hiện:** Orchestrator Agent & Đội Ngũ Subagents
+> **Người phê duyệt:** 👑 Master (Sếp)
+> **Phạm vi tác động:** `backend` (orders, products, scheduler, notifications telegram), `frontend` (OrdersPage), `database` (PostgreSQL VPS).
 
 ---
 
 ### 1. PHáº M VI NGHIá»†M THU (SCOPE)
 
-1. **Quy Táº¯c GiÃ¡ Catalog Äá»™ng Khi Chuyá»ƒn Sang `RENEW_REQUIRED` (Cáº§n Gia Háº¡n):**
-   - Khi Ä‘Æ¡n `PAID` (ÄÃ£ Thanh ToÃ¡n) chuyá»ƒn tráº¡ng thÃ¡i thÃ nh `RENEW_REQUIRED` (qua Cron 0h hÃ ng ngÃ y `updateOrderStatusTask` hoáº·c gá»i API `/renew`): GiÃ¡ bÃ¡n gá»‘c (`gross_selling_price`) **báº¯t buá»™c láº¥y theo giÃ¡ hiá»‡n hÃ nh trong catalog (báº£ng giÃ¡)** theo phÃ¢n loáº¡i tiá»n tá»‘ Ä‘Æ¡n hÃ ng:
-     - `MAVL` (BÃ¡n láº») -> `tier_id = 2`
-     - `MAVC` (Cá»™ng tÃ¡c viÃªn) -> `tier_id = 1`
-     - `MAVK` (Khuyáº¿n mÃ£i) -> `tier_id = 3`
-     - `MAVS` (Há»c sinh - Sinh viÃªn) -> `tier_id = 4`
-     - `MAVT` (QuÃ  táº·ng / Tri Ã¢n) -> `0 â‚«`
-     - `MAVN` (ÄÆ¡n nháº­p / ná»™i bá»™) -> Chi phÃ­ vá»‘n / giÃ¡ cÆ¡ sá»Ÿ
-   - **Äá»“ng Bá»™ GiÃ¡ Tá»± Äá»™ng Khi Äá»•i Báº£ng GiÃ¡:** Khi Ä‘Æ¡n Ä‘ang á»Ÿ tráº¡ng thÃ¡i `RENEW_REQUIRED`, náº¿u Master thay Ä‘á»•i báº£ng giÃ¡ trong Catalog (vÃ­ dá»¥ tá»« 200.000 â‚« thÃ nh 150.000 â‚«), há»‡ thá»‘ng tá»± Ä‘á»™ng cáº­p nháº­t láº¡i giÃ¡ cá»§a cÃ¡c Ä‘Æ¡n `RENEW_REQUIRED` Ä‘ang chá» theo giÃ¡ má»›i (150.000 â‚« + slot suffix Ä‘Ã£ ghim).
-   - **Báº£o Vá»‡ Tuyá»‡t Äá»‘i ÄÆ¡n `PAID` & `EXPIRED`:**
-     - CÃ¡c Ä‘Æ¡n Ä‘Ã£ thanh toÃ¡n (`PAID`) vÃ  cÃ¡c Ä‘Æ¡n Ä‘Ã£ háº¿t háº¡n (`EXPIRED`) lÃ  dá»¯ liá»‡u lá»‹ch sá»­ tÃ i chÃ­nh báº¥t biáº¿n. Tuyá»‡t Ä‘á»‘i **KHÃ”NG** thay Ä‘á»•i hoáº·c lÃ m mÃ©o mÃ³ dá»¯ liá»‡u giÃ¡ bÃ¡n cá»§a cÃ¡c Ä‘Æ¡n nÃ y khi báº£ng giÃ¡ catalog thay Ä‘á»•i.
+1. **Quy Tắc Giá Catalog Động Khi Chuyển Sang `RENEW_REQUIRED` (Cần Gia Hạn):**
+   - Khi đơn `PAID` (Đã Thanh Toán) chuyển trạng thái thành `RENEW_REQUIRED` (qua Cron 0h hàng ngày `updateOrderStatusTask` hoặc gọi API `/renew`): Giá bán gốc (`gross_selling_price`) **bắt buộc lấy theo giá hiện hành trong catalog (bảng giá)** theo phân loại tiền tố đơn hàng:
+     - `MAVL` (Bán lẻ) -> `tier_id = 2`
+     - `MAVC` (Cộng tác viên) -> `tier_id = 1`
+     - `MAVK` (Khuyến mãi) -> `tier_id = 3`
+     - `MAVS` (Học sinh - Sinh viên) -> `tier_id = 4`
+     - `MAVT` (Quà tặng / Tri ân) -> `0 ₫`
+     - `MAVN` (Đơn nhập / nội bộ) -> Chi phí vốn / giá cơ sở
+   - **Đồng Bộ Giá Tự Động Khi Đổi Bảng Giá:** Khi đơn đang ở trạng thái `RENEW_REQUIRED`, nếu Master thay đổi bảng giá trong Catalog (ví dụ từ 200.000 ₫ thành 150.000 ₫), hệ thống tự động cập nhật lại giá của các đơn `RENEW_REQUIRED` đang chờ theo giá mới (150.000 ₫ + slot suffix đã ghim).
+   - **Bảo Vệ Tuyệt Đối Đơn `PAID` & `EXPIRED`:**
+     - Các đơn đã thanh toán (`PAID`) và các đơn đã hết hạn (`EXPIRED`) là dữ liệu lịch sử tài chính bất biến. Tuyệt đối **KHÔNG** thay đổi hoặc làm méo mó dữ liệu giá bán của các đơn này khi bảng giá catalog thay đổi.
 
-2. **CÆ¡ Cháº¿ Giá»¯ Cháº·t Slot Suffix & Tuyá»‡t Äá»‘i KhÃ´ng LÃ m TrÃ²n GiÃ¡:**
-   - ÄÆ¡n hÃ ng chiáº¿m dá»¥ng slot suffix tá»« 1 Ä‘áº¿n 100, suffix Ä‘Æ°á»£c ghim cá»‘ Ä‘á»‹nh tá»« khi táº¡o cho Ä‘áº¿n khi thanh toÃ¡n thÃ nh cÃ´ng hoáº·c há»§y. Sá»­a sáº£n pháº©m hay cáº­p nháº­t thÃ´ng tin Ä‘Æ¡n hÃ ng khÃ´ng lÃ m thay Ä‘á»•i slot suffix.
-   - Triá»‡t tiÃªu hoÃ n toÃ n cÃ¡c lá»‡nh lÃ m trÃ²n sá»‘ tiá»n (`Math.floor(x / 100) * 100`, `Math.floor(x / 1000) * 1000`). GiÃ¡ sáº£n pháº©m luÃ´n láº¥y chÃ­nh xÃ¡c theo catalog.
+2. **Cơ Chế Giữ Chặt Slot Suffix & Tuyệt Đối Không Làm Tròn Giá:**
+   - Đơn hàng chiếm dụng slot suffix từ 1 đến 100, suffix được ghim cố định từ khi tạo cho đến khi thanh toán thành công hoặc hủy. Sửa sản phẩm hay cập nhật thông tin đơn hàng không làm thay đổi slot suffix.
+   - Triệt tiêu hoàn toàn các lệnh làm tròn số tiền (`Math.floor(x / 100) * 100`, `Math.floor(x / 1000) * 1000`). Giá sản phẩm luôn lấy chính xác theo catalog.
 
-3. **ThÃ´ng BÃ¡o Telegram LÃºc 7h SÃ¡ng Äá»‘i Vá»›i Sáº£n Pháº©m ÄÃ£ NgÆ°ng Hoáº¡t Äá»™ng (`is_active = false`):**
-   - CÃ¡c Ä‘Æ¡n hÃ ng cÃ³ sáº£n pháº©m/variant Ä‘ang ngÆ°ng hoáº¡t Ä‘á»™ng (`is_active = false`):
-     - Váº«n gá»­i thÃ´ng bÃ¡o gia háº¡n nháº¯c khÃ¡ch hÃ ng bÃ¬nh thÆ°á»ng.
-     - **LÆ°á»£c bá» hoÃ n toÃ n mÃ£ QR thanh toÃ¡n**.
-     - **LÆ°á»£c bá» hoÃ n toÃ n thÃ´ng tin giÃ¡ tiá»n, STK ngÃ¢n hÃ ng**.
-     - Bá»• sung thÃ´ng Ä‘iá»‡p hÆ°á»›ng dáº«n khÃ¡ch liÃªn há»‡ há»— trá»£ Ä‘á»ƒ Ä‘Æ°á»£c tÆ° váº¥n gÃ³i sáº£n pháº©m phÃ¹ há»£p.
+3. **Thông Báo Telegram Lúc 7h Sáng Đối Với Sản Phẩm Đã Ngưng Hoạt Động (`is_active = false`):**
+   - Các đơn hàng có sản phẩm/variant đang ngưng hoạt động (`is_active = false`):
+     - Vẫn gửi thông báo gia hạn nhắc khách hàng bình thường.
+     - **Lược bỏ hoàn toàn mã QR thanh toán**.
+     - **Lược bỏ hoàn toàn thông tin giá tiền, STK ngân hàng**.
+     - Bổ sung thông điệp hướng dẫn khách liên hệ hỗ trợ để được tư vấn gói sản phẩm phù hợp.
 
 ---
 
 ### 2. TRáº NG THÃI NGHIá»†M THU (ACCEPTANCE STATUS)
 
-| Háº¡ng má»¥c kiá»ƒm tra | Tráº¡ng thÃ¡i | Ghi chÃº nghiá»‡m thu |
+| Hạng mục kiểm tra | Trạng thái | Ghi chú nghiệm thu |
 | :--- | :---: | :--- |
-| **Báº£o vá»‡ tÃ­nh báº¥t biáº¿n Ä‘Æ¡n `PAID` & `EXPIRED`** | âœ… **Äáº T** | Truy váº¥n DB xÃ¡c nháº­n Ä‘Æ¡n `PAID` vÃ  `EXPIRED` giá»¯ nguyÃªn giÃ¡ lá»‹ch sá»­ 100%. |
-| **GiÃ¡ catalog Ä‘á»™ng cho Ä‘Æ¡n `RENEW_REQUIRED`** | âœ… **Äáº T** | ÄÃ£ viáº¿t service táº­p trung `catalogPricingService.js`, tÃ­ch há»£p hook vÃ o `productService.updateVariantPrice` vÃ  Cron 0h. |
-| **LÆ°á»£c bá» QR & GiÃ¡ khi sáº£n pháº©m ngÆ°ng hoáº¡t Ä‘á»™ng** | âœ… **Äáº T** | TÃ­ch há»£p vÃ o `orderMessageBuilder.js` vÃ  `orderNotifier.js`. Variant `is_active = false` áº©n toÃ n bá»™ block thanh toÃ¡n. |
-| **Khá»›p biÃªn lai SePay #95110228 vÃ o Ä‘Æ¡n MAVLR5LOB** | âœ… **Äáº T** | ÄÆ¡n MAVLR5LOB chuyá»ƒn `PAID` (80.004 â‚« / base 80.000 â‚«, slot 4). BiÃªn lai 43 chuyá»ƒn `FULLY_ALLOCATED` (0.00 â‚« dÆ°). |
-| **Bá»™ kiá»ƒm thá»­ tá»± Ä‘á»™ng (Unit Test Suite)** | âœ… **Äáº T** | 58/58 test pass 100% (gá»“m suite `catalogRenewalPricing.test.js`). |
-| **Kiá»ƒm tra biÃªn dá»‹ch Frontend (Vite/TSC)** | âœ… **Äáº T** | `tsc && vite build` hoÃ n thÃ nh khÃ´ng cÃ³ báº¥t ká»³ lá»—i cÃº phÃ¡p hoáº·c cáº£nh bÃ¡o nÃ o. |
-| **Triá»ƒn khai Production VPS (`admin_orderlist-backend`)** | âœ… **Äáº T** | ÄÃ£ Ä‘á»“ng bá»™ mÃ£ nguá»“n lÃªn container, khá»Ÿi Ä‘á»™ng láº¡i container vÃ  flush Redis sáº¡ch sáº½. Há»‡ thá»‘ng cháº¡y á»•n Ä‘á»‹nh. |
+| **Bảo vệ tính bất biến đơn `PAID` & `EXPIRED`** | ✅ **ĐẠT** | Truy vấn DB xác nhận đơn `PAID` và `EXPIRED` giữ nguyên giá lịch sử 100%. |
+| **Giá catalog động cho đơn `RENEW_REQUIRED`** | ✅ **ĐẠT** | Đã viết service tập trung `catalogPricingService.js`, tích hợp hook vào `productService.updateVariantPrice` và Cron 0h. |
+| **Lược bỏ QR & Giá khi sản phẩm ngưng hoạt động** | ✅ **ĐẠT** | Tích hợp vào `orderMessageBuilder.js` và `orderNotifier.js`. Variant `is_active = false` ẩn toàn bộ block thanh toán. |
+| **Khớp biên lai SePay #95110228 vào đơn MAVLR5LOB** | ✅ **ĐẠT** | Đơn MAVLR5LOB chuyển `PAID` (80.004 ₫ / base 80.000 ₫, slot 4). Biên lai 43 chuyển `FULLY_ALLOCATED` (0.00 ₫ dư). |
+| **Bộ kiểm thử tự động (Unit Test Suite)** | ✅ **ĐẠT** | 58/58 test pass 100% (gồm suite `catalogRenewalPricing.test.js`). |
+| **Kiểm tra biên dịch Frontend (Vite/TSC)** | ✅ **ĐẠT** | `tsc && vite build` hoàn thành không có bất kỳ lỗi cú pháp hoặc cảnh báo nào. |
+| **Triển khai Production VPS (`admin_orderlist-backend`)** | ✅ **ĐẠT** | Đã đồng bộ mã nguồn lên container, khởi động lại container và flush Redis sạch sẽ. Hệ thống chạy ổn định. |
 
 ---
 
 ### 3. CÃC Táº¬P TIN MÃƒ NGUá»’N ÄÃƒ THAY Äá»”I & Táº O Má»šI
 
 1. [`backend/src/domains/products/services/catalogPricingService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/products/services/catalogPricingService.js):
-   - Service trung tÃ¢m giáº£i quyáº¿t giÃ¡ catalog theo prefix vÃ  kiá»ƒm tra tráº¡ng thÃ¡i hoáº¡t Ä‘á»™ng cá»§a sáº£n pháº©m.
-   - Cung cáº¥p hÃ m `syncRenewRequiredOrdersPricing` chá»‰ cáº­p nháº­t Ä‘Æ¡n `RENEW_REQUIRED`.
+   - Service trung tâm giải quyết giá catalog theo prefix và kiểm tra trạng thái hoạt động của sản phẩm.
+   - Cung cấp hàm `syncRenewRequiredOrdersPricing` chỉ cập nhật đơn `RENEW_REQUIRED`.
 
 2. [`backend/src/scheduler/tasks/updateOrderStatusTask.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/scheduler/tasks/updateOrderStatusTask.js):
-   - Cháº¡y cron 0h hÃ ng ngÃ y: khi chuyá»ƒn Ä‘Æ¡n sang `RENEW_REQUIRED`, tá»± Ä‘á»™ng giáº£i quyáº¿t giÃ¡ catalog má»›i vÃ  Ä‘á»“ng bá»™ láº¡i giÃ¡ cho toÃ n bá»™ Ä‘Æ¡n `RENEW_REQUIRED`.
-   - Giá»¯ nguyÃªn giÃ¡ gá»‘c cho Ä‘Æ¡n `EXPIRED`.
+   - Chạy cron 0h hàng ngày: khi chuyển đơn sang `RENEW_REQUIRED`, tự động giải quyết giá catalog mới và đồng bộ lại giá cho toàn bộ đơn `RENEW_REQUIRED`.
+   - Giữ nguyên giá gốc cho đơn `EXPIRED`.
 
 3. [`backend/src/domains/products/services/productService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/products/services/productService.js):
-   - Khi chá»‰nh sá»­a giÃ¡ bÃ¡n variant trong catalog, tá»± Ä‘á»™ng gá»i `syncRenewRequiredOrdersPricing` Ä‘á»ƒ cáº­p nháº­t tá»©c thÃ¬ cho cÃ¡c Ä‘Æ¡n `RENEW_REQUIRED`.
+   - Khi chỉnh sửa giá bán variant trong catalog, tự động gọi `syncRenewRequiredOrdersPricing` để cập nhật tức thì cho các đơn `RENEW_REQUIRED`.
 
 4. [`backend/src/domains/orders/services/orderService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/orders/services/orderService.js):
-   - Loáº¡i bá» phÃ©p lÃ m trÃ²n giÃ¡ `Math.floor / 1000`.
-   - Giá»¯ cháº·t slot suffix khi cáº­p nháº­t hoáº·c Ä‘á»•i sáº£n pháº©m cho Ä‘Æ¡n chÆ°a thanh toÃ¡n.
-   - Khi gia háº¡n thá»§ cÃ´ng (`renewOrder`), láº¥y giÃ¡ catalog hiá»‡n hÃ nh vÃ  gÃ¡n slot suffix kháº£ dá»¥ng.
+   - Loại bỏ phép làm tròn giá `Math.floor / 1000`.
+   - Giữ chặt slot suffix khi cập nhật hoặc đổi sản phẩm cho đơn chưa thanh toán.
+   - Khi gia hạn thủ công (`renewOrder`), lấy giá catalog hiện hành và gán slot suffix khả dụng.
 
 5. [`backend/src/domains/notifications/telegram/builders/orderMessageBuilder.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/notifications/telegram/builders/orderMessageBuilder.js):
-   - Trong `buildDueOrderMessage`: Khi `is_active === false`, áº©n giÃ¡ tiá»n vÃ  STK ngÃ¢n hÃ ng, chÃ¨n dÃ²ng hÆ°á»›ng dáº«n liÃªn há»‡ há»— trá»£.
+   - Trong `buildDueOrderMessage`: Khi `is_active === false`, ẩn giá tiền và STK ngân hàng, chèn dòng hướng dẫn liên hệ hỗ trợ.
 
 6. [`backend/src/domains/notifications/telegram/dispatchers/orderNotifier.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/notifications/telegram/dispatchers/orderNotifier.js):
-   - Tra cá»©u `is_active` cho tá»«ng Ä‘Æ¡n khi gá»­i thÃ´ng bÃ¡o buá»•i sÃ¡ng; náº¿u sáº£n pháº©m ngÆ°ng hoáº¡t Ä‘á»™ng thÃ¬ bá» qua viá»‡c Ä‘Ã­nh kÃ¨m áº£nh QR.
+   - Tra cứu `is_active` cho từng đơn khi gửi thông báo buổi sáng; nếu sản phẩm ngưng hoạt động thì bỏ qua việc đính kèm ảnh QR.
 
 7. [`backend/tests/unit/catalogRenewalPricing.test.js`](file:///e:/Project/admin_store/admin_orderlist/backend/tests/unit/catalogRenewalPricing.test.js):
-   - Bá»™ 8 bÃ i test chuyÃªn biá»‡t kiá»ƒm chá»©ng tiá»n tá»‘, láº¥y giÃ¡ catalog, báº£o vá»‡ Ä‘Æ¡n `PAID`/`EXPIRED` vÃ  áº©n QR khi sáº£n pháº©m inactive.
+   - Bộ 8 bài test chuyên biệt kiểm chứng tiền tố, lấy giá catalog, bảo vệ đơn `PAID`/`EXPIRED` và ẩn QR khi sản phẩm inactive.
 
 ---
 
 ### 4. Káº¾T QUáº¢ KIá»‚M THá»¬ (TEST VERIFICATION)
 
-#### 4.1. Cháº¡y Backend Unit Tests:
+#### 4.1. Chạy Backend Unit Tests:
 ```
 âœ” resolvePgDumpExecutable resolves pg_dump without uncaught exceptions
 âœ” scheduler registers auto_backup_database handler
 âœ” Batch Payment & Slot Suffix Reconciliation Suite (10.3686ms)
 âœ” Catalog Renewal Pricing & Inactive Notification Suite (26.1253ms)
   âœ” 1. getOrderPrefix logic
-  âœ” 2. resolveOrderCatalogPricing (láº¥y Ä‘Ãºng tier vÃ  cá» isActive)
-  âœ” 3. syncRenewRequiredOrdersPricing - Báº£o Vá»‡ Tuyá»‡t Äá»‘i ÄÆ¡n PAID & EXPIRED
-  âœ” 4. buildDueOrderMessage - LÆ°á»£c Bá» GiÃ¡ & QR Cho Sáº£n Pháº©m KhÃ´ng Hoáº¡t Äá»™ng
-âœ” Order Delete Status Transition Suite - Chá»‰ Äáº¡o Cá»§a Master
-âœ” Renewal Date Calculation - Logic Chuáº©n HÃ³a Theo Chá»‰ Äáº¡o Cá»§a Master
+  ✔ 2. resolveOrderCatalogPricing (lấy đúng tier và cờ isActive)
+  ✔ 3. syncRenewRequiredOrdersPricing - Bảo Vệ Tuyệt Đối Đơn PAID & EXPIRED
+  ✔ 4. buildDueOrderMessage - Lược Bỏ Giá & QR Cho Sản Phẩm Không Hoạt Động
+✔ Order Delete Status Transition Suite - Chỉ Đạo Của Master
+✔ Renewal Date Calculation - Logic Chuẩn Hóa Theo Chỉ Đạo Của Master
 âœ” Slot Suffix Immutability & Unrounded Pricing Tests
 â„¹ tests 58
 â„¹ suites 15
@@ -133,28 +133,28 @@
 â„¹ fail 0
 ```
 
-#### 4.2. Tráº¡ng thÃ¡i thá»±c táº¿ trÃªn VPS Production (Truy váº¥n PostgreSQL trá»±c tiáº¿p):
-- **ÄÆ¡n hÃ ng `MAVLR5LOB` (ID 1422):**
-  - Tráº¡ng thÃ¡i: `PAID` (ÄÃ£ thanh toÃ¡n)
-  - GiÃ¡: `80.004,00 â‚«` (GiÃ¡ gá»‘c: `80.000,00 â‚«`, Slot suffix: `4`)
+#### 4.2. Trạng thái thực tế trên VPS Production (Truy vấn PostgreSQL trực tiếp):
+- **Đơn hàng `MAVLR5LOB` (ID 1422):**
+  - Trạng thái: `PAID` (Đã thanh toán)
+  - Giá: `80.004,00 ₫` (Giá gốc: `80.000,00 ₫`, Slot suffix: `4`)
   - `was_paid`: `true`
-- **BiÃªn lai SePay `95110228` (ID 43):**
-  - Sá»‘ tiá»n: `80.004,00 â‚«`
-  - Sá»‘ tiá»n chÆ°a phÃ¢n bá»•: `0,00 â‚«`
-  - Tráº¡ng thÃ¡i: `FULLY_ALLOCATED`
-- **Báº£n ghi phÃ¢n bá»• (Allocation ID 41):**
-  - ÄÃ£ phÃ¢n bá»• toÃ n bá»™ `80.004,00 â‚«` vÃ o Ä‘Æ¡n `MAVLR5LOB`.
+- **Biên lai SePay `95110228` (ID 43):**
+  - Số tiền: `80.004,00 ₫`
+  - Số tiền chưa phân bổ: `0,00 ₫`
+  - Trạng thái: `FULLY_ALLOCATED`
+- **Bản ghi phân bổ (Allocation ID 41):**
+  - Đã phân bổ toàn bộ `80.004,00 ₫` vào đơn `MAVLR5LOB`.
 
 ---
 
 ### 5. Káº¾T LUáº¬N & KIáº¾N NGHá»Š
 
-Há»‡ thá»‘ng Ä‘Ã£ Ä‘Ã¡p á»©ng chÃ­nh xÃ¡c 100% cÃ¡c yÃªu cáº§u ká»¹ thuáº­t vÃ  nghiá»‡p vá»¥ do Master chá»‰ Ä‘áº¡o:
-1. ÄÆ¡n hÃ ng khÃ´ng bá»‹ lÃ m trÃ²n giÃ¡ báº¥t ká»³ Ä‘Ã¢u.
-2. Slot suffix giá»¯ nguyÃªn khÃ´ng bá»‹ nháº£y khi sá»­a Ä‘Æ¡n.
-3. GiÃ¡ Ä‘Æ¡n gia háº¡n (`RENEW_REQUIRED`) luÃ´n gáº¯n káº¿t máº­t thiáº¿t vÃ  cáº­p nháº­t tá»± Ä‘á»™ng theo báº£ng giÃ¡ catalog.
-4. Dá»¯ liá»‡u tÃ i chÃ­nh cá»§a Ä‘Æ¡n `PAID` vÃ  `EXPIRED` Ä‘Æ°á»£c báº£o vá»‡ báº¥t biáº¿n.
-5. KhÃ¡ch hÃ ng sá»­ dá»¥ng gÃ³i dá»‹ch vá»¥ Ä‘Ã£ ngÆ°ng hoáº¡t Ä‘á»™ng sáº½ khÃ´ng bá»‹ nháº­n mÃ£ QR thanh toÃ¡n nháº§m mÃ  Ä‘Æ°á»£c thÃ´ng bÃ¡o liÃªn há»‡ há»— trá»£.
+Hệ thống đã đáp ứng chính xác 100% các yêu cầu kỹ thuật và nghiệp vụ do Master chỉ đạo:
+1. Đơn hàng không bị làm tròn giá bất kỳ đâu.
+2. Slot suffix giữ nguyên không bị nhảy khi sửa đơn.
+3. Giá đơn gia hạn (`RENEW_REQUIRED`) luôn gắn kết mật thiết và cập nhật tự động theo bảng giá catalog.
+4. Dữ liệu tài chính của đơn `PAID` và `EXPIRED` được bảo vệ bất biến.
+5. Khách hàng sử dụng gói dịch vụ đã ngưng hoạt động sẽ không bị nhận mã QR thanh toán nhầm mà được thông báo liên hệ hỗ trợ.
 
 ---
 
@@ -1379,52 +1379,52 @@ Ký hiệu: `RUNTIME` là đường chạy chính hiện tại; `MIGRATION` là 
 
 > *Nguồn gốc tài liệu hợp nhất:* [report/2026-11-01-vps-timezone-and-ntp-synchronization-review.md](file:///d:/Desktop/admin/admin_orderlist/report/2026-11-01-vps-timezone-and-ntp-synchronization-review.md)
 
-> **Thá»i gian thá»±c hiá»‡n (UTC+7):** 2026-11-01 16:30
-> **NgÆ°á»i thá»±c hiá»‡n:** Orchestrator Agent & Äá»™i NgÅ© Subagents
-> **NgÆ°á»i phÃª duyá»‡t:** ðŸ‘‘ Master (Sáº¿p)
-> **Pháº¡m vi tÃ¡c Ä‘á»™ng:** VPS Host Ubuntu 24.04, Docker Engine, PostgreSQL 16, Redis 7, Backend Node.js, Frontend Nginx, Cloud Browser.
+> **Thời gian thực hiện (UTC+7):** 2026-11-01 16:30
+> **Người thực hiện:** Orchestrator Agent & Đội Ngũ Subagents
+> **Người phê duyệt:** 👑 Master (Sếp)
+> **Phạm vi tác động:** VPS Host Ubuntu 24.04, Docker Engine, PostgreSQL 16, Redis 7, Backend Node.js, Frontend Nginx, Cloud Browser.
 
 ---
 
 ### 1. PHáº M VI NGHIá»†M THU (SCOPE)
 
-1. **Kháº¯c Phá»¥c Lá»‡ch Giá» & Chuáº©n HÃ³a Thá»i Gian TrÃªn Host VPS:**
-   - Xá»­ lÃ½ tÃ¬nh tráº¡ng Ä‘á»“ng há»“ mÃ¡y chá»§ bá»‹ cháº¡y cháº­m ~5 phÃºt do dá»‹ch vá»¥ `systemd-timesyncd` máº·c Ä‘á»‹nh trá» tá»›i `ntp.ubuntu.com` bá»‹ timeout káº¿t ná»‘i ra quá»‘c táº¿ trÃªn cá»•ng UDP 123.
-   - CÃ i Ä‘áº·t cÃ´ng cá»¥ quáº£n trá»‹ Ä‘á»“ng há»“ pháº§n cá»©ng `util-linux-extra` (`hwclock`).
-   - Äá»“ng bá»™ thá»i gian há»‡ thá»‘ng tá»©c thÃ¬ vá»›i Ä‘á»“ng há»“ RTC (Real-Time Clock) cá»§a áº£o hÃ³a KVM: `hwclock --hctosys`.
-   - Thiáº¿t láº­p tÃ¡c vá»¥ tá»± Ä‘á»™ng Ä‘á»“ng bá»™ hÃ ng giá» táº¡i `/etc/cron.hourly/sync-clock` Ä‘á»ƒ Ä‘áº£m báº£o thá»i gian mÃ¡y chá»§ khÃ´ng bá»‹ trÃ´i lá»‡ch theo thá»i gian.
+1. **Khắc Phục Lệch Giờ & Chuẩn Hóa Thời Gian Trên Host VPS:**
+   - Xử lý tình trạng đồng hồ máy chủ bị chạy chậm ~5 phút do dịch vụ `systemd-timesyncd` mặc định trỏ tới `ntp.ubuntu.com` bị timeout kết nối ra quốc tế trên cổng UDP 123.
+   - Cài đặt công cụ quản trị đồng hồ phần cứng `util-linux-extra` (`hwclock`).
+   - Đồng bộ thời gian hệ thống tức thì với đồng hồ RTC (Real-Time Clock) của ảo hóa KVM: `hwclock --hctosys`.
+   - Thiết lập tác vụ tự động đồng bộ hàng giờ tại `/etc/cron.hourly/sync-clock` để đảm bảo thời gian máy chủ không bị trôi lệch theo thời gian.
 
-2. **ÄÆ°a ToÃ n Bá»™ Docker Containers Vá» MÃºi Giá» Viá»‡t Nam (`Asia/Ho_Chi_Minh` / UTC+7):**
-   - Cáº¥u hÃ¬nh láº¡i symlink `/etc/localtime -> /usr/share/zoneinfo/Asia/Ho_Chi_Minh` vÃ  `/etc/timezone` chá»©a `Asia/Ho_Chi_Minh` cho toÃ n bá»™ container:
+2. **Đưa Toàn Bộ Docker Containers Về Múi Giờ Việt Nam (`Asia/Ho_Chi_Minh` / UTC+7):**
+   - Cấu hình lại symlink `/etc/localtime -> /usr/share/zoneinfo/Asia/Ho_Chi_Minh` và `/etc/timezone` chứa `Asia/Ho_Chi_Minh` cho toàn bộ container:
      - `admin_orderlist-backend`
      - `admin_orderlist-postgres`
      - `admin_orderlist-redis`
      - `admin_orderlist-frontend`
      - `admin_orderlist-cloud-browser`
-   - Cáº­p nháº­t vÄ©nh viá»…n cáº¥u hÃ¬nh dá»± Ã¡n trong [`docker-compose.yml`](file:///e:/Project/admin_store/admin_orderlist/docker-compose.yml) vÃ  [`backend/.env.docker`](file:///e:/Project/admin_store/admin_orderlist/backend/.env.docker) bá»• sung `TZ: Asia/Ho_Chi_Minh`.
-   - Cáº¥u hÃ¬nh cÆ¡ sá»Ÿ dá»¯ liá»‡u PostgreSQL mÃ¡y chá»§ (`admin_orderlist-postgres`):
+   - Cập nhật vĩnh viễn cấu hình dự án trong [`docker-compose.yml`](file:///e:/Project/admin_store/admin_orderlist/docker-compose.yml) và [`backend/.env.docker`](file:///e:/Project/admin_store/admin_orderlist/backend/.env.docker) bổ sung `TZ: Asia/Ho_Chi_Minh`.
+   - Cấu hình cơ sở dữ liệu PostgreSQL máy chủ (`admin_orderlist-postgres`):
      - `ALTER SYSTEM SET timezone = 'Asia/Ho_Chi_Minh';`
-     - Náº¡p láº¡i cáº¥u hÃ¬nh `SELECT pg_reload_conf();`.
+     - Nạp lại cấu hình `SELECT pg_reload_conf();`.
 
 ---
 
 ### 2. TRáº NG THÃI NGHIá»†M THU (ACCEPTANCE STATUS)
 
-| Háº¡ng má»¥c kiá»ƒm tra | Tráº¡ng thÃ¡i | Ghi chÃº nghiá»‡m thu |
+| Hạng mục kiểm tra | Trạng thái | Ghi chú nghiệm thu |
 | :--- | :---: | :--- |
-| **Äá»“ng bá»™ thá»i gian Host VPS** | âœ… **Äáº T** | Local time vÃ  RTC time khá»›p 100% thá»i gian thá»±c Viá»‡t Nam (chÃ­nh xÃ¡c Ä‘áº¿n tá»«ng giÃ¢y). |
-| **TÃ¡c vá»¥ chá»‘ng trÃ´i lá»‡ch thá»i gian** | âœ… **Äáº T** | ÄÃ£ táº¡o `/etc/cron.hourly/sync-clock` cháº¡y Ä‘á»‹nh ká»³ má»—i giá» `hwclock --hctosys`. |
-| **MÃºi giá» PostgreSQL Server** | âœ… **Äáº T** | `SHOW timezone;` tráº£ vá» `Asia/Ho_Chi_Minh`. `SELECT now();` tráº£ vá» `+07`. |
-| **MÃºi giá» Backend Container** | âœ… **Äáº T** | Lá»‡nh `date` tráº£ vá» `Sun Nov 1 ... +07 2026`. Node.js log nháº­n diá»‡n mÃºi giá» UTC+7. |
-| **MÃºi giá» Redis Container** | âœ… **Äáº T** | Lá»‡nh `date` tráº£ vá» `Sun Nov 1 ... +07 2026`. |
-| **MÃºi giá» Frontend Container** | âœ… **Äáº T** | Lá»‡nh `date` tráº£ vá» `Sun Nov 1 ... +07 2026`. |
-| **Cáº¥u hÃ¬nh Compose & Env lÃ¢u dÃ i** | âœ… **Äáº T** | ÄÃ£ cáº­p nháº­t `docker-compose.yml` vÃ  `backend/.env.docker` trÃªn cáº£ Git repo vÃ  VPS. |
+| **Đồng bộ thời gian Host VPS** | ✅ **ĐẠT** | Local time và RTC time khớp 100% thời gian thực Việt Nam (chính xác đến từng giây). |
+| **Tác vụ chống trôi lệch thời gian** | ✅ **ĐẠT** | Đã tạo `/etc/cron.hourly/sync-clock` chạy định kỳ mỗi giờ `hwclock --hctosys`. |
+| **Múi giờ PostgreSQL Server** | ✅ **ĐẠT** | `SHOW timezone;` trả về `Asia/Ho_Chi_Minh`. `SELECT now();` trả về `+07`. |
+| **Múi giờ Backend Container** | ✅ **ĐẠT** | Lệnh `date` trả về `Sun Nov 1 ... +07 2026`. Node.js log nhận diện múi giờ UTC+7. |
+| **Múi giờ Redis Container** | ✅ **ĐẠT** | Lệnh `date` trả về `Sun Nov 1 ... +07 2026`. |
+| **Múi giờ Frontend Container** | ✅ **ĐẠT** | Lệnh `date` trả về `Sun Nov 1 ... +07 2026`. |
+| **Cấu hình Compose & Env lâu dài** | ✅ **ĐẠT** | Đã cập nhật `docker-compose.yml` và `backend/.env.docker` trên cả Git repo và VPS. |
 
 ---
 
 ### 3. Káº¾T QUáº¢ Äá»I SOÃT TRá»°C TIáº¾P TRÃŠN MÃY CHá»¦ VPS
 
-#### 3.1. Äá»‘i SoÃ¡t Lá»‡nh `date` ToÃ n Bá»™ Há»‡ Thá»‘ng (Host & Containers):
+#### 3.1. Đối Soát Lệnh `date` Toàn Bộ Hệ Thống (Host & Containers):
 ```bash
 === HOST ===
                Local time: Sun 2026-11-01 16:27:06 +07
@@ -1443,7 +1443,7 @@ Sun Nov  1 16:27:06 +07 2026
 Sun Nov  1 04:27:06 PM +07 2026
 ```
 
-#### 3.2. Äá»‘i SoÃ¡t PostgreSQL Database:
+#### 3.2. Đối Soát PostgreSQL Database:
 ```sql
 mydtbmav=# SHOW timezone;
      TimeZone
@@ -1464,21 +1464,21 @@ mydtbmav=# SELECT now();
 (1 row)
 ```
 
-#### 3.3. Äá»‘i SoÃ¡t Log Trá»±c Tiáº¿p Cá»§a Docker Compose (`docker compose logs`):
+#### 3.3. Đối Soát Log Trực Tiếp Của Docker Compose (`docker compose logs`):
 ```bash
 admin_orderlist-frontend       | 2026/11/01 16:33:22 [notice] 1#1: start worker process 29
 admin_orderlist-redis          | 1:M 01 Nov 2026 16:33:14.565 * Ready to accept connections tcp
 admin_orderlist-postgres       | 2026-11-01 16:32:10.234 +07 [26] LOG:  checkpoint starting: immediate force wait
 admin_orderlist-postgres       | 2026-11-01 16:32:10.253 +07 [26] LOG:  checkpoint complete: wrote 0 buffers
 admin_orderlist-cloud-browser  | INFO:printing:Print queue Selkies listening on /config/.XDG/selkies-cups/cups.sock...
-admin_orderlist-backend        | [Scheduler] ÄÃ£ khá»Ÿi táº¡o 5 lá»‹ch tÃ¡c vá»¥.
+admin_orderlist-backend        | [Scheduler] Đã khởi tạo 5 lịch tác vụ.
 ```
 
 ---
 
 ### 4. Káº¾T LUáº¬N
 
-Há»‡ thá»‘ng VPS vÃ  toÃ n bá»™ cÃ¡c container dá»‹ch vá»¥ cá»§a dá»± Ã¡n `admin_orderlist` Ä‘Ã£ Ä‘Æ°á»£c Ä‘Æ°a vá» Ä‘Ãºng **100% mÃºi giá» Viá»‡t Nam (`Asia/Ho_Chi_Minh` / UTC+7)**. Lá»—i lá»‡ch thá»i gian 5 phÃºt Ä‘Ã£ Ä‘Æ°á»£c triá»‡t tiÃªu hoÃ n toÃ n, báº£o Ä‘áº£m cÃ¡c tÃ¡c vá»¥ tá»± Ä‘á»™ng (Cron 0h chuyá»ƒn tráº¡ng thÃ¡i Ä‘Æ¡n, Cron 7h gá»­i tin nháº¯n Telegram, cÃ¡c tÃ¡c vá»¥ tÃ­nh lÃ£i tÃ i chÃ­nh) diá»…n ra chuáº©n xÃ¡c tuyá»‡t Ä‘á»‘i.
+Hệ thống VPS và toàn bộ các container dịch vụ của dự án `admin_orderlist` đã được đưa về đúng **100% múi giờ Việt Nam (`Asia/Ho_Chi_Minh` / UTC+7)**. Lỗi lệch thời gian 5 phút đã được triệt tiêu hoàn toàn, bảo đảm các tác vụ tự động (Cron 0h chuyển trạng thái đơn, Cron 7h gửi tin nhắn Telegram, các tác vụ tính lãi tài chính) diễn ra chuẩn xác tuyệt đối.
 
 ---
 

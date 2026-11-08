@@ -720,3 +720,95 @@
   - **API Gateway Live Probe**: `http://127.0.0.1:3001/api/public/otp-portal-slots` $\rightarrow$ Trả về đủ 8 slots hoạt động trơn tru.
 
 - **Trạng thái nghiệm thu:** ĐÃ HOÀN TẤT XUẤT SẮC 100% THEO CHỈ ĐẠO CỦA MASTER.
+
+
+---
+
+## [23:15] Tích Hợp Trường Chọn Loại OTP Lưu Kho & Cấu Hình API Sản Phẩm (Tab 3: Product API Mapping)
+
+- **Phạm vi tác động & Chỉ đạo của Master:**
+  - *"giờ phần lưu kho tôi muốn có thêm 1 trường gọi là trường chọn loại OTP nhưng mà có tổng 3 sản phẩm vậy thì phân bổ ra, nếu display_name thuộc sản phẩm nào thì dropdown OTP sản phẩm đó."*
+  - *"vậy thì ở trang cấu hình tôi nghĩ thêm 1 tab gọi là cấu hình API sản phẩm nhỉ. Để sau này nếu có sản phẩm khác thì tôi tự cấu hình luôn. Bảng database là bảng match giữa các API và sản phẩm, rồi từ sản phẩm sẽ được phân bổ xuống các variant."*
+
+- **Chi tiết kỹ thuật triển khai:**
+  1. **Cơ sở dữ liệu & Migration ([`20261108000002_create_product_api_configs.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261108000002_create_product_api_configs.js)):**
+     - Tạo bảng [`business.product_api_configs`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/tables.js#L87) lưu quan hệ N-N giữa sản phẩm ([`business.product`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/tables.js#L33)) và API ([`system_automation.external_api_configs`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/tables.js#L75)).
+     - Thêm ràng buộc `UNIQUE(product_id, api_config_id)` chống trùng lặp, cờ `is_default`, `sort_order`, `note`, timestamps.
+     - Thêm cột `otp_type VARCHAR(100)` vào bảng kho hàng [`warehouse.account_slots`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/tables.js#L39).
+     - Đã chạy migration thành công (`Batch 22 run: 1 migrations`).
+     - Khởi tạo sẵn 10 bản ghi mapping cho 3 nhóm sản phẩm chủ lực:
+       - **Adobe (product_id = 1)**: `fix_ades` (★ Mặc định), `tinyhost`, `yuna_mail`, `yuna_2fa`.
+       - **Netflix (product_id = 29)**: `vivarocky_household` (★ Mặc định), `vivarocky_six_digit`, `vivarocky_signin`.
+       - **Chat GPT (product_id = 7)**: `warehouse_2fa` (★ Mặc định), `tinyhost`, `totp`.
+  2. **Schema & Tables Definition ([`tables.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/tables.js)):**
+     - Đăng ký `TABLES.PRODUCT_API_CONFIGS`, `COLS.PRODUCT_API_CONFIGS`, `COLS.ACCOUNT_SLOTS.OTP_TYPE`.
+  3. **Backend Service & Controller ([`productApiService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/productApiService.js) & [`productApiController.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/controllers/productApiController.js)):**
+     - `listProductApis()`: Truy vấn 63 sản phẩm, join với bảng mapping và danh sách biến thể con kế thừa.
+     - `assignApiToProduct()`: Gán cổng API cho sản phẩm trong Knex transaction, tự động đảo cờ `is_default`.
+     - `updateMapping()`: Cập nhật ghi chú, thứ tự sắp xếp và trạng thái kích hoạt.
+     - `setDefaultApi()`: Đặt 1 API làm cổng mặc định duy nhất cho sản phẩm.
+     - `removeApiFromProduct()`: Gỡ bỏ API khỏi sản phẩm và tự động promote API kế tiếp nếu vừa gỡ cổng mặc định.
+     - `getApisByProductMapping()`: Endpoint nhẹ tối ưu cho frontend, trả về Dictionary phân bổ theo `byProductId`, `byVariantId`, `byDisplayName`, `byVariantName`, `byPackageName`.
+  4. **Đăng ký System Routes ([`routes.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/routes.js)):**
+     - `GET /api/system/product-apis` & `GET /api/system/product-apis/mapping`
+     - `POST /api/system/product-apis` & `PUT /api/system/product-apis/:id`
+     - `PUT /api/system/product-apis/:id/default` & `DELETE /api/system/product-apis/:id`
+  5. **Đồng bộ Đơn Hàng & Kho Hàng ([`orderService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/orders/services/orderService.js) & [`warehouseService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/warehouse/services/warehouseService.js)):**
+     - `orderService.js`: Khi tạo đơn `MAVN` với `save_to_warehouse = true`, tự động lưu `otp_type: payload.warehouse_otp_type || payload.otp_type` vào `account_slots`.
+     - `warehouseService.js`: Hỗ trợ truy vấn `ss.otp_type`, tạo mới tài khoản kho lưu `otp_type`, và cập nhật `updateWarehouseServiceSlot` với `otpType`.
+  6. **Giao diện Modal Tạo / Sửa Đơn Nhập Hàng ([`OrderCreateEditModal.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/orders/components/OrderCreateEditModal.tsx)):**
+     - Bổ sung ô chọn **"Loại OTP"** vào box *"Thông Tin Tài Khoản Lưu Kho"* (grid 4 cột: *Mật Khẩu Kho*, *Email Backup*, *Mã 2FA Secret Key*, *Loại OTP*).
+     - Tự động lọc danh sách cổng OTP theo sản phẩm đang chọn (kế thừa từ biến thể `id_product` / `display_name`).
+     - Tự động chọn cổng `is_default` của sản phẩm khi vừa chọn danh mục.
+  7. **Giao diện Sửa Slot Dịch Vụ Kho ([`WarehouseEditSlotModal.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseEditSlotModal.tsx)):**
+     - Bổ sung ô chọn **"Cổng / Loại OTP"** (`otpType`) hỗ trợ Master xem và điều chỉnh trực tiếp loại OTP của tài khoản lưu kho.
+  8. **Giao diện Tab 3: Cấu Hình API Sản Phẩm ([`ExternalApiConfigPage.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx)):**
+     - Bổ sung nút chuyển Tab thứ 3: *"Tab 3: Cấu Hình API Sản Phẩm (Product Mapping)"* trên thanh điều hướng.
+     - Thẻ thống kê tổng quan (Tổng SP cha, SP đã gán, SP chưa gán, Cổng API khả dụng).
+     - Bộ lọc tìm kiếm nhanh theo tên sản phẩm, biến thể con, và trạng thái gán API.
+     - Lưới thẻ sản phẩm (Product Cards) hiển thị số biến thể con thừa kế (kèm danh sách mở rộng), danh sách cổng API đang gán, badge `★ Mặc định`, nút đổi mặc định và nút gỡ cổng.
+     - Modal "+ Gán Cổng API Cho Sản Phẩm" cho phép chọn API từ danh mục, tick đặt làm mặc định và nhập ghi chú.
+
+- **Kiểm tra nghiệm thu (Verification):**
+  - **Frontend Compilation**: `npm --prefix frontend run build` (`tsc && vite build`) PASS 100% trong **5.18s** (0 lỗi, 0 warning).
+  - **Automated Integration Tests (6/6 PASS)**:
+    1. `listProductApis()`: Nạp đủ 63 sản phẩm cùng các API mapping chuẩn xác.
+    2. `getApisByProductMapping()`: Dictionary phân bổ đủ key cho các sản phẩm cha và biến thể con.
+    3. Gán API mới cho Canva (id=17), đặt mặc định, và gỡ bỏ mapping thành công 100%.
+    4. Tạo đơn hàng `MAVN` có `save_to_warehouse = true` và `warehouse_otp_type = 'fix_ades'`: DB `warehouse.account_slots.otp_type` lưu chính xác `'fix_ades'`.
+    5. `updateWarehouseServiceSlot`: Cập nhật `otp_type` sang `'yuna_mail'` thành công.
+    6. `listWarehouseAccounts`: Trả về chuẩn xác `otp_type` của slot dịch vụ.
+    7. Dọn dẹp dữ liệu test sạch sẽ 100%.
+
+- **Trạng thái nghiệm thu:** ĐÃ HOÀN TẤT TRIỂN KHAI VÀ NGHIỆM THU 100% THEO CHỈ ĐẠO CỦA MASTER.
+
+---
+
+## [23:55] Tái Cấu Trúc Toàn Diện Giai Đoạn 1 & 2 (Modular Hóa External API, Kho Hàng & Nhập Ngoài Luồng)
+
+- **Người thực hiện:** Orchestrator Agent & Kỹ Sư Chuyên Trách
+- **Phê duyệt:** Master (Sếp)
+- **Mục tiêu:** Thực hiện theo Kế Hoạch Tổng Thể Tái Cấu Trúc Toàn Bộ Codebase ([`docs/plans/2026-11-08_comprehensive_codebase_refactor_master_plan.md`](file:///e:/Project/admin_store/admin_orderlist/docs/plans/2026-11-08_comprehensive_codebase_refactor_master_plan.md)), giải tỏa các điểm nóng lớn nhất hệ thống:
+  1. **Giai đoạn 1 (External API & Shared Foundation):**
+     - Bóc tách [`ExternalApiConfigPage.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ExternalApiConfigPage.tsx) từ **3.679 dòng** xuống **6 dòng** (chỉ mount `<ExternalApiConfigFeature />`).
+     - Tạo tầng dùng chung: [`frontend/src/shared/api/apiClient.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/api/apiClient.ts), [`apiEndpoints.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/api/apiEndpoints.ts), [`useClipboard.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/hooks/useClipboard.ts).
+     - Đóng gói toàn bộ module `frontend/src/features/external-api/`.
+  2. **Giai đoạn 2 (Kho Hàng & Nhập Ngoài Luồng):**
+     - Bóc tách [`WarehouseAccountsTable.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseAccountsTable.tsx) từ **1.178 dòng** xuống **358 dòng**, tách thành các sub-components độc lập:
+       - [`WarehouseCopyableField.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseCopyableField.tsx): Component copy & ẩn/hiện mật khẩu.
+       - [`WarehouseSlotSubTable.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseSlotSubTable.tsx): Bảng 8 cột chi tiết slot trên Desktop/Tablet.
+       - [`WarehouseMobileAccountCard.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseMobileAccountCard.tsx): Chế độ xem thẻ Responsive trên Mobile (< 640px).
+     - Bóc tách [`ExternalImportsPage.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ExternalImportsPage.tsx) từ **1.045 dòng** xuống **6 dòng**, đóng gói module `frontend/src/features/external-imports/`:
+       - [`types.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/external-imports/types.ts): TypeScript interfaces.
+       - [`ExternalImportCreateModal.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/external-imports/components/ExternalImportCreateModal.tsx): Modal ghi nhận khoản chi mới.
+       - [`ExternalImportEditModal.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/external-imports/components/ExternalImportEditModal.tsx): Modal chỉnh sửa khoản chi.
+       - [`ExternalImportDetailModal.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/external-imports/components/ExternalImportDetailModal.tsx): Modal xem chi tiết & metadata.
+       - [`ExternalImportsFeature.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/external-imports/ExternalImportsFeature.tsx): Component container chính.
+     - Backend Sub-Services Kho Hàng:
+       - Trích xuất [`warehouseSlotService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/warehouse/services/warehouseSlotService.js): Quản lý slot dịch vụ kho, 2FA, đổi mật khẩu.
+       - Trích xuất [`warehouseAutomationService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/warehouse/services/warehouseAutomationService.js): Điều khiển Playwright headless browser & session cookies.
+       - Rút gọn [`warehouseService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/warehouse/services/warehouseService.js) từ **1.134 dòng** xuống **653 dòng**, hoạt động như Facade điều phối.
+- **Kiểm tra nghiệm thu (Verification):**
+  - **Frontend Build**: `npm --prefix frontend run build` PASS trong **5.33s** (0 lỗi TypeScript, 0 warning cú pháp).
+  - **Backend Unit Tests**: Toàn bộ **119 test cases** (`npm --prefix backend test`) PASS 100% trong **1.04s**.
+- **Trạng thái:** HOÀN THÀNH 100% GIAI ĐOẠN 1 & 2. SẴN SÀNG CHUYỂN TIẾP GIAI ĐOẠN 3.

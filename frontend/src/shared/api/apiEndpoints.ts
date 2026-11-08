@@ -1,0 +1,15 @@
+export const apiEndpoints = {
+  orders: "/api/orders",
+  orderDetail: (id: number | string) => `/api/orders/${id}`,
+  orderProcess: (id: number | string) => `/api/orders/${id}/process`,
+  orderComplete: (id: number | string) => `/api/orders/${id}/complete`,
+  orderRenew: (id: number | string) => `/api/orders/${id}/renew`,
+  orderPayCredit: (id: number | string) => `/api/orders/${id}/pay-credit`,
+  productApis: "/api/system/product-apis",
+  portalSlots: "/api/public/otp-portal-slots",
+  portalSlotProbe: "/api/public/otp/probe-slot",
+  systemConfigs: "/api/system/configs",
+  externalApis: "/api/system/external-apis",
+  externalApiOtpTest: "/api/system/external-apis/test-otp",
+  externalApiAnalyze: "/api/system/external-apis/analyze-endpoint",
+} as const;

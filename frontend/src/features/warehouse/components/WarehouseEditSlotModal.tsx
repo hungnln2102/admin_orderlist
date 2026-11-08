@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Pencil,
   X,
@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   FileText,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import {
   WarehouseAccountItem,
@@ -45,6 +46,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     password: "",
     backupEmail: "",
     twoFa: "",
+    otpType: "",
     expiresAt: "",
     status: "AVAILABLE",
     note: "",
@@ -52,6 +54,21 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
 
   const [showPassword, setShowPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [apiMapping, setApiMapping] = useState<{
+    byDisplayName: Record<string, any[]>;
+    byPackageName: Record<string, any[]>;
+    allApis: any[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/system/product-apis/mapping")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setApiMapping(data);
+      })
+      .catch((err) => console.error("[WarehouseEditSlotModal] Lỗi nạp mapping API:", err));
+  }, [open]);
 
   useEffect(() => {
     if (open && slot && account) {
@@ -71,6 +88,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
         password: slot.password || "",
         backupEmail: slot.backup_email || "",
         twoFa: slot.two_fa || "",
+        otpType: slot.otp_type || "",
         expiresAt: initialExpires,
         status: slot.status || "AVAILABLE",
         note: slot.note || "",
@@ -78,6 +96,20 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
       setShowPassword(false);
     }
   }, [open, account, slot]);
+
+  const availableOtpApis = useMemo(() => {
+    if (!apiMapping || !slot) return [];
+    const name = String(slot.display_name || slot.category || "").trim().toLowerCase();
+    if (name && apiMapping.byDisplayName?.[name]?.length) {
+      return apiMapping.byDisplayName[name];
+    }
+    for (const [pkgName, apis] of Object.entries(apiMapping.byPackageName || {})) {
+      if (apis.length > 0 && name.includes(pkgName)) {
+        return apis;
+      }
+    }
+    return apiMapping.allApis || [];
+  }, [apiMapping, slot]);
 
   if (!open || !slot || !account) return null;
 
@@ -204,8 +236,8 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
             </div>
           </div>
 
-          {/* 2FA SECRET & EMAIL BACKUP (2 COLS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* 2FA SECRET, EMAIL BACKUP & LOẠI OTP (3 COLS) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
@@ -256,6 +288,34 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                 placeholder="ví dụ: recovery@domain.com"
                 className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Cổng / Loại OTP</span>
+                </span>
+                {availableOtpApis.length > 0 && (
+                  <span className="text-[10px] text-cyan-400 font-mono">
+                    {availableOtpApis.length} cổng
+                  </span>
+                )}
+              </label>
+              <select
+                value={formData.otpType || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, otpType: e.target.value })
+                }
+                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition-colors cursor-pointer truncate"
+              >
+                <option value="">-- Mặc định / Không OTP --</option>
+                {availableOtpApis.map((api: any) => (
+                  <option key={api.service_key} value={api.service_key}>
+                    {api.service_name} ({api.service_key})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

@@ -14,14 +14,18 @@ import {
   ChevronRight,
   CalendarDays,
   LayoutGrid,
+  SlidersHorizontal,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   generateMonthCalendar,
   CalendarCell,
 } from "../shared/utils/lunarCalendar";
+import { DEFAULT_THEME_SCHEDULE, findNextRuleDate, getHolidayRuleForDate, normalizeThemeSchedule, ThemeDateRule, ThemeScheduleConfig } from "../shared/utils/themeSchedule";
 
 type SeasonFilter = "all" | "spring" | "summer" | "autumn" | "winter" | "modern";
-type ViewTab = "calendar" | "presets";
+type ViewTab = "calendar" | "presets" | "schedule";
 
 interface ThemeItem {
   id: string;
@@ -75,6 +79,7 @@ export const OtpThemeConfigPage: React.FC = () => {
   const [themesList, setThemesList] = useState<ThemeItem[]>(THEMES_LIST);
   const [mode, setMode] = useState<"auto" | "fixed">("auto");
   const [selectedTheme, setSelectedTheme] = useState<string>("modern");
+  const [schedule, setSchedule] = useState<ThemeScheduleConfig>(DEFAULT_THEME_SCHEDULE);
   const [activeSeason, setActiveSeason] = useState<SeasonFilter>("all");
   const [activeTab, setActiveTab] = useState<ViewTab>("calendar");
   const [loading, setLoading] = useState(true);
@@ -184,7 +189,21 @@ export const OtpThemeConfigPage: React.FC = () => {
   };
 
   // Danh sách cells cho tháng
-  const monthCells = generateMonthCalendar(calYear, calMonth);
+  const monthCells = generateMonthCalendar(calYear, calMonth).map((cell) => {
+    const rule = getHolidayRuleForDate(schedule, cell.solarDay, cell.solarMonth, cell.solarYear);
+    if (!rule) return { ...cell, holidayTheme: null };
+    const theme = themesList.find((item) => item.id === rule.theme);
+    return {
+      ...cell,
+      holidayTheme: {
+        themeKey: rule.theme,
+        holidayName: theme?.name || rule.id,
+        calendarType: rule.calendarType,
+        description: `Rule ${rule.startDay}/${rule.startMonth} - ${rule.endDay}/${rule.endMonth}`,
+        accentColor: theme?.accent || "#22d3ee",
+      },
+    };
+  });
 
   // Tự động gán cell hôm nay khi mới mở
   useEffect(() => {
@@ -198,6 +217,24 @@ export const OtpThemeConfigPage: React.FC = () => {
     ? themesList
     : themesList.filter((t) => t.season === activeSeason);
 
+
+  const updateHolidayRule = (ruleId: string, patch: Partial<ThemeDateRule>) => {
+    setSchedule((current) => ({
+      ...current,
+      holidayRules: current.holidayRules.map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule),
+    }));
+  };
+
+  const focusThemeSchedule = (themeId: string) => {
+    setSelectedTheme(themeId);
+    const rule = schedule.holidayRules.find((item) => item.enabled && item.theme === themeId);
+    if (!rule) return;
+    const nextDate = findNextRuleDate(rule);
+    if (!nextDate) return;
+    setCalYear(nextDate.getUTCFullYear());
+    setCalMonth(nextDate.getUTCMonth() + 1);
+    setActiveTab("calendar");
+  };
   const activeThemeMeta = themesList.find((t) => t.id === selectedTheme) || themesList[0] || THEMES_LIST[0];
 
   // Lấy thông tin theme của ngày đang click trên lịch
@@ -331,6 +368,18 @@ export const OtpThemeConfigPage: React.FC = () => {
             <LayoutGrid className="w-3.5 h-3.5" />
             <span>Bộ Sưu Tập ({themesList.length} Themes)</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("schedule")}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === "schedule"
+                ? "bg-amber-500 text-slate-950 shadow-sm"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Lịch Rule</span>
+          </button>
         </div>
 
         {/* Nhóm 3: Mini Badge Theme đang chọn */}
@@ -344,7 +393,23 @@ export const OtpThemeConfigPage: React.FC = () => {
 
       {/* 3. Main Content Area (Tự động co dãn vừa khít chiều cao còn lại của màn hình) */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {activeTab === "calendar" ? (
+        {activeTab === "schedule" ? (
+          <div className="h-full overflow-y-auto pr-1 space-y-3">
+            <div className="rounded-xl border border-amber-700/50 bg-slate-900/90 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div><h3 className="text-sm font-bold text-white">Theme nền theo mùa</h3><p className="text-[10px] text-slate-400">Lặp lại hằng năm; lễ luôn ưu tiên hơn.</p></div>
+                <select value={schedule.defaultTheme} onChange={(event) => setSchedule((current) => ({ ...current, defaultTheme: event.target.value }))} className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white">{themesList.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</select>
+              </div>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                {schedule.seasonRules.map((rule) => <div key={rule.id} className="rounded-lg border border-slate-800 bg-slate-950/70 p-2 space-y-2"><div className="text-xs font-bold text-cyan-300 capitalize">{rule.id}</div><div className="grid grid-cols-2 gap-1"><input type="number" min="1" max="12" value={rule.startMonth} onChange={(event) => setSchedule((current) => ({ ...current, seasonRules: current.seasonRules.map((item) => item.id === rule.id ? { ...item, startMonth: Number(event.target.value) } : item) }))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs" aria-label={`Tháng bắt đầu ${rule.id}`} /><input type="number" min="1" max="12" value={rule.endMonth} onChange={(event) => setSchedule((current) => ({ ...current, seasonRules: current.seasonRules.map((item) => item.id === rule.id ? { ...item, endMonth: Number(event.target.value) } : item) }))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs" aria-label={`Tháng kết thúc ${rule.id}`} /></div><select value={rule.theme} onChange={(event) => setSchedule((current) => ({ ...current, seasonRules: current.seasonRules.map((item) => item.id === rule.id ? { ...item, theme: event.target.value } : item) }))} className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white">{themesList.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</select></div>)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-rose-800/50 bg-slate-900/90 p-3">
+              <div className="flex items-center justify-between"><div><h3 className="text-sm font-bold text-white">Theme lễ ưu tiên</h3><p className="text-[10px] text-slate-400">Rule ngày lặp lại theo lịch Dương hoặc Âm.</p></div><button type="button" onClick={() => setSchedule((current) => ({ ...current, holidayRules: [...current.holidayRules, { id: `holiday-${Date.now()}`, calendarType: "solar", startMonth: 1, startDay: 1, endMonth: 1, endDay: 1, theme: current.defaultTheme, enabled: true }] }))} className="rounded bg-rose-500 px-2 py-1 text-xs font-bold text-white flex items-center gap-1"><Plus className="w-3 h-3"/>Thêm</button></div>
+              <div className="mt-3 space-y-2">{schedule.holidayRules.map((rule) => <div key={rule.id} className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto_repeat(4,4rem)_auto] gap-1.5 rounded border border-slate-800 bg-slate-950/70 p-2 items-center"><input type="checkbox" checked={rule.enabled} onChange={(event) => updateHolidayRule(rule.id, { enabled: event.target.checked })} /><select value={rule.theme} onChange={(event) => updateHolidayRule(rule.id, { theme: event.target.value })} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white">{themesList.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</select><select value={rule.calendarType} onChange={(event) => updateHolidayRule(rule.id, { calendarType: event.target.value as ThemeDateRule["calendarType"] })} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"><option value="solar">Dương</option><option value="lunar">Âm</option></select><input type="number" min="1" max="12" value={rule.startMonth} onChange={(event) => updateHolidayRule(rule.id, { startMonth: Number(event.target.value) })} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs" /><input type="number" min="1" max="31" value={rule.startDay} onChange={(event) => updateHolidayRule(rule.id, { startDay: Number(event.target.value) })} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs" /><input type="number" min="1" max="12" value={rule.endMonth} onChange={(event) => updateHolidayRule(rule.id, { endMonth: Number(event.target.value) })} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs" /><input type="number" min="1" max="31" value={rule.endDay} onChange={(event) => updateHolidayRule(rule.id, { endDay: Number(event.target.value) })} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs" /><button type="button" onClick={() => setSchedule((current) => ({ ...current, holidayRules: current.holidayRules.filter((item) => item.id !== rule.id) }))} className="p-1 text-rose-300"><Trash2 className="w-4 h-4" /></button></div>)}</div>
+            </div>
+          </div>
+        ) : activeTab === "calendar" ? (
           /* TAB 1: BẢNG LỊCH ÂM DƯƠNG (Layout 2 cột ngang, Cột Lịch + Cột Inspector) */
           <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
             {/* Cột Trái: Bảng Lịch (Chiếm 8/12 cột = ~67%) */}
@@ -676,7 +741,7 @@ export const OtpThemeConfigPage: React.FC = () => {
                 return (
                   <div
                     key={item.id}
-                    onClick={() => setSelectedTheme(item.id)}
+                    onClick={() => focusThemeSchedule(item.id)}
                     className={`relative p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
                         ? "bg-slate-900/90 border-cyan-400 ring-2 ring-cyan-500/20 shadow-md shadow-cyan-950/60"

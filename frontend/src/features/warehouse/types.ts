@@ -14,6 +14,7 @@ export interface WarehouseServiceSlot {
   password?: string;
   backup_email?: string;
   two_fa?: string;
+  otp_type?: string;
   expires_at?: string;
   raw_expires_at?: string;
   note?: string;
@@ -29,6 +30,7 @@ export interface WarehouseSlotEditFormData {
   password: string;
   backupEmail: string;
   twoFa: string;
+  otpType?: string;
   expiresAt: string;
   status: WarehouseSlotStatus;
   note: string;

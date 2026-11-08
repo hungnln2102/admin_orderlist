@@ -84,6 +84,7 @@ const TABLES = {
   EMAIL_INGESTION_RECEIPTS: formatTable(SCHEMAS.FINANCE, "email_ingestion_receipts"),
   EMAIL_RECONCILIATION_RUNS: formatTable(SCHEMAS.FINANCE, "email_reconciliation_runs"),
   PACKAGE_SLOT_DAILY_LOGS: formatTable(SCHEMAS.WAREHOUSE, "package_slot_daily_logs"),
+  PRODUCT_API_CONFIGS: formatTable(SCHEMAS.PRODUCT, "product_api_configs"),
 };
 
 
@@ -217,6 +218,7 @@ const COLS = {
     SERVICE_NOTE: "service_note",
     SESSION_IS_AUTHENTICATED: "session_is_authenticated",
     SESSION_CHECKED_AT: "session_checked_at",
+    OTP_TYPE: "otp_type",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },
@@ -632,6 +634,17 @@ const COLS = {
     REVENUE_REVERSED: "revenue_reversed",
     DASHBOARD_ORDERS_COUNT: "dashboard_orders_count",
     DASHBOARD_CANCELED_COUNT: "dashboard_canceled_count",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
+  PRODUCT_API_CONFIGS: {
+    ID: "id",
+    PRODUCT_ID: "product_id",
+    API_CONFIG_ID: "api_config_id",
+    IS_DEFAULT: "is_default",
+    IS_ACTIVE: "is_active",
+    SORT_ORDER: "sort_order",
+    NOTE: "note",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },

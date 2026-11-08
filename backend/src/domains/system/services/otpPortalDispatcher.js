@@ -5,7 +5,6 @@
 
 const systemConfigService = require("./systemConfigService");
 const otpProviderService = require("./otpProviderService");
-const totpService = require("./totpService");
 
 const DEFAULT_SLOTS = [
   {
@@ -143,25 +142,8 @@ async function dispatchSlotRequest({ slotKey, input }) {
     };
   }
 
-  // 1. Đặc biệt: Slot 2FA TOTP (nếu truyền Base32 Secret Key)
-  if (slotKey === "two_factor_totp") {
-    try {
-      const totpRes = totpService.generateTotp(cleanInput);
-      return {
-        success: true,
-        slot_key: slotKey,
-        slot_name: slot.name,
-        otp: totpRes.code,
-        remaining_seconds: totpRes.remainingSeconds,
-        service_used: "totp_engine",
-        message: `Đã sinh mã 2FA [${totpRes.code}] thành công (còn ${totpRes.remainingSeconds}s)!`,
-      };
-    } catch {
-      // Nếu không phải secret Base32 chuẩn (vd: người dùng nhập mã đơn hàng Yuna), fallback sang API cổng chính
-    }
-  }
-
-  // 2. Lấy danh sách các cổng API được gán cho ô này
+  // Load the configured OTP service chain.
+  // 1. Lấy danh sách các cổng API được gán cho ô này
   let serviceChain = [];
   if (Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0) {
     serviceChain = [...slot.assigned_services];
@@ -173,7 +155,7 @@ async function dispatchSlotRequest({ slotKey, input }) {
   }
 
   if (serviceChain.length === 0) {
-    serviceChain = ["fix_ades"];
+    throw new Error(`OTP service chain is not configured for slot '${slotKey}'.`);
   }
 
   let probeResult = null;
@@ -189,15 +171,6 @@ async function dispatchSlotRequest({ slotKey, input }) {
         email: cleanInput,
         serviceKey: currentService,
       };
-      if (currentService === "vivarocky") {
-        if (slotKey === "netflix_household") {
-          probePayload.subType = "household";
-        } else if (slotKey === "netflix_six_digit") {
-          probePayload.subType = "six_digit";
-        } else if (slotKey === "netflix_login_otp") {
-          probePayload.subType = "signin_code";
-        }
-      }
       const res = await otpProviderService.probeOtpForEmail(probePayload);
       if (res && res.found && (res.otp || res.extra_fields?.length > 0)) {
         probeResult = res;

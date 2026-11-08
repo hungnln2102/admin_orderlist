@@ -16,6 +16,7 @@ import {
   OrderDetailModal,
   OrderDeleteModal,
   PayWithCreditModal,
+  ordersApiClient,
 } from "../features/orders";
 import {
   ORDER_PREFIX,
@@ -101,16 +102,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   const handleMarkPaid = async (order: Order) => {
     try {
-      const res = await fetch(`/api/orders/${order.id}/process`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        notify.success(`Đã chuyển đơn #${order.id_order} sang Đang Xử Lý thành công!`);
-        refreshOrders();
-      } else {
-        throw new Error(data.error || "Không thể chuyển trạng thái.");
-      }
+      await ordersApiClient.processOrder(order.id);
+      notify.success(`Đã chuyển đơn #${order.id_order} sang Đang Xử Lý thành công!`);
+      refreshOrders();
     } catch (err: any) {
       console.error("Lỗi chuyển đơn sang Đang Xử Lý:", err);
       notify.error(err.message || "Lỗi hệ thống.");
@@ -119,16 +113,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   const handleCompleteOrder = async (order: Order) => {
     try {
-      const res = await fetch(`/api/orders/${order.id}/complete`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        notify.success(`Đã hoàn thành đơn #${order.id_order} (Đã Thanh Toán)! Đã ghi nhận doanh thu.`);
-        refreshOrders();
-      } else {
-        throw new Error(data.error || "Không thể hoàn thành đơn hàng.");
-      }
+      await ordersApiClient.completeOrder(order.id);
+      notify.success(`Đã hoàn thành đơn #${order.id_order} (Đã Thanh Toán)! Đã ghi nhận doanh thu.`);
+      refreshOrders();
     } catch (err: any) {
       console.error("Lỗi hoàn thành đơn hàng:", err);
       notify.error(err.message || "Lỗi hệ thống.");
@@ -142,27 +129,18 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
   const handleRenewOrder = async (order: Order) => {
     try {
-      const res = await fetch(`/api/orders/${order.id}/renew`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const isImport = Boolean(
-          (order.id_order && String(order.id_order).toUpperCase().startsWith("MAVN")) ||
-          (order.customer && String(order.customer).trim().toLowerCase() === "mavryk") ||
-          activeTab === "import"
-        );
-        if (isImport) {
-          notify.success(`Đã gia hạn đơn nhập hàng #${order.id_order} thành công (Đã Thanh Toán)!`);
-        } else {
-          notify.success(`Yêu cầu gia hạn đơn #${order.id_order} thành công!`);
-        }
-        refreshOrders();
+      await ordersApiClient.renewOrder(order.id);
+      const isImport = Boolean(
+        (order.id_order && String(order.id_order).toUpperCase().startsWith("MAVN")) ||
+        (order.customer && String(order.customer).trim().toLowerCase() === "mavryk") ||
+        activeTab === "import"
+      );
+      if (isImport) {
+        notify.success(`Đã gia hạn đơn nhập hàng #${order.id_order} thành công (Đã Thanh Toán)!`);
       } else {
-        throw new Error(data.error || "Không thể gia hạn.");
+        notify.success(`Yêu cầu gia hạn đơn #${order.id_order} thành công!`);
       }
+      refreshOrders();
     } catch (err: any) {
       console.error("Lỗi gia hạn:", err);
       notify.error(err.message || "Lỗi hệ thống khi gia hạn.");
@@ -464,25 +442,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         save_to_package: isImportTab ? (formData.save_to_package !== false) : false,
       };
 
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const createdOrder = await res.json();
-        setIsCreateModalOpen(false);
-        refreshOrders();
-        if (createdOrder && createdOrder.id_order) {
-          setSelectedOrder(createdOrder);
-          setIsViewModalOpen(true);
-        }
-      } else {
-        const errData = await res.json();
-        notify.error(errData.error || "Tạo đơn thất bại", "Lỗi Tạo Đơn");
+      const createdOrder = await ordersApiClient.createOrder(payload);
+      setIsCreateModalOpen(false);
+      refreshOrders();
+      if (createdOrder && createdOrder.id_order) {
+        setSelectedOrder(createdOrder);
+        setIsViewModalOpen(true);
       }
-    } catch (err) {
-      notify.error("Lỗi kết nối máy chủ", "Kết Nối Thất Bại");
+    } catch (err: any) {
+      notify.error(err.message || "Tạo đơn thất bại", "Lỗi Tạo Đơn");
     }
   };
 
@@ -506,40 +474,24 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     }
     if (!selectedOrder) return;
     try {
-      const res = await fetch(`/api/orders/${selectedOrder.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      if (res.ok) {
-        setIsEditModalOpen(false);
-        notify.success("Cập nhật đơn hàng thành công!", "Cập Nhật Đơn Hàng");
-        refreshOrders();
-      } else {
-        const errData = await res.json();
-        notify.error(errData.error || "Cập nhật đơn thất bại", "Lỗi Cập Nhật");
-      }
-    } catch (err) {
-      notify.error("Lỗi kết nối máy chủ", "Kết Nối Thất Bại");
+      await ordersApiClient.updateOrder(selectedOrder.id, formData);
+      setIsEditModalOpen(false);
+      notify.success("Cập nhật đơn hàng thành công!", "Cập Nhật Đơn Hàng");
+      refreshOrders();
+    } catch (err: any) {
+      notify.error(err.message || "Cập nhật đơn thất bại", "Lỗi Cập Nhật");
     }
   };
 
   const handleDeleteSubmit = async () => {
     if (!selectedOrder) return;
     try {
-      const res = await fetch(`/api/orders/${selectedOrder.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setIsDeleteModalOpen(false);
-        notify.success(data.message || "Đã xử lý xóa đơn hàng!", "Xóa Đơn Hàng");
-        refreshOrders();
-      } else {
-        notify.error(data.error || "Xóa đơn thất bại", "Lỗi Xóa Đơn");
-      }
-    } catch (err) {
-      notify.error("Lỗi kết nối máy chủ", "Kết Nối Thất Bại");
+      await ordersApiClient.deleteOrder(selectedOrder.id);
+      setIsDeleteModalOpen(false);
+      notify.success("Đã xử lý xóa đơn hàng!", "Xóa Đơn Hàng");
+      refreshOrders();
+    } catch (err: any) {
+      notify.error(err.message || "Xóa đơn thất bại", "Lỗi Xóa Đơn");
     }
   };
 

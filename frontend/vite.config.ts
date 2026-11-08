@@ -15,6 +15,19 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/react-router")) return "react-vendor";
+            if (id.includes("node_modules/lucide-react/")) return "icons";
+            if (id.includes("node_modules/@google-analytics/")) return "analytics-sdk";
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: 3003,
       proxy: {

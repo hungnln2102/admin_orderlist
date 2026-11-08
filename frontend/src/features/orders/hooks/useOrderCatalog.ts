@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { CatalogProduct, CatalogSupplier, CatalogSupplierCost } from "../types";
+import { apiClient } from "@/shared/api/apiClient";
 
 export type OrderCatalogSnapshot = {
   products: CatalogProduct[];
@@ -13,7 +14,7 @@ type EnsureCatalogOptions = {
 };
 
 async function fetchCatalogJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { credentials: "include" });
+  const response = await apiClient(url);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "Không thể tải catalog đơn hàng.");
   return data as T;

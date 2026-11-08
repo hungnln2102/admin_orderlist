@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
 import { TablePagination } from "@/shared/components/TablePagination";
 import { StatCard } from "@/shared/components/StatCard";
+import { useTrafficData } from "./hooks/useTrafficData";
 import {
   Eye,
   Users,
@@ -30,88 +31,10 @@ import {
   Layers,
 } from "lucide-react";
 
-interface DailyTrafficItem {
-  date: string;
-  fullDate?: string;
-  visitors: number;
-  sessions: number;
-  pageviews: number;
-  bounceRate: number;
-  avgDuration: string;
-}
-
-interface SourceItem {
-  name: string;
-  channel?: string;
-  sessions: number;
-  users: number;
-  newUsers?: number;
-  bounceRate: string;
-  share: number;
-}
-
-interface TopPageItem {
-  path: string;
-  title: string;
-  views: number;
-  users: number;
-  time: string;
-  bounceRate: string;
-}
-
-interface DeviceItem {
-  device: string;
-  name?: string;
-  os: string;
-  browser: string;
-  sessions: number;
-  users: number;
-  share: number;
-  color?: string;
-}
-
-interface LocationItem {
-  city: string;
-  country: string;
-  sessions: number;
-  users: number;
-  share: number;
-}
-
-interface TrafficApiResponse {
-  source: string;
-  available?: boolean;
-  reason?: string;
-  domain: string;
-  days: number;
-  lastUpdated: string;
-  kpi: {
-    pageviews: string;
-    pageviewsChange: string;
-    visitors: string;
-    visitorsChange: string;
-    sessions: string;
-    sessionsChange: string;
-    avgDuration: string;
-    avgDurationChange: string;
-    bounceRate: string;
-    bounceRateChange: string;
-    returningRate: string;
-    returningRateChange: string;
-  };
-  trafficData: DailyTrafficItem[];
-  sourceData: SourceItem[];
-  topPages: TopPageItem[];
-  deviceData: DeviceItem[];
-  locationData: LocationItem[];
-  newVsReturning: { name: string; value: number; share: number; color?: string }[];
-}
-
+import { DailyTrafficItem, DeviceItem, LocationItem, SourceItem, TopPageItem, TrafficApiResponse } from "./types";
 export const TrafficPage: React.FC = () => {
   const [days, setDays] = useState<number>(30);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [data, setData] = useState<TrafficApiResponse | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { data, loading, errorMsg, refresh: fetchTrafficData } = useTrafficData(days);
 
   // Active Tab cho 5 bảng stat
   const [activeTab, setActiveTab] = useState<"daily" | "sources" | "pages" | "devices" | "locations">("daily");
@@ -131,28 +54,7 @@ export const TrafficPage: React.FC = () => {
   const [hoveredChartIdx, setHoveredChartIdx] = useState<number | null>(null);
 
   // Fetch dữ liệu Traffic
-  const fetchTrafficData = async (selectedDays: number) => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch(`/api/traffic/stats?days=${selectedDays}`);
-      const json = await res.json();
-      if (json.success && json.data) {
-        setData(json.data);
-      } else {
-        throw new Error(json.message || "Không thể tải dữ liệu traffic");
-      }
-    } catch (err: any) {
-      console.error("Lỗi khi tải traffic stats:", err);
-      setErrorMsg(err.message || "Lỗi kết nối");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchTrafficData(days);
-  }, [days]);
 
   // Reset trang và search khi đổi tab
   useEffect(() => {

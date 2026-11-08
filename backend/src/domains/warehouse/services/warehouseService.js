@@ -2,7 +2,8 @@ const { db } = require("@/db");
 const { TABLES } = require("@/db/tables");
 const { eventBus, EVENTS } = require("@/events");
 const { getVietnamDateString } = require("@/utils/time");
-const browserLauncherService = require("./browserLauncherService");
+const warehouseAutomationService = require("./warehouseAutomationService");
+const warehouseSlotService = require("./warehouseSlotService");
 
 /**
  * Format date value sang chuỗi hiển thị DD/MM/YYYY
@@ -314,142 +315,9 @@ const updateWarehouseAccount = async (id, payload) => {
 /**
  * Thêm một slot dịch vụ mới vào tài khoản kho hiện có
  */
-const addServiceSlotToAccount = async (accountId, payload) => {
-  const stockId = Number(accountId);
-  if (!stockId) throw new Error("ID tài khoản kho không hợp lệ!");
+const addServiceSlotToAccount = (...args) => warehouseSlotService.addServiceSlotToAccount(...args);
 
-  const {
-    serviceName,
-    category,
-    password,
-    backupEmail,
-    twoFa,
-    expiresAt,
-    status = "AVAILABLE",
-    note,
-    variantTag,
-  } = payload || {};
-
-  const slotName = String(serviceName || category || "").trim();
-  if (!slotName) {
-    throw new Error("Tên loại dịch vụ không được để trống!");
-  }
-
-  return await db.transaction(async (trx) => {
-    const account = await trx(TABLES.PRODUCT_KEYS).where("id", stockId).first();
-    if (!account) {
-      throw new Error(`Không tìm thấy tài khoản kho với ID ${stockId}`);
-    }
-
-    const now = new Date();
-
-    // 1. Tìm hoặc tạo mới tên dịch vụ trong PRODUCT_NAMES
-    let pName = await trx(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(name) = ?", [slotName.toLowerCase()])
-      .first();
-
-    let nameId = pName?.id;
-    if (!nameId) {
-      const [insertedP] = await trx(TABLES.PRODUCT_NAMES)
-        .insert({ name: slotName })
-        .returning("id");
-      nameId = insertedP.id || insertedP;
-    }
-
-    // 2. Tính toán slot_index lớn nhất hiện tại
-    const maxSlot = await trx(TABLES.STOCK_SERVICES)
-      .where({ account_id: stockId })
-      .max("slot_index as max_index")
-      .first();
-    const nextSlotIndex = (Number(maxSlot?.max_index) || 0) + 1;
-
-    // 3. Xử lý định dạng ngày hết hạn
-    let parsedExpiredAt = null;
-    if (expiresAt && String(expiresAt).trim()) {
-      const s = String(expiresAt).trim();
-      const dmyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      if (dmyMatch) {
-        const [, day, month, year] = dmyMatch;
-        parsedExpiredAt = new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00.000Z`);
-      } else {
-        const d = new Date(s);
-        parsedExpiredAt = isNaN(d.getTime()) ? null : d;
-      }
-    }
-
-    // 4. Insert slot dịch vụ mới
-    const [insertedSlot] = await trx(TABLES.STOCK_SERVICES)
-      .insert({
-        account_id: stockId,
-        name_id: nameId,
-        slot_index: nextSlotIndex,
-        password: password ? String(password).trim() : null,
-        backup_email: backupEmail ? String(backupEmail).trim() : null,
-        two_fa: twoFa ? String(twoFa).trim() : null,
-        expired_at: parsedExpiredAt,
-        status: status || "AVAILABLE",
-        service_note: note ? String(note).trim() : null,
-        variant_tag: variantTag ? String(variantTag).trim() : null,
-        created_at: now,
-        updated_at: now,
-      })
-      .returning("*");
-
-    const result = {
-      id: Number(insertedSlot.id),
-      account_id: stockId,
-      name_id: nameId,
-      display_name: slotName,
-      variant_tag: insertedSlot.variant_tag || "",
-      password: insertedSlot.password || "",
-      backup_email: insertedSlot.backup_email || "",
-      two_fa: insertedSlot.two_fa || "",
-      expires_at: formatDateDisplay(insertedSlot.expired_at),
-      raw_expires_at: insertedSlot.expired_at ? new Date(insertedSlot.expired_at).toISOString().split("T")[0] : "",
-      status: insertedSlot.status || "AVAILABLE",
-      note: insertedSlot.service_note || "",
-    };
-
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
-      slotId: Number(insertedSlot.id),
-      accountId: stockId,
-      accountUsername: account.account_username,
-      serviceName: slotName,
-    });
-
-    return result;
-  });
-};
-
-/**
- * Xóa một slot dịch vụ con khỏi tài khoản kho
- */
-const deleteWarehouseServiceSlot = async (slotId) => {
-  const numericSlotId = Number(slotId);
-  if (!numericSlotId) throw new Error("ID slot dịch vụ không hợp lệ!");
-
-  return await db.transaction(async (trx) => {
-    const existing = await trx(TABLES.STOCK_SERVICES).where("id", numericSlotId).first();
-    if (!existing) {
-      throw new Error(`Không tìm thấy slot dịch vụ với ID ${numericSlotId}`);
-    }
-
-    await trx(TABLES.STOCK_SERVICES).where("id", numericSlotId).del();
-
-    const remainingCount = await trx(TABLES.STOCK_SERVICES)
-      .where("account_id", existing.account_id)
-      .count("id as count")
-      .first();
-
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
-      slotId: numericSlotId,
-      accountId: existing.account_id,
-      deleted: true,
-    });
-
-    return { success: true, deleted: true, remainingSlots: Number(remainingCount?.count || 0) };
-  });
-};
+const deleteWarehouseServiceSlot = (...args) => warehouseSlotService.deleteWarehouseServiceSlot(...args);
 
 const listCatalogItems = async () => {
   const pNames = await db(`${TABLES.PRODUCT_NAMES} as pn`)
@@ -602,249 +470,7 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
 };
 
 /**
- * Xóa dịch vụ khỏi danh mục kho (chỉ khi kho hoàn toàn trống)
- */
-const deleteCatalogItem = async (id) => {
-  if (!id) throw new Error("ID dịch vụ không được để trống!");
-
-  const existing = await db(TABLES.PRODUCT_NAMES).where("id", id).first();
-  if (!existing) {
-    throw new Error(`Không tìm thấy dịch vụ kho với ID ${id}!`);
-  }
-
-  // 1. Kiểm tra tồn kho slot (AVAILABLE, RESERVED hoặc bất kỳ slot nào)
-  const slotStats = await db(TABLES.STOCK_SERVICES)
-    .where("name_id", id)
-    .count("id as total_slots")
-    .sum({ in_stock: db.raw("CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END") })
-    .sum({ reserved: db.raw("CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END") })
-    .first();
-
-  const totalSlots = Number(slotStats?.total_slots || 0);
-  const inStock = Number(slotStats?.in_stock || 0);
-  const reserved = Number(slotStats?.reserved || 0);
-
-  if (inStock > 0 || reserved > 0 || totalSlots > 0) {
-    throw new Error(
-      `Kho dịch vụ "${existing.name}" vẫn còn ${totalSlots} slot (${inStock} tồn kho, ${reserved} đã giữ chỗ). Kho phải trống hoàn toàn (0 slot) mới có thể xóa!`
-    );
-  }
-
-  // 2. Kiểm tra nếu đang có gói nào liên kết trong warehouse.package_products
-  const packageCount = await db(TABLES.PACKAGE_PRODUCT)
-    .where("product_name_id", id)
-    .count("id as count")
-    .first();
-
-  if (Number(packageCount?.count || 0) > 0) {
-    throw new Error(
-      `Dịch vụ "${existing.name}" đang được liên kết trong kho gói (${packageCount.count} gói). Vui lòng gỡ liên kết trước khi xóa!`
-    );
-  }
-
-  // 3. Tiến hành xóa khỏi warehouse.product_names
-  await db(TABLES.PRODUCT_NAMES).where("id", id).del();
-
-  const payload = {
-    id: existing.id,
-    name: existing.name,
-  };
-
-  eventBus.emit(EVENTS.WAREHOUSE_CATALOG_DELETED, payload);
-
-  return {
-    success: true,
-    message: `Đã xóa dịch vụ "${existing.name}" khỏi danh mục kho thành công.`,
-    data: payload,
-  };
-};
-
-/**
- * Mở trình duyệt Profile độc lập cho tài khoản kho
- */
-const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } = {}) => {
-  if (!accountId) {
-    throw new Error("ID tài khoản kho không được để trống!");
-  }
-
-  const account = await db(TABLES.PRODUCT_KEYS).where("id", accountId).first();
-  if (!account) {
-    throw new Error(`Không tìm thấy tài khoản kho với ID ${accountId}!`);
-  }
-
-  let customUrl = null;
-  let resolvedServiceName = serviceName || "";
-
-  // 1. Nếu có slotId, truy vấn để lấy login_url từ warehouse.product_names
-  let verifiedSlotId = null;
-  if (slotId) {
-    const slot = await db(TABLES.STOCK_SERVICES)
-      .where({ id: slotId, account_id: account.id })
-      .first();
-    if (slot && slot.name_id) {
-      verifiedSlotId = slot.id;
-      const pName = await db(TABLES.PRODUCT_NAMES).where("id", slot.name_id).first();
-      if (pName) {
-        customUrl = pName.login_url;
-        resolvedServiceName = resolvedServiceName || pName.name;
-      }
-    }
-  }
-
-  // 2. Nếu chưa có customUrl, thử tìm theo resolvedServiceName
-  if (!customUrl && resolvedServiceName) {
-    const pName = await db(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(name) = ?", [resolvedServiceName.trim().toLowerCase()])
-      .first();
-    if (pName && pName.login_url) {
-      customUrl = pName.login_url;
-    }
-  }
-
-  if (!customUrl) {
-    throw new Error(`Dịch vụ ${resolvedServiceName || "này"} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng trước khi mở trình duyệt.`);
-  }
-
-  const launchResult = await browserLauncherService.launchAccountBrowser({
-    accountId: account.id,
-    accountUsername: account.account_username,
-    serviceName: resolvedServiceName,
-    customUrl,
-    userAgent,
-  });
-
-  if (verifiedSlotId) {
-    await db(TABLES.STOCK_SERVICES)
-      .where("id", verifiedSlotId)
-      .update({
-        session_is_authenticated: launchResult.data?.hasAuthenticatedSession === true,
-        session_checked_at: new Date(),
-        updated_at: new Date(),
-      });
-  }
-
-  return launchResult;
-};
-
-/**
- * Cập nhật thông tin dịch vụ slot (password, backup_email, two_fa, expires_at, status, service_note)
- * và optionally cập nhật account_username của tài khoản mẹ
- */
-const updateWarehouseServiceSlot = async (slotId, payload) => {
-  const numericSlotId = Number(slotId);
-  if (!numericSlotId) {
-    throw new Error("ID slot dịch vụ không hợp lệ!");
-  }
-
-  const {
-    password,
-    backupEmail,
-    twoFa,
-    expiresAt,
-    status,
-    note,
-    variantTag,
-    accountUsername,
-  } = payload;
-
-  return await db.transaction(async (trx) => {
-    const existingSlot = await trx(TABLES.STOCK_SERVICES)
-      .where("id", numericSlotId)
-      .first();
-
-    if (!existingSlot) {
-      throw new Error(`Không tìm thấy slot dịch vụ với ID ${numericSlotId}`);
-    }
-
-    const now = new Date();
-    const updateData = {
-      updated_at: now,
-    };
-
-    if (password !== undefined) updateData.password = password || null;
-    if (backupEmail !== undefined) updateData.backup_email = backupEmail || null;
-    if (twoFa !== undefined) updateData.two_fa = twoFa || null;
-    if (note !== undefined) updateData.service_note = note || null;
-    if (variantTag !== undefined) updateData.variant_tag = String(variantTag || "").trim() || null;
-    if (status !== undefined) {
-      updateData.status = status;
-    }
-
-    if (expiresAt !== undefined) {
-      if (!expiresAt || !String(expiresAt).trim()) {
-        updateData.expired_at = null;
-      } else {
-        const s = String(expiresAt).trim();
-        const dmyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (dmyMatch) {
-          const [, day, month, year] = dmyMatch;
-          updateData.expired_at = new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00.000Z`);
-        } else {
-          const d = new Date(s);
-          updateData.expired_at = isNaN(d.getTime()) ? null : d;
-        }
-      }
-    }
-
-    await trx(TABLES.STOCK_SERVICES)
-      .where("id", numericSlotId)
-      .update(updateData);
-
-    // Cập nhật account_username nếu có
-    if (accountUsername && String(accountUsername).trim()) {
-      const normalizedAccount = String(accountUsername).trim().toLowerCase();
-      await trx(TABLES.PRODUCT_KEYS)
-        .where("id", existingSlot.account_id)
-        .update({
-          account_username: normalizedAccount,
-          updated_at: now,
-        });
-    }
-
-    const updatedSlot = await trx(`${TABLES.STOCK_SERVICES} as ss`)
-      .leftJoin(`${TABLES.PRODUCT_NAMES} as pn`, "pn.id", "ss.name_id")
-      .select(
-        "ss.id",
-        "ss.account_id",
-        "ss.name_id",
-        "pn.name as display_name",
-        "ss.password",
-        "ss.backup_email",
-        "ss.two_fa",
-        "ss.expired_at as expires_at",
-        "ss.status",
-        "ss.service_note as note",
-        "ss.updated_at"
-      )
-      .where("ss.id", numericSlotId)
-      .first();
-
-    const result = {
-      id: Number(updatedSlot.id),
-      account_id: Number(updatedSlot.account_id),
-      display_name: updatedSlot.display_name || "Dịch vụ",
-      variant_tag: updatedSlot.variant_tag || "",
-      password: updatedSlot.password || "",
-      backup_email: updatedSlot.backup_email || "",
-      two_fa: updatedSlot.two_fa || "",
-      expires_at: formatDateDisplay(updatedSlot.expires_at),
-      raw_expires_at: updatedSlot.expires_at ? new Date(updatedSlot.expires_at).toISOString().split("T")[0] : "",
-      status: updatedSlot.status || "AVAILABLE",
-      note: updatedSlot.note || "",
-    };
-
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
-      slotId: numericSlotId,
-      accountId: updatedSlot.account_id,
-      updatedFields: updateData,
-    });
-
-    return result;
-  });
-};
-
-/**
- * Cập nhật thông tin dịch vụ trong danh mục (name, category, login_url)
+ * Cập nhật thông tin dịch vụ trong danh mục (name, category, login_url, product_id)
  */
 const updateCatalogItem = async (id, payload) => {
   const numericId = Number(id);
@@ -910,8 +536,70 @@ const updateCatalogItem = async (id, payload) => {
 };
 
 /**
- * Lấy danh sách sản phẩm hệ thống từ business.product
+ * Xóa dịch vụ khỏi danh mục kho (chỉ khi kho hoàn toàn trống)
  */
+const deleteCatalogItem = async (id) => {
+  if (!id) throw new Error("ID dịch vụ không được để trống!");
+
+  const existing = await db(TABLES.PRODUCT_NAMES).where("id", id).first();
+  if (!existing) {
+    throw new Error(`Không tìm thấy dịch vụ kho với ID ${id}!`);
+  }
+
+  // 1. Kiểm tra tồn kho slot (AVAILABLE, RESERVED hoặc bất kỳ slot nào)
+  const slotStats = await db(TABLES.STOCK_SERVICES)
+    .where("name_id", id)
+    .count("id as total_slots")
+    .sum({ in_stock: db.raw("CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END") })
+    .sum({ reserved: db.raw("CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END") })
+    .first();
+
+  const totalSlots = Number(slotStats?.total_slots || 0);
+  const inStock = Number(slotStats?.in_stock || 0);
+  const reserved = Number(slotStats?.reserved || 0);
+
+  if (inStock > 0 || reserved > 0 || totalSlots > 0) {
+    throw new Error(
+      `Kho dịch vụ "${existing.name}" vẫn còn ${totalSlots} slot (${inStock} tồn kho, ${reserved} đã giữ chỗ). Kho phải trống hoàn toàn (0 slot) mới có thể xóa!`
+    );
+  }
+
+  // 2. Kiểm tra nếu đang có gói nào liên kết trong warehouse.package_products
+  const packageCount = await db(TABLES.PACKAGE_PRODUCT)
+    .where("product_name_id", id)
+    .count("id as count")
+    .first();
+
+  if (Number(packageCount?.count || 0) > 0) {
+    throw new Error(
+      `Dịch vụ "${existing.name}" đang được liên kết trong kho gói (${packageCount.count} gói). Vui lòng gỡ liên kết trước khi xóa!`
+    );
+  }
+
+  // 3. Tiến hành xóa khỏi warehouse.product_names
+  await db(TABLES.PRODUCT_NAMES).where("id", id).del();
+
+  const payload = {
+    id: existing.id,
+    name: existing.name,
+  };
+
+  eventBus.emit(EVENTS.WAREHOUSE_CATALOG_DELETED, payload);
+
+  return {
+    success: true,
+    message: `Đã xóa dịch vụ "${existing.name}" khỏi danh mục kho thành công.`,
+    data: payload,
+  };
+};
+
+/**
+ * Mở trình duyệt Profile độc lập cho tài khoản kho
+ */
+const openAccountBrowser = (...args) => warehouseAutomationService.openAccountBrowser(...args);
+
+const updateWarehouseServiceSlot = (...args) => warehouseSlotService.updateWarehouseServiceSlot(...args);
+
 const getSystemProducts = async () => {
   const list = await db(TABLES.PRODUCT)
     .select("id", "package_name as name", "is_active")

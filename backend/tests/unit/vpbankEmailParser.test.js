@@ -1,42 +1,42 @@
-﻿const test = require("node:test");
+const test = require("node:test");
 const assert = require("node:assert/strict");
 const { parseVpbankEmail, parseVNDAmount, parseDateTimeVN, extractCardSuffix } = require("../../src/domains/finance/services/vpbankEmailParser");
 
 test("VPBank Email Parser Suite", async (t) => {
-  await t.test("1. parseVNDAmount chuyá»ƒn Ä‘á»•i chÃ­nh xÃ¡c cÃ¡c Ä‘á»‹nh dáº¡ng tiá»n tá»‡ VNÄ", () => {
+  await t.test("1. parseVNDAmount chuyển đổi chính xác các định dạng tiền tệ VNĐ", () => {
     assert.equal(parseVNDAmount("150,000 VND"), 150000);
-    assert.equal(parseVNDAmount("1.500.000 Ä‘"), 1500000);
+    assert.equal(parseVNDAmount("1.500.000 đ"), 1500000);
     assert.equal(parseVNDAmount("- 350.000 VND"), 350000);
-    assert.equal(parseVNDAmount("+ 1,451,834 Ä‘"), 1451834);
+    assert.equal(parseVNDAmount("+ 1,451,834 đ"), 1451834);
     assert.equal(parseVNDAmount(null), null);
     assert.equal(parseVNDAmount("invalid"), null);
   });
 
-  await t.test("2. parseDateTimeVN parse chÃ­nh xÃ¡c ngÃ y giá» sang Ä‘á»‹nh dáº¡ng ISO GMT+7", () => {
+  await t.test("2. parseDateTimeVN parse chính xác ngày giờ sang định dạng ISO GMT+7", () => {
     const iso = parseDateTimeVN("03/11/2026 18:39:41");
     assert.equal(iso, "2026-11-03T18:39:41+07:00");
   });
 
-  await t.test("3. extractCardSuffix trÃ­ch xuáº¥t Ä‘Ãºng 4 sá»‘ cuá»‘i tháº»", () => {
-    assert.equal(extractCardSuffix("Tháº» VISA *2340 cá»§a QuÃ½ khÃ¡ch"), "2340");
-    assert.equal(extractCardSuffix("Giao dá»‹ch tháº» 4541xxxx0985 thÃ nh cÃ´ng"), "0985");
-    assert.equal(extractCardSuffix("Sá»‘ tÃ i khoáº£n: 1234xxxx8181"), "8181");
+  await t.test("3. extractCardSuffix trích xuất đúng 4 số cuối thẻ", () => {
+    assert.equal(extractCardSuffix("Thẻ VISA *2340 của Quý khách"), "2340");
+    assert.equal(extractCardSuffix("Giao dịch thẻ 4541xxxx0985 thành công"), "0985");
+    assert.equal(extractCardSuffix("Số tài khoản: 1234xxxx8181"), "8181");
   });
 
-  await t.test("4. BÃ³c tÃ¡ch email chi tiÃªu tháº» tÃ­n dá»¥ng (CARD_SPEND)", () => {
+  await t.test("4. Bóc tách email chi tiêu thẻ tín dụng (CARD_SPEND)", () => {
     const email = {
-      subject: "ThÃ´ng bÃ¡o giao dá»‹ch tháº» tÃ­n dá»¥ng quá»‘c táº¿ VPBank",
+      subject: "Thông báo giao dịch thẻ tín dụng quốc tế VPBank",
       from: "customercare@care.vpb.com.vn",
       authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
       text: `
-        KÃ­nh gá»­i QuÃ½ khÃ¡ch,
-        Tháº» tÃ­n dá»¥ng quá»‘c táº¿ VISA *2340 vá»«a phÃ¡t sinh giao dá»‹ch:
-        - Sá»‘ tiá»n giao dá»‹ch: - 150,000 VND
+        Kính gửi Quý khách,
+        Thẻ tín dụng quốc tế VISA *2340 vừa phát sinh giao dịch:
+        - Số tiền giao dịch: - 150,000 VND
         - Thá»i gian: 03/11/2026 18:39:41
         merchant: Foody
-        - MÃ£ chuáº©n chi: 987654
-        - Háº¡n má»©c kháº£ dá»¥ng cÃ²n láº¡i: 18,242,622 VND
-        TrÃ¢n trá»ng cáº£m Æ¡n QuÃ½ khÃ¡ch!
+        - Mã chuẩn chi: 987654
+        - Hạn mức khả dụng còn lại: 18,242,622 VND
+        Trân trọng cảm ơn Quý khách!
       `,
     };
 
@@ -54,17 +54,17 @@ test("VPBank Email Parser Suite", async (t) => {
     assert.equal(result.senderValid, true);
   });
 
-  await t.test("5. BÃ³c tÃ¡ch email thanh toÃ¡n dÆ° ná»£ tháº» tÃ­n dá»¥ng (+ CARD_PAYMENT)", () => {
+  await t.test("5. Bóc tách email thanh toán dư nợ thẻ tín dụng (+ CARD_PAYMENT)", () => {
     const email = {
-      subject: "ThÃ´ng bÃ¡o thanh toÃ¡n tháº» tÃ­n dá»¥ng thÃ nh cÃ´ng",
+      subject: "Thông báo thanh toán thẻ tín dụng thành công",
       from: "customercare@care.vpb.com.vn",
       authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
       text: `
-        QuÃ½ khÃ¡ch Ä‘Ã£ thanh toÃ¡n thÃ nh cÃ´ng dÆ° ná»£ tháº» tÃ­n dá»¥ng VISA *2340:
-        Sá»‘ tiá»n thanh toÃ¡n: + 337,331 VND
-        Thá»i gian giao dá»‹ch: 03/11/2026 00:25:10
-        MÃ£ giao dá»‹ch: VPB2611032491547559
-        Háº¡n má»©c kháº£ dá»¥ng sau thanh toÃ¡n: 18,384,522 VND
+        Quý khách đã thanh toán thành công dư nợ thẻ tín dụng VISA *2340:
+        Số tiền thanh toán: + 337,331 VND
+        Thời gian giao dịch: 03/11/2026 00:25:10
+        Mã giao dịch: VPB2611032491547559
+        Hạn mức khả dụng sau thanh toán: 18,384,522 VND
       `,
     };
 
@@ -110,12 +110,12 @@ test("VPBank Email Parser Suite", async (t) => {
     assert.equal(result.requiresManualStatementImport, true);
   });
 
-  await t.test("8. BÃ³c tÃ¡ch email mÃ£ xÃ¡c thá»±c OTP / Non-transaction", () => {
+  await t.test("8. Bóc tách email mã xác thực OTP / Non-transaction", () => {
     const email = {
-      subject: "MÃ£ xÃ¡c thá»±c OTP giao dá»‹ch trá»±c tuyáº¿n VPBank",
+      subject: "Mã xác thực OTP giao dịch trực tuyến VPBank",
       from: "customercare@care.vpb.com.vn",
       authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
-      text: "MÃ£ OTP cá»§a quÃ½ khÃ¡ch lÃ  654321, cÃ³ hiá»‡u lá»±c trong 2 phÃºt.",
+      text: "Mã OTP của quý khách là 654321, có hiệu lực trong 2 phút.",
     };
 
     const result = parseVpbankEmail(email);
@@ -123,11 +123,11 @@ test("VPBank Email Parser Suite", async (t) => {
     assert.equal(result.isFinancial, false);
   });
 
-  await t.test("9. Cáº£nh bÃ¡o sender giáº£ máº¡o khÃ´ng thuá»™c tÃªn miá»n VPBank", () => {
+  await t.test("9. Cảnh báo sender giả mạo không thuộc tên miền VPBank", () => {
     const email = {
-      subject: "ThÃ´ng bÃ¡o giao dá»‹ch tháº» tÃ­n dá»¥ng",
+      subject: "Thông báo giao dịch thẻ tín dụng",
       from: "attacker@gmail.com",
-      text: "Tháº» *2340 trá»« tiá»n 100,000 VND",
+      text: "Thẻ *2340 trừ tiền 100,000 VND",
     };
 
     const result = parseVpbankEmail(email);

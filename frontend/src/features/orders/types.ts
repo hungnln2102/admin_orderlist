@@ -41,6 +41,15 @@ export interface Order {
 
 export type OrderDatasetKey = "active" | "import" | "expired" | "canceled";
 
+export interface OrdersQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  tab?: string;
+  includeStats?: boolean;
+}
+
 export interface OrdersPageProps {
   initialTab?: OrderDatasetKey;
 }
@@ -74,6 +83,7 @@ export interface OrderFormData {
   warehouse_password?: string;
   warehouse_backup_email?: string;
   warehouse_two_fa?: string;
+  warehouse_otp_type?: string;
 }
 
 export const DEFAULT_FORM_DATA: OrderFormData = {
@@ -100,6 +110,7 @@ export const DEFAULT_FORM_DATA: OrderFormData = {
   warehouse_password: "",
   warehouse_backup_email: "",
   warehouse_two_fa: "",
+  warehouse_otp_type: "",
 };
 
 export interface CatalogProduct {

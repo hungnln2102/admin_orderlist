@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff, Sparkles, ChevronDown } from "lucide-react";
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
@@ -52,19 +52,96 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
   requiresStorage = false,
 }) => {
   const [showWarehousePassword, setShowWarehousePassword] = useState(false);
+  const [apiMapping, setApiMapping] = useState<{
+    byProductId: Record<string, any[]>;
+    byVariantId: Record<string, any[]>;
+    byDisplayName: Record<string, any[]>;
+    byVariantName: Record<string, any[]>;
+    byPackageName: Record<string, any[]>;
+    allApis: any[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    fetch("/api/system/product-apis/mapping")
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.success) {
+          setApiMapping(data);
+        }
+      })
+      .catch((err) => console.error("[OrderCreateEditModal] Lỗi nạp mapping API sản phẩm:", err));
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  const matchedProduct = useMemo(() => {
+    return productsCatalog.find(
+      (p) =>
+        Number(p.id) === Number(formData.id_product) ||
+        String(p.id) === String(formData.id_product) ||
+        (p.package_product && p.package_product === formData.id_product) ||
+        p.san_pham === formData.id_product
+    );
+  }, [productsCatalog, formData.id_product]);
+
+  const availableOtpApis = useMemo(() => {
+    if (!apiMapping) return [];
+
+    // 1. Tìm theo variant id
+    const vId = Number(matchedProduct?.id || formData.id_product);
+    if (!isNaN(vId) && apiMapping.byVariantId[vId]?.length) {
+      return apiMapping.byVariantId[vId];
+    }
+
+    // 2. Tìm theo display_name
+    const dName = String(matchedProduct?.san_pham || formData.display_name || "").trim().toLowerCase();
+    if (dName && apiMapping.byDisplayName[dName]?.length) {
+      return apiMapping.byDisplayName[dName];
+    }
+
+    // 3. Tìm theo variant_name / package_product
+    const vName = String(matchedProduct?.package_product || formData.variant_name || "").trim().toLowerCase();
+    if (vName && apiMapping.byVariantName[vName]?.length) {
+      return apiMapping.byVariantName[vName];
+    }
+
+    // 4. Tìm theo package name (Adobe, Netflix, Chat GPT, etc.)
+    const fullText = `${dName} ${vName}`.toLowerCase();
+    for (const [pkgName, apis] of Object.entries(apiMapping.byPackageName || {})) {
+      if (apis.length > 0 && fullText.includes(pkgName)) {
+        return apis;
+      }
+    }
+
+    return [];
+  }, [apiMapping, matchedProduct, formData.id_product, formData.display_name, formData.variant_name]);
+
+  // Tự động gán default OTP API khi chọn sản phẩm
+  useEffect(() => {
+    if (!availableOtpApis.length) {
+      if (formData.warehouse_otp_type) {
+        setFormData((prev) => ({ ...prev, warehouse_otp_type: "" }));
+      }
+      return;
+    }
+
+    // Nếu đã có giá trị và giá trị đó thuộc availableOtpApis -> giữ nguyên
+    const exists = availableOtpApis.some((a) => a.service_key === formData.warehouse_otp_type);
+    if (!exists) {
+      const defaultApi = availableOtpApis.find((a) => a.is_default) || availableOtpApis[0];
+      if (defaultApi) {
+        setFormData((prev) => ({ ...prev, warehouse_otp_type: defaultApi.service_key }));
+      }
+    }
+  }, [availableOtpApis]);
 
   if (!isOpen) return null;
 
   const currentPrefix = formData.order_prefix || (isImportTab ? ORDER_PREFIX.MAVN : ORDER_PREFIX.MAVC);
   const isImportMode = isImportTab || currentPrefix === ORDER_PREFIX.MAVN;
-
-  const matchedProduct = productsCatalog.find(
-    (p) =>
-      Number(p.id) === Number(formData.id_product) ||
-      String(p.id) === String(formData.id_product) ||
-      (p.package_product && p.package_product === formData.id_product) ||
-      p.san_pham === formData.id_product
-  );
 
   const handleDateRangeChange = (
     start: string,
@@ -363,7 +440,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   {/* Mật Khẩu Kho */}
                   <div>
                     <label className="block text-slate-400 mb-1 font-medium flex items-center gap-1">
@@ -417,6 +494,42 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                       onChange={(e) => setFormData({ ...formData, warehouse_two_fa: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 font-mono text-xs"
                     />
+                  </div>
+
+                  {/* Loại OTP (Phân bổ động theo Sản Phẩm) */}
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-cyan-400" />
+                        <span>Loại OTP</span>
+                      </span>
+                      {availableOtpApis.length > 0 && (
+                        <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 font-mono">
+                          {availableOtpApis.length} cổng
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={formData.warehouse_otp_type || ""}
+                        onChange={(e) => setFormData({ ...formData, warehouse_otp_type: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-2.5 pr-7 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 font-mono text-xs appearance-none cursor-pointer truncate"
+                      >
+                        {availableOtpApis.length === 0 ? (
+                          <option value="">Không có cổng OTP</option>
+                        ) : (
+                          <>
+                            <option value="">-- Chọn Loại OTP --</option>
+                            {availableOtpApis.map((api: any) => (
+                              <option key={api.service_key} value={api.service_key}>
+                                {api.service_name} ({api.service_key}){api.is_default ? " ★ Mặc định" : ""}
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
               </div>

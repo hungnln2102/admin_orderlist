@@ -45,6 +45,7 @@ function parseConfigRow(row) {
     endpoints: parseJson(row.endpoints, {}),
     auth_config: parseJson(row.auth_config, {}),
     field_mapping: parseJson(row.field_mapping, []),
+    execution_mode: row.execution_mode || "GENERIC_HTTP",
   };
 }
 
@@ -100,7 +101,7 @@ async function createConfig(data) {
   return withTransaction(async (trx) => {
     const serviceKey = String(data.service_key).trim();
     if (await trx(TABLE).where("service_key", serviceKey).forUpdate().first()) throw new Error(`Service key '${serviceKey}' already exists.`);
-    const [inserted] = await trx(TABLE).insert({ service_key: serviceKey, service_name: String(data.service_name).trim(), category: data.category || "OTP", description: data.description || "", base_url: await validateBaseUrl(data.base_url), endpoints: JSON.stringify(data.endpoints || {}), auth_config: JSON.stringify(data.auth_config || {}), field_mapping: JSON.stringify(data.field_mapping || []), is_active: data.is_active !== false, created_at: trx.fn.now(), updated_at: trx.fn.now() }).returning("*");
+    const [inserted] = await trx(TABLE).insert({ service_key: serviceKey, service_name: String(data.service_name).trim(), category: data.category || "OTP", description: data.description || "", base_url: await validateBaseUrl(data.base_url), endpoints: JSON.stringify(data.endpoints || {}), auth_config: JSON.stringify(data.auth_config || {}), field_mapping: JSON.stringify(data.field_mapping || []), execution_mode: String(data.execution_mode || "GENERIC_HTTP").trim().toUpperCase(), is_active: data.is_active !== false, created_at: trx.fn.now(), updated_at: trx.fn.now() }).returning("*");
     const config = parseConfigRow(inserted);
     await publishEventInTrx(trx, { eventName: EVENTS.EXTERNAL_API_CONFIG_MUTATED, aggregateType: "EXTERNAL_API_CONFIG", aggregateId: inserted.id, action: "CREATE", afterState: toClientConfig(config), source: "EXTERNAL_API_CONFIG", payload: { configId: inserted.id, serviceKey, action: "CREATE" } });
     trx.afterCommit(() => clearCache());
@@ -121,6 +122,7 @@ async function updateConfig(id, data) {
     if (data.endpoints !== undefined) updateData.endpoints = JSON.stringify(data.endpoints || {});
     if (data.auth_config !== undefined) updateData.auth_config = JSON.stringify(mergeAuthConfig(existing.auth_config, data.auth_config));
     if (data.field_mapping !== undefined) updateData.field_mapping = JSON.stringify(data.field_mapping || []);
+    if (data.execution_mode !== undefined) updateData.execution_mode = String(data.execution_mode || "GENERIC_HTTP").trim().toUpperCase();
     if (data.is_active !== undefined) updateData.is_active = Boolean(data.is_active);
     const [updatedRow] = await trx(TABLE).where("id", id).update(updateData).returning("*");
     const updated = parseConfigRow(updatedRow);
@@ -224,11 +226,11 @@ async function analyzeEndpoint({ configId, method, endpoint, email, body } = {})
   const startedAt = Date.now();
 
   // 1. Nếu là cổng Fix Ades Support (có Bearer Token và 2 headers chuyên biệt):
-  if (config.service_key === "fix_ades" && targetEmail) {
+  if (config.execution_mode === "AUTHENTICATED_OTP" && targetEmail) {
     try {
-      const { fetchOtpFromFixAdes } = require("./otpProviderService");
-      const probeRes = await fetchOtpFromFixAdes(targetEmail, { includeDetails: true });
-      const rawPayload = probeRes?.rawData || probeRes;
+      const { probeOtpForEmail } = require("./otpProviderService");
+      const probeRes = await probeOtpForEmail({ email: targetEmail, serviceKey: config.service_key });
+      const rawPayload = probeRes;
       const jsonText = JSON.stringify(rawPayload, null, 2);
       return {
         success: true,
@@ -240,7 +242,7 @@ async function analyzeEndpoint({ configId, method, endpoint, email, body } = {})
         parsed_data: rawPayload,
         raw_body: jsonText,
         detected_fields: extractJsonPaths(rawPayload),
-        target_url: `${config.base_url}/ades-support/only-otp?email=${encodeURIComponent(targetEmail)}`,
+        target_url: config.base_url,
       };
     } catch (err) {
       // Fallback xuống request thông thường nếu có lỗi provider

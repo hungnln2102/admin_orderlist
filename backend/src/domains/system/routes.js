@@ -6,6 +6,7 @@ const systemLogService = require("./services/systemLogService");
 const externalApiConfigService = require("./services/externalApiConfigService");
 const otpProviderService = require("./services/otpProviderService");
 const totpController = require("./controllers/totpController");
+const productApiController = require("./controllers/productApiController");
 const { requireAdmin } = require("@/domains/auth/middleware/requireAdmin");
 const { sensitiveOperationRateLimiter } = require("./middleware/sensitiveOperationRateLimiter");
 const scheduler = require("@/scheduler");
@@ -232,5 +233,26 @@ router.post("/external-apis/test-otp", sensitiveOperationRateLimiter, async (req
 
 // POST /api/system/totp/generate - Generate Google Authenticator code from request-only Base32 secret.
 router.post("/totp/generate", sensitiveOperationRateLimiter, totpController.generate);
+
+// ==========================================
+// PRODUCT API CONFIGS MAPPING
+// ==========================================
+// GET /api/system/product-apis - Liệt kê tất cả sản phẩm và cấu hình API tương ứng
+router.get("/product-apis", productApiController.list);
+
+// GET /api/system/product-apis/mapping - Lấy dictionary map theo product_id/variant_id/display_name
+router.get("/product-apis/mapping", productApiController.getMapping);
+
+// POST /api/system/product-apis - Gán API vào sản phẩm
+router.post("/product-apis", productApiController.assign);
+
+// PUT /api/system/product-apis/:id - Cập nhật cấu hình mapping
+router.put("/product-apis/:id", productApiController.update);
+
+// PUT /api/system/product-apis/:id/default - Đặt API làm mặc định cho sản phẩm
+router.put("/product-apis/:id/default", productApiController.setDefault);
+
+// DELETE /api/system/product-apis/:id - Gỡ bỏ API khỏi sản phẩm
+router.delete("/product-apis/:id", productApiController.remove);
 
 module.exports = router;
