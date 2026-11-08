@@ -688,3 +688,35 @@
   - **Production Admin API URL**: `https://admin.mavrykpremium.com/api/public/otp-portal-slots` $\rightarrow$ HTTP 200 OK (Phản hồi dữ liệu JSON chuẩn xác).
 
 - **Trạng thái nghiệm thu:** ĐÃ HOÀN TẤT TRIỂN KHAI VÀ VẬN HÀNH 100% TRÊN TOÀN HỆ THỐNG.
+
+
+---
+
+## [22:18] Đồng Bộ Toàn Diện 11 Cổng API Bên Thứ 3 & Cấu Hình Slot Lên Production Database (VPS 180.93.43.169)
+
+- **Phạm vi tác động & Chỉ đạo của Master:**
+  - *"ở prod đang thiếu nhiều trường API, cấu hình thêm vào database cho tôi"*
+  - Ảnh đính kèm: Bảng Danh Sách Cổng API Bên Thứ 3 gồm đủ 11 cổng với các phân loại OTP, NETFLIX, 2FA.
+
+- **Dữ liệu thực tế xác minh trước khi xử lý:**
+  - Production DB (`system_automation.external_api_configs`) chỉ mới có 6 cổng API đời đầu (`tinyhost`, `fix_ades`, `yuna_2fa`, `yuna_mail`, `generator_email`, `mail_imap`).
+  - Thiếu 5 cổng API: `vivarocky_household`, `vivarocky_six_digit`, `vivarocky_signin`, `totp`, `warehouse_2fa`.
+  - Thiếu khóa cấu hình `OTP_PORTAL_SLOTS_CONFIG` trong bảng `system_automation.system_configs`.
+
+- **Chi tiết kỹ thuật triển khai:**
+  1. **Tạo Migration Chuẩn Knex ([`20261108000001_sync_all_external_api_gateways.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261108000001_sync_all_external_api_gateways.js)):**
+     - Bổ sung 5 cổng API với cấu hình `base_url`, `auth_config`, `endpoints`, `field_mapping` và `category` (NETFLIX, 2FA).
+     - Ràng buộc an toàn `onConflict("service_key").ignore()` chống ghi đè dữ liệu đang chạy.
+     - Tự động kiểm tra và chèn `OTP_PORTAL_SLOTS_CONFIG` chuẩn 8 ô slot vào `system_configs`.
+  2. **Source Control & VPS Execution:**
+     - Commit `f7d09477` đã push thành công lên `origin/main`.
+     - VPS kéo code mới nhất và chạy `npx knex migrate:latest` trên container `admin_orderlist-backend` (`Batch 21 run: 1 migrations`).
+     - Khởi động lại container backend để làm mới bộ nhớ cache cổng API.
+
+- **Kiểm tra nghiệm thu thực tế trên Production (Evidence-based Verification):**
+  - **Query PostgreSQL VPS**: Bảng `system_automation.external_api_configs` đã có **đủ 11 cổng API (11 rows)** chuẩn xác 100%.
+  - **Query System Configs VPS**: Khóa `OTP_PORTAL_SLOTS_CONFIG` có `slot_count = 8`.
+  - **Backend Health Check**: `http://127.0.0.1:3001/api/health` $\rightarrow$ `{"status":"ok","version":"2.0.0","database":"connected"}`.
+  - **API Gateway Live Probe**: `http://127.0.0.1:3001/api/public/otp-portal-slots` $\rightarrow$ Trả về đủ 8 slots hoạt động trơn tru.
+
+- **Trạng thái nghiệm thu:** ĐÃ HOÀN TẤT XUẤT SẮC 100% THEO CHỈ ĐẠO CỦA MASTER.
