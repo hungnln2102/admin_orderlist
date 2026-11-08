@@ -108,12 +108,33 @@ const getInteger = (key, defaultValue, min, max) => {
  * @param {string} updatedBy - Tên người cập nhật (Mặc định 'ADMIN')
  */
 const set = async (key, rawValue, updatedBy = 'ADMIN') => withTransaction(async (trx) => {
+  const isObject = typeof rawValue === 'object' && rawValue !== null;
+  const stringValue = isObject ? JSON.stringify(rawValue) : rawValue;
+
   const existing = await trx(TABLES.SYSTEM_CONFIGS).where({ config_key: key }).forUpdate().first();
   if (!existing) {
-    throw new Error(`Configuration ${key} was not found.`);
+    const isJson = isObject || (typeof stringValue === 'string' && (stringValue.startsWith('{') || stringValue.startsWith('[')));
+    const dataType = isJson ? 'JSON' : 'STRING';
+    const normalizedValue = typeof stringValue === 'string' ? stringValue : JSON.stringify(stringValue);
+    const [inserted] = await trx(TABLES.SYSTEM_CONFIGS)
+      .insert({
+        config_key: key,
+        config_value: normalizedValue,
+        data_type: dataType,
+        group_name: 'OTP_PORTAL',
+        description: 'Cấu hình tự động khởi tạo: ' + key,
+        updated_at: trx.fn.now(),
+        updated_by: updatedBy,
+      })
+      .returning("*");
+    
+    trx.afterCommit(() => {
+      configCache[key] = { value: isObject ? rawValue : parseValue(normalizedValue, dataType), dataType, group: 'OTP_PORTAL' };
+    });
+    return inserted;
   }
 
-  const normalizedValue = validateValue(key, rawValue, existing.data_type);
+  const normalizedValue = validateValue(key, stringValue, existing.data_type);
   const oldValueParsed = parseValue(existing.config_value, existing.data_type);
   const newValueParsed = parseValue(normalizedValue, existing.data_type);
   const changes = {

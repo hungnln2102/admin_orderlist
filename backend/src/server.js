@@ -141,18 +141,116 @@ app.post(
   require("@/domains/webhooks/services/sepayAuth").requireSepayApiKey,
   require("@/domains/webhooks/controllers/webhookController").handleSePayWebhook
 );
-// Public API cho OTP Portal đọc cấu hình theme hiện hành
-app.get("/api/public/theme", async (req, res) => {
+// Public API cho OTP Portal đọc cấu hình theme hiện hành & toàn bộ danh mục Themes SSOT
+const { ALL_THEMES_CATALOG } = require("@/domains/system/constants/themeCatalog");
+app.get(["/api/public/theme", "/api/public/themes"], async (req, res) => {
   try {
     const raw = systemConfigService.get("OTP_PORTAL_THEME");
     let config = { mode: "auto", theme: null };
     if (raw) {
       config = typeof raw === "string" ? JSON.parse(raw) : raw;
     }
-    return res.json({ success: true, config });
+    return res.json({ success: true, config, themes: ALL_THEMES_CATALOG });
   } catch (err) {
     console.error("[Public Theme API] Error:", err.message);
-    return res.json({ success: true, config: { mode: "auto", theme: null } });
+    return res.json({ success: true, config: { mode: "auto", theme: null }, themes: ALL_THEMES_CATALOG });
+  }
+});
+
+// Public API cho OTP Portal đọc cấu hình gán API bên thứ 3 động vào các ô giao diện
+const otpPortalDispatcher = require("@/domains/system/services/otpPortalDispatcher");
+
+app.get("/api/public/otp-portal-slots", async (req, res) => {
+  try {
+    const slots = otpPortalDispatcher.getActiveSlots();
+    return res.json({ success: true, slots });
+  } catch (err) {
+    console.error("[Public OTP Slots API] Error:", err.message);
+    return res.json({ success: true, slots: otpPortalDispatcher.DEFAULT_SLOTS });
+  }
+});
+
+// Dispatcher trung tâm cho mọi ô input trên OTP Portal & Live Test Admin
+app.post("/api/public/otp/probe-slot", async (req, res) => {
+  try {
+    const slotKey = req.body?.slot_key || req.body?.slotKey;
+    const input = req.body?.input || req.body?.email || req.body?.secret || req.body?.order_code;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey, input });
+    return res.json(result);
+  } catch (err) {
+    console.error("[Public OTP Probe API] Error:", err.message);
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+});
+
+// Các endpoint cụ thể từng dịch vụ (tương thích backward & link trực tiếp)
+app.post("/api/public/otp/adobe/code", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "adobe_otp", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/adobe/account", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.order_code || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "adobe_account", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/netflix/household", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "netflix_household", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/netflix/six-digit", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "netflix_six_digit", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/netflix/login-otp", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "netflix_login_otp", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/gpt/code", async (req, res) => {
+  try {
+    const input = req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "gpt_otp", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/public/otp/2fa/generate", async (req, res) => {
+  try {
+    const input = req.body?.secret || req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "two_factor_totp", input });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
   }
 });
 

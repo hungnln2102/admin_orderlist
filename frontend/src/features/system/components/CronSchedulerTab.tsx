@@ -10,6 +10,8 @@ import {
   X,
   Terminal,
   RefreshCw,
+  CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface CronJobItem {
@@ -326,6 +328,18 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
             <Plus className="w-4 h-4" />
             <span>Tạo Báo Thức</span>
           </button>
+        </div>
+      </div>
+
+      {/* 1.1 Banner ghi chú kiến trúc bóc tách SSOT */}
+      <div className="p-3.5 bg-slate-900/60 rounded-xl border border-cyan-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-cyan-500/10 rounded-lg text-cyan-400 shrink-0">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <p className="leading-relaxed">
+            <strong className="text-white">Kiến trúc bóc tách an toàn:</strong> Tác vụ chuyển đổi trạng thái Database (<code className="text-cyan-300 font-mono">task_order_status_0h</code> lúc 00:00 ngầm) chạy hoàn toàn độc lập, không gửi Telegram lúc nửa đêm. Thông báo cảnh báo đơn hết hạn (0 ngày) và nhắc gia hạn (4 ngày) được tách riêng gửi vào 07:00 sáng.
+          </p>
         </div>
       </div>
 

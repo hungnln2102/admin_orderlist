@@ -529,6 +529,147 @@ async function fetchOtpFromYunaMail(email, { includeDetails = false } = {}) {
   }
 }
 
+
+/**
+ * 6. Luồng Viva Rocky Portal (https://vivarocky.in):
+ * - Bóc tách 3 chức năng:
+ *   1) household: POST /household.php (user_email) -> Link TV / Household Netflix
+ *   2) six_digit: POST /six_digit_login.php (user_email) -> Mã OTP 6 số
+ *   3) signin_code: POST /signin_code.php (user_email, access_code) -> Mã đăng nhập nhanh
+ */
+async function fetchOtpFromVivaRocky(queryInput, { serviceKey = 'vivarocky_household', type = 'household', accessCode = '', includeDetails = false } = {}) {
+  if (!queryInput) return { otp: null, extra_fields: [] };
+
+  let email = String(queryInput).trim();
+  let code = accessCode;
+  if (email.includes('|')) {
+    const parts = email.split('|');
+    email = parts[0].trim();
+    if (!code) code = parts[1].trim();
+  } else if (email.includes(':') && !email.startsWith('http')) {
+    const parts = email.split(':');
+    email = parts[0].trim();
+    if (!code) code = parts[1].trim();
+  }
+
+  let resolvedType = type;
+  if (serviceKey === 'vivarocky_six_digit' || serviceKey.includes('six_digit')) resolvedType = 'six_digit';
+  else if (serviceKey === 'vivarocky_signin' || serviceKey.includes('signin')) resolvedType = 'signin_code';
+  else if (serviceKey === 'vivarocky_household' || serviceKey.includes('household')) resolvedType = 'household';
+
+  const configFromDb = await getConfigByKey(serviceKey);
+  const config = {
+    base_url: configFromDb?.base_url || 'https://vivarocky.in',
+    ...(configFromDb || {})
+  };
+  const timeoutMs = Number(config.auth_config?.timeoutMs) || 15_000;
+
+  let endpoint = '';
+  // Nếu base_url chưa chứa .php thì mới cộng thêm endpoint
+  if (!config.base_url.includes('.php')) {
+    if (resolvedType === 'six_digit') endpoint = '/six_digit_login.php';
+    else if (resolvedType === 'signin_code') endpoint = '/signin_code.php';
+    else endpoint = '/household.php';
+  }
+
+  const finalAccessCode = code || config.auth_config?.access_code || config.auth_config?.token || 'mvrk56';
+  const params = new URLSearchParams();
+  params.append('user_email', email);
+  if (resolvedType === 'signin_code' && finalAccessCode) {
+    params.append('access_code', finalAccessCode);
+  }
+
+  try {
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    };
+
+    const response = await requestConfiguredApi(config, {
+      method: 'POST',
+      endpoint,
+      body: params.toString(),
+      headers,
+      timeoutMs
+    });
+
+    if (!response.ok) {
+      throw new Error('Viva Rocky returned HTTP ' + response.status);
+    }
+
+    const html = await readExternalResponse(response);
+
+    const errorMatch = html.match(/<div[^>]*class=["'][^"']*error-box[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    let errorMessage = null;
+    if (errorMatch) {
+      errorMessage = errorMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    const linkMatches = html.match(/https?:\/\/(?:www\.)?netflix\.com\/[^\s"'<>]+/gi) || [];
+    let netflixLink = linkMatches.find(l => /update|household|location|confirm/i.test(l)) || linkMatches[0] || null;
+
+    let foundOtp = null;
+    const successMatch = html.match(/<div[^>]*class=["'][^"']*(?:success-box|result-box|code-box)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    if (successMatch) {
+      foundOtp = extractOtpCode(successMatch[1]);
+    }
+    if (!foundOtp) {
+      const contextualMatch = html.match(/(?:netflix|mã|code|otp|login\s*code)[^0-9]{1,50}(\d{6})/i);
+      if (contextualMatch?.[1]) {
+        foundOtp = contextualMatch[1];
+      }
+    }
+    if (!foundOtp && type === 'six_digit') {
+      const allCodes = html.match(/\b\d{6}\b/g) || [];
+      foundOtp = allCodes.find(c => !html.includes('style.css?v=' + c)) || null;
+    }
+
+    const extraFields = [];
+    if (netflixLink) {
+      extraFields.push({
+        key: 'netflix_link',
+        label: 'Link Cập Nhật Netflix',
+        value: netflixLink,
+        path: 'netflix_link'
+      });
+    }
+    if (foundOtp) {
+      extraFields.push({
+        key: 'otp',
+        label: 'Mã OTP / 6 Số',
+        value: String(foundOtp),
+        path: 'otp'
+      });
+    }
+    if (errorMessage && !netflixLink && !foundOtp) {
+      extraFields.push({
+        key: 'server_message',
+        label: 'Thông Báo Máy Chủ',
+        value: errorMessage,
+        path: 'error_box'
+      });
+    }
+
+    const result = {
+      otp: foundOtp,
+      netflix_link: netflixLink,
+      extra_fields: extraFields,
+      error_message: errorMessage,
+      raw_data: { html_snippet: html.slice(0, 1000) }
+    };
+
+    if (includeDetails) return result;
+    return result;
+  } catch (err) {
+    return {
+      otp: null,
+      extra_fields: [],
+      error: err.message
+    };
+  }
+}
+
 async function fetchOtpFromYuna(email) {
   const result = await fetchYunaAccountOrder(email);
   return result?.otp || null;
@@ -618,13 +759,100 @@ async function fetchOtpFromDynamicConfig(config, email) {
 /**
  * Hàm điều phối chung: Probe OTP hoặc thông tin tài khoản cho bất kỳ dịch vụ nào
  */
-async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
+async function fetch2FaFromWarehouse(queryInput) {
+  if (!queryInput) return { otp: null, extra_fields: [], message: "Vui lòng nhập email hoặc mã đơn hàng cần tra cứu." };
+  const cleanInput = String(queryInput).trim();
+  const { db, TABLES } = require("@/db");
+  const totpService = require("./totpService");
+
+  try {
+    // 1. Tìm trong warehouse.account_slots kết hợp accounts
+    let matched = await db(TABLES.ACCOUNT_SLOTS)
+      .join(TABLES.ACCOUNTS, `${TABLES.ACCOUNT_SLOTS}.account_id`, `${TABLES.ACCOUNTS}.id`)
+      .where(function () {
+        this.whereILike(`${TABLES.ACCOUNTS}.account_username`, cleanInput)
+          .orWhereILike(`${TABLES.ACCOUNT_SLOTS}.backup_email`, cleanInput)
+          .orWhereILike(`${TABLES.ACCOUNT_SLOTS}.customer`, cleanInput)
+          .orWhere(`${TABLES.ACCOUNT_SLOTS}.id_order`, cleanInput)
+          .orWhere(`${TABLES.ACCOUNTS}.id_order`, cleanInput);
+      })
+      .select(
+        `${TABLES.ACCOUNTS}.account_username`,
+        `${TABLES.ACCOUNTS}.note as acc_note`,
+        `${TABLES.ACCOUNT_SLOTS}.two_fa`,
+        `${TABLES.ACCOUNT_SLOTS}.backup_email`,
+        `${TABLES.ACCOUNT_SLOTS}.service_note`
+      )
+      .first();
+
+    // 2. Nếu chưa thấy trong slots, tìm trực tiếp trong accounts
+    if (!matched) {
+      const acc = await db(TABLES.ACCOUNTS)
+        .where(function () {
+          this.whereILike("account_username", cleanInput)
+            .orWhere("id_order", cleanInput);
+        })
+        .first();
+      if (acc) {
+        matched = {
+          account_username: acc.account_username,
+          acc_note: acc.note,
+          two_fa: null,
+        };
+      }
+    }
+
+    if (!matched) {
+      return {
+        otp: null,
+        found: false,
+        message: `Không tìm thấy tài khoản [${cleanInput}] trong Kho Hàng.`,
+      };
+    }
+
+    // 3. Trích xuất Secret Key 2FA
+    let secretKey = matched.two_fa;
+    if (!secretKey && matched.acc_note) {
+      const m = matched.acc_note.match(/(?:2fa|totp|secret)[:\s]+([a-z2-7\s]{16,64})/i);
+      if (m) secretKey = m[1];
+    }
+
+    if (!secretKey) {
+      return {
+        otp: null,
+        found: false,
+        message: `Tài khoản [${matched.account_username || cleanInput}] trong kho chưa được cài mã 2FA.`,
+      };
+    }
+
+    // 4. Sinh mã OTP qua totpService
+    const totpRes = totpService.generateTotp(secretKey);
+    return {
+      otp: totpRes.code,
+      found: true,
+      extra_fields: [
+        { key: "account_username", label: "Tài khoản kho", value: matched.account_username || cleanInput, path: "account_username" },
+        { key: "remaining_seconds", label: "Thời gian còn lại", value: `${totpRes.remainingSeconds}s`, path: "remainingSeconds" },
+        { key: "expires_at", label: "Hết hạn lúc", value: totpRes.expiresAt, path: "expiresAt" },
+      ],
+      message: `Đã tìm thấy khóa 2FA trong kho và sinh mã OTP [${totpRes.code}] thành công!`,
+    };
+  } catch (err) {
+    return {
+      otp: null,
+      found: false,
+      message: `Lỗi tra cứu kho: ${err.message}`,
+    };
+  }
+}
+
+async function probeOtpForEmail({ email, serviceKey = "otp_hdsd", ...options }) {
   if (!email) {
     throw new Error("Vui lòng cung cấp email hoặc mã đơn hàng cần kiểm tra.");
   }
 
   const queryInput = String(email).trim();
-  if (serviceKey !== "yuna_2fa" && !queryInput.includes("@")) {
+  if (serviceKey !== "yuna_2fa" && serviceKey !== "totp" && serviceKey !== "totp_engine" && serviceKey !== "warehouse_2fa" && !queryInput.includes("@")) {
     throw new Error("Vui lòng cung cấp email hợp lệ (vd: user@domain.com).");
   }
 
@@ -636,6 +864,30 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
   let probeRawData = null;
 
   switch (serviceKey) {
+    case "warehouse_2fa": {
+      const wRes = await fetch2FaFromWarehouse(queryInput);
+      otp = wRes.otp;
+      extraFields = wRes.extra_fields || [];
+      probeRawData = wRes;
+      if (!otp) probeRawData = { error: wRes.message };
+      break;
+    }
+    case "totp":
+    case "totp_engine": {
+      const totpService = require("./totpService");
+      try {
+        const totpRes = totpService.generateTotp(queryInput);
+        otp = totpRes.code;
+        extraFields = [
+          { key: "remaining_seconds", label: "Thời gian còn lại", value: `${totpRes.remainingSeconds}s`, path: "remainingSeconds" },
+          { key: "expires_at", label: "Hết hạn lúc", value: totpRes.expiresAt, path: "expiresAt" },
+        ];
+        probeRawData = totpRes;
+      } catch (totpErr) {
+        probeRawData = { error: totpErr.message };
+      }
+      break;
+    }
     case "otp_hdsd": {
       const res = await fetchOtpFromHdsd(cleanEmail, { includeDetails: true });
       otp = res?.otp || null;
@@ -659,6 +911,24 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
       otp = yunaRes.otp;
       probeRawData = yunaRes.raw_data;
       extraFields = yunaRes.extra_fields || [];
+      break;
+    }
+    case "vivarocky_household":
+    case "vivarocky_six_digit":
+    case "vivarocky_signin":
+    case "vivarocky": {
+      const vRes = await fetchOtpFromVivaRocky(queryInput, {
+        serviceKey,
+        type: options?.subType || options?.type || "household",
+        accessCode: options?.accessCode || "",
+        includeDetails: true,
+      });
+      otp = vRes.otp;
+      extraFields = vRes.extra_fields || [];
+      probeRawData = vRes.raw_data;
+      if (vRes.error_message && !otp && extraFields.length === 0) {
+        probeRawData = { error: vRes.error_message };
+      }
       break;
     }
     case "yuna_mail": {
@@ -723,7 +993,17 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
   const durationMs = Date.now() - startTime;
 
   let message = "";
-  if (serviceKey === "yuna_2fa") {
+    if (serviceKey.startsWith("vivarocky")) {
+    const hasLink = extraFields.some((f) => f.key === "netflix_link");
+    if (hasLink) {
+      message = "Đã lấy link Netflix từ Viva Rocky thành công!";
+    } else if (otp) {
+      message = 'Đã tìm thấy mã OTP Netflix [' + otp + '] thành công!';
+    } else {
+      const errField = extraFields.find((f) => f.key === "server_message");
+      message = errField?.value || "Chưa có thư mới hoặc chưa có mã OTP từ Viva Rocky.";
+    }
+  } else if (serviceKey === "yuna_2fa") {
     message = extraFields.length > 0
       ? `Đã lấy thông tin tài khoản thành công! (${extraFields.length} trường)`
       : (otp ? `Đã lấy mã 2FA [${otp}] thành công!` : "Không tìm thấy thông tin đơn hàng hoặc mã 2FA.");
@@ -738,7 +1018,7 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
     email: queryInput,
     service_key: sourceUsed,
     otp: otp || null,
-    found: Boolean(otp || extraFields.length > 0),
+    found: Boolean(otp || extraFields.some((f) => f.key !== "server_message")),
     duration_ms: durationMs,
     extra_fields: extraFields,
     message,
@@ -746,6 +1026,7 @@ async function probeOtpForEmail({ email, serviceKey = "otp_hdsd" }) {
 }
 
 module.exports = {
+  fetchOtpFromVivaRocky,
   extractOtpCode,
   getValueByPath,
   fetchOtpFromHdsd,

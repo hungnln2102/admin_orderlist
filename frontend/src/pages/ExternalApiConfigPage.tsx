@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
+  Database,
+  Edit,
   Globe,
   Key,
   RefreshCw,
@@ -48,54 +50,9 @@ import {
   ArrowLeft,
   User,
   Lock,
+  Bot,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
-
-export interface MessageTemplateItem {
-  id: string;
-  name: string;
-  title: string;
-  content: string;
-}
-
-export interface TemplateVariable {
-  key: string;
-  tag: string;
-  label: string;
-  sample: string;
-  color?: string;
-}
-
-export const DEFAULT_MESSAGE_TEMPLATES: MessageTemplateItem[] = [
-  {
-    id: "template_1",
-    name: "Mẫu tin 1 (Telegram Bot)",
-    title: "Telegram Bot Alert",
-    content: `🔐 <b>MÃ XÁC THỰC {{service_name}}</b>\n------------------------\n- Mã OTP: <code>{{otp}}</code>\n- Tài khoản: <code>{{email}}</code>\n- Tiêu đề: {{email_subject}}\n- Nhận lúc: <code>{{email_date}}</code>\n- Nguồn gửi: {{sender}}\n------------------------\n⚠️ <i>Mã có hiệu lực trong 5 phút. Vui lòng không chia sẻ cho bất kỳ ai!</i>`,
-  },
-  {
-    id: "template_2",
-    name: "Mẫu tin 2 (Giao Diện Web / Khách)",
-    title: "Web Customer Notification",
-    content: `Chào bạn!\nMã xác thực đăng nhập tài khoản của bạn là: {{otp}}\n\n- Hòm thư nhận mã: {{email}}\n- Tiêu đề thư: {{email_subject}}\n- Thời gian: {{email_date}}\n\nVui lòng nhập mã để hoàn tất phiên đăng nhập của bạn.`,
-  },
-  {
-    id: "template_3",
-    name: "Mẫu tin 3 (Ghi Chú Đơn Hàng)",
-    title: "Order Internal Log",
-    content: `[OTP-LOG] {{service_name}} | OTP: {{otp}} | Account: {{email}} | Date: {{email_date}} | Sender: {{sender}}`,
-  },
-];
-
-export const TEMPLATE_VARIABLES: TemplateVariable[] = [
-  { key: "otp", tag: "{{otp}}", label: "Mã xác thực OTP (6 số)", sample: "699211", color: "text-rose-400" },
-  { key: "email", tag: "{{email}}", label: "Địa chỉ email nhận mã", sample: "netlink.port.8315@colegiomontealto.us", color: "text-amber-400" },
-  { key: "email_subject", tag: "{{email_subject}}", label: "Tiêu đề email nhận mã", sample: "Verification code", color: "text-cyan-400" },
-  { key: "email_date", tag: "{{email_date}}", label: "Thời gian nhận thư", sample: "2026-11-04 14:55:51", color: "text-emerald-400" },
-  { key: "service_name", tag: "{{service_name}}", label: "Tên nhà cung cấp / Cổng", sample: "Fix Ades Support", color: "text-purple-400" },
-  { key: "sender", tag: "{{sender}}", label: "Người gửi (Sender)", sample: "Adobe (account.adobe.com)", color: "text-blue-400" },
-  { key: "content", tag: "{{content}}", label: "Toàn văn nội dung thư", sample: "Your Adobe verification code is 699211", color: "text-slate-300" },
-];
 
 export interface FieldMappingItem {
   key: string;
@@ -147,6 +104,30 @@ export interface AvailableFieldPreset {
 }
 
 export const PRESET_AVAILABLE_FIELDS: Record<string, AvailableFieldPreset[]> = {
+  warehouse_2fa: [
+    { key: "otp", label: "Mã 2FA / OTP", path: "code", is_primary: true, description: "Mã 2FA 6 số", icon: "🎯", sampleValue: "515152" },
+    { key: "account_username", label: "Tài khoản kho", path: "account_username", is_primary: false, description: "Tài khoản trong kho", icon: "👤", sampleValue: "user@domain.com" },
+    { key: "remaining_seconds", label: "Thời gian còn lại (s)", path: "remainingSeconds", is_primary: false, description: "Số giây còn hiệu lực", icon: "⏳", sampleValue: "28" },
+  ],
+  totp: [
+    { key: "otp", label: "Mã 2FA / OTP", path: "code", is_primary: true, description: "Mã 2FA 6 số", icon: "🎯", sampleValue: "419205" },
+    { key: "remaining_seconds", label: "Thời gian còn lại (s)", path: "remainingSeconds", is_primary: false, description: "Số giây còn hiệu lực", icon: "⏳", sampleValue: "28" },
+  ],
+  vivarocky_household: [
+    { key: "netflix_link", label: "Link Cập Nhật Netflix", path: "netflix_link", is_primary: true, description: "Link cập nhật Household / TV Netflix", icon: "🔗", sampleValue: "https://www.netflix.com/update-primary-location" },
+  ],
+  vivarocky_six_digit: [
+    { key: "otp", label: "Mã Xác Minh 6 Số", path: "otp", is_primary: true, description: "Mã xác minh 6 số từ Viva Rocky", icon: "🎯", sampleValue: "582103" },
+  ],
+  vivarocky_signin: [
+    { key: "otp", label: "Mã OTP Đăng Nhập", path: "otp", is_primary: true, description: "Mã đăng nhập nhanh Sign-in Code", icon: "🔑", sampleValue: "918234" },
+  ],
+  vivarocky: [
+    { key: "netflix_link", label: "Link Cập Nhật Netflix", path: "netflix_link", is_primary: false, description: "Link cập nhật Household / TV Netflix", icon: "🔗", sampleValue: "https://www.netflix.com/update-primary-location" },
+    { key: "otp", label: "Mã OTP / 6 Số", path: "otp", is_primary: true, description: "Mã xác minh 6 số từ Viva Rocky", icon: "🎯", sampleValue: "582103" },
+    { key: "server_message", label: "Thông Báo Máy Chủ", path: "error_box", is_primary: false, description: "Thông báo từ Viva Rocky", icon: "ℹ️", sampleValue: "Error: No recent email found..." },
+  ],
+
   fix_ades: [
     { key: "otp", label: "Mã xác thực OTP", path: "data.otp", is_primary: true, description: "Mã 6 số từ Adobe", icon: "🎯", sampleValue: "699211" },
     { key: "email_date", label: "Thời gian nhận thư", path: "data.emailDate", is_primary: false, description: "Thời điểm email gửi về hòm thư", icon: "🕒", sampleValue: "2026-11-04T07:55:51.004Z" },
@@ -214,9 +195,168 @@ function extractJsonPathsFrontend(value: any, path = "", depth = 0): DetectedFie
   );
 }
 
+// Vector Flaticon Icons cho từng loại mặt hàng (Chuẩn nhận diện thương hiệu quốc tế)
+export const AdobeFlaticon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="12" fill="#FA0F00" />
+    <path d="M29.5 10H40V38L29.5 10Z" fill="white" />
+    <path d="M18.5 10H8V38L18.5 10Z" fill="white" />
+    <path d="M24 23L31 38H26.5L24.5 32H19.5L24 23Z" fill="white" />
+  </svg>
+);
+
+export const NetflixFlaticon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="12" fill="#000000" />
+    <path d="M14 9H20.5V39H14V9Z" fill="#E50914" />
+    <path d="M27.5 9H34V39H27.5V9Z" fill="#E50914" />
+    <path d="M14 9H20.5L34 39H27.5L14 9Z" fill="#B81D24" />
+  </svg>
+);
+
+export const ChatGPTFlaticon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="12" fill="#10A37F" />
+    <path
+      d="M37.5 21.2a7.6 7.6 0 0 0-.6-6 7.7 7.7 0 0 0-7.3-4.1 7.4 7.4 0 0 0-4.8 1.8 7.6 7.6 0 0 0-10.4 3.7 7.7 7.7 0 0 0-3.3 6.9 7.7 7.7 0 0 0 3.7 7.5 7.6 7.6 0 0 0 .6 6 7.7 7.7 0 0 0 7.3 4.1 7.4 7.4 0 0 0 4.8-1.8 7.6 7.6 0 0 0 10.4-3.7 7.7 7.7 0 0 0 3.3-6.9 7.7 7.7 0 0 0-3.7-7.5zm-14.7 17a5.5 5.5 0 0 1-3.6-1.3l.2-.1 6-3.5a1.1 1.1 0 0 0 .6-1V24l2.5 1.4v7a5.6 5.6 0 0 1-5.7 5.8zm-11-7a5.5 5.5 0 0 1-.7-3.8l.2.1 6 3.5a1.1 1.1 0 0 0 1.1 0l7.2-4.1v2.9l-6 3.5a5.6 5.6 0 0 1-7.8-2.1zm-1.8-13.1a5.5 5.5 0 0 1 2.9-2.5v7.2a1.1 1.1 0 0 0 .6 1l7.2 4.1-2.5 1.5-6-3.5a5.6 5.6 0 0 1-2.2-7.8zm21.4 5.3-7.2-4.1 2.5-1.5 6 3.5a5.6 5.6 0 0 1 2.2 7.8 5.5 5.5 0 0 1-2.9 2.5v-7.2a1.1 1.1 0 0 0-.6-1zm3.6 7.6a5.5 5.5 0 0 1 .7 3.8l-.2-.1-6-3.5a1.1 1.1 0 0 0-1.1 0l-7.2 4.1v-2.9l6-3.5a5.6 5.6 0 0 1 7.8 2.1zm-12.7-2.6-3.2-1.8 3.2-1.9 3.2 1.9-3.2 1.8zm-6.2-7.5a5.5 5.5 0 0 1 3.6 1.3l-.2.1-6 3.5a1.1 1.1 0 0 0-.6 1v8.3l-2.5-1.4v-7a5.6 5.6 0 0 1 5.7-5.8z"
+      fill="white"
+    />
+  </svg>
+);
+
+export const TwoFactorFlaticon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="12" fill="#1A73E8" />
+    <path d="M24 10L13 14.5V23C13 30.2 17.7 36.8 24 38.5C30.3 36.8 35 30.2 35 23V14.5L24 10Z" fill="#1557B0" />
+    <path d="M24 12L15 15.7V23C15 29.1 18.8 34.7 24 36.2C29.2 34.7 33 29.1 33 23V15.7L24 12Z" fill="white" opacity="0.9" />
+    <circle cx="24" cy="22" r="3.5" fill="#1A73E8" />
+    <path d="M22.5 24H25.5V29H22.5V24Z" fill="#1A73E8" />
+  </svg>
+);
+
+export interface PortalSlotItem {
+  slot_key: string;
+  name: string;
+  category: "adobe" | "netflix" | "gpt" | "2fa" | string;
+  assigned_services?: string[];
+  primary_service_key?: string;
+  fallback_service_key?: string | null;
+  cooldown_seconds?: number;
+  btn_text?: string;
+  input_placeholder?: string;
+  enabled: boolean;
+}
+
+export const DEFAULT_PORTAL_SLOTS: PortalSlotItem[] = [
+  {
+    slot_key: "adobe_otp",
+    name: "Adobe: Lấy Mã OTP 6 Số",
+    category: "adobe",
+    assigned_services: ["fix_ades", "tinyhost"],
+    primary_service_key: "fix_ades",
+    fallback_service_key: "tinyhost",
+        cooldown_seconds: 30,
+    btn_text: "Lấy Mã OTP Adobe",
+    input_placeholder: "Nhập địa chỉ Email Adobe (VD: user@domain.com)...",
+    enabled: true,
+  },
+  {
+    slot_key: "adobe_account",
+    name: "Adobe: Tra Cứu Tài Khoản",
+    category: "adobe",
+    assigned_services: ["yuna_2fa"],
+    primary_service_key: "yuna_2fa",
+    fallback_service_key: null,
+        cooldown_seconds: 15,
+    btn_text: "Tra Cứu Thông Tin",
+    input_placeholder: "Nhập Email hoặc Mã Đơn Hàng...",
+    enabled: true,
+  },
+  {
+    slot_key: "netflix_household",
+    name: "Netflix: Link TV / Hộ Gia Đình",
+    category: "netflix",
+    assigned_services: ["vivarocky_household", "fix_ades", "tmail_webmail"],
+    primary_service_key: "fix_ades",
+    fallback_service_key: "tmail_webmail",
+        cooldown_seconds: 45,
+    btn_text: "Lấy Link Cập Nhật TV",
+    input_placeholder: "Nhập Email tài khoản Netflix...",
+    enabled: true,
+  },
+  {
+    slot_key: "netflix_six_digit",
+    name: "Netflix: Mã Xác Minh 6 Số",
+    category: "netflix",
+    assigned_services: ["vivarocky_six_digit", "fix_ades", "tinyhost"],
+    primary_service_key: "fix_ades",
+    fallback_service_key: "tinyhost",
+        cooldown_seconds: 30,
+    btn_text: "Lấy Mã 6 Số Netflix",
+    input_placeholder: "Nhập Email tài khoản Netflix...",
+    enabled: true,
+  },
+  {
+    slot_key: "netflix_login_otp",
+    name: "Netflix: OTP Đăng Nhập",
+    category: "netflix",
+    assigned_services: ["vivarocky", "fix_ades", "tmail_webmail"],
+    primary_service_key: "fix_ades",
+    fallback_service_key: "tmail_webmail",
+        cooldown_seconds: 30,
+    btn_text: "Lấy OTP Đăng Nhập",
+    input_placeholder: "Nhập Email tài khoản Netflix...",
+    enabled: true,
+  },
+  {
+    slot_key: "gpt_otp",
+    name: "ChatGPT: Mã Xác Minh OpenAI",
+    category: "gpt",
+    assigned_services: ["warehouse_2fa", "tinyhost"],
+    primary_service_key: "tinyhost",
+    fallback_service_key: null,
+        cooldown_seconds: 30,
+    btn_text: "Lấy OTP ChatGPT",
+    input_placeholder: "Nhập Email tài khoản OpenAI / ChatGPT...",
+    enabled: true,
+  },
+  {
+    slot_key: "two_factor_totp",
+    name: "2FA: Sinh Mã TOTP",
+    category: "2fa",
+    assigned_services: ["totp", "yuna_2fa"],
+    primary_service_key: "yuna_2fa",
+    fallback_service_key: null,
+        cooldown_seconds: 10,
+    btn_text: "Lấy Mã 2FA (6 Số)",
+    input_placeholder: "Nhập Secret Key 2FA (VD: JBSWY3DPEHPK3PXP)...",
+    enabled: true,
+  },
+];
+
 export const ExternalApiConfigPage: React.FC = () => {
   const notify = useNotification();
   const [configs, setConfigs] = useState<ExternalApiConfig[]>([]);
+
+  const renderConfigIcon = (cfg: ExternalApiConfig) => {
+    const cat = String(cfg.category || "").toLowerCase();
+    const key = String(cfg.service_key || "").toLowerCase();
+
+    if (cat.includes("adobe") || key.includes("ades") || key.includes("adobe")) {
+      return <AdobeFlaticon className="w-8 h-8 rounded-lg shadow-purple-500/20" />;
+    }
+    if (cat.includes("netflix") || key.includes("netflix") || key.includes("vivarocky")) {
+      return <NetflixFlaticon className="w-8 h-8 rounded-lg shadow-red-500/20" />;
+    }
+    if (cat.includes("gpt") || key.includes("gpt") || key.includes("openai")) {
+      return <ChatGPTFlaticon className="w-8 h-8 rounded-lg shadow-emerald-500/20" />;
+    }
+    if (cat.includes("2fa") || key.includes("2fa") || key.includes("totp") || key.includes("warehouse")) {
+      return <TwoFactorFlaticon className="w-8 h-8 rounded-lg shadow-blue-500/20" />;
+    }
+    return <Globe className="w-6 h-6 text-cyan-400" />;
+  };
+
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<"all" | "direct_otp" | "webmail">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline">("all");
@@ -284,97 +424,229 @@ export const ExternalApiConfigPage: React.FC = () => {
   const [savingMapping, setSavingMapping] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
 
-  // SUB-PAGE CHÍNH: Cấu Hình Cổng (configs) vs Mẫu Thông Báo (templates)
-  const [activeMainTab, setActiveMainTab] = useState<"configs" | "templates">("configs");
+  // State cho Bảng Form Test Nhanh Mọi Cổng API (Quick API Test Table)
+  const [testInputs, setTestInputs] = useState<Record<string, string>>({});
+  const [testingRows, setTestingRows] = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults] = useState<
+    Record<
+      string,
+      {
+        success: boolean;
+        otp?: string | null;
+        duration_ms?: number;
+        message?: string;
+        error?: string;
+        timestamp?: string;
+      } | null
+    >
+  >({});
+  const [togglingRows, setTogglingRows] = useState<Record<number, boolean>>({});
+  const [copiedOtpKey, setCopiedOtpKey] = useState<string | null>(null);
+  const [portalSlots, setPortalSlots] = useState<PortalSlotItem[]>(DEFAULT_PORTAL_SLOTS);
+  // State quản lý Tab chính: "slots" (Gán cổng vào ô input) vs "api_manager" (Quản lý cổng API trong DB)
+  const [activeMainTab, setActiveMainTab] = useState<"slots" | "api_manager">("slots");
+  const [editModalConfig, setEditModalConfig] = useState<ExternalApiConfig | null>(null);
+  const [savingEditModal, setSavingEditModal] = useState(false);
 
-  // State cho Sub-Page 2: Cấu Hình Mẫu Tin Nhắn & Nội Dung Hiển Thị
-  const [templateMode, setTemplateMode] = useState<"default" | "custom">("custom");
-  const [selectedTemplateIndex, setSelectedTemplateIndex] = useState<number>(0);
-  const [previewDevice, setPreviewDevice] = useState<"web" | "mobile">("web");
-  const [webPreviewTab, setWebPreviewTab] = useState<"adobe" | "netflix">("adobe");
-  const [webPreviewSubForm, setWebPreviewSubForm] = useState<0 | 1>(1); // 0: Lấy Tài Khoản, 1: Nhận OTP
-  const [webPreviewNetflixSubTab, setWebPreviewNetflixSubTab] = useState<0 | 1 | 2>(0); // 0: Link TV, 1: Mã 6 số, 2: OTP Login
-  const [copiedPreviewKey, setCopiedPreviewKey] = useState<string | null>(null);
-  const [showVariableDropdown, setShowVariableDropdown] = useState(false);
-  const [messageTemplates, setMessageTemplates] = useState<MessageTemplateItem[]>(() => {
+  const [savingSlots, setSavingSlots] = useState(false);
+
+  // Tải cấu hình gán ô từ DB system_configs hoặc public slots API
+  const fetchPortalSlots = useCallback(async () => {
     try {
-      const saved = localStorage.getItem("mavryk_otp_message_templates");
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_MESSAGE_TEMPLATES;
-  });
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+      const res = await fetch("/api/public/otp-portal-slots");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.slots) && data.slots.length > 0) {
+          setPortalSlots(data.slots);
+          return;
+        }
+      }
+      const resConfig = await fetch("/api/system/configs");
+      if (resConfig.ok) {
+        const list = await resConfig.json();
+        const found = list.find((item: any) => item.config_key === "OTP_PORTAL_SLOTS_CONFIG");
+        if (found && found.config_value) {
+          const parsed = typeof found.config_value === "string" ? JSON.parse(found.config_value) : found.config_value;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPortalSlots(parsed);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Không thể tải cấu hình gán ô:", err);
+    }
+  }, []);
 
-  const handleUpdateTemplateContent = (newContent: string) => {
-    setMessageTemplates((prev) => {
-      const updated = [...prev];
-      updated[selectedTemplateIndex] = {
-        ...updated[selectedTemplateIndex],
-        content: newContent,
-      };
-      return updated;
-    });
+  // Lưu danh sách slots vào DB system_configs
+  const savePortalSlotsToDb = async (updated: PortalSlotItem[]) => {
+    try {
+      setSavingSlots(true);
+      const res = await fetch("/api/system/configs/OTP_PORTAL_SLOTS_CONFIG", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: JSON.stringify(updated) }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Lỗi khi lưu cấu hình ô trên web");
+      }
+      showToast("success", "Đã tự động lưu cấu hình ô trên Web OTP Portal!");
+    } catch (err: any) {
+      showToast("error", err.message || "Lỗi lưu cấu hình");
+    } finally {
+      setSavingSlots(false);
+    }
   };
 
-  const handleInsertVariable = (varTag: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      handleUpdateTemplateContent(messageTemplates[selectedTemplateIndex].content + varTag);
-      setShowVariableDropdown(false);
+  // Helper: lấy mảng danh sách cổng API được gán cho slot
+  const getSlotServices = (slot: PortalSlotItem): string[] => {
+    if (Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0) {
+      return slot.assigned_services;
+    }
+    const list: string[] = [];
+    if (slot.primary_service_key) list.push(slot.primary_service_key);
+    if (slot.fallback_service_key && slot.fallback_service_key !== "none" && !list.includes(slot.fallback_service_key)) {
+      list.push(slot.fallback_service_key);
+    }
+    return list.length > 0 ? list : ["fix_ades"];
+  };
+
+  // Thêm 1 cổng mới vào chuỗi API của ô
+  const handleAddServiceToSlot = async (slotKey: string, newServiceKey: string) => {
+    if (!newServiceKey || newServiceKey === "none") return;
+    const updated = portalSlots.map((s) => {
+      if (s.slot_key !== slotKey) return s;
+      const currentList = getSlotServices(s);
+      if (currentList.includes(newServiceKey)) return s;
+      const nextList = [...currentList, newServiceKey];
+      return {
+        ...s,
+        assigned_services: nextList,
+        primary_service_key: nextList[0],
+        fallback_service_key: nextList[1] || null,
+      };
+    });
+    setPortalSlots(updated);
+    await savePortalSlotsToDb(updated);
+  };
+
+  // Gỡ bỏ 1 cổng khỏi chuỗi (giữ lại tối thiểu 1 cổng)
+  const handleRemoveServiceFromSlot = async (slotKey: string, serviceToRemove: string) => {
+    const targetSlot = portalSlots.find((s) => s.slot_key === slotKey);
+    if (targetSlot && getSlotServices(targetSlot).length <= 1) {
+      showToast("error", "Mỗi ô phải giữ lại tối thiểu 1 cổng API để xử lý!");
       return;
     }
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const current = messageTemplates[selectedTemplateIndex].content;
-    const updated = current.substring(0, start) + varTag + current.substring(end);
-    handleUpdateTemplateContent(updated);
-    setShowVariableDropdown(false);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + varTag.length, start + varTag.length);
-    }, 50);
+    const updated = portalSlots.map((s) => {
+      if (s.slot_key !== slotKey) return s;
+      const currentList = getSlotServices(s);
+      const nextList = currentList.filter((srv) => srv !== serviceToRemove);
+      return {
+        ...s,
+        assigned_services: nextList,
+        primary_service_key: nextList[0] || "fix_ades",
+        fallback_service_key: nextList[1] || null,
+      };
+    });
+    setPortalSlots(updated);
+    await savePortalSlotsToDb(updated);
   };
 
-  const handleFormatText = (prefix: string, suffix: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const current = messageTemplates[selectedTemplateIndex].content;
-    const selected = current.substring(start, end);
-    const replacement = `${prefix}${selected || "văn_bản"}${suffix}`;
-    const updated = current.substring(0, start) + replacement + current.substring(end);
-    handleUpdateTemplateContent(updated);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length + (selected ? selected.length : 7));
-    }, 50);
+  // Bật / Tắt hiển thị ô trên Web OTP Portal
+  const handleToggleSlotEnabled = async (slotKey: string) => {
+    const updated = portalSlots.map((s) =>
+      s.slot_key === slotKey ? { ...s, enabled: !s.enabled } : s
+    );
+    setPortalSlots(updated);
+    await savePortalSlotsToDb(updated);
   };
 
-  const handleSaveTemplates = () => {
+  // Test nhanh dữ liệu trực tiếp cho 1 ô (giả lập hành vi khách hàng gõ trên web)
+  const handleQuickTestSlot = async (slot: PortalSlotItem) => {
+    const inputVal = (testInputs[slot.slot_key] || "").trim();
+    if (!inputVal) {
+      showToast("error", `Vui lòng nhập dữ liệu test cho ô "${slot.name}"!`);
+      return;
+    }
+
+    setTestingRows((prev) => ({ ...prev, [slot.slot_key]: true }));
+    setTestResults((prev) => ({ ...prev, [slot.slot_key]: null }));
+
+    const startTime = Date.now();
     try {
-      localStorage.setItem("mavryk_otp_message_templates", JSON.stringify(messageTemplates));
-      showToast("success", "Đã lưu cấu hình mẫu tin nhắn thành công!");
+      const res = await fetch("/api/public/otp/probe-slot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slot_key: slot.slot_key,
+          input: inputVal,
+        }),
+      });
+
+      const duration_ms = Date.now() - startTime;
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success && (data.otp || data.found || data.extra_fields?.length > 0)) {
+        setTestResults((prev) => ({
+          ...prev,
+          [slot.slot_key]: {
+            success: true,
+            otp: data.otp || null,
+            duration_ms: data.duration_ms || duration_ms,
+            message: data.message || "Lấy mã OTP thành công!",
+            timestamp: new Date().toLocaleTimeString("vi-VN"),
+          },
+        }));
+        showToast("success", `[${slot.name}] ${data.otp ? `Mã OTP: ${data.otp}` : "Thành công!"}`);
+      } else {
+        setTestResults((prev) => ({
+          ...prev,
+          [slot.slot_key]: {
+            success: false,
+            duration_ms: data.duration_ms || duration_ms,
+            message: data.message || data.error || "Không tìm thấy mã OTP hoặc chưa có thư mới.",
+            timestamp: new Date().toLocaleTimeString("vi-VN"),
+          },
+        }));
+        showToast("error", `[${slot.name}] ${data.message || data.error || "Không tìm thấy OTP"}`);
+      }
     } catch (err: any) {
-      showToast("error", "Lỗi khi lưu cấu hình mẫu: " + err.message);
+      setTestResults((prev) => ({
+        ...prev,
+        [slot.slot_key]: {
+          success: false,
+          error: err.message || "Lỗi kết nối",
+          message: err.message || "Lỗi kết nối",
+          timestamp: new Date().toLocaleTimeString("vi-VN"),
+        },
+      }));
+      showToast("error", `Lỗi test ô ${slot.name}: ${err.message}`);
+    } finally {
+      setTestingRows((prev) => ({ ...prev, [slot.slot_key]: false }));
     }
   };
 
-  const handleResetTemplates = () => {
-    setMessageTemplates(DEFAULT_MESSAGE_TEMPLATES);
-    localStorage.removeItem("mavryk_otp_message_templates");
-    showToast("success", "Đã khôi phục về các mẫu tin nhắn mặc định!");
+  const handleToggleApiActive = async (cfg: ExternalApiConfig) => {
+    const newStatus = !cfg.is_active;
+    setTogglingRows((prev) => ({ ...prev, [cfg.id]: true }));
+    try {
+      const res = await fetch(`/api/system/external-apis/${cfg.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Không thể cập nhật trạng thái");
+      }
+      setConfigs((prev) => prev.map((c) => (c.id === cfg.id ? { ...c, is_active: newStatus } : c)));
+      showToast("success", `Đã ${newStatus ? "BẬT" : "TẮT"} cổng API: ${cfg.service_name}`);
+    } catch (err: any) {
+      showToast("error", err.message || "Lỗi khi cập nhật trạng thái");
+    } finally {
+      setTogglingRows((prev) => ({ ...prev, [cfg.id]: false }));
+    }
   };
-
-  // Helper render text thay thế biến cho live preview
-  const previewRenderedText = useMemo(() => {
-    const raw = messageTemplates[selectedTemplateIndex]?.content || "";
-    let res = raw;
-    TEMPLATE_VARIABLES.forEach((v) => {
-      res = res.split(v.tag).join(v.sample);
-    });
-    return res;
-  }, [messageTemplates, selectedTemplateIndex]);
 
   const previewExtractedValue = useMemo(() => {
     if (!analysisResult?.is_json || !analysisResult?.data) return undefined;
@@ -387,15 +659,6 @@ export const ExternalApiConfigPage: React.FC = () => {
     } else {
       notify.error(text);
     }
-  };
-
-  const handleCopyPreviewText = (text: string, keyName: string, successMsg: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedPreviewKey(keyName);
-    showToast("success", successMsg);
-    setTimeout(() => {
-      setCopiedPreviewKey((prev) => (prev === keyName ? null : prev));
-    }, 2000);
   };
 
   // 1. Tải danh sách cấu hình
@@ -422,7 +685,8 @@ export const ExternalApiConfigPage: React.FC = () => {
 
   useEffect(() => {
     fetchConfigs();
-  }, [fetchConfigs]);
+    fetchPortalSlots();
+  }, [fetchConfigs, fetchPortalSlots]);
 
   // Handle thay đổi form cục bộ trên từng card
   const handleFieldChange = (id: number, field: string, value: any) => {
@@ -454,6 +718,40 @@ export const ExternalApiConfigPage: React.FC = () => {
         },
       };
     });
+  };
+
+  
+  // Lưu thay đổi từ Modal Sửa Cổng API vào DB
+  const handleSaveEditModal = async () => {
+    if (!editModalConfig) return;
+    try {
+      setSavingEditModal(true);
+      const res = await fetch(`/api/system/external-apis/${editModalConfig.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_name: editModalConfig.service_name,
+          category: editModalConfig.category,
+          description: editModalConfig.description,
+          base_url: editModalConfig.base_url,
+          endpoints: editModalConfig.endpoints,
+          auth_config: editModalConfig.auth_config,
+          field_mapping: editModalConfig.field_mapping,
+          is_active: editModalConfig.is_active,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Không thể cập nhật cấu hình.");
+
+      showToast("success", `Đã lưu thành công cấu hình [${editModalConfig.service_name}]!`);
+      setEditModalConfig(null);
+      await fetchConfigs();
+    } catch (err: any) {
+      showToast("error", err.message || "Lỗi lưu cấu hình");
+    } finally {
+      setSavingEditModal(false);
+    }
   };
 
   // 2. Lưu cấu hình của 1 card
@@ -994,7 +1292,7 @@ export const ExternalApiConfigPage: React.FC = () => {
   const onlineCount = useMemo(() => configs.filter((c) => c.is_active).length, [configs]);
   const offlineCount = useMemo(() => configs.filter((c) => !c.is_active).length, [configs]);
   const presetCount = useMemo(
-    () => configs.filter((c) => ["fix_ades", "otp_hdsd", "yuna_mail", "tinyhost", "yuna_2fa"].includes(c.service_key)).length,
+    () => configs.filter((c) => ["fix_ades", "otp_hdsd", "yuna_mail", "tinyhost", "yuna_2fa", "vivarocky"].includes(c.service_key)).length,
     [configs]
   );
   const mappedCount = useMemo(
@@ -1070,1720 +1368,768 @@ export const ExternalApiConfigPage: React.FC = () => {
         </div>
       </div>
 
-      {/* TOP SUB-PAGE SWITCHER: 2 TABS CHÍNH */}
-      <div className="flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit shadow-lg">
+
+      {/* THANH ĐIỀU HƯỚNG 2 TAB: GÁN CỔNG VÀO Ô INPUT VS QUẢN LÝ CỔNG API */}
+      <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
         <button
           type="button"
-          onClick={() => setActiveMainTab("configs")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeMainTab === "configs"
-            ? "bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-md shadow-amber-600/25"
-            : "text-slate-400 hover:text-white"
-            }`}
+          onClick={() => setActiveMainTab("slots")}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 transition-all shadow-md active:scale-95 ${
+            activeMainTab === "slots"
+              ? "bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-amber-600/25 ring-1 ring-amber-400/40"
+              : "bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800"
+          }`}
         >
-          <Sliders className="w-4 h-4" />
-          <span>Cấu Hình Cổng & Bóc Tách Trường</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono">
-            {configs.length}
+          <Zap className="w-4 h-4 text-amber-300" />
+          <span>Tab 1: Gán Cổng Vào Ô Input (Web OTP Portal)</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            activeMainTab === "slots" ? "bg-black/30 text-white" : "bg-slate-800 text-slate-400"
+          }`}>
+            {portalSlots.length} Ô
           </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveMainTab("templates")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeMainTab === "templates"
-            ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-600/25"
-            : "text-slate-400 hover:text-white"
-            }`}
+          onClick={() => setActiveMainTab("api_manager")}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 transition-all shadow-md active:scale-95 ${
+            activeMainTab === "api_manager"
+              ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-cyan-600/25 ring-1 ring-cyan-400/40"
+              : "bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800"
+          }`}
         >
-          <MessageSquare className="w-4 h-4" />
-          <span>Cấu Hình Mẫu Tin Nhắn (Nội Dung Hiển Thị)</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-400/20 text-cyan-200 font-mono">
-            Web & Mobile
+          <Database className="w-4 h-4 text-cyan-300" />
+          <span>Tab 2: Quản Lý Cổng API (Database CRUD)</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            activeMainTab === "api_manager" ? "bg-black/30 text-white" : "bg-slate-800 text-slate-400"
+          }`}>
+            {configs.length} Cổng
           </span>
         </button>
       </div>
 
-      {activeMainTab === "configs" ? (
-        <>
-          {/* 4 STATS OVERVIEW CARDS - 100% CHUYÊN BIỆT CHO OTP */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Card 1: Tổng Cổng Dịch Vụ OTP */}
-        <div className="bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/30 rounded-2xl p-4 flex items-center gap-3.5 backdrop-blur-sm transition-all">
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
-            <Key className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xl font-black text-amber-300">{configs.length}</div>
-            <div className="text-xs text-slate-300 font-bold">Tổng Dịch Vụ OTP</div>
-          </div>
-        </div>
-
-        {/* Card 2: Đang Hoạt Động (Online) */}
-        <div className="bg-slate-900/60 border border-slate-800/80 hover:border-emerald-500/30 rounded-2xl p-4 flex items-center gap-3.5 backdrop-blur-sm transition-all">
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl relative">
-            <ShieldCheck className="w-5 h-5" />
-            <span className="w-2 h-2 rounded-full bg-emerald-400 absolute top-2 right-2 animate-pulse" />
-          </div>
-          <div>
-            <div className="text-xl font-black text-emerald-400">{onlineCount}</div>
-            <div className="text-xs text-slate-300 font-bold">Đang Hoạt Động (Online)</div>
-          </div>
-        </div>
-
-        {/* Card 3: Cổng Tự Động Hóa (Preset) */}
-        <div className="bg-slate-900/60 border border-slate-800/80 hover:border-purple-500/30 rounded-2xl p-4 flex items-center gap-3.5 backdrop-blur-sm transition-all">
-          <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl">
-            <Zap className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xl font-black text-purple-400">{presetCount}</div>
-            <div className="text-xs text-slate-300 font-bold">Tự Động Hóa (Preset)</div>
-          </div>
-        </div>
-
-        {/* Card 4: Đã Ghép Trường Dữ Liệu */}
-        <div className="bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/30 rounded-2xl p-4 flex items-center gap-3.5 backdrop-blur-sm transition-all">
-          <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xl font-black text-cyan-300">{mappedCount}</div>
-            <div className="text-xs text-slate-300 font-bold">Bóc Tách Trường Động</div>
-          </div>
-        </div>
-      </div>
-
-      {/* TOOLBAR ĐIỀU KHIỂN & BỘ LỌC - ZERO SCROLLBAR & MODERN SEGMENTED */}
-      <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
-        {/* Khối Trái: Segmented Inset Pill Loại Cổng + Dropdown Trạng Thái */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Segmented Control 3 nút gọn gàng */}
-          <div className="bg-slate-950/90 p-1 rounded-xl border border-slate-800/80 flex items-center gap-1 shadow-inner">
-            <button
-              type="button"
-              onClick={() => setTypeFilter("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${typeFilter === "all"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
-                : "text-slate-400 hover:text-white"
-                }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Tất Cả</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
-                {configs.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTypeFilter("direct_otp")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${typeFilter === "direct_otp"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
-                : "text-slate-400 hover:text-white"
-                }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>Only-OTP & 2FA</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
-                {directOtpCount}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTypeFilter("webmail")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${typeFilter === "webmail"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm"
-                : "text-slate-400 hover:text-white"
-                }`}
-            >
-              <Mail className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Webmail</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
-                {webmailCount}
-              </span>
-            </button>
-          </div>
-
-          {/* Dropdown Trạng Thái Hoạt Động */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-slate-950/90 border border-slate-800/90 hover:border-slate-700 text-slate-300 text-xs font-semibold rounded-xl px-3 py-2 pr-8 focus:outline-none focus:border-amber-500 appearance-none cursor-pointer transition-all shadow-inner"
-            >
-              <option value="all">⚡ Mọi trạng thái ({configs.length})</option>
-              <option value="online">🟢 Đang hoạt động ({onlineCount})</option>
-              <option value="offline">⚪ Tạm tắt ({offlineCount})</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </div>
-
-        {/* Khối Phải: Ô Tìm Kiếm Co Giãn + Bộ Đếm */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Tìm theo tên, key, URL host..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-all font-mono"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                title="Xóa từ khóa tìm kiếm"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <span className="text-xs text-slate-400 bg-slate-950/90 border border-slate-800 px-3 py-2 rounded-xl font-mono whitespace-nowrap shadow-inner">
-            {filteredConfigs.length} / {configs.length} Cổng
-          </span>
-        </div>
-      </div>
-
-      {/* DANH SÁCH CÁC CỔNG DỊCH VỤ OTP (GRID 2 CỘT HIỆN ĐẠI) */}
-      {loading ? (
-        <div className="py-20 text-center space-y-3 bg-slate-900/40 border border-slate-800/80 rounded-3xl backdrop-blur-sm">
-          <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
-          <p className="text-xs text-slate-400">Đang tải danh sách các cổng kết nối OTP & Mail Server...</p>
-        </div>
-      ) : filteredConfigs.length === 0 ? (
-        <div className="py-16 text-center bg-slate-900/40 border border-slate-800 rounded-3xl p-8 space-y-3">
-          <Key className="w-10 h-10 text-slate-600 mx-auto" />
-          <p className="text-sm font-semibold text-slate-300">Không tìm thấy cổng OTP nào phù hợp bộ lọc.</p>
-          <p className="text-xs text-slate-500">Hãy thử đổi từ khóa tìm kiếm hoặc bấm nút "Thêm Cổng OTP".</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {filteredConfigs.map((config) => {
-            const formData = editForms[config.id] || config;
-            const isSaving = savingId === config.id;
-            const isPinging = pingingId === config.id;
-            const ping = pingResults[config.id];
-            const isTokenVisible = Boolean(showTokens[config.id]);
-            const isDirect = isDirectOtpService(config);
-            const isZeroAuth = isZeroAuthService(config.service_key);
-
-            // Card Style
-            const borderHover = isDirect ? "hover:border-amber-500/40" : "hover:border-cyan-500/40";
-            const iconBg = isDirect
-              ? "bg-amber-500/10 text-amber-400 border-amber-500/25"
-              : "bg-cyan-500/10 text-cyan-400 border-cyan-500/25";
-
-            return (
-              <div
-                key={config.id}
-                className={`bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 shadow-xl transition-all duration-200 flex flex-col justify-between backdrop-blur-md relative overflow-hidden ${borderHover}`}
-              >
-                <div className="space-y-4">
-                  {/* Card Header: Service Tag + Title + Online Toggle + Delete */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className={`p-3 rounded-2xl border ${iconBg} shadow-inner shrink-0 mt-0.5`}>
-                        {isDirect ? <Key className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          {isDirect ? (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                              <Zap className="w-3 h-3 text-amber-400" />
-                              ONLY-OTP & 2FA
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-cyan-400" />
-                              HỘP THƯ WEBMAIL
-                            </span>
-                          )}
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                            {config.service_key}
-                          </span>
-                        </div>
-                        <h3 className="text-base font-bold text-white tracking-tight truncate">{config.service_name}</h3>
-                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{config.description || "Dịch vụ cào mã xác thực OTP"}</p>
-                      </div>
-                    </div>
-
-                    {/* Right: Online / Offline Toggle + Delete */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newActive = !formData.is_active;
-                          handleFieldChange(config.id, "is_active", newActive);
-                        }}
-                        className="focus:outline-none transition-transform active:scale-95"
-                        title={formData.is_active ? "Đang bật (Nhấn để tạm tắt)" : "Đang tắt (Nhấn để bật)"}
-                      >
-                        {formData.is_active ? (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl text-[11px] font-bold">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>ONLINE</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border border-slate-700 text-slate-400 rounded-xl text-[11px] font-bold">
-                            <span className="w-2 h-2 rounded-full bg-slate-500" />
-                            <span>OFFLINE</span>
-                          </div>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteConfig(config.id, config.service_name)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
-                        title={`Xóa cấu hình [${config.service_name}]`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Form Inputs inside Card */}
-                  <div className="space-y-3 pt-1">
-                    {/* Base URL */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
-                        <span>Base URL / Endpoint Host</span>
-                        <a
-                          href={formData.base_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 text-[10px] font-normal"
-                        >
-                          Mở trang <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                      <input
-                        type="text"
-                        value={formData.base_url || ""}
-                        onChange={(e) => handleFieldChange(config.id, "base_url", e.target.value)}
-                        placeholder="https://..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono transition-all"
-                      />
-                    </div>
-
-                    {/* Zero-Auth Banner OR Token Input */}
-                    {isZeroAuth ? (
-                      <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-200 text-[11px] flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
-                        <span>
-                          <b>Zero-Auth:</b> Hệ thống tự động cấp Bearer Token / Session Cache, không cần nhập API Token thủ công.
-                        </span>
-                      </div>
-                    ) : formData.auth_config ? (
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
-                          <span>API Token / Secret Key / Fallback Token</span>
-                          <span className="text-[10px] text-slate-500 font-mono">Loại: {formData.auth_config.type || "mặc định"}</span>
-                        </div>
-                        <div className="relative">
-                          <input
-                            type={isTokenVisible ? "text" : "password"}
-                            placeholder="Nhập API Token hoặc để trống nếu dùng mặc định"
-                            value={formData.auth_config.token || formData.auth_config.defaultToken || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (formData.auth_config.token !== undefined) {
-                                handleAuthConfigChange(config.id, "token", val);
-                              } else {
-                                handleAuthConfigChange(config.id, "defaultToken", val);
-                              }
-                            }}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono transition-all"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setShowTokens((prev) => ({
-                                ...prev,
-                                [config.id]: !prev[config.id],
-                              }))
-                            }
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                          >
-                            {isTokenVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {/* Khu Vực Bóc Tách Trường Dữ Liệu (Field Mapping Hub) */}
-                    <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-                          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                          Trường Dữ Liệu Bóc Tách ({config.field_mapping?.length || 0})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => openFieldMappingModal(config)}
-                          className="px-2.5 py-1 bg-cyan-600/15 hover:bg-cyan-600/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
-                          title="Mở kho trường và bộ bóc tách JSON cho cổng này"
-                        >
-                          <Sliders className="w-3 h-3 text-cyan-400" />
-                          Cấu Hình Trường
-                        </button>
-                      </div>
-
-                      {config.field_mapping && config.field_mapping.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 pt-0.5">
-                          {config.field_mapping.map((fm, idx) => (
-                            <span
-                              key={idx}
-                              className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border flex items-center gap-1 ${fm.is_primary
-                                ? "bg-amber-500/15 border-amber-500/40 text-amber-300 font-bold"
-                                : "bg-slate-900 border-slate-800 text-slate-300"
-                                }`}
-                              title={`JSON Path: ${fm.path}`}
-                            >
-                              <Tag className="w-2.5 h-2.5 opacity-70" />
-                              <span className="font-sans font-semibold">{fm.label}:</span>
-                              <span className="text-slate-400 font-mono">{fm.path}</span>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-500 italic">
-                          Đang dùng mã OTP mặc định. Bấm nút <b>"Cấu Hình Trường"</b> để bật thêm Ngày Giờ, Tiêu Đề...
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Timeout & Sender Filter (2 cột) */}
-                    <div className="grid grid-cols-2 gap-3 pt-0.5">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-400">Timeout (ms)</label>
-                        <input
-                          type="number"
-                          step="1000"
-                          value={formData.auth_config?.timeoutMs ?? 10000}
-                          onChange={(e) => handleAuthConfigChange(config.id, "timeoutMs", Number(e.target.value))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-400">Sender Filter (Tiêu chí lọc)</label>
-                        <input
-                          type="text"
-                          placeholder="adobe / all"
-                          value={formData.auth_config?.senderFilter ?? "adobe"}
-                          onChange={(e) => handleAuthConfigChange(config.id, "senderFilter", e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Block Footer Actions */}
-                <div className="pt-3.5 mt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
-                  {/* Ping Result Badge */}
-                  <div className="flex items-center gap-2">
-                    {ping ? (
-                      <div
-                        className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1.5 ${ping.reachable
-                          ? "bg-emerald-950/80 border border-emerald-500/40 text-emerald-300"
-                          : "bg-rose-950/80 border border-rose-500/40 text-rose-300"
-                          }`}
-                      >
-                        <Wifi className="w-3.5 h-3.5" />
-                        <span>
-                          {ping.status ? `${ping.status} ${ping.statusText}` : ping.statusText}
-                          {ping.responseTimeMs !== null ? ` (${ping.responseTimeMs}ms)` : ""}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-500 italic">Chưa kiểm tra kết nối</span>
-                    )}
-                  </div>
-
-                  {/* Main Action Buttons: 3 nút tối giản */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Live Test OTP Button */}
-                    <button
-                      type="button"
-                      onClick={() => openOtpProbeModal(config.service_key)}
-                      className="px-3 py-2 bg-gradient-to-r from-amber-600/25 to-amber-500/20 hover:from-amber-600/35 hover:to-amber-500/30 text-amber-300 border border-amber-500/35 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
-                      title="Mở popup thử cào OTP từ email"
-                    >
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Thử Lấy OTP</span>
-                    </button>
-
-                    {/* Ping Test Button */}
-                    <button
-                      type="button"
-                      onClick={() => handlePingTest(config.id)}
-                      disabled={isPinging}
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                    >
-                      <Wifi className={`w-3.5 h-3.5 text-cyan-400 ${isPinging ? "animate-pulse text-cyan-300" : ""}`} />
-                      <span>{isPinging ? "Đang ping..." : "Ping"}</span>
-                    </button>
-
-                    {/* Save Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleSaveCard(config.id)}
-                      disabled={isSaving}
-                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-600/20 active:scale-95 disabled:opacity-50"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span>{isSaving ? "Lưu..." : "Lưu"}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      </>
-    ) : (
-      /* SUB-PAGE 2: CẤU HÌNH MẪU THÔNG BÁO & MULTI-DEVICE PREVIEW (WEB / MOBILE) */
       <div className="space-y-5 animate-in fade-in duration-200">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* CỘT TRÁI (6 COLS): BẢNG SOẠN THẢO MẪU THÔNG BÁO (CHUẨN 1-1 ẢNH CỦA MASTER) */}
-          <div className="lg:col-span-6 bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xl backdrop-blur-md">
-            {/* Tiêu đề mục & Switch Mặc định / Tùy chỉnh */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+          {activeMainTab === "slots" && (
+          <div className="space-y-5">
+          {/* Header Banner Bảng Kiểm Tra Nhanh */}
+          <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/30 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
+            <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-amber-500/10 to-transparent pointer-events-none" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-lg shadow-amber-500/10">
+                  <Zap className="w-6 h-6" />
+                </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-cyan-400" />
-                    Cấu hình mẫu thông báo
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Định nghĩa mẫu tin nhắn gửi qua Bot Telegram hoặc hiển thị nội dung cho nhân viên.
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg font-bold text-white tracking-wide">
+                      Bảng Kiểm Tra Nhanh Mọi Cổng API Đọc OTP
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      LIVE TEST ENGINE
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                    Nhập dữ liệu test vào từng ô và bấm icon ⚡ để lấy OTP thực tế từ hòm thư của bên thứ 3 (Fix Ades, TinyHost, HDSD...).
                   </p>
                 </div>
               </div>
 
-              {/* Switcher Mặc định / Tùy chỉnh */}
-              <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 w-fit">
-                <button
-                  type="button"
-                  onClick={() => setTemplateMode("default")}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    templateMode === "default"
-                      ? "bg-slate-800 text-white shadow"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Mặc định
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTemplateMode("custom")}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    templateMode === "custom"
-                      ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Tùy chỉnh
-                </button>
-              </div>
-            </div>
-
-            {/* Chọn mẫu tin nhắn: 3 nút mẫu */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1">
-                <span>Chọn mẫu tin nhắn</span>
-                <span className="text-rose-400">*</span>
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {messageTemplates.map((tpl, idx) => {
-                  const isSelected = selectedTemplateIndex === idx;
-                  return (
-                    <button
-                      key={tpl.id}
-                      type="button"
-                      onClick={() => setSelectedTemplateIndex(idx)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all truncate border ${
-                        isSelected
-                          ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30"
-                          : "bg-slate-950/80 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-white"
-                      }`}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{tpl.name.split("(")[0]}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Soạn nội dung template */}
-            <div className="space-y-2.5">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1">
-                  <span>Nội dung</span>
-                  <span className="text-rose-400">*</span>
-                </label>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Bạn có thể tùy chỉnh nội dung theo ý thích. Hệ thống hỗ trợ các biến có sẵn giúp bạn có thể tạo mẫu tin nhắn theo cách riêng.
-                </p>
-              </div>
-
-              {/* Toolbar Format & Dropdown Chèn biến */}
-              <div className="relative">
-                <div className="flex items-center justify-between bg-slate-950 p-1.5 rounded-t-xl border border-b-0 border-slate-800">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleFormatText("<b>", "</b>")}
-                      title="In đậm (Bold - <b>)"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                    >
-                      <Bold className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatText("<i>", "</i>")}
-                      title="In nghiêng (Italic - <i>)"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                    >
-                      <Italic className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatText('<a href="https://example.com">', "</a>")}
-                      title="Chèn liên kết (Link - <a href>)"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatText("<code>", "</code>")}
-                      title="Định dạng mã code (Monospace - <code>)"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
-                    >
-                      &lt;&gt;
-                    </button>
-                  </div>
-
-                  {/* Nút Chèn biến ▾ */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowVariableDropdown(!showVariableDropdown)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Chèn biến</span>
-                      <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showVariableDropdown ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {/* Dropdown Menu Biến (Chuẩn 1-1 ảnh 2 của Master) */}
-                    {showVariableDropdown && (
-                      <div className="absolute right-0 top-full mt-1.5 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-30 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="px-2.5 py-1 text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-1.5 mb-1 flex items-center justify-between">
-                          <span>Danh sách biến có sẵn:</span>
-                          <span className="text-[10px] text-cyan-400">Click để chèn</span>
-                        </div>
-                        <div className="max-h-60 overflow-y-auto space-y-0.5">
-                          {TEMPLATE_VARIABLES.map((v) => (
-                            <button
-                              key={v.key}
-                              type="button"
-                              onClick={() => handleInsertVariable(v.tag)}
-                              className="w-full px-2.5 py-2 rounded-xl text-left hover:bg-slate-800/90 flex items-center justify-between group transition-colors"
-                            >
-                              <div className="min-w-0 pr-2">
-                                <div className="text-xs font-medium text-slate-200 truncate">{v.label}</div>
-                                <div className="text-[10px] text-slate-500 truncate">VD: {v.sample}</div>
-                              </div>
-                              <span className="font-mono text-xs font-bold text-rose-400 group-hover:text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-lg shrink-0">
-                                {v.tag}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                  <span className="text-slate-400">Đang bật:</span>
+                  <span className="font-bold text-emerald-400">
+                    {configs.filter((c) => c.is_active).length}/{configs.length}
+                  </span>
                 </div>
-
-                {/* Textarea Template Editor */}
-                <textarea
-                  ref={textareaRef}
-                  rows={10}
-                  disabled={templateMode === "default"}
-                  value={messageTemplates[selectedTemplateIndex]?.content || ""}
-                  onChange={(e) => handleUpdateTemplateContent(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-b-xl p-3.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-cyan-500 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed select-text"
-                  placeholder="Nhập nội dung mẫu tin nhắn..."
-                />
-              </div>
-
-              {/* Mẹo sử dụng biến */}
-              <div className="text-[11px] text-slate-400 flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-slate-500">Mẹo: Sử dụng các biến</span>
-                {TEMPLATE_VARIABLES.slice(0, 3).map((v) => (
-                  <button
-                    key={v.key}
-                    type="button"
-                    onClick={() => handleInsertVariable(v.tag)}
-                    className="text-rose-400 hover:text-rose-300 font-mono text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 transition-colors"
-                  >
-                    {v.tag}
-                  </button>
-                ))}
                 <button
                   type="button"
-                  onClick={() => setShowVariableDropdown(true)}
-                  className="text-cyan-400 hover:text-cyan-300 font-semibold underline text-[11px] ml-1"
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-all flex items-center gap-1.5 shadow-sm"
                 >
-                  Xem tất cả biến
+                  <Plus className="w-4 h-4" />
+                  <span>Thêm Cổng Mới</span>
                 </button>
               </div>
-            </div>
-
-            {/* Nút Lưu & Khôi phục */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={handleResetTemplates}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 flex items-center gap-1.5 transition-all"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Khôi phục mặc định</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveTemplates}
-                className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/25 active:scale-95 transition-all"
-              >
-                <Save className="w-4 h-4" />
-                <span>Lưu Mẫu Cấu Hình</span>
-              </button>
             </div>
           </div>
 
-          {/* CỘT PHẢI (6 COLS): LIVE PREVIEW TÙY BIẾN LINH HOẠT WEB HOẶC MOBILE (THEO CHỈ ĐẠO MASTER) */}
-          <div className="lg:col-span-6 space-y-4">
-            {/* Header Cột Phải: Bộ Chuyển Đổi Thiết Bị (Device Switcher) */}
-            <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800/90 rounded-2xl p-2.5 shadow-md">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                <Eye className="w-4 h-4 text-cyan-400" />
-                <span>Xem Trước Trực Quan (Live Preview)</span>
-              </div>
+          {/* BẢNG QUẢN LÝ & TEST NHANH 7 Ô INPUT WEB OTP PORTAL */}
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-3.5 px-4 w-14 text-center">STT</th>
+                    <th className="py-3.5 px-4 min-w-[260px]">Ô Input Trên Web OTP Portal</th>
+                    <th className="py-3.5 px-4 min-w-[250px]">Cổng API Xử Lý (Gán Cổng)</th>
+                    <th className="py-3.5 px-4 w-32 text-center">Trạng Thái</th>
+                    <th className="py-3.5 px-4 min-w-[360px]">Ô Input Và Icon ⚡ Test</th>
+                    <th className="py-3.5 px-4 w-32 text-center">Thao Tác Tắt/Mở</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs">
+                  {portalSlots.map((slot, index) => {
+                    const isTesting = testingRows[slot.slot_key] || false;
+                    const result = testResults[slot.slot_key];
+                    const isCopied = copiedOtpKey === slot.slot_key;
+                    const primaryConfig = configs.find((c) => c.service_key === slot.primary_service_key);
+                    const isPrimaryActive = primaryConfig ? primaryConfig.is_active : true;
 
-              {/* Nút chuyển đổi Web vs Mobile */}
-              <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => setPreviewDevice("web")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    previewDevice === "web"
-                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  <Monitor className="w-3.5 h-3.5" />
-                  <span>Giao Diện Web</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPreviewDevice("mobile")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    previewDevice === "mobile"
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span>Giao Diện Mobile</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 1. KHI CHỌN GIAO DIỆN WEB (CHUẨN 100% GIAO DIỆN otp_portal CỦA MASTER) */}
-            {previewDevice === "web" ? (
-              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in duration-150">
-                {/* Web Browser Top Bar */}
-                <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
-                    <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
-                    <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
-                  </div>
-                  <div className="flex-1 max-w-sm bg-slate-900 border border-slate-800/80 rounded-lg px-3 py-1 text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
-                    <Globe className="w-3 h-3 text-amber-400" />
-                    <span className="truncate">https://otp.mavrykpremium.com/portal/verify-session</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Trực Tuyến</span>
-                  </div>
-                </div>
-
-                {/* Vùng Thẻ Thông Báo Web: HIỂN THỊ DUY NHẤT 1 GIAO DIỆN CHI TIẾT THEO CHỈ ĐẠO CỦA MASTER */}
-                <div className="p-4 sm:p-6 bg-gradient-to-b from-[#0d0714] via-[#120a1d] to-[#0a0512] flex flex-col items-center justify-center min-h-[500px]">
-                  <div className="w-full max-w-md bg-gradient-to-b from-[#1f1335]/95 via-[#180e2b]/95 to-[#120922]/95 border border-amber-500/30 rounded-3xl p-5 shadow-[0_15px_45px_rgba(0,0,0,0.7),0_0_35px_rgba(245,158,11,0.12)] space-y-4 text-white">
-                    {/* Header Dịch Vụ: Adobe vs Netflix */}
-                    <div className="flex p-1 bg-black/40 border border-amber-500/20 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setWebPreviewTab("adobe")}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          webPreviewTab === "adobe"
-                            ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_2px_12px_rgba(245,158,11,0.35)]"
-                            : "text-slate-400 hover:text-white"
+                    return (
+                      <tr
+                        key={slot.slot_key}
+                        className={`hover:bg-slate-800/40 transition-colors ${
+                          !slot.enabled ? "opacity-60 bg-slate-950/30" : ""
                         }`}
                       >
-                        <span className="w-4 h-4 rounded bg-black/20 flex items-center justify-center text-[10px] font-black">
-                          A
-                        </span>
-                        <span>Adobe</span>
-                      </button>
+                        {/* 1. STT */}
+                        <td className="py-4 px-4 text-center font-mono font-bold text-slate-400">
+                          {index + 1}
+                        </td>
 
-                      <button
-                        type="button"
-                        onClick={() => setWebPreviewTab("netflix")}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                          webPreviewTab === "netflix"
-                            ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_2px_12px_rgba(245,158,11,0.35)]"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                      >
-                        <Film className="w-3.5 h-3.5" />
-                        <span>Netflix</span>
-                      </button>
-                    </div>
+                        {/* 2. Ô INPUT TRÊN WEB OTP PORTAL */}
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="shrink-0">
+                              {slot.category === "adobe" && (
+                                <AdobeFlaticon className="w-9 h-9 drop-shadow-md rounded-xl shadow-purple-500/20" />
+                              )}
+                              {slot.category === "netflix" && (
+                                <NetflixFlaticon className="w-9 h-9 drop-shadow-md rounded-xl shadow-red-500/20" />
+                              )}
+                              {slot.category === "gpt" && (
+                                <ChatGPTFlaticon className="w-9 h-9 drop-shadow-md rounded-xl shadow-emerald-500/20" />
+                              )}
+                              {slot.category === "2fa" && (
+                                <TwoFactorFlaticon className="w-9 h-9 drop-shadow-md rounded-xl shadow-blue-500/20" />
+                              )}
+                            </div>
 
-                    {/* ========================================================================= */}
-                    {/* 1. KHI CHỌN ADOBE: ĐƠN LẬP 1 GIAO DIỆN DUY NHẤT                           */}
-                    {/* ========================================================================= */}
-                    {webPreviewTab === "adobe" && (
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between pb-2 border-b border-amber-500/15">
-                          <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
-                            Adobe Creative Cloud
-                          </span>
-
-                          <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-lg text-[11px]">
-                            <button
-                              type="button"
-                              onClick={() => setWebPreviewSubForm(0)}
-                              className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-bold transition-all ${
-                                webPreviewSubForm === 0
-                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
-                                  : "text-slate-400 hover:text-white"
-                              }`}
-                            >
-                              <KeyRound className="w-3 h-3" />
-                              <span>Lấy Tài Khoản</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setWebPreviewSubForm(1)}
-                              className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-bold transition-all ${
-                                webPreviewSubForm === 1
-                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
-                                  : "text-slate-400 hover:text-white"
-                              }`}
-                            >
-                              <Zap className="w-3 h-3" />
-                              <span>Nhận OTP</span>
-                            </button>
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white text-sm">
+                                  {slot.name}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950 text-cyan-400 border border-slate-800">
+                                  {slot.slot_key}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-xs" title={slot.input_placeholder}>
+                                Gợi ý: {slot.input_placeholder || "Nhập dữ liệu..."}
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        </td>
 
-                        {/* HIỂN THỊ ĐƠN LẬP FORM 1 (NHẬN OTP) HOẶC FORM 0 (LẤY TÀI KHOẢN) */}
-                        {webPreviewSubForm === 1 ? (
-                          /* FORM 1: NHẬN OTP (MÃ SỐ TO RÕ, NÚT SAO CHÉP, KHÔNG CÓ KHỐI CHI TIẾT THỪA) */
-                          <div className="space-y-3 animate-in fade-in zoom-in-95 duration-150">
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
-                              <input
-                                type="text"
-                                readOnly
-                                value="netlink.port.8315@colegiomontealto.us"
-                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100/90 font-mono focus:outline-none"
-                              />
-                            </div>
+                          {/* 3. CỔNG API XỬ LÝ (GÁN CỔNG CHO Ô INPUT) */}
+                        <td className="py-4 px-4 min-w-[280px]">
+                          <div className="space-y-2">
+                            {/* Danh sách các Tags API phẳng, đồng cấp gán cho ô này */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {getSlotServices(slot).map((srvKey) => {
+                                const targetCfg = configs.find((c) => c.service_key === srvKey);
 
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setWebPreviewSubForm(0)}
-                                className="px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/20 bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-1 transition-all"
-                              >
-                                <ArrowLeft className="w-3 h-3" />
-                                <span>Lấy Tài Khoản</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_3px_15px_rgba(245,158,11,0.3)] hover:brightness-110 active:scale-98 transition-all"
-                              >
-                                <Zap className="w-3.5 h-3.5 fill-current" />
-                                <span>Lấy Mã OTP Adobe</span>
-                              </button>
-                            </div>
-
-                            {/* Khối Kết Quả OTP */}
-                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2.5 shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                                MÃ XÁC MINH ADOBE CỦA BẠN
-                              </div>
-
-                              <div
-                                onClick={() =>
-                                  handleCopyPreviewText("699211", "otp_digits", "Đã sao chép mã OTP: 699211!")
-                                }
-                                className="flex items-center justify-center gap-2 cursor-pointer py-1"
-                                title="Bấm vào để sao chép mã ngay"
-                              >
-                                {["6", "9", "9", "2", "1", "1"].map((digit, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="w-10 h-12 rounded-xl bg-gradient-to-b from-black/80 to-black/95 border border-amber-500/50 flex items-center justify-center text-2xl font-black text-amber-300 font-mono shadow-[0_0_12px_rgba(245,158,11,0.25)] hover:scale-105 transition-transform"
+                                return (
+                                  <span
+                                    key={srvKey}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950/80 border border-slate-700/80 hover:border-cyan-500/50 text-slate-200 text-xs font-medium shadow-sm transition-all"
                                   >
-                                    {digit}
-                                  </div>
-                                ))}
+                                    <Zap className="w-3 h-3 text-cyan-400 shrink-0 fill-current" />
+                                    <span className="truncate max-w-[160px]" title={targetCfg?.service_name || srvKey}>
+                                      {targetCfg?.service_name || srvKey}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveServiceFromSlot(slot.slot_key, srvKey)}
+                                      title="Gỡ API này khỏi ô input"
+                                      className="p-0.5 text-slate-400 hover:text-rose-400 rounded-md hover:bg-rose-950/40 transition-colors ml-0.5"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+
+                              {getSlotServices(slot).length === 0 && (
+                                <span className="text-[11px] text-slate-500 italic">
+                                  Chưa gán API nào
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Dropdown Gán thêm API vào ô này */}
+                            <div>
+                              <select
+                                value="none"
+                                onChange={(e) => {
+                                  if (e.target.value !== "none") {
+                                    handleAddServiceToSlot(slot.slot_key, e.target.value);
+                                  }
+                                }}
+                                className="w-full bg-slate-950/70 border border-dashed border-slate-700 hover:border-cyan-500/60 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all cursor-pointer"
+                              >
+                                <option value="none">➕ Gán thêm API cho ô này...</option>
+                                {configs
+                                  .filter((cfg) => !getSlotServices(slot).includes(cfg.service_key))
+                                  .map((cfg) => (
+                                    <option key={cfg.service_key} value={cfg.service_key} className="bg-slate-900 text-white">
+                                      + {cfg.service_name} ({cfg.service_key}) {!cfg.is_active ? "[CỔNG TẮT]" : ""}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 4. TRẠNG THÁI */}
+                        <td className="py-4 px-4 text-center">
+                          {!slot.enabled ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                              TẠM ẨN WEB
+                            </span>
+                          ) : !isPrimaryActive ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                              CỔNG ĐANG TẮT
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              ONLINE
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 5. Ô INPUT VÀ ICON ⚡ TEST */}
+                        <td className="py-4 px-4">
+                          <div className="space-y-2">
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleQuickTestSlot(slot);
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <div className="relative flex-1 min-w-[200px]">
+                                <input
+                                  type="text"
+                                  value={testInputs[slot.slot_key] || ""}
+                                  onChange={(e) =>
+                                    setTestInputs((prev) => ({
+                                      ...prev,
+                                      [slot.slot_key]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder={slot.input_placeholder || "Nhập dữ liệu test..."}
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/40 transition-all font-mono"
+                                />
                               </div>
 
                               <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopyPreviewText("699211", "otp_button", "Đã sao chép mã OTP: 699211!")
-                                }
-                                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(245,158,11,0.3)] hover:brightness-110 active:scale-98 transition-all"
+                                type="submit"
+                                disabled={isTesting}
+                                title="Bấm để test lấy OTP giả lập khách trên web"
+                                className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-all shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20"
                               >
-                                {copiedPreviewKey === "otp_button" || copiedPreviewKey === "otp_digits" ? (
+                                {isTesting ? (
                                   <>
-                                    <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
-                                    <span>ĐÃ SAO CHÉP MÃ (699211)!</span>
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Đang test...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Copy className="w-4 h-4 text-slate-950 stroke-[2.5]" />
-                                    <span>SAO CHÉP MÃ XÁC THỰC (699211)</span>
+                                    <Zap className="w-3.5 h-3.5 fill-current" />
+                                    <span>Test</span>
                                   </>
                                 )}
                               </button>
-                            </div>
-                          </div>
-                        ) : (
-                          /* FORM 0: LẤY TÀI KHOẢN (KẾT QUẢ DẠNG TEXT CÓ DÒNG MẬT KHẨU THEO YÊU CẦU MASTER) */
-                          <div className="space-y-3 animate-in fade-in zoom-in-95 duration-150">
-                            <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
-                              <input
-                                type="text"
-                                readOnly
-                                value="customer.order.2026@gmail.com"
-                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100/90 font-mono focus:outline-none"
-                              />
-                            </div>
+                            </form>
 
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_3px_15px_rgba(245,158,11,0.3)] hover:brightness-110 active:scale-98 transition-all"
+                            {/* Khung kết quả test hiển thị ngay dưới ô */}
+                            {result && (
+                              <div
+                                className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs animate-in fade-in duration-150 ${
+                                  result.success
+                                    ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-200"
+                                    : "bg-rose-950/30 border-rose-500/30 text-rose-200"
+                                }`}
                               >
-                                <KeyRound className="w-3.5 h-3.5" />
-                                <span>Tra Cứu Tài Khoản</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => setWebPreviewSubForm(1)}
-                                className="px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/20 bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-1 transition-all"
-                              >
-                                <span>Lấy OTP</span>
-                                <ArrowRight className="w-3 h-3" />
-                              </button>
-                            </div>
-
-                            {/* Khối Kết Quả Tài Khoản Text Đầy Đủ Dòng Mật Khẩu */}
-                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 space-y-2 text-xs shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
-                              <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                                <span className="font-bold text-slate-300 uppercase flex items-center gap-1 text-[11px]">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>TÀI KHOẢN ĐƯỢC CẤP</span>
-                                </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                  ĐANG HOẠT ĐỘNG
-                                </span>
-                              </div>
-
-                              <div className="space-y-1.5 text-[11px]">
-                                {/* Dòng 1: Email Cấp */}
-                                <div className="flex items-center justify-between p-2 rounded-lg border border-amber-500/20 bg-black/40">
-                                  <div className="truncate max-w-[240px] font-mono text-amber-100 font-bold">
-                                    netlink.port.8315@colegiomontealto.us
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleCopyPreviewText(
-                                        "netlink.port.8315@colegiomontealto.us",
-                                        "acc_email",
-                                        "Đã chép Email Adobe!"
-                                      )
-                                    }
-                                    className="p-1 rounded border border-amber-500/30 hover:bg-amber-500/20 text-amber-400 transition-all"
-                                    title="Sao chép Email"
-                                  >
-                                    {copiedPreviewKey === "acc_email" ? (
-                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                </div>
-
-                                {/* Dòng 2: MẬT KHẨU (Chuẩn Master yêu cầu) */}
-                                <div className="flex items-center justify-between p-2 rounded-lg border border-amber-500/20 bg-black/40">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-[10px] uppercase font-semibold">
-                                      Mật khẩu:
-                                    </span>
-                                    <span className="font-mono font-bold text-amber-300">
-                                      Mavryk@2026!#
-                                    </span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleCopyPreviewText(
-                                        "Mavryk@2026!#",
-                                        "acc_pass",
-                                        "Đã chép Mật khẩu Adobe!"
-                                      )
-                                    }
-                                    className="p-1 rounded border border-amber-500/30 hover:bg-amber-500/20 text-amber-400 transition-all"
-                                    title="Sao chép Mật khẩu"
-                                  >
-                                    {copiedPreviewKey === "acc_pass" ? (
-                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                </div>
-
-                                {/* Dòng 3: Gói & Hạn dùng */}
-                                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
-                                  <span>Gói: Adobe All Apps 1 Năm</span>
-                                  <span>Hạn: 04/11/2027</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* ========================================================================= */}
-                    {/* 2. KHI CHỌN NETFLIX: ĐƠN LẬP 1 GIAO DIỆN DUY NHẤT                         */}
-                    {/* ========================================================================= */}
-                    {webPreviewTab === "netflix" && (
-                      <div className="space-y-3.5 animate-in fade-in duration-150">
-                        <div className="flex items-center justify-between pb-2 border-b border-amber-500/15">
-                          <span className="text-xs font-bold text-amber-200/90 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
-                            Netflix Premium Cổng Tự Động
-                          </span>
-
-                          <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-lg text-[10px]">
-                            <button
-                              type="button"
-                              onClick={() => setWebPreviewNetflixSubTab(0)}
-                              className={`px-2 py-0.5 rounded font-bold transition-all ${
-                                webPreviewNetflixSubTab === 0
-                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                  : "text-slate-400 hover:text-white"
-                              }`}
-                            >
-                              Link TV
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setWebPreviewNetflixSubTab(1)}
-                              className={`px-2 py-0.5 rounded font-bold transition-all ${
-                                webPreviewNetflixSubTab === 1
-                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                  : "text-slate-400 hover:text-white"
-                              }`}
-                            >
-                              Mã 6 Số
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setWebPreviewNetflixSubTab(2)}
-                              className={`px-2 py-0.5 rounded font-bold transition-all ${
-                                webPreviewNetflixSubTab === 2
-                                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                  : "text-slate-400 hover:text-white"
-                              }`}
-                            >
-                              OTP Login
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Subform Netflix: Link TV */}
-                        {webPreviewNetflixSubTab === 0 && (
-                          <div className="space-y-3">
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
-                              <input
-                                type="text"
-                                readOnly
-                                value="premium.family@netflix.com"
-                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100 font-mono focus:outline-none"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_3px_15px_rgba(245,158,11,0.3)]"
-                            >
-                              <Zap className="w-3.5 h-3.5 fill-current" />
-                              <span>Lấy Link Xác Minh TV / Hộ Gia Đình</span>
-                            </button>
-
-                            <div className="p-3 rounded-xl border border-amber-500/30 bg-black/65 space-y-2">
-                              <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
-                                <span className="flex items-center gap-1">
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>LINK XÁC MINH SẴN SÀNG</span>
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-normal">Hết hạn: 15p</span>
-                              </div>
-                              <div className="flex items-center justify-between p-2 rounded-lg border border-amber-500/20 bg-black/40">
-                                <span className="font-mono text-[11px] text-amber-200 truncate max-w-[240px]">
-                                  https://www.netflix.com/account/travel/verify?token=nf_99182a...
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCopyPreviewText(
-                                      "https://www.netflix.com/account/travel/verify?token=nf_99182a",
-                                      "nf_link",
-                                      "Đã sao chép link Netflix!"
-                                    )
-                                  }
-                                  className="p-1 rounded border border-amber-500/30 hover:bg-amber-500/20 text-amber-400"
-                                >
-                                  {copiedPreviewKey === "nf_link" ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {result.success ? (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-slate-300">Kết quả:</span>
+                                        {result.otp ? (
+                                          <span className="font-mono text-base font-black text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-emerald-500/30 tracking-widest">
+                                            {result.otp}
+                                          </span>
+                                        ) : (
+                                          <span className="text-emerald-300 font-bold">
+                                            {result.message}
+                                          </span>
+                                        )}
+                                        {result.duration_ms && (
+                                          <span className="text-[10px] text-slate-400 font-mono">
+                                            ⏱️ {result.duration_ms}ms
+                                          </span>
+                                        )}
+                                      </div>
+                                    </>
                                   ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Subform Netflix: Mã 6 Số */}
-                        {webPreviewNetflixSubTab === 1 && (
-                          <div className="space-y-3">
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
-                              <input
-                                type="text"
-                                readOnly
-                                value="premium.family@netflix.com"
-                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100 font-mono focus:outline-none"
-                              />
-                            </div>
-                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2.5 shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                                MÃ XÁC MINH 6 SỐ NETFLIX
-                              </div>
-                              <div className="flex items-center justify-center gap-2 py-1">
-                                {["4", "8", "1", "0", "9", "3"].map((digit, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="w-10 h-12 rounded-xl bg-black/90 border border-amber-500/50 flex items-center justify-center text-2xl font-black text-amber-300 font-mono"
-                                  >
-                                    {digit}
-                                  </div>
-                                ))}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopyPreviewText(
-                                    "481093",
-                                    "nf_6digit",
-                                    "Đã sao chép mã Netflix: 481093!"
-                                  )
-                                }
-                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2"
-                              >
-                                <Copy className="w-4 h-4" />
-                                <span>SAO CHÉP MÃ XÁC THỰC (481093)</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Subform Netflix: OTP Login 4 Số */}
-                        {webPreviewNetflixSubTab === 2 && (
-                          <div className="space-y-3">
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/60" />
-                              <input
-                                type="text"
-                                readOnly
-                                value="premium.family@netflix.com"
-                                className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-9 pr-3 py-2.5 text-xs text-amber-100 font-mono focus:outline-none"
-                              />
-                            </div>
-                            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2.5 shadow-[0_4px_25px_rgba(245,158,11,0.15)]">
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                                MÃ ĐĂNG NHẬP 4 SỐ NETFLIX
-                              </div>
-                              <div className="flex items-center justify-center gap-2 py-1">
-                                {["7", "2", "9", "5"].map((digit, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="w-10 h-12 rounded-xl bg-black/90 border border-amber-500/50 flex items-center justify-center text-2xl font-black text-amber-300 font-mono"
-                                  >
-                                    {digit}
-                                  </div>
-                                ))}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopyPreviewText(
-                                    "7295",
-                                    "nf_4digit",
-                                    "Đã sao chép mã đăng nhập: 7295!"
-                                  )
-                                }
-                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2"
-                              >
-                                <Copy className="w-4 h-4" />
-                                <span>SAO CHÉP MÃ ĐĂNG NHẬP (7295)</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Chân Thẻ Bảo Mật SSL */}
-                    <div className="pt-1 flex items-center justify-center gap-1.5 text-[11px] text-amber-400/80">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Bảo mật 256–Bit SSL</span>
-                    </div>
-                  </div>
-
-                  {/* Footer Ghi Chú Bên Dưới Thẻ Web */}
-                  <div className="mt-4 text-center text-[10px] text-slate-500 space-y-1">
-                    <div>📺 Mở link TV trên cùng Wi-Fi • 🎧 Hỗ trợ 24/7 trực tuyến</div>
-                    <div>© 2026 Mavryk Premium • Cổng Dịch Vụ Khách Hàng</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* 2. KHI CHỌN GIAO DIỆN MOBILE (IPHONE SMARTPHONE PREVIEW - CHUẨN GIAO DIỆN otp_portal CỦA MASTER) */
-              <div className="flex justify-center">
-                <div className="w-[330px] sm:w-[360px] bg-[#0c1017] rounded-[50px] p-3 border-[6px] border-slate-700/80 shadow-2xl relative select-none">
-                  {/* Dynamic Island iPhone */}
-                  <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-30 flex items-center justify-between px-2.5">
-                    <div className="w-2 h-2 rounded-full bg-slate-900 border border-slate-800" />
-                    <div className="w-2 h-2 rounded-full bg-blue-950/60" />
-                  </div>
-
-                  {/* Màn hình điện thoại iPhone */}
-                  <div className="bg-[#0e0717] rounded-[40px] overflow-hidden flex flex-col h-[600px] text-white font-sans text-xs relative border border-slate-800/80">
-                    {/* Status Bar: Giờ 9:41, Pin, Sóng */}
-                    <div className="pt-3 px-6 pb-1.5 flex items-center justify-between text-[11px] font-semibold text-slate-300 shrink-0 bg-[#0e0717]/90 z-20">
-                      <span>9:41</span>
-                      <div className="flex items-center gap-1.5 text-[10px]">
-                        <span>5G</span>
-                        <span className="w-4 h-2 rounded-sm border border-slate-300 inline-block p-0.5">
-                          <span className="w-full h-full bg-white block rounded-xs" />
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Mobile Safari URL Bar */}
-                    <div className="px-3 py-1.5 bg-[#150a24] border-b border-amber-500/15 flex items-center gap-2 shrink-0 z-20">
-                      <div className="flex-1 bg-black/50 border border-amber-500/20 rounded-lg px-2.5 py-1 text-[10px] font-mono text-slate-300 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
-                          <span className="truncate">otp.mavrykpremium.com</span>
-                        </div>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
-                      </div>
-                      <RefreshCw className="w-3 h-3 text-slate-400 shrink-0" />
-                    </div>
-
-                    {/* Nội dung trang Web otp_portal bên trong iPhone (Có thể cuộn) */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gradient-to-b from-[#120722] via-[#1a0c30] to-[#0a0414] [scrollbar-width:none]">
-                      {/* Brand Header */}
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center font-black text-slate-950 text-[10px] shadow-sm">
-                            M
-                          </div>
-                          <div>
-                            <div className="text-[10px] font-black tracking-wider text-amber-200 uppercase leading-none">
-                              MAVRYK PREMIUM
-                            </div>
-                            <div className="text-[8px] text-slate-400 leading-none mt-0.5">Cổng Kích Hoạt Tự Động</div>
-                          </div>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          ● Trực Tuyến
-                        </span>
-                      </div>
-
-                      {/* Festival Title Stage Mobile */}
-                      <div className="text-center py-1 space-y-1">
-                        <div className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300 tracking-wider">
-                          ✨ RẰM THÁNG TÁM ĐOÀN VIÊN
-                        </div>
-                        <div className="text-base font-bold text-amber-100 font-serif leading-tight">
-                          Đêm hội trăng rằm
-                        </div>
-                        <div className="text-[10px] text-slate-400 italic">
-                          Trăng tròn sum vầy, hội ngộ bình an.
-                        </div>
-                      </div>
-
-                      {/* Mobile Card: Single-Interface Tương Tác Giống 100% Web */}
-                      <div className="bg-gradient-to-b from-[#1e1133]/90 via-[#170c29]/95 to-[#10071e]/95 border border-amber-500/30 rounded-2xl p-3 space-y-3 shadow-lg">
-                        {/* Service Switcher Tabs: Adobe vs Netflix */}
-                        <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => setWebPreviewTab("adobe")}
-                            className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${
-                              webPreviewTab === "adobe"
-                                ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
-                                : "text-slate-400 hover:text-white"
-                            }`}
-                          >
-                            <span className="w-3.5 h-3.5 rounded bg-black/20 flex items-center justify-center text-[9px] font-black">
-                              A
-                            </span>
-                            <span>Adobe</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setWebPreviewTab("netflix")}
-                            className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${
-                              webPreviewTab === "netflix"
-                                ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-sm"
-                                : "text-slate-400 hover:text-white"
-                            }`}
-                          >
-                            <Film className="w-3 h-3" />
-                            <span>Netflix</span>
-                          </button>
-                        </div>
-
-                        {/* Adobe Subform Mobile */}
-                        {webPreviewTab === "adobe" && (
-                          <div className="space-y-2.5">
-                            <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/15">
-                              <span className="text-[10px] font-bold text-amber-200/90 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                Adobe CC
-                              </span>
-
-                              <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-md text-[9px]">
-                                <button
-                                  type="button"
-                                  onClick={() => setWebPreviewSubForm(0)}
-                                  className={`px-2 py-0.5 rounded font-bold transition-all ${
-                                    webPreviewSubForm === 0
-                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                      : "text-slate-400 hover:text-white"
-                                  }`}
-                                >
-                                  Lấy TK
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setWebPreviewSubForm(1)}
-                                  className={`px-2 py-0.5 rounded font-bold transition-all ${
-                                    webPreviewSubForm === 1
-                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                      : "text-slate-400 hover:text-white"
-                                  }`}
-                                >
-                                  Nhận OTP
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* CHỈ HIỂN THỊ ĐƠN LẬP 1 FORM DUY NHẤT */}
-                            {webPreviewSubForm === 1 ? (
-                              /* Mobile Form 1: Nhận OTP */
-                              <div className="space-y-2.5 animate-in fade-in duration-150">
-                                <div className="relative">
-                                  <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400/60" />
-                                  <input
-                                    type="text"
-                                    readOnly
-                                    value="netlink.port.8315@colegiomontealto.us"
-                                    className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-8 pr-2 py-2 text-[10px] text-amber-100 font-mono focus:outline-none truncate"
-                                  />
-                                </div>
-
-                                <div className="flex gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => setWebPreviewSubForm(0)}
-                                    className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold border border-amber-500/20 bg-white/5 text-slate-300 flex items-center gap-0.5"
-                                  >
-                                    <ArrowLeft className="w-3 h-3" />
-                                    <span>TK</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-[10px] flex items-center justify-center gap-1 shadow-md hover:brightness-110 active:scale-98 transition-all"
-                                  >
-                                    <Zap className="w-3 h-3 fill-current" />
-                                    <span>Lấy Mã OTP Adobe</span>
-                                  </button>
-                                </div>
-
-                                <div className="p-2.5 rounded-xl border border-amber-500/30 bg-black/65 text-center space-y-2 shadow-md">
-                                  <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400">
-                                    MÃ XÁC MINH ADOBE
-                                  </div>
-
-                                  <div
-                                    onClick={() =>
-                                      handleCopyPreviewText("699211", "m_otp_digits", "Đã sao chép mã OTP: 699211!")
-                                    }
-                                    className="flex items-center justify-center gap-1.5 cursor-pointer py-0.5"
-                                    title="Bấm vào để sao chép mã ngay"
-                                  >
-                                    {["6", "9", "9", "2", "1", "1"].map((digit, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="w-8 h-10 rounded-lg bg-black/90 border border-amber-500/50 flex items-center justify-center text-lg font-black text-amber-300 font-mono shadow-sm"
-                                      >
-                                        {digit}
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleCopyPreviewText("699211", "m_otp_btn", "Đã sao chép mã OTP: 699211!")
-                                    }
-                                    className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px] uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                                  >
-                                    {copiedPreviewKey === "m_otp_btn" || copiedPreviewKey === "m_otp_digits" ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-slate-950 stroke-[3]" />
-                                        <span>ĐÃ SAO CHÉP MÃ!</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-3 h-3 text-slate-950 stroke-[2.5]" />
-                                        <span>SAO CHÉP MÃ (699211)</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              /* Mobile Form 0: Lấy Tài Khoản (Dạng Text có dòng mật khẩu) */
-                              <div className="space-y-2.5 animate-in fade-in duration-150">
-                                <div className="relative">
-                                  <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400/60" />
-                                  <input
-                                    type="text"
-                                    readOnly
-                                    value="customer.order.2026@gmail.com"
-                                    className="w-full bg-black/45 border border-amber-500/25 rounded-xl pl-8 pr-2 py-2 text-[10px] text-amber-100 font-mono focus:outline-none truncate"
-                                  />
-                                </div>
-
-                                <div className="flex gap-1.5">
-                                  <button
-                                    type="button"
-                                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-bold text-[10px] flex items-center justify-center gap-1 shadow-md hover:brightness-110 active:scale-98 transition-all"
-                                  >
-                                    <KeyRound className="w-3 h-3" />
-                                    <span>Tra Cứu</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setWebPreviewSubForm(1)}
-                                    className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold border border-amber-500/20 bg-white/5 text-slate-300 flex items-center gap-0.5"
-                                  >
-                                    <span>OTP</span>
-                                    <ArrowRight className="w-3 h-3" />
-                                  </button>
-                                </div>
-
-                                <div className="p-2.5 rounded-xl border border-amber-500/30 bg-black/65 space-y-1.5 text-[10px] shadow-md">
-                                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
-                                    <span className="font-bold text-slate-300 uppercase flex items-center gap-1 text-[9px]">
-                                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                      <span>TÀI KHOẢN CẤP</span>
-                                    </span>
-                                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                      HOẠT ĐỘNG
-                                    </span>
-                                  </div>
-
-                                  <div className="space-y-1 text-[9.5px]">
-                                    {/* Dòng Email */}
-                                    <div className="flex items-center justify-between p-1.5 rounded-lg border border-amber-500/20 bg-black/40">
-                                      <span className="truncate max-w-[190px] font-mono text-amber-100 font-bold">
-                                        netlink.port.8315@colegiomontealto.us
+                                    <>
+                                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                                      <span className="text-[11px] truncate">
+                                        {result.message || "Không tìm thấy thư mới hoặc mã OTP."}
                                       </span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleCopyPreviewText(
-                                            "netlink.port.8315@colegiomontealto.us",
-                                            "m_acc_email",
-                                            "Đã chép Email Adobe!"
-                                          )
-                                        }
-                                        className="p-0.5 text-amber-400"
-                                      >
-                                        {copiedPreviewKey === "m_acc_email" ? (
-                                          <Check className="w-3 h-3 text-emerald-400" />
-                                        ) : (
-                                          <Copy className="w-3 h-3" />
-                                        )}
-                                      </button>
-                                    </div>
-
-                                    {/* Dòng MẬT KHẨU */}
-                                    <div className="flex items-center justify-between p-1.5 rounded-lg border border-amber-500/20 bg-black/40">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-slate-400 text-[8.5px] uppercase font-semibold">
-                                          Mật khẩu:
+                                      {result.duration_ms && (
+                                        <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                          ⏱️ {result.duration_ms}ms
                                         </span>
-                                        <span className="font-mono font-bold text-amber-300">
-                                          Mavryk@2026!#
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleCopyPreviewText(
-                                            "Mavryk@2026!#",
-                                            "m_acc_pass",
-                                            "Đã chép Mật khẩu Adobe!"
-                                          )
-                                        }
-                                        className="p-0.5 text-amber-400"
-                                      >
-                                        {copiedPreviewKey === "m_acc_pass" ? (
-                                          <Check className="w-3 h-3 text-emerald-400" />
-                                        ) : (
-                                          <Copy className="w-3 h-3" />
-                                        )}
-                                      </button>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-[8.5px] text-slate-400 px-0.5">
-                                      <span>Adobe All Apps 1 Năm</span>
-                                      <span>Hạn: 04/11/2027</span>
-                                    </div>
-                                  </div>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
 
-                        {/* Netflix Mobile */}
-                        {webPreviewTab === "netflix" && (
-                          <div className="space-y-2.5 animate-in fade-in duration-150">
-                            <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/15">
-                              <span className="text-[10px] font-bold text-amber-200/90 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                Netflix
-                              </span>
-
-                              <div className="flex p-0.5 bg-black/40 border border-amber-500/20 rounded-md text-[8.5px]">
-                                <button
-                                  type="button"
-                                  onClick={() => setWebPreviewNetflixSubTab(0)}
-                                  className={`px-1.5 py-0.5 rounded font-bold ${
-                                    webPreviewNetflixSubTab === 0
-                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                      : "text-slate-400 hover:text-white"
-                                  }`}
-                                >
-                                  Link TV
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setWebPreviewNetflixSubTab(1)}
-                                  className={`px-1.5 py-0.5 rounded font-bold ${
-                                    webPreviewNetflixSubTab === 1
-                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                      : "text-slate-400 hover:text-white"
-                                  }`}
-                                >
-                                  Mã 6 Số
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setWebPreviewNetflixSubTab(2)}
-                                  className={`px-1.5 py-0.5 rounded font-bold ${
-                                    webPreviewNetflixSubTab === 2
-                                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950"
-                                      : "text-slate-400 hover:text-white"
-                                  }`}
-                                >
-                                  OTP
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Netflix Mobile Subforms */}
-                            {webPreviewNetflixSubTab === 0 && (
-                              <div className="space-y-2">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  value="premium.family@netflix.com"
-                                  className="w-full bg-black/45 border border-amber-500/25 rounded-xl px-2.5 py-1.5 text-[10px] text-amber-100 font-mono truncate"
-                                />
-                                <button
-                                  type="button"
-                                  className="w-full py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px]"
-                                >
-                                  Lấy Link Xác Minh TV
-                                </button>
-                                <div className="p-2 rounded-xl border border-amber-500/30 bg-black/65 flex items-center justify-between text-[9px]">
-                                  <span className="font-mono text-amber-200 truncate max-w-[190px]">
-                                    netflix.com/verify?token=...
-                                  </span>
+                                {result.success && result.otp && (
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      handleCopyPreviewText(
-                                        "https://www.netflix.com/account/travel/verify?token=nf_99182a",
-                                        "m_nf_link",
-                                        "Đã sao chép link Netflix!"
-                                      )
-                                    }
-                                    className="p-0.5 text-amber-400"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(String(result.otp));
+                                      setCopiedOtpKey(slot.slot_key);
+                                      showToast("success", `Đã sao chép mã: ${result.otp}`);
+                                      setTimeout(() => setCopiedOtpKey(null), 2000);
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1 shrink-0 transition-colors"
                                   >
-                                    {copiedPreviewKey === "m_nf_link" ? (
-                                      <Check className="w-3 h-3 text-emerald-400" />
+                                    {isCopied ? (
+                                      <>
+                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Đã chép</span>
+                                      </>
                                     ) : (
-                                      <Copy className="w-3 h-3" />
+                                      <>
+                                        <Copy className="w-3.5 h-3.5" />
+                                        <span>Chép mã</span>
+                                      </>
                                     )}
                                   </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {webPreviewNetflixSubTab === 1 && (
-                              <div className="space-y-2 text-center">
-                                <div className="text-[9px] font-bold text-amber-400">MÃ 6 SỐ NETFLIX</div>
-                                <div className="flex justify-center gap-1">
-                                  {["4", "8", "1", "0", "9", "3"].map((d, i) => (
-                                    <div
-                                      key={i}
-                                      className="w-7 h-9 rounded-md bg-black/90 border border-amber-500/50 flex items-center justify-center font-bold text-base text-amber-300 font-mono"
-                                    >
-                                      {d}
-                                    </div>
-                                  ))}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCopyPreviewText("481093", "m_nf_6", "Đã sao chép mã Netflix: 481093!")
-                                  }
-                                  className="w-full py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px]"
-                                >
-                                  SAO CHÉP MÃ (481093)
-                                </button>
-                              </div>
-                            )}
-
-                            {webPreviewNetflixSubTab === 2 && (
-                              <div className="space-y-2 text-center">
-                                <div className="text-[9px] font-bold text-amber-400">MÃ ĐĂNG NHẬP NETFLIX</div>
-                                <div className="flex justify-center gap-1">
-                                  {["7", "2", "9", "5"].map((d, i) => (
-                                    <div
-                                      key={i}
-                                      className="w-8 h-9 rounded-md bg-black/90 border border-amber-500/50 flex items-center justify-center font-bold text-base text-amber-300 font-mono"
-                                    >
-                                      {d}
-                                    </div>
-                                  ))}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCopyPreviewText("7295", "m_nf_4", "Đã sao chép mã đăng nhập: 7295!")
-                                  }
-                                  className="w-full py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-[10px]"
-                                >
-                                  SAO CHÉP MÃ (7295)
-                                </button>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
+                        </td>
 
-                        <div className="pt-0.5 flex items-center justify-center gap-1 text-[9px] text-amber-400/80">
-                          <ShieldCheck className="w-3 h-3" />
-                          <span>Bảo mật 256–Bit SSL</span>
-                        </div>
-                      </div>
-
-                      {/* Footer Ghi Chú Mobile */}
-                      <div className="text-center text-[8.5px] text-slate-500 space-y-0.5 pt-1 pb-3">
-                        <div>📺 Mở link TV trên cùng Wi-Fi • 🎧 Hỗ trợ 24/7</div>
-                        <div>© 2026 Mavryk Premium</div>
-                      </div>
-                    </div>
-
-                    {/* Vạch Home Indicator iPhone */}
-                    <div className="pb-1 pt-1 flex justify-center bg-[#0e0717] shrink-0 border-t border-slate-900">
-                      <div className="w-28 h-1 bg-slate-500 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                        {/* 6. THAO TÁC TẮT/MỞ TRÊN WEB */}
+                        <td className="py-4 px-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={slot.enabled}
+                                onChange={() => handleToggleSlotEnabled(slot.slot_key)}
+                                className="sr-only"
+                              />
+                              <div
+                                className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-1 ${
+                                  slot.enabled ? "bg-emerald-500" : "bg-slate-700"
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                                    slot.enabled ? "translate-x-5" : "translate-x-0"
+                                  }`}
+                                />
+                              </div>
+                            </label>
+                            <span className="text-[11px] font-semibold text-slate-400 min-w-[50px] text-left">
+                              {slot.enabled ? "Bật" : "Tắt"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+        )}
+
+        {/* NỘI DUNG TAB 2: QUẢN LÝ CHI TIẾT CÁC CỔNG API TRONG DATABASE */}
+        {activeMainTab === "api_manager" && (
+          <div className="space-y-5 animate-in fade-in duration-200">
+            {/* Banner Header Quản lý API */}
+            <div className="bg-gradient-to-r from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-500/30 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-md">
+              <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-cyan-500/10 to-transparent pointer-events-none" />
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 shadow-lg shadow-cyan-500/10">
+                    <Database className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-lg font-bold text-white tracking-wide">
+                        Bảng Quản Lý Danh Sách Cổng API Bên Thứ 3
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        DATABASE: external_api_configs
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                      Xem và chỉnh sửa trực tiếp thông tin các cột trong database (Mã Key, Tên hiển thị, URL máy chủ, Khóa bí mật Secret, Data mapping).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm cổng API..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 w-48 sm:w-60"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-cyan-600/20 active:scale-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Thêm Cổng Mới</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* BẢNG CHI TIẾT CÁC CỘT DATABASE - TOÀN KHUNG 100%, KHÔNG SCROLL NGANG */}
+            <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md">
+              <div className="w-full">
+                <table className="w-full table-fixed text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <th className="py-3.5 px-2 text-center w-[4%]">STT</th>
+                      <th className="py-3.5 px-2.5 w-[16%]">Tên Cổng & Logo</th>
+                      <th className="py-3.5 px-2.5 w-[18%]">Mã Định Danh (KEY)</th>
+                      <th className="py-3.5 px-2.5 w-[18%]">Đường Dẫn Máy Chủ (URL)</th>
+                      <th className="py-3.5 px-2 text-center w-[9%]">Khóa Bí Mật (SECRET)</th>
+                      <th className="py-3.5 px-2.5 w-[20%]">Bóc Tách (DATA)</th>
+                      <th className="py-3.5 px-2 text-center w-[7%]">Trạng Thái</th>
+                      <th className="py-3.5 px-2 text-center w-[8%]">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {configs.map((cfg, idx) => {
+                      const isOnline = cfg.is_active;
+                      const hasSecret = Boolean(cfg.auth_config?.token || cfg.auth_config?.api_key);
+                      const isPinging = pingingId === cfg.id;
+
+                      return (
+                        <tr key={cfg.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-2 text-center font-bold text-slate-500 text-xs">
+                            {idx + 1}
+                          </td>
+
+                          {/* 1. TÊN CỔNG & LOGO (16% - Thu gọn thanh lịch) */}
+                          <td className="py-3 px-2.5 overflow-hidden">
+                            <div className="flex items-center gap-2 min-w-0" title={cfg.description ? `${cfg.service_name} (${cfg.description})` : cfg.service_name}>
+                              <div className="w-8 h-8 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 p-1 shadow-md">
+                                {renderConfigIcon(cfg)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-bold text-white text-xs truncate">
+                                  {cfg.service_name}
+                                </div>
+                                <div className="mt-0.5">
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-cyan-400 border border-slate-700">
+                                    {cfg.category || "OTP"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 2. MÃ ĐỊNH DANH KEY (18% - Rộng rãi, trọn vẹn 100%) */}
+                          <td className="py-3 px-2.5 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(cfg.service_key);
+                                showToast("success", `Đã sao chép key: ${cfg.service_key}`);
+                              }}
+                              className="w-full px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-cyan-300 font-mono text-[11px] font-bold inline-flex items-center justify-between gap-1 hover:border-cyan-500/40 hover:bg-slate-900 transition-all group"
+                              title={`Click để sao chép key: ${cfg.service_key}`}
+                            >
+                              <span className="truncate">{cfg.service_key}</span>
+                              <Copy className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 transition-colors shrink-0" />
+                            </button>
+                          </td>
+
+                          {/* 3. ĐƯỜNG DẪN MÁY CHỦ URL (18% - Thu gọn vừa vặn) */}
+                          <td className="py-3 px-2.5 overflow-hidden">
+                            <div className="flex items-center gap-1.5 font-mono text-[11px] min-w-0" title={cfg.base_url}>
+                              <span className="px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/30 text-[10px] shrink-0">
+                                {cfg.auth_config?.method || "POST"}
+                              </span>
+                              <span className="text-slate-200 font-semibold truncate select-all">
+                                {cfg.base_url}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* 4. KHÓA BÍ MẬT SECRET (9% - Căn giữa) */}
+                          <td className="py-3 px-2 text-center overflow-hidden">
+                            {hasSecret ? (
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-mono">
+                                <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                                <span>••••••</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic">
+                                Công khai
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 5. BÓC TÁCH DỮ LIỆU DATA (20% - Mở rộng hiển thị rõ từng trường) */}
+                          <td className="py-3 px-2.5 overflow-hidden">
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              {Array.isArray(cfg.field_mapping) && cfg.field_mapping.length > 0 ? (
+                                cfg.field_mapping.map((f: any, fIdx: number) => (
+                                  <div key={fIdx} className="flex items-center gap-1 text-[10px] truncate" title={`${f.key || f.label}: ${f.path}`}>
+                                    <span className="text-amber-400 font-bold shrink-0">🎯 {f.key || f.label}:</span>
+                                    <span className="font-mono text-slate-400 truncate">{f.path}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-slate-500 italic">Mặc định (Auto-detect)</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 6. TRẠNG THÁI (7% - Căn giữa) */}
+                          <td className="py-3 px-2 text-center overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleApiActive(cfg)}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                                cfg.is_active
+                                  ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
+                                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.is_active ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                              <span>{cfg.is_active ? "Bật" : "Tắt"}</span>
+                            </button>
+                          </td>
+
+                          {/* 7. THAO TÁC (8% - Căn giữa) */}
+                          <td className="py-3 px-2 text-center overflow-hidden">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handlePingTest(cfg.id)}
+                                disabled={isPinging}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-300 text-slate-400 border border-slate-700/60 transition-all disabled:opacity-50"
+                                title="Ping kiểm tra kết nối"
+                              >
+                                <Zap className={`w-3.5 h-3.5 ${isPinging ? "animate-spin text-amber-400" : ""}`} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setEditModalConfig({ ...cfg })}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-500/20 hover:text-cyan-300 text-slate-400 border border-slate-700/60 transition-all"
+                                title="Chỉnh sửa cấu hình cổng này"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteConfig(cfg.id, cfg.service_name)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700/60 transition-all"
+                                title="Xóa cổng này khỏi database"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    )}
+
+
+  
+      {/* MODAL SỬA CỔNG DỊCH VỤ API (DATABASE CRUD) */}
+      {editModalConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-cyan-400">
+                  <Edit className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Chỉnh Sửa Cổng API #{editModalConfig.id}</h3>
+                  <p className="text-xs text-slate-400">Sửa đổi trực tiếp các cột lưu trong bảng database</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEditModalConfig(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* 1. TÊN CỔNG & DANH MỤC */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Tên Cổng Hiển Thị (Name)</label>
+                  <input
+                    type="text"
+                    value={editModalConfig.service_name}
+                    onChange={(e) => setEditModalConfig({ ...editModalConfig, service_name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500/60 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Danh Mục (Category)</label>
+                  <select
+                    value={editModalConfig.category || "OTP"}
+                    onChange={(e) => setEditModalConfig({ ...editModalConfig, category: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-cyan-500/60 font-semibold"
+                  >
+                    <option value="ADOBE">ADOBE</option>
+                    <option value="NETFLIX">NETFLIX</option>
+                    <option value="CHATGPT">CHATGPT</option>
+                    <option value="2FA">2FA / TOTP</option>
+                    <option value="OTP">OTP CHUNG</option>
+                    <option value="OTHER">KHÁC</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 2. MÃ KEY ĐỊNH DANH */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">Mã Định Danh (KEY - Dùng để gán vào ô)</label>
+                <input
+                  type="text"
+                  value={editModalConfig.service_key}
+                  onChange={(e) => setEditModalConfig({ ...editModalConfig, service_key: e.target.value.trim().toLowerCase() })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-cyan-300 font-mono focus:outline-none focus:border-cyan-500/60 font-bold"
+                />
+              </div>
+
+              {/* 3. URL MÁY CHỦ */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">Đường Dẫn Máy Chủ (Base URL)</label>
+                <input
+                  type="text"
+                  value={editModalConfig.base_url}
+                  onChange={(e) => setEditModalConfig({ ...editModalConfig, base_url: e.target.value.trim() })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-cyan-500/60 text-[11px]"
+                />
+              </div>
+
+              {/* 4. KHÓA BẢO MẬT (SECRET) */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">Khóa Bí Mật / Token (SECRET - Để trống nếu công khai)</label>
+                <input
+                  type="password"
+                  placeholder="Nhập Bearer Token, API Key hoặc Secret của NCC..."
+                  value={editModalConfig.auth_config?.token || editModalConfig.auth_config?.api_key || ""}
+                  onChange={(e) =>
+                    setEditModalConfig({
+                      ...editModalConfig,
+                      auth_config: {
+                        ...(editModalConfig.auth_config || {}),
+                        token: e.target.value,
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-amber-300 font-mono focus:outline-none focus:border-cyan-500/60 text-[11px]"
+                />
+              </div>
+
+              {/* 5. MÔ TẢ */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">Mô Tả Ghi Chú</label>
+                <input
+                  type="text"
+                  value={editModalConfig.description || ""}
+                  onChange={(e) => setEditModalConfig({ ...editModalConfig, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 focus:outline-none focus:border-cyan-500/60"
+                  placeholder="Ghi chú về nguồn cung cấp hoặc đơn vị cấp API..."
+                />
+              </div>
+
+              {/* 6. SWITCH TRẠNG THÁI */}
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 border border-slate-800">
+                <div>
+                  <div className="font-bold text-white">Kích Hoạt Cổng Này</div>
+                  <div className="text-[11px] text-slate-400">Cho phép các ô input sử dụng API này để lấy mã</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editModalConfig.is_active}
+                    onChange={(e) => setEditModalConfig({ ...editModalConfig, is_active: e.target.checked })}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-1 ${
+                      editModalConfig.is_active ? "bg-emerald-500" : "bg-slate-700"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                        editModalConfig.is_active ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* BUTTONS */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setEditModalConfig(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditModal}
+                disabled={savingEditModal}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-600/25 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>{savingEditModal ? "Đang Lưu..." : "Lưu Thay Đổi"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL 1: THỬ LẤY OTP TRỰC TIẾP (LIVE OTP PROBE) */}
       {showOtpModal && (

@@ -64,9 +64,15 @@ const THEMES_LIST: ThemeItem[] = [
   { id: "giang-sinh", season: "winter", name: "Giáng Sinh Noel", icon: "🎄", badge: "24 Tháng 12", title: "Mùa an lành", subtitle: "Để yêu thương sưởi ấm mùa đông.", accent: "#efcf91" },
   // Core
   { id: "modern", season: "modern", name: "Cyber Core", icon: "⚡", badge: "Mavryk Standard", title: "Kết nối trong an tâm", subtitle: "Bảo vệ từng kết nối của bạn.", accent: "#00f0ff" },
+  // 4 Mùa Anime Cinematic
+  { id: "season-spring", season: "spring", name: "Mùa Xuân Anime", icon: "🌸", badge: "Xuân Khởi Sắc", title: "Xuân khởi sắc", subtitle: "Bình minh dịu, cánh hoa anh đào và thung lũng anime.", accent: "#f4a8c0" },
+  { id: "season-summer", season: "summer", name: "Mùa Hạ Anime", icon: "☀️", badge: "Hạ Rực Rỡ", title: "Hạ rực rỡ", subtitle: "Nắng xanh, đồng lúa bao la và đom đóm lấp lánh.", accent: "#7fd7d2" },
+  { id: "season-autumn", season: "autumn", name: "Mùa Thu Anime", icon: "🍁", badge: "Thu Đoàn Viên", title: "Thu đoàn viên", subtitle: "Phố cổ, nắng mật ong và sắc lá phong chao lượn.", accent: "#e9aa68" },
+  { id: "season-winter", season: "winter", name: "Mùa Đông Anime", icon: "❄️", badge: "Đông Ấm Áp", title: "Đông ấm áp", subtitle: "Làng núi, tuyết trắng tinh khôi và những ô cửa ấm.", accent: "#9fd5ef" },
 ];
 
 export const OtpThemeConfigPage: React.FC = () => {
+  const [themesList, setThemesList] = useState<ThemeItem[]>(THEMES_LIST);
   const [mode, setMode] = useState<"auto" | "fixed">("auto");
   const [selectedTheme, setSelectedTheme] = useState<string>("modern");
   const [activeSeason, setActiveSeason] = useState<SeasonFilter>("all");
@@ -74,6 +80,18 @@ export const OtpThemeConfigPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Tự động đồng bộ toàn bộ Themes mới nhất từ Backend SSOT Catalog (/api/public/themes)
+  useEffect(() => {
+    fetch("/api/public/themes")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.themes && Array.isArray(data.themes) && data.themes.length > 0) {
+          setThemesList(data.themes);
+        }
+      })
+      .catch((err) => console.log("Sử dụng fallback danh mục theme nội bộ:", err));
+  }, []);
 
   // Trạng thái tháng/năm cho Lịch Âm Dương
   const now = new Date();
@@ -177,14 +195,14 @@ export const OtpThemeConfigPage: React.FC = () => {
   }, [calYear, calMonth]);
 
   const filteredThemes = activeSeason === "all"
-    ? THEMES_LIST
-    : THEMES_LIST.filter((t) => t.season === activeSeason);
+    ? themesList
+    : themesList.filter((t) => t.season === activeSeason);
 
-  const activeThemeMeta = THEMES_LIST.find((t) => t.id === selectedTheme) || THEMES_LIST[0];
+  const activeThemeMeta = themesList.find((t) => t.id === selectedTheme) || themesList[0] || THEMES_LIST[0];
 
   // Lấy thông tin theme của ngày đang click trên lịch
   const activeCellTheme = selectedDayCell?.holidayTheme
-    ? THEMES_LIST.find((t) => t.id === selectedDayCell.holidayTheme?.themeKey) || null
+    ? themesList.find((t) => t.id === selectedDayCell.holidayTheme?.themeKey) || null
     : null;
 
   return (
@@ -311,7 +329,7 @@ export const OtpThemeConfigPage: React.FC = () => {
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>24 Themes Presets</span>
+            <span>Bộ Sưu Tập ({themesList.length} Themes)</span>
           </button>
         </div>
 
@@ -622,11 +640,11 @@ export const OtpThemeConfigPage: React.FC = () => {
             <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 shrink-0">
               <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-900/90 border border-slate-800">
                 {[
-                  { id: "all", label: "Tất cả (24)" },
-                  { id: "spring", label: "Mùa Xuân (8)" },
-                  { id: "summer", label: "Mùa Hạ (6)" },
-                  { id: "autumn", label: "Mùa Thu (5)" },
-                  { id: "winter", label: "Mùa Đông (4)" },
+                  { id: "all", label: `Tất cả (${themesList.length})` },
+                  { id: "spring", label: `Mùa Xuân (${themesList.filter((t) => t.season === "spring").length})` },
+                  { id: "summer", label: `Mùa Hạ (${themesList.filter((t) => t.season === "summer").length})` },
+                  { id: "autumn", label: `Mùa Thu (${themesList.filter((t) => t.season === "autumn").length})` },
+                  { id: "winter", label: `Mùa Đông (${themesList.filter((t) => t.season === "winter").length})` },
                   { id: "modern", label: "Cyber Core" },
                 ].map((tab) => (
                   <button

@@ -90,16 +90,11 @@ function registerTelegramSubscriber() {
     }
   });
 
-  // 5. Lắng nghe Event Thay Đổi Cấu Hình Hệ Thống
+  // 5. Lắng nghe Event Thay Đổi Cấu Hình Hệ Thống -> Chỉ log nội bộ, không spam Telegram
   eventBus.on(eventTypes.SYSTEM_CONFIG_UPDATED, async (configData) => {
-    try {
-      console.log(`[TelegramSubscriber] Nhận sự kiện SYSTEM_CONFIG_UPDATED: ${configData.summary}`);
-      if (typeof systemNotifier?.notifyCritical === 'function') {
-        systemNotifier.notifyCritical(`⚙️ [SYSTEM CONFIG] ${configData.summary}`);
-      }
-    } catch (err) {
-      console.error("[TelegramSubscriber] Lỗi khi xử lý SYSTEM_CONFIG_UPDATED:", err.message);
-    }
+    const key = configData?.key || "N/A";
+    const actor = configData?.updated_by || "Admin";
+    console.log(`[TelegramSubscriber] Cấu hình hệ thống [${key}] đã được cập nhật bởi [${actor}].`);
   });
 
   console.log("✅ [EventBus] Telegram Event Subscriber registered successfully.");
