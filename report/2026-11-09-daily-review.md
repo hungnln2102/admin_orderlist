@@ -364,3 +364,28 @@
   - Không gây xung đột với bất kỳ file nào Master đang làm dở trên worktree.
 
 - **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT VÀ KIỂM CHỨNG TOÀN DIỆN.
+
+## [00:55 Asia/Bangkok] Khởi tạo Script Triển Khai Tự Động deploy.sh cho OTP Portal (otp.mavrykpremium.com)
+
+- **Phạm vi & Chỉ đạo của Master**:
+  - Tạo script triển khai tự động [`deploy.sh`](file:///e:/Project/admin_store/otp_portal/deploy.sh) cho dự án độc lập [`otp_portal`](file:///e:/Project/admin_store/otp_portal), tương thích máy chủ Linux phục vụ domain `otp.mavrykpremium.com`.
+  - Hỗ trợ đầy đủ các bước: Kiểm tra an toàn Git worktree, kéo code mới (`git pull origin main`), đồng bộ Git Submodule `.agents` (`core-agents`), cài đặt thư viện (`npm install`), build production (`tsc && vite build`), đồng bộ tài sản web sang `/var/www/otp_portal` và tự động reload Host Nginx (hoặc khởi động lại PM2 nếu chạy port 3005).
+
+- **Thay đổi kỹ thuật**:
+  - [`otp_portal/deploy.sh`](file:///e:/Project/admin_store/otp_portal/deploy.sh):
+    + Viết mới shell script chuẩn POSIX/Bash với `set -euo pipefail`.
+    + Bước 1: Kiểm tra Node.js & npm runtime.
+    + Bước 2: Kiểm tra Git worktree sạch; tự động stash thay đổi nếu có; pull code mới nhất theo nhánh hiện hành; đồng bộ submodules `.agents`.
+    + Bước 3: Cài đặt dependencies (`npm ci` hoặc `npm install --prefer-offline --no-audit`), hỗ trợ cờ `--clean` dọn dẹp node_modules khi cần.
+    + Bước 4: Build bản sản xuất (`npm run build`), kiểm tra tính toàn vẹn của `dist/index.html`.
+    + Bước 5: Triển khai web assets sang `TARGET_WEB_ROOT` (mặc định `/var/www/otp_portal`) bằng `rsync`/`cp`.
+    + Bước 6: Kiểm tra cú pháp Nginx (`sudo nginx -t`) và reload an toàn (`sudo systemctl reload nginx`), hoặc khởi động lại tiến trình PM2 `otp-portal`.
+  - [`otp_portal/README.md`](file:///e:/Project/admin_store/otp_portal/README.md):
+    + Bổ sung phần hướng dẫn triển khai sản xuất với `./deploy.sh`, `./deploy.sh --no-pull`, và `./deploy.sh --clean`.
+
+- **Kiểm tra Verification Gates**:
+  - Shell Syntax Check: `bash -n deploy.sh` qua Git Bash $\rightarrow$ **Cú pháp hợp lệ 100%, 0 lỗi**.
+  - Production Build: `npm --prefix e:/Project/admin_store/otp_portal run build` $\rightarrow$ **0 lỗi TypeScript, 1.587 modules transformed, Vite build thành công trong 1.95s**.
+  - Không gây side effect hay xung đột với bất kỳ file nào trên hệ thống.
+
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT VÀ BÀN GIAO CHO MASTER.
