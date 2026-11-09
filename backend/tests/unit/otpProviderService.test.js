@@ -33,7 +33,7 @@ test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign
     assert.equal(options.headers["Content-Type"], "application/x-www-form-urlencoded");
 
     if (String(url).endsWith("/household.php")) {
-      return new Response('<a href="https://www.netflix.com/account/travel/verify?nftoken=abc&amp;messageGuid=xyz"><span>Get Code</span></a>', { status: 200 });
+      return new Response('<b>Sent:</b> Sunday, October 25, 2026 4:12:17 AM (UTC+00:00) Monrovia, Reykjavik<br><a href="https://www.netflix.com/account/travel/verify?nftoken=abc&amp;messageGuid=xyz"><span>Nhận mã</span></a>', { status: 200 });
     }
     if (String(url).endsWith("/six_digit_login.php")) {
       return new Response('<div class="success-box">123456</div>', { status: 200 });
@@ -60,6 +60,7 @@ test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign
     }, "user@example.com");
 
     assert.equal(household.extra_fields.find((field) => field.key === "netflix_link")?.value, "https://www.netflix.com/account/travel/verify?nftoken=abc&messageGuid=xyz");
+    assert.equal(household.extra_fields.find((field) => field.key === "sent_time")?.value, "11:12:17 25/10/2026 (UTC+7)");
     assert.equal(household.otp, null);
     assert.equal(household.extra_fields.some((field) => field.key === "otp"), false);
     assert.equal(sixDigit.otp, "123456");

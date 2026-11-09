@@ -206,6 +206,9 @@ async function dispatchSlotRequest({ slotKey, input }) {
     }
   }
 
+  const netflixLink = probeResult?.netflix_link || probeResult?.extra_fields?.find((f) => f.key === "netflix_link")?.value || null;
+  const sentTime = probeResult?.sent_time || probeResult?.extra_fields?.find((f) => f.key === "sent_time")?.value || null;
+
   return {
     success: true,
     slot_key: slotKey,
@@ -216,6 +219,8 @@ async function dispatchSlotRequest({ slotKey, input }) {
     input: cleanInput,
     data: accountData,
     otp: probeResult?.otp || null,
+    link: netflixLink,
+    sent_time: sentTime,
     found: Boolean(probeResult?.found),
     duration_ms: probeResult?.duration_ms || 0,
     extra_fields: probeResult?.extra_fields || [],

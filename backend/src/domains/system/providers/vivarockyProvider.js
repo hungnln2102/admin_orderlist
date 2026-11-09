@@ -2,6 +2,43 @@ const { requestProviderApi } = require("./providerRequest");
 const { readExternalResponse } = require("@/utils/safeExternalRequest");
 const { extractOtpCode } = require("./otpProviderUtils");
 
+function parseUtcToUtc7(rawStr) {
+  if (!rawStr) return null;
+  const raw = String(rawStr).trim();
+  const cleanText = raw.replace(/<[^>]+>/g, '').trim();
+
+  // Chuyển chuỗi định dạng "Sunday, October 25, 2026 4:12:17 AM (UTC+00:00) Monrovia, Reykjavik" sang UTC
+  let cleaned = cleanText
+    .replace(/^[A-Za-z]+,\s*/, '')
+    .replace(/\s*\([^\)]*\).*$/, ' UTC')
+    .trim();
+
+  let ts = Date.parse(cleaned);
+  if (Number.isNaN(ts)) {
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(cleanText)) {
+      const iso = cleanText.replace(' ', 'T').replace(/Z?$/, 'Z');
+      ts = Date.parse(iso);
+    }
+  }
+  if (Number.isNaN(ts)) {
+    ts = Date.parse(cleanText);
+  }
+  if (Number.isNaN(ts)) return cleanText;
+
+  const d = new Date(ts);
+  const formatted = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(d);
+  return `${formatted} (UTC+7)`;
+}
+
 async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, serviceKey = 'vivarocky_household', type = 'household', accessCode = '', includeDetails = false } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
 
@@ -65,7 +102,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
     }
 
     const nftokenMatch = html.match(/href=["']([^"']*[?&](?:nftoken|messageGuid)=[^"']+)["']/i);
-    const buttonTextMatch = html.match(/<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]{0,400}?(?:Get\s+Code|Lấy\s+mã|Lay\s+ma)[\s\S]{0,200}?<\/a>/i);
+    const buttonTextMatch = html.match(/<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]{0,400}?(?:Get\s+Code|Lấy\s+mã|Lay\s+ma|Nhận\s+mã|Nhan\s+ma)[\s\S]{0,200}?<\/a>/i);
     const travelVerifyMatch = html.match(/href=["'](https?:\/\/[^"']*\/(?:account\/travel\/verify|travel\/verify)[^"']*)["']/i);
     const linkMatch =
       nftokenMatch ||
@@ -77,6 +114,19 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
     const netflixLink = resolvedType === 'household' && linkMatch?.[1]
       ? linkMatch[1].replace(/&amp;/gi, '&').replace(/&#38;/g, '&').replace(/&#x26;/gi, '&').trim()
       : null;
+
+    let sentTime = null;
+    if (resolvedType === 'household') {
+      const sentMatch = html.match(/(?:<b>\s*)?Sent:\s*(?:<\/b>\s*)?([^\r\n<]+)/i) || html.match(/Sent:\s*([^\r\n<]+)/i);
+      if (sentMatch?.[1]) {
+        sentTime = parseUtcToUtc7(sentMatch[1].trim());
+      } else {
+        const dateMatch = html.match(/<p><strong>Date:<\/strong>\s*([^\r\n<]+)<\/p>/i) || html.match(/Date:\s*([^\r\n<]+)/i);
+        if (dateMatch?.[1]) {
+          sentTime = parseUtcToUtc7(dateMatch[1].trim());
+        }
+      }
+    }
 
     let foundOtp = null;
     if (resolvedType !== 'household') {
@@ -112,6 +162,14 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
         path: 'netflix_link'
       });
     }
+    if (sentTime) {
+      extraFields.push({
+        key: 'sent_time',
+        label: 'Thời gian gửi',
+        value: sentTime,
+        path: 'sent_time'
+      });
+    }
     if (foundOtp) {
       extraFields.push({
         key: 'otp',
@@ -132,9 +190,10 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
     const result = {
       otp: foundOtp,
       netflix_link: netflixLink,
+      sent_time: sentTime,
       extra_fields: extraFields,
       error_message: errorMessage,
-      raw_data: { html_snippet: html.slice(0, 1000) }
+      raw_data: { html_snippet: html.slice(0, 1000), netflix_link: netflixLink, sent_time: sentTime }
     };
 
     if (includeDetails) return result;
@@ -148,4 +207,4 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
   }
 }
 
-module.exports = { fetchOtpFromVivaRocky };
+module.exports = { fetchOtpFromVivaRocky, parseUtcToUtc7 };

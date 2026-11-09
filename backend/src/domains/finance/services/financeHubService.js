@@ -373,6 +373,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       db.raw("COALESCE(SUM(dashboard_orders_count), 0)::int as count"),
       db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as total_revenue"),
       db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost"),
+      db.raw("COALESCE(SUM(slot_vacant_cost), 0)::numeric as total_slot_vacant_cost"),
       db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as total_refund")
     )
     .first();
@@ -391,13 +392,15 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
 
   const totalExternalImport = toNumber(expenseStats?.total_external_import || 0);
   const totalMonthlyExpense = toNumber(expenseStats?.total_monthly_expense || 0);
-  const totalOperationalExpenses = toNumber(expenseStats?.total_all_expenses || 0);
+  const totalPostedOperationalExpenses = toNumber(expenseStats?.total_all_expenses || 0);
 
   const shopOrdersCount = Number(summaryStats?.count || 0);
   const shopRevenue = toNumber(summaryStats?.total_revenue || 0);
   const shopCogs = toNumber(summaryStats?.total_cost || 0);
+  const totalSlotVacantCost = toNumber(summaryStats?.total_slot_vacant_cost || 0);
   const shopRefunds = toNumber(summaryStats?.total_refund || 0);
-  // Operating profit includes COGS, refunds, and posted operating expenses.
+  const totalOperationalExpenses = totalPostedOperationalExpenses + totalSlotVacantCost;
+  // Operating profit includes COGS, refunds, vacant-slot costs, and posted operating expenses.
   const shopGrossProfit = shopRevenue - shopCogs - shopRefunds - totalOperationalExpenses;
 
   // 4. Động cơ Điểm Hòa Vốn (Break-even Engine)
@@ -420,7 +423,8 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
         db.raw("TO_CHAR(summary_date, 'YYYY-MM-DD') as day_str"),
         db.raw("COALESCE(dashboard_orders_count, 0)::int as count"),
         db.raw("COALESCE(earned_revenue, 0)::numeric as daily_revenue"),
-        db.raw("COALESCE(total_shop_cost, 0)::numeric as daily_cost")
+        db.raw("COALESCE(total_shop_cost, 0)::numeric as daily_cost"),
+        db.raw("COALESCE(slot_vacant_cost, 0)::numeric as daily_slot_vacant_cost")
       ),
     db(TABLES.STORE_PROFIT_EXPENSES)
       .leftJoin(TABLES.FINANCIAL_ACCOUNTS, `${TABLES.STORE_PROFIT_EXPENSES}.shop_bank_account_id`, `${TABLES.FINANCIAL_ACCOUNTS}.id`)
@@ -448,14 +452,15 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   dailyRows.forEach((r) => {
     const rev = toNumber(r.daily_revenue);
     const cost = toNumber(r.daily_cost);
+    const slotVacantCost = toNumber(r.daily_slot_vacant_cost);
     const exp = dailyExpenseMap.get(r.day_str) || { externalImport: 0, monthlyExpense: 0, totalExpense: 0 };
     dailyMap.set(r.day_str, {
       count: Number(r.count || 0),
       revenue: rev,
-      cost: cost + exp.totalExpense,
+      cost: cost + slotVacantCost + exp.totalExpense,
       externalImport: exp.externalImport,
       monthlyExpense: exp.monthlyExpense,
-      profit: rev - cost - exp.totalExpense,
+      profit: rev - cost - slotVacantCost - exp.totalExpense,
     });
   });
 
@@ -715,6 +720,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       shopGrossProfit,
       shopRevenue,
       shopCogs,
+      totalSlotVacantCost,
       shopRefunds,
       shopOrdersCount,
       netProfit,

@@ -1,6 +1,7 @@
 import { convertSolar2Lunar } from "./lunarCalendar";
 
 export type ThemeCalendarType = "solar" | "lunar";
+export type ThemeBackgroundMode = "fixed_default" | "seasonal_4seasons";
 
 export interface ThemeDateRule {
   id: string;
@@ -21,6 +22,7 @@ export interface SeasonThemeRule {
 }
 
 export interface ThemeScheduleConfig {
+  backgroundMode?: ThemeBackgroundMode;
   defaultTheme: string;
   seasonRules: SeasonThemeRule[];
   holidayRules: ThemeDateRule[];
@@ -29,6 +31,7 @@ export interface ThemeScheduleConfig {
 const holidayRule = (id: string, calendarType: ThemeCalendarType, startMonth: number, startDay: number, endMonth: number, endDay: number, theme = id): ThemeDateRule => ({ id, calendarType, startMonth, startDay, endMonth, endDay, theme, enabled: true });
 
 export const DEFAULT_THEME_SCHEDULE: ThemeScheduleConfig = {
+  backgroundMode: "seasonal_4seasons",
   defaultTheme: "modern",
   seasonRules: [
     { id: "spring", startMonth: 1, endMonth: 3, theme: "season-spring" },
@@ -44,6 +47,7 @@ export const DEFAULT_THEME_SCHEDULE: ThemeScheduleConfig = {
 
 export function normalizeThemeSchedule(value: Partial<ThemeScheduleConfig> | null | undefined): ThemeScheduleConfig {
   return {
+    backgroundMode: value?.backgroundMode === "fixed_default" ? "fixed_default" : "seasonal_4seasons",
     defaultTheme: value?.defaultTheme || DEFAULT_THEME_SCHEDULE.defaultTheme,
     seasonRules: Array.isArray(value?.seasonRules) && value.seasonRules.length > 0 ? value.seasonRules : DEFAULT_THEME_SCHEDULE.seasonRules,
     holidayRules: Array.isArray(value?.holidayRules) && value.holidayRules.length > 0 ? value.holidayRules : DEFAULT_THEME_SCHEDULE.holidayRules,
@@ -70,6 +74,29 @@ export function getHolidayRuleForDate(schedule: ThemeScheduleConfig, solarDay: n
 export function getSeasonThemeForMonth(schedule: ThemeScheduleConfig, month: number): string | null {
   const rule = schedule.seasonRules.find((item) => item.startMonth <= item.endMonth ? month >= item.startMonth && month <= item.endMonth : month >= item.startMonth || month <= item.endMonth);
   return rule?.theme || null;
+}
+
+export function resolveScheduledThemeForDate(
+  schedule: ThemeScheduleConfig,
+  solarDay: number,
+  solarMonth: number,
+  solarYear: number
+): { themeKey: string; ruleType: "holiday" | "season" | "fixed_default"; label: string } {
+  const holiday = getHolidayRuleForDate(schedule, solarDay, solarMonth, solarYear);
+  if (holiday) {
+    return { themeKey: holiday.theme, ruleType: "holiday", label: "Theme Lễ Ưu Tiên" };
+  }
+  if (schedule.backgroundMode === "seasonal_4seasons") {
+    const seasonTheme = getSeasonThemeForMonth(schedule, solarMonth);
+    if (seasonTheme) {
+      return { themeKey: seasonTheme, ruleType: "season", label: "Theme Theo Mùa Anime" };
+    }
+  }
+  return {
+    themeKey: schedule.defaultTheme || "modern",
+    ruleType: "fixed_default",
+    label: "Theme Ngày Thường Cố Định",
+  };
 }
 
 export function findNextRuleDate(rule: ThemeDateRule, fromDate = new Date()): Date | null {

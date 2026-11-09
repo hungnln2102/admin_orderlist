@@ -15,14 +15,12 @@ async function syncSlotCostFinanceDelta({
 
   try {
     await accumulateDailySummary(date, {
-      total_shop_cost: costDelta,
       slot_vacant_cost: costDelta,
     });
 
     const monthKey = getVietnamMonthString(date);
     await financeNotifier.notifyFinanceMonthlyDelta({
       monthKey,
-      importDelta: costDelta,
       profitDelta: -costDelta,
       context: `Chi phí slot trống Kho Gói ngày ${date} (${totalVacantSlots} slot trống, ${totalVacantCost.toLocaleString()} đ)`,
     });

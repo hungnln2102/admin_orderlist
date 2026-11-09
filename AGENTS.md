@@ -132,6 +132,24 @@ Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà)
 
 ---
 
+### Nguyên Tắc 7: Kiến Trúc Phân Rã Module & Cấm File Độc Bản Khổng Lồ (Modular Architecture & Anti-Monolith / Single Responsibility)
+- **CẤM TUYỆT ĐỐI BẮT 1 FILE GÁNH HẾT TOÀN BỘ LOGIC, UX/UI**:
+  - Không bao giờ được phép dồn nén toàn bộ logic xử lý, state, gọi API, validation, event listeners và các khối giao diện phức tạp vào một file duy nhất (chống tạo các "God Files" khổng lồ hàng trăm/nghìn dòng).
+- **BẮT BUỘC TUÂN THỦ CẤU TRÚC HIỆN TẠI CỦA DỰ ÁN**:
+  - **Frontend (Feature-Driven Architecture)**:
+    - `pages/`: Chỉ đóng vai trò Page Orchestrator mỏng (Thin Orchestrator), điều phối bố cục cấp cao và kết nối các feature modules, không trực tiếp chứa các khối JSX dài ngoằng hay business logic phức tạp.
+    - `features/<feature_name>/`:
+      + `components/`: Tách nhỏ các khối UI thành các sub-components độc lập, chuyên biệt (mỗi component một trách nhiệm duy nhất: bảng danh sách, form nhập liệu, modal, card thông tin).
+      + `hooks/`: Bóc tách toàn bộ state logic phức tạp, event listeners (kéo thả, long-press, keyboard shortcuts), tính toán dữ liệu thành các Custom Hooks độc lập (ví dụ: `useCalendarRangeSelection`, `useThemeScheduleConfig`).
+      + `api/` hoặc `services/`: Tập trung các API client calls, mapper, serialize/deserialize riêng biệt, typing chặt chẽ.
+      + `types/`: Định nghĩa interfaces, data contracts rõ ràng.
+    - `shared/`: Tái sử dụng components dùng chung (`GlassCard`, `StatCard`, modals, buttons, form controls).
+  - **Backend (Domain-Driven Architecture)**:
+    - Bóc tách theo đúng domain (`domains/<domain>/`): routes $\rightarrow$ controllers $\rightarrow$ services/sub-services (tách riêng queries, mutations, transactions, external providers) $\rightarrow$ event publishers.
+    - Khi một file service phình to hoặc gánh nhiều trách nhiệm, bắt buộc phân rã thành các sub-services chuyên biệt (như chuẩn mực đã thiết lập cho `orderService` $\rightarrow$ `orderQueryService`, `orderCreditService`; `productService` $\rightarrow$ `packageProductService`).
+
+---
+
 ## 🎯 3. TIÊU CHUẨN HOÀN THÀNH (DEFINITION OF DONE)
 
 Một nhiệm vụ CHỈ ĐƯỢC XEM LÀ HOÀN THÀNH khi:

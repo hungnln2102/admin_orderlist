@@ -79,9 +79,9 @@ async function getOrderStatsForRange(start, end) {
       db.raw("COALESCE(SUM(dashboard_orders_count), 0)::integer as total_orders"),
       db.raw("COALESCE(SUM(dashboard_canceled_count), 0)::integer as canceled_orders"),
       db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as total_revenue"),
-      db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as total_cost"),
+      db.raw("COALESCE(SUM(total_shop_cost + slot_vacant_cost), 0)::numeric as total_cost"),
       db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as total_refund"),
-      db.raw("COALESCE(SUM(earned_revenue - total_shop_cost - revenue_reversed), 0)::numeric as total_profit")
+      db.raw("COALESCE(SUM(earned_revenue - total_shop_cost - slot_vacant_cost - revenue_reversed), 0)::numeric as total_profit")
     )
     .first();
 
@@ -243,9 +243,9 @@ async function getDashboardSummary(params = {}) {
           db.raw("COALESCE(dashboard_orders_count, 0)::integer as orders"),
           db.raw("COALESCE(dashboard_canceled_count, 0)::integer as canceled"),
           db.raw("COALESCE(earned_revenue, 0)::numeric as revenue"),
-          db.raw("COALESCE(total_shop_cost, 0)::numeric as cost"),
+          db.raw("COALESCE(total_shop_cost + slot_vacant_cost, 0)::numeric as cost"),
           db.raw("COALESCE(revenue_reversed, 0)::numeric as refund"),
-          db.raw("COALESCE(earned_revenue - total_shop_cost - revenue_reversed, 0)::numeric as profit")
+          db.raw("COALESCE(earned_revenue - total_shop_cost - slot_vacant_cost - revenue_reversed, 0)::numeric as profit")
         )
         .orderBy("summary_date", "asc"),
       db(TABLES.STORE_PROFIT_EXPENSES)
@@ -340,9 +340,9 @@ async function getDashboardSummary(params = {}) {
         db.raw("COALESCE(SUM(dashboard_orders_count), 0)::integer as orders"),
         db.raw("COALESCE(SUM(dashboard_canceled_count), 0)::integer as canceled"),
         db.raw("COALESCE(SUM(earned_revenue), 0)::numeric as revenue"),
-        db.raw("COALESCE(SUM(total_shop_cost), 0)::numeric as cost"),
+        db.raw("COALESCE(SUM(total_shop_cost + slot_vacant_cost), 0)::numeric as cost"),
         db.raw("COALESCE(SUM(revenue_reversed), 0)::numeric as refund"),
-        db.raw("COALESCE(SUM(earned_revenue - total_shop_cost - revenue_reversed), 0)::numeric as profit")
+        db.raw("COALESCE(SUM(earned_revenue - total_shop_cost - slot_vacant_cost - revenue_reversed), 0)::numeric as profit")
       )
       .groupBy("month_num")
       .orderBy("month_num", "asc");

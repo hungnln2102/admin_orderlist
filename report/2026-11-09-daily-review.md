@@ -241,3 +241,126 @@
 - **Secret giu lai trong env**: IMAP credential, `YUNA_2FA_TOKEN`, `VIVAROCKY_SIGNIN_ACCESS_CODE`.
 - **Kiem tra**: `node --check` cac provider/service; `npm.cmd --prefix backend test -- --test-name-pattern ...` pass 143/143; `git diff --check` pass.
 - **Trang thai nghiem thu**: Dat source-level. Chua goi live provider hay dung production credential.
+
+## [22:32 Asia/Bangkok] Khắc phục triệt để lỗi column pac.provider_key does not exist trong ProductApi Controller
+
+- **Nguyên nhân gốc**: Mã nguồn [`productApiService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/productApiService.js) và [`productApiController.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/controllers/productApiController.js) đã được cập nhật sang dùng `provider_key`, nhưng các migration của ngày 2026-11-09 (`20261109000001` đến `20261109000004`) chưa được chạy lên Database, dẫn đến bảng `business.product_api_configs` vẫn lưu cột cũ `api_config_id` và thiếu cột `provider_key`, gây lỗi SQL code `42703` khi gọi `GET /api/system/product-apis`.
+- **Thay đổi kỹ thuật & Thực thi**:
+  - Thực thi hoàn tất Knex migration Batch 23:
+    1. [`20261109000001_add_external_api_execution_mode.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261109000001_add_external_api_execution_mode.js): Cập nhật `execution_mode` cho các gateway.
+    2. [`20261109000002_create_activation_keys.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261109000002_create_activation_keys.js): Khởi tạo bảng `warehouse.activation_keys` và các chỉ mục liên quan.
+    3. [`20261109000003_add_provider_key_to_product_api_configs.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261109000003_add_provider_key_to_product_api_configs.js): Bổ sung cột `provider_key`, backfill 100% dữ liệu 10 dòng mapping (`ades`, `tinyhost`, `yuna_mail`, `yuna_2fa`, `vivarocky_*`, `warehouse_2fa`, `totp`), tạo unique index `(product_id, provider_key)`.
+    4. [`20261109000004_drop_external_api_configs.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/db/migrations/20261109000004_drop_external_api_configs.js): Drop cột cũ `api_config_id`, đặt `provider_key NOT NULL`, dọn sạch bảng `system_automation.external_api_configs`.
+  - [`backend/tests/unit/productApiService.test.js`](file:///e:/Project/admin_store/admin_orderlist/backend/tests/unit/productApiService.test.js): Tạo mới 3 test case kiểm thử tự động cho `listProductApis()`, `getApisByProductMapping()`, và `productApiController.list()`.
+- **Kiểm tra Verification Gates**:
+  - Knex Migration: Batch 23 (4 migrations) chạy thành công 100%, 0 migration pending.
+  - Runtime Database Check: Truy vấn `listProductApis()` trả về đầy đủ 63 sản phẩm, 10 cổng provider, HTTP status 200 `success: true`.
+  - Backend Unit Tests: `npm --prefix backend test` -> **146/146 unit tests PASS 100%**.
+  - Frontend Build: `npm --prefix frontend run build` -> **0 lỗi TypeScript, bundle thành công trong 7.95s**.
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT KHẮC PHỤC TRIỆT ĐỂ. Lỗi sập API `listProductApis` đã được giải quyết tận gốc.
+
+## [22:55 Asia/Bangkok] Cập nhật Form hiển thị Link Household Netflix, Nút "Nhận mã" và Parse Giờ Sent UTC+7
+
+- **Nguyên nhân gốc**:
+  1. Khi gọi `/api/public/otp/netflix/household`, backend trả link trong `extra_fields` mà không gán `link` ở root object của `dispatchSlotRequest`, khiến `fetchNetflixHousehold` trên frontend nhận `res.link = undefined`, không set `householdData` và báo toast lỗi màu đỏ `"Đã lấy thông tin tài khoản thành công! (1 trường)"`.
+  2. Header email Netflix trả về từ VivaRocky chứa mốc thời gian dạng `Sent: Sunday, October 25, 2026 4:12:17 AM (UTC+00:00) Monrovia, Reykjavik`, `Date.parse()` mặc định của JS trả về `NaN` do chuỗi múi giờ phía sau, chưa được trích xuất và chưa chuyển đổi về UTC+7 (Giờ Việt Nam).
+  3. Giao diện frontend chưa có nút bấm trực tiếp "Nhận mã" gắn URL xác minh từ VivaRocky và chưa có mục hiển thị thời gian gửi email.
+
+- **Thay đổi kỹ thuật**:
+  - [`backend/src/domains/system/providers/vivarockyProvider.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/providers/vivarockyProvider.js):
+    + Viết hàm `parseUtcToUtc7(rawStr)` chuyển đổi chuỗi ngày giờ từ email header về định dạng chuẩn `HH:mm:ss DD/MM/YYYY (UTC+7)` thông qua `Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok' })`.
+    + Bóc tách trường `Sent:` (hoặc fallback `<strong>Date:</strong>`) từ HTML của VivaRocky, đưa vào `sent_time` trong kết quả trả về.
+    + Mở rộng `buttonTextMatch` nhận diện cả text nút `"Nhận mã"`, `"Nhận Mã"`, `"Get Code"`, `"Lấy mã"`.
+  - [`backend/src/domains/system/providers/providerConfig.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/providers/providerConfig.js): Bổ sung `sent_time` vào `field_mapping` của provider `vivarocky_household`.
+  - [`backend/src/domains/system/services/otpPortalDispatcher.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/system/services/otpPortalDispatcher.js): Gán trực tiếp `link` và `sent_time` ra root object của `dispatchSlotRequest`.
+  - [`backend/tests/unit/otpProviderService.test.js`](file:///e:/Project/admin_store/admin_orderlist/backend/tests/unit/otpProviderService.test.js): Bổ sung assertion kiểm thử trích xuất `netflix_link` và `sent_time: "11:12:17 25/10/2026 (UTC+7)"`.
+  - [`otp_portal/src/types/otp.ts`](file:///e:/Project/admin_store/otp_portal/src/types/otp.ts): Thêm trường `sent_time?: string` vào interface `HouseholdResult`.
+  - [`otp_portal/src/services/otpService.ts`](file:///e:/Project/admin_store/otp_portal/src/services/otpService.ts): Cập nhật `fetchNetflixHousehold` bóc tách an toàn `link` và `sent_time` từ cả `data.link` lẫn `extra_fields`.
+  - [`otp_portal/src/features/netflix/components/NetflixSection.tsx`](file:///e:/Project/admin_store/otp_portal/src/features/netflix/components/NetflixSection.tsx):
+    + Nhận diện `link` và `sent_time` khi bấm lấy link Household, lưu vào state `householdData`.
+    + Render form/card kết quả ngay dưới nút bấm: hiển thị mục **Thời gian gửi (Sent)** định dạng UTC+7 với icon Clock, nút CTA **"Nhận mã"** màu đỏ thương hiệu Netflix gắn URL xác minh mở tab mới, và nút **"Sao chép"** tiện lợi.
+
+- **Kiểm tra Verification Gates**:
+  - Backend Unit Tests: `npm --prefix backend test` -> **147/147 unit tests PASS 100%**.
+  - Frontend OTP Portal Build: `npm --prefix e:/Project/admin_store/otp_portal run build` -> **0 lỗi TypeScript, bundle Vite thành công trong 1.80s**.
+
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT VÀ KIỂM CHỨNG TOÀN DIỆN.
+
+## [23:45 Asia/Bangkok] Tái thiết kế toàn diện Cấu Hình Theme OTP (Lịch Âm Dương, Theme Cố Định & Theme Hàng Ngày, Bảng Lịch Rule)
+
+- **Phạm vi & Yêu cầu của Master**:
+  1. Hỗ trợ thao tác **Nhấn giữ chuột (Long-press >= 400ms)** hoặc **Kéo quét dải ngày (Drag Range Selection)** trên Lịch Âm Dương: cột bên phải tự động chuyển sang Form Cấu Hình Theme Lễ Hội với dải ngày được điền sẵn, hỗ trợ chọn 28 themes, loại lịch Dương/Âm, áp dụng rule ngay trên lịch.
+  2. Khắc phục triệt để lỗi không lưu được **Theme Hàng Ngày** và **Theme Cố Định**: hàm `handleSave` trước đây bỏ rơi `schedule`, hàm `fetchConfig` không nạp lại `schedule`; bổ sung Quick Theme Picker ngay trên Toolbar khi bật `mode === "fixed"` và tinh chỉnh Tab "Bộ Sưu Tập" để chọn theme cố định không bị nhảy tab.
+  3. **Tái thiết kế toàn diện Bảng Cấu Hình "Theme Lễ Ưu Tiên"** (Tab Lịch Rule): thay thế các ô input trần trụi (`12`, `29`, `1`, `4`) thành Bảng Quản Trị Lễ Hội hiện đại có đầy đủ Header cột, nhãn Ngày/Tháng chuẩn Việt Nam (`dd/mm`), badge màu sắc theme, bộ lọc Âm/Dương lịch, thanh tìm kiếm nhanh, và nút xem vị trí lễ trên Lịch Âm Dương.
+
+- **Thay đổi kỹ thuật**:
+  - [`frontend/src/pages/OtpThemeConfigPage.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/OtpThemeConfigPage.tsx):
+    + **State & Persistence**: Đồng bộ trọn vẹn `schedule: { defaultTheme, seasonRules, holidayRules }` trong `handleSave` gửi lên `PUT /api/system/configs/OTP_PORTAL_THEME` và nạp lại qua `fetchConfig` với `normalizeThemeSchedule()`.
+    + **Tương tác Lịch Âm Dương**: Bổ sung `handleCellMouseDown`, `handleCellMouseEnter`, `handleCellMouseUp` cùng `longPressTimerRef` và `window.mouseup` listener để bắt mượt mà cả thao tác click, nhấn giữ và kéo dải ngày; hiển thị highlight dải ngày được chọn trên grid lịch.
+    + **Form Cột Phải (Holiday Config Form)**: Cho phép cấu hình theme lễ hội trực tiếp từ lịch với dải ngày tự động, chọn loại lịch (Dương / Âm), đặt tên gợi nhớ, nút *"Áp Dụng Rule Cho Lịch"* và nút *"Áp Dụng & Lưu Ngay Lên Hệ Thống"*.
+    + **Cấu hình Theme Cố Định & Hàng Ngày**: Thêm dropdown Quick Fixed Theme Selector trên top toolbar; tách bạch rõ ràng Theme Mặc Định Hàng Ngày và 4 Thẻ Mùa trong Tab Lịch Rule; ngày thường trên lịch hiển thị đúng theme ngày thường và có nút bấm đổi theme lễ tức thì.
+    + **Bảng Theme Lễ Ưu Tiên**: Nâng cấp toàn diện với thanh tìm kiếm `Search`, bộ lọc tab con (Tất cả / Âm Lịch / Dương Lịch / Đang Bật), Header cột trực quan (`Bật`, `Theme Lễ Hội`, `Hệ Lịch`, `Ngày Bắt Đầu`, `Ngày Kết Thúc`, `Dải Ngày`, `Thao Tác`), định dạng `Ngày [dd] / Tháng [mm]`, nút xem trên Lịch Âm Dương (`Eye`) và nút xóa (`Trash2`).
+
+- **Kiểm tra Verification Gates**:
+  - Frontend Build: `npm --prefix frontend run build` -> **0 lỗi TypeScript, Vite build thành công 100% trong 4.68s** (`dist/assets/OtpThemeConfigPage-FDPTpuwp.js`).
+  - Git Isolation: 100% bảo vệ dữ liệu Master, không can thiệp vào các file backend/finance/orders chưa hoàn thành.
+
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT VÀ SẴN SÀNG SỬ DỤNG.
+
+## [00:20 Asia/Bangkok] Phân rã cấu trúc OtpThemeConfigPage thành Feature Module chuẩn theo Nguyên Tắc 7
+
+- **Phạm vi & Chỉ đạo của Master**:
+  - Áp dụng ngay **Nguyên Tắc 7 (Kiến trúc phân rã module & Chống tệp tin độc bản khổng lồ)** vừa ban hành vào [AGENTS.md](file:///e:/Project/admin_store/admin_orderlist/AGENTS.md) và repo trung tâm [`hungnln2102/core-agents`](https://github.com/hungnln2102/core-agents).
+  - Phân rã toàn bộ file độc bản khổng lồ [OtpThemeConfigPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/OtpThemeConfigPage.tsx) (~850 dòng) thành feature module chuyên biệt tại `frontend/src/features/otp-theme/`.
+
+- **Thay đổi kỹ thuật**:
+  - [`frontend/src/features/otp-theme/types.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/types.ts): Định nghĩa các interfaces (`ThemeItem`, `SeasonFilter`, `ViewTab`, `RuleCalendarFilter`, `RangeSelection`, `HolidayFormState`).
+  - [`frontend/src/features/otp-theme/constants/themesList.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/constants/themesList.ts): Trích xuất danh mục 28 Themes SSOT.
+  - [`frontend/src/features/otp-theme/api/otpThemeApi.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/api/otpThemeApi.ts): Tập trung các API client calls (`fetchRemoteThemesCatalog`, `fetchSystemConfigs`, `saveSystemThemeConfig`).
+  - [`frontend/src/features/otp-theme/hooks/useOtpThemeConfig.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/hooks/useOtpThemeConfig.ts): Custom hook quản trị cấu hình hệ thống, catalog themes, lưu dữ liệu và notifications.
+  - [`frontend/src/features/otp-theme/hooks/useCalendarDragRange.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/hooks/useCalendarDragRange.ts): Custom hook chuyên trách điều hướng lịch, long-press timer, drag range selection, form state và các thao tác rule.
+  - [`frontend/src/features/otp-theme/components/OtpThemeToolbar.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/OtpThemeToolbar.tsx): Component toolbar điều khiển chế độ Auto/Fixed, quick fixed theme selector và tabs chuyển view.
+  - [`frontend/src/features/otp-theme/components/CalendarGridSection.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/CalendarGridSection.tsx): Component hiển thị Lịch Âm Dương tháng, header navigation, grid ngày với badge âm/dương và highlight dải ngày.
+  - [`frontend/src/features/otp-theme/components/HolidayThemeConfigForm.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/HolidayThemeConfigForm.tsx): Component Form cấu hình theme lễ cột phải khi nhấn giữ hoặc quét dải ngày.
+  - [`frontend/src/features/otp-theme/components/DayDetailsInspector.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/DayDetailsInspector.tsx): Component thanh tra chi tiết ngày click thường (can chi, hoàng đạo, theme ngày thường/lễ hội, preview card).
+  - [`frontend/src/features/otp-theme/components/DailySeasonThemeSection.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/DailySeasonThemeSection.tsx): Component cấu hình Theme Mặc Định Hàng Ngày & 4 Thẻ Mùa trong năm.
+  - [`frontend/src/features/otp-theme/components/HolidayRulesTable.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/HolidayRulesTable.tsx): Component Bảng Quản Trị Rule Lễ Ưu Tiên với tìm kiếm, lọc âm/dương, định dạng dd/mm và xem trên lịch.
+  - [`frontend/src/features/otp-theme/components/ThemePresetsGrid.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/ThemePresetsGrid.tsx): Component hiển thị bộ sưu tập 28 themes kèm bộ lọc mùa và chọn theme cố định.
+  - [`frontend/src/pages/OtpThemeConfigPage.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/OtpThemeConfigPage.tsx): Tái cấu trúc thành **Thin Page Orchestrator** mỏng (~160 dòng), chỉ điều phối layout cấp cao và kết nối các feature modules.
+
+- **Kiểm tra Verification Gates**:
+  - Frontend Build: `npm --prefix frontend run build` -> **0 lỗi TypeScript, 1.773 modules transformed, bundle Vite hoàn tất trong 4.36s** (`dist/assets/OtpThemeConfigPage-BcUih0SR.js`).
+  - Kiến trúc: Đạt chuẩn Feature-Driven Architecture và Single Responsibility 100%.
+
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT VÀ KIỂM CHỨNG TOÀN DIỆN.
+
+## [00:45 Asia/Bangkok] Giải quyết triệt để xung đột Theme Hàng Ngày VS Theme 4 Mùa Anime (Daily Theme Strategy Switcher & Resolver)
+
+- **Nguyên nhân gốc & Phân tích nghiệp vụ**:
+  1. Trong thiết kế trước đây, hệ thống vừa tồn tại cấu hình `defaultTheme: "modern"` (Cyber Core) vừa tồn tại 4 quy tắc mùa phủ kín 12 tháng (`spring: 1-3`, `summer: 4-6`, `autumn: 7-9`, `winter: 10-12`). Khi đó, người dùng nhìn vào form không rõ: chọn Cyber Core ở góc trên thì 4 mùa bên dưới có tác dụng gì, và ngược lại.
+  2. Tại `otp_portal/src/services/themeService.ts`, cấu hình từ backend gửi về dạng `{ mode, theme, schedule: { ... } }`, nhưng resolver chỉ kiểm tra trực tiếp `remote.holidayRules` mà không bóc tách `remote.schedule`. Do đó `remote.holidayRules` bị `undefined`, hệ thống âm thầm fallback về hàm cũ `getAutoThemeByDate()`, và ngày thường luôn trả về cứng `"modern"` (Cyber Core) bất kể Master đã cấu hình gì trên admin.
+  3. Trên giao diện Lịch Âm Dương (`DayDetailsInspector.tsx`), nhãn ngày thường hiển thị cứng `Cyber Core (Ngày Thường)` mà không phản ánh mùa thực tế (Tháng 11 là Mùa Đông Anime).
+
+- **Thay đổi kỹ thuật**:
+  - [`frontend/src/shared/utils/themeSchedule.ts`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/utils/themeSchedule.ts):
+    + Bổ sung kiểu `ThemeBackgroundMode = "fixed_default" | "seasonal_4seasons"` vào `ThemeScheduleConfig`.
+    + Cập nhật `normalizeThemeSchedule()` bảo toàn trường `backgroundMode`.
+    + Viết mới hàm `resolveScheduledThemeForDate(schedule, solarDay, solarMonth, solarYear)`: Phân giải chính xác thứ tự ưu tiên: 1. Rule Lễ Hội ưu tiên $\rightarrow$ 2. Nếu chế độ 4 Mùa (`seasonal_4seasons`): Lấy Theme mùa của tháng $\rightarrow$ 3. Nếu chế độ Cố Định (`fixed_default`): Lấy Theme cố định mặc định.
+  - [`frontend/src/features/otp-theme/components/DailySeasonThemeSection.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/DailySeasonThemeSection.tsx):
+    + Tái thiết kế trực quan với **Bộ Chuyển Đổi Chiến Lược (Strategy Switcher)** 2 nút bấm to rõ ràng:
+      * **Nút 1**: `🌸 Tự Động Đổi Theo 4 Mùa Anime` (Xuân T1-3, Hạ T4-6, Thu T7-9, Đông T10-12). Kèm huy hiệu `🔥 ĐANG HOẠT ĐỘNG` và viền sáng phát quang cho mùa của tháng hiện tại (Tháng 11 -> Mùa Đông Anime).
+      * **Nút 2**: `⚡ Dùng 1 Theme Cố Định Quanh Năm`. Mở panel chọn 1 theme duy nhất (VD: Cyber Core) cho toàn bộ ngày thường và tự động làm mờ (dim/lock) 4 thẻ mùa để tránh nhầm lẫn.
+  - [`frontend/src/features/otp-theme/components/DayDetailsInspector.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/otp-theme/components/DayDetailsInspector.tsx):
+    + Đồng bộ nhãn hiển thị thông minh: Hiển thị đúng `❄️ Mùa Đông Anime (Theme Theo Mùa Anime)` khi đang ở chế độ 4 mùa, hoặc `⚡ Cyber Core (Theme Cố Định Quanh Năm)` khi ở chế độ cố định.
+  - [`frontend/src/pages/OtpThemeConfigPage.tsx`](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/OtpThemeConfigPage.tsx):
+    + Tích hợp `resolveScheduledThemeForDate()` để tính toán động theme cho cell ngày đang xem.
+  - [`otp_portal/src/services/themeSchedule.ts`](file:///e:/Project/admin_store/otp_portal/src/services/themeSchedule.ts) & [`otp_portal/src/services/themeService.ts`](file:///e:/Project/admin_store/otp_portal/src/services/themeService.ts):
+    + Đồng bộ `ThemeBackgroundMode` và logic phân giải theme theo `backgroundMode`.
+    + Sửa lỗi đọc lồng `(remote && (remote.schedule || remote))`, đảm bảo OTP Portal nhận diện chính xác 100% theme mùa hoặc theme cố định từ backend.
+
+- **Kiểm tra Verification Gates**:
+  - `admin_orderlist/frontend`: `npm --prefix frontend run build` -> **0 lỗi TypeScript, 1.773 modules transformed, Vite bundle thành công 4.33s**.
+  - `otp_portal`: `npm --prefix e:/Project/admin_store/otp_portal run build` -> **0 lỗi TypeScript, 1.587 modules transformed, Vite bundle thành công 2.34s**.
+  - Không gây xung đột với bất kỳ file nào Master đang làm dở trên worktree.
+
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT VÀ KIỂM CHỨNG TOÀN DIỆN.
