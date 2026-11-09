@@ -233,3 +233,11 @@
 - **Database:** Migration `20261109000003_add_provider_key_to_product_api_configs.js` backfill mapping, migration `20261109000004_drop_external_api_configs.js` chỉ drop khóa/bảng cũ sau khi xác minh mapping đầy đủ.
 - **Kiểm tra:** `npm --prefix backend test` pass **144/144**; `npm --prefix frontend run build` pass.
 - **Chưa nghiệm thu production:** Chưa chạy migration trên DB thử nghiệm và `deploy.sh` từ chối worktree bẩn; không thực hiện drop/deploy production để tránh đụng thay đổi chưa commit.
+
+## [Asia/Bangkok] Refactor Provider API ben thu ba
+
+- **Pham vi**: Bo override runtime URL/path/timeout bang bien moi truong cho TinyHost, Ades, Yuna va VivaRocky; tach handler vendor khoi `otpProviderService.js` thanh provider module doc lap.
+- **Thay doi**: `providerConfig.js` la catalog tong hop cau hinh co dinh; them `adesProvider.js`, `yuna2faProvider.js`, `yunaMailProvider.js`, `vivarockyProvider.js`; bo `GENERIC_HTTP` de khong chap nhan endpoint tuy y.
+- **Secret giu lai trong env**: IMAP credential, `YUNA_2FA_TOKEN`, `VIVAROCKY_SIGNIN_ACCESS_CODE`.
+- **Kiem tra**: `node --check` cac provider/service; `npm.cmd --prefix backend test -- --test-name-pattern ...` pass 143/143; `git diff --check` pass.
+- **Trang thai nghiem thu**: Dat source-level. Chua goi live provider hay dung production credential.

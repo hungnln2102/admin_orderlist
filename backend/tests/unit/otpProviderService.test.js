@@ -18,51 +18,11 @@ async function withMockedExternalFetch(responder, run) {
   }
 }
 
-test("GENERIC_HTTP GET uses the configured endpoint and maps response fields", { concurrency: false }, async () => {
-  await withMockedExternalFetch(async (url, options) => {
-    assert.equal(String(url), "https://otp.example.test/read?email=user%40example.com");
-    assert.equal(options.method, "GET");
-    return new Response(JSON.stringify({ payload: { code: "123456", plan: "Business" } }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  }, async () => {
-    const result = await executeOtpConfig({
-      service_key: "custom_get",
-      base_url: "https://otp.example.test",
-      execution_mode: "GENERIC_HTTP",
-      endpoints: { get_otp: "/read" },
-      field_mapping: [
-        { key: "otp", label: "OTP", path: "payload.code", is_primary: true },
-        { key: "plan", label: "Plan", path: "payload.plan" },
-      ],
-    }, "user@example.com");
-
-    assert.equal(result.otp, "123456");
-    assert.deepEqual(result.extra_fields, [
-      { key: "otp", label: "OTP", value: "123456", path: "payload.code" },
-      { key: "plan", label: "Plan", value: "Business", path: "payload.plan" },
-    ]);
-  });
-});
-
-test("GENERIC_HTTP POST uses the configured request method", { concurrency: false }, async () => {
-  await withMockedExternalFetch(async (url, options) => {
-    assert.equal(String(url), "https://otp.example.test/read");
-    assert.equal(options.method, "POST");
-    assert.equal(options.body, JSON.stringify({ email: "user@example.com" }));
-    return new Response(JSON.stringify({ otp: "654321" }), { status: 200 });
-  }, async () => {
-    const result = await executeOtpConfig({
-      service_key: "custom_post",
-      base_url: "https://otp.example.test",
-      execution_mode: "GENERIC_HTTP",
-      auth_config: { method: "POST" },
-      endpoints: { get_otp: "/read" },
-    }, "user@example.com");
-
-    assert.equal(result.otp, "654321");
-  });
+test("GENERIC_HTTP configurations are rejected because providers own their endpoints", async () => {
+  await assert.rejects(
+    executeOtpConfig({ service_key: "custom_get", execution_mode: "GENERIC_HTTP" }, "user@example.com"),
+    /Unsupported OTP execution mode 'GENERIC_HTTP'/
+  );
 });
 
 test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign-in requests", { concurrency: false }, async () => {
