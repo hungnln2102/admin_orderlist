@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Persists daily vacant-slot cost logs atomically and returns the finance delta.
  */
 const { TABLES, withTransaction } = require("@/db");

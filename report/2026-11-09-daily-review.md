@@ -132,3 +132,104 @@
 - **Phạm vi đã bảo vệ:** Household `/household.php`, 6-Digit Login `/six_digit_login.php`, Sign-in Code `/signin_code.php`; request JSON hiện có vẫn giữ hành vi cũ.
 - **Kiểm tra:** `node --test tests/unit/otpProviderService.test.js tests/unit/securityHardening.test.js` đạt **14/14**; toàn bộ `npm --prefix backend test` đạt **143/143**; `node --check` hai file và `git diff --check` đều pass.
 - **Trạng thái:** Đã sửa source local và chưa deploy production theo yêu cầu hiện tại.
+## [11:45 Asia/Bangkok] Đồng bộ V2 Household với HTML button của V1
+
+- **Đối chiếu V1:** V1 gửi `email` + `user_email` tới `/household.php`, sau đó lấy `href` của `Get Code`/liên kết có `nftoken` hoặc `messageGuid`.
+- **Thay đổi:** V2 bổ sung field `email` cho Household; parser ưu tiên `nftoken`, `messageGuid`, `Get Code`, travel verify và giải mã HTML entity trước khi trả `netflix_link`.
+- **Sửa lỗi hiển thị sai:** Không còn ưu tiên mã 6 số xuất hiện trong HTML email Household; mã 6 số chỉ dùng cho luồng `six_digit`.
+- **Kiểm tra:** `npm --prefix backend test` đạt **143/143**; `node --check` và `git diff --check` pass.
+- **Trạng thái:** Đã sửa source local; chưa deploy production.
+## [12:05 Asia/Bangkok] Kiểm thử email thực tế và loại bỏ OTP giả trong Household
+
+- **Email kiểm thử:** `alexcarry7748@outlook.com`.
+- **Bằng chứng upstream:** VivaRocky trả HTML thành công; parser trích được URL button `Get Code` dạng `travel/verify` có `nftoken`, độ dài 399 ký tự.
+- **Bằng chứng production trước deploy:** API production cũ trả link `/browse?...` và mã `600212`, xác nhận đang lấy nhầm URL logo/mã trong HTML thay vì button.
+- **Thay đổi local:** Household chỉ tạo `extra_fields.netflix_link`; không chạy parser OTP cho `resolvedType = household`. Hai luồng 6-Digit và Sign-in Code vẫn giữ OTP.
+- **Kiểm tra:** local với email thực tế trả `hasLink=true`, `isTravelVerify=true`, `hasNftoken=true`, `otp=null`; regression `11/11` pass.
+- **Trạng thái:** Local đã đúng; production vẫn cần deploy mới dùng parser này.
+## [12:30 Asia/Bangkok] Kiểm thử hai luồng VivaRocky còn lại
+
+- **Mã TV 6 số:** Với `alexcarry7748@outlook.com`, VivaRocky trả HTML thành công; parser local lấy đúng mã 6 số, chỉ trả field `otp`.
+- **Sign-in Code:** VivaRocky trả HTML email thành công; mã thực tế trong email có 4 số, parser cũ chỉ tìm 6 số nên bỏ sót.
+- **Thay đổi:** Parser Sign-in Code nhận mã 4–8 số sau nội dung “Enter this code to sign in”; các luồng code không còn trả nhầm link logo Netflix.
+- **Kiểm tra:** Regression VivaRocky `11/11` pass; toàn bộ `npm --prefix backend test` đạt **143/143**; syntax và `git diff --check` pass.
+- **Trạng thái:** Local đã đúng; production cần deploy mới nhận bản sửa.
+
+## [14:00 Asia/Bangkok] Khắc phục toàn bộ lỗi Text Encoding, Mojibake và Chuẩn hóa UTF-8 No-BOM
+
+- **Phạm vi**:
+  - Quét toàn diện 689 tệp tin của `admin_orderlist` và 119 tệp tin của `otp_portal`.
+  - Phục hồi 100% văn bản tiếng Việt bị lỗi Mojibake (do ghi đè Windows-1252 / ISO-8859-1 trước đây).
+  - Loại bỏ hoàn toàn byte BOM (`0xEF 0xBB 0xBF`) trên 37 tệp tin, đưa toàn bộ codebase về chuẩn UTF-8 No-BOM sạch.
+- **Thay đổi kỹ thuật**:
+  - [`backend/src/domains/system/services/otpProviderService.js`](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/system/services/otpProviderService.js): Phục hồi 67 dòng tiếng Việt (bộ xử lý lấy mã OTP, thông báo lỗi TinyHost, cache session Yuna, thông báo tìm thấy khóa 2FA trong kho...).
+  - [`frontend/src/features/external-api/components/ExternalApiConfigController.tsx`](file:///d:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ExternalApiConfigController.tsx): Phục hồi 35 dòng tiếng Việt (nhãn tự động "Thời Gian", header section, thanh điều hướng 2 tab, tiêu đề bảng 7 ô input Web OTP Portal, badge "[CỔNG TẮT]", "TẠM ẨN WEB"...).
+  - [`backend/tests/unit/vpbankEmailParser.test.js`](file:///d:/Desktop/admin/admin_orderlist/backend/tests/unit/vpbankEmailParser.test.js): Phục hồi test case dòng 35 (`- Thời gian: 03/11/2026 18:39:41`).
+  - [`report/2026-11-01-daily-review.md`](file:///d:/Desktop/admin/admin_orderlist/report/2026-11-01-daily-review.md): Phục hồi 9 dòng tiêu đề mục báo cáo cũ bị lỗi font hiển thị.
+  - Loại bỏ byte BOM trên 37 tệp tin (migration database, controllers/services tài chính, kho hàng, ví và các component frontend external-api).
+- **Kiểm tra Verification Gates**:
+  - Re-run Scanner toàn diện: **689/689 tệp tin đạt chuẩn UTF-8 sạch, 0 tệp tin còn lỗi Mojibake (0 corrupted files), 0 tệp tin có BOM (0 BOM files)**.
+  - Thư mục `otp_portal`: Quét 119 tệp tin xác nhận 100% sạch (0 lỗi).
+  - Backend Unit Tests: `npm --prefix backend test` -> **143/143 unit tests PASS 100%**.
+  - Frontend Build: `npm --prefix frontend run build` -> **0 lỗi TypeScript, build thành công 12.78s**.
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT TOÀN DIỆN. Toàn bộ mã nguồn, dữ liệu test và báo cáo đã đồng bộ UTF-8 chuẩn.
+
+## [14:45 Asia/Bangkok] Khắc phục triệt để lỗi Question-Mark (?) Text Encoding trong Runtime Code
+
+- **Nguyên nhân gốc**: Khi commit `a135e403` được thực hiện qua môi trường shell/terminal dùng bảng mã ASCII/CP437, các chuỗi tiếng Việt có dấu trong source code bị hệ thống thay thế vĩnh viễn bằng ký tự `?` (ASCII `0x3F`). Dẫn đến khi API trả kết quả về cho OTP Portal hiển thị toast: `?? t?m th?y m? OTP [600212] th?nh c?ng!`.
+- **Phạm vi & Thay đổi kỹ thuật**:
+  - [`backend/src/domains/system/services/otpProviderService.js`](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/system/services/otpProviderService.js):
+    - Dòng 953: Phục hồi message thành công: `Đã tìm thấy mã OTP [${executionResult.otp}] thành công!`, `Đã lấy thông tin tài khoản thành công! (${extraFields.length} trường)`.
+    - Dòng 954: Phục hồi message lỗi: `Chưa có thư mới hoặc chưa lấy được mã OTP trong hộp thư.`.
+    - Dòng 871-919: Phục hồi `Thời gian còn lại`, `Hết hạn lúc`, thông báo kiểm tra `Vui lòng cung cấp email hoặc mã đơn hàng cần kiểm tra.`, `Vui lòng cung cấp email hợp lệ (vd: user@domain.com).`.
+  - [`backend/src/domains/invoices/services/receiptAllocationService.js`](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/invoices/services/receiptAllocationService.js):
+    - Dòng 20: Phục hồi lỗi `Không tìm thấy biên lai thanh toán`.
+    - Dòng 24: Phục hồi `Số tiền phân bổ vượt quá số dư khả dụng của biên lai (${currentUnallocated.toLocaleString("vi-VN")} ₫)`.
+  - [`backend/src/domains/payments/services/webhookInboundOrderService.js`](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/payments/services/webhookInboundOrderService.js):
+    - Dòng 15-17: Phục hồi các status tiếng Việt: `Chưa Thanh Toán`, `Cần Gia Hạn`, `Đang Xử Lý`.
+  - [`backend/src/domains/products/services/productService.js`](file:///d:/Desktop/admin/admin_orderlist/backend/src/domains/products/services/productService.js):
+    - Dòng 335: Phục hồi lỗi `Sản phẩm không tồn tại`.
+    - Dòng 390-416: Phục hồi các nhãn theo dõi thay đổi: `Tên sản phẩm`, `Tên gói`, `Giá gốc`, `Giá bán lẻ`, `Giá sinh viên`, `Giá khuyến mại`, `Trạng thái: Hoạt động / Ẩn`, `Cập nhật sản phẩm`.
+  - [`frontend/src/pages/WarehousePage.tsx`](file:///d:/Desktop/admin/admin_orderlist/frontend/src/pages/WarehousePage.tsx):
+    - Dòng 111: Phục hồi lỗi `Không thể tải danh sách kho.`.
+- **Kiểm tra Verification Gates**:
+  - Scanner toàn diện: Quét toàn bộ 530 tệp tin runtime code $\rightarrow$ **0 chuỗi tiếng Việt bị lỗi dấu `?`**.
+  - Backend Unit Tests: `npm --prefix backend test` $\rightarrow$ **143/143 tests PASS 100%**.
+  - Frontend Build: `npm --prefix frontend run build` $\rightarrow$ **0 lỗi TypeScript, build thành công trong 13.66s**.
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT KHẮC PHỤC TRIỆT ĐỂ. Message toast và tất cả nhãn tiếng Việt trên hệ thống hiển thị chính xác 100%.
+## [15:06] Refactor Master Plan - Public OTP Router
+- **Phạm vi:** Tách 12 public OTP endpoints và 2 slot-sync endpoints khỏi `backend/src/server.js` sang router domain riêng.
+- **Trạng thái:** Đã hoàn tất slice router; chưa triển khai provider driver/frontend slices.
+- **Thay đổi:** `backend/src/domains/system/routes/publicOtpRoutes.js`, `backend/src/server.js`, `task.md`.
+- **Kiểm tra:** `node --check` cho server/router; `git diff --check` còn cảnh báo blank line EOF tồn tại từ report hiện hữu.
+- **Điều kiện còn lại:** Chạy backend suite và frontend build; tiếp tục phase 2/3 sau khi xác nhận contract regression.
+## [15:20] Refactor Master Plan - Finance Bundle
+- **Phạm vi:** Lazy-load năm tab không phải Overview của Finance Hub và `PersonalAssetsModal` chỉ khi người dùng mở luồng tương ứng.
+- **Trạng thái:** Hoàn tất; không đổi API, state hoặc hành vi form.
+- **Thay đổi:** `frontend/src/features/finance/FinanceHubPage.tsx`, `frontend/src/features/finance/components/SavingsAndAssetsSection.tsx`, `frontend/src/features/finance/components/DebtsAndInstallmentsSection.tsx`, `task.md`.
+- **Kiểm tra:** `npm --prefix frontend run build` pass; FinanceHubPage giảm từ 691.72 kB xuống 84.71 kB, không còn warning chunk >500 kB.
+- **Điều kiện còn lại:** Controller External API vẫn 3,404 dòng; provider drivers và 40 tệp/128 raw fetch chưa được refactor.
+## [15:35] Refactor Master Plan - Provider Drivers - HDSD/TinyHost
+- **Phạm vi:** Tách HDSD, TinyHost và các utility parse/extract OTP dùng chung khỏi facade.
+- **Trạng thái:** Hoàn tất slice đầu; `otpProviderService` vẫn giữ export compatibility và registry hiện hành.
+- **Thay đổi:** `backend/src/domains/system/providers/otpProviderUtils.js`, `backend/src/domains/system/providers/hdsdProvider.js`, `backend/src/domains/system/providers/tinyhostProvider.js`, `backend/src/domains/system/services/otpProviderService.js`, `task.md`.
+- **Kiểm tra:** `node --check` cho các module đã sửa; `npm --prefix backend test` pass 143/143; `git diff --check` pass.
+- **Điều kiện còn lại:** Ades, Yuna, VivaRocky, warehouse 2FA chưa tách; frontend controller/raw fetch chưa xử lý.
+## [15:50] Refactor Master Plan - External API Helpers
+- **Phạm vi:** Tách helper thuần xử lý JSON path và giá trị lồng nhau khỏi `ExternalApiConfigController`.
+- **Trạng thái:** Hoàn tất; giữ nguyên output và `DetectedField` contract.
+- **Thay đổi:** `frontend/src/features/external-api/utils/externalApiHelpers.ts`, `frontend/src/features/external-api/components/ExternalApiConfigController.tsx`, `task.md`.
+- **Kiểm tra:** `npm --prefix frontend run build` pass; không phát sinh cảnh báo chunk mới.
+- **Điều kiện còn lại:** Controller vẫn cần tách các tab/modal JSX; raw fetch inventory còn 40 file/128 calls.
+## [16:20] Refactor Master Plan - IMAP and Hard-Coded Slots
+- **Phạm vi:** Thêm provider IMAP từ environment và chuyển fallback slot OTP về default hard-code khi cấu hình DB không tồn tại.
+- **Trạng thái:** Hoàn tất slice; HDSD/Tmail không còn trong slot chain; IMAP `NOT_CONFIGURED` khi thiếu `OTP_IMAP_*`.
+- **Thay đổi:** `backend/src/domains/system/providers/imap.js`, `backend/src/domains/system/providers/providerConfig.js`, `backend/src/domains/system/providers/registry.js`, `backend/src/domains/system/services/otpProviderService.js`, `backend/src/domains/system/services/otpPortalDispatcher.js`, `backend/tests/unit/imapProvider.test.js`, `backend/tests/unit/otpProviderService.test.js`, `task.md`.
+- **Kiểm tra:** `npm --prefix backend test` pass 144/144; `git diff --check` pass.
+- **Điều kiện còn lại:** Provider hiện hữu vẫn đọc `external_api_configs`; không được drop bảng trước khi hoàn thành migration registry/provider_key/product mappings.
+## [22:10] Provider Hard-Code Cutover
+- **Phạm vi:** Loại runtime CRUD của `external_api_configs`, chuẩn hóa provider cố định và giữ mapping provider với sản phẩm/ô input OTP.
+- **Thay đổi:** Registry `tinyhost`, `ades`, `yuna_2fa`, `yuna_mail`, VivaRocky, `totp`, `warehouse_2fa`, `imap`; UI bảng Tên dịch vụ / ô input test / trạng thái / on-off; product mapping dùng `provider_key`; HDSD/Tmail đã bị loại khỏi runtime.
+- **Database:** Migration `20261109000003_add_provider_key_to_product_api_configs.js` backfill mapping, migration `20261109000004_drop_external_api_configs.js` chỉ drop khóa/bảng cũ sau khi xác minh mapping đầy đủ.
+- **Kiểm tra:** `npm --prefix backend test` pass **144/144**; `npm --prefix frontend run build` pass.
+- **Chưa nghiệm thu production:** Chưa chạy migration trên DB thử nghiệm và `deploy.sh` từ chối worktree bẩn; không thực hiện drop/deploy production để tránh đụng thay đổi chưa commit.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Orchestrates historical daily vacant-slot cost recalculation.
  */
 const { db, TABLES } = require("@/db");

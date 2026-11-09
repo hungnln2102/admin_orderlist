@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { lazy, Suspense, useState, useMemo } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { PersonalAssetsModal } from "./PersonalAssetsModal";
+const PersonalAssetsModal = lazy(() => import("./PersonalAssetsModal").then((module) => ({ default: module.PersonalAssetsModal })));
 import { PersonalBankAccountModal } from "./PersonalBankAccountModal";
 import { PersonalFinanceBalanceLogSection } from "./PersonalFinanceBalanceLogSection";
 
@@ -539,14 +539,16 @@ export const SavingsAndAssetsSection: React.FC<Props> = ({
 
 
       {/* Modals */}
-      <PersonalAssetsModal
+      <Suspense fallback={null}>
+        <PersonalAssetsModal
 
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         editingItem={editingItem}
         defaultType={modalDefaultType}
-      />
+        />
+      </Suspense>
 
       <PersonalBankAccountModal
         isOpen={bankModalOpen}

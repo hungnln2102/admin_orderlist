@@ -1,4 +1,4 @@
-﻿# Giai đoạn 5 mới - Dynamic OTP Gateway, Traffic Feature và Code Splitting
+# Giai đoạn 5 mới - Dynamic OTP Gateway, Traffic Feature và Code Splitting
 
 - Ngày lập: 2026-11-09
 - Múi giờ: Asia/Bangkok

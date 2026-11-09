@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Read-only queries for daily vacant-slot cost ledger.
  */
 const { db, TABLES } = require("@/db");

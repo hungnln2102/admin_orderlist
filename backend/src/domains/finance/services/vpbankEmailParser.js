@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VPBank Email Parser Engine (Pure Function)
  *
  * Parses VPBank transaction notifications without accessing persistence.

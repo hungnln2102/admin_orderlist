@@ -1,7 +1,7 @@
-﻿export interface ProductApiMappingItem {
+export interface ProductApiMappingItem {
   mapping_id: number;
   product_id: number;
-  api_config_id: number;
+  provider_key: string;
   is_default: boolean;
   is_active: boolean;
   sort_order: number;

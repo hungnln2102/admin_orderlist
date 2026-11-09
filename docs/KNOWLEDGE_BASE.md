@@ -1,4 +1,4 @@
-﻿# TRUNG TÂM TRI THỨC NGHIỆP VỤ VÀ KIẾN TRÚC
+# TRUNG TÂM TRI THỨC NGHIỆP VỤ VÀ KIẾN TRÚC
 
 Tài liệu này được gom từ các hướng dẫn tài chính, kiến trúc và quy trình cũ trước đợt tái cấu trúc dự án.
 

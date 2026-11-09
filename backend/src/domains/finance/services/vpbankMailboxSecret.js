@@ -1,4 +1,4 @@
-﻿const crypto = require("crypto");
+const crypto = require("crypto");
 
 const KEY_ENV = "VPBANK_MAILBOX_ENCRYPTION_KEY";
 const VERSION = "v1";

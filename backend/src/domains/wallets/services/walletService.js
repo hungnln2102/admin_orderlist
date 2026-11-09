@@ -1,4 +1,4 @@
-﻿/**
+/**
  * walletService.js (V2)
  * Quản lý Tài khoản Thanh toán (Bank) và Ví USDT (USDT) từ DB (finance.financial_accounts)
  */

@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { requireAdmin } = require("../../src/domains/auth/middleware/requireAdmin");
 const { assertSafeExternalUrl } = require("../../src/utils/safeExternalRequest");
-const { requestConfiguredApi } = require("../../src/domains/system/services/externalApiConfigService");
+const { requestProviderApi } = require("../../src/domains/system/providers/providerRequest");
 
 function createResponse() {
   return {
@@ -41,5 +41,5 @@ test("external request policy rejects non-HTTPS and private targets", async () =
 
 
 test("configured OTP transport rejects private base URLs before making a request", async () => {
-  await assert.rejects(() => requestConfiguredApi({ base_url: "https://127.0.0.1", auth_config: {} }, { endpoint: "/otp" }));
+  await assert.rejects(() => requestProviderApi({ base_url: "https://127.0.0.1", auth_config: {} }, { endpoint: "/otp" }));
 });

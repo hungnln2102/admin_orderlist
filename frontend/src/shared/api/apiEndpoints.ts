@@ -9,7 +9,5 @@ export const apiEndpoints = {
   portalSlots: "/api/public/otp-portal-slots",
   portalSlotProbe: "/api/public/otp/probe-slot",
   systemConfigs: "/api/system/configs",
-  externalApis: "/api/system/external-apis",
-  externalApiOtpTest: "/api/system/external-apis/test-otp",
-  externalApiAnalyze: "/api/system/external-apis/analyze-endpoint",
+  providers: "/api/system/providers",
 } as const;

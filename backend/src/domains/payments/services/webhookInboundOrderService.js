@@ -12,9 +12,9 @@ const PAYABLE_STATUSES = [
   ORDER_STATUS.UNPAID,
   ORDER_STATUS.RENEW_REQUIRED,
   ORDER_STATUS.PROCESSING,
-  "Ch?a Thanh To?n",
-  "C?n Gia H?n",
-  "?ang X? L?",
+  "Chưa Thanh Toán",
+  "Cần Gia Hạn",
+  "Đang Xử Lý",
 ];
 
 const getOrderTable = (trx) => trx(TABLES.ORDER_LIST);

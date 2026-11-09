@@ -1,4 +1,4 @@
-﻿export type ApiRequestOptions = Omit<RequestInit, "body" | "headers"> & {
+export type ApiRequestOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: unknown;
   headers?: HeadersInit;
 };

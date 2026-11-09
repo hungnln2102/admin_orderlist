@@ -1,4 +1,4 @@
-﻿const SYSTEM_SCHEMA = process.env.DB_SCHEMA_SYSTEM_AUTOMATION || "system_automation";
+const SYSTEM_SCHEMA = process.env.DB_SCHEMA_SYSTEM_AUTOMATION || "system_automation";
 const CONFIG_KEY = "VPBANK_MAILBOX_CONFIG";
 
 exports.up = async function up(knex) {

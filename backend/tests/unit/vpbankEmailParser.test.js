@@ -32,7 +32,7 @@ test("VPBank Email Parser Suite", async (t) => {
         Kính gửi Quý khách,
         Thẻ tín dụng quốc tế VISA *2340 vừa phát sinh giao dịch:
         - Số tiền giao dịch: - 150,000 VND
-        - Thá»i gian: 03/11/2026 18:39:41
+        - Thời gian: 03/11/2026 18:39:41
         merchant: Foody
         - Mã chuẩn chi: 987654
         - Hạn mức khả dụng còn lại: 18,242,622 VND

@@ -1,4 +1,4 @@
-﻿const crypto = require("crypto");
+const crypto = require("crypto");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 

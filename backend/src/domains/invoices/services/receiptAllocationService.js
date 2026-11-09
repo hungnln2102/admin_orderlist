@@ -17,11 +17,11 @@ async function allocateReceiptInTrx(trx, receiptId, allocAmount, allocType, targ
     .where({ id: Number(receiptId) })
     .forUpdate()
     .first();
-  if (!receipt) throw new Error("Kh?ng t?m th?y bi?n lai thanh to?n");
+  if (!receipt) throw new Error("Không tìm thấy biên lai thanh toán");
 
   const currentUnallocated = Number(receipt.unallocated_amount ?? receipt.amount ?? 0);
   if (allocAmount > currentUnallocated) {
-    throw new Error(`S? ti?n ph?n b? v??t qu? s? d? kh? d?ng c?a bi?n lai (${currentUnallocated.toLocaleString("vi-VN")} ?)`);
+    throw new Error(`Số tiền phân bổ vượt quá số dư khả dụng của biên lai (${currentUnallocated.toLocaleString("vi-VN")} ₫)`);
   }
 
   const newUnallocated = currentUnallocated - allocAmount;

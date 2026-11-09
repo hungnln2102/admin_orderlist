@@ -42,7 +42,7 @@
 
 ---
 
-### 1. PHáº M VI NGHIá»†M THU (SCOPE)
+### 1. PHẠM VI NGHIỆM THU (SCOPE)
 
 1. **Quy Tắc Giá Catalog Động Khi Chuyển Sang `RENEW_REQUIRED` (Cần Gia Hạn):**
    - Khi đơn `PAID` (Đã Thanh Toán) chuyển trạng thái thành `RENEW_REQUIRED` (qua Cron 0h hàng ngày `updateOrderStatusTask` hoặc gọi API `/renew`): Giá bán gốc (`gross_selling_price`) **bắt buộc lấy theo giá hiện hành trong catalog (bảng giá)** theo phân loại tiền tố đơn hàng:
@@ -69,7 +69,7 @@
 
 ---
 
-### 2. TRáº NG THÃI NGHIá»†M THU (ACCEPTANCE STATUS)
+### 2. TRẠNG THÁI NGHIỆM THU (ACCEPTANCE STATUS)
 
 | Hạng mục kiểm tra | Trạng thái | Ghi chú nghiệm thu |
 | :--- | :---: | :--- |
@@ -83,7 +83,7 @@
 
 ---
 
-### 3. CÃC Táº¬P TIN MÃƒ NGUá»’N ÄÃƒ THAY Äá»”I & Táº O Má»šI
+### 3. CÁC TẬP TIN MÃ NGUỒN ĐÃ THAY ĐỔI & TẠO MỚI
 
 1. [`backend/src/domains/products/services/catalogPricingService.js`](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/products/services/catalogPricingService.js):
    - Service trung tâm giải quyết giá catalog theo prefix và kiểm tra trạng thái hoạt động của sản phẩm.
@@ -112,7 +112,7 @@
 
 ---
 
-### 4. Káº¾T QUáº¢ KIá»‚M THá»¬ (TEST VERIFICATION)
+### 4. KẾT QUẢ KIỂM THỬ (TEST VERIFICATION)
 
 #### 4.1. Chạy Backend Unit Tests:
 ```
@@ -147,7 +147,7 @@
 
 ---
 
-### 5. Káº¾T LUáº¬N & KIáº¾N NGHá»Š
+### 5. KẾT LUẬN & KIẾN NGHỊ
 
 Hệ thống đã đáp ứng chính xác 100% các yêu cầu kỹ thuật và nghiệp vụ do Master chỉ đạo:
 1. Đơn hàng không bị làm tròn giá bất kỳ đâu.
@@ -1386,7 +1386,7 @@ Ký hiệu: `RUNTIME` là đường chạy chính hiện tại; `MIGRATION` là 
 
 ---
 
-### 1. PHáº M VI NGHIá»†M THU (SCOPE)
+### 1. PHẠM VI NGHIỆM THU (SCOPE)
 
 1. **Khắc Phục Lệch Giờ & Chuẩn Hóa Thời Gian Trên Host VPS:**
    - Xử lý tình trạng đồng hồ máy chủ bị chạy chậm ~5 phút do dịch vụ `systemd-timesyncd` mặc định trỏ tới `ntp.ubuntu.com` bị timeout kết nối ra quốc tế trên cổng UDP 123.
@@ -1408,7 +1408,7 @@ Ký hiệu: `RUNTIME` là đường chạy chính hiện tại; `MIGRATION` là 
 
 ---
 
-### 2. TRáº NG THÃI NGHIá»†M THU (ACCEPTANCE STATUS)
+### 2. TRẠNG THÁI NGHIỆM THU (ACCEPTANCE STATUS)
 
 | Hạng mục kiểm tra | Trạng thái | Ghi chú nghiệm thu |
 | :--- | :---: | :--- |
@@ -1422,7 +1422,7 @@ Ký hiệu: `RUNTIME` là đường chạy chính hiện tại; `MIGRATION` là 
 
 ---
 
-### 3. Káº¾T QUáº¢ Äá»I SOÃT TRá»°C TIáº¾P TRÃŠN MÃY CHá»¦ VPS
+### 3. KẾT QUẢ ĐỐI SOÁT TRỰC TIẾP TRÊN MÁY CHỦ VPS
 
 #### 3.1. Đối Soát Lệnh `date` Toàn Bộ Hệ Thống (Host & Containers):
 ```bash
@@ -1476,7 +1476,7 @@ admin_orderlist-backend        | [Scheduler] Đã khởi tạo 5 lịch tác v�
 
 ---
 
-### 4. Káº¾T LUáº¬N
+### 4. KẾT LUẬN
 
 Hệ thống VPS và toàn bộ các container dịch vụ của dự án `admin_orderlist` đã được đưa về đúng **100% múi giờ Việt Nam (`Asia/Ho_Chi_Minh` / UTC+7)**. Lỗi lệch thời gian 5 phút đã được triệt tiêu hoàn toàn, bảo đảm các tác vụ tự động (Cron 0h chuyển trạng thái đơn, Cron 7h gửi tin nhắn Telegram, các tác vụ tính lãi tài chính) diễn ra chuẩn xác tuyệt đối.
 

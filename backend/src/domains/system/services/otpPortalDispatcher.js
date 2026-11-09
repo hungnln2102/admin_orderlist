@@ -11,7 +11,7 @@ const DEFAULT_SLOTS = [
     slot_key: "adobe_otp",
     name: "Adobe: Lấy Mã OTP 6 Số",
     category: "adobe",
-    assigned_services: ["fix_ades", "tinyhost"],
+    assigned_services: ["ades", "tinyhost"],
     cooldown_seconds: 30,
     btn_text: "Lấy Mã OTP Adobe",
     input_placeholder: "Nhập địa chỉ Email Adobe (VD: user@domain.com)...",
@@ -31,7 +31,7 @@ const DEFAULT_SLOTS = [
     slot_key: "netflix_household",
     name: "Netflix: Link TV / Hộ Gia Đình",
     category: "netflix",
-    assigned_services: ["vivarocky_household", "fix_ades", "tmail_webmail"],
+    assigned_services: ["vivarocky_household", "ades", "imap"],
     cooldown_seconds: 45,
     btn_text: "Lấy Link Cập Nhật TV",
     input_placeholder: "Nhập Email tài khoản Netflix...",
@@ -41,7 +41,7 @@ const DEFAULT_SLOTS = [
     slot_key: "netflix_six_digit",
     name: "Netflix: Mã Xác Minh 6 Số",
     category: "netflix",
-    assigned_services: ["vivarocky_six_digit", "fix_ades", "tinyhost"],
+    assigned_services: ["vivarocky_six_digit", "ades", "tinyhost"],
     cooldown_seconds: 30,
     btn_text: "Lấy Mã 6 Số Netflix",
     input_placeholder: "Nhập Email tài khoản Netflix...",
@@ -51,7 +51,7 @@ const DEFAULT_SLOTS = [
     slot_key: "netflix_login_otp",
     name: "Netflix: OTP Đăng Nhập",
     category: "netflix",
-    assigned_services: ["vivarocky_signin", "fix_ades", "tmail_webmail"],
+    assigned_services: ["vivarocky_signin", "ades", "imap"],
     cooldown_seconds: 30,
     btn_text: "Lấy OTP Đăng Nhập",
     input_placeholder: "Nhập Email tài khoản Netflix...",
@@ -95,8 +95,7 @@ const DEFAULT_SLOTS = [
 function getActiveSlots({ allowMissing = false } = {}) {
   const raw = systemConfigService.get("OTP_PORTAL_SLOTS_CONFIG");
   if (raw === null || raw === undefined || raw === "") {
-    if (allowMissing) return [];
-    throw new Error("OTP_PORTAL_SLOTS_CONFIG_NOT_FOUND");
+    return allowMissing ? [] : DEFAULT_SLOTS.map((slot) => ({ ...slot, assigned_services: [...slot.assigned_services] }));
   }
 
   let parsed;

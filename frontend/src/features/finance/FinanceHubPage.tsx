@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { lazy, Suspense, useState, useEffect, useCallback } from "react";
 import { FinanceSummaryData } from "./types";
 import { createFixedCost, createInstallment, createPersonalAsset, deleteFixedCost, deleteInstallment, deletePersonalAsset, getFinanceSummary, updateFixedCost, updateInstallment, updatePersonalAsset } from "./api/financeApiClient";
 import { NetWorthCards } from "./components/NetWorthCards";
 import { FinanceOverviewPanel } from "./components/FinanceOverviewPanel";
 import { FinanceVisualChartsSection } from "./components/FinanceVisualChartsSection";
-import { DebtsAndInstallmentsSection } from "./components/DebtsAndInstallmentsSection";
-import { FixedCostList } from "./components/FixedCostList";
-import { SavingsAndAssetsSection } from "./components/SavingsAndAssetsSection";
-import { SavingGoalsSection } from "./components/SavingGoalsSection";
-import { WarehouseFinanceSection } from "./components/WarehouseFinanceSection";
+
+
+
+
+
 import { DateRangePicker } from "@/shared/components/DateRangePicker";
 import {
   Calendar,
@@ -25,6 +25,11 @@ import {
   Boxes,
 } from "lucide-react";
 
+const DebtsAndInstallmentsSection = lazy(() => import("./components/DebtsAndInstallmentsSection").then((module) => ({ default: module.DebtsAndInstallmentsSection })));
+const FixedCostList = lazy(() => import("./components/FixedCostList").then((module) => ({ default: module.FixedCostList })));
+const SavingsAndAssetsSection = lazy(() => import("./components/SavingsAndAssetsSection").then((module) => ({ default: module.SavingsAndAssetsSection })));
+const SavingGoalsSection = lazy(() => import("./components/SavingGoalsSection").then((module) => ({ default: module.SavingGoalsSection })));
+const WarehouseFinanceSection = lazy(() => import("./components/WarehouseFinanceSection").then((module) => ({ default: module.WarehouseFinanceSection })));
 export type FinanceTabKey =
   | "OVERVIEW"
   | "DEBTS_INSTALLMENTS"
@@ -412,6 +417,7 @@ export const FinanceHubPage: React.FC = () => {
       {/* 3. DYNAMIC CONTENT AREA BASED ON SELECTED TAB */}
       {data && (
         <div className="space-y-6">
+          <Suspense fallback={null}>
           {/* TAB 1: TỔNG QUAN (KHỐI BIỂU ĐỒ TRỰC QUAN HOÀN CHỈNH Y HỆT ẢNH MẪU CỦA MASTER) */}
           {activeTab === "OVERVIEW" && (
             <div className="space-y-6 animate-in fade-in duration-200">
@@ -501,6 +507,7 @@ export const FinanceHubPage: React.FC = () => {
               <WarehouseFinanceSection />
             </div>
           )}
+          </Suspense>
         </div>
       )}
     </div>

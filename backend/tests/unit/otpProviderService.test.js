@@ -73,12 +73,12 @@ test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign
     assert.equal(options.headers["Content-Type"], "application/x-www-form-urlencoded");
 
     if (String(url).endsWith("/household.php")) {
-      return new Response('<a href="https://www.netflix.com/account/household/update?token=abc">Update</a>', { status: 200 });
+      return new Response('<a href="https://www.netflix.com/account/travel/verify?nftoken=abc&amp;messageGuid=xyz"><span>Get Code</span></a>', { status: 200 });
     }
     if (String(url).endsWith("/six_digit_login.php")) {
       return new Response('<div class="success-box">123456</div>', { status: 200 });
     }
-    return new Response('<div class="success-box">654321</div>', { status: 200 });
+    return new Response('Enter this code to sign in<table><tr><td>0586</td></tr></table>', { status: 200 });
   }, async () => {
     const household = await executeOtpConfig({
       service_key: "vivarocky_household",
@@ -99,12 +99,16 @@ test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign
       auth_config: { operation: "signin_code", access_code: "mvrk56" },
     }, "user@example.com");
 
-    assert.equal(household.extra_fields.find((field) => field.key === "netflix_link")?.value, "https://www.netflix.com/account/household/update?token=abc");
+    assert.equal(household.extra_fields.find((field) => field.key === "netflix_link")?.value, "https://www.netflix.com/account/travel/verify?nftoken=abc&messageGuid=xyz");
+    assert.equal(household.otp, null);
+    assert.equal(household.extra_fields.some((field) => field.key === "otp"), false);
     assert.equal(sixDigit.otp, "123456");
-    assert.equal(signIn.otp, "654321");
+    assert.equal(signIn.otp, "0586");
+    assert.equal(sixDigit.extra_fields.some((field) => field.key === "netflix_link"), false);
+    assert.equal(signIn.extra_fields.some((field) => field.key === "netflix_link"), false);
   });
 
-  assert.equal(calls[0].options.body, "user_email=user%40example.com");
+  assert.equal(calls[0].options.body, "email=user%40example.com&user_email=user%40example.com");
   assert.equal(calls[1].options.body, "user_email=user%40example.com");
   assert.equal(calls[2].options.body, "user_email=user%40example.com&access_code=mvrk56");
 });
@@ -196,7 +200,7 @@ test("dispatcher rejects slots without a configured service chain", { concurrenc
 test("probe requires an explicit service key and does not fall back to HDSD", async () => {
   await assert.rejects(
     probeOtpForEmail({ email: "user@example.com" }),
-    /EXTERNAL_API_CONFIG_NOT_FOUND: service_key is required/
+    /OTP_PROVIDER_NOT_FOUND: service_key is required/
   );
 });
 
@@ -228,13 +232,15 @@ test("registering a new portal slot does not inject vendor fallback services", a
 });
 
 
-test("dispatcher fails closed when the portal slot config is missing or malformed", { concurrency: false }, () => {
+test("dispatcher uses hard-coded slots when the portal slot config is missing and rejects malformed overrides", { concurrency: false }, () => {
   const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
   const systemConfigService = require("../../src/domains/system/services/systemConfigService");
   const originalGet = systemConfigService.get;
   systemConfigService.get = () => null;
   try {
-    assert.throws(() => dispatcher.getActiveSlots(), /OTP_PORTAL_SLOTS_CONFIG_NOT_FOUND/);
+    const slots = dispatcher.getActiveSlots();
+    assert.ok(slots.some((slot) => slot.slot_key === "adobe_otp"));
+    assert.ok(slots.every((slot) => !slot.assigned_services.includes("otp_hdsd") && !slot.assigned_services.includes("tmail_webmail")));
     systemConfigService.get = () => "not-json";
     assert.throws(() => dispatcher.getActiveSlots(), /OTP_PORTAL_SLOTS_CONFIG_INVALID/);
   } finally {

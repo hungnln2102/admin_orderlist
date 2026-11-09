@@ -1,4 +1,4 @@
-﻿/**
+/**
  * types.ts
  * Định nghĩa kiểu dữ liệu cho Trung Tâm Tài Chính V2
  */

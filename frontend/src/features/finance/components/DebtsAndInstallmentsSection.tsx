@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { lazy, Suspense, useState, useEffect } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
@@ -17,7 +17,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { InstallmentModal } from "./InstallmentModal";
-import { PersonalAssetsModal } from "./PersonalAssetsModal";
+const PersonalAssetsModal = lazy(() => import("./PersonalAssetsModal").then((module) => ({ default: module.PersonalAssetsModal })));
 import { DebtPaymentModal } from "./DebtPaymentModal";
 
 interface Props {
@@ -774,13 +774,15 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
         onSave={saveInstallment}
         editingItem={editingInstallment}
       />
-      <PersonalAssetsModal
+      <Suspense fallback={null}>
+        <PersonalAssetsModal
         isOpen={debtModalOpen}
         onClose={() => setDebtModalOpen(false)}
         onSave={saveDebt}
         editingItem={editingDebt}
         defaultType="DEBT_PAYABLE"
-      />
+        />
+      </Suspense>
       <DebtPaymentModal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}

@@ -3,7 +3,7 @@ const router = express.Router();
 const systemConfigService = require("./services/systemConfigService");
 const cronJobService = require("./services/cronJobService");
 const systemLogService = require("./services/systemLogService");
-const externalApiConfigService = require("./services/externalApiConfigService");
+const { listProviderCatalog } = require("./providers/registry");
 const otpProviderService = require("./services/otpProviderService");
 const totpController = require("./controllers/totpController");
 const productApiController = require("./controllers/productApiController");
@@ -142,89 +142,16 @@ router.get("/audit-logs/:id", async (req, res) => {
 // EXTERNAL APIS & OTP SERVICES
 // ==========================================
 
-// GET /api/system/external-apis - Liệt kê tất cả cấu hình API
-router.get("/external-apis", async (req, res) => {
-  try {
-    const configs = await externalApiConfigService.getAllConfigs();
-    res.json({ success: true, configs });
-  } catch (err) {
-    console.error("[System API] Lỗi lấy danh sách external APIs:", err);
-    res.status(500).json({ success: false, error: "Lỗi hệ thống khi tải cấu hình API." });
-  }
+// GET /api/system/providers - Danh mục provider hard-code
+router.get("/providers", (_req, res) => {
+  res.json({ success: true, providers: listProviderCatalog() });
 });
 
-// GET /api/system/external-apis/:id - Chi tiết 1 cấu hình
-router.get("/external-apis/:id", async (req, res) => {
+// POST /api/system/providers/:key/test - Kiểm tra provider bằng input do người dùng nhập
+router.post("/providers/:key/test", sensitiveOperationRateLimiter, async (req, res) => {
   try {
-    const config = await externalApiConfigService.getConfigById(Number(req.params.id));
-    if (!config) return res.status(404).json({ success: false, error: "Không tìm thấy cấu hình." });
-    res.json({ success: true, config });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/system/external-apis - Tạo mới cấu hình
-router.post("/external-apis", async (req, res) => {
-  try {
-    const config = await externalApiConfigService.createConfig(req.body);
-    res.status(201).json({ success: true, config, message: "Đã tạo cấu hình mới." });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// PUT /api/system/external-apis/:id - Cập nhật cấu hình
-router.put("/external-apis/:id", async (req, res) => {
-  try {
-    const config = await externalApiConfigService.updateConfig(Number(req.params.id), req.body);
-    res.json({ success: true, config, message: "Đã cập nhật cấu hình." });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// DELETE /api/system/external-apis/:id - Xóa cấu hình
-router.delete("/external-apis/:id", async (req, res) => {
-  try {
-    const result = await externalApiConfigService.deleteConfig(Number(req.params.id));
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/system/external-apis/:id/test - Ping kiểm tra kết nối
-router.post("/external-apis/:id/test", sensitiveOperationRateLimiter, async (req, res) => {
-  try {
-    const result = await externalApiConfigService.testApiConnection(Number(req.params.id));
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/system/external-apis/analyze-endpoint - Gửi thử request & phân tích cây JSON
-router.post("/external-apis/analyze-endpoint", sensitiveOperationRateLimiter, async (req, res) => {
-  try {
-    const result = await externalApiConfigService.analyzeEndpoint({
-      configId: Number(req.body?.config_id),
-      method: req.body?.method,
-      endpoint: req.body?.endpoint,
-      email: req.body?.email,
-      body: req.body?.body,
-    });
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/system/external-apis/test-otp - Live Probe kiểm tra lấy mã OTP từ email
-router.post("/external-apis/test-otp", sensitiveOperationRateLimiter, async (req, res) => {
-  try {
-    const { email, service_key } = req.body || {};
-    const result = await otpProviderService.probeOtpForEmail({ email, serviceKey: service_key });
+    const { email, input } = req.body || {};
+    const result = await otpProviderService.probeOtpForEmail({ email: email || input, serviceKey: req.params.key });
     res.json(result);
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

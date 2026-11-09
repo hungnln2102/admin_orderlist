@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy } from "react";
 
 const ExternalApiConfigController = lazy(() =>
   import("@/features/external-api/components/ExternalApiConfigController")

@@ -1,4 +1,4 @@
-﻿const personalDebitTransactionService = require("../services/personalDebitTransactionService");
+const personalDebitTransactionService = require("../services/personalDebitTransactionService");
 
 function respond(handler, status = 200) {
   return async (req, res, next) => {

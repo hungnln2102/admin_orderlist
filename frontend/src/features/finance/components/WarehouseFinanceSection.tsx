@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useWarehouseFinanceData } from "../hooks/useWarehouseFinanceData";
 import type { PackageFinancialItem } from "./warehouseFinanceTypes";
 import { WarehouseFinanceBackfillModal } from "./WarehouseFinanceBackfillModal";

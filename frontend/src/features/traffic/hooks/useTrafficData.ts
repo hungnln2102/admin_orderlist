@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TrafficApiResponse } from "../types";
 
 export function useTrafficData(days: number) {

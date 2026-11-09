@@ -1,4 +1,4 @@
-﻿const FINANCE_SCHEMA = process.env.DB_SCHEMA_FINANCE || "finance";
+const FINANCE_SCHEMA = process.env.DB_SCHEMA_FINANCE || "finance";
 
 exports.up = async function up(knex) {
   await knex.raw(`

@@ -1,4 +1,4 @@
-﻿const FINANCE_SCHEMA = process.env.DB_SCHEMA_FINANCE || "finance";
+const FINANCE_SCHEMA = process.env.DB_SCHEMA_FINANCE || "finance";
 
 const DEFAULT_CATEGORIES = [
   ["FOOD_DRINK", "Ăn uống & Cafe", "Utensils", "amber", 1, ["highlands", "coffee", "grabfood", "shopeefood"]],

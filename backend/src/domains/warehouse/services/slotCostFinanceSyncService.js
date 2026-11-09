@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Synchronizes committed vacant-slot cost deltas to finance projections.
  */
 const { accumulateDailySummary } = require("@/domains/dashboard/services/dailySummaryService");

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * slotCostService.js
  * Quản lý tính toán và ghi nhận chi phí phân bổ slot trống hàng ngày cho Kho Gói Sản Phẩm.
  *

@@ -108,7 +108,7 @@ export const WarehousePage: React.FC = () => {
         fetchCachedJson<SystemProduct[]>("/api/warehouse/system-products", { ttlMs: 5 * 60 * 1000, staleWhileRevalidateMs: 5 * 60 * 1000 }),
       ]);
 
-      if (!accRes.ok) throw new Error("Kh?ng th? t?i danh s?ch kho.");
+      if (!accRes.ok) throw new Error("Không thể tải danh sách kho.");
       const accData: WarehouseAccountItem[] = await accRes.json();
       const nextAccounts = Array.isArray(accData) ? accData : [];
       setAccounts(nextAccounts);

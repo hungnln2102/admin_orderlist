@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 
 export function useClipboard() {
   const [copied, setCopied] = useState<string | null>(null);

@@ -332,7 +332,7 @@ const createProduct = async (data) => {
 const updateProduct = async (id, data) => withTransaction(async (trx) => {
   const variantId = parseInt(id, 10);
   const oldVariant = await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
-  if (!oldVariant) throw new Error("S?n ph?m kh?ng t?n t?i");
+  if (!oldVariant) throw new Error("Sản phẩm không tồn tại");
 
   const oldPrices = await trx(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId });
   const getOldPrice = (tierId) => {
@@ -387,17 +387,17 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
       ? label + ": " + formatMoney(oldState[key]) + " -> " + formatMoney(data[key])
       : label + ": \"" + oldState[key] + "\" -> \"" + data[key] + "\"");
   };
-  trackChange("san_pham", "T?n s?n ph?m");
-  trackChange("package_product", "T?n g?i");
-  trackChange("base_price", "Gi? g?c", true);
-  trackChange("retail_price", "Gi? b?n l?", true);
+  trackChange("san_pham", "Tên sản phẩm");
+  trackChange("package_product", "Tên gói");
+  trackChange("base_price", "Giá gốc", true);
+  trackChange("retail_price", "Giá bán lẻ", true);
   trackChange("ctv_price", "Gi? CTV", true);
-  trackChange("student_price", "Gi? sinh vi?n", true);
-  trackChange("promo_price", "Gi? khuy?n m?i", true);
+  trackChange("student_price", "Giá sinh viên", true);
+  trackChange("promo_price", "Giá khuyến mại", true);
   if (is_active !== undefined && Boolean(is_active) !== oldState.is_active) {
     changes.is_active = { old: oldState.is_active, new: Boolean(is_active) };
     changedFields.push("is_active");
-    summaryParts.push("Tr?ng th?i: " + (oldState.is_active ? "Ho?t ??ng" : "?n") + " -> " + (is_active ? "Ho?t ??ng" : "?n"));
+    summaryParts.push("Trạng thái: " + (oldState.is_active ? "Hoạt động" : "Ẩn") + " -> " + (is_active ? "Hoạt động" : "Ẩn"));
   }
 
   const updatedProductPayload = {
@@ -413,7 +413,7 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
     changed_fields: changedFields,
     changes,
     old_values: oldState,
-    summary: summaryParts.join("; ") || "C?p nh?t s?n ph?m",
+    summary: summaryParts.join("; ") || "Cập nhật sản phẩm",
   };
   trx.afterCommit(() => eventBus.emit(EVENTS.PRODUCT_UPDATED, updatedProductPayload));
   return updatedProductPayload;

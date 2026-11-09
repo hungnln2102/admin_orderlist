@@ -1,125 +1,21 @@
 /**
  * otpProviderService.js (V2)
  * 
- * Bá»™ xá»­ lÃ½ láº¥y mÃ£ OTP tá»« cÃ¡c API dá»‹ch vá»¥ bÃªn thá»© 3 báº±ng native fetch (Node.js 18+):
- * - HDSD API (https://otp.hdsd.net)
+ * Bộ xử lý lấy mã OTP từ các API dịch vụ bên thứ 3 bằng native fetch (Node.js 18+):
  * - TinyHost Temp Mail (https://tinyhost.shop)
  * - Fix Ades Support GPM (https://api-2026-02.ades.support)
  * - Yuna 2FA & Scraper (https://hub.yunagrp.com/2fa/)
- * - Generic Webmail (Tmail, Generator.email)
  */
 
-const { getConfigByKey, requestConfiguredApi } = require("./externalApiConfigService");
+const { requestProviderApi } = require("../providers/providerRequest");
+const { getProviderConfig } = require("../providers/registry");
 const { fetchSafeExternal, readExternalResponse } = require("@/utils/safeExternalRequest");
-
-function extractOtpCode(raw) {
-  if (raw == null) return null;
-  const str = String(raw);
-  const direct = str.match(/\b(\d{4,8})\b/);
-  if (direct?.[1]) return direct[1];
-  return null;
-}
-
-function collectOtpCandidates(obj, out = [], parentKey = "") {
-  if (obj == null) return out;
-  if (typeof obj === "string") {
-    out.push(obj);
-    return out;
-  }
-  if (typeof obj === "number") {
-    if (/otp|code|token|verification|value/i.test(parentKey)) {
-      out.push(String(obj));
-    }
-    return out;
-  }
-  if (Array.isArray(obj)) {
-    for (const item of obj) collectOtpCandidates(item, out, parentKey);
-    return out;
-  }
-  if (typeof obj === "object") {
-    for (const [key, value] of Object.entries(obj)) {
-      if (/otp|code|token|verification/i.test(key)) {
-        out.push(value);
-      }
-      collectOtpCandidates(value, out, key);
-    }
-  }
-  return out;
-}
-
-/**
- * 1. Láº¥y OTP tá»« HDSD (otp.hdsd.net)
- */
-async function parseJsonResponse(response) {
-  try {
-    return JSON.parse(await readExternalResponse(response));
-  } catch {
-    return null;
-  }
-}
-
-function appendQuery(endpoint, params) {
-  const query = new URLSearchParams(params);
-  return endpoint + (endpoint.includes("?") ? "&" : "?") + query.toString();
-}
+const { extractOtpCode, collectOtpCandidates, parseJsonResponse, appendQuery } = require("../providers/otpProviderUtils");
+const { fetchOtpFromTinyHost } = require("../providers/tinyhostProvider");
+const { fetchOtpFromImap } = require("../providers/imap");
 
 async function resolveOtpConfig(config, serviceKey, baseUrl) {
-  return { base_url: baseUrl, ...(config || (await getConfigByKey(serviceKey)) || {}) };
-}
-
-async function fetchOtpFromHdsd(email, { includeDetails = false } = {}) {
-  const config = { base_url: "https://otp.hdsd.net", ...((await getConfigByKey("otp_hdsd")) || {}) };
-  const response = await requestConfiguredApi(config, { method: "POST", endpoint: config.endpoints?.get_otp || "/get_otp_api", body: { email }, timeoutMs: Number(config.auth_config?.timeoutMs) || 10_000 });
-  if (!response.ok) throw new Error("HDSD returned HTTP " + response.status + ".");
-  const data = await parseJsonResponse(response);
-  const rows = Array.isArray(data) ? data : (data?.data || data?.mails || []);
-  let foundCode = null;
-  for (const row of rows) {
-    const code = extractOtpCode(row?.value ?? row?.otp ?? row?.code);
-    if (code) {
-      foundCode = code;
-      break;
-    }
-  }
-  if (!foundCode) foundCode = collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
-  if (includeDetails) {
-    return { otp: foundCode, rawData: data };
-  }
-  return foundCode;
-}
-
-async function fetchOtpFromTinyHost(email, { config: configuredConfig, includeDetails = false } = {}) {
-  const [user, domain] = String(email || "").split("@");
-  if (!user || !domain) throw new Error("Email khÃ´ng há»£p lá»‡ Ä‘á»ƒ tra cá»©u TinyHost.");
-  const config = await resolveOtpConfig(configuredConfig, "tinyhost", "https://tinyhost.shop");
-  const timeoutMs = Number(config.auth_config?.timeoutMs) || 15_000;
-  const listPath = config.endpoints?.list || "/api/email/{domain}/{user}/";
-  const listEndpoint = appendQuery(listPath.replace("{domain}", encodeURIComponent(domain)).replace("{user}", encodeURIComponent(user)), { limit: "10" });
-  const response = await requestConfiguredApi(config, { endpoint: listEndpoint, timeoutMs });
-  if (!response.ok) throw new Error("TinyHost returned HTTP " + response.status + ".");
-  const data = await parseJsonResponse(response) || {};
-  let foundCode = null;
-  for (const item of data.emails || []) {
-    const directCode = extractOtpCode(item.subject);
-    if (directCode) {
-      foundCode = directCode;
-      break;
-    }
-    const detailPath = config.endpoints?.detail || "/api/email/{domain}/{user}/{id}";
-    const detailEndpoint = detailPath.replace("{domain}", encodeURIComponent(domain)).replace("{user}", encodeURIComponent(user)).replace("{id}", encodeURIComponent(item.id));
-    const detailResponse = await requestConfiguredApi(config, { endpoint: detailEndpoint, timeoutMs });
-    if (!detailResponse.ok) continue;
-    const detail = await parseJsonResponse(detailResponse);
-    const code = extractOtpCode(detail?.body || detail?.html_body);
-    if (code) {
-      foundCode = code;
-      break;
-    }
-  }
-  if (includeDetails) {
-    return { otp: foundCode, rawData: data };
-  }
-  return foundCode;
+  return config || getProviderConfig(serviceKey) || { base_url: baseUrl };
 }
 
 /* â”€â”€ Ades Support Auto-Token & Only-OTP Cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -134,7 +30,7 @@ async function getAdesSessionToken(config, timeoutMs = 10_000) {
   }
 
   try {
-    const tokenRes = await requestConfiguredApi(config, {
+    const tokenRes = await requestProviderApi(config, {
       method: "POST",
       endpoint: config.endpoints?.auth_token || "/ades-support/auth/token",
       headers: {
@@ -165,13 +61,13 @@ async function getAdesSessionToken(config, timeoutMs = 10_000) {
 async function fetchOtpFromFixAdes(email, { config: configuredConfig, includeDetails = false } = {}) {
   if (!email) return null;
   const cleanEmail = String(email).trim().toLowerCase();
-  const config = await resolveOtpConfig(configuredConfig, "fix_ades", "https://api-2026-02.ades.support");
+  const config = await resolveOtpConfig(configuredConfig, "ades", "https://api-2026-02.ades.support");
   const timeoutMs = Number(config.auth_config?.timeoutMs) || 12_000;
 
-  // 1. Tá»± Ä‘á»™ng láº¥y/tÃ¡i sá»­ dá»¥ng Bearer Token (háº¡n 10 phÃºt, khÃ´ng cáº§n nháº­p thá»§ cÃ´ng)
+  // 1. Tự động lấy/tái sử dụng Bearer Token (hạn 10 phút, không cần nhập thủ công)
   let token = await getAdesSessionToken(config, timeoutMs);
 
-  // 2. Gá»i endpoint chuyÃªn dá»¥ng Only-OTP (/ades-support/only-otp)
+  // 2. Gọi endpoint chuyên dụng Only-OTP (/ades-support/only-otp)
   const endpointPath = config.endpoints?.only_otp || "/ades-support/only-otp";
   const endpointWithQuery = appendQuery(endpointPath, { email: cleanEmail });
 
@@ -184,20 +80,20 @@ async function fetchOtpFromFixAdes(email, { config: configuredConfig, includeDet
     headers.Authorization = `Bearer ${token}`;
   }
 
-  let response = await requestConfiguredApi(config, {
+  let response = await requestProviderApi(config, {
     method: "GET",
     endpoint: endpointWithQuery,
     headers,
     timeoutMs,
   });
 
-  // Náº¿u token háº¿t háº¡n (401), tá»± Ä‘á»™ng xÃ³a cache vÃ  thá»­ cấp má»›i token 1 láº§n
+  // Nếu token hết hạn (401), tự động xóa cache và thử cấp mới token 1 lần
   if (response.status === 401) {
     adesSessionCache.delete(config.service_key || config.base_url);
     token = await getAdesSessionToken(config, timeoutMs);
     if (token) {
       headers.Authorization = `Bearer ${token}`;
-      response = await requestConfiguredApi(config, {
+      response = await requestProviderApi(config, {
         method: "GET",
         endpoint: endpointWithQuery,
         headers,
@@ -206,10 +102,10 @@ async function fetchOtpFromFixAdes(email, { config: configuredConfig, includeDet
     }
   }
 
-  // 3. Fallback sang endpoint cÅ© náº¿u endpoint má»›i tráº£ mÃ£ lá»—i khÃ¡c
+  // 3. Fallback sang endpoint cũ nếu endpoint mới trả mã lỗi khác
   if (!response.ok) {
     const fallbackEndpoint = appendQuery(config.endpoints?.read_otp || "/mail/read-otp-gpm", { email: cleanEmail });
-    const fallbackRes = await requestConfiguredApi(config, { endpoint: fallbackEndpoint, headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs }).catch(() => null);
+    const fallbackRes = await requestProviderApi(config, { endpoint: fallbackEndpoint, headers: { "User-Agent": "Mozilla/5.0" }, timeoutMs }).catch(() => null);
     if (fallbackRes?.ok) {
       const fbData = await parseJsonResponse(fallbackRes);
       const fbOtp = extractOtpCode(fbData?.data?.otp || fbData?.data?.code);
@@ -220,7 +116,7 @@ async function fetchOtpFromFixAdes(email, { config: configuredConfig, includeDet
   }
 
   const data = await parseJsonResponse(response);
-  // Äá»‹nh dáº¡ng chuáº©n: { status: 200, success: true, data: { success: true, otp: "699211", emailSubject: "...", emailDate: "..." } }
+  // Định dạng chuẩn: { status: 200, success: true, data: { success: true, otp: "699211", emailSubject: "...", emailDate: "..." } }
   const directCode = extractOtpCode(data?.data?.otp || data?.data?.code || data?.otp);
   const otp = directCode || collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
   if (includeDetails) {
@@ -230,15 +126,15 @@ async function fetchOtpFromFixAdes(email, { config: configuredConfig, includeDet
 }
 
 /* â”€â”€ YunaGRP Polite & Anti-Spam Caches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-// 1. Session Cache cho Yuna 2FA Center (hub.yunagrp.com/2fa/) - TTL 10 phÃºt
+// 1. Session Cache cho Yuna 2FA Center (hub.yunagrp.com/2fa/) - TTL 10 phút
 const yunaSessionCache = new Map();
 
-// 2. Rules Cache cho Yuna Mail (mail.yunagrp.com) - TTL 15 phÃºt
+// 2. Rules Cache cho Yuna Mail (mail.yunagrp.com) - TTL 15 phút
 const yunaRulesCache = new Map();
 
 /**
- * Láº¥y token vÃ  cookie phiÃªn lÃ m viá»‡c tá»« https://hub.yunagrp.com/2fa/
- * LÆ°u cache 10 phÃºt Ä‘á»ƒ khÃ´ng gá»­i request liÃªn tá»¥c lÃ m phiá»n mÃ¡y chá»§ Ä‘á»‘i tÃ¡c.
+ * Lấy token và cookie phiên làm việc từ https://hub.yunagrp.com/2fa/
+ * Lưu cache 10 phút để không gửi request liên tục làm phiền máy chủ đối tác.
  */
 async function getYuna2FaSession(config, timeoutMs = 10000) {
   const cacheKey = config.service_key || config.base_url;
@@ -248,7 +144,7 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
     return cachedSession;
   }
 
-  const pageResponse = await requestConfiguredApi(config, {
+  const pageResponse = await requestProviderApi(config, {
     headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
     timeoutMs,
   });
@@ -274,9 +170,9 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
 }
 
 /**
- * 4. Luá»“ng Yuna 2FA Center (hub.yunagrp.com/2fa/):
- * - Tra cá»©u theo Ä‘Æ¡n hÃ ng (order_code) -> Láº¤Y DANH SÃCH TÃ€I KHOáº¢N (items)
- * - Hoáº·c tra cá»©u mÃ£ 2FA tá»« secret (get_manual)
+ * 4. Luồng Yuna 2FA Center (hub.yunagrp.com/2fa/):
+ * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
+ * - Hoặc tra cứu mã 2FA từ secret (get_manual)
  */
 async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
@@ -288,7 +184,7 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
   try {
     const session = await getYuna2FaSession(config, timeoutMs);
     if (!session.token) {
-      return { otp: null, extra_fields: [], error: "KhÃ´ng thá»ƒ láº¥y token xÃ¡c thá»±c tá»« Yuna 2FA." };
+      return { otp: null, extra_fields: [], error: "Không thể lấy token xác thực từ Yuna 2FA." };
     }
 
     const form = new URLSearchParams();
@@ -311,7 +207,7 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
       headers["Cookie"] = session.cookie;
     }
 
-    const response = await requestConfiguredApi(config, {
+    const response = await requestProviderApi(config, {
       method: "POST",
       endpoint: config.endpoints?.get_otp || config.endpoints?.path || "",
       body: form.toString(),
@@ -330,37 +226,37 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
     let foundOtp = extractOtpCode(data.code) || null;
     const extraFields = [];
 
-    // Náº¿u lÃ  get_manual: cÃ³ code vÃ  time_left
+    // Nếu là get_manual: có code và time_left
     if (data.code) {
-      extraFields.push({ key: "code", label: "MÃ£ 2FA / OTP", value: String(data.code), path: "code" });
+      extraFields.push({ key: "code", label: "Mã 2FA / OTP", value: String(data.code), path: "code" });
     }
     if (data.time_left !== undefined) {
-      extraFields.push({ key: "time_left", label: "Thá»i gian cÃ²n láº¡i (s)", value: String(data.time_left), path: "time_left" });
+      extraFields.push({ key: "time_left", label: "Thời gian còn lại (s)", value: String(data.time_left), path: "time_left" });
     }
 
-    // Náº¿u lÃ  get_order: tráº£ vá» danh sÃ¡ch tÃ i khoáº£n (items)
+    // Nếu là get_order: trả về danh sách tài khoản (items)
     if (Array.isArray(data.items) && data.items.length > 0) {
       extraFields.push({
         key: "items",
-        label: "Danh SÃ¡ch TÃ i Khoáº£n",
+        label: "Danh Sách Tài Khoản",
         value: JSON.stringify(data.items),
         path: "items",
       });
 
-      // Láº¥y tÃ i khoáº£n Ä‘áº§u tiÃªn
+      // Lấy tài khoản đầu tiên
       const primaryItem = data.items[0];
       if (primaryItem.name) {
-        extraFields.push({ key: "account_email", label: "Email TÃ i Khoáº£n", value: String(primaryItem.name), path: "items[0].name" });
+        extraFields.push({ key: "account_email", label: "Email Tài Khoản", value: String(primaryItem.name), path: "items[0].name" });
       }
       if (primaryItem.group) {
-        extraFields.push({ key: "product_plan", label: "GÃ³i Dá»‹ch Vá»¥", value: String(primaryItem.group), path: "items[0].group" });
+        extraFields.push({ key: "product_plan", label: "Gói Dịch Vụ", value: String(primaryItem.group), path: "items[0].group" });
       }
       if (primaryItem.expires_at_str) {
-        extraFields.push({ key: "expires_at", label: "Háº¡n Sá»­ Dá»¥ng", value: String(primaryItem.expires_at_str), path: "items[0].expires_at_str" });
+        extraFields.push({ key: "expires_at", label: "Hạn Sử Dụng", value: String(primaryItem.expires_at_str), path: "items[0].expires_at_str" });
       }
       if (primaryItem.code && !foundOtp) {
         foundOtp = extractOtpCode(primaryItem.code);
-        extraFields.push({ key: "otp", label: "MÃ£ OTP 2FA", value: String(primaryItem.code), path: "items[0].code" });
+        extraFields.push({ key: "otp", label: "Mã OTP 2FA", value: String(primaryItem.code), path: "items[0].code" });
       }
     }
 
@@ -371,10 +267,10 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
 }
 
 /**
- * 5. Luá»“ng Yuna Mail Hub & Aggregator (mail.yunagrp.com):
- * - Tá»± Ä‘á»™ng táº£i routing rules tá»« https://mail.yunagrp.com/admin.php?public=rules (Cache 15 phÃºt)
- * - TÃ­ch há»£p 5 API gá»­i tháº³ng JSON (api_getadobe, api_hdsd, api_local, api_mailtm, api_trackmail)
- * - TÃ­ch há»£p 2 link webmail chuyá»ƒn tiáº¿p (generator.email, tmail)
+ * 5. Luồng Yuna Mail Hub & Aggregator (mail.yunagrp.com):
+ * - Tự động tải routing rules từ https://mail.yunagrp.com/admin.php?public=rules (Cache 15 phút)
+ * - Tích hợp 5 API gửi thẳng JSON (api_getadobe, api_hdsd, api_local, api_mailtm, api_trackmail)
+ * - Tích hợp 2 link webmail chuyển tiếp (generator.email, tmail)
  */
 async function callYunaProxy(config, endpoint, email, timeoutMs = 10_000, includeDetails = false) {
   try {
@@ -384,7 +280,7 @@ async function callYunaProxy(config, endpoint, email, timeoutMs = 10_000, includ
       "X-Yuna-Version": "Â©2026 YunaGRP Panel V3.12.1",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     };
-    const response = await requestConfiguredApi(config, {
+    const response = await requestProviderApi(config, {
       method: "POST",
       endpoint,
       body: { email },
@@ -432,10 +328,10 @@ async function fetchOtpFromWebmail(targetUrl, timeoutMs = 10_000) {
     });
     if (!res.ok) return null;
     const html = await readExternalResponse(res);
-    // 1. TÃ¬m theo ngá»¯ cáº£nh xÃ¡c minh mÃ£ OTP 6 sá»‘
-    const contextualMatch = html.match(/(?:adobe|verification\s*code|mÃ£\s*xÃ¡c\s*minh|mÃ£\s*xÃ¡c\s*thá»±c|mÃ£\s*otp|otp\s*code)[^0-9]{1,50}(\d{6})/i);
+    // 1. Tìm theo ngữ cảnh xác minh mã OTP 6 số
+    const contextualMatch = html.match(/(?:adobe|verification\s*code|mã\s*xác\s*minh|mã\s*xác\s*thực|mã\s*otp|otp\s*code)[^0-9]{1,50}(\d{6})/i);
     if (contextualMatch?.[1]) return contextualMatch[1];
-    // 2. TÃ¬m tháº» chá»©a class hoáº·c id liÃªn quan tá»›i otp/code
+    // 2. Tìm thẻ chứa class hoặc id liên quan tới otp/code
     const tagMatch = html.match(/(?:class|id)=["'][^"']*(?:otp|code|verify)[^"']*["'][^>]*>[\s\r\n]*(\d{4,8})[\s\r\n]*</i);
     if (tagMatch?.[1]) return tagMatch[1];
     return null;
@@ -451,13 +347,13 @@ async function fetchOtpFromYunaMail(email, { config: configuredConfig, includeDe
   const now = Date.now();
 
   try {
-    // 1. Láº¥y danh sÃ¡ch rules vá»›i cache 15 phÃºt (chá»‘ng gá»i liÃªn tá»¥c lÃ m phiá»n Yuna)
+    // 1. Lấy danh sách rules với cache 15 phút (chống gọi liên tục làm phiền Yuna)
     const mailConfig = await resolveOtpConfig(configuredConfig, "yuna_mail", "https://mail.yunagrp.com");
     const cacheKey = mailConfig.service_key || mailConfig.base_url;
     const cachedRules = yunaRulesCache.get(cacheKey);
     let rules = cachedRules?.rules;
     if (!rules || cachedRules.expiresAt < now) {
-      const rulesRes = await requestConfiguredApi(mailConfig, {
+      const rulesRes = await requestProviderApi(mailConfig, {
         endpoint: mailConfig.endpoints?.rules || "/admin.php?public=rules",
         headers: { "User-Agent": "Mozilla/5.0" },
         timeoutMs: 10_000,
@@ -477,25 +373,25 @@ async function fetchOtpFromYunaMail(email, { config: configuredConfig, includeDe
 
     let resObj = null;
 
-    // Ráº½ nhÃ¡nh tuáº§n tá»± theo chá»‰ Ä‘áº¡o cá»§a Master:
+    // Rẽ nhánh tuần tự theo chỉ đạo của Master:
     if (action === "api_getadobe") {
-      // 1. GetAdobe: gá»i POST /api-getadobe.php
+      // 1. GetAdobe: gọi POST /api-getadobe.php
       resObj = await callYunaProxy(mailConfig, mailConfig.endpoints?.api_getadobe || "/api-getadobe.php", cleanEmail, 10_000, true);
     } else if (action === "api_hdsd") {
-      // 2. HDSD: gá»i POST /api-hdsd.php, náº¿u chÆ°a cÃ³ thÃ¬ fallback sang fetchOtpFromHdsd
+      // 2. HDSD: gọi POST /api-hdsd.php, nếu chưa có thì fallback sang
       resObj = await callYunaProxy(mailConfig, mailConfig.endpoints?.api_hdsd || "/api-hdsd.php", cleanEmail, 10_000, true);
 
     } else if (action === "api_local") {
-      // 3. Local NNM: gá»i POST /api-nnm.php
+      // 3. Local NNM: gọi POST /api-nnm.php
       resObj = await callYunaProxy(mailConfig, mailConfig.endpoints?.api_local || "/api-nnm.php", cleanEmail, 10_000, true);
     } else if (action === "api_mailtm") {
-      // 4. MailTM: gá»i POST /api-mailtm.php
+      // 4. MailTM: gọi POST /api-mailtm.php
       resObj = await callYunaProxy(mailConfig, mailConfig.endpoints?.api_mailtm || "/api-mailtm.php", cleanEmail, 10_000, true);
     } else if (action === "api_trackmail") {
-      // 5. Outlook/Hotmail: gá»i POST /outlook-api.php
+      // 5. Outlook/Hotmail: gọi POST /outlook-api.php
       resObj = await callYunaProxy(mailConfig, mailConfig.endpoints?.api_trackmail || "/outlook-api.php", cleanEmail, 10_000, true);
     } else if (action === "redirect_email" || action === "redirect_fixed") {
-      // 6 & 7. Chuyá»ƒn hÆ°á»›ng Webmail (generator.email & tmail)
+      // 6 & 7. Chuyển hướng Webmail (generator.email & tmail)
       const targetTemplate = matchedRule?.target || "";
       const targetUrl = targetTemplate
         .replace(/\{email\}/g, cleanEmail)
@@ -507,7 +403,7 @@ async function fetchOtpFromYunaMail(email, { config: configuredConfig, includeDe
         resObj = { otp: otpCode, rawData: { target_url: targetUrl, otp: otpCode } };
       }
     } else {
-      // Fallback: Thá»­ gá»i api-getadobe.php
+      // Fallback: Thử gọi api-getadobe.php
       resObj = await callYunaProxy(mailConfig, "/api-getadobe.php", cleanEmail, 10_000, true);
     }
 
@@ -522,11 +418,11 @@ async function fetchOtpFromYunaMail(email, { config: configuredConfig, includeDe
 
 
 /**
- * 6. Luá»“ng Viva Rocky Portal (https://vivarocky.in):
- * - BÃ³c tÃ¡ch 3 chá»©c nÄƒng:
+ * 6. Luồng Viva Rocky Portal (https://vivarocky.in):
+ * - Bóc tách 3 chức năng:
  *   1) household: POST /household.php (user_email) -> Link TV / Household Netflix
- *   2) six_digit: POST /six_digit_login.php (user_email) -> MÃ£ OTP 6 sá»‘
- *   3) signin_code: POST /signin_code.php (user_email, access_code) -> MÃ£ Ä‘Äƒng nháº­p nhanh
+ *   2) six_digit: POST /six_digit_login.php (user_email) -> Mã OTP 6 số
+ *   3) signin_code: POST /signin_code.php (user_email, access_code) -> Mã đăng nhập nhanh
  */
 async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, serviceKey = 'vivarocky_household', type = 'household', accessCode = '', includeDetails = false } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
@@ -548,7 +444,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
   const timeoutMs = Number(config.auth_config?.timeoutMs) || 15_000;
 
   let endpoint = '';
-  // Náº¿u base_url chÆ°a chá»©a .php thÃ¬ má»›i cá»™ng thÃªm endpoint
+  // Nếu base_url chưa chứa .php thì mới cộng thêm endpoint
   if (!config.base_url.includes('.php')) {
     if (resolvedType === 'six_digit') endpoint = config.endpoints?.six_digit || '/six_digit_login.php';
     else if (resolvedType === 'signin_code') endpoint = config.endpoints?.signin || '/signin_code.php';
@@ -557,6 +453,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
 
   const finalAccessCode = code || config.auth_config?.access_code || config.auth_config?.token || 'mvrk56';
   const params = new URLSearchParams();
+  if (resolvedType === 'household') params.append('email', email);
   params.append('user_email', email);
   if (resolvedType === 'signin_code' && finalAccessCode) {
     params.append('access_code', finalAccessCode);
@@ -569,7 +466,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
     };
 
-    const response = await requestConfiguredApi(config, {
+    const response = await requestProviderApi(config, {
       method: 'POST',
       endpoint,
       body: params.toString(),
@@ -589,30 +486,50 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
       errorMessage = errorMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
     }
 
-    const linkMatches = html.match(/https?:\/\/(?:www\.)?netflix\.com\/[^\s"'<>]+/gi) || [];
-    let netflixLink = linkMatches.find(l => /update|household|location|confirm/i.test(l)) || linkMatches[0] || null;
+    const nftokenMatch = html.match(/href=["']([^"']*[?&](?:nftoken|messageGuid)=[^"']+)["']/i);
+    const buttonTextMatch = html.match(/<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]{0,400}?(?:Get\s+Code|Lấy\s+mã|Lay\s+ma)[\s\S]{0,200}?<\/a>/i);
+    const travelVerifyMatch = html.match(/href=["'](https?:\/\/[^"']*\/(?:account\/travel\/verify|travel\/verify)[^"']*)["']/i);
+    const linkMatch =
+      nftokenMatch ||
+      buttonTextMatch ||
+      travelVerifyMatch ||
+      html.match(/href=["'](https?:\/\/[^"']*household[^"']*)["']/i) ||
+      html.match(/href=["'](https?:\/\/[^"']*netflix[^"']*)["']/i) ||
+      html.match(/window\.location\.href\s*=\s*["'](https?:\/\/[^"']+)["']/i);
+    const netflixLink = resolvedType === 'household' && linkMatch?.[1]
+      ? linkMatch[1].replace(/&amp;/gi, '&').replace(/&#38;/g, '&').replace(/&#x26;/gi, '&').trim()
+      : null;
 
     let foundOtp = null;
-    const successMatch = html.match(/<div[^>]*class=["'][^"']*(?:success-box|result-box|code-box)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-    if (successMatch) {
-      foundOtp = extractOtpCode(successMatch[1]);
-    }
-    if (!foundOtp) {
-      const contextualMatch = html.match(/(?:netflix|mÃ£|code|otp|login\s*code)[^0-9]{1,50}(\d{6})/i);
-      if (contextualMatch?.[1]) {
-        foundOtp = contextualMatch[1];
+    if (resolvedType !== 'household') {
+      const successMatch = html.match(/<div[^>]*class=["'][^"']*(?:success-box|result-box|code-box)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      if (successMatch) {
+        foundOtp = extractOtpCode(successMatch[1]);
       }
-    }
-    if (!foundOtp && resolvedType === 'six_digit') {
-      const allCodes = html.match(/\b\d{6}\b/g) || [];
-      foundOtp = allCodes.find(c => !html.includes('style.css?v=' + c)) || null;
+      if (!foundOtp) {
+        const contextualMatch = html.match(/(?:netflix|mÃƒÂ£|code|otp|login\s*code)[^0-9]{1,50}(\d{6})/i);
+        if (contextualMatch?.[1]) {
+          foundOtp = contextualMatch[1];
+        }
+      }
+      if (!foundOtp && resolvedType === 'signin_code') {
+        const textContent = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ');
+        const signInCodeMatch = textContent.match(/enter\s+this\s+code\s+to\s+sign\s+in[\s\S]{0,120}?\b(\d{4,8})\b/i);
+        if (signInCodeMatch?.[1]) {
+          foundOtp = signInCodeMatch[1];
+        }
+      }
+      if (!foundOtp && resolvedType === 'six_digit') {
+        const allCodes = html.match(/\b\d{6}\b/g) || [];
+        foundOtp = allCodes.find(c => !html.includes('style.css?v=' + c)) || null;
+      }
     }
 
     const extraFields = [];
     if (netflixLink) {
       extraFields.push({
         key: 'netflix_link',
-        label: 'Link Cáº­p Nháº­t Netflix',
+        label: 'Link Cập Nhật Netflix',
         value: netflixLink,
         path: 'netflix_link'
       });
@@ -620,7 +537,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
     if (foundOtp) {
       extraFields.push({
         key: 'otp',
-        label: 'MÃ£ OTP / 6 Sá»‘',
+        label: 'Mã OTP / 6 Số',
         value: String(foundOtp),
         path: 'otp'
       });
@@ -628,7 +545,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
     if (errorMessage && !netflixLink && !foundOtp) {
       extraFields.push({
         key: 'server_message',
-        label: 'ThÃ´ng BÃ¡o MÃ¡y Chá»§',
+        label: 'Thông Báo Máy Chủ',
         value: errorMessage,
         path: 'error_box'
       });
@@ -675,7 +592,7 @@ function getValueByPath(obj, path) {
 }
 
 /**
- * Gá»i API linh hoáº¡t theo cáº¥u hÃ¬nh tÃ¹y chá»‰nh vÃ  trÃ­ch xuáº¥t dá»¯ liá»‡u theo field_mapping
+ * Gọi API linh hoạt theo cấu hình tùy chỉnh và trích xuất dữ liệu theo field_mapping
  */
 async function fetchOtpFromDynamicConfig(config, email) {
   if (!config || !config.base_url) return { otp: null, extra_fields: [] };
@@ -686,10 +603,10 @@ async function fetchOtpFromDynamicConfig(config, email) {
   try {
     let res;
     if (authConfig.method === "POST" || config.endpoints?.method === "POST") {
-      res = await requestConfiguredApi(config, { method: "POST", body: { email }, endpoint });
+      res = await requestProviderApi(config, { method: "POST", body: { email }, endpoint });
     } else {
       const query = endpoint.includes("?") ? "&" : "?";
-      res = await requestConfiguredApi(config, { method: "GET", endpoint: `${endpoint}${query}email=${encodeURIComponent(email)}` });
+      res = await requestProviderApi(config, { method: "GET", endpoint: `${endpoint}${query}email=${encodeURIComponent(email)}` });
     }
 
     if (!res.ok) return { otp: null, extra_fields: [] };
@@ -700,7 +617,7 @@ async function fetchOtpFromDynamicConfig(config, email) {
     let foundOtp = null;
     const extraFields = [];
 
-    // 1. TrÃ­ch xuáº¥t theo danh sÃ¡ch field_mapping ngÆ°á»i dÃ¹ng Ä‘Ã£ cáº¥u hÃ¬nh
+    // 1. Trích xuất theo danh sách field_mapping người dùng đã cấu hình
     if (fieldMapping.length > 0) {
       for (const field of fieldMapping) {
         const val = getValueByPath(data, field.path);
@@ -713,7 +630,7 @@ async function fetchOtpFromDynamicConfig(config, email) {
             path: field.path,
           });
 
-          if (field.key === "otp" || field.is_primary || /otp|code|mÃ£/i.test(field.label)) {
+          if (field.key === "otp" || field.is_primary || /otp|code|mã/i.test(field.label)) {
             const extracted = extractOtpCode(valStr);
             if (extracted && !foundOtp) foundOtp = extracted;
           }
@@ -721,7 +638,7 @@ async function fetchOtpFromDynamicConfig(config, email) {
       }
     }
 
-    // 2. Fallback quÃ©t tá»± Ä‘á»™ng náº¿u chÆ°a cÃ³ OTP
+    // 2. Fallback quét tự động nếu chưa có OTP
     if (!foundOtp) {
       const candidates = collectOtpCandidates(data);
       for (const c of candidates) {
@@ -740,16 +657,16 @@ async function fetchOtpFromDynamicConfig(config, email) {
 }
 
 /**
- * HÃ m Ä‘iá»u phá»‘i chung: Probe OTP hoáº·c thÃ´ng tin tÃ i khoáº£n cho báº¥t ká»³ dá»‹ch vá»¥ nÃ o
+ * Hàm điều phối chung: Probe OTP hoặc thông tin tài khoản cho bất kỳ dịch vụ nào
  */
 async function fetch2FaFromWarehouse(queryInput) {
-  if (!queryInput) return { otp: null, extra_fields: [], message: "Vui lÃ²ng nháº­p email hoáº·c mÃ£ Ä‘Æ¡n hÃ ng cáº§n tra cá»©u." };
+  if (!queryInput) return { otp: null, extra_fields: [], message: "Vui lòng nhập email hoặc mã đơn hàng cần tra cứu." };
   const cleanInput = String(queryInput).trim();
   const { db, TABLES } = require("@/db");
   const totpService = require("./totpService");
 
   try {
-    // 1. TÃ¬m trong warehouse.account_slots káº¿t há»£p accounts
+    // 1. Tìm trong warehouse.account_slots kết hợp accounts
     let matched = await db(TABLES.ACCOUNT_SLOTS)
       .join(TABLES.ACCOUNTS, `${TABLES.ACCOUNT_SLOTS}.account_id`, `${TABLES.ACCOUNTS}.id`)
       .where(function () {
@@ -768,7 +685,7 @@ async function fetch2FaFromWarehouse(queryInput) {
       )
       .first();
 
-    // 2. Náº¿u chÆ°a tháº¥y trong slots, tÃ¬m trá»±c tiáº¿p trong accounts
+    // 2. Nếu chưa thấy trong slots, tìm trực tiếp trong accounts
     if (!matched) {
       const acc = await db(TABLES.ACCOUNTS)
         .where(function () {
@@ -789,11 +706,11 @@ async function fetch2FaFromWarehouse(queryInput) {
       return {
         otp: null,
         found: false,
-        message: `KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n [${cleanInput}] trong Kho HÃ ng.`,
+        message: `Không tìm thấy tài khoản [${cleanInput}] trong Kho Hàng.`,
       };
     }
 
-    // 3. TrÃ­ch xuáº¥t Secret Key 2FA
+    // 3. Trích xuất Secret Key 2FA
     let secretKey = matched.two_fa;
     if (!secretKey && matched.acc_note) {
       const m = matched.acc_note.match(/(?:2fa|totp|secret)[:\s]+([a-z2-7\s]{16,64})/i);
@@ -804,27 +721,27 @@ async function fetch2FaFromWarehouse(queryInput) {
       return {
         otp: null,
         found: false,
-        message: `TÃ i khoáº£n [${matched.account_username || cleanInput}] trong kho chÆ°a Ä‘Æ°á»£c cÃ i mÃ£ 2FA.`,
+        message: `Tài khoản [${matched.account_username || cleanInput}] trong kho chưa được cài mã 2FA.`,
       };
     }
 
-    // 4. Sinh mÃ£ OTP qua totpService
+    // 4. Sinh mã OTP qua totpService
     const totpRes = totpService.generateTotp(secretKey);
     return {
       otp: totpRes.code,
       found: true,
       extra_fields: [
-        { key: "account_username", label: "TÃ i khoáº£n kho", value: matched.account_username || cleanInput, path: "account_username" },
-        { key: "remaining_seconds", label: "Thá»i gian cÃ²n láº¡i", value: `${totpRes.remainingSeconds}s`, path: "remainingSeconds" },
-        { key: "expires_at", label: "Háº¿t háº¡n lÃºc", value: totpRes.expiresAt, path: "expiresAt" },
+        { key: "account_username", label: "Tài khoản kho", value: matched.account_username || cleanInput, path: "account_username" },
+        { key: "remaining_seconds", label: "Thời gian còn lại", value: `${totpRes.remainingSeconds}s`, path: "remainingSeconds" },
+        { key: "expires_at", label: "Hết hạn lúc", value: totpRes.expiresAt, path: "expiresAt" },
       ],
-      message: `ÄÃ£ tÃ¬m tháº¥y khÃ³a 2FA trong kho vÃ  sinh mÃ£ OTP [${totpRes.code}] thÃ nh cÃ´ng!`,
+      message: `Đã tìm thấy khóa 2FA trong kho và sinh mã OTP [${totpRes.code}] thành công!`,
     };
   } catch (err) {
     return {
       otp: null,
       found: false,
-      message: `Lá»—i tra cá»©u kho: ${err.message}`,
+      message: `Lỗi tra cứu kho: ${err.message}`,
     };
   }
 }
@@ -847,8 +764,8 @@ async function executeInternalTotp(input) {
       otp: result.code,
       raw_data: result,
       extra_fields: [
-        { key: "remaining_seconds", label: "Th?i gian c?n l?i", value: `${result.remainingSeconds}s`, path: "remainingSeconds" },
-        { key: "expires_at", label: "H?t h?n l?c", value: result.expiresAt, path: "expiresAt" },
+        { key: "remaining_seconds", label: "Thời gian còn lại", value: `${result.remainingSeconds}s`, path: "remainingSeconds" },
+        { key: "expires_at", label: "Hết hạn lúc", value: result.expiresAt, path: "expiresAt" },
       ],
     });
   } catch (error) {
@@ -875,6 +792,7 @@ const OTP_EXECUTION_HANDLERS = Object.freeze({
   })),
   INTERNAL_TOTP: async (_config, input) => executeInternalTotp(input),
   INTERNAL_WAREHOUSE_2FA: async (_config, input) => executeWarehouse2Fa(input),
+  INTERNAL_IMAP: async (_config, input) => normalizeExecutionResult(await fetchOtpFromImap(input, { includeDetails: true })),
 });
 
 async function executeOtpConfig(config, input, options = {}) {
@@ -885,17 +803,17 @@ async function executeOtpConfig(config, input, options = {}) {
 }
 
 async function probeOtpForEmail({ email, serviceKey, ...options }) {
-  if (!email) throw new Error("Vui l?ng cung c?p email ho?c m? ??n h?ng c?n ki?m tra.");
+  if (!email) throw new Error("Vui lòng cung cấp email hoặc mã đơn hàng cần kiểm tra.");
 
-  if (!serviceKey) throw new Error("EXTERNAL_API_CONFIG_NOT_FOUND: service_key is required.");
+  if (!serviceKey) throw new Error("OTP_PROVIDER_NOT_FOUND: service_key is required.");
   const queryInput = String(email).trim();
-  const serviceConfig = await getConfigByKey(serviceKey);
-  if (!serviceConfig) throw new Error(`EXTERNAL_API_CONFIG_NOT_FOUND: no active OTP configuration for service_key '${serviceKey}'.`);
+  const serviceConfig = getProviderConfig(serviceKey);
+  if (!serviceConfig) throw new Error(`OTP_PROVIDER_NOT_FOUND: no active OTP configuration for service_key '${serviceKey}'.`);
 
   const executionMode = String(serviceConfig.execution_mode || "GENERIC_HTTP").trim().toUpperCase();
   const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_2FA"].includes(executionMode);
   if (!acceptsNonEmailInput && !queryInput.includes("@")) {
-    throw new Error("Vui l?ng cung c?p email h?p l? (vd: user@domain.com).");
+    throw new Error("Vui lòng cung cấp email hợp lệ (vd: user@domain.com).");
   }
 
   const cleanInput = acceptsNonEmailInput ? queryInput : queryInput.toLowerCase();
@@ -929,8 +847,8 @@ async function probeOtpForEmail({ email, serviceKey, ...options }) {
     duration_ms: Date.now() - startedAt,
     extra_fields: extraFields,
     message: found
-      ? (executionResult.otp ? `?? t?m th?y m? OTP [${executionResult.otp}] th?nh c?ng!` : `?? l?y th?ng tin t?i kho?n th?nh c?ng! (${extraFields.length} tr??ng)`)
-      : (executionResult.error_message || "Ch?a c? th? m?i ho?c ch?a l?y ???c m? OTP trong h?p th?."),
+      ? (executionResult.otp ? `Đã tìm thấy mã OTP [${executionResult.otp}] thành công!` : `Đã lấy thông tin tài khoản thành công! (${extraFields.length} trường)`)
+      : (executionResult.error_message || "Chưa có thư mới hoặc chưa lấy được mã OTP trong hộp thư."),
   };
 }
 
@@ -938,7 +856,6 @@ module.exports = {
   fetchOtpFromVivaRocky,
   extractOtpCode,
   getValueByPath,
-  fetchOtpFromHdsd,
   fetchOtpFromTinyHost,
   fetchOtpFromFixAdes,
   fetchYunaAccountOrder,
