@@ -27,6 +27,12 @@ import { BatchDetailModal } from "./BatchDetailModal";
 import { BatchSubOrdersModal } from "./BatchSubOrdersModal";
 import { StatusBadge } from "@/features/orders/components/StatusBadge";
 import { ORDER_STATUS } from "@/features/orders/constants/orderStatus";
+import {
+  createInvoiceBatch,
+  getInvoiceBatchSuffix,
+  getMatchableOrders,
+  getShopBankAccounts,
+} from "../api/invoicesApiClient";
 
 interface BankAccount {
   id: number;
@@ -142,7 +148,7 @@ export const CreateReceiptModal: React.FC<CreateReceiptModalProps> = ({
     const fetchBanks = async () => {
       setLoadingBanks(true);
       try {
-        const res = await fetch("/api/wallets/shop-bank-accounts");
+        const res = await getShopBankAccounts();
         if (res.ok) {
           const data = await res.json();
           const items: BankAccount[] = Array.isArray(data?.items)
@@ -175,7 +181,7 @@ export const CreateReceiptModal: React.FC<CreateReceiptModalProps> = ({
     const fetchOrders = async () => {
       setLoadingOrders(true);
       try {
-        const res = await fetch("/api/invoices/matchable-orders?limit=150");
+        const res = await getMatchableOrders({ limit: 150 });
         if (res.ok) {
           const json = await res.json();
           const ordersList: MatchableOrder[] = Array.isArray(json?.data)
@@ -208,7 +214,7 @@ export const CreateReceiptModal: React.FC<CreateReceiptModalProps> = ({
 
     const fetchSuffix = async () => {
       try {
-        const res = await fetch("/api/invoices/batches/suffix");
+        const res = await getInvoiceBatchSuffix();
         if (res.ok) {
           const data = await res.json();
           if (data?.suffix) {
@@ -417,17 +423,13 @@ export const CreateReceiptModal: React.FC<CreateReceiptModalProps> = ({
     setErrorMessage(null);
     setConflictingBatches(null);
     try {
-      const res = await fetch("/api/invoices/batches", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderCodes: selectedOrderCodes,
-          financialAccountId: selectedBankId ? Number(selectedBankId) : null,
-          customerName: selectedOrderObjects[0]?.customer || "",
-          note: `Gộp ${selectedOrderCodes.length} đơn qua form Tạo Biên Lai`,
-          created_by: "ADMIN",
-          forceCancelOldBatches: forceCancelOld,
-        }),
+      const res = await createInvoiceBatch({
+        orderCodes: selectedOrderCodes,
+        financialAccountId: selectedBankId ? Number(selectedBankId) : null,
+        customerName: selectedOrderObjects[0]?.customer || "",
+        note: `Gộp ${selectedOrderCodes.length} đơn qua form Tạo Biên Lai`,
+        created_by: "ADMIN",
+        forceCancelOldBatches: forceCancelOld,
       });
 
       const json = await res.json();

@@ -13,7 +13,8 @@ import {
   ShieldCheck,
   Sliders,
   Settings,
-  Sparkles
+  Sparkles,
+  KeyRound,
 } from "lucide-react";
 
 export interface MenuItem {
@@ -50,6 +51,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     items: [
       { name: "Gói sản phẩm", path: "/package-products", icon: Package },
       { name: "Bảng giá Niêm yết", path: "/pricing", icon: Tag },
+      { name: "Quản lý Mã Kích Hoạt", path: "/activation-keys", icon: KeyRound },
     ],
   },
   {

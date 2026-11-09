@@ -2,6 +2,7 @@ const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { eventBus, EVENTS } = require("@/events");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE } = require("@/constants/receiptStatus");
+const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 const { settleSupplierDebtTransaction } = require("./supplierSettlementService");
 const { getDefaultShopBank } = require("@/domains/orders/services/orderService");
 
@@ -277,7 +278,7 @@ const getSupplierDetailById = async (id) => {
     if (remainingDebt > 0 && accNum) {
       // Shop nợ NCC -> QR của NCC để Shop chuyển khoản trả NCC
       const amount = Math.max(0, Math.round(remainingDebt) - supplierId);
-      vietqrUrl = `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`;
+      vietqrUrl = buildVietQrImageUrl({ bankCode: bin, accountNumber: accNum, amount, accountName: accName });
       qrTargetType = "SUPPLIER";
       qrBankInfo = {
         bank_name: bankName,
@@ -294,7 +295,7 @@ const getSupplierDetailById = async (id) => {
         const sAccName = defaultBank.account_holder || defaultBank.accountHolder || "";
         const absAmount = Math.abs(Math.round(remainingDebt)); // Bỏ dấu trừ để URL VietQR đúng chuẩn
         const memo = encodeURIComponent(`NCC${supplierId} HOAN TIEN`);
-        vietqrUrl = `https://img.vietqr.io/image/${sBin}-${sAccNum}-compact2.png?amount=${absAmount}&accountName=${encodeURIComponent(sAccName)}&addInfo=${memo}`;
+        vietqrUrl = buildVietQrImageUrl({ bankCode: sBin, accountNumber: sAccNum, amount: absAmount, accountName: sAccName, addInfo: `NCC${supplierId} HOAN TIEN` });
         qrTargetType = "SHOP";
         qrBankInfo = {
           bank_name: defaultBank.bank_display_name || defaultBank.bankShortCode || sBin,

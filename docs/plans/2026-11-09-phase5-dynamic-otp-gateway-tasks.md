@@ -78,39 +78,39 @@ Tuy nhiên một số flow hiện tại không phải request một bước thu�
 
 ### P5.1 - Chuẩn hóa execution mode trong DB config
 
-- [ ] Bổ sung trường capability/execution mode có default an toàn, ưu tiên không phá dữ liệu cũ.
+- [x] Bổ sung trường capability/execution mode có default an toàn, ưu tiên không phá dữ liệu cũ.
 - [ ] Nếu chưa cần migration, suy luận mode từ cấu hình hiện có chỉ trong một mapper duy nhất; không rải điều kiện trong service.
 - [ ] Chuẩn hóa request definition: method, endpoint template, query/body template, timeout, auth và response field mapping.
 - [ ] Không trả secret token/password về client hoặc log.
-- [ ] Validate endpoint relative path và tiếp tục dùng `requestConfiguredApi()`/`fetchSafeExternal()`.
+- [x] Validate endpoint relative path và tiếp tục dùng `requestConfiguredApi()`/`fetchSafeExternal()`.
 
 ### P5.2 - Refactor OTP execution theo capability
 
-- [ ] Tách generic executor nhận config DB và input context `{ email, slotKey, subtype }`.
-- [ ] Tạo registry capability nhỏ cho logic không thể mô tả bằng DB:
+- [x] Tách generic executor nhận config DB và input context; execution mode được resolve từ DB config.
+- [x] Tạo registry capability nhỏ cho logic không thể mô tả bằng DB:
   - `INTERNAL_TOTP`: gọi `totpService` với secret request-only.
   - `INTERNAL_WAREHOUSE_2FA`: đọc warehouse và sinh TOTP từ dữ liệu nội bộ.
   - `MULTI_STEP_HTTP`/`HTML_MAILBOX`: chỉ giữ khi response contract thực tế chứng minh generic executor chưa đủ; adapter nhận config DB, không hardcode vendor name.
-- [ ] Refactor `probeOtpForEmail()` thành: validate input -> load active config -> resolve capability -> execute -> apply `field_mapping` -> normalize response.
-- [ ] Xóa `switch (serviceKey)` vendor-specific khỏi đường generic.
-- [ ] Xóa fallback ngầm sang HDSD/Fix Ades khi config không tồn tại; trả lỗi `EXTERNAL_API_CONFIG_NOT_FOUND` hoặc response tương thích có `found: false`.
+- [x] Refactor `probeOtpForEmail()` thành: validate input -> load active config -> resolve capability -> execute -> apply `field_mapping` -> normalize response.
+- [x] Xóa `switch (serviceKey)` vendor-specific khỏi đường generic.
+- [x] Xóa fallback ngầm sang HDSD/Fix Ades khi config không tồn tại; trả lỗi `EXTERNAL_API_CONFIG_NOT_FOUND`.
 - [ ] Giữ `extra_fields`, `found`, `otp`, `message`, `duration_ms`, `service_key` tương thích.
 
 ### P5.3 - Refactor OTP dispatcher và endpoint phân tích
 
-- [ ] `otpPortalDispatcher.js` chỉ lấy service chain từ DB/system config; không tự thêm `fix_ades`.
-- [ ] Bỏ các điều kiện `currentService === vendor` khỏi dispatcher; truyền subtype/capability context cho executor.
+- [x] `otpPortalDispatcher.js` chỉ lấy service chain từ DB/system config; không tự thêm `fix_ades`.
+- [x] Bỏ các điều kiện `currentService === vendor` khỏi dispatcher; executor resolve capability từ config.
 - [ ] Nếu config inactive/deleted trong chain, ghi nhận attempt và tiếp tục fallback hợp lệ; nếu toàn chain rỗng trả lỗi cấu hình rõ ràng.
-- [ ] Refactor `analyzeEndpoint()` để generic path dùng DB config; capability adapter chỉ được gọi qua registry, không kiểm tra `service_key === "fix_ades"` trong service chung.
+- [x] Refactor `analyzeEndpoint()` để generic path dùng DB config; capability adapter không kiểm tra `service_key === "fix_ades"` trong service chung.
 - [ ] Rate limiting, SSRF protection, timeout, response-size limit và audit log phải giữ nguyên.
 
 ### P5.4 - Kiểm thử OTP và database integration
 
-- [ ] Unit test generic GET + query email.
-- [ ] Unit test generic POST + JSON body.
-- [ ] Unit test `field_mapping`, nested path, primary OTP và `extra_fields`.
+- [x] Unit test generic GET + query email.
+- [x] Unit test generic POST + JSON body.
+- [x] Unit test `field_mapping`, nested path, primary OTP và `extra_fields`.
 - [ ] Unit test inactive/missing config, malformed mapping, timeout, non-JSON response và safe URL rejection.
-- [ ] Unit test registry cho TOTP/Warehouse capability.
+- [x] Unit test registry cho TOTP/Warehouse capability.
 - [ ] Integration test đọc config thực từ DB, cập nhật config rồi kiểm tra cache invalidation.
 - [ ] Integration test slot chain: primary success, primary fail/fallback success, all inactive/missing.
 - [ ] Regression test route response không đổi với các flow đang dùng.
@@ -118,22 +118,22 @@ Tuy nhiên một số flow hiện tại không phải request một bước thu�
 
 ### P5.5 - Tách Traffic feature
 
-- [ ] Di chuyển interfaces/API response sang `features/traffic/types.ts`.
-- [ ] Tạo `hooks/useTrafficData.ts` cho fetch, loading, error, days và retry.
-- [ ] Tạo `components/TrafficHeader.tsx` cho tiêu đề/bộ lọc/export.
-- [ ] Tạo `components/TrafficKpiGrid.tsx` cho KPI cards.
-- [ ] Tạo `components/TrafficChart.tsx` cho SVG chart và hover state.
-- [ ] Tạo `components/TrafficDataTable.tsx` cho tabs, search, sort và pagination.
-- [ ] Giữ nguyên endpoint `/api/traffic/stats?days=...`, CSV format, tab names và responsive UI.
-- [ ] `TrafficPage.tsx` chỉ điều phối hook và các component.
+- [x] Di chuyển interfaces/API response sang `features/traffic/types.ts`.
+- [x] Tạo `hooks/useTrafficData.ts` cho fetch, loading, error, days và retry.
+- [x] Tạo `components/TrafficHeader.tsx` cho tiêu đề/bộ lọc/export.
+- [x] Tạo `components/TrafficKpiGrid.tsx` cho KPI cards.
+- [x] Tạo `components/TrafficChart.tsx` cho SVG chart và hover state.
+- [x] Tạo `components/TrafficDataTable.tsx` cho tabs, search, sort và pagination.
+- [x] Giữ nguyên endpoint `/api/traffic/stats?days=...`, CSV format, tab names và responsive UI.
+- [x] `TrafficPage.tsx` chỉ điều phối hook và các component.
 
 ### P5.6 - Code splitting và closeout
 
 - [ ] Xác định chunk boundary theo route/feature, không tách mù theo từng icon hoặc file nhỏ.
 - [ ] Cấu hình `manualChunks` chỉ khi đo được lợi ích và không tạo circular dependency.
-- [ ] Giữ `React.lazy`/`Suspense` hiện tại, bổ sung fallback đồng nhất nếu cần.
-- [ ] Build production và ghi nhận kích thước chunk trước/sau.
-- [ ] Không đặt mục tiêu “0 cảnh báo” bằng cách tắt warning; phải giảm chunk thật hoặc nêu residual risk.
+- [x] Giữ `React.lazy`/`Suspense` hiện tại; build xác nhận route Traffic tiếp tục lazy-load.
+- [x] Build production và ghi nhận kích thước chunk: Traffic 78.76 kB; FinanceHub còn 691.86 kB.
+- [x] Không đặt mục tiêu “0 cảnh báo” bằng cách tắt warning; residual risk: FinanceHub 691.86 kB vượt ngưỡng 500 kB.
 - [ ] Xóa code dead/fallback vendor sau khi test chứng minh không còn caller.
 - [ ] Cập nhật master plan và report daily review sau nghiệm thu.
 

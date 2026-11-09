@@ -12,6 +12,7 @@ export const routeLoaders: Record<string, RouteImporter> = {
   "/invoices": () => import("@/pages/ReceiptsPage").then((module) => ({ default: module.ReceiptsPage })),
   "/package-products": () => import("@/features/packages/PackageManagementPage").then((module) => ({ default: module.PackageManagementPage })),
   "/pricing": () => import("@/pages/PricingPage").then((module) => ({ default: module.PricingPage })),
+  "/activation-keys": () => import("@/pages/ActivationKeysPage").then((module) => ({ default: module.ActivationKeysPage })),
   "/sources": () => import("@/pages/SuppliersPage").then((module) => ({ default: module.SuppliersPage })),
   "/external-imports": () => import("@/pages/ExternalImportsPage").then((module) => ({ default: module.ExternalImportsPage })),
   "/warehouse": () => import("@/pages/WarehousePage").then((module) => ({ default: module.WarehousePage })),

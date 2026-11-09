@@ -166,7 +166,7 @@ app.get("/api/public/otp-portal-slots", async (req, res) => {
     return res.json({ success: true, slots });
   } catch (err) {
     console.error("[Public OTP Slots API] Error:", err.message);
-    return res.json({ success: true, slots: otpPortalDispatcher.DEFAULT_SLOTS });
+    return res.status(503).json({ success: false, error: err.message, message: "OTP portal configuration is unavailable." });
   }
 });
 
@@ -221,9 +221,40 @@ app.post("/api/public/otp/adobe/account", async (req, res) => {
   }
 });
 
+const activationKeyController = require("@/domains/products/controllers/activationKeyController");
+const activationKeyService = require("@/domains/products/services/activationKeyService");
+
+// Public API kích hoạt mã key tự động cấp slot kho
+app.post("/api/public/otp/activate-key", activationKeyController.publicActivateKey);
+
 app.post("/api/public/otp/gpt/account", async (req, res) => {
   try {
     const input = req.body?.email || req.body?.order_code || req.body?.search || req.body?.input;
+    if (input && String(input).includes("-")) {
+      try {
+        const keyResult = await activationKeyService.activateKeyWithTransaction({
+          keyCode: input,
+          customerInfo: req.body?.email || req.body?.customer || "",
+        });
+        if (keyResult && keyResult.account) {
+          return res.json({
+            success: true,
+            data: {
+              account: keyResult.account,
+              password: keyResult.password,
+              plan: "ChatGPT Plus",
+              status: "ĐANG HOẠT ĐỘNG",
+              note: keyResult.message,
+            },
+            message: keyResult.message,
+          });
+        }
+      } catch (keyErr) {
+        if (!keyErr.message.includes("không tồn tại")) {
+          return res.status(400).json({ success: false, error: keyErr.message });
+        }
+      }
+    }
     const result = await otpPortalDispatcher.dispatchSlotRequest({ slotKey: "gpt_account", input });
     return res.json(result);
   } catch (err) {

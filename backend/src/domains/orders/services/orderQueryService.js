@@ -1,6 +1,7 @@
 const { db, TABLES, COLS } = require("@/db");
 const { getAvailableSuffix, applySuffixToPrice, extractSlotSuffix } = require("@/domains/payments/services/slotSuffixService");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
+const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
 
 const O_COLS = COLS.ORDER_LIST;
@@ -235,7 +236,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       const accNum = supplier.number_bank || supplier.numberBank;
       const accName = supplier.account_holder || supplier.accountHolder || supplier.supplier_name || "";
       const amount = Math.round(Number(order.cost || effectivePrice || 0));
-      enriched.vietqr_url = `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`;
+      enriched.vietqr_url = buildVietQrImageUrl({ bankCode: bin, accountNumber: accNum, amount, accountName: accName });
       enriched.bank_info = {
         bank_name: supplier.bin_bank || bin,
         bank_bin: bin,
@@ -245,7 +246,7 @@ async function attachBatchSupplierAndQrInfo(orders, trx) {
       };
     } else if (defaultShopBankInfo) {
       const amount = Math.round(effectivePrice);
-      enriched.vietqr_url = `https://img.vietqr.io/image/${defaultShopBankInfo.bin}-${defaultShopBankInfo.accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(defaultShopBankInfo.accName)}`;
+      enriched.vietqr_url = buildVietQrImageUrl({ bankCode: defaultShopBankInfo.bin, accountNumber: defaultShopBankInfo.accNum, amount, accountName: defaultShopBankInfo.accName });
       enriched.bank_info = {
         bank_name: defaultShopBankInfo.bankName,
         bank_bin: defaultShopBankInfo.bankBin,
@@ -333,7 +334,7 @@ async function attachVietQrToOrder(order, trx) {
         const amount = Math.round(Number(order.cost || order.price || 0));
         return {
           ...order,
-          vietqr_url: `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`,
+          vietqr_url: buildVietQrImageUrl({ bankCode: bin, accountNumber: accNum, amount, accountName: accName }),
           bank_info: {
             bank_name: supplier.bin_bank || bin,
             account_number: accNum,
@@ -354,7 +355,7 @@ async function attachVietQrToOrder(order, trx) {
       if (accNum) {
         return {
           ...order,
-          vietqr_url: `https://img.vietqr.io/image/${bin}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`,
+          vietqr_url: buildVietQrImageUrl({ bankCode: bin, accountNumber: accNum, amount, accountName: accName }),
           bank_info: {
             bank_name: defaultBank.bank_display_name || defaultBank.bankShortCode || bin,
             bank_bin: defaultBank.bank_bin || defaultBank.bankBin || bin,

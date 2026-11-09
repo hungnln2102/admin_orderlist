@@ -884,12 +884,13 @@ async function executeOtpConfig(config, input, options = {}) {
   return handler(config, input, options);
 }
 
-async function probeOtpForEmail({ email, serviceKey = "otp_hdsd", ...options }) {
+async function probeOtpForEmail({ email, serviceKey, ...options }) {
   if (!email) throw new Error("Vui l?ng cung c?p email ho?c m? ??n h?ng c?n ki?m tra.");
 
+  if (!serviceKey) throw new Error("EXTERNAL_API_CONFIG_NOT_FOUND: service_key is required.");
   const queryInput = String(email).trim();
   const serviceConfig = await getConfigByKey(serviceKey);
-  if (!serviceConfig) throw new Error(`Kh?ng t?m th?y c?u h?nh OTP active cho service_key '${serviceKey}'.`);
+  if (!serviceConfig) throw new Error(`EXTERNAL_API_CONFIG_NOT_FOUND: no active OTP configuration for service_key '${serviceKey}'.`);
 
   const executionMode = String(serviceConfig.execution_mode || "GENERIC_HTTP").trim().toUpperCase();
   const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_2FA"].includes(executionMode);

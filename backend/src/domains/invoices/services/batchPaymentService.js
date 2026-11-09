@@ -22,6 +22,7 @@ const { getAvailableSuffix } = require("@/domains/payments/services/slotSuffixSe
 const { getOrderPrefix, resolveOrdersWithCatalogPrices } = require("@/domains/products/services/catalogPricingService");
 const { calculateNewExpiry } = require("@/domains/orders/services/orderPaymentService");
 const { ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
+const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 
 const PAYABLE_STATUSES = [
   ORDER_STATUS.UNPAID,
@@ -398,7 +399,7 @@ async function getBatchPaymentDetail(batchIdOrCode) {
   const accName = batch.bank_account_holder || "";
   const amount = Math.round(Number(batch.total_amount || 0));
   const vietqrUrl = accNum
-    ? `https://img.vietqr.io/image/${bankCode}-${accNum}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accName)}`
+    ? buildVietQrImageUrl({ bankCode, accountNumber: accNum, amount, accountName: accName })
     : "";
 
   return {

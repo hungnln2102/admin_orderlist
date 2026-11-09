@@ -92,27 +92,25 @@ const DEFAULT_SLOTS = [
 /**
  * Lấy danh sách slots hiện tại từ memory cache / DB và tự động bù đắp slots mới
  */
-function getActiveSlots() {
+function getActiveSlots({ allowMissing = false } = {}) {
   const raw = systemConfigService.get("OTP_PORTAL_SLOTS_CONFIG");
-  let current = DEFAULT_SLOTS;
-  if (raw) {
-    try {
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        current = parsed;
-      }
-    } catch {}
+  if (raw === null || raw === undefined || raw === "") {
+    if (allowMissing) return [];
+    throw new Error("OTP_PORTAL_SLOTS_CONFIG_NOT_FOUND");
   }
 
-  // Tự động merge slot mới trong DEFAULT_SLOTS nếu DB chưa có
-  const existingKeys = new Set(current.map((s) => s.slot_key));
-  const merged = [...current];
-  for (const defSlot of DEFAULT_SLOTS) {
-    if (!existingKeys.has(defSlot.slot_key)) {
-      merged.push(defSlot);
-    }
+  let parsed;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch (error) {
+    throw new Error("OTP_PORTAL_SLOTS_CONFIG_INVALID");
   }
-  return merged;
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("OTP_PORTAL_SLOTS_CONFIG_INVALID");
+  }
+
+  return parsed;
 }
 
 /**
@@ -237,7 +235,7 @@ async function registerSlotsFromPortal(incomingSlots = [], updatedBy = "PORTAL_S
     return getActiveSlots();
   }
 
-  const currentSlots = getActiveSlots();
+  const currentSlots = getActiveSlots({ allowMissing: true });
   const currentMap = new Map(currentSlots.map((s) => [s.slot_key, s]));
   let hasChanges = false;
 
@@ -275,8 +273,8 @@ async function registerSlotsFromPortal(incomingSlots = [], updatedBy = "PORTAL_S
         assigned_services:
           Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
             ? slot.assigned_services
-            : ["warehouse_2fa", "fix_ades"],
-        primary_service_key: slot.assigned_services?.[0] || "warehouse_2fa",
+            : [],
+        primary_service_key: slot.assigned_services?.[0] || null,
         fallback_service_key: slot.assigned_services?.[1] || null,
         cooldown_seconds: Number(slot.cooldown_seconds) || 30,
         btn_text: slot.btn_text || "Lấy Mã Xác Nhận",

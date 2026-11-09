@@ -1,7 +1,14 @@
 const express = require("express");
 const productController = require("../controllers/productController");
+const activationKeyController = require("../controllers/activationKeyController");
 
 const router = express.Router();
+
+// Quản lý Mã Kích Hoạt Key (Activation Keys)
+router.get("/activation-keys", activationKeyController.getActivationKeys);
+router.post("/activation-keys", activationKeyController.createActivationKeys);
+router.post("/activation-keys/:id/revoke", activationKeyController.revokeActivationKey);
+router.delete("/activation-keys/:id", activationKeyController.deleteActivationKey);
 
 router.get("/prices", productController.getProductPrices);
 router.get("/packages", productController.getPackageProducts);

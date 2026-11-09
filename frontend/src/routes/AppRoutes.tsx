@@ -7,6 +7,7 @@ import { routeLoaders } from "./routeLoaders";
 const DashboardPage = React.lazy(routeLoaders["/dashboard"]);
 const OrdersPage = React.lazy(routeLoaders["/orders"]);
 const PricingPage = React.lazy(routeLoaders["/pricing"]);
+const ActivationKeysPage = React.lazy(routeLoaders["/activation-keys"]);
 const SuppliersPage = React.lazy(routeLoaders["/sources"]);
 const CreditPage = React.lazy(routeLoaders["/credit"]);
 const PaymentWalletsPage = React.lazy(routeLoaders["/shop-bank-accounts"]);
@@ -90,6 +91,7 @@ export const AppRoutes: React.FC = () => {
           {/* 3. Danh mục Sản phẩm & Giá */}
           <Route path="/package-products" element={<PackageManagementPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/activation-keys" element={<ActivationKeysPage />} />
 
           {/* 4. Nguồn hàng & Kho */}
           <Route path="/sources" element={<SuppliersPage />} />

@@ -13,6 +13,12 @@ import {
   CreditCard,
   Calendar,
 } from "lucide-react";
+import {
+  allocateInvoiceReceipt,
+  getFinanceSummary,
+  getFixedCosts,
+  getMatchableOrders,
+} from "../api/invoicesApiClient";
 
 interface InvoiceReceipt {
   id: number;
@@ -87,7 +93,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     const timer = setTimeout(async () => {
       try {
         setSearchingOrder(true);
-        const res = await fetch(`/api/invoices/matchable-orders?q=${encodeURIComponent(targetCode.trim())}&limit=5`);
+        const res = await getMatchableOrders({ query: targetCode.trim(), limit: 5 });
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
           const exact = json.data.find(
@@ -127,7 +133,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
 
         // Tự động nạp danh sách chi phí cố định để gợi ý khớp
         setLoadingFixedCosts(true);
-        fetch("/api/finance/fixed-costs")
+        getFixedCosts()
           .then((res) => (res.ok ? res.json() : { items: [] }))
           .then((data) => {
             const items = (data.items || []).filter((i: any) => i.isActive);
@@ -148,7 +154,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         // Nạp thêm danh sách nợ & trả góp để sẵn sàng phân bổ
         setLoadingDebts(true);
         setLoadingInstallments(true);
-        fetch("/api/finance/summary")
+        getFinanceSummary()
           .then((res) => (res.ok ? res.json() : null))
           .then((summary) => {
             if (summary) {
@@ -278,15 +284,11 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         ? (importId.trim() || generateRandomImportId())
         : (allocationType === "ORDER" ? targetCode.trim() : null);
 
-      const res = await fetch(`/api/invoices/${receipt.id}/allocate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          allocation_type: allocationType,
-          target_code: finalTargetCode,
-          amount: allocAmount,
-          note: finalNote,
-        }),
+      const res = await allocateInvoiceReceipt(receipt.id, {
+        allocation_type: allocationType,
+        target_code: finalTargetCode,
+        amount: allocAmount,
+        note: finalNote,
       });
 
       const data = await res.json();

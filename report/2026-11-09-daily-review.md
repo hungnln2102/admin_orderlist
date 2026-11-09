@@ -80,3 +80,55 @@
   - Frontend Build: `npm --prefix frontend run build` -> **0 lỗi TypeScript, build thành công trong 5.68s**.
 - **Trạng thái nghiệm thu**: ĐÃ HOÀN TẤT KHẮC PHỤC. Server backend và nodemon khởi động bình thường, toàn bộ domain Finance hoạt động ổn định.
 
+
+
+## [Asia/Bangkok] Phase 5 - Dynamic OTP Gateway và Traffic feature
+
+- **Phạm vi**: Hoàn tất phần source-level còn thiếu của generic OTP gateway và tách Traffic thành component feature-local; không chạy migration hoặc ghi database production.
+- **OTP**: `probeOtpForEmail()` buộc truyền `service_key`, bỏ fallback ngầm sang HDSD; slot mới không tự chèn `warehouse_2fa`/`fix_ades`; `analyzeEndpoint()` dispatch theo `execution_mode` thay vì nhận diện Fix Ades. Bổ sung `COLS.EXTERNAL_API_CONFIGS.EXECUTION_MODE`.
+- **Traffic**: Tách `TrafficPage.tsx` từ 960 xuống 266 dòng; thêm `TrafficHeader.tsx`, `TrafficKpiGrid.tsx`, `TrafficChart.tsx`, `TrafficDataTable.tsx`. State/filter/sort/pagination/export CSV vẫn ở page orchestration, endpoint giữ `/api/traffic/stats?days=...`.
+- **Kiểm tra đã chạy**: syntax check backend; `npm --prefix backend test` pass **135/135**; `npm --prefix frontend run build` pass. Bundle ghi nhận Traffic `78.76 kB`; residual warning là FinanceHub `691.86 kB` vượt ngưỡng `500 kB`.
+- **Chưa nghiệm thu**: integration DB OTP/cache invalidation, browser smoke test Traffic/OTP Portal và production verification. Không tuyên bố production-ready.
+
+## [Asia/Bangkok] Refactor an toàn - OTP, VietQR và API client frontend
+
+- Phạm vi: Loại bỏ fallback runtime không an toàn của OTP; gom URL VietQR theo contract hiện có; chuẩn hóa một phần request frontend qua apiClient mà không đổi endpoint hoặc payload.
+- OTP fail-closed: Dispatcher trả lỗi cấu hình xác định khi OTP_PORTAL_SLOTS_CONFIG thiếu hoặc hỏng; public endpoint trả 503 thay vì tự lộ slot mặc định.
+- VietQR: Thêm backend/src/utils/qrUrl.js và golden tests; Orders, Suppliers, Invoices dùng chung helper. Luồng Telegram chưa chuyển vì mã hóa dấu cách khác contract business hiện tại.
+- Frontend transport: FinanceHubPage.tsx, CreateReceiptModal.tsx, AllocateReceiptModal.tsx gọi qua feature API client dựa trên apiClient, bảo toàn credentials, xử lý 401, route, body và response đang có.
+- Kiểm tra đã chạy: npm --prefix backend test pass 138/138; npm --prefix frontend run build pass; git diff --check pass.
+- Rủi ro còn lại: Chưa chạy integration DB, browser smoke hoặc production verification. Bundle FinanceHubPage vẫn khoảng 691.76 kB, vượt ngưỡng cảnh báo 500 kB; chưa có profiling để tách chunk an toàn.
+
+## [10:10 Asia/Bangkok] Triển khai Quản lý Mã Kích Hoạt Key & Cấp phát Slot Tự động (Kho Gói -> Đơn hàng)
+
+- **Phạm vi**:
+  - Bổ sung phân hệ "Quản lý Mã Kích Hoạt Key" (`/activation-keys`) nằm trong nhóm "Danh mục Sản phẩm & Giá" theo đúng chỉ đạo của Master.
+  - Xây dựng động cơ tự động cấp phát slot kho chuẩn ACID transaction (`activateKeyWithTransaction`): Khách nhập mã key -> Hệ thống tự động vào Kho Gói (`warehouse.account_slots`) tìm tài khoản còn slot trống -> Chiếm slot (`status = 'IN_USE'`) -> Cập nhật tài khoản vào cột `slot` của đơn hàng (`order_list.slot`) -> Cập nhật key thành `ACTIVATED` -> Trả thông tin tài khoản cho khách.
+- **Thay đổi kỹ thuật**:
+  - Database: Migration `backend/src/db/migrations/20261109000002_create_activation_keys.js` tạo bảng `warehouse.activation_keys` và các chỉ mục (`key_code`, `status`, `product_name_id`, `id_order`). Khai báo bảng & cột chuẩn hóa trong `backend/src/db/tables.js`.
+  - Backend Services & Routes:
+    - `backend/src/domains/products/services/activationKeyService.js`: Chuyên trách sinh key chuẩn ngẫu nhiên cao (`PREFIX-XXXX-XXXX`), truy vấn danh sách, phân trang, lọc, thu hồi và giao dịch cấp phát slot tự động (`activateKeyWithTransaction`) bọc Knex transaction với `FOR UPDATE` chống race condition.
+    - `backend/src/domains/products/controllers/activationKeyController.js`: Xử lý HTTP request và phân quyền.
+    - `backend/src/domains/products/routes/index.js`: Mount các endpoint `/api/products/activation-keys`.
+    - `backend/src/server.js`: Đăng ký public route `/api/public/otp/activate-key` và tích hợp tự động phát hiện mã key trong endpoint `/api/public/otp/gpt/account`.
+  - Frontend UI:
+    - `frontend/src/layout/navigation.ts`: Thêm menu item `{ name: "Quản lý Mã Kích Hoạt", path: "/activation-keys", icon: KeyRound }` vào nhóm `"Danh mục Sản phẩm & Giá"`.
+    - `frontend/src/routes/AppRoutes.tsx` & `routeLoaders.ts`: Đăng ký lazy route `/activation-keys`.
+    - `frontend/src/features/activationKeys/`: Bộ component hoàn chỉnh gồm thẻ thống kê nhanh (`ActivationKeyStatsCards.tsx`), thanh công cụ lọc & tìm kiếm (`ActivationKeyFilterBar.tsx`), bảng dữ liệu (`ActivationKeyTable.tsx`) và modal tạo mã key mới (`CreateActivationKeyModal.tsx`).
+    - `frontend/src/pages/ActivationKeysPage.tsx`: Trang quản lý trung tâm Dark theme, Responsive, tích hợp phân trang URL.
+  - Tests:
+    - `backend/tests/unit/activationKeyService.test.js`: Kiểm thử định dạng mã key, tính ngẫu nhiên độc nhất và xác thực lỗi đầu vào.
+- **Kiểm tra Verification Gates**:
+  - Migration Knex: Chạy thành công Batch 14.
+  - Backend Unit Tests: `npm --prefix backend test` -> **142/142 tests PASS 100%**.
+  - Frontend Build: `npm --prefix frontend run build` -> **0 lỗi TypeScript, bundle thành công 15.46s**.
+- **Trạng thái nghiệm thu**: ĐÃ HOÀN THÀNH VÀ SẴN SÀNG SỬ DỤNG.
+
+
+## [11:20 Asia/Bangkok] Khắc phục V2 VivaRocky gửi sai định dạng request cho cả 3 luồng
+
+- **Nguyên nhân gốc:** `fetchOtpFromVivaRocky` tạo body form và truyền `Content-Type: application/x-www-form-urlencoded`, nhưng `requestConfiguredApi` ghi đè thành `application/json`. VivaRocky vì vậy không đọc được `user_email` trong V2, trong khi V1 dùng form transport trực tiếp.
+- **Thay đổi:** `backend/src/domains/system/services/externalApiConfigService.js` chỉ tự thêm `application/json` khi caller chưa truyền `Content-Type`; giữ nguyên body form của VivaRocky.
+- **Phạm vi đã bảo vệ:** Household `/household.php`, 6-Digit Login `/six_digit_login.php`, Sign-in Code `/signin_code.php`; request JSON hiện có vẫn giữ hành vi cũ.
+- **Kiểm tra:** `node --test tests/unit/otpProviderService.test.js tests/unit/securityHardening.test.js` đạt **14/14**; toàn bộ `npm --prefix backend test` đạt **143/143**; `node --check` hai file và `git diff --check` đều pass.
+- **Trạng thái:** Đã sửa source local và chưa deploy production theo yêu cầu hiện tại.

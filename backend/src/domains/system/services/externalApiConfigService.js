@@ -177,7 +177,8 @@ async function requestConfiguredApi(config, { method = "GET", body = null, endpo
   try {
     const options = { method: requestMethod, headers, signal: controller.signal };
     if (["POST", "PUT", "PATCH"].includes(requestMethod) && body !== null && body !== undefined) {
-      headers["Content-Type"] = "application/json";
+      const hasContentType = Object.keys(headers).some((headerName) => headerName.toLowerCase() === "content-type");
+      if (!hasContentType) headers["Content-Type"] = "application/json";
       options.body = typeof body === "string" ? body : JSON.stringify(body);
     }
     return await fetchSafeExternal(fullUrl, options);
@@ -226,7 +227,8 @@ async function analyzeEndpoint({ configId, method, endpoint, email, body } = {})
   const startedAt = Date.now();
 
   // 1. Nếu là cổng Fix Ades Support (có Bearer Token và 2 headers chuyên biệt):
-  if (config.execution_mode === "AUTHENTICATED_OTP" && targetEmail) {
+  // Capability modes own their request flow; the generic analyzer must not infer vendors.
+  if (config.execution_mode !== "GENERIC_HTTP" && targetEmail) {
     try {
       const { probeOtpForEmail } = require("./otpProviderService");
       const probeRes = await probeOtpForEmail({ email: targetEmail, serviceKey: config.service_key });
@@ -235,7 +237,7 @@ async function analyzeEndpoint({ configId, method, endpoint, email, body } = {})
       return {
         success: true,
         status: 200,
-        statusText: "OK (Ades Authenticated Session)",
+        statusText: `OK (${config.execution_mode})`,
         latency_ms: Date.now() - startedAt,
         contentType: "application/json; charset=utf-8",
         is_json: true,
@@ -245,7 +247,17 @@ async function analyzeEndpoint({ configId, method, endpoint, email, body } = {})
         target_url: config.base_url,
       };
     } catch (err) {
-      // Fallback xuống request thông thường nếu có lỗi provider
+      return {
+        success: false,
+        status: 0,
+        statusText: err.message,
+        latency_ms: Date.now() - startedAt,
+        is_json: false,
+        parsed_data: null,
+        raw_body: "",
+        detected_fields: [],
+        target_url: config.base_url,
+      };
     }
   }
 
@@ -271,18 +283,11 @@ async function analyzeEndpoint({ configId, method, endpoint, email, body } = {})
     }
   }
 
-  const extraHeaders = {};
-  if (config.base_url.includes("ades.support") || config.service_key === "fix_ades") {
-    extraHeaders["X-Feature-Code"] = "only-otp";
-    extraHeaders["X-App-Key"] = "ades-otp-mail";
-  }
-
   try {
     const response = await requestConfiguredApi(config, {
       method: requestMethod,
       body: requestBody,
       endpoint: endpointPath,
-      headers: extraHeaders,
     });
     const text = await readExternalResponse(response);
     let data = null;

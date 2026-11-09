@@ -3,7 +3,7 @@ require("module-alias/register");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const dns = require("node:dns");
-const { executeOtpConfig } = require("../../src/domains/system/services/otpProviderService");
+const { executeOtpConfig, probeOtpForEmail } = require("../../src/domains/system/services/otpProviderService");
 
 async function withMockedExternalFetch(responder, run) {
   const originalLookup = dns.promises.lookup;
@@ -65,6 +65,49 @@ test("GENERIC_HTTP POST uses the configured request method", { concurrency: fals
   });
 });
 
+test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign-in requests", { concurrency: false }, async () => {
+  const calls = [];
+  await withMockedExternalFetch(async (url, options) => {
+    calls.push({ url: String(url), options });
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["Content-Type"], "application/x-www-form-urlencoded");
+
+    if (String(url).endsWith("/household.php")) {
+      return new Response('<a href="https://www.netflix.com/account/household/update?token=abc">Update</a>', { status: 200 });
+    }
+    if (String(url).endsWith("/six_digit_login.php")) {
+      return new Response('<div class="success-box">123456</div>', { status: 200 });
+    }
+    return new Response('<div class="success-box">654321</div>', { status: 200 });
+  }, async () => {
+    const household = await executeOtpConfig({
+      service_key: "vivarocky_household",
+      base_url: "https://vivarocky.example.test/household.php",
+      execution_mode: "VIVAROCKY_HTML",
+      auth_config: { operation: "household" },
+    }, "user@example.com");
+    const sixDigit = await executeOtpConfig({
+      service_key: "vivarocky_six_digit",
+      base_url: "https://vivarocky.example.test/six_digit_login.php",
+      execution_mode: "VIVAROCKY_HTML",
+      auth_config: { operation: "six_digit" },
+    }, "user@example.com");
+    const signIn = await executeOtpConfig({
+      service_key: "vivarocky_signin",
+      base_url: "https://vivarocky.example.test/signin_code.php",
+      execution_mode: "VIVAROCKY_HTML",
+      auth_config: { operation: "signin_code", access_code: "mvrk56" },
+    }, "user@example.com");
+
+    assert.equal(household.extra_fields.find((field) => field.key === "netflix_link")?.value, "https://www.netflix.com/account/household/update?token=abc");
+    assert.equal(sixDigit.otp, "123456");
+    assert.equal(signIn.otp, "654321");
+  });
+
+  assert.equal(calls[0].options.body, "user_email=user%40example.com");
+  assert.equal(calls[1].options.body, "user_email=user%40example.com");
+  assert.equal(calls[2].options.body, "user_email=user%40example.com&access_code=mvrk56");
+});
 test("MAILBOX_REST executes the passed DB config instead of loading a named provider", { concurrency: false }, async () => {
   await withMockedExternalFetch(async (url) => {
     assert.equal(String(url), "https://mailbox.example.test/api/email/example.com/user/?limit=10");
@@ -144,6 +187,56 @@ test("dispatcher rejects slots without a configured service chain", { concurrenc
       dispatcher.dispatchSlotRequest({ slotKey: "unconfigured", input: "user@example.com" }),
       /OTP service chain is not configured/ 
     );
+  } finally {
+    systemConfigService.get = originalGet;
+  }
+});
+
+
+test("probe requires an explicit service key and does not fall back to HDSD", async () => {
+  await assert.rejects(
+    probeOtpForEmail({ email: "user@example.com" }),
+    /EXTERNAL_API_CONFIG_NOT_FOUND: service_key is required/
+  );
+});
+
+test("registering a new portal slot does not inject vendor fallback services", async () => {
+  const systemConfigService = require("../../src/domains/system/services/systemConfigService");
+  const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
+  const originalGet = systemConfigService.get;
+  const originalSet = systemConfigService.set;
+  let savedValue = null;
+  systemConfigService.get = () => JSON.stringify([]);
+  systemConfigService.set = async (_key, value) => {
+    savedValue = JSON.parse(value);
+  };
+
+  try {
+    const slots = await dispatcher.registerSlotsFromPortal([{
+      slot_key: "new_unconfigured_slot",
+      name: "New slot",
+      enabled: true,
+    }]);
+    const created = slots.find((slot) => slot.slot_key === "new_unconfigured_slot");
+    assert.deepEqual(created.assigned_services, []);
+    assert.equal(created.primary_service_key, null);
+    assert.ok(savedValue.some((slot) => slot.slot_key === "new_unconfigured_slot"));
+  } finally {
+    systemConfigService.get = originalGet;
+    systemConfigService.set = originalSet;
+  }
+});
+
+
+test("dispatcher fails closed when the portal slot config is missing or malformed", { concurrency: false }, () => {
+  const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
+  const systemConfigService = require("../../src/domains/system/services/systemConfigService");
+  const originalGet = systemConfigService.get;
+  systemConfigService.get = () => null;
+  try {
+    assert.throws(() => dispatcher.getActiveSlots(), /OTP_PORTAL_SLOTS_CONFIG_NOT_FOUND/);
+    systemConfigService.get = () => "not-json";
+    assert.throws(() => dispatcher.getActiveSlots(), /OTP_PORTAL_SLOTS_CONFIG_INVALID/);
   } finally {
     systemConfigService.get = originalGet;
   }
