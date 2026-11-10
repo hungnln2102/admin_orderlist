@@ -1,5 +1,5 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE } = require("@/constants/receiptStatus");
 const { buildVietQrImageUrl } = require("@/utils/qrUrl");
@@ -404,11 +404,14 @@ const paySupplierDebt = async (id) => {
         isRefund: true,
         summary: `Đã thu tiền hoàn công nợ từ NCC "${supplier[S_COLS.SUPPLIER_NAME]}": ${new Intl.NumberFormat("vi-VN").format(collectedAmount)} ₫`,
       };
-      if (typeof trx?.afterCommit === "function") {
-        trx.afterCommit(() => eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, refundPayload));
-      } else {
-        eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, refundPayload);
-      }
+      await publishEventInTrx(trx, {
+        eventName: EVENTS.SUPPLIER_DEBT_PAID,
+        aggregateType: "SUPPLIER",
+        aggregateId: supplierId,
+        action: "REFUND_COLLECTED",
+        source: "SUPPLIER_DEBT",
+        payload: refundPayload,
+      });
 
       return {
         success: true,
@@ -456,21 +459,39 @@ const paySupplierDebt = async (id) => {
  */
 const toggleSupplierStatus = async (id) => {
   const supplierId = parseInt(id, 10);
-  const existing = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).first();
-  if (!existing) throw new Error("Không tìm thấy Nhà cung cấp");
 
-  const newStatus = !existing[S_COLS.ACTIVE_SUPPLY];
-  await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).update({ [S_COLS.ACTIVE_SUPPLY]: newStatus });
+  return withTransaction(async (trx) => {
+    const existing = await trx(TABLES.SUPPLIER)
+      .where({ [S_COLS.ID]: supplierId })
+      .forUpdate()
+      .first();
+    if (!existing) throw new Error("Không tìm thấy Nhà cung cấp");
 
-  eventBus.emit(EVENTS.SUPPLIER_STATUS_TOGGLED, {
-    id: supplierId,
-    supplier_name: existing[S_COLS.SUPPLIER_NAME],
-    previous_status: existing[S_COLS.ACTIVE_SUPPLY],
-    new_status: newStatus,
-    summary: `Đã ${newStatus ? "kích hoạt" : "ngưng"} hợp tác với nhà cung cấp "${existing[S_COLS.SUPPLIER_NAME]}"`,
+    const newStatus = !existing[S_COLS.ACTIVE_SUPPLY];
+    await trx(TABLES.SUPPLIER)
+      .where({ [S_COLS.ID]: supplierId })
+      .update({ [S_COLS.ACTIVE_SUPPLY]: newStatus });
+
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.SUPPLIER_STATUS_TOGGLED,
+      aggregateType: "SUPPLIER",
+      aggregateId: supplierId,
+      action: "STATUS_TOGGLED",
+      beforeState: existing,
+      afterState: { ...existing, [S_COLS.ACTIVE_SUPPLY]: newStatus },
+      changedFields: { active_supply: { old: existing[S_COLS.ACTIVE_SUPPLY], new: newStatus } },
+      source: "SUPPLIER",
+      payload: {
+        id: supplierId,
+        supplier_name: existing[S_COLS.SUPPLIER_NAME],
+        previous_status: existing[S_COLS.ACTIVE_SUPPLY],
+        new_status: newStatus,
+        summary: `Đã ${newStatus ? "kích hoạt" : "ngừng"} hợp tác với nhà cung cấp "${existing[S_COLS.SUPPLIER_NAME]}"`,
+      },
+    });
+
+    return { id: supplierId, active_supply: newStatus };
   });
-
-  return { id: supplierId, active_supply: newStatus };
 };
 
 /**
@@ -489,39 +510,40 @@ const createSupplier = async (data) => {
     throw new Error("Vui lòng nhập tên nhà cung cấp");
   }
 
-  const [inserted] = await db(TABLES.SUPPLIER)
-    .insert({
-      [S_COLS.SUPPLIER_NAME]: supplier_name.trim(),
-      [S_COLS.NUMBER_BANK]: number_bank ? number_bank.trim() : null,
-      [S_COLS.BIN_BANK]: bin_bank ? bin_bank.trim() : null,
-      [S_COLS.ACCOUNT_HOLDER]: account_holder ? account_holder.trim() : null,
-      [S_COLS.ACTIVE_SUPPLY]: active_supply ?? true,
-    })
-    .returning("*");
+  return withTransaction(async (trx) => {
+    const [inserted] = await trx(TABLES.SUPPLIER)
+      .insert({
+        [S_COLS.SUPPLIER_NAME]: supplier_name.trim(),
+        [S_COLS.NUMBER_BANK]: number_bank ? number_bank.trim() : null,
+        [S_COLS.BIN_BANK]: bin_bank ? bin_bank.trim() : null,
+        [S_COLS.ACCOUNT_HOLDER]: account_holder ? account_holder.trim() : null,
+        [S_COLS.ACTIVE_SUPPLY]: active_supply ?? true,
+      })
+      .returning("*");
 
-  eventBus.emit(EVENTS.SUPPLIER_CREATED, {
-    id: inserted[S_COLS.ID],
-    supplier_name: inserted[S_COLS.SUPPLIER_NAME],
-    number_bank: inserted[S_COLS.NUMBER_BANK],
-    bin_bank: inserted[S_COLS.BIN_BANK],
-    account_holder: inserted[S_COLS.ACCOUNT_HOLDER],
-    active_supply: inserted[S_COLS.ACTIVE_SUPPLY],
-    summary: `Thêm mới nhà cung cấp "${inserted[S_COLS.SUPPLIER_NAME]}"`,
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.SUPPLIER_CREATED,
+      aggregateType: "SUPPLIER",
+      aggregateId: inserted[S_COLS.ID],
+      action: "CREATED",
+      afterState: inserted,
+      source: "SUPPLIER",
+      payload: {
+        id: inserted[S_COLS.ID],
+        supplier_name: inserted[S_COLS.SUPPLIER_NAME],
+        number_bank: inserted[S_COLS.NUMBER_BANK],
+        bin_bank: inserted[S_COLS.BIN_BANK],
+        account_holder: inserted[S_COLS.ACCOUNT_HOLDER],
+        active_supply: inserted[S_COLS.ACTIVE_SUPPLY],
+        summary: `Thêm mới nhà cung cấp "${inserted[S_COLS.SUPPLIER_NAME]}"`,
+      },
+    });
+
+    return inserted;
   });
-
-  return inserted;
 };
-
-/**
- * Cập nhật Nhà cung cấp
- */
 const updateSupplier = async (id, data) => {
   const supplierId = parseInt(id, 10);
-  const existing = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).first();
-  if (!existing) {
-    throw new Error("Không tìm thấy Nhà cung cấp cần sửa");
-  }
-
   const updateFields = {};
   if (data.supplier_name !== undefined) updateFields[S_COLS.SUPPLIER_NAME] = data.supplier_name.trim();
   if (data.number_bank !== undefined) updateFields[S_COLS.NUMBER_BANK] = data.number_bank ? data.number_bank.trim() : null;
@@ -529,44 +551,53 @@ const updateSupplier = async (id, data) => {
   if (data.account_holder !== undefined) updateFields[S_COLS.ACCOUNT_HOLDER] = data.account_holder ? data.account_holder.trim() : null;
   if (data.active_supply !== undefined) updateFields[S_COLS.ACTIVE_SUPPLY] = Boolean(data.active_supply);
 
-  const [updated] = await db(TABLES.SUPPLIER)
-    .where({ [S_COLS.ID]: supplierId })
-    .update(updateFields)
-    .returning("*");
+  return withTransaction(async (trx) => {
+    const existing = await trx(TABLES.SUPPLIER)
+      .where({ [S_COLS.ID]: supplierId })
+      .forUpdate()
+      .first();
+    if (!existing) throw new Error("Không tìm thấy Nhà cung cấp cần sửa");
 
-  const changedFields = [];
-  const changes = {};
+    const [updated] = await trx(TABLES.SUPPLIER)
+      .where({ [S_COLS.ID]: supplierId })
+      .update(updateFields)
+      .returning("*");
+    const changedFields = [];
+    const changes = {};
+    const trackedFields = [
+      [S_COLS.SUPPLIER_NAME, "supplier_name"],
+      [S_COLS.NUMBER_BANK, "number_bank"],
+      [S_COLS.BIN_BANK, "bin_bank"],
+      [S_COLS.ACCOUNT_HOLDER, "account_holder"],
+      [S_COLS.ACTIVE_SUPPLY, "active_supply"],
+    ];
+    for (const [column, field] of trackedFields) {
+      if (updateFields[column] !== undefined && updateFields[column] !== existing[column]) {
+        changedFields.push(field);
+        changes[field] = { old: existing[column], new: updateFields[column] };
+      }
+    }
 
-  if (updateFields[S_COLS.SUPPLIER_NAME] !== undefined && updateFields[S_COLS.SUPPLIER_NAME] !== existing[S_COLS.SUPPLIER_NAME]) {
-    changedFields.push("supplier_name");
-    changes.supplier_name = { old: existing[S_COLS.SUPPLIER_NAME], new: updateFields[S_COLS.SUPPLIER_NAME] };
-  }
-  if (updateFields[S_COLS.NUMBER_BANK] !== undefined && updateFields[S_COLS.NUMBER_BANK] !== existing[S_COLS.NUMBER_BANK]) {
-    changedFields.push("number_bank");
-    changes.number_bank = { old: existing[S_COLS.NUMBER_BANK], new: updateFields[S_COLS.NUMBER_BANK] };
-  }
-  if (updateFields[S_COLS.BIN_BANK] !== undefined && updateFields[S_COLS.BIN_BANK] !== existing[S_COLS.BIN_BANK]) {
-    changedFields.push("bin_bank");
-    changes.bin_bank = { old: existing[S_COLS.BIN_BANK], new: updateFields[S_COLS.BIN_BANK] };
-  }
-  if (updateFields[S_COLS.ACCOUNT_HOLDER] !== undefined && updateFields[S_COLS.ACCOUNT_HOLDER] !== existing[S_COLS.ACCOUNT_HOLDER]) {
-    changedFields.push("account_holder");
-    changes.account_holder = { old: existing[S_COLS.ACCOUNT_HOLDER], new: updateFields[S_COLS.ACCOUNT_HOLDER] };
-  }
-  if (updateFields[S_COLS.ACTIVE_SUPPLY] !== undefined && updateFields[S_COLS.ACTIVE_SUPPLY] !== existing[S_COLS.ACTIVE_SUPPLY]) {
-    changedFields.push("active_supply");
-    changes.active_supply = { old: existing[S_COLS.ACTIVE_SUPPLY], new: updateFields[S_COLS.ACTIVE_SUPPLY] };
-  }
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.SUPPLIER_UPDATED,
+      aggregateType: "SUPPLIER",
+      aggregateId: supplierId,
+      action: "UPDATED",
+      beforeState: existing,
+      afterState: updated,
+      changedFields: changes,
+      source: "SUPPLIER",
+      payload: {
+        id: updated[S_COLS.ID],
+        supplier_name: updated[S_COLS.SUPPLIER_NAME],
+        changed_fields: changedFields,
+        changes,
+        summary: `Cập nhật nhà cung cấp "${updated[S_COLS.SUPPLIER_NAME]}"${changedFields.length > 0 ? ` (${changedFields.join(", ")})` : ""}`,
+      },
+    });
 
-  eventBus.emit(EVENTS.SUPPLIER_UPDATED, {
-    id: updated[S_COLS.ID],
-    supplier_name: updated[S_COLS.SUPPLIER_NAME],
-    changed_fields: changedFields,
-    changes: changes,
-    summary: `Cập nhật nhà cung cấp "${updated[S_COLS.SUPPLIER_NAME]}"${changedFields.length > 0 ? ` (${changedFields.join(", ")})` : ""}`,
+    return updated;
   });
-
-  return updated;
 };
 
 /**
@@ -574,24 +605,40 @@ const updateSupplier = async (id, data) => {
  */
 const deleteSupplier = async (id) => {
   const supplierId = parseInt(id, 10);
-  const existing = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).first();
-  if (!existing) {
-    throw new Error("Không tìm thấy Nhà cung cấp cần xóa");
-  }
 
-  await db(TABLES.SUPPLIER_COST).where({ supplier_id: supplierId }).del();
-  await db(TABLES.SUPPLIER_ORDER_COST_LOG).where({ supply_id: supplierId }).del();
-  await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).del();
+  return withTransaction(async (trx) => {
+    const existing = await trx(TABLES.SUPPLIER)
+      .where({ [S_COLS.ID]: supplierId })
+      .forUpdate()
+      .first();
+    if (!existing) {
+      throw new Error("Không tìm thấy Nhà cung cấp cần xóa");
+    }
 
-  eventBus.emit(EVENTS.SUPPLIER_DELETED, {
-    id: supplierId,
-    supplier_name: existing[S_COLS.SUPPLIER_NAME],
-    summary: `Đã xóa nhà cung cấp "${existing[S_COLS.SUPPLIER_NAME]}" khỏi hệ thống`,
+    await trx(TABLES.SUPPLIER_COST).where({ supplier_id: supplierId }).del();
+    await trx(TABLES.SUPPLIER_ORDER_COST_LOG).where({ supply_id: supplierId }).del();
+    await trx(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).del();
+
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.SUPPLIER_DELETED,
+      aggregateType: "SUPPLIER",
+      aggregateId: supplierId,
+      action: "DELETED",
+      beforeState: existing,
+      source: "SUPPLIER",
+      payload: {
+        id: supplierId,
+        supplier_name: existing[S_COLS.SUPPLIER_NAME],
+        summary: `Đã xóa nhà cung cấp "${existing[S_COLS.SUPPLIER_NAME]}" khỏi hệ thống`,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Đã xóa nhà cung cấp ${existing[S_COLS.SUPPLIER_NAME]}`,
+    };
   });
-
-  return { success: true, message: `Đã xóa nhà cung cấp ${existing[S_COLS.SUPPLIER_NAME]}` };
 };
-
 module.exports = {
   getSuppliersOverview,
   getSupplierCostLogs,

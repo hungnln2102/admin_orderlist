@@ -5,6 +5,17 @@ class EventBus extends EventEmitter {
     super();
     this.setMaxListeners(30);
   }
+
+  async emitAsync(eventName, payload) {
+    const listeners = this.listeners(eventName);
+    const results = [];
+
+    for (const listener of listeners) {
+      results.push(await listener(payload));
+    }
+
+    return results;
+  }
 }
 
 // Instance singleton dùng chung cho toàn hệ thống V2

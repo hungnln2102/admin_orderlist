@@ -47,6 +47,18 @@ async function processPaymentWebhook(payload = {}) {
   const gateway = payload.gateway || payload.bankBrandName || "SEPAY";
   const noteContent = payload.content || payload.transactionContent || payload.note || "";
   const paymentDate = payload.transactionDate || payload.payment_date || new Date().toISOString().split("T")[0];
+  const eventType = isOutbound ? EVENTS.WEBHOOK_MONEY_OUT : EVENTS.WEBHOOK_MONEY_IN;
+  const eventData = {
+    id: payload.id || payload.sepay_transaction_id || payload.transactionId || null,
+    amount: transferAmount,
+    transferType: isOutbound ? TRANSFER_TYPE.OUT : TRANSFER_TYPE.IN,
+    content: noteContent,
+    referenceCode: referenceCode || "",
+    gateway,
+    accountNumber: payload.accountNumber || "",
+    transactionDate: payload.transactionDate || paymentDate,
+    rawPayload: payload,
+  };
   const toDuplicateResult = (receipt) => ({
     success: true,
     duplicate: true,
@@ -107,13 +119,23 @@ async function processPaymentWebhook(payload = {}) {
       });
 
       // 3. Tiền ra (OUT) — ghi sổ cái và chỉ tất toán NCC khi khớp duy nhất.
-      if (isOutbound) {
-        return processOutboundReceiptInTrx({ trx, payload, receipt, receiptId, transferAmount, gateway, noteContent });
-      }
+      const paymentResult = isOutbound
+        ? await processOutboundReceiptInTrx({ trx, payload, receipt, receiptId, transferAmount, gateway, noteContent })
+        : await processInboundReceiptInTrx({
+          trx, payload, receipt, receiptId, transferAmount, gateway, noteContent, numSepayTxId, referenceCode,
+        });
 
-      return processInboundReceiptInTrx({
-        trx, payload, receipt, receiptId, transferAmount, gateway, noteContent, numSepayTxId, referenceCode,
+      await publishEventInTrx(trx, {
+        eventName: eventType,
+        aggregateType: "WEBHOOK",
+        aggregateId: eventData.referenceCode || eventData.accountNumber || "UNKNOWN",
+        action: "PAYMENT_PROCESSED",
+        source: "PAYMENT_WEBHOOK",
+        idempotencyKey: `webhook:${receiptId}`,
+        payload: { ...eventData, payment: paymentResult },
       });
+
+      return paymentResult;
     });
   } catch (error) {
     if (numSepayTxId && error?.code === "23505") {

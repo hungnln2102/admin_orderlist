@@ -16,7 +16,7 @@
  *  6. Khi tạo batch mới bị trùng đơn với batch cũ -> Hủy batch cũ nếu Master/Admin xác nhận.
  */
 const { db, TABLES, withTransaction } = require("@/db");
-const { eventBus, EVENTS, publishEventInTrx } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getAvailableSuffix } = require("@/domains/payments/services/slotSuffixService");
 const { getOrderPrefix, resolveOrdersWithCatalogPrices } = require("@/domains/products/services/catalogPricingService");
@@ -587,8 +587,13 @@ async function fulfillRemainingBatchOrders(batchIdOrCode) {
       // Phát sự kiện gia hạn kỹ thuật (chúc mừng gia hạn, cập nhật kho)
       // TUYỆT ĐỐI KHÔNG PHÁT ORDER_PAID CÓ TIỀN HAY BATCH_PAYMENT_COMPLETED!
       if (isRenewal) {
-        trx.afterCommit(() => {
-          eventBus.emit(EVENTS.ORDER_RENEWED, {
+        await publishEventInTrx(trx, {
+          eventName: EVENTS.ORDER_RENEWED,
+          aggregateType: "ORDER",
+          aggregateId: updatedOrder.id_order,
+          action: "BATCH_RETRY_FULFILLMENT",
+          source: "BATCH_PAYMENT",
+          payload: {
             orderId: updatedOrder.id,
             id_order: updatedOrder.id_order,
             id_product: updatedOrder.id_product,
@@ -599,7 +604,7 @@ async function fulfillRemainingBatchOrders(batchIdOrCode) {
             daysAdded: renewalDays,
             monthsAdded,
             action: "BATCH_RETRY_FULFILLMENT",
-          });
+          },
         });
       }
 

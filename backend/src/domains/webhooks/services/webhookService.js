@@ -1,4 +1,4 @@
-const { eventBus, EVENTS, recordEvent } = require("@/events");
+const { EVENTS } = require("@/events");
 const { processPaymentWebhook } = require("@/domains/payments/services/webhookPaymentService");
 
 async function handleIncomingWebhook(payload = {}) {
@@ -23,17 +23,6 @@ async function handleIncomingWebhook(payload = {}) {
   };
 
   const payment = await processPaymentWebhook(eventData);
-
-  if (payment.success && !payment.duplicate) {
-    eventBus.emit(eventType, { ...eventData, payment });
-  }
-
-  recordEvent({
-    eventName: eventType,
-    aggregateType: "WEBHOOK",
-    aggregateId: eventData.referenceCode || eventData.accountNumber || "UNKNOWN",
-    payload: { ...eventData, payment },
-  }).catch((error) => console.error("[WebhookDomain] Unable to record event:", error));
 
   return { success: true, eventType, data: eventData, payment };
 }

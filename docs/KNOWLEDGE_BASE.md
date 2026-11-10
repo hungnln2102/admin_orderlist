@@ -1,5 +1,8 @@
 # TRUNG TÂM TRI THỨC NGHIỆP VỤ VÀ KIẾN TRÚC
 
+> 🌟 **QUY TRÌNH VẬN HÀNH & NGHIỆP VỤ CHUẨN CỬA HÀNG (SOP):**  
+> Vui lòng tham chiếu tài liệu: [`docs/business-rules/core-business-flows.md`](file:///d:/Desktop/admin/admin_orderlist/docs/business-rules/core-business-flows.md) quy định chi tiết 9 quy trình vận hành thực tế (Quản lý dòng tiền Bank, Khớp thanh toán đơn hàng & kho Mavryk, Thanh toán Credit đủ/thiếu/dư, Sửa đơn hàng, Hủy đơn & hoàn tiền/NCC, Tự động chuyển gia hạn 0h theo giá Catalog mới, Thanh toán công nợ NCC, Rào chắn an toàn khi quản lý sản phẩm, và Nhập hàng/Lưu kho & Tạo gói).
+
 Tài liệu này được gom từ các hướng dẫn tài chính, kiến trúc và quy trình cũ trước đợt tái cấu trúc dự án.
 
 ## --- [DEPENDENCIES_AND_ARCHITECTURE.md] ---

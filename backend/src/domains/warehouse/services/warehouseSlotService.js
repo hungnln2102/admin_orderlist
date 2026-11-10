@@ -1,7 +1,14 @@
-const { db } = require("@/db");
+const { db, withTransaction } = require("@/db");
 const { TABLES } = require("@/db/tables");
-const { eventBus, EVENTS } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { getVietnamDateString } = require("@/utils/time");
+const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
+  eventName,
+  aggregateType: "WAREHOUSE",
+  aggregateId: payload.slotId || payload.accountId || payload.id || "WAREHOUSE",
+  source: "WAREHOUSE",
+  payload,
+});
 
 const addServiceSlotToAccount = async (accountId, payload) => {
   const stockId = Number(accountId);
@@ -24,7 +31,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
     throw new Error("Tên loại dịch vụ không được để trống!");
   }
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const account = await trx(TABLES.PRODUCT_KEYS).where("id", stockId).first();
     if (!account) {
       throw new Error(`Không tìm thấy tài khoản kho với ID ${stockId}`);
@@ -99,7 +106,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
       note: insertedSlot.service_note || "",
     };
 
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_STOCK_UPDATED, {
       slotId: Number(insertedSlot.id),
       accountId: stockId,
       accountUsername: account.account_username,
@@ -118,7 +125,7 @@ const deleteWarehouseServiceSlot = async (slotId) => {
   const numericSlotId = Number(slotId);
   if (!numericSlotId) throw new Error("ID slot dịch vụ không hợp lệ!");
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const existing = await trx(TABLES.STOCK_SERVICES).where("id", numericSlotId).first();
     if (!existing) {
       throw new Error(`Không tìm thấy slot dịch vụ với ID ${numericSlotId}`);
@@ -131,7 +138,7 @@ const deleteWarehouseServiceSlot = async (slotId) => {
       .count("id as count")
       .first();
 
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_STOCK_UPDATED, {
       slotId: numericSlotId,
       accountId: existing.account_id,
       deleted: true,
@@ -158,7 +165,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     accountUsername,
   } = payload;
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const existingSlot = await trx(TABLES.STOCK_SERVICES)
       .where("id", numericSlotId)
       .first();
@@ -244,7 +251,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
       note: updatedSlot.note || "",
     };
 
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_STOCK_UPDATED, {
       slotId: numericSlotId,
       accountId: updatedSlot.account_id,
       updatedFields: updateData,
@@ -265,7 +272,7 @@ const updateCatalogItem = async (id, payload) => {
   const title = (name || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const existing = await trx(TABLES.PRODUCT_NAMES).where("id", numericId).first();
     if (!existing) {
       throw new Error(`Không tìm thấy dịch vụ kho với ID ${numericId}!`);
@@ -301,7 +308,7 @@ const updateCatalogItem = async (id, payload) => {
       .where("pn.id", numericId)
       .first();
 
-    eventBus.emit(EVENTS.WAREHOUSE_CATALOG_UPDATED, {
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_CATALOG_UPDATED, {
       id: updated.id,
       name: updated.name,
       category: updated.category,

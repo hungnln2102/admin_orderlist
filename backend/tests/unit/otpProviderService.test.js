@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const dns = require("node:dns");
 const { executeOtpConfig, probeOtpForEmail } = require("../../src/domains/system/services/otpProviderService");
+const { listProviderCatalog } = require("../../src/domains/system/providers/registry");
 
 async function withMockedExternalFetch(responder, run) {
   const originalLookup = dns.promises.lookup;
@@ -87,6 +88,55 @@ test("MAILBOX_REST executes the passed DB config instead of loading a named prov
 
     assert.equal(result.otp, "112233");
   });
+});
+
+test("FIX_ADES_STATUS posts email and returns the requested status fields", { concurrency: false }, async () => {
+  await withMockedExternalFetch(async (url, options) => {
+    assert.equal(String(url), "https://reseller.ado-besoft.com/api/user-status");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["Content-Type"], "application/json");
+    assert.deepEqual(JSON.parse(options.body), { email: "user@example.com" });
+    return new Response(JSON.stringify({
+      found: true,
+      email: "user@example.com",
+      organization: { id: 646, name: "K12-Primrose School of Meadowbrook" },
+      status: "active",
+      teamChange: {
+        previousName: "Evergreenlearningacademy",
+        currentName: "K12-Primrose School of Meadowbrook",
+        changedAt: "2026-11-09T14:50:57.658Z",
+      },
+    }), { status: 200 });
+  }, async () => {
+    const result = await probeOtpForEmail({ email: "USER@EXAMPLE.COM", serviceKey: "fix_ades_status" });
+    assert.equal(result.found, true);
+    assert.equal(result.otp, null);
+    assert.equal(result.extra_fields.find((field) => field.key === "organization_id")?.value, "646");
+    assert.equal(result.extra_fields.find((field) => field.key === "organization_name")?.value, "K12-Primrose School of Meadowbrook");
+    assert.equal(result.extra_fields.find((field) => field.key === "status")?.value, "active");
+    assert.equal(result.extra_fields.find((field) => field.key === "team_change_previous_name")?.value, "Evergreenlearningacademy");
+    assert.equal(result.extra_fields.find((field) => field.key === "team_change_current_name")?.value, "K12-Primrose School of Meadowbrook");
+    assert.equal(result.extra_fields.find((field) => field.key === "team_change_changed_at")?.value, "2026-11-09T14:50:57.658Z");
+  });
+});
+
+test("FIX_ADES_STATUS returns the upstream missing-subscription message", { concurrency: false }, async () => {
+  await withMockedExternalFetch(async () => new Response(JSON.stringify({
+    error: "No subscription found for this email",
+    found: false,
+  }), { status: 200 }), async () => {
+    const result = await probeOtpForEmail({ email: "missing@example.com", serviceKey: "fix_ades_status" });
+    assert.equal(result.found, false);
+    assert.deepEqual(result.extra_fields, []);
+    assert.equal(result.message, "No subscription found for this email");
+  });
+});
+
+test("provider catalog keeps Ades OTP and Fix-Ades status distinct", () => {
+  const catalog = listProviderCatalog();
+  assert.equal(catalog.find((provider) => provider.key === "ades")?.name, "Ades-otp");
+  assert.equal(catalog.find((provider) => provider.key === "fix_ades_status")?.name, "Fix-Ades");
+  assert.equal(catalog.find((provider) => provider.key === "vivarocky_signin")?.status, "READY");
 });
 
 test("INTERNAL_TOTP stays local and returns a normalized OTP result", async () => {

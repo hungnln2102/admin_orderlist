@@ -1,6 +1,7 @@
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+require("dotenv").config({ path: path.resolve(__dirname, "..", ".env") });
 
 const integrationDirectory = path.resolve(__dirname, "integration");
 const requestedTests = process.argv.slice(2);

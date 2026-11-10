@@ -1,5 +1,5 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getVietnamDateString } = require("@/utils/time");
 
@@ -244,7 +244,7 @@ const getAllSuppliersList = async () => {
 /**
  * Thêm mới Sản phẩm & Bảng giá (Event: PRODUCT_CREATED)
  */
-const createProduct = async (data) => {
+const createProduct = async (data) => withTransaction(async (trx) => {
   const {
     san_pham,
     package_product,
@@ -260,36 +260,36 @@ const createProduct = async (data) => {
   const variantName = package_product || san_pham;
 
   // Tim hoac tao product_id trong catalog product
-  let catalogProduct = await db(TABLES.PRODUCT)
+  let catalogProduct = await trx(TABLES.PRODUCT)
     .whereRaw(`LOWER(${P_COLS.PACKAGE_NAME}) = LOWER(?)`, [variantName || displayName])
     .first();
 
   if (!catalogProduct) {
-    const firstProduct = await db(TABLES.PRODUCT).first();
+    const firstProduct = await trx(TABLES.PRODUCT).first();
     if (firstProduct) {
       catalogProduct = firstProduct;
     } else {
-      const [newP] = await db(TABLES.PRODUCT)
+      const [newP] = await trx(TABLES.PRODUCT)
         .insert({
           [P_COLS.PACKAGE_NAME]: variantName || displayName,
           [P_COLS.IS_ACTIVE]: true,
-          [P_COLS.CREATED_AT]: db.fn.now(),
-          [P_COLS.UPDATED_AT]: db.fn.now(),
+          [P_COLS.CREATED_AT]: trx.fn.now(),
+          [P_COLS.UPDATED_AT]: trx.fn.now(),
         })
         .returning("*");
       catalogProduct = newP;
     }
   }
 
-  const [insertedVariant] = await db(TABLES.VARIANT)
+  const [insertedVariant] = await trx(TABLES.VARIANT)
     .insert({
       [V_COLS.PRODUCT_ID]: catalogProduct[P_COLS.ID],
       [V_COLS.DISPLAY_NAME]: displayName,
       [V_COLS.VARIANT_NAME]: variantName,
       [V_COLS.BASE_PRICE]: base_price || null,
       [V_COLS.IS_ACTIVE]: is_active ?? true,
-      [V_COLS.CREATED_AT]: db.fn.now(),
-      [V_COLS.UPDATED_AT]: db.fn.now(),
+      [V_COLS.CREATED_AT]: trx.fn.now(),
+      [V_COLS.UPDATED_AT]: trx.fn.now(),
     })
     .returning("*");
 
@@ -304,7 +304,7 @@ const createProduct = async (data) => {
   ].filter((p) => p[VP_COLS.PRICE] > 0);
 
   if (tierPrices.length > 0) {
-    await db(TABLES.VARIANT_PRICE).insert(tierPrices);
+    await trx(TABLES.VARIANT_PRICE).insert(tierPrices);
   }
 
   const resultProduct = {
@@ -320,10 +320,10 @@ const createProduct = async (data) => {
   };
 
   // Emit Domain Event
-  eventBus.emit(EVENTS.PRODUCT_CREATED, resultProduct);
+  await publishEventInTrx(trx, { eventName: EVENTS.PRODUCT_CREATED, aggregateType: "PRODUCT", aggregateId: variantId, source: "PRODUCT", payload: resultProduct });
 
   return resultProduct;
-};
+});
 
 /**
  * Cập nhật Sản phẩm & Bảng giá (Event: PRODUCT_UPDATED)
@@ -415,7 +415,7 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
     old_values: oldState,
     summary: summaryParts.join("; ") || "Cập nhật sản phẩm",
   };
-  trx.afterCommit(() => eventBus.emit(EVENTS.PRODUCT_UPDATED, updatedProductPayload));
+  await publishEventInTrx(trx, { eventName: EVENTS.PRODUCT_UPDATED, aggregateType: "PRODUCT", aggregateId: variantId, source: "PRODUCT", payload: updatedProductPayload });
   return updatedProductPayload;
 });
 const deleteProduct = async (id) => withTransaction(async (trx) => {
@@ -500,9 +500,7 @@ const deleteProduct = async (id) => withTransaction(async (trx) => {
   };
 
   // 5. Emit Domain Event sau khi transaction đã commit thành công
-  trx.afterCommit(() => {
-    eventBus.emit(EVENTS.PRODUCT_DELETED, deletedPayload);
-  });
+  await publishEventInTrx(trx, { eventName: EVENTS.PRODUCT_DELETED, aggregateType: "PRODUCT", aggregateId: variantId, source: "PRODUCT", payload: deletedPayload });
 
   return deletedPayload;
 });
@@ -510,26 +508,26 @@ const deleteProduct = async (id) => withTransaction(async (trx) => {
 /**
  * Thêm giá nhập của Nhà Cung Cấp (NCC) cho sản phẩm (Event: SUPPLIER_COST_ADDED)
  */
-const addSupplierCost = async (variantId, supplierId, price) => {
+const addSupplierCost = async (variantId, supplierId, price) => withTransaction(async (trx) => {
   const vId = parseInt(variantId, 10);
   const sId = parseInt(supplierId, 10);
   const costPrice = parseFloat(price || 0);
 
-  const maxRes = await db(TABLES.SUPPLIER_COST).max(`${SC_COLS.ID} as maxId`).first();
+  const maxRes = await trx(TABLES.SUPPLIER_COST).max(`${SC_COLS.ID} as maxId`).first();
   const nextId = (parseInt(maxRes?.maxId || 0, 10)) + 1;
 
-  const [inserted] = await db(TABLES.SUPPLIER_COST)
+  const [inserted] = await trx(TABLES.SUPPLIER_COST)
     .insert({
       [SC_COLS.ID]: nextId,
       [SC_COLS.VARIANT_ID]: vId,
       [SC_COLS.SUPPLIER_ID]: sId,
       [SC_COLS.PRICE]: costPrice,
-      [SC_COLS.CREATED_AT]: db.fn.now(),
-      [SC_COLS.UPDATED_AT]: db.fn.now(),
+      [SC_COLS.CREATED_AT]: trx.fn.now(),
+      [SC_COLS.UPDATED_AT]: trx.fn.now(),
     })
     .returning("*");
 
-  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: sId }).first();
+  const supplier = await trx(TABLES.SUPPLIER).where({ [S_COLS.ID]: sId }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
@@ -541,45 +539,29 @@ const addSupplierCost = async (variantId, supplierId, price) => {
     summary: `Thêm nguồn NCC "${supplier?.[S_COLS.SUPPLIER_NAME] || sId}" với giá nhập ${formatMoney(costPrice)}`,
   };
 
-  // Emit SUPPLIER_COST_ADDED event
-  eventBus.emit(EVENTS.SUPPLIER_COST_ADDED, supplierCostPayload);
-
-  // Emit PRODUCT_UPDATED event as well
-  eventBus.emit(EVENTS.PRODUCT_UPDATED, {
-    id: vId,
-    action: "ADD_SUPPLIER_COST",
-    changed_fields: ["supplier_cost"],
-    changes: {
-      supplier_cost: {
-        action: "ADD",
-        supplier_id: sId,
-        supplier_name: supplier?.[S_COLS.SUPPLIER_NAME] || "",
-        price: costPrice,
-      },
-    },
-    summary: supplierCostPayload.summary,
-  });
+  await publishEventInTrx(trx, { eventName: EVENTS.SUPPLIER_COST_ADDED, aggregateType: "PRODUCT", aggregateId: vId, source: "PRODUCT", payload: supplierCostPayload });
+  await publishEventInTrx(trx, { eventName: EVENTS.PRODUCT_UPDATED, aggregateType: "PRODUCT", aggregateId: vId, source: "PRODUCT", payload: { id: vId, action: "ADD_SUPPLIER_COST", changed_fields: ["supplier_cost"], changes: { supplier_cost: { action: "ADD", supplier_id: sId, supplier_name: supplier?.[S_COLS.SUPPLIER_NAME] || "", price: costPrice } }, summary: supplierCostPayload.summary } });
 
   return inserted;
-};
+});
 
 /**
  * Cập nhật giá nhập của Nhà Cung Cấp (NCC) (Event: SUPPLIER_COST_UPDATED)
  */
-const updateSupplierCost = async (supplierCostId, price) => {
+const updateSupplierCost = async (supplierCostId, price) => withTransaction(async (trx) => {
   const scId = parseInt(supplierCostId, 10);
   const costPrice = parseFloat(price || 0);
 
-  const row = await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).first();
+  const row = await trx(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).first();
   if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
 
   const oldPrice = parseFloat(row[SC_COLS.PRICE] || 0);
 
-  await db(TABLES.SUPPLIER_COST)
+  await trx(TABLES.SUPPLIER_COST)
     .where({ [SC_COLS.ID]: scId })
-    .update({ [SC_COLS.PRICE]: costPrice, [SC_COLS.UPDATED_AT]: db.fn.now() });
+    .update({ [SC_COLS.PRICE]: costPrice, [SC_COLS.UPDATED_AT]: trx.fn.now() });
 
-  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: row[SC_COLS.SUPPLIER_ID] }).first();
+  const supplier = await trx(TABLES.SUPPLIER).where({ [S_COLS.ID]: row[SC_COLS.SUPPLIER_ID] }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
@@ -592,40 +574,24 @@ const updateSupplierCost = async (supplierCostId, price) => {
     summary: `Cập nhật giá nhập NCC "${supplier?.[S_COLS.SUPPLIER_NAME] || row[SC_COLS.SUPPLIER_ID]}": ${formatMoney(oldPrice)} ➔ ${formatMoney(costPrice)}`,
   };
 
-  // Emit SUPPLIER_COST_UPDATED event
-  eventBus.emit(EVENTS.SUPPLIER_COST_UPDATED, supplierCostPayload);
-
-  // Emit PRODUCT_UPDATED event
-  eventBus.emit(EVENTS.PRODUCT_UPDATED, {
-    id: row[SC_COLS.VARIANT_ID],
-    action: "UPDATE_SUPPLIER_COST",
-    changed_fields: ["supplier_cost"],
-    changes: {
-      supplier_cost: {
-        action: "UPDATE",
-        supplier_cost_id: scId,
-        old_price: oldPrice,
-        price: costPrice,
-      },
-    },
-    summary: supplierCostPayload.summary,
-  });
+  await publishEventInTrx(trx, { eventName: EVENTS.SUPPLIER_COST_UPDATED, aggregateType: "PRODUCT", aggregateId: row[SC_COLS.VARIANT_ID], source: "PRODUCT", payload: supplierCostPayload });
+  await publishEventInTrx(trx, { eventName: EVENTS.PRODUCT_UPDATED, aggregateType: "PRODUCT", aggregateId: row[SC_COLS.VARIANT_ID], source: "PRODUCT", payload: { id: row[SC_COLS.VARIANT_ID], action: "UPDATE_SUPPLIER_COST", changed_fields: ["supplier_cost"], changes: { supplier_cost: { action: "UPDATE", supplier_cost_id: scId, old_price: oldPrice, price: costPrice } }, summary: supplierCostPayload.summary } });
 
   return { ...row, [SC_COLS.PRICE]: costPrice };
-};
+});
 
 /**
  * Xóa giá nhập của Nhà Cung Cấp (NCC) (Event: SUPPLIER_COST_DELETED)
  */
-const deleteSupplierCost = async (supplierCostId) => {
+const deleteSupplierCost = async (supplierCostId) => withTransaction(async (trx) => {
   const scId = parseInt(supplierCostId, 10);
 
-  const row = await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).first();
+  const row = await trx(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).first();
   if (!row) throw new Error("Bản ghi giá NCC không tồn tại");
 
-  await db(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).del();
+  await trx(TABLES.SUPPLIER_COST).where({ [SC_COLS.ID]: scId }).del();
 
-  const supplier = await db(TABLES.SUPPLIER).where({ [S_COLS.ID]: row[SC_COLS.SUPPLIER_ID] }).first();
+  const supplier = await trx(TABLES.SUPPLIER).where({ [S_COLS.ID]: row[SC_COLS.SUPPLIER_ID] }).first();
   const formatMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 
   const supplierCostPayload = {
@@ -637,25 +603,11 @@ const deleteSupplierCost = async (supplierCostId) => {
     summary: `Xóa nguồn NCC "${supplier?.[S_COLS.SUPPLIER_NAME] || row[SC_COLS.SUPPLIER_ID]}" (${formatMoney(row[SC_COLS.PRICE])}) khỏi sản phẩm`,
   };
 
-  // Emit SUPPLIER_COST_DELETED event
-  eventBus.emit(EVENTS.SUPPLIER_COST_DELETED, supplierCostPayload);
-
-  // Emit PRODUCT_UPDATED event
-  eventBus.emit(EVENTS.PRODUCT_UPDATED, {
-    id: row[SC_COLS.VARIANT_ID],
-    action: "DELETE_SUPPLIER_COST",
-    changed_fields: ["supplier_cost"],
-    changes: {
-      supplier_cost: {
-        action: "DELETE",
-        supplier_cost_id: scId,
-      },
-    },
-    summary: supplierCostPayload.summary,
-  });
+  await publishEventInTrx(trx, { eventName: EVENTS.SUPPLIER_COST_DELETED, aggregateType: "PRODUCT", aggregateId: row[SC_COLS.VARIANT_ID], source: "PRODUCT", payload: supplierCostPayload });
+  await publishEventInTrx(trx, { eventName: EVENTS.PRODUCT_UPDATED, aggregateType: "PRODUCT", aggregateId: row[SC_COLS.VARIANT_ID], source: "PRODUCT", payload: { id: row[SC_COLS.VARIANT_ID], action: "DELETE_SUPPLIER_COST", changed_fields: ["supplier_cost"], changes: { supplier_cost: { action: "DELETE", supplier_cost_id: scId } }, summary: supplierCostPayload.summary } });
 
   return row;
-};
+});
 
 
 // Sub-service quản lý Kho Gói Sản Phẩm phân rã theo Giai Đoạn 4 (Master Refactoring Plan)

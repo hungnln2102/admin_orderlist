@@ -1,5 +1,5 @@
 const { TABLES, COLS } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const {
   RECEIPT_STATUS,
@@ -128,15 +128,22 @@ async function settleSupplierDebtTransaction({
       note: appendAuditNote(receipt.note, auditNote),
     });
 
-  trx.afterCommit(() => eventBus.emit(EVENTS.SUPPLIER_DEBT_PAID, {
-    id: numericSupplierId,
-    supplier_name: supplier[SUPPLIER_COLS.SUPPLIER_NAME],
-    amount: paidAmount,
-    settledDebt,
-    suffixAmount,
-    receiptId: numericReceiptId,
-    summary: `Đã thanh toán công nợ NCC "${supplier[SUPPLIER_COLS.SUPPLIER_NAME]}" (${paidAmount.toLocaleString("vi-VN")} đ; NCC${numericSupplierId})`,
-  }));
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.SUPPLIER_DEBT_PAID,
+    aggregateType: "SUPPLIER",
+    aggregateId: numericSupplierId,
+    action: "DEBT_SETTLED",
+    source: `SUPPLIER_SETTLEMENT:${source}`,
+    payload: {
+      id: numericSupplierId,
+      supplier_name: supplier[SUPPLIER_COLS.SUPPLIER_NAME],
+      amount: paidAmount,
+      settledDebt,
+      suffixAmount,
+      receiptId: numericReceiptId,
+      summary: `Đã thanh toán công nợ NCC "${supplier[SUPPLIER_COLS.SUPPLIER_NAME]}" (${paidAmount.toLocaleString("vi-VN")} đ; NCC${numericSupplierId})`,
+    },
+  });
 
   return {
     settled: true,

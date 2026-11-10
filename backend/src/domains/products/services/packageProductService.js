@@ -1,5 +1,5 @@
-const { db, TABLES } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
+const { db, TABLES, withTransaction } = require("@/db");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getVietnamDateString } = require("@/utils/time");
 
@@ -417,7 +417,7 @@ const getPackageCategories = async () => {
 /**
  * Tạo mới hoặc cập nhật Loại Gói (đánh dấu is_package = true, requires_storage, và liên kết product_id)
  */
-const createPackageCategory = async ({ name, requiresStorage = false }) => {
+const createPackageCategory = async ({ name, requiresStorage = false }) => withTransaction(async (trx) => {
   const trimmedName = (name || "").trim();
   if (!trimmedName) {
     throw new Error("Tên loại gói không được để trống!");
@@ -426,14 +426,14 @@ const createPackageCategory = async ({ name, requiresStorage = false }) => {
   // Tự động tìm product_id từ business.product
   const normalize = (str) => String(str || "").toLowerCase().replace(/[\s\-_]+/g, "");
   const normName = normalize(trimmedName);
-  const sysProducts = await db(TABLES.PRODUCT).select("id", "package_name");
+  const sysProducts = await trx(TABLES.PRODUCT).select("id", "package_name");
   const matchedProd = sysProducts.find((p) => {
     const normP = normalize(p.package_name);
     return normP === normName || normP.includes(normName) || normName.includes(normP);
   });
   const linkedProductId = matchedProd ? matchedProd.id : null;
 
-  const existing = await db(TABLES.PRODUCT_NAMES)
+  const existing = await trx(TABLES.PRODUCT_NAMES)
     .whereRaw("LOWER(name) = ?", [trimmedName.toLowerCase()])
     .first();
 
@@ -441,13 +441,13 @@ const createPackageCategory = async ({ name, requiresStorage = false }) => {
     const updateData = {
       is_package: true,
       requires_storage: Boolean(requiresStorage),
-      updated_at: db.fn.now(),
+      updated_at: trx.fn.now(),
     };
     if (linkedProductId && !existing.product_id) {
       updateData.product_id = linkedProductId;
     }
 
-    const [updated] = await db(TABLES.PRODUCT_NAMES)
+    const [updated] = await trx(TABLES.PRODUCT_NAMES)
       .where("id", existing.id)
       .update(updateData)
       .returning("*");
@@ -459,11 +459,11 @@ const createPackageCategory = async ({ name, requiresStorage = false }) => {
       isPackage: Boolean(updated.is_package),
       requiresStorage: Boolean(updated.requires_storage),
     };
-    eventBus.emit(EVENTS.PACKAGE_CATEGORY_CREATED, result);
+    await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_CATEGORY_CREATED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
     return result;
   }
 
-  const [inserted] = await db(TABLES.PRODUCT_NAMES)
+  const [inserted] = await trx(TABLES.PRODUCT_NAMES)
     .insert({
       name: trimmedName,
       is_package: true,
@@ -479,20 +479,20 @@ const createPackageCategory = async ({ name, requiresStorage = false }) => {
     isPackage: Boolean(inserted.is_package),
     requiresStorage: Boolean(inserted.requires_storage),
   };
-  eventBus.emit(EVENTS.PACKAGE_CATEGORY_CREATED, result);
+  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_CATEGORY_CREATED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
   return result;
-};
+});
 
 /**
  * Cập nhật tên Loại Gói và cờ requires_storage trong warehouse.product_names
  */
-const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
+const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => withTransaction(async (trx) => {
   const trimmedNew = (newName || oldName || "").trim();
   const trimmedOld = (oldName || "").trim();
   if (!trimmedNew) throw new Error("Tên loại gói mới không được để trống!");
   if (!trimmedOld) throw new Error("Tên loại gói cũ không hợp lệ!");
 
-  const existing = await db(TABLES.PRODUCT_NAMES)
+  const existing = await trx(TABLES.PRODUCT_NAMES)
     .whereRaw("LOWER(name) = ?", [trimmedOld.toLowerCase()])
     .first();
 
@@ -503,7 +503,7 @@ const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
   const updateFields = {
     name: trimmedNew,
     is_package: true,
-    updated_at: db.fn.now(),
+    updated_at: trx.fn.now(),
   };
   if (requiresStorage !== undefined) {
     updateFields.requires_storage = Boolean(requiresStorage);
@@ -513,7 +513,7 @@ const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
   if (trimmedNew.toLowerCase() !== trimmedOld.toLowerCase()) {
     const normalize = (str) => String(str || "").toLowerCase().replace(/[\s\-_]+/g, "");
     const normNew = normalize(trimmedNew);
-    const sysProducts = await db(TABLES.PRODUCT).select("id", "package_name");
+    const sysProducts = await trx(TABLES.PRODUCT).select("id", "package_name");
     const matchedProd = sysProducts.find((p) => {
       const normP = normalize(p.package_name);
       return normP === normNew || normP.includes(normNew) || normNew.includes(normP);
@@ -523,7 +523,7 @@ const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
     }
   }
 
-  const [updated] = await db(TABLES.PRODUCT_NAMES)
+  const [updated] = await trx(TABLES.PRODUCT_NAMES)
     .where("id", existing.id)
     .update(updateFields)
     .returning("*");
@@ -536,18 +536,18 @@ const updatePackageCategory = async ({ oldName, newName, requiresStorage }) => {
     requiresStorage: Boolean(updated.requires_storage),
   };
 
-  eventBus.emit(EVENTS.PACKAGE_CATEGORY_UPDATED, result);
+  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_CATEGORY_UPDATED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
 
   return result;
-};
+});
 
 /**
  * Xóa mềm Loại Gói (đặt is_package = false)
  */
-const deletePackageCategory = async (nameOrId) => {
+const deletePackageCategory = async (nameOrId) => withTransaction(async (trx) => {
   if (!nameOrId) throw new Error("ID hoặc Tên loại gói không được để trống!");
 
-  let query = db(TABLES.PRODUCT_NAMES);
+  let query = trx(TABLES.PRODUCT_NAMES);
   if (!isNaN(Number(nameOrId))) {
     query = query.where("id", Number(nameOrId));
   } else {
@@ -559,11 +559,11 @@ const deletePackageCategory = async (nameOrId) => {
     throw new Error(`Không tìm thấy loại gói '${nameOrId}'!`);
   }
 
-  const [updated] = await db(TABLES.PRODUCT_NAMES)
+  const [updated] = await trx(TABLES.PRODUCT_NAMES)
     .where("id", existing.id)
     .update({
       is_package: false,
-      updated_at: db.fn.now(),
+      updated_at: trx.fn.now(),
     })
     .returning("*");
 
@@ -574,29 +574,29 @@ const deletePackageCategory = async (nameOrId) => {
     isPackage: false,
   };
 
-  eventBus.emit(EVENTS.PACKAGE_CATEGORY_DELETED, result);
+  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_CATEGORY_DELETED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
 
   return result;
-};
+});
 
 /**
  * Helper tìm hoặc tạo tài khoản kho trong warehouse.accounts
  */
-const findOrCreateAccount = async (accountUsername) => {
+const findOrCreateAccount = async (query, accountUsername) => {
   const trimmed = (accountUsername || "").trim();
   if (!trimmed) return null;
 
-  const existing = await db(TABLES.PRODUCT_KEYS)
+  const existing = await query(TABLES.PRODUCT_KEYS)
     .whereRaw("LOWER(account_username) = ?", [trimmed.toLowerCase()])
     .first();
 
   if (existing) return existing;
 
-  const [created] = await db(TABLES.PRODUCT_KEYS)
+  const [created] = await query(TABLES.PRODUCT_KEYS)
     .insert({
       account_username: trimmed,
-      created_at: db.fn.now(),
-      updated_at: db.fn.now(),
+      created_at: query.fn.now(),
+      updated_at: query.fn.now(),
     })
     .returning("*");
 
@@ -607,7 +607,7 @@ const findOrCreateAccount = async (accountUsername) => {
  * Thêm mới Gói Sản Phẩm (Kho Gói Sản Phẩm)
  * Hỗ trợ tài khoản gốc (account_id) và tài khoản liên kết (storage_account_id / storage_total)
  */
-const createPackageProduct = async (payload) => {
+const createPackageProduct = async (payload) => withTransaction(async (trx) => {
   const {
     name,
     category,
@@ -633,12 +633,12 @@ const createPackageProduct = async (payload) => {
   }
 
   // 1. Tìm hoặc tạo product_name_id trong warehouse.product_names
-  let pnRecord = await db(TABLES.PRODUCT_NAMES)
+  let pnRecord = await trx(TABLES.PRODUCT_NAMES)
     .whereRaw("LOWER(name) = ?", [catName.toLowerCase()])
     .first();
 
   if (!pnRecord) {
-    const [createdPn] = await db(TABLES.PRODUCT_NAMES)
+    const [createdPn] = await trx(TABLES.PRODUCT_NAMES)
       .insert({
         name: catName,
         is_package: true,
@@ -649,17 +649,17 @@ const createPackageProduct = async (payload) => {
   }
 
   // 2. Tìm hoặc tạo Tài khoản gốc trong warehouse.accounts
-  const mainAccount = await findOrCreateAccount(mainAccUser);
+  const mainAccount = await findOrCreateAccount(trx, mainAccUser);
 
   // 3. Tìm hoặc tạo Tài khoản dung lượng/liên kết (nếu có)
   const storageAccUser = storageAccountUsername || storageAccountInfo;
   let storageAccount = null;
   if (storageAccUser && storageAccUser.trim()) {
-    storageAccount = await findOrCreateAccount(storageAccUser);
+    storageAccount = await findOrCreateAccount(trx, storageAccUser);
   }
 
   // 4. Insert vào warehouse.package_products
-  const [inserted] = await db(TABLES.PACKAGE_PRODUCT)
+  const [inserted] = await trx(TABLES.PACKAGE_PRODUCT)
     .insert({
       product_name_id: pnRecord.id,
       account_id: mainAccount.id,
@@ -670,8 +670,8 @@ const createPackageProduct = async (payload) => {
       storage_account_id: storageAccount ? storageAccount.id : null,
       storage_total: storageTotal || null,
       match_rule: payload.matchRule || "information",
-      created_at: db.fn.now(),
-      updated_at: db.fn.now(),
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now(),
     })
     .returning("*");
 
@@ -695,18 +695,18 @@ const createPackageProduct = async (payload) => {
     slotAssignments: [],
   };
 
-  eventBus.emit(EVENTS.PACKAGE_PRODUCT_CREATED, resultItem);
+  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_PRODUCT_CREATED, aggregateType: "PRODUCT", aggregateId: resultItem.id, source: "PRODUCT", payload: resultItem });
   return resultItem;
-};
+});
 
 /**
  * Cập nhật Gói Sản Phẩm trong warehouse.package_products
  */
-const updatePackageProduct = async (id, payload) => {
+const updatePackageProduct = async (id, payload) => withTransaction(async (trx) => {
   const pkgId = parseInt(id, 10);
   if (!pkgId) throw new Error("ID gói không hợp lệ!");
 
-  const existing = await db(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
+  const existing = await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
   if (!existing) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
 
   const {
@@ -725,16 +725,16 @@ const updatePackageProduct = async (id, payload) => {
   } = payload;
 
   const updateFields = {
-    updated_at: db.fn.now(),
+    updated_at: trx.fn.now(),
   };
 
   let targetPnRecord = null;
   if (category) {
-    targetPnRecord = await db(TABLES.PRODUCT_NAMES)
+    targetPnRecord = await trx(TABLES.PRODUCT_NAMES)
       .whereRaw("LOWER(name) = ?", [category.trim().toLowerCase()])
       .first();
     if (!targetPnRecord) {
-      const [created] = await db(TABLES.PRODUCT_NAMES)
+      const [created] = await trx(TABLES.PRODUCT_NAMES)
         .insert({ name: category.trim(), is_package: true })
         .returning("*");
       targetPnRecord = created;
@@ -744,14 +744,14 @@ const updatePackageProduct = async (id, payload) => {
 
   const mainAccUser = accountUsername || accountInfo;
   if (mainAccUser && mainAccUser.trim()) {
-    const mainAcc = await findOrCreateAccount(mainAccUser);
+    const mainAcc = await findOrCreateAccount(trx, mainAccUser);
     updateFields.account_id = mainAcc.id;
   }
 
   const storageAccUser = storageAccountUsername !== undefined ? storageAccountUsername : storageAccountInfo;
   if (storageAccUser !== undefined) {
     if (storageAccUser && storageAccUser.trim()) {
-      const storageAcc = await findOrCreateAccount(storageAccUser);
+      const storageAcc = await findOrCreateAccount(trx, storageAccUser);
       updateFields.storage_account_id = storageAcc.id;
     } else {
       updateFields.storage_account_id = null;
@@ -765,16 +765,16 @@ const updatePackageProduct = async (id, payload) => {
   if (totalSlots !== undefined) updateFields.slot = parseInt(totalSlots || 2, 10);
   if (note !== undefined) updateFields.package_note = note;
 
-  const [updated] = await db(TABLES.PACKAGE_PRODUCT)
+  const [updated] = await trx(TABLES.PACKAGE_PRODUCT)
     .where("id", pkgId)
     .update(updateFields)
     .returning("*");
 
-  const mainAcc = await db(TABLES.PRODUCT_KEYS).where("id", updated.account_id).first();
+  const mainAcc = await trx(TABLES.PRODUCT_KEYS).where("id", updated.account_id).first();
   const storageAcc = updated.storage_account_id
-    ? await db(TABLES.PRODUCT_KEYS).where("id", updated.storage_account_id).first()
+    ? await trx(TABLES.PRODUCT_KEYS).where("id", updated.storage_account_id).first()
     : null;
-  const pn = await db(TABLES.PRODUCT_NAMES).where("id", updated.product_name_id).first();
+  const pn = await trx(TABLES.PRODUCT_NAMES).where("id", updated.product_name_id).first();
 
   const resultItem = {
     id: updated.id,
@@ -795,30 +795,30 @@ const updatePackageProduct = async (id, payload) => {
     status: (payload.usedSlots || 0) >= updated.slot ? "expired" : "active",
   };
 
-  eventBus.emit(EVENTS.PACKAGE_PRODUCT_UPDATED, resultItem);
+  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_PRODUCT_UPDATED, aggregateType: "PRODUCT", aggregateId: resultItem.id, source: "PRODUCT", payload: resultItem });
   return resultItem;
-};
+});
 
 /**
  * Xóa Gói Sản Phẩm khỏi warehouse.package_products
  */
-const deletePackageProduct = async (id) => {
+const deletePackageProduct = async (id) => withTransaction(async (trx) => {
   const pkgId = parseInt(id, 10);
   if (!pkgId) throw new Error("ID gói không hợp lệ!");
 
-  const existing = await db(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
+  const existing = await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
   if (!existing) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
 
-  await db(TABLES.PACKAGE_PRODUCT).where("id", pkgId).del();
+  await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).del();
 
   const result = {
     success: true,
     id: pkgId,
   };
 
-  eventBus.emit(EVENTS.PACKAGE_PRODUCT_DELETED, result);
+  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_PRODUCT_DELETED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
   return result;
-};
+});
 
 /**
  * Lấy toàn bộ danh sách tên sản phẩm trong bảng Master Catalog (warehouse.product_names)

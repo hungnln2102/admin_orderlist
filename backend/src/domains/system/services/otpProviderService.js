@@ -1,6 +1,7 @@
 const { getProviderConfig } = require("../providers/registry");
 const { fetchOtpFromTinyHost } = require("../providers/tinyhostProvider");
 const { fetchOtpFromFixAdes } = require("../providers/adesProvider");
+const { fetchFixAdesStatus } = require("../providers/fixAdesStatusProvider");
 const { fetchYunaAccountOrder } = require("../providers/yuna2faProvider");
 const { fetchOtpFromYunaMail } = require("../providers/yunaMailProvider");
 const { fetchOtpFromVivaRocky } = require("../providers/vivarockyProvider");
@@ -144,6 +145,7 @@ async function executeWarehouse2Fa(input) {
 const OTP_EXECUTION_HANDLERS = Object.freeze({
   MAILBOX_REST: async (config, input) => normalizeExecutionResult(await fetchOtpFromTinyHost(input, { config, includeDetails: true })),
   AUTHENTICATED_OTP: async (config, input) => normalizeExecutionResult(await fetchOtpFromFixAdes(input, { config, includeDetails: true })),
+  FIX_ADES_STATUS: async (config, input) => normalizeExecutionResult(await fetchFixAdesStatus(input, { config })),
   YUNA_2FA: async (config, input) => normalizeExecutionResult(await fetchYunaAccountOrder(input, { config })),
   YUNA_MAIL: async (config, input) => normalizeExecutionResult(await fetchOtpFromYunaMail(input, { config, includeDetails: true })),
   VIVAROCKY_HTML: async (config, input, options) => normalizeExecutionResult(await fetchOtpFromVivaRocky(input, {

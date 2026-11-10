@@ -132,21 +132,27 @@ Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà)
 
 ---
 
-### Nguyên Tắc 7: Kiến Trúc Phân Rã Module & Cấm File Độc Bản Khổng Lồ (Modular Architecture & Anti-Monolith / Single Responsibility)
-- **CẤM TUYỆT ĐỐI BẮT 1 FILE GÁNH HẾT TOÀN BỘ LOGIC, UX/UI**:
-  - Không bao giờ được phép dồn nén toàn bộ logic xử lý, state, gọi API, validation, event listeners và các khối giao diện phức tạp vào một file duy nhất (chống tạo các "God Files" khổng lồ hàng trăm/nghìn dòng).
-- **BẮT BUỘC TUÂN THỦ CẤU TRÚC HIỆN TẠI CỦA DỰ ÁN**:
-  - **Frontend (Feature-Driven Architecture)**:
-    - `pages/`: Chỉ đóng vai trò Page Orchestrator mỏng (Thin Orchestrator), điều phối bố cục cấp cao và kết nối các feature modules, không trực tiếp chứa các khối JSX dài ngoằng hay business logic phức tạp.
-    - `features/<feature_name>/`:
-      + `components/`: Tách nhỏ các khối UI thành các sub-components độc lập, chuyên biệt (mỗi component một trách nhiệm duy nhất: bảng danh sách, form nhập liệu, modal, card thông tin).
-      + `hooks/`: Bóc tách toàn bộ state logic phức tạp, event listeners (kéo thả, long-press, keyboard shortcuts), tính toán dữ liệu thành các Custom Hooks độc lập (ví dụ: `useCalendarRangeSelection`, `useThemeScheduleConfig`).
-      + `api/` hoặc `services/`: Tập trung các API client calls, mapper, serialize/deserialize riêng biệt, typing chặt chẽ.
-      + `types/`: Định nghĩa interfaces, data contracts rõ ràng.
-    - `shared/`: Tái sử dụng components dùng chung (`GlassCard`, `StatCard`, modals, buttons, form controls).
-  - **Backend (Domain-Driven Architecture)**:
-    - Bóc tách theo đúng domain (`domains/<domain>/`): routes $\rightarrow$ controllers $\rightarrow$ services/sub-services (tách riêng queries, mutations, transactions, external providers) $\rightarrow$ event publishers.
-    - Khi một file service phình to hoặc gánh nhiều trách nhiệm, bắt buộc phân rã thành các sub-services chuyên biệt (như chuẩn mực đã thiết lập cho `orderService` $\rightarrow$ `orderQueryService`, `orderCreditService`; `productService` $\rightarrow$ `packageProductService`).
+### Nguyên Tắc 7: Kiến Trúc Phân Rã Module Theo Mô Hình Feature/Domain & Event Bus (Modular Feature/Domain & Event-Driven Architecture)
+- **CẤM TUYỆT ĐỐI FILE ĐỘC BẢN KHỔNG LỒ (ANTI-MONOLITH / ANTI-GOD-FILES)**:
+  - Cấm tuyệt đối dồn nén toàn bộ logic xử lý, state, gọi API, validation và giao diện vào một file duy nhất. Mỗi file chỉ đảm nhận duy nhất một trách nhiệm (Single Responsibility Principle - SRP).
+- **FRONTEND: KIẾN TRÚC THEO TÍNH NĂNG (FEATURE-DRIVEN ARCHITECTURE) & REALTIME EVENT BUS**:
+  - `pages/`: Đóng vai trò là Page Orchestrator mỏng (Thin Orchestrator), chỉ điều phối bố cục cấp cao và kết nối các feature modules, tuyệt đối không chứa JSX phức tạp hay business logic.
+  - `features/<feature_name>/`:
+    + `components/`: Chia nhỏ UI thành các sub-components độc lập, chuyên biệt (mỗi component một trách nhiệm: form, list table, modal, card).
+    + `hooks/`: Bóc tách toàn bộ state logic, event listeners, side-effects thành các Custom Hooks độc lập (ví dụ: `useExternalApiConfig`, `useCalendarRangeSelection`).
+    + `api/` hoặc `services/`: Tập trung API client calls, mapper, serialization/deserialization, typing chặt chẽ.
+    + `types/`: Data contracts và interface chuẩn.
+  - `shared/`: Tái sử dụng components và contexts dùng chung (`GlassCard`, `StatCard`, inputs, modals).
+  - **Frontend Realtime / Event Decoupling**: Các module tính năng nhận cập nhật trạng thái real-time từ backend qua `RealtimeContext` (SSE / Event Stream) hoặc Event Bus nội bộ thay vì gọi chéo gây phụ thuộc chặt chẽ giữa các trang/tính năng.
+- **BACKEND: KIẾN TRÚC THEO MIỀN (DOMAIN-DRIVEN ARCHITECTURE) & EVENT BUS (TRANSACTIONAL OUTBOX)**:
+  - Bóc tách theo đúng từng domain độc lập (`domains/<domain>/`):  
+    `routes` $\rightarrow$ `controllers` $\rightarrow$ `services / sub-services` $\rightarrow$ `event publishers`.
+  - Khi service phình to hoặc gánh nhiều trách nhiệm, bắt buộc phân rã thành các sub-services chuyên biệt (như chuẩn mực đã thiết lập: `orderService` $\rightarrow$ `orderQueryService`, `orderCreditService`; `productService` $\rightarrow$ `packageProductService`).
+  - **GIAO TIẾP LIÊN DOMAIN BẰNG EVENT BUS (DECOUPLED EVENT-DRIVEN COMMUNICATION)**:
+    + **Nghiêm cấm gọi chéo trực tiếp (Tight Coupling)**: Các domain không được import trực tiếp service của domain khác để xử lý các side-effects hoặc nghiệp vụ phái sinh (ví dụ: Orders không import trực tiếp Telegram bot hay dịch vụ kế toán/kho).
+    + **Bắt buộc phát sự kiện qua Event Bus (`backend/src/events/`)**: Mọi thay đổi dữ liệu (mutation) phải phát ra Domain Event tương ứng (`ORDER_CREATED`, `PAYMENT_COMPLETED`, `WAREHOUSE_UPDATED`...).
+    + **Transactional Outbox an toàn theo ACID**: Ghi event vào bảng `domain_event_store` trong cùng transaction với mutation chính (`publishEventInTrx` / `recordEventInTrx`). Khi commit thành công mới dispatch sang `eventBus`.
+    + **Event Subscribers**: Các domain liên quan (Telegram, Warehouse, Finance, Realtime SSE) độc lập đăng ký lắng nghe (subscribe) qua `eventBus.on(EVENTS.xxx)` để xử lý bất đồng bộ, bảo đảm tính nhất quán cuối cùng (Eventual Consistency) và không bao giờ làm nghẽn transaction cốt lõi.
 
 ---
 

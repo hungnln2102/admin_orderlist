@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { db, TABLES, COLS, withTransaction } = require("@/db");
-const { eventBus, EVENTS } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 
 const A = COLS.FINANCIAL_ACCOUNTS;
 const L = COLS.FINANCIAL_ACCOUNT_LEDGER;
@@ -264,12 +264,13 @@ async function recordPersonalDebitTransactionInTrx(trx, payload) {
     .update({ [T.FINANCIAL_ACCOUNT_LEDGER_ID]: ledger[L.ID], [T.UPDATED_AT]: trx.fn.now() });
 
   const transaction = await getTransactionById(log[T.ID], trx);
-  trx.afterCommit(() => eventBus.emit(EVENTS.FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED, {
-    financialAccountId,
-    transactionId: transaction.id,
-    direction,
-    occurredAt: transaction.occurredAt,
-  }));
+  await publishEventInTrx(trx, {
+    eventName: EVENTS.FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED,
+    aggregateType: "FINANCE_PERSONAL_DEBIT",
+    aggregateId: transaction.id,
+    source: "FINANCE",
+    payload: { financialAccountId, transactionId: transaction.id, direction, occurredAt: transaction.occurredAt },
+  });
   return { transaction, alreadyProcessed: false };
 }
 
@@ -289,11 +290,13 @@ async function updateTransactionCategory(transactionId, categoryId) {
       [T.UPDATED_AT]: trx.fn.now(),
     });
     const updated = await getTransactionById(id, trx);
-    trx.afterCommit(() => eventBus.emit(EVENTS.FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED, {
-      financialAccountId: updated.financialAccountId,
-      transactionId: updated.id,
-      action: "CATEGORY_UPDATED",
-    }));
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.FINANCE_PERSONAL_DEBIT_TRANSACTION_SYNCED,
+      aggregateType: "FINANCE_PERSONAL_DEBIT",
+      aggregateId: updated.id,
+      source: "FINANCE",
+      payload: { financialAccountId: updated.financialAccountId, transactionId: updated.id, action: "CATEGORY_UPDATED" },
+    });
     return updated;
   });
 }

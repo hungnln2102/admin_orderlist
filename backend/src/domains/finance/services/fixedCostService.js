@@ -1,7 +1,7 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { debitFinancialAccount, creditFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { allocateReceiptInTrx } = require("@/domains/invoices/services/invoiceService");
-const { eventBus, EVENTS, recordEvent } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { snapshotObligation, receiptMonth } = require("./profitObligationService");
 
 const toNumber = (val) => {
@@ -9,71 +9,77 @@ const toNumber = (val) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const publishFixedCostMutation = (action, id, name) => {
-  eventBus.emit(EVENTS.FINANCE_FIXED_COST_MUTATED, { action, id, name });
-  recordEvent({
-    eventName: EVENTS.FINANCE_FIXED_COST_MUTATED,
-    aggregateType: "FIXED_COST",
-    aggregateId: id,
-    payload: { action, id, name },
-  }).catch((err) => console.error("[FinanceHub] Unable to record fixed cost event:", err.message));
-};
+const publishFixedCostMutation = (trx, action, id, name) => publishEventInTrx(trx, {
+  eventName: EVENTS.FINANCE_FIXED_COST_MUTATED,
+  aggregateType: "FIXED_COST",
+  aggregateId: id,
+  source: "FINANCE",
+  payload: { action, id, name },
+});
 
 async function createFixedCost(payload) {
-  const [created] = await db(TABLES.FIXED_COSTS)
-    .insert({
-      name: payload.name,
-      amount: toNumber(payload.amount),
-      category: payload.category || "LIVING",
-      is_active: payload.isActive !== false,
-      note: payload.note || "",
-    })
-    .returning("*");
+  return withTransaction(async (trx) => {
+    const [created] = await trx(TABLES.FIXED_COSTS)
+      .insert({
+        name: payload.name,
+        amount: toNumber(payload.amount),
+        category: payload.category || "LIVING",
+        is_active: payload.isActive !== false,
+        note: payload.note || "",
+      })
+      .returning("*");
 
-  publishFixedCostMutation("CREATE", Number(created.id), created.name);
+    await publishFixedCostMutation(trx, "CREATE", Number(created.id), created.name);
 
-  return {
-    id: Number(created.id),
-    name: created.name,
-    amount: toNumber(created.amount),
-    category: created.category,
-    isActive: Boolean(created.is_active),
-    note: created.note || "",
-  };
+    return {
+      id: Number(created.id),
+      name: created.name,
+      amount: toNumber(created.amount),
+      category: created.category,
+      isActive: Boolean(created.is_active),
+      note: created.note || "",
+    };
+  });
 }
 
 async function updateFixedCost(id, payload) {
-  const updateData = { updated_at: db.fn.now() };
-  if (payload.name !== undefined) updateData.name = payload.name;
-  if (payload.amount !== undefined) updateData.amount = toNumber(payload.amount);
-  if (payload.category !== undefined) updateData.category = payload.category;
-  if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
-  if (payload.note !== undefined) updateData.note = payload.note;
+  return withTransaction(async (trx) => {
+    const updateData = { updated_at: trx.fn.now() };
+    if (payload.name !== undefined) updateData.name = payload.name;
+    if (payload.amount !== undefined) updateData.amount = toNumber(payload.amount);
+    if (payload.category !== undefined) updateData.category = payload.category;
+    if (payload.isActive !== undefined) updateData.is_active = Boolean(payload.isActive);
+    if (payload.note !== undefined) updateData.note = payload.note;
 
+    const [updated] = await trx(TABLES.FIXED_COSTS)
+      .where("id", id)
+      .update(updateData)
+      .returning("*");
 
-  const [updated] = await db(TABLES.FIXED_COSTS)
-    .where("id", id)
-    .update(updateData)
-    .returning("*");
+    if (!updated) return null;
 
-  if (!updated) return null;
+    await publishFixedCostMutation(trx, "UPDATE", Number(updated.id), updated.name);
 
-  publishFixedCostMutation("UPDATE", Number(updated.id), updated.name);
-
-  return {
-    id: Number(updated.id),
-    name: updated.name,
-    amount: toNumber(updated.amount),
-    category: updated.category,
-    isActive: Boolean(updated.is_active),
-    note: updated.note || "",
-  };
+    return {
+      id: Number(updated.id),
+      name: updated.name,
+      amount: toNumber(updated.amount),
+      category: updated.category,
+      isActive: Boolean(updated.is_active),
+      note: updated.note || "",
+    };
+  });
 }
 
 async function deleteFixedCost(id) {
-  const res = await db(TABLES.FIXED_COSTS).where("id", id).del();
-  if (res > 0) publishFixedCostMutation("DELETE", Number(id));
-  return res;
+  return withTransaction(async (trx) => {
+    const fixedCost = await trx(TABLES.FIXED_COSTS).where("id", id).forUpdate().first();
+    if (!fixedCost) return 0;
+
+    const res = await trx(TABLES.FIXED_COSTS).where("id", id).del();
+    await publishFixedCostMutation(trx, "DELETE", Number(id), fixedCost.name);
+    return res;
+  });
 }
 
 async function payFixedCost(id, payload = {}) {
@@ -131,7 +137,7 @@ async function payFixedCost(id, payload = {}) {
       })
       .returning("*");
 
-    publishFixedCostMutation("PAY", Number(id), fixedCost.name);
+    await publishFixedCostMutation(trx, "PAY", Number(id), fixedCost.name);
 
     return { success: true, logId: Number(createdLog.id), periodMonth: targetMonth };
   });
@@ -168,7 +174,7 @@ async function cancelFixedCostPayment(id, payload = {}) {
       .where({ id: existingLog.id })
       .del();
 
-    publishFixedCostMutation("UNPAY", Number(id));
+    await publishFixedCostMutation(trx, "UNPAY", Number(id));
 
     return { success: true };
   });

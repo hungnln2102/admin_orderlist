@@ -8,16 +8,6 @@ const otpProviderService = require("./otpProviderService");
 
 const DEFAULT_SLOTS = [
   {
-    slot_key: "adobe_otp",
-    name: "Adobe: Lấy Mã OTP 6 Số",
-    category: "adobe",
-    assigned_services: ["ades", "tinyhost"],
-    cooldown_seconds: 30,
-    btn_text: "Lấy Mã OTP Adobe",
-    input_placeholder: "Nhập địa chỉ Email Adobe (VD: user@domain.com)...",
-    enabled: true,
-  },
-  {
     slot_key: "adobe_account",
     name: "Adobe: Tra Cứu Tài Khoản",
     category: "adobe",
@@ -25,6 +15,26 @@ const DEFAULT_SLOTS = [
     cooldown_seconds: 15,
     btn_text: "Tra Cứu Thông Tin",
     input_placeholder: "Nhập Email hoặc Mã Đơn Hàng...",
+    enabled: true,
+  },
+  {
+    slot_key: "adobe_check",
+    name: "Adobe: Kiểm Tra Tài Khoản",
+    category: "adobe",
+    assigned_services: ["fix_ades_status", "ades", "tinyhost"],
+    cooldown_seconds: 15,
+    btn_text: "Kiểm Tra Bản Quyền",
+    input_placeholder: "Nhập Email tài khoản Adobe cần kiểm tra...",
+    enabled: true,
+  },
+  {
+    slot_key: "adobe_otp",
+    name: "Adobe: Lấy Mã OTP 6 Số",
+    category: "adobe",
+    assigned_services: ["ades", "tinyhost"],
+    cooldown_seconds: 30,
+    btn_text: "Lấy Mã OTP Adobe",
+    input_placeholder: "Nhập địa chỉ Email Adobe (VD: user@domain.com)...",
     enabled: true,
   },
   {
@@ -184,26 +194,34 @@ async function dispatchSlotRequest({ slotKey, input }) {
   }
 
   let accountData = null;
-  if (slotKey.includes("account")) {
+  if (slotKey.includes("account") || slotKey.includes("check")) {
     const extraFields = probeResult?.extra_fields || [];
     const accEmail =
-      extraFields.find((f) => f.key === "account_email" || f.key === "account_username")?.value ||
+      extraFields.find((f) => f.key === "account_email" || f.key === "account_username" || f.key === "email")?.value ||
       (cleanInput.includes("@") ? cleanInput : "");
     const pass = extraFields.find((f) => f.key === "password" || f.key === "acc_pass")?.value || "";
+    const rawStatus =
+      probeResult?.raw_data?.status ||
+      probeResult?.raw_data?.state ||
+      extraFields.find((f) => f.key === "status" || f.key === "account_status")?.value;
     const plan =
+      probeResult?.raw_data?.plan ||
+      probeResult?.raw_data?.subscription ||
       extraFields.find((f) => f.key === "product_plan" || f.key === "plan")?.value ||
       (slotKey.includes("gpt") ? "ChatGPT Plus" : "Adobe CC All Apps");
-    const exp = extraFields.find((f) => f.key === "expires_at")?.value || "Theo gói";
+    const exp =
+      probeResult?.raw_data?.expires_at ||
+      probeResult?.raw_data?.expired_at ||
+      extraFields.find((f) => f.key === "expires_at")?.value ||
+      "Theo gói";
 
-    if (probeResult?.found || accEmail || pass) {
-      accountData = {
-        account: accEmail || cleanInput,
-        password: pass,
-        plan,
-        expired_at: exp,
-        status: "ĐANG HOẠT ĐỘNG",
-      };
-    }
+    accountData = {
+      account: accEmail || cleanInput,
+      password: pass,
+      plan,
+      expired_at: exp,
+      status: rawStatus || (probeResult?.found ? "ĐANG HOẠT ĐỘNG" : "HOẠT ĐỘNG BÌNH THƯỜNG"),
+    };
   }
 
   const netflixLink = probeResult?.netflix_link || probeResult?.extra_fields?.find((f) => f.key === "netflix_link")?.value || null;

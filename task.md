@@ -1,16 +1,16 @@
-# Task — thống nhất cấu trúc admin_orderlist
+## 2026-11-10 – Ban hành Quy Trình Vận Hành & Nghiệp Vụ Chuẩn Cửa Hàng (SOP)
 
-## Audit Event Outbox — 2026-11-05
+- [x] Chuyển đổi và hoàn thiện tài liệu [docs/business-rules/core-business-flows.md](file:///d:/Desktop/admin/admin_orderlist/docs/business-rules/core-business-flows.md) thành Quy Trình Nghiệp Vụ Chuẩn (SOP) thuần túy ngôn ngữ kinh doanh/vận hành dành cho khách hàng và quản trị viên (loại bỏ hoàn toàn thuật ngữ code). Chuẩn hóa 9 luồng thao tác thực tế (bao gồm Nhập hàng, phân loại NCC Mavryk vs NCC ngoài, và 3 kịch bản Lưu kho/Tạo gói): Biến động dòng tiền Bank, Tự động khớp thanh toán đơn hàng & sản phẩm Mavryk, Thanh toán bằng số dư Credit (Đủ/Thiếu mã QR/Dư liên kết cha-con), Lưu vết sửa đơn hàng, Hủy đơn bảo vệ quyền lợi & hoàn NCC, Tự động gia hạn 0h áp dụng giá mới, Thanh toán nợ NCC không tính trùng chi phí, và Rào chắn an toàn cấm xóa sản phẩm đang hoạt động. Tham chiếu tại [docs/KNOWLEDGE_BASE.md](file:///d:/Desktop/admin/admin_orderlist/docs/KNOWLEDGE_BASE.md).
 
 - [x] Nâng cấp `domain_event_store` thành audit log + transactional outbox dùng chung.
-- [ ] Chuyển các mutation nghiệp vụ sang ghi event trong cùng transaction và phát sau commit.
+- [x] Chuyển các mutation nghiệp vụ sang ghi event trong cùng transaction và phát sau commit.
   - [x] Wallet bank/USDT: create, update, set-default, soft-delete, withdraw.
   - [x] Invoice/batch: allocate receipt, create batch, cancel batch.
-  - [/] Orders, finance hub, product/supplier, warehouse/package, system và external import/API config.
+  - [x] Orders, finance hub, product/supplier, warehouse/package, system và external import/API config.
     - [x] Orders/payments/webhook: create, update, renew, cancel/delete, receipt allocation và batch completion.
-    - [ ] Finance hub, product/supplier, warehouse/package, system và external import/API config.
-- [ ] Mở rộng SSE/cache/listener frontend theo event domain.
-- [ ] Bổ sung test rollback, payload redaction và replay event pending.
+    - [x] Finance hub, product/supplier, warehouse/package, system và external import/API config.
+- [x] Mở rộng SSE/cache/listener frontend theo event domain (SSE provider, domain cache invalidation và listener cụ thể/wildcard đã có; frontend production build đạt).
+- [/] Bổ sung test rollback, payload redaction và replay event pending (redaction/replay unit đã đạt; rollback cần integration DB).
 ## Kế hoạch Browser Profile Vault
 
 - [x] Lập kế hoạch `docs/plans/2026-11-01_remote_browser_profile_vault_plan.md` cho popup remote browser, profile Chromium mã hóa trong PostgreSQL, viewer, RBAC, lock và tiêu chí nghiệm thu.
@@ -456,3 +456,9 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] **REFACTOR-MASTER-PLAN-2026-11-09**: Chuyển External API sang provider hard-code, giữ mapping provider với sản phẩm/slot, loại HDSD/Tmail và thêm IMAP fail-closed. Migration production còn cần chạy trên DB test trước khi deploy.
 
 - [x] **REFACTOR-PROVIDER-HARDCODE-CUTOVER-2026-11-09**: Đã chuyển runtime OTP và mapping sản phẩm khỏi `external_api_configs`; registry provider/env, UI bảng 4 cột, mapping sản phẩm/slot, migrations `20261109000003`/`20261109000004`, backend unit 144/144 và frontend build pass. Chưa deploy production.
+
+- [x] Giai đoạn 1P - Bổ sung unit test cho payload redaction và replay event pending; xác minh 155/155 backend unit tests.
+
+- [x] **TEST-DB-LOCAL-2026-11-10**: Cấu hình `backend/.env` với `TEST_DATABASE_URL` trỏ đến PostgreSQL local `mydtbmav_test`; database này là bản clone của `mydtbmav`, được Node `pg` kết nối xác minh, có 42 migration, 48 bảng core, `system_automation.domain_event_store` và `business.product_api_configs`. Chưa chạy integration/migration trên database test ở bước này.
+
+- [/] **TEST-SOP-9-FLOWS-2026-11-10**: Đã chạy ma trận kiểm thử 9 luồng trên `mydtbmav_test`. Đạt: webhook khớp đơn 5/5, đổi NCC và đối soát công nợ, nhập hàng tài chính, Mavryk 0 chi phí, Credit ledger, rào chắn xóa/gia hạn/kho/outbox unit. Chưa đạt hoặc chưa đủ bằng chứng: test số dư tiền vào/ra đang lệch schema ledger hiện tại; dashboard doanh thu gia hạn chưa tăng trong assertion; Credit thiếu tiền chưa có nhánh trừ một phần + QR; package catalog test thiếu 1 danh mục chuẩn trong dữ liệu clone.

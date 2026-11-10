@@ -1,9 +1,16 @@
-const { db } = require("@/db");
+const { db, withTransaction } = require("@/db");
 const { TABLES } = require("@/db/tables");
-const { eventBus, EVENTS } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const { getVietnamDateString } = require("@/utils/time");
 const warehouseAutomationService = require("./warehouseAutomationService");
 const warehouseSlotService = require("./warehouseSlotService");
+const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
+  eventName,
+  aggregateType: "WAREHOUSE",
+  aggregateId: payload.id || payload.accountId || "WAREHOUSE",
+  source: "WAREHOUSE",
+  payload,
+});
 
 /**
  * Format date value sang chuỗi hiển thị DD/MM/YYYY
@@ -120,7 +127,7 @@ const createWarehouseAccount = async (payload) => {
 
   const normalizedAccount = String(account).trim().toLowerCase();
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const now = new Date();
 
     const [stock] = await trx(TABLES.PRODUCT_KEYS)
@@ -254,7 +261,7 @@ const createWarehouseAccount = async (payload) => {
     }
 
     const result = { id: stockId, account: normalizedAccount };
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_CREATED, result);
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_STOCK_CREATED, result);
     return result;
   });
 };
@@ -266,7 +273,7 @@ const deleteWarehouseAccount = async (id) => {
   const stockId = Number(id);
   if (!stockId) throw new Error("ID tài khoản kho không hợp lệ!");
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     await trx(TABLES.STOCK_SERVICES).where("account_id", stockId).del();
     const deletedCount = await trx(TABLES.PRODUCT_KEYS).where("id", stockId).del();
     return { success: true, deleted: deletedCount > 0 };
@@ -290,7 +297,7 @@ const updateWarehouseAccount = async (id, payload) => {
 
   const normalizedAccount = String(account).trim().toLowerCase();
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const existing = await trx(TABLES.PRODUCT_KEYS).where("id", stockId).first();
     if (!existing) {
       throw new Error(`Không tìm thấy tài khoản kho với ID ${stockId}`);
@@ -303,7 +310,7 @@ const updateWarehouseAccount = async (id, payload) => {
       });
 
     const result = { id: stockId, account: normalizedAccount };
-    eventBus.emit(EVENTS.WAREHOUSE_STOCK_UPDATED, {
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_STOCK_UPDATED, {
       accountId: stockId,
       accountUsername: normalizedAccount,
     });
@@ -433,46 +440,42 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
   const resolvedProductId = productId ? Number(productId) : null;
   const resolvedLoginUrl = loginUrl ? String(loginUrl).trim() : null;
 
-  const existing = await db(TABLES.PRODUCT_NAMES)
-    .whereRaw("LOWER(name) = ?", [title.toLowerCase()])
-    .first();
+  return withTransaction(async (trx) => {
+    const existing = await trx(TABLES.PRODUCT_NAMES)
+      .whereRaw("LOWER(name) = ?", [title.toLowerCase()])
+      .forUpdate()
+      .first();
 
-  if (existing) {
-    const updates = {};
-    if (resolvedCategory !== undefined && existing.category !== resolvedCategory) {
-      updates.category = resolvedCategory;
+    if (existing) {
+      const updates = {};
+      if (existing.category !== resolvedCategory) updates.category = resolvedCategory;
+      if (existing.login_url !== resolvedLoginUrl) updates.login_url = resolvedLoginUrl;
+      if (existing.product_id !== resolvedProductId) updates.product_id = resolvedProductId;
+      if (Object.keys(updates).length > 0) {
+        const [updated] = await trx(TABLES.PRODUCT_NAMES).where("id", existing.id).update(updates).returning("*");
+        await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_CATALOG_UPDATED, {
+          id: updated.id,
+          name: updated.name,
+          category: updated.category,
+          loginUrl: updated.login_url,
+          productId: updated.product_id,
+        });
+        return updated;
+      }
+      return existing;
     }
-    if (resolvedLoginUrl && existing.login_url !== resolvedLoginUrl) {
-      updates.login_url = resolvedLoginUrl;
-    }
-    if (resolvedProductId !== undefined && existing.product_id !== resolvedProductId) {
-      updates.product_id = resolvedProductId;
-    }
-    if (Object.keys(updates).length > 0) {
-      await db(TABLES.PRODUCT_NAMES).where("id", existing.id).update(updates);
-      Object.assign(existing, updates);
-    }
-    return existing;
-  }
 
-  const [inserted] = await db(TABLES.PRODUCT_NAMES)
-    .insert({
-      name: title,
-      category: resolvedCategory,
-      product_id: resolvedProductId,
-      login_url: resolvedLoginUrl,
-    })
-    .returning("*");
-
-  eventBus.emit(EVENTS.WAREHOUSE_CATALOG_CREATED, inserted);
-
-  return inserted;
+    const [inserted] = await trx(TABLES.PRODUCT_NAMES)
+      .insert({ name: title, category: resolvedCategory, product_id: resolvedProductId, login_url: resolvedLoginUrl })
+      .returning("*");
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_CATALOG_CREATED, inserted);
+    return inserted;
+  });
 };
 
 /**
  * Cập nhật thông tin dịch vụ trong danh mục (name, category, login_url, product_id)
- */
-const updateCatalogItem = async (id, payload) => {
+ */const updateCatalogItem = async (id, payload) => {
   const numericId = Number(id);
   if (!numericId) throw new Error("ID dịch vụ không hợp lệ!");
 
@@ -480,7 +483,7 @@ const updateCatalogItem = async (id, payload) => {
   const title = (name || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     const existing = await trx(TABLES.PRODUCT_NAMES).where("id", numericId).first();
     if (!existing) {
       throw new Error(`Không tìm thấy dịch vụ kho với ID ${numericId}!`);
@@ -516,7 +519,7 @@ const updateCatalogItem = async (id, payload) => {
       .where("pn.id", numericId)
       .first();
 
-    eventBus.emit(EVENTS.WAREHOUSE_CATALOG_UPDATED, {
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_CATALOG_UPDATED, {
       id: updated.id,
       name: updated.name,
       category: updated.category,
@@ -541,62 +544,53 @@ const updateCatalogItem = async (id, payload) => {
 const deleteCatalogItem = async (id) => {
   if (!id) throw new Error("ID dịch vụ không được để trống!");
 
-  const existing = await db(TABLES.PRODUCT_NAMES).where("id", id).first();
-  if (!existing) {
-    throw new Error(`Không tìm thấy dịch vụ kho với ID ${id}!`);
-  }
+  return withTransaction(async (trx) => {
+    const existing = await trx(TABLES.PRODUCT_NAMES).where("id", id).forUpdate().first();
+    if (!existing) {
+      throw new Error(`Không tìm thấy dịch vụ kho với ID ${id}!`);
+    }
 
-  // 1. Kiểm tra tồn kho slot (AVAILABLE, RESERVED hoặc bất kỳ slot nào)
-  const slotStats = await db(TABLES.STOCK_SERVICES)
-    .where("name_id", id)
-    .count("id as total_slots")
-    .sum({ in_stock: db.raw("CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END") })
-    .sum({ reserved: db.raw("CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END") })
-    .first();
+    const slotStats = await trx(TABLES.STOCK_SERVICES)
+      .where("name_id", id)
+      .count("id as total_slots")
+      .sum({ in_stock: trx.raw("CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END") })
+      .sum({ reserved: trx.raw("CASE WHEN status = 'RESERVED' THEN 1 ELSE 0 END") })
+      .first();
 
-  const totalSlots = Number(slotStats?.total_slots || 0);
-  const inStock = Number(slotStats?.in_stock || 0);
-  const reserved = Number(slotStats?.reserved || 0);
+    const totalSlots = Number(slotStats?.total_slots || 0);
+    const inStock = Number(slotStats?.in_stock || 0);
+    const reserved = Number(slotStats?.reserved || 0);
+    if (inStock > 0 || reserved > 0 || totalSlots > 0) {
+      throw new Error(
+        `Kho dịch vụ "${existing.name}" vẫn còn ${totalSlots} slot (${inStock} tồn kho, ${reserved} đã giữ chỗ). Kho phải trống hoàn toàn (0 slot) mới có thể xóa!`
+      );
+    }
 
-  if (inStock > 0 || reserved > 0 || totalSlots > 0) {
-    throw new Error(
-      `Kho dịch vụ "${existing.name}" vẫn còn ${totalSlots} slot (${inStock} tồn kho, ${reserved} đã giữ chỗ). Kho phải trống hoàn toàn (0 slot) mới có thể xóa!`
-    );
-  }
+    const packageCount = await trx(TABLES.PACKAGE_PRODUCT)
+      .where("product_name_id", id)
+      .count("id as count")
+      .first();
+    if (Number(packageCount?.count || 0) > 0) {
+      throw new Error(
+        `Dịch vụ "${existing.name}" đang được liên kết trong kho gói (${packageCount.count} gói). Vui lòng gỡ liên kết trước khi xóa!`
+      );
+    }
 
-  // 2. Kiểm tra nếu đang có gói nào liên kết trong warehouse.package_products
-  const packageCount = await db(TABLES.PACKAGE_PRODUCT)
-    .where("product_name_id", id)
-    .count("id as count")
-    .first();
+    await trx(TABLES.PRODUCT_NAMES).where("id", id).del();
+    const payload = { id: existing.id, name: existing.name };
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_CATALOG_DELETED, payload);
 
-  if (Number(packageCount?.count || 0) > 0) {
-    throw new Error(
-      `Dịch vụ "${existing.name}" đang được liên kết trong kho gói (${packageCount.count} gói). Vui lòng gỡ liên kết trước khi xóa!`
-    );
-  }
-
-  // 3. Tiến hành xóa khỏi warehouse.product_names
-  await db(TABLES.PRODUCT_NAMES).where("id", id).del();
-
-  const payload = {
-    id: existing.id,
-    name: existing.name,
-  };
-
-  eventBus.emit(EVENTS.WAREHOUSE_CATALOG_DELETED, payload);
-
-  return {
-    success: true,
-    message: `Đã xóa dịch vụ "${existing.name}" khỏi danh mục kho thành công.`,
-    data: payload,
-  };
+    return {
+      success: true,
+      message: `Đã xóa dịch vụ "${existing.name}" khỏi danh mục kho thành công.`,
+      data: payload,
+    };
+  });
 };
 
 /**
  * Mở trình duyệt Profile độc lập cho tài khoản kho
- */
-const openAccountBrowser = (...args) => warehouseAutomationService.openAccountBrowser(...args);
+ */const openAccountBrowser = (...args) => warehouseAutomationService.openAccountBrowser(...args);
 
 const updateWarehouseServiceSlot = (...args) => warehouseSlotService.updateWarehouseServiceSlot(...args);
 
@@ -639,7 +633,7 @@ const renameCatalogTag = async ({ productId, oldTag, newTag }) => {
     throw new Error("Tên tag cũ và tên tag mới không được để trống!");
   }
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     // 1. Cập nhật trong business.variant
     const vQuery = trx(TABLES.VARIANT)
       .whereRaw("LOWER(TRIM(variant_name)) = ?", [oldName.toLowerCase()]);
@@ -684,7 +678,7 @@ const deleteCatalogTag = async ({ productId, tag }) => {
     throw new Error("Tên tag cần xóa không được để trống!");
   }
 
-  return await db.transaction(async (trx) => {
+  return await withTransaction(async (trx) => {
     // 1. Vô hiệu hóa trong business.variant (is_active = false)
     const vQuery = trx(TABLES.VARIANT)
       .whereRaw("LOWER(TRIM(variant_name)) = ?", [targetTag.toLowerCase()]);

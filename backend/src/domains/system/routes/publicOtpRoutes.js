@@ -53,6 +53,7 @@ router.post("/otp/probe-slot", async (req, res) => {
 
 router.post("/otp/adobe/code", (req, res) => dispatchSlot(res, "adobe_otp", req.body?.email || req.body?.input));
 router.post("/otp/adobe/account", (req, res) => dispatchSlot(res, "adobe_account", req.body?.email || req.body?.order_code || req.body?.search || req.body?.input));
+router.post(["/otp/adobe/check", "/otp/adobe/status"], (req, res) => dispatchSlot(res, "adobe_check", req.body?.email || req.body?.account || req.body?.search || req.body?.input));
 router.post("/otp/activate-key", activationKeyController.publicActivateKey);
 
 router.post("/otp/gpt/account", async (req, res) => {

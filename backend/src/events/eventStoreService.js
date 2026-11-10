@@ -77,7 +77,7 @@ async function markEventDispatchFailed(eventId, error) {
     .update({ [E.ERROR_MESSAGE]: error.message || String(error) });
 }
 
-async function dispatchStoredEvent(event) {
+async function dispatchStoredEventWith(event, { emitAsync, markPublishedFn, markFailedFn }) {
   const payload = {
     ...(event[E.PAYLOAD] || {}),
     auditEventId: event[E.ID],
@@ -85,12 +85,20 @@ async function dispatchStoredEvent(event) {
   };
 
   try {
-    eventBus.emit(event[E.EVENT_NAME], payload);
-    await markEventPublished(event[E.ID]);
+    await emitAsync(event[E.EVENT_NAME], payload);
+    await markPublishedFn(event[E.ID]);
   } catch (error) {
-    await markEventDispatchFailed(event[E.ID], error);
+    await markFailedFn(event[E.ID], error);
     throw error;
   }
+}
+
+async function dispatchStoredEvent(event) {
+  return dispatchStoredEventWith(event, {
+    emitAsync: eventBus.emitAsync.bind(eventBus),
+    markPublishedFn: markEventPublished,
+    markFailedFn: markEventDispatchFailed,
+  });
 }
 
 async function publishEventInTrx(trx, input) {
@@ -129,6 +137,7 @@ async function recordEvent(input) {
 
 module.exports = {
   dispatchPendingEvents,
+  dispatchStoredEventWith,
   publishEventInTrx,
   recordEvent,
   recordEventInTrx,
