@@ -1276,6 +1276,7 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
       isSupplierMavryk,
       supply_id: updatedOrder.supply_id,
       order_date: updatedOrder.order_date,
+      transactionDate: options.transactionDate,
       status: updatedOrder.status,
       isRenewal,
       action: options.action || "COMPLETED",

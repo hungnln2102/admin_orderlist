@@ -198,7 +198,7 @@ async function calculateNewExpiry(orderOrExpiry, optionsOrDays = {}) {
  * @returns {Promise<{updatedOrder: object, isRenewal: boolean, newExpiredAt: string|null, newOrderDate: string|null}>}
  */
 async function processOrderPayment(trx, order, amount, options = {}) {
-  const { receiptId, action = "PAYMENT_RECEIVED" } = options;
+  const { receiptId, action = "PAYMENT_RECEIVED", transactionDate } = options;
 
   if (
     ![
@@ -286,6 +286,8 @@ async function processOrderPayment(trx, order, amount, options = {}) {
       isSupplierMavryk,
       supply_id: supplyId,
       status: updatedOrder.status,
+      order_date: updatedOrder.order_date,
+      updated_at: updatedOrder.updated_at,
       receiptId,
       isRenewal,
       action,

@@ -4,9 +4,13 @@ require("module-alias/register");
 
 const warehouseService = require("@/domains/warehouse/services/warehouseService");
 const { db } = require("@/db");
+const { TABLES } = require("@/db/tables");
+const { ensureYoutubeLoginUrl } = require("../fixtures/trustFlowFixtures");
 
 test("Warehouse Integration Tests (V2)", async (t) => {
+  const cleanupYoutubeLoginUrl = await ensureYoutubeLoginUrl(db, TABLES.PRODUCT_NAMES);
   t.after(async () => {
+    await cleanupYoutubeLoginUrl();
     await db.destroy();
   });
   await t.test("1. listWarehouseAccounts returns accounts structure properly", async () => {

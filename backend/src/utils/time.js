@@ -54,6 +54,20 @@ function getVietnamDateTimeString(date = new Date()) {
   return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
 }
 
+function formatDateDisplay(dateVal) {
+  if (!dateVal) return "";
+  try {
+    const date = new Date(dateVal);
+    if (isNaN(date.getTime())) return String(dateVal);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return String(dateVal);
+  }
+}
+
 /**
  * Cộng ngày hết hạn theo giờ Việt Nam
  * @param {Date|string|null} currentExpiry - Ngày hết hạn hiện tại
@@ -83,5 +97,6 @@ module.exports = {
   getVietnamDateString,
   getVietnamMonthString,
   getVietnamDateTimeString,
+  formatDateDisplay,
   addDaysVietnam,
 };

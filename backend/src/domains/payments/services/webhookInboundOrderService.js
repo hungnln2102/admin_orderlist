@@ -372,6 +372,7 @@ await publishEventInTrx(trx, {
 const { updatedOrder, isRenewal } = await processCompleteOrder(trx, matchedOrder, transferAmount, {
   receiptId,
   action: "WEBHOOK_PAYMENT_MATCH",
+  transactionDate: payload.transactionDate,
 });
 
 return {

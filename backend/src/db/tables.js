@@ -183,6 +183,7 @@ const COLS = {
     USDT_EXCHANGE_RATE: "usdt_exchange_rate",
     USDT_WALLET_ID: "usdt_wallet_id",
     WAS_PAID: "was_paid",
+    CREDIT_PAID_AMOUNT: "credit_paid_amount",
     CREATED_AT: "created_at",
   },
   ACCOUNTS: {

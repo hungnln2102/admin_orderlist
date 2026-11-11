@@ -43,8 +43,8 @@ function assert(condition, message) {
 async function cleanup() {
   if (createdReceiptIds.length) {
     await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
-      .where("source_kind", "payment_receipt")
-      .whereIn("source_id", createdReceiptIds.map(String))
+      .where("reference_type", "payment_receipt")
+      .whereIn("reference_id", createdReceiptIds.map(String))
       .del()
       .catch(() => {});
     await db(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).whereIn("receipt_id", createdReceiptIds).del().catch(() => {});

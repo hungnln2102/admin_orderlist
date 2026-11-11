@@ -3,10 +3,13 @@ const assert = require("node:assert/strict");
 require("module-alias/register");
 
 const productService = require("@/domains/products/services/productService");
-const { db } = require("@/db");
+const { db, TABLES } = require("@/db");
+const { ensureStandardPackageCategories } = require("../fixtures/trustFlowFixtures");
 
 test("Package Categories Integration Tests (V2)", async (t) => {
+  const cleanupStandardCategories = await ensureStandardPackageCategories(db, TABLES.PRODUCT_NAMES);
   t.after(async () => {
+    await cleanupStandardCategories();
     await db.destroy();
   });
 

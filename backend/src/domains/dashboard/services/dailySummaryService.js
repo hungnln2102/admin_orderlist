@@ -79,7 +79,7 @@ function registerDailySummaryListeners() {
       }
 
       const cost = isMavryk ? 0 : Number(data.cost || 0);
-      const dateStr = getVietnamDateString(data.order_date || data.transactionDate || data.updated_at);
+      const dateStr = getVietnamDateString(data.transactionDate || data.order_date || data.updated_at);
       const isRenewal = Boolean(data.isRenewal);
       console.log(`📊 [DailySummary] Nhận ORDER_PAID (${isRenewal ? "Gia hạn" : "Đơn mới"}${isMavryk ? " - NCC Mavryk (Chủ shop)" : ""}): +${amount} ₫ doanh thu, +${cost} ₫ chi phí, +1 đơn (Ngày: ${dateStr})`);
 

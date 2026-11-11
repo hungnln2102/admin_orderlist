@@ -12,6 +12,7 @@ const { TRANSFER_TYPE } = require("@/constants/receiptStatus");
 let PASS = 0;
 let FAIL = 0;
 const createdReceiptIds = [];
+let createdBankAccountId = null;
 
 function assert(condition, message) {
   if (!condition) throw new Error(`ASSERT FAIL: ${message}`);
@@ -33,12 +34,15 @@ async function runTest(name, fn) {
 async function cleanup() {
   if (createdReceiptIds.length) {
     await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
-      .where("source_kind", "payment_receipt")
-      .whereIn("source_id", createdReceiptIds.map(String))
+      .where("reference_type", "payment_receipt")
+      .whereIn("reference_id", createdReceiptIds.map(String))
       .del()
       .catch(() => {});
     await db(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).whereIn("receipt_id", createdReceiptIds).del().catch(() => {});
     await db(TABLES.PAYMENT_RECEIPT).whereIn("id", createdReceiptIds).del().catch(() => {});
+  }
+  if (createdBankAccountId) {
+    await db(TABLES.SHOP_BANK_ACCOUNTS).where("id", createdBankAccountId).del().catch(() => {});
   }
 }
 
@@ -48,35 +52,24 @@ async function main() {
   console.log("=================================================");
 
   try {
-    // Đảm bảo có ít nhất 1 tài khoản ngân hàng hoạt động để test
-    let testAccount = await db(TABLES.SHOP_BANK_ACCOUNTS)
-      .where({ is_default: true, is_active: true, is_deleted: false })
-      .first();
-
-    if (!testAccount) {
-      testAccount = await db(TABLES.SHOP_BANK_ACCOUNTS)
-        .where({ is_deleted: false })
-        .first();
-    }
-
-    if (!testAccount) {
-      const [inserted] = await db(TABLES.SHOP_BANK_ACCOUNTS)
-        .insert({
-          account_type: "bank",
-          label: "Test MBBank",
-          account_number: "0378304963",
-          account_holder: "TEST OWNER",
-          bank_short_code: "MB",
-          is_default: true,
-          is_active: true,
-          balance: 1000000,
-          total_received: 0,
-          total_withdrawn: 0,
-        })
-        .returning("*");
-      testAccount = inserted;
-    }
-
+    // Tạo tài khoản ngân hàng riêng cho suite để tiền vào/ra không phụ thuộc dữ liệu nền.
+    const [testAccount] = await db(TABLES.SHOP_BANK_ACCOUNTS)
+      .insert({
+        account_type: "bank",
+        label: "Test MBBank",
+        account_number: `TESTMB${Date.now()}`,
+        account_holder: "TEST OWNER",
+        bank_short_code: "MB",
+        account_scope: "SHOP",
+        is_default: false,
+        is_active: true,
+        is_deleted: false,
+        balance: 1000000,
+        total_received: 0,
+        total_withdrawn: 0,
+      })
+      .returning("*");
+    createdBankAccountId = testAccount.id;
     const testAccountId = testAccount.id;
     const testAccountNumber = testAccount.account_number;
 
@@ -119,14 +112,14 @@ async function main() {
       // Kiểm tra sổ cái financial_account_ledger
       const ledgerEntry = await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
         .where({
-          source_kind: "payment_receipt",
-          source_id: String(result.receiptId),
+          reference_type: "payment_receipt",
+          reference_id: String(result.receiptId),
         })
         .first();
 
       assert(Boolean(ledgerEntry), "Phải có bản ghi sổ cái tương ứng với receiptId");
       assert(ledgerEntry.entry_type === "receipt_in", `entry_type phải là receipt_in, nhận: ${ledgerEntry.entry_type}`);
-      assert(Number(ledgerEntry.signed_amount) === amountIn, `signed_amount phải là +${amountIn}`);
+      assert(Number(ledgerEntry.amount) === amountIn, `amount phải là +${amountIn}`);
       assert(Number(ledgerEntry.balance_after) === balanceAfter, `balance_after trong sổ cái phải khớp số dư thực`);
     });
 
@@ -170,14 +163,14 @@ async function main() {
       // Kiểm tra sổ cái
       const ledgerEntry = await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
         .where({
-          source_kind: "payment_receipt",
-          source_id: String(result.receiptId),
+          reference_type: "payment_receipt",
+          reference_id: String(result.receiptId),
         })
         .first();
 
       assert(Boolean(ledgerEntry), "Phải có bản ghi sổ cái cho tiền ra");
       assert(ledgerEntry.entry_type === "receipt_out", `entry_type phải là receipt_out`);
-      assert(Number(ledgerEntry.signed_amount) === -amountOut, `signed_amount phải là -${amountOut}`);
+      assert(Number(ledgerEntry.amount) === amountOut, `amount phải là ${amountOut}`);
     });
 
     // [TC-03] Webhook SePay gửi trùng lặp -> Không bị cộng/trừ 2 lần

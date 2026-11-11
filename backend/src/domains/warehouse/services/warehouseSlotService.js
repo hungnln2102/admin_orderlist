@@ -1,7 +1,7 @@
 const { db, withTransaction } = require("@/db");
 const { TABLES } = require("@/db/tables");
 const { EVENTS, publishEventInTrx } = require("@/events");
-const { getVietnamDateString } = require("@/utils/time");
+const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
   eventName,
   aggregateType: "WAREHOUSE",

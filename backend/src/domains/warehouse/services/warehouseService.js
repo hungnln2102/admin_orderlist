@@ -1,7 +1,7 @@
 const { db, withTransaction } = require("@/db");
 const { TABLES } = require("@/db/tables");
 const { EVENTS, publishEventInTrx } = require("@/events");
-const { getVietnamDateString } = require("@/utils/time");
+const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const warehouseAutomationService = require("./warehouseAutomationService");
 const warehouseSlotService = require("./warehouseSlotService");
 const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
@@ -15,20 +15,6 @@ const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx
 /**
  * Format date value sang chuỗi hiển thị DD/MM/YYYY
  */
-const formatDateDisplay = (dateVal) => {
-  if (!dateVal) return "";
-  try {
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  } catch {
-    return String(dateVal);
-  }
-};
-
 /**
  * Lấy danh sách toàn bộ tài khoản kho và các dịch vụ bên trong
  */

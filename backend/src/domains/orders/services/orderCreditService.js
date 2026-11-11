@@ -3,6 +3,8 @@ const { publishEventInTrx, EVENTS } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
+const { getDefaultShopBank } = require("./orderQueryService");
+const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
 
@@ -60,6 +62,8 @@ async function payOrderWithCredit(id, creditNoteId) {
     if (!creditNote) throw new Error("Không tìm thấy mã credit.");
 
     const orderPrice = Number(order.price || 0);
+    const alreadyApplied = Number(order.credit_paid_amount || 0);
+    const remainingAmount = Math.max(0, orderPrice - alreadyApplied);
     const availableAmount = Number(creditNote.available_amount || 0);
 
     if (![ORDER_STATUS.UNPAID, ORDER_STATUS.RENEW_REQUIRED].includes(order.status)) {
@@ -74,20 +78,25 @@ async function payOrderWithCredit(id, creditNoteId) {
       throw new Error("Số tiền đơn hàng phải lớn hơn 0 để thanh toán bằng credit.");
     }
 
-    if (availableAmount < orderPrice) {
-      throw new Error(`Số dư credit (${availableAmount.toLocaleString()} ₫) không đủ thanh toán đơn hàng (${orderPrice.toLocaleString()} ₫).`);
+    if (remainingAmount <= 0) {
+      throw new Error("Đơn hàng đã đủ số tiền Credit trước đó.");
+    }
+
+    const appliedAmount = Math.min(availableAmount, remainingAmount);
+    if (appliedAmount <= 0) {
+      throw new Error("Credit không còn số dư khả dụng.");
     }
 
     await trx(TABLES.REFUND_CREDIT_APPLICATIONS).insert({
       credit_note_id: creditNote.id,
       target_order_list_id: order.id,
       target_order_code: order.id_order,
-      applied_amount: orderPrice,
+      applied_amount: appliedAmount,
       note: `Thanh toán đơn #${order.id_order} bằng credit ${creditNote.credit_code}`,
       applied_by: 'ADMIN',
     });
 
-    const newAvailable = availableAmount - orderPrice;
+    const newAvailable = availableAmount - appliedAmount;
     const newStatus = newAvailable <= 0 ? 'FULLY_APPLIED' : 'PARTIALLY_APPLIED';
     await trx(TABLES.REFUND_CREDIT_NOTES)
       .where({ id: creditNote.id })
@@ -98,9 +107,12 @@ async function payOrderWithCredit(id, creditNoteId) {
       });
 
     const isRenewal = isRenewalOrder(order.status);
+    const totalCreditPaid = alreadyApplied + appliedAmount;
+    const isFullyPaid = appliedAmount >= remainingAmount;
     const updateFields = {
-      status: ORDER_STATUS.PROCESSING,
-      payment_method: 'credit',
+      status: isFullyPaid ? ORDER_STATUS.PAID : order.status,
+      payment_method: isFullyPaid ? "credit" : "credit_partial",
+      credit_paid_amount: totalCreditPaid,
     };
 
     if (isRenewal) {
@@ -115,6 +127,30 @@ async function payOrderWithCredit(id, creditNoteId) {
       .update(updateFields)
       .returning("*");
 
+
+    if (!isFullyPaid) {
+      const defaultBank = await getDefaultShopBank(trx);
+      const remainingToPay = Math.max(0, remainingAmount - appliedAmount);
+      const bankAccount = defaultBank?.account_number || defaultBank?.accountNumber;
+      const bankCode = defaultBank?.bank_bin || defaultBank?.bankBin || defaultBank?.bank_short_code || defaultBank?.bankShortCode;
+      const qrUrl = bankAccount && bankCode
+        ? buildVietQrImageUrl({
+          bankCode,
+          accountNumber: bankAccount,
+          amount: remainingToPay,
+          accountName: defaultBank.account_holder || defaultBank.accountHolder || "",
+          addInfo: updatedOrder.id_order,
+        })
+        : "";
+      return {
+        ...updatedOrder,
+        success: true,
+        partial: true,
+        appliedAmount,
+        remainingAmount: remainingToPay,
+        vietqr_url: qrUrl,
+      };
+    }
     const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
     const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
       .where({ order_list_id: updatedOrder.id })
