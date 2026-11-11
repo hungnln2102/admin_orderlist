@@ -12,6 +12,7 @@ const { TRANSFER_TYPE } = require("@/constants/receiptStatus");
 let PASS = 0;
 let FAIL = 0;
 const createdReceiptIds = [];
+const createdTransactionIds = [];
 let createdBankAccountId = null;
 
 function assert(condition, message) {
@@ -32,18 +33,19 @@ async function runTest(name, fn) {
 }
 
 async function cleanup() {
-  if (createdReceiptIds.length) {
-    await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
-      .where("reference_type", "payment_receipt")
-      .whereIn("reference_id", createdReceiptIds.map(String))
-      .del()
-      .catch(() => {});
-    await db(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).whereIn("receipt_id", createdReceiptIds).del().catch(() => {});
-    await db(TABLES.PAYMENT_RECEIPT).whereIn("id", createdReceiptIds).del().catch(() => {});
-  }
-  if (createdBankAccountId) {
-    await db(TABLES.SHOP_BANK_ACCOUNTS).where("id", createdBankAccountId).del().catch(() => {});
-  }
+  await db.transaction(async (trx) => {
+    if (createdReceiptIds.length) {
+      await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).whereIn("receipt_id", createdReceiptIds).del();
+      await trx(TABLES.PAYMENT_RECEIPT).whereIn("id", createdReceiptIds).del();
+    }
+
+    if (createdBankAccountId) {
+      await trx(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
+        .where("financial_account_id", createdBankAccountId)
+        .del();
+      await trx(TABLES.SHOP_BANK_ACCOUNTS).where("id", createdBankAccountId).del();
+    }
+  });
 }
 
 async function main() {
@@ -80,10 +82,10 @@ async function main() {
       const receivedBefore = Number(accBefore.total_received || 0);
 
       const amountIn = 250000;
-      const txId = Date.now();
+      const txId = `TX-IN-${Date.now()}`;
 
       const result = await processPaymentWebhook({
-        id: txId,
+        transaction_id: txId,
         transferAmount: amountIn,
         transferType: TRANSFER_TYPE.IN,
         content: `Test chuyen tien vao ${txId}`,
@@ -93,6 +95,7 @@ async function main() {
       });
 
       createdReceiptIds.push(result.receiptId);
+      createdTransactionIds.push(txId);
       assert(result.success === true, "Webhook phải trả về success: true");
 
       // Kiểm tra số dư tài khoản trong DB
@@ -113,7 +116,7 @@ async function main() {
       const ledgerEntry = await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
         .where({
           reference_type: "payment_receipt",
-          reference_id: String(result.receiptId),
+          reference_id: txId,
         })
         .first();
 
@@ -130,10 +133,10 @@ async function main() {
       const withdrawnBefore = Number(accBefore.total_withdrawn || 0);
 
       const amountOut = 100000;
-      const txId = Date.now() + 1;
+      const txId = `TX-OUT-${Date.now() + 1}`;
 
       const result = await processPaymentWebhook({
-        id: txId,
+        transaction_id: txId,
         transferAmount: amountOut,
         transferType: TRANSFER_TYPE.OUT,
         content: `Test chuyen tien ra nha cung cap ${txId}`,
@@ -143,6 +146,7 @@ async function main() {
       });
 
       createdReceiptIds.push(result.receiptId);
+      createdTransactionIds.push(txId);
       assert(result.success === true, "Webhook tiền ra phải trả về success: true");
       assert(result.transferType === TRANSFER_TYPE.OUT, "Loại giao dịch phải là OUT");
 
@@ -164,7 +168,7 @@ async function main() {
       const ledgerEntry = await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
         .where({
           reference_type: "payment_receipt",
-          reference_id: String(result.receiptId),
+          reference_id: txId,
         })
         .first();
 
@@ -175,12 +179,12 @@ async function main() {
 
     // [TC-03] Webhook SePay gửi trùng lặp -> Không bị cộng/trừ 2 lần
     await runTest("TC-03: Webhook SePay trùng lặp (Idempotency) -> KHÔNG bị cộng/trừ 2 lần", async () => {
-      const txId = Date.now() + 2;
+      const txId = `TX-DUP-${Date.now() + 2}`;
       const amount = 50000;
 
       // Lần 1
       const res1 = await processPaymentWebhook({
-        id: txId,
+        transaction_id: txId,
         transferAmount: amount,
         transferType: TRANSFER_TYPE.IN,
         content: "Giao dich dau tien",
@@ -188,13 +192,14 @@ async function main() {
         accountNumber: testAccountNumber,
       });
       createdReceiptIds.push(res1.receiptId);
+      createdTransactionIds.push(txId);
 
       const accAfterFirst = await db(TABLES.SHOP_BANK_ACCOUNTS).where({ id: testAccountId }).first();
       const balanceAfterFirst = Number(accAfterFirst.balance || 0);
 
       // Lần 2 (trùng txId)
       const res2 = await processPaymentWebhook({
-        id: txId,
+        transaction_id: txId,
         transferAmount: amount,
         transferType: TRANSFER_TYPE.IN,
         content: "Giao dich trung lap",
@@ -212,7 +217,41 @@ async function main() {
         `Số dư lần 2 (${balanceAfterSecond}) không được tăng thêm so với lần 1 (${balanceAfterFirst})`
       );
     });
+    // [TC-04] SePay transaction_id remains the stable ledger identity.
+    await runTest("TC-04: transaction_id is the fixed ledger identity", async () => {
+      const txId = `TX-FIXED-${Date.now()}`;
+      const amount = 61000;
+      const first = await processPaymentWebhook({
+        transaction_id: txId,
+        id: `legacy-${txId}`,
+        transferAmount: amount,
+        transferType: TRANSFER_TYPE.IN,
+        content: "Fixed transaction identity",
+        gateway: "MBBANK",
+        accountNumber: testAccountNumber,
+      });
+      createdReceiptIds.push(first.receiptId);
+      createdTransactionIds.push(txId);
 
+      const receipt = await db(TABLES.PAYMENT_RECEIPT).where({ id: first.receiptId }).first();
+      const ledger = await db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
+        .where({ reference_type: "payment_receipt", reference_id: txId })
+        .first();
+
+      assert(receipt.sepay_transaction_id === txId, "Receipt must store transaction_id");
+      assert(Boolean(ledger), "Ledger must use transaction_id as reference_id");
+
+      const second = await processPaymentWebhook({
+        transaction_id: txId,
+        id: `different-${txId}`,
+        transferAmount: amount,
+        transferType: TRANSFER_TYPE.IN,
+        content: "Retry with same transaction identity",
+        gateway: "MBBANK",
+        accountNumber: testAccountNumber,
+      });
+      assert(second.duplicate === true, "Same transaction_id retry must be duplicate");
+    });
   } finally {
     await cleanup();
     await db.destroy();

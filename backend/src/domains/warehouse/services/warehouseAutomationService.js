@@ -71,4 +71,6 @@ const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } 
  * và optionally cập nhật account_username của tài khoản mẹ
  */
 
-module.exports = { openAccountBrowser };
+const closeAllBrowserContexts = () => browserLauncherService.closeAllBrowserContexts();
+
+module.exports = { openAccountBrowser, closeAllBrowserContexts };

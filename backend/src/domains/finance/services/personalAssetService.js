@@ -1,7 +1,7 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { debitFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { allocateReceiptInTrx } = require("@/domains/invoices/services/invoiceService");
-const { publishEventInTrx } = require("@/events");
+const { EVENTS, publishEventInTrx } = require("@/events");
 const creditLedgerService = require("../credit/creditLedgerService");
 
 const toNumber = (val) => {

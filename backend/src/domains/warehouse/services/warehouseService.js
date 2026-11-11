@@ -577,6 +577,7 @@ const deleteCatalogItem = async (id) => {
 /**
  * Mở trình duyệt Profile độc lập cho tài khoản kho
  */const openAccountBrowser = (...args) => warehouseAutomationService.openAccountBrowser(...args);
+const closeAllBrowserContexts = () => warehouseAutomationService.closeAllBrowserContexts();
 
 const updateWarehouseServiceSlot = (...args) => warehouseSlotService.updateWarehouseServiceSlot(...args);
 
@@ -780,6 +781,7 @@ module.exports = {
   updateCatalogItem,
   deleteCatalogItem,
   openAccountBrowser,
+  closeAllBrowserContexts,
   getSystemProducts,
   renameCatalogTag,
   deleteCatalogTag,

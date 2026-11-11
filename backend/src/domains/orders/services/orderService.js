@@ -126,9 +126,17 @@ async function incrementVariantOrderCount(trx, variantId) {
 async function createOrder(payload) {
   return await withTransaction(async (trx) => {
     const rawPrefix = String(payload.order_prefix || "").trim().toUpperCase();
-    const isMavn = rawPrefix === "MAVN" || String(payload.id_order || "").toUpperCase().startsWith("MAVN");
+    const requestedOrderCode = String(payload.id_order || "").trim().toUpperCase();
+    const isMavn = rawPrefix === "MAVN" || requestedOrderCode.startsWith("MAVN");
     const effectivePrefix = isMavn ? "MAVN" : (VALID_ORDER_PREFIXES.includes(rawPrefix) ? rawPrefix : "MAVC");
-    const id_order = payload.id_order || generateOrderCode(effectivePrefix);
+    const id_order = requestedOrderCode || generateOrderCode(effectivePrefix);
+
+    const existingOrder = await getOrderTable(trx)
+      .whereRaw("UPPER(BTRIM(??)) = ?", [O_COLS.ID_ORDER, id_order])
+      .first(O_COLS.ID);
+    if (existingOrder) {
+      throw new Error("M\u00e3 \u0111\u01a1n h\u00e0ng " + id_order + " \u0111\u00e3 t\u1ed3n t\u1ea1i.");
+    }
     const rawPrice = Number(payload.price || 0);
     const basePrice = payload.gross_selling_price != null ? Number(payload.gross_selling_price) : rawPrice;
     const status = payload.status || (isMavn ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID);
@@ -189,9 +197,17 @@ async function createOrder(payload) {
       }
     }
 
-    const [createdOrder] = await getOrderTable(trx)
-      .insert(newOrderData)
-      .returning("*");
+    let createdOrder;
+    try {
+      [createdOrder] = await getOrderTable(trx)
+        .insert(newOrderData)
+        .returning("*");
+    } catch (error) {
+      if (error?.code === "23505" && error?.constraint === "uq_order_list_id_order_upper_trim") {
+        throw new Error("M\u00e3 \u0111\u01a1n h\u00e0ng " + id_order + " \u0111\u00e3 t\u1ed3n t\u1ea1i.");
+      }
+      throw error;
+    }
 
     const isMavnOrder = isMavn || String(id_order).toUpperCase().startsWith("MAVN");
     const shouldSyncWarehouseOrPackage = isMavnOrder && (payload.save_to_package === true || payload.save_to_warehouse === true);

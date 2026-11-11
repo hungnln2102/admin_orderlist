@@ -6,7 +6,16 @@ const { settleSupplierDebtTransaction } = require("@/domains/suppliers/services/
 const { resolveWebhookAccount, startReceiptProfit } = require("@/domains/finance/services/receiptProfitService");
 
 
-async function processOutboundReceiptInTrx({ trx, payload, receipt, receiptId, transferAmount, gateway, noteContent }) {
+async function processOutboundReceiptInTrx({
+  trx,
+  payload,
+  receipt,
+  receiptId,
+  transferAmount,
+  gateway,
+  noteContent,
+  bankTransactionId,
+}) {
   const outgoingAccount = await resolveWebhookAccount(trx, payload.accountNumber, gateway);
   if (!outgoingAccount) {
     return { success: true, matched: false, receiptId, transferType: TRANSFER_TYPE.OUT, amount: transferAmount, reason: "ACCOUNT_NOT_RESOLVED" };
@@ -20,7 +29,7 @@ await debitFinancialAccount(trx, {
   allowNegativeBalance: true,
   amount: transferAmount,
   sourceKind: "payment_receipt",
-  sourceId: receiptId,
+  sourceId: bankTransactionId || `receipt:${receiptId}`,
   note: noteContent || `Webhook Tiền ra #${receiptId}`,
 });
 

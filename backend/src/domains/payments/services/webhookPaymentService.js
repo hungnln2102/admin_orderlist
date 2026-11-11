@@ -41,15 +41,22 @@ async function processPaymentWebhook(payload = {}) {
   ).toLowerCase();
   const isOutbound = rawTransferType === TRANSFER_TYPE.OUT || Number(rawAmount) < 0;
 
-  const rawSepayTxId = payload.id || payload.sepay_transaction_id || payload.transactionId || null;
-  const numSepayTxId = (rawSepayTxId && !isNaN(Number(rawSepayTxId))) ? String(rawSepayTxId).trim() : null;
-  const referenceCode = payload.referenceCode || payload.code || (!numSepayTxId && rawSepayTxId ? String(rawSepayTxId) : null);
+  const rawTransactionId = payload.transaction_id
+    ?? payload.sepay_transaction_id
+    ?? payload.transactionId
+    ?? payload.id
+    ?? null;
+  const bankTransactionId = rawTransactionId == null || String(rawTransactionId).trim() === ""
+    ? null
+    : String(rawTransactionId).trim();
+  const referenceCode = payload.referenceCode || payload.code || bankTransactionId || null;
   const gateway = payload.gateway || payload.bankBrandName || "SEPAY";
   const noteContent = payload.content || payload.transactionContent || payload.note || "";
   const paymentDate = payload.transactionDate || payload.payment_date || new Date().toISOString().split("T")[0];
   const eventType = isOutbound ? EVENTS.WEBHOOK_MONEY_OUT : EVENTS.WEBHOOK_MONEY_IN;
   const eventData = {
-    id: payload.id || payload.sepay_transaction_id || payload.transactionId || null,
+    id: bankTransactionId,
+    transaction_id: bankTransactionId,
     amount: transferAmount,
     transferType: isOutbound ? TRANSFER_TYPE.OUT : TRANSFER_TYPE.IN,
     content: noteContent,
@@ -69,9 +76,9 @@ async function processPaymentWebhook(payload = {}) {
   });
 
   // 1. Kiểm tra trùng lặp (Idempotency check)
-  if (numSepayTxId) {
+  if (bankTransactionId) {
     const existing = await getReceiptTable()
-      .where("sepay_transaction_id", numSepayTxId)
+      .where("sepay_transaction_id", bankTransactionId)
       .first();
 
     if (existing) {
@@ -92,7 +99,7 @@ async function processPaymentWebhook(payload = {}) {
           receiver: payload.receiver || null,
           gateway,
           reference_code: referenceCode,
-          sepay_transaction_id: numSepayTxId,
+          sepay_transaction_id: bankTransactionId,
           transfer_type: isOutbound ? TRANSFER_TYPE.OUT : TRANSFER_TYPE.IN,
           note: noteContent,
         })
@@ -107,7 +114,7 @@ async function processPaymentWebhook(payload = {}) {
         action: "WEBHOOK_RECEIVED",
         afterState: receipt,
         source: "PAYMENT_WEBHOOK",
-        idempotencyKey: numSepayTxId || referenceCode || `receipt:${receiptId}`,
+        idempotencyKey: bankTransactionId || referenceCode || `receipt:${receiptId}`,
         payload: {
           receiptId,
           amount: transferAmount,
@@ -120,9 +127,11 @@ async function processPaymentWebhook(payload = {}) {
 
       // 3. Tiền ra (OUT) — ghi sổ cái và chỉ tất toán NCC khi khớp duy nhất.
       const paymentResult = isOutbound
-        ? await processOutboundReceiptInTrx({ trx, payload, receipt, receiptId, transferAmount, gateway, noteContent })
+        ? await processOutboundReceiptInTrx({
+          trx, payload, receipt, receiptId, transferAmount, gateway, noteContent, bankTransactionId,
+        })
         : await processInboundReceiptInTrx({
-          trx, payload, receipt, receiptId, transferAmount, gateway, noteContent, numSepayTxId, referenceCode,
+          trx, payload, receipt, receiptId, transferAmount, gateway, noteContent, bankTransactionId, referenceCode,
         });
 
       await publishEventInTrx(trx, {
@@ -131,15 +140,15 @@ async function processPaymentWebhook(payload = {}) {
         aggregateId: eventData.referenceCode || eventData.accountNumber || "UNKNOWN",
         action: "PAYMENT_PROCESSED",
         source: "PAYMENT_WEBHOOK",
-        idempotencyKey: `webhook:${receiptId}`,
+        idempotencyKey: `webhook:${bankTransactionId || `receipt:${receiptId}`}`,
         payload: { ...eventData, payment: paymentResult },
       });
 
       return paymentResult;
     });
   } catch (error) {
-    if (numSepayTxId && error?.code === "23505") {
-      const existing = await getReceiptTable().where("sepay_transaction_id", numSepayTxId).first();
+    if (bankTransactionId && error?.code === "23505") {
+      const existing = await getReceiptTable().where("sepay_transaction_id", bankTransactionId).first();
       if (existing) return toDuplicateResult(existing);
     }
     throw error;

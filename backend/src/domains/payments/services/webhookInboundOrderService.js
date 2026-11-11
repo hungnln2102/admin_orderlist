@@ -21,14 +21,24 @@ const getOrderTable = (trx) => trx(TABLES.ORDER_LIST);
 const getReceiptTable = (trx) => trx(TABLES.PAYMENT_RECEIPT);
 const getAllocationsTable = (trx) => trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS);
 
-async function processInboundReceiptInTrx({ trx, payload, receipt, receiptId, transferAmount, gateway, noteContent, numSepayTxId, referenceCode }) {
+async function processInboundReceiptInTrx({
+  trx,
+  payload,
+  receipt,
+  receiptId,
+  transferAmount,
+  gateway,
+  noteContent,
+  bankTransactionId,
+  referenceCode,
+}) {
   const creditRes = await creditFinancialAccount(trx, {
     accountNumber: payload.accountNumber || payload.receiver || null,
     gateway,
     accountScope: "SHOP",
     amount: transferAmount,
     sourceKind: "payment_receipt",
-    sourceId: receiptId,
+    sourceId: bankTransactionId || `receipt:${receiptId}`,
     note: noteContent || `Webhook Tiền vào #${receiptId}`,
   });
   const receivingAccountId = creditRes?.accountId || null;
@@ -204,7 +214,7 @@ if (matchedBatch) {
     afterState: { ...matchedBatch, status: "COMPLETED", payment_receipt_id: receiptId },
     changedFields: { status: { old: matchedBatch.status, new: "COMPLETED" }, payment_receipt_id: { old: matchedBatch.payment_receipt_id, new: receiptId } },
     source: "PAYMENT_WEBHOOK",
-    idempotencyKey: numSepayTxId || referenceCode || `batch:${matchedBatch.id}:receipt:${receiptId}`,
+    idempotencyKey: bankTransactionId || referenceCode || `batch:${matchedBatch.id}:receipt:${receiptId}`,
     payload: batchEventPayload,
   });
 

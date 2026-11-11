@@ -343,6 +343,12 @@ const getOrLaunchContext = async (accountId, preferredChannel) => {
 /**
  * Mở trình duyệt thật (ưu tiên Edge hoặc trình duyệt người dùng đang dùng) với profile lưu cookie riêng cho từng tài khoản.
  */
+const closeAllBrowserContexts = async () => {
+  const contexts = Array.from(activeContexts.values());
+  activeContexts.clear();
+  await Promise.allSettled(contexts.map((context) => context.close()));
+};
+
 const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, customUrl, userAgent }) => {
   if (!accountId) throw new Error("ID tài khoản không được để trống!");
 
@@ -420,4 +426,5 @@ module.exports = {
   isVerifiedSessionUrl,
   resolveLoginUrl,
   launchAccountBrowser,
+  closeAllBrowserContexts,
 };

@@ -10,6 +10,7 @@ const { ensureYoutubeLoginUrl } = require("../fixtures/trustFlowFixtures");
 test("Warehouse Integration Tests (V2)", async (t) => {
   const cleanupYoutubeLoginUrl = await ensureYoutubeLoginUrl(db, TABLES.PRODUCT_NAMES);
   t.after(async () => {
+    await warehouseService.closeAllBrowserContexts();
     await cleanupYoutubeLoginUrl();
     await db.destroy();
   });

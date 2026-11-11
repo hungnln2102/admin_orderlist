@@ -21,22 +21,28 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
     let mappingId;
     let creditDebtAssetId;
     let replayDebtAssetId;
+    const debitSuffix = String(Date.now()).slice(-4);
+    const debitAccountNumber = `12344541${debitSuffix}`;
+    const creditSuffix = String((Number(debitSuffix) + 1) % 10000).padStart(4, "0");
+    const replaySuffix = String((Number(debitSuffix) + 2) % 10000).padStart(4, "0");
+    const creditReference = `VPB${Date.now()}01`;
+    const replayReference = `VPB${Date.now()}02`;
     try {
       process.env.VPBANK_MAILBOX_ENCRYPTION_KEY = crypto.randomBytes(32).toString("base64");
       await saveMailboxConfig({ email: "test.vpbank@gmail.com", appPassword: "abcd efgh ijkl mnop", isActive: false });
       const [account] = await db(TABLES.FINANCIAL_ACCOUNTS).insert({
-        label: "VPBank Ingestion Test 0985", account_type: "bank", account_scope: "PERSONAL",
-        account_number: "123445410985", bank_short_code: "VPBANK", balance: 10000000, is_active: true, is_deleted: false,
+        label: `VPBank Ingestion Test ${debitSuffix}`, account_type: "bank", account_scope: "PERSONAL",
+        account_number: debitAccountNumber, bank_short_code: "VPBANK", balance: 10000000, is_active: true, is_deleted: false,
       }).returning("id");
       accountId = account.id || account;
       const [mapping] = await db(TABLES.BANK_INSTRUMENT_MAPPINGS).insert({
-        provider: "VPBANK", instrument_kind: "DEBIT_CARD", masked_suffix: "0985", linked_financial_account_id: accountId, status: "ACTIVE",
+        provider: "VPBANK", instrument_kind: "DEBIT_CARD", masked_suffix: debitSuffix, linked_financial_account_id: accountId, status: "ACTIVE",
       }).returning("id");
       mappingId = mapping.id || mapping;
       const email = {
         uid: 99901, uidValidity: "test-uid-validity", subject: "Thông báo biến động số dư tài khoản thanh toán",
         from: "customercare@care.vpb.com.vn", authenticationResults: "mx.google.com; dkim=pass header.d=care.vpb.com.vn;",
-        text: "Tài khoản 4541xxxx0985\nSố tiền: - 1,500,000 VND\nThời gian: 02/11/2026 14:15:00\nMã giao dịch: FT99901",
+        text: `Tài khoản 4541xxxx${debitSuffix}\nSố tiền: - 1,500,000 VND\nThời gian: 02/11/2026 14:15:00\nMã giao dịch: FT99901`,
       };
       const [first, second] = await Promise.all([
         ingestEmailMessage(email, { mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity" }),
@@ -62,11 +68,11 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
       assert.equal(Number(resetCheckpoint.last_terminal_uid), 1);
 
       const [creditDebtAsset] = await db(TABLES.PERSONAL_ASSETS).insert({
-        name: "VPBank Credit Card 2340",
+        name: `VPBank Credit Card ${creditSuffix}`,
         type: "DEBT_PAYABLE",
         amount: 6568258,
         bank_name: "VPBank",
-        card_last_digits: "2340",
+        card_last_digits: creditSuffix,
       }).returning("id");
       creditDebtAssetId = creditDebtAsset.id || creditDebtAsset;
       const creditEmail = {
@@ -82,9 +88,9 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
           "Noi dung / Transaction Content",
           "17,870,822 VND",
           "Han muc con lai / Available Limit",
-          "VISA *2340",
+          `VISA *${creditSuffix}`,
           "06/11/2026 13:13:37",
-          "630906039965",
+          creditReference,
           "Ma giao dich / Transaction Code",
         ].join("\n"),
       };
@@ -99,18 +105,18 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
       assert.equal(creditReceipt.status, "APPLIED");
       assert.ok(creditReceipt.personal_debt_payment_log_id);
       const debtLog = await db(TABLES.DEBT_PAYMENT_LOGS).where("id", creditReceipt.personal_debt_payment_log_id).first();
-      assert.equal(debtLog.reference_code, "630906039965");
+      assert.equal(debtLog.reference_code, creditReference);
       assert.match(debtLog.note, /Hạn mức còn lại: 17[.]870[.]822 VND/);
 
-      const replayEmail = { ...creditEmail, uid: 99904, text: creditEmail.text.replace("*2340", "*6789").replace("630906039965", "630906039966") };
+      const replayEmail = { ...creditEmail, uid: 99904, text: creditEmail.text.replace(`*${creditSuffix}`, `*${replaySuffix}`).replace(creditReference, replayReference) };
       const awaitingMapping = await ingestEmailMessage(replayEmail, { mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity-2" });
       assert.equal(awaitingMapping.status, "MANUAL_REVIEW");
       const [replayDebtAsset] = await db(TABLES.PERSONAL_ASSETS).insert({
-        name: "VPBank Replay Card 6789",
+        name: `VPBank Replay Card ${replaySuffix}`,
         type: "DEBT_PAYABLE",
         amount: 100000,
         bank_name: "VPBank",
-        card_last_digits: "6789",
+        card_last_digits: replaySuffix,
       }).returning("id");
       replayDebtAssetId = replayDebtAsset.id || replayDebtAsset;
       const replayed = await ingestEmailMessage(replayEmail, {
@@ -124,7 +130,7 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
     } finally {
       await db(TABLES.EMAIL_INGESTION_RECEIPTS).whereIn("email_uid", [99901, 99902, 99903, 99904, 1]).del();
       if (creditDebtAssetId || replayDebtAssetId) {
-        await db(TABLES.DEBT_PAYMENT_LOGS).whereIn("reference_code", ["630906039965", "630906039966"]).del();
+        await db(TABLES.DEBT_PAYMENT_LOGS).whereIn("reference_code", [creditReference, replayReference]).del();
       }
       if (creditDebtAssetId) await db(TABLES.PERSONAL_ASSETS).where("id", creditDebtAssetId).del();
       if (replayDebtAssetId) await db(TABLES.PERSONAL_ASSETS).where("id", replayDebtAssetId).del();
