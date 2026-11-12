@@ -32,7 +32,7 @@ export const ExternalApiHeader: React.FC<ExternalApiHeaderProps> = ({
             <span className="text-xs text-slate-500 font-mono">v2.0 • Microservice Catalog</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
-            Cấu Hình & Thử Nghiệm API Ngoại Vi
+            Cấu Hình API
           </h1>
           <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
             Hạ tầng kết nối dịch vụ OTP, xác thực tự động và điều hướng cổng phân phối mã. Thông số kết nối bảo mật được quản lý độc lập tại biến môi trường hệ thống.

@@ -2,12 +2,16 @@ import React from "react";
 import {
   Save,
   Loader2,
-  ArrowRight,
   ShieldAlert,
   Layers,
-  ArrowRightLeft,
   Sparkles,
   Info,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  CheckCircle2,
+  Power,
 } from "lucide-react";
 import type { PortalSlotItem } from "@/features/external-api/types";
 import type { Provider } from "@/features/external-api/hooks/useExternalApiConfig";
@@ -16,11 +20,10 @@ interface OtpPortalSlotsTabProps {
   slots: PortalSlotItem[];
   providers: Provider[];
   savingSlots: boolean;
-  onUpdateSlot: (
-    slotKey: string,
-    field: "primary_service_key" | "fallback_service_key",
-    value: string
-  ) => void;
+  onAddService: (slotKey: string, serviceKey: string) => void;
+  onRemoveService: (slotKey: string, serviceKey: string) => void;
+  onMoveService: (slotKey: string, fromIndex: number, toIndex: number) => void;
+  onToggleEnabled: (slotKey: string, enabled: boolean) => void;
   onSaveSlots: () => void;
 }
 
@@ -28,7 +31,10 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
   slots,
   providers,
   savingSlots,
-  onUpdateSlot,
+  onAddService,
+  onRemoveService,
+  onMoveService,
+  onToggleEnabled,
   onSaveSlots,
 }) => {
   return (
@@ -38,10 +44,12 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">Điều Hướng Cổng OTP Khách Hàng (Portal Routing)</h2>
+            <h2 className="text-base font-bold text-white">
+              Điều Hướng & Gán Đa Cổng NCC Cho Ô Input (Multi-Provider Routing)
+            </h2>
           </div>
-          <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
-            Mỗi ô input trên trang nhận mã OTP của khách hàng sẽ được định tuyến tới Provider chính. Khi gặp sự cố hoặc timeout, hệ thống sẽ tự động chuyển hướng sang Provider dự phòng (Fallback).
+          <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+            Mỗi ô input trên cổng OTP khách hàng có thể gắn nhiều Cổng Dịch Vụ / Nhà Cung Cấp (NCC) khác nhau không giới hạn. Hệ thống sẽ lần lượt xử lý theo thứ tự ưu tiên từ trên xuống dưới; mỗi NCC dùng cơ chế đọc OTP hoặc kiểm tra trạng thái riêng biệt.
           </p>
         </div>
 
@@ -68,25 +76,40 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
       {/* Slots List */}
       <div className="space-y-4">
         {slots.map((slot) => {
-          const primaryProvider = providers.find((p) => p.key === slot.primary_service_key);
-          const fallbackProvider = providers.find((p) => p.key === slot.fallback_service_key);
+          const assignedServices = Array.isArray(slot.assigned_services)
+            ? slot.assigned_services
+            : [slot.primary_service_key, slot.fallback_service_key].filter(
+                (k): k is string => Boolean(k)
+              );
 
-          const isPrimaryConfigured = primaryProvider?.configured;
-          const isFallbackConfigured = fallbackProvider?.configured;
+          const availableToAdd = providers.filter(
+            (p) => !assignedServices.includes(p.key)
+          );
+
+          const isEnabled = slot.enabled !== false;
 
           return (
             <div
               key={slot.slot_key}
-              className="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-xl hover:border-slate-700/80 transition-all space-y-4"
+              className={`p-5 rounded-2xl border backdrop-blur-xl transition-all space-y-4 ${
+                isEnabled
+                  ? "border-slate-800/80 bg-slate-900/60 hover:border-slate-700/80"
+                  : "border-slate-800/40 bg-slate-950/50 opacity-75"
+              }`}
             >
               {/* Slot Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/60">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/60">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-100 text-base">{slot.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-100 text-base">{slot.name}</h3>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        {assignedServices.length} cổng
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
                       <span>Key: {slot.slot_key}</span>
                       <span>•</span>
@@ -97,8 +120,8 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-slate-400">
-                  {slot.cooldown_seconds && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                  {slot.cooldown_seconds !== undefined && (
                     <span className="bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/50">
                       Cooldown: <strong className="text-white">{slot.cooldown_seconds}s</strong>
                     </span>
@@ -108,82 +131,152 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
                       Nút: <strong className="text-white">{slot.btn_text}</strong>
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => onToggleEnabled(slot.slot_key, !isEnabled)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold transition-all ${
+                      isEnabled
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                        : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                    }`}
+                  >
+                    <Power className="w-3 h-3" />
+                    <span>{isEnabled ? "Đang Bật" : "Tạm Tắt"}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Pipeline Flow Visualization */}
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-3 pt-1">
-                {/* Primary Provider Selector */}
-                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                      Provider Chính (Primary)
-                    </span>
-                    {slot.primary_service_key && !isPrimaryConfigured && (
-                      <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
-                        <ShieldAlert className="w-3 h-3" />
-                        Chưa nạp env
-                      </span>
-                    )}
-                  </div>
-
-                  <select
-                    value={slot.primary_service_key || ""}
-                    onChange={(e) => onUpdateSlot(slot.slot_key, "primary_service_key", e.target.value)}
-                    className="w-full text-xs font-medium bg-slate-900 border border-slate-700 focus:border-cyan-500 text-slate-200 rounded-lg p-2.5 outline-none cursor-pointer"
-                  >
-                    <option value="">-- Chưa chọn provider chính --</option>
-                    {providers.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.name} ({p.key}) {p.configured ? "✓ Sẵn sàng" : "⚠️ Chưa cấu hình"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Arrow Transfer */}
-                <div className="hidden lg:flex flex-col items-center justify-center text-slate-500">
-                  <ArrowRightLeft className="w-5 h-5 text-slate-500" />
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mt-1">
-                    Fallback
+              {/* Assigned Providers Chain */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                    Danh sách Cổng Dịch Vụ / NCC được gán (Thứ tự ưu tiên từ trên xuống)
                   </span>
                 </div>
 
-                {/* Fallback Provider Selector */}
-                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-purple-400" />
-                      Provider Dự Phòng (Fallback)
-                    </span>
-                    {slot.fallback_service_key && !isFallbackConfigured && (
-                      <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
-                        <ShieldAlert className="w-3 h-3" />
-                        Chưa nạp env
-                      </span>
-                    )}
+                {assignedServices.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 text-center text-xs text-amber-300">
+                    Chưa có Cổng / NCC nào được gắn cho ô input này. Hãy chọn cổng ở ô bên dưới để thêm vào chuỗi xử lý.
                   </div>
+                ) : (
+                  <div className="space-y-2">
+                    {assignedServices.map((serviceKey, idx) => {
+                      const provider = providers.find((p) => p.key === serviceKey);
+                      const isConfigured = provider ? provider.configured : false;
 
-                  <select
-                    value={slot.fallback_service_key || ""}
-                    onChange={(e) => onUpdateSlot(slot.slot_key, "fallback_service_key", e.target.value)}
-                    className="w-full text-xs font-medium bg-slate-900 border border-slate-700 focus:border-purple-500 text-slate-200 rounded-lg p-2.5 outline-none cursor-pointer"
-                  >
-                    <option value="">-- Không sử dụng fallback --</option>
-                    {providers.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.name} ({p.key}) {p.configured ? "✓ Sẵn sàng" : "⚠️ Chưa cấu hình"}
+                      return (
+                        <div
+                          key={serviceKey}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-slate-950/75 border border-slate-800 hover:border-slate-700 transition-all"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs flex items-center justify-center shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-slate-100 truncate">
+                                  {provider?.name || serviceKey}
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                  {serviceKey}
+                                </span>
+                                {provider?.category && (
+                                  <span className="text-[10px] uppercase font-bold text-cyan-400/90 bg-cyan-950/50 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                                    {provider.category}
+                                  </span>
+                                )}
+                              </div>
+                              {provider?.description && (
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                  {provider.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                            {isConfigured ? (
+                              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1 font-semibold">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Sẵn sàng
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1 font-semibold">
+                                <ShieldAlert className="w-3 h-3" />
+                                Chưa cấu hình
+                              </span>
+                            )}
+
+                            <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => onMoveService(slot.slot_key, idx, idx - 1)}
+                                title="Tăng độ ưu tiên (Lên)"
+                                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/40 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === assignedServices.length - 1}
+                                onClick={() => onMoveService(slot.slot_key, idx, idx + 1)}
+                                title="Giảm độ ưu tiên (Xuống)"
+                                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/40 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onRemoveService(slot.slot_key, serviceKey)}
+                                title="Gỡ cổng này khỏi ô input"
+                                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-500/15 hover:border-rose-500/40 transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Add Service Dropdown */}
+                <div className="pt-1 flex items-center gap-2">
+                  <div className="relative flex-1 max-w-md">
+                    <Plus className="w-3.5 h-3.5 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <select
+                      value=""
+                      disabled={availableToAdd.length === 0}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          onAddService(slot.slot_key, e.target.value);
+                        }
+                      }}
+                      className="w-full text-xs font-medium bg-slate-950 border border-slate-700/80 hover:border-cyan-500/50 focus:border-cyan-500 text-slate-200 rounded-xl pl-8 pr-3 py-2.5 outline-none cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">
+                        {availableToAdd.length === 0
+                          ? "-- Đã gắn toàn bộ các cổng khả dụng --"
+                          : "-- Chọn để gắn thêm Cổng Dịch Vụ / NCC vào ô này --"}
                       </option>
-                    ))}
-                  </select>
+                      {availableToAdd.map((p) => (
+                        <option key={p.key} value={p.key}>
+                          + {p.name} ({p.key}) • {p.category} {p.configured ? "✓" : "⚠️"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {/* Client Preview Hint */}
               <div className="text-[11px] text-slate-400 flex items-center gap-1.5 bg-slate-950/40 px-3 py-1.5 rounded-lg border border-slate-800/50">
                 <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span>Gợi ý ô nhập: {slot.input_placeholder || "Nhập thông tin xác thực..."}</span>
+                <span>Gợi ý ô nhập trên web: {slot.input_placeholder || "Nhập thông tin xác thực..."}</span>
               </div>
             </div>
           );

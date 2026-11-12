@@ -211,6 +211,7 @@ async function probeOtpForEmail({ email, serviceKey, ...options }) {
     found,
     duration_ms: Date.now() - startedAt,
     extra_fields: extraFields,
+    raw_data: executionResult.raw_data || null,
     message: found
       ? (executionResult.otp ? `Đã tìm thấy mã OTP [${executionResult.otp}] thành công!` : `Đã lấy thông tin tài khoản thành công! (${extraFields.length} trường)`)
       : (executionResult.error_message || "Chưa có thư mới hoặc chưa lấy được mã OTP trong hộp thư."),

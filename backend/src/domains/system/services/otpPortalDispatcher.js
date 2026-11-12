@@ -150,16 +150,18 @@ async function dispatchSlotRequest({ slotKey, input }) {
   }
 
   // Load the configured OTP service chain.
-  // 1. Lấy danh sách các cổng API được gán cho ô này
-  let serviceChain = [];
-  if (Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0) {
-    serviceChain = [...slot.assigned_services];
-  } else {
-    if (slot.primary_service_key) serviceChain.push(slot.primary_service_key);
-    if (slot.fallback_service_key && slot.fallback_service_key !== "none" && !serviceChain.includes(slot.fallback_service_key)) {
-      serviceChain.push(slot.fallback_service_key);
-    }
-  }
+  // 1. Lấy danh sách các cổng API / NCC được gán cho ô này (theo thứ tự ưu tiên)
+  const rawChain = Array.isArray(slot.assigned_services)
+    ? slot.assigned_services
+    : [slot.primary_service_key, slot.fallback_service_key];
+
+  const serviceChain = Array.from(
+    new Set(
+      rawChain
+        .filter((s) => typeof s === "string" && s.trim() && s !== "none")
+        .map((s) => s.trim())
+    )
+  );
 
   if (serviceChain.length === 0) {
     throw new Error(`OTP service chain is not configured for slot '${slotKey}'.`);
@@ -200,10 +202,55 @@ async function dispatchSlotRequest({ slotKey, input }) {
       extraFields.find((f) => f.key === "account_email" || f.key === "account_username" || f.key === "email")?.value ||
       (cleanInput.includes("@") ? cleanInput : "");
     const pass = extraFields.find((f) => f.key === "password" || f.key === "acc_pass")?.value || "";
+
+    // Phân loại chính xác 3 trạng thái: active | inactive | not_found
+    const rawOrgStatus =
+      probeResult?.raw_data?.organizationStatus?.status ||
+      probeResult?.raw_data?.organization_status ||
+      extraFields.find((f) => f.key === "organization_status")?.value;
     const rawStatus =
       probeResult?.raw_data?.status ||
       probeResult?.raw_data?.state ||
       extraFields.find((f) => f.key === "status" || f.key === "account_status")?.value;
+
+    let statusType = "active";
+    let statusText = "ĐANG HOẠT ĐỘNG";
+
+    if (!probeResult || probeResult.found === false) {
+      statusType = "not_found";
+      statusText = "KHÔNG TỒN TẠI";
+    } else if (String(rawOrgStatus || "").toLowerCase() === "inactive") {
+      statusType = "inactive";
+      statusText = "CẦN CHUYỂN TEAM";
+    } else if (String(rawOrgStatus || "").toLowerCase() === "active") {
+      statusType = "active";
+      statusText = "ĐANG HOẠT ĐỘNG";
+    } else if (String(rawStatus || "").toLowerCase() === "inactive") {
+      statusType = "inactive";
+      statusText = "CẦN CHUYỂN TEAM";
+    } else {
+      statusType = "active";
+      statusText = rawStatus ? String(rawStatus).toUpperCase() : "ĐANG HOẠT ĐỘNG";
+    }
+
+    const orgName =
+      probeResult?.raw_data?.organization?.name ||
+      extraFields.find((f) => f.key === "organization_name")?.value ||
+      null;
+    const orgId =
+      probeResult?.raw_data?.organization?.id ||
+      extraFields.find((f) => f.key === "organization_id")?.value ||
+      null;
+    const teamChange =
+      probeResult?.raw_data?.teamChange ||
+      (extraFields.some((f) => f.key.startsWith("team_change"))
+        ? {
+            previousName: extraFields.find((f) => f.key === "team_change_previous_name")?.value || null,
+            currentName: extraFields.find((f) => f.key === "team_change_current_name")?.value || null,
+            changedAt: extraFields.find((f) => f.key === "team_change_changed_at")?.value || null,
+          }
+        : null);
+
     const plan =
       probeResult?.raw_data?.plan ||
       probeResult?.raw_data?.subscription ||
@@ -213,14 +260,18 @@ async function dispatchSlotRequest({ slotKey, input }) {
       probeResult?.raw_data?.expires_at ||
       probeResult?.raw_data?.expired_at ||
       extraFields.find((f) => f.key === "expires_at")?.value ||
-      "Theo gói";
+      (statusType === "not_found" ? "" : "Theo gói");
 
     accountData = {
       account: accEmail || cleanInput,
       password: pass,
       plan,
       expired_at: exp,
-      status: rawStatus || (probeResult?.found ? "ĐANG HOẠT ĐỘNG" : "HOẠT ĐỘNG BÌNH THƯỜNG"),
+      status: statusText,
+      status_type: statusType,
+      organization: orgName,
+      organization_id: orgId,
+      team_change: teamChange,
     };
   }
 
@@ -324,10 +375,42 @@ async function registerSlotsFromPortal(incomingSlots = [], updatedBy = "PORTAL_S
   return merged;
 }
 
+/**
+ * Kích hoạt đổi team cho tài khoản Ades (POST /api/credits-pool/public/org-switch)
+ */
+async function requestAdobeSwitchTeam(email) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes("@")) {
+    throw new Error("Vui lòng cung cấp email tài khoản Adobe hợp lệ.");
+  }
+  const { providerConfig } = require("../providers/providerConfig");
+  const { switchOrgAdes } = require("../providers/fixAdesStatusProvider");
+  const config = providerConfig("fix_ades_status");
+  if (!config) throw new Error("Cấu hình Fix-Ades không tồn tại trên hệ thống.");
+  return await switchOrgAdes(cleanEmail, { config });
+}
+
+/**
+ * Theo dõi tiến trình đổi team Ades (POST /api/credits-pool/public/org-switch/status)
+ */
+async function getAdobeSwitchTeamStatus(email) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes("@")) {
+    throw new Error("Vui lòng cung cấp email tài khoản Adobe hợp lệ.");
+  }
+  const { providerConfig } = require("../providers/providerConfig");
+  const { getSwitchOrgStatusAdes } = require("../providers/fixAdesStatusProvider");
+  const config = providerConfig("fix_ades_status");
+  if (!config) throw new Error("Cấu hình Fix-Ades không tồn tại trên hệ thống.");
+  return await getSwitchOrgStatusAdes(cleanEmail, { config });
+}
+
 module.exports = {
   DEFAULT_SLOTS,
   getActiveSlots,
   dispatchSlotRequest,
   registerSlotsFromPortal,
+  requestAdobeSwitchTeam,
+  getAdobeSwitchTeamStatus,
 };
 

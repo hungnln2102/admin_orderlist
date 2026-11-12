@@ -100,6 +100,7 @@ test("FIX_ADES_STATUS posts email and returns the requested status fields", { co
       found: true,
       email: "user@example.com",
       organization: { id: 646, name: "K12-Primrose School of Meadowbrook" },
+      organizationStatus: { status: "active" },
       status: "active",
       teamChange: {
         previousName: "Evergreenlearningacademy",
@@ -113,10 +114,59 @@ test("FIX_ADES_STATUS posts email and returns the requested status fields", { co
     assert.equal(result.otp, null);
     assert.equal(result.extra_fields.find((field) => field.key === "organization_id")?.value, "646");
     assert.equal(result.extra_fields.find((field) => field.key === "organization_name")?.value, "K12-Primrose School of Meadowbrook");
+    assert.equal(result.extra_fields.find((field) => field.key === "organization_status")?.value, "active");
     assert.equal(result.extra_fields.find((field) => field.key === "status")?.value, "active");
     assert.equal(result.extra_fields.find((field) => field.key === "team_change_previous_name")?.value, "Evergreenlearningacademy");
     assert.equal(result.extra_fields.find((field) => field.key === "team_change_current_name")?.value, "K12-Primrose School of Meadowbrook");
     assert.equal(result.extra_fields.find((field) => field.key === "team_change_changed_at")?.value, "2026-11-09T14:50:57.658Z");
+  });
+});
+
+test("dispatcher classifies inactive organizationStatus as CẦN CHUYỂN TEAM", { concurrency: false }, async () => {
+  const { dispatchSlotRequest } = require("../../src/domains/system/services/otpPortalDispatcher");
+  await withMockedExternalFetch(async (url) => {
+    assert.equal(String(url), "https://reseller.ado-besoft.com/api/user-status");
+    return new Response(JSON.stringify({
+      found: true,
+      email: "inactive_user@example.com",
+      organization: { id: 888, name: "Old Team Inc" },
+      organizationStatus: { status: "inactive" },
+      status: "active", // top-level status is active, but organizationStatus is inactive
+    }), { status: 200 });
+  }, async () => {
+    const result = await dispatchSlotRequest({ slotKey: "adobe_check", input: "inactive_user@example.com" });
+    assert.equal(result.success, true);
+    assert.equal(result.data.status_type, "inactive");
+    assert.equal(result.data.status, "CẦN CHUYỂN TEAM");
+    assert.equal(result.data.organization, "Old Team Inc");
+  });
+});
+
+test("switchOrgAdes and getSwitchOrgStatusAdes call upstream org-switch endpoints", { concurrency: false }, async () => {
+  const { switchOrgAdes, getSwitchOrgStatusAdes } = require("../../src/domains/system/providers/fixAdesStatusProvider");
+  const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const config = providerConfig("fix_ades_status");
+
+  await withMockedExternalFetch(async (url, options) => {
+    if (String(url).endsWith("/org-switch")) {
+      assert.equal(options.method, "POST");
+      assert.deepEqual(JSON.parse(options.body), { email: "switch@example.com" });
+      return new Response(JSON.stringify({ status: "waiting", position: 3, etaSeconds: 6 }), { status: 200 });
+    }
+    if (String(url).endsWith("/org-switch/status")) {
+      assert.equal(options.method, "POST");
+      assert.deepEqual(JSON.parse(options.body), { email: "switch@example.com" });
+      return new Response(JSON.stringify({ status: "sending", position: 0, etaSeconds: 15, newOrgName: "New Team Ltd" }), { status: 200 });
+    }
+    throw new Error(`Unexpected url: ${url}`);
+  }, async () => {
+    const res1 = await switchOrgAdes("switch@example.com", { config });
+    assert.equal(res1.status, "waiting");
+    assert.equal(res1.position, 3);
+
+    const res2 = await getSwitchOrgStatusAdes("switch@example.com", { config });
+    assert.equal(res2.status, "sending");
+    assert.equal(res2.newOrgName, "New Team Ltd");
   });
 });
 

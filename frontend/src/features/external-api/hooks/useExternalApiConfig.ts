@@ -58,7 +58,17 @@ export function useExternalApiConfig() {
       setProviders(providerResponse.providers || []);
       setProducts(mappingResponse.products || []);
       setAvailableApis(mappingResponse.availableApis || []);
-      setSlots(slotResponse.slots || []);
+      const loadedSlots = (slotResponse.slots || []).map((slot: PortalSlotItem) => {
+        const assigned = Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
+          ? slot.assigned_services
+          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
+        return {
+          ...slot,
+          assigned_services: assigned,
+          enabled: slot.enabled !== false,
+        };
+      });
+      setSlots(loadedSlots);
       if (isManualRefresh) {
         showToast("success", "Đã làm mới dữ liệu cấu hình.");
       }
@@ -161,6 +171,81 @@ export function useExternalApiConfig() {
     } catch (error: any) {
       showToast("error", error.message || "Không thể gỡ mapping.");
     }
+  };
+
+  const addServiceToSlot = (slotKey: string, serviceKey: string) => {
+    if (!serviceKey) return;
+    setSlots((current) =>
+      current.map((slot) => {
+        if (slot.slot_key !== slotKey) return slot;
+        const currentAssigned = Array.isArray(slot.assigned_services)
+          ? [...slot.assigned_services]
+          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
+
+        if (currentAssigned.includes(serviceKey)) return slot;
+        const newAssigned = [...currentAssigned, serviceKey];
+        return {
+          ...slot,
+          assigned_services: newAssigned,
+          primary_service_key: newAssigned[0],
+          fallback_service_key: newAssigned[1] || null,
+        };
+      })
+    );
+  };
+
+  const removeServiceFromSlot = (slotKey: string, serviceKey: string) => {
+    setSlots((current) =>
+      current.map((slot) => {
+        if (slot.slot_key !== slotKey) return slot;
+        const currentAssigned = Array.isArray(slot.assigned_services)
+          ? [...slot.assigned_services]
+          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
+
+        const newAssigned = currentAssigned.filter((k) => k !== serviceKey);
+        return {
+          ...slot,
+          assigned_services: newAssigned,
+          primary_service_key: newAssigned[0] || undefined,
+          fallback_service_key: newAssigned[1] || null,
+        };
+      })
+    );
+  };
+
+  const moveServiceInSlot = (slotKey: string, fromIndex: number, toIndex: number) => {
+    setSlots((current) =>
+      current.map((slot) => {
+        if (slot.slot_key !== slotKey) return slot;
+        const currentAssigned = Array.isArray(slot.assigned_services)
+          ? [...slot.assigned_services]
+          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
+
+        if (fromIndex < 0 || fromIndex >= currentAssigned.length || toIndex < 0 || toIndex >= currentAssigned.length) {
+          return slot;
+        }
+
+        const newAssigned = [...currentAssigned];
+        const [moved] = newAssigned.splice(fromIndex, 1);
+        newAssigned.splice(toIndex, 0, moved);
+
+        return {
+          ...slot,
+          assigned_services: newAssigned,
+          primary_service_key: newAssigned[0],
+          fallback_service_key: newAssigned[1] || null,
+        };
+      })
+    );
+  };
+
+  const toggleSlotEnabled = (slotKey: string, enabled: boolean) => {
+    setSlots((current) =>
+      current.map((slot) => {
+        if (slot.slot_key !== slotKey) return slot;
+        return { ...slot, enabled };
+      })
+    );
   };
 
   const updateSlot = (
@@ -297,6 +382,10 @@ export function useExternalApiConfig() {
 
     slots,
     updateSlot,
+    addServiceToSlot,
+    removeServiceFromSlot,
+    moveServiceInSlot,
+    toggleSlotEnabled,
     saveSlots,
     savingSlots,
 

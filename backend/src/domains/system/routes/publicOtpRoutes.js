@@ -54,6 +54,42 @@ router.post("/otp/probe-slot", async (req, res) => {
 router.post("/otp/adobe/code", (req, res) => dispatchSlot(res, "adobe_otp", req.body?.email || req.body?.input));
 router.post("/otp/adobe/account", (req, res) => dispatchSlot(res, "adobe_account", req.body?.email || req.body?.order_code || req.body?.search || req.body?.input));
 router.post(["/otp/adobe/check", "/otp/adobe/status"], (req, res) => dispatchSlot(res, "adobe_check", req.body?.email || req.body?.account || req.body?.search || req.body?.input));
+
+const switchTeamPendingLocks = new Set();
+
+router.post("/otp/adobe/switch-team", async (req, res) => {
+  const email = String(req.body?.email || req.body?.input || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ success: false, error: "Vui lòng cung cấp email hợp lệ.", message: "Vui lòng cung cấp email hợp lệ." });
+  }
+  if (switchTeamPendingLocks.has(email)) {
+    return res.status(429).json({
+      success: false,
+      error: "Yêu cầu chuyển team cho email này đang được xử lý.",
+      message: "Yêu cầu chuyển team cho email này đang được xử lý.",
+    });
+  }
+  switchTeamPendingLocks.add(email);
+  try {
+    const result = await otpPortalDispatcher.requestAdobeSwitchTeam(email);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  } finally {
+    switchTeamPendingLocks.delete(email);
+  }
+});
+
+router.post("/otp/adobe/switch-team/status", async (req, res) => {
+  try {
+    const email = req.body?.email || req.body?.input;
+    const result = await otpPortalDispatcher.getAdobeSwitchTeamStatus(email);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+});
+
 router.post("/otp/activate-key", activationKeyController.publicActivateKey);
 
 router.post("/otp/gpt/account", async (req, res) => {

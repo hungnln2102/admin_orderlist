@@ -36,7 +36,10 @@ export const ExternalApiConfigController: React.FC = () => {
     removeMapping,
 
     slots,
-    updateSlot,
+    addServiceToSlot,
+    removeServiceFromSlot,
+    moveServiceInSlot,
+    toggleSlotEnabled,
     saveSlots,
     savingSlots,
 
@@ -173,7 +176,10 @@ export const ExternalApiConfigController: React.FC = () => {
             slots={slots}
             providers={providers}
             savingSlots={savingSlots}
-            onUpdateSlot={updateSlot}
+            onAddService={addServiceToSlot}
+            onRemoveService={removeServiceFromSlot}
+            onMoveService={moveServiceInSlot}
+            onToggleEnabled={toggleSlotEnabled}
             onSaveSlots={() => void saveSlots()}
           />
         )}
