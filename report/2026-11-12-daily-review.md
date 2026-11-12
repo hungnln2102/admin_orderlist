@@ -115,3 +115,40 @@
 - **Backend Unit Tests:** `15/15 tests PASS 100%` trên bộ test `otpProviderService.test.js`.
 - **An toàn mã nguồn:** Không phá vỡ backward compatibility cho các cấu hình slots cũ đã lưu trong database.
 
+---
+
+## [21:55] Triển Khai Production 2 Dự Án: OTP Portal & Admin Orderlist Lên VPS (180.93.43.169)
+
+### 1. Phạm vi triển khai
+- Triển khai toàn bộ bản cập nhật mới nhất của 2 dự án lên máy chủ sản xuất VPS (`vps` — `180.93.43.169`):
+  1. [`otp_portal`](file:///e:/Project/admin_store/otp_portal): Triển khai bản build tĩnh mới nhất (commit `c9134d80`) chứa bộ 3 form trạng thái Ades (*active*, *inactive*, *not_found*), luồng Fix Team, và giao diện hiệu ứng Anime Rig.
+  2. [`admin_orderlist`](file:///e:/Project/admin_store/admin_orderlist): Triển khai bản phát hành hoàn chỉnh (commit `77c87a6c`) chứa tính năng chuỗi gán đa cổng NCC không giới hạn chính/phụ trên ô input cổng OTP, API đổi team Fix-Ades, bảo toàn unique index `id_order` và xử lý an toàn tài khoản ngân hàng.
+
+### 2. Quá trình thực hiện kỹ thuật
+- **OTP Portal ([`otp_portal`](file:///e:/Project/admin_store/otp_portal)):**
+  - Sao lưu bản build đang chạy trên VPS: `/var/www/otp_portal/.dist-backup-20261112-213450`.
+  - Biên dịch production build cục bộ: `tsc && vite build` thành công trong `12.42s`.
+  - Đóng gói và đồng bộ bản build (`index-B8oC2m2u.js`, `index-D09SOTM-.css`) sang `/var/www/otp_portal/dist/`.
+  - Cập nhật phân quyền: `sudo chown -R www-data:www-data /var/www/otp_portal/dist`.
+  - Tải lại Host Nginx: `sudo nginx -t && sudo nginx -s reload` (0 downtime).
+- **Admin Orderlist ([`admin_orderlist`](file:///e:/Project/admin_store/admin_orderlist)):**
+  - Cập nhật release worktree `/var/www/admin_orderlist-release` về commit `77c87a6c` (`origin/main`).
+  - Bảo toàn tuyệt đối các liên kết biểu tượng `.env`, `backend/.env.docker`, `warehouse_profiles` và thư mục dữ liệu hình ảnh `backend/image_product/`.
+  - Biên dịch Docker images trên VPS với BuildKit:
+    + `admin_orderlist-backend:latest` (`f389accac264` — 2.09GB).
+    + `admin_orderlist-frontend:latest` (`75dd597ff2e5` — 75.9MB).
+  - Kiểm tra database migration qua one-off container: `Using environment: production. Already up to date`.
+  - Tái tạo an toàn 2 container ứng dụng: `docker compose -p admin_orderlist up -d --no-deps backend frontend`.
+  - Giữ nguyên liên tục các dịch vụ hạ tầng đang chạy: PostgreSQL, Redis, Cloud Browser, Cheap Accommodation.
+
+### 3. Nghiệm thu sản xuất (Live Verification)
+- **Cổng OTP Portal:**
+  - `https://www.mavrykpremium.com/otp/`: HTTP/2 `200 OK`.
+  - `https://www.mavrykpremium.com/otp/assets/index-B8oC2m2u.js`: HTTP/2 `200 OK`.
+  - `https://www.mavrykpremium.com/otp/assets/index-D09SOTM-.css`: HTTP/2 `200 OK`.
+- **Cổng Quản Trị Admin Orderlist:**
+  - `https://admin.mavrykpremium.com/api/health`: HTTP/2 `200 OK`, `{"status":"ok","version":"2.0.0","database":"connected"}`.
+  - `https://admin.mavrykpremium.com/`: HTTP/2 `200 OK`.
+  - Trạng thái Docker container: `admin_orderlist-backend` (healthy), `admin_orderlist-frontend` (Up), `admin_orderlist-postgres` (healthy), `admin_orderlist-redis` (healthy).
+  - Dung lượng đĩa VPS sau deploy: Còn trống `28GB / 50GB` (`41%` sử dụng).
+
