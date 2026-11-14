@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { externalApiClient } from "@/features/external-api/api/externalApiClient";
-import type { PortalSlotItem, ProductItem } from "@/features/external-api/types";
+import type { PortalSlotItem, PortalSlotRoutingRule, ProductItem, SupplierOption } from "@/features/external-api/types";
 
 export interface Provider {
   key: string;
@@ -31,6 +31,8 @@ export function useExternalApiConfig() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [availableApis, setAvailableApis] = useState<any[]>([]);
   const [slots, setSlots] = useState<PortalSlotItem[]>([]);
+  const [routingRules, setRoutingRules] = useState<PortalSlotRoutingRule[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [savingSlots, setSavingSlots] = useState(false);
@@ -49,15 +51,18 @@ export function useExternalApiConfig() {
     }
 
     try {
-      const [providerResponse, mappingResponse, slotResponse] = await Promise.all([
+      const [providerResponse, mappingResponse, slotResponse, ruleResponse] = await Promise.all([
         fetch("/api/system/providers", { credentials: "include" }).then((response) => response.json()),
         externalApiClient.getProductApis().then((response) => response.json()),
         externalApiClient.getPortalSlots().then((response) => response.json()),
+        externalApiClient.getRoutingRules().then((response) => response.json()).catch(() => ({ rules: [], suppliers: [] })),
       ]);
 
       setProviders(providerResponse.providers || []);
       setProducts(mappingResponse.products || []);
       setAvailableApis(mappingResponse.availableApis || []);
+      setRoutingRules(ruleResponse.rules || []);
+      setSuppliers(ruleResponse.suppliers || []);
       const loadedSlots = (slotResponse.slots || []).map((slot: PortalSlotItem) => {
         const assigned = Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
           ? slot.assigned_services
@@ -156,6 +161,20 @@ export function useExternalApiConfig() {
       await load();
     } catch (error: any) {
       showToast("error", error.message || "Không thể gán provider.");
+    }
+  };
+
+  const setDefaultProvider = async (mappingId: number) => {
+    try {
+      const response = await externalApiClient.setDefaultProductApi(mappingId);
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "Không thể đặt provider làm mặc định.");
+      }
+      showToast("success", "Đã đặt provider làm cổng mặc định cho sản phẩm.");
+      await load();
+    } catch (error: any) {
+      showToast("error", error.message || "Không thể đặt provider làm mặc định.");
     }
   };
 
@@ -299,6 +318,78 @@ export function useExternalApiConfig() {
     }
   };
 
+  // CRUD Routing Rules (Phương Án A)
+  const createRoutingRule = async (ruleData: {
+    slotKey: string;
+    productNameId: number;
+    supplierId?: number | null;
+    providerKey: string;
+    priority?: number;
+    isActive?: boolean;
+    note?: string;
+  }) => {
+    try {
+      const response = await externalApiClient.createRoutingRule(ruleData);
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "Không thể tạo quy tắc liên kết.");
+      }
+      showToast("success", "Đã tạo thành công quy tắc liên kết ô input & NCC.");
+      await load();
+      return true;
+    } catch (error: any) {
+      showToast("error", error.message || "Không thể tạo quy tắc liên kết.");
+      return false;
+    }
+  };
+
+  const updateRoutingRule = async (
+    ruleId: number,
+    ruleData: Partial<{
+      slotKey: string;
+      productNameId: number;
+      supplierId: number | null;
+      providerKey: string;
+      priority: number;
+      isActive: boolean;
+      note: string;
+    }>
+  ) => {
+    try {
+      const response = await externalApiClient.updateRoutingRule(ruleId, ruleData);
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "Không thể cập nhật quy tắc.");
+      }
+      showToast("success", "Đã cập nhật quy tắc liên kết.");
+      await load();
+      return true;
+    } catch (error: any) {
+      showToast("error", error.message || "Không thể cập nhật quy tắc.");
+      return false;
+    }
+  };
+
+  const deleteRoutingRule = async (ruleId: number) => {
+    try {
+      const response = await externalApiClient.deleteRoutingRule(ruleId);
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "Không thể xóa quy tắc.");
+      }
+      showToast("success", "Đã xóa quy tắc liên kết.");
+      await load();
+      return true;
+    } catch (error: any) {
+      showToast("error", error.message || "Không thể xóa quy tắc.");
+      return false;
+    }
+  };
+
+  const toggleRoutingRuleActive = async (ruleId: number, currentActive: boolean) => {
+    return updateRoutingRule(ruleId, { isActive: !currentActive });
+  };
+
   // Metrics
   const configuredCount = useMemo(
     () => providers.filter((provider) => provider.configured).length,
@@ -339,11 +430,31 @@ export function useExternalApiConfig() {
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    const query = productSearch.trim().toLowerCase();
+    const list = products.filter((p) => {
+      const matchesName = p.package_name.toLowerCase().includes(query);
+      const matchesId = String(p.id).includes(query);
+      const matchesCategory = (p.category || "").toLowerCase().includes(query);
+      const matchesTags = (p.warehouse_tags || []).some((t) => t.toLowerCase().includes(query));
+      const matchesVariants = (p.variants || []).some(
+        (v) =>
+          (v.variant_name || "").toLowerCase().includes(query) ||
+          (v.display_name || "").toLowerCase().includes(query)
+      );
+      const matchesApis = (p.apis || []).some(
+        (a) =>
+          (a.service_name || "").toLowerCase().includes(query) ||
+          (a.provider_key || "").toLowerCase().includes(query)
+      );
+
       const matchesSearch =
-        !productSearch.trim() ||
-        p.package_name.toLowerCase().includes(productSearch.toLowerCase()) ||
-        String(p.id).includes(productSearch.trim());
+        !query ||
+        matchesName ||
+        matchesId ||
+        matchesCategory ||
+        matchesTags ||
+        matchesVariants ||
+        matchesApis;
 
       const hasApis = p.apis && p.apis.length > 0;
       const matchesFilter =
@@ -352,6 +463,16 @@ export function useExternalApiConfig() {
         (productFilter === "UNASSIGNED" && !hasApis);
 
       return matchesSearch && matchesFilter;
+    });
+
+    return [...list].sort((a, b) => {
+      const aAssigned = a.apis && a.apis.length > 0 ? 1 : 0;
+      const bAssigned = b.apis && b.apis.length > 0 ? 1 : 0;
+      if (aAssigned !== bAssigned) return bAssigned - aAssigned;
+      const aSlots = a.total_slots || 0;
+      const bSlots = b.total_slots || 0;
+      if (aSlots !== bSlots) return bSlots - aSlots;
+      return a.id - b.id;
     });
   }, [products, productSearch, productFilter]);
 
@@ -378,6 +499,7 @@ export function useExternalApiConfig() {
     setProductFilter,
     availableApis,
     assignProvider,
+    setDefaultProvider,
     removeMapping,
 
     slots,
@@ -388,6 +510,13 @@ export function useExternalApiConfig() {
     toggleSlotEnabled,
     saveSlots,
     savingSlots,
+
+    routingRules,
+    suppliers,
+    createRoutingRule,
+    updateRoutingRule,
+    deleteRoutingRule,
+    toggleRoutingRuleActive,
 
     loading,
     refreshing,

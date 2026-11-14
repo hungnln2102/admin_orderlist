@@ -61,6 +61,50 @@ async function getMapping(req, res) {
   }
 }
 
+// ==========================================
+// PORTAL SLOT ROUTING RULES (PHƯƠNG ÁN A)
+// ==========================================
+
+async function listRules(req, res) {
+  try {
+    const { rules, suppliers } = await productApiService.listRoutingRules();
+    res.json({ success: true, rules, suppliers });
+  } catch (error) {
+    console.error("[ProductApi Controller] Lỗi listRoutingRules:", error);
+    res.status(500).json({ success: false, error: getClientErrorMessage(error, "Không thể tải danh sách quy tắc điều phối.") });
+  }
+}
+
+async function createRule(req, res) {
+  try {
+    const result = await productApiService.createRoutingRule(req.body || {});
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("[ProductApi Controller] Lỗi createRoutingRule:", error);
+    res.status(400).json({ success: false, error: getClientErrorMessage(error, "Không thể tạo quy tắc điều phối.") });
+  }
+}
+
+async function updateRule(req, res) {
+  try {
+    const result = await productApiService.updateRoutingRule(Number(req.params.id), req.body || {});
+    res.json(result);
+  } catch (error) {
+    console.error(`[ProductApi Controller] Lỗi updateRoutingRule #${req.params.id}:`, error);
+    res.status(400).json({ success: false, error: getClientErrorMessage(error, "Không thể cập nhật quy tắc điều phối.") });
+  }
+}
+
+async function deleteRule(req, res) {
+  try {
+    const result = await productApiService.deleteRoutingRule(Number(req.params.id));
+    res.json(result);
+  } catch (error) {
+    console.error(`[ProductApi Controller] Lỗi deleteRoutingRule #${req.params.id}:`, error);
+    res.status(400).json({ success: false, error: getClientErrorMessage(error, "Không thể xóa quy tắc điều phối.") });
+  }
+}
+
 module.exports = {
   list,
   assign,
@@ -68,5 +112,8 @@ module.exports = {
   setDefault,
   remove,
   getMapping,
+  listRules,
+  createRule,
+  updateRule,
+  deleteRule,
 };
-

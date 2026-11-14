@@ -33,6 +33,7 @@ export const ExternalApiConfigController: React.FC = () => {
     setProductFilter,
     availableApis,
     assignProvider,
+    setDefaultProvider,
     removeMapping,
 
     slots,
@@ -42,6 +43,13 @@ export const ExternalApiConfigController: React.FC = () => {
     toggleSlotEnabled,
     saveSlots,
     savingSlots,
+
+    routingRules,
+    suppliers,
+    createRoutingRule,
+    updateRoutingRule,
+    deleteRoutingRule,
+    toggleRoutingRuleActive,
 
     loading,
     refreshing,
@@ -161,6 +169,7 @@ export const ExternalApiConfigController: React.FC = () => {
           <ProductApiMappingTab
             products={products}
             filteredProducts={filteredProducts}
+            providers={providers}
             availableApis={availableApis}
             searchQuery={productSearch}
             onSearchChange={setProductSearch}
@@ -168,6 +177,13 @@ export const ExternalApiConfigController: React.FC = () => {
             onFilterChange={setProductFilter}
             onAssignProvider={assignProvider}
             onRemoveMapping={removeMapping}
+            slots={slots}
+            routingRules={routingRules}
+            suppliers={suppliers}
+            onCreateRoutingRule={createRoutingRule}
+            onUpdateRoutingRule={updateRoutingRule}
+            onDeleteRoutingRule={deleteRoutingRule}
+            onToggleRoutingRuleActive={toggleRoutingRuleActive}
           />
         )}
 

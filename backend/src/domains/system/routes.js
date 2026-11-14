@@ -167,6 +167,18 @@ router.post("/totp/generate", sensitiveOperationRateLimiter, totpController.gene
 // GET /api/system/product-apis - Liệt kê tất cả sản phẩm và cấu hình API tương ứng
 router.get("/product-apis", productApiController.list);
 
+// GET /api/system/product-apis/rules - Danh sách quy tắc định tuyến ô input & NCC (Phương Án A)
+router.get("/product-apis/rules", productApiController.listRules);
+
+// POST /api/system/product-apis/rules - Tạo mới quy tắc định tuyến
+router.post("/product-apis/rules", productApiController.createRule);
+
+// PUT /api/system/product-apis/rules/:id - Cập nhật quy tắc định tuyến
+router.put("/product-apis/rules/:id", productApiController.updateRule);
+
+// DELETE /api/system/product-apis/rules/:id - Xóa quy tắc định tuyến
+router.delete("/product-apis/rules/:id", productApiController.deleteRule);
+
 // GET /api/system/product-apis/mapping - Lấy dictionary map theo product_id/variant_id/display_name
 router.get("/product-apis/mapping", productApiController.getMapping);
 

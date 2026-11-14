@@ -163,17 +163,35 @@ async function dispatchSlotRequest({ slotKey, input }) {
     )
   );
 
-  if (serviceChain.length === 0) {
+  // [ĐIỀU PHỐI ĐỘNG THEO ĐƠN HÀNG & NCC] (Phương Án A)
+  // Tra cứu đơn hàng theo input để nhận diện sản phẩm & NCC, ưu tiên gọi thẳng Provider đích
+  let effectiveChain = [...serviceChain];
+  let matchedRoutingRule = null;
+  try {
+    const productApiService = require("./productApiService");
+    matchedRoutingRule = await productApiService.findRoutingProviderForInput({
+      slotKey,
+      input: cleanInput,
+    });
+    if (matchedRoutingRule && matchedRoutingRule.provider_key) {
+      const targetProvider = matchedRoutingRule.provider_key.trim();
+      effectiveChain = [targetProvider, ...effectiveChain.filter((k) => k !== targetProvider)];
+    }
+  } catch (err) {
+    console.warn(`[OTP Dispatcher] Lỗi kiểm tra quy tắc định tuyến cho [${slotKey}]:`, err.message);
+  }
+
+  if (effectiveChain.length === 0) {
     throw new Error(`OTP service chain is not configured for slot '${slotKey}'.`);
   }
 
   let probeResult = null;
-  let serviceUsed = serviceChain[0];
+  let serviceUsed = effectiveChain[0];
   const attemptedServices = [];
 
   // Quét qua các cổng API được gán cho ô này để lấy mã OTP
-  for (let i = 0; i < serviceChain.length; i++) {
-    const currentService = serviceChain[i];
+  for (let i = 0; i < effectiveChain.length; i++) {
+    const currentService = effectiveChain[i];
     attemptedServices.push(currentService);
     try {
       const probePayload = {
@@ -283,7 +301,9 @@ async function dispatchSlotRequest({ slotKey, input }) {
     slot_key: slotKey,
     slot_name: slot.name,
     service_used: serviceUsed,
-    assigned_services: serviceChain,
+    assigned_services: effectiveChain,
+    default_assigned_services: serviceChain,
+    routing_rule: matchedRoutingRule || null,
     attempted_services: attemptedServices,
     input: cleanInput,
     data: accountData,

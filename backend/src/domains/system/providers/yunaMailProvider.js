@@ -9,7 +9,7 @@ async function callYunaProxy(config, endpoint, email, timeoutMs = 10_000, includ
     const headers = {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "X-Yuna-Version": "Â©2026 YunaGRP Panel V3.12.1",
+      "X-Yuna-Version": "©2026 YunaGRP Panel V3.12.1",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     };
     const response = await requestProviderApi(config, {

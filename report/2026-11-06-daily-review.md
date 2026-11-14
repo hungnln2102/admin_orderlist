@@ -602,26 +602,26 @@
 
 ---
 
-## [21:25] Kh?c ph?c c?nh b?o 0 ng?y cho ??n ?? chuy?n H?t H?n
+## [21:25] Khắc phục cảnh báo 0 ngày cho đơn đã chuyển Hết Hạn
 
-### Ph?m vi
-- R? so?t lu?ng x?a ??n C?n Gia H?n sang H?t H?n v? scheduler th?ng b?o ??n c?n 0 ng?y.
+### Phạm vi
+- Rà soát luồng xóa đơn Cần Gia Hạn sang Hết Hạn và scheduler thông báo đơn còn 0 ngày.
 
-### Nguy?n nh?n g?c
-- Scheduler `notify_zero_days` l?c c? `RENEW_REQUIRED` v? `EXPIRED`; v? v?y ??n ?? chuy?n sang H?t H?n v?n b? ??a v?o th?ng b?o 0 ng?y.
+### Nguyên nhân gốc
+- Scheduler `notify_zero_days` lọc cả `RENEW_REQUIRED` và `EXPIRED`; vì vậy đơn đã chuyển sang Hết Hạn vẫn bị đưa vào thông báo 0 ngày.
 
-### Thay ??i k? thu?t
-- [notifyZeroDaysTask.js](file:///E:/Project/admin_store/admin_orderlist/backend/src/scheduler/tasks/notifyZeroDaysTask.js): ch? ch?n `RENEW_REQUIRED` t?i m?c 0 ng?y; `EXPIRED` b? lo?i kh?i nh?c gia h?n.
-- [notifyZeroDaysTask.test.js](file:///E:/Project/admin_store/admin_orderlist/backend/tests/unit/notifyZeroDaysTask.test.js): th?m regression test x?c nh?n SQL ch? bind `RENEW_REQUIRED` v? kh?ng ch?a `EXPIRED`.
+### Thay đổi kỹ thuật
+- [notifyZeroDaysTask.js](file:///E:/Project/admin_store/admin_orderlist/backend/src/scheduler/tasks/notifyZeroDaysTask.js): chỉ chặn `RENEW_REQUIRED` tại mốc 0 ngày; `EXPIRED` bị loại khỏi nhắc gia hạn.
+- [notifyZeroDaysTask.test.js](file:///E:/Project/admin_store/admin_orderlist/backend/tests/unit/notifyZeroDaysTask.test.js): thêm regression test xác nhận SQL chỉ bind `RENEW_REQUIRED` và không chứa `EXPIRED`.
 
-### Ki?m tra ?? ch?y
+### Kiểm tra đã chạy
 - `node --check src/scheduler/tasks/notifyZeroDaysTask.js`: pass.
 - `node --check tests/unit/notifyZeroDaysTask.test.js`: pass.
 - `node --test tests/unit/notifyZeroDaysTask.test.js`: 1/1 pass.
 - `git diff --check -- backend/src/scheduler/tasks/notifyZeroDaysTask.js backend/tests/unit/notifyZeroDaysTask.test.js`: pass.
 
-### Tr?ng th?i nghi?m thu
-- **?? nghi?m thu local:** ??n H?t H?n kh?ng c?n nh?n c?nh b?o 0 ng?y; ??n C?n Gia H?n v?n ???c gi? trong lu?ng nh?c.
+### Trạng thái nghiệm thu
+- **Đã nghiệm thu local:** Đơn Hết Hạn không còn nhận cảnh báo 0 ngày; Đơn Cần Gia Hạn vẫn được giữ trong luồng nhắc.
 
 ---
 

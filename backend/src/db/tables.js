@@ -83,6 +83,7 @@ const TABLES = {
   EMAIL_RECONCILIATION_RUNS: formatTable(SCHEMAS.FINANCE, "email_reconciliation_runs"),
   PACKAGE_SLOT_DAILY_LOGS: formatTable(SCHEMAS.WAREHOUSE, "package_slot_daily_logs"),
   PRODUCT_API_CONFIGS: formatTable(SCHEMAS.PRODUCT, "product_api_configs"),
+  PORTAL_SLOT_ROUTING_RULES: formatTable(SCHEMAS.SYSTEM, "portal_slot_routing_rules"),
   ACTIVATION_KEYS: formatTable(SCHEMAS.WAREHOUSE, "activation_keys"),
 };
 
@@ -650,8 +651,19 @@ const COLS = {
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },
+  PORTAL_SLOT_ROUTING_RULES: {
+    ID: "id",
+    SLOT_KEY: "slot_key",
+    PRODUCT_NAME_ID: "product_name_id",
+    SUPPLIER_ID: "supplier_id",
+    PROVIDER_KEY: "provider_key",
+    PRIORITY: "priority",
+    IS_ACTIVE: "is_active",
+    NOTE: "note",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
 };
-
 
 module.exports = {
   SCHEMAS,

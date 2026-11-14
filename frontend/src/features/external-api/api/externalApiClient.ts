@@ -11,4 +11,8 @@ export const externalApiClient = {
   getSystemConfigs: () => apiClient(apiEndpoints.systemConfigs),
   savePortalSlots: (body: Record<string, unknown>) => apiClient(`${apiEndpoints.systemConfigs}/OTP_PORTAL_SLOTS_CONFIG`, { method: "PUT", body }),
   probeSlot: (body: Record<string, unknown>) => apiClient(apiEndpoints.portalSlotProbe, { method: "POST", body }),
+  getRoutingRules: () => apiClient(`${apiEndpoints.productApis}/rules`),
+  createRoutingRule: (body: Record<string, unknown>) => apiClient(`${apiEndpoints.productApis}/rules`, { method: "POST", body }),
+  updateRoutingRule: (id: number, body: Record<string, unknown>) => apiClient(`${apiEndpoints.productApis}/rules/${id}`, { method: "PUT", body }),
+  deleteRoutingRule: (id: number) => apiClient(`${apiEndpoints.productApis}/rules/${id}`, { method: "DELETE" }),
 };

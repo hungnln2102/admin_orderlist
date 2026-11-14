@@ -135,7 +135,7 @@ async function fetchOtpFromVivaRocky(queryInput, { config: configuredConfig, ser
         foundOtp = extractOtpCode(successMatch[1]);
       }
       if (!foundOtp) {
-        const contextualMatch = html.match(/(?:netflix|mÃƒÂ£|code|otp|login\s*code)[^0-9]{1,50}(\d{6})/i);
+        const contextualMatch = html.match(/(?:netflix|mã|code|otp|login\s*code)[^0-9]{1,50}(\d{6})/i);
         if (contextualMatch?.[1]) {
           foundOtp = contextualMatch[1];
         }
