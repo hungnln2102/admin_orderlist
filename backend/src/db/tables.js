@@ -220,6 +220,7 @@ const COLS = {
     SESSION_IS_AUTHENTICATED: "session_is_authenticated",
     SESSION_CHECKED_AT: "session_checked_at",
     OTP_TYPE: "otp_type",
+    PROVIDER_KEY: "provider_key",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },

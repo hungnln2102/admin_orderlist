@@ -1,5 +1,6 @@
 const { db, withTransaction } = require("@/db");
-const { TABLES } = require("@/db/tables");
+const { TABLES, COLS } = require("@/db/tables");
+const SS = COLS.ACCOUNT_SLOTS;
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const warehouseAutomationService = require("./warehouseAutomationService");
@@ -35,6 +36,7 @@ const listWarehouseAccounts = async () => {
       "ss.account_id",
       "ss.name_id",
       "ss.variant_tag",
+      "ss." + SS.PROVIDER_KEY + " as provider_key",
       "pn.name as display_name",
       "pn.category as catalog_tag",
       "pn.login_url as login_url",
@@ -65,6 +67,7 @@ const listWarehouseAccounts = async () => {
       login_url: srv.login_url || "",
       category: resolvedTag || srv.display_name || "Dịch vụ",
       variant_tag: resolvedTag,
+      provider_key: srv.provider_key || "",
       password: srv.password || "",
       backup_email: srv.backup_email || "",
       two_fa: srv.two_fa || "",

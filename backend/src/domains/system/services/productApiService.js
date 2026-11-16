@@ -9,6 +9,7 @@ const SS = COLS.ACCOUNT_SLOTS;
 const RR = COLS.PORTAL_SLOT_ROUTING_RULES;
 const SUP = COLS.SUPPLIER;
 const ORD = COLS.ORDER_LIST;
+const AK = COLS.ACTIVATION_KEYS;
 
 const normalizeKey = (value) =>
   String(value || "")
@@ -610,11 +611,74 @@ async function deleteRoutingRule(ruleId) {
  */
 async function findRoutingProviderForInput({ slotKey, input }) {
   if (!slotKey || !input) return null;
-  const cleanInput = String(input).trim().toLowerCase();
+  const rawInput = String(input).trim();
+  const cleanInput = rawInput.toLowerCase();
   if (!cleanInput) return null;
 
   try {
-    // 1. Tìm đơn hàng trong order_list
+    const slotSelect = () => db(TABLES.STOCK_SERVICES + " as ss")
+      .leftJoin(TABLES.ACCOUNTS + " as a", "a.id", "ss." + SS.ACCOUNT_ID)
+      .select(
+        "ss." + SS.ID + " as slot_id",
+        "ss." + SS.NAME_ID + " as name_id",
+        "ss." + SS.PROVIDER_KEY + " as slot_provider_key",
+        "a.product_name_id as account_product_name_id"
+      );
+
+    const activationKey = await db(TABLES.ACTIVATION_KEYS)
+      .select(AK.ACCOUNT_SLOT_ID, AK.ASSIGNED_ACCOUNT, AK.PRODUCT_NAME_ID, AK.ID_ORDER)
+      .whereRaw("UPPER(TRIM(" + AK.KEY_CODE + ")) = ?", [rawInput.toUpperCase()])
+      .first();
+
+    let matchedSlot = null;
+    let matchedProductNameId = Number(activationKey?.[AK.PRODUCT_NAME_ID]) || null;
+    let matchedSupplierId = null;
+
+    if (activationKey?.[AK.ACCOUNT_SLOT_ID]) {
+      matchedSlot = await slotSelect()
+        .where("ss." + SS.ID, Number(activationKey[AK.ACCOUNT_SLOT_ID]))
+        .first();
+    }
+
+    if (!matchedSlot && activationKey?.[AK.ASSIGNED_ACCOUNT]) {
+      const assignedAccount = String(activationKey[AK.ASSIGNED_ACCOUNT]).trim().toLowerCase();
+      if (assignedAccount) {
+        const assignedSlotQuery = slotSelect()
+          .whereRaw("LOWER(a.account_username) = ?", [assignedAccount])
+          .orderBy("ss." + SS.ID, "desc");
+        if (matchedProductNameId) {
+          assignedSlotQuery.where("a.product_name_id", matchedProductNameId);
+        }
+        matchedSlot = await assignedSlotQuery.first();
+      }
+    }
+
+    if (!matchedSlot) {
+      matchedSlot = await slotSelect()
+        .where(function () {
+          this.whereRaw("LOWER(ss." + SS.CUSTOMER + ") = ?", [cleanInput])
+            .orWhereRaw("LOWER(ss." + SS.CONTACT + ") = ?", [cleanInput])
+            .orWhereRaw("LOWER(a.account_username) = ?", [cleanInput]);
+        })
+        .orderBy("ss." + SS.ID, "desc")
+        .first();
+    }
+
+    const directProviderKey = String(matchedSlot?.slot_provider_key || "").trim();
+    if (directProviderKey) {
+      return {
+        provider_key: directProviderKey,
+        match_type: "DIRECT_SLOT_PROVIDER",
+        source: "WAREHOUSE_SLOT",
+      };
+    }
+
+    if (matchedSlot) {
+      matchedProductNameId = Number(matchedSlot.name_id || matchedSlot.account_product_name_id)
+        || matchedProductNameId;
+    }
+
+    const linkedOrderId = activationKey?.[AK.ID_ORDER];
     const matchedOrder = await db(TABLES.ORDER_LIST)
       .select(
         ORD.ID,
@@ -629,53 +693,24 @@ async function findRoutingProviderForInput({ slotKey, input }) {
         this.whereRaw("LOWER(" + ORD.INFORMATION_ORDER + ") = ?", [cleanInput])
           .orWhereRaw("LOWER(" + ORD.ID_ORDER + ") = ?", [cleanInput])
           .orWhereRaw("LOWER(" + ORD.SLOT + ") LIKE ?", [`%${cleanInput}%`]);
+        if (linkedOrderId) this.orWhere(ORD.ID_ORDER, linkedOrderId);
       })
       .whereNotIn(ORD.STATUS, ["CANCELED", "REFUNDED"])
       .orderBy(ORD.ID, "desc")
       .first();
 
-    let matchedProductNameId = null;
-    let matchedSupplierId = null;
-
     if (matchedOrder) {
       matchedSupplierId = matchedOrder[ORD.SUPPLY_ID] ? Number(matchedOrder[ORD.SUPPLY_ID]) : null;
-
-      if (matchedOrder[ORD.ID_PRODUCT]) {
-        const prod = await db(TABLES.PRODUCT_NAMES)
+      if (!matchedProductNameId && matchedOrder[ORD.ID_PRODUCT]) {
+        const productName = await db(TABLES.PRODUCT_NAMES)
           .where(PN.PRODUCT_ID, Number(matchedOrder[ORD.ID_PRODUCT]))
           .first();
-        if (prod) {
-          matchedProductNameId = Number(prod[PN.ID]);
-        }
+        if (productName) matchedProductNameId = Number(productName[PN.ID]);
       }
     }
 
-    // Nếu không tìm thấy qua order_list, thử tìm qua account_slots (kho hàng)
-    if (!matchedProductNameId) {
-      const matchedSlot = await db(TABLES.STOCK_SERVICES + " as ss")
-        .leftJoin(TABLES.ACCOUNTS + " as a", "a.id", "ss." + SS.ACCOUNT_ID)
-        .select(
-          "ss." + SS.NAME_ID + " as name_id",
-          "a.product_name_id as account_product_name_id"
-        )
-        .where(function () {
-          this.whereRaw("LOWER(ss." + SS.CUSTOMER + ") = ?", [cleanInput])
-            .orWhereRaw("LOWER(ss." + SS.CONTACT + ") = ?", [cleanInput])
-            .orWhereRaw("LOWER(a.account_username) = ?", [cleanInput]);
-        })
-        .orderBy("ss.id", "desc")
-        .first();
+    if (!matchedProductNameId) return null;
 
-      if (matchedSlot) {
-        matchedProductNameId = Number(matchedSlot.name_id || matchedSlot.account_product_name_id);
-      }
-    }
-
-    if (!matchedProductNameId) {
-      return null;
-    }
-
-    // 2. Tìm trong bảng portal_slot_routing_rules
     const rules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
       .where({
         [RR.SLOT_KEY]: slotKey,
@@ -687,9 +722,8 @@ async function findRoutingProviderForInput({ slotKey, input }) {
 
     if (rules.length === 0) return null;
 
-    // Ưu tiên 1: Khớp chính xác NCC (supplier_id)
     if (matchedSupplierId) {
-      const supplierRule = rules.find((r) => Number(r[RR.SUPPLIER_ID]) === matchedSupplierId);
+      const supplierRule = rules.find((rule) => Number(rule[RR.SUPPLIER_ID]) === matchedSupplierId);
       if (supplierRule) {
         return {
           provider_key: supplierRule[RR.PROVIDER_KEY],
@@ -701,8 +735,7 @@ async function findRoutingProviderForInput({ slotKey, input }) {
       }
     }
 
-    // Ưu tiên 2: Rule áp dụng cho Mọi NCC (supplier_id IS NULL)
-    const defaultRule = rules.find((r) => !r[RR.SUPPLIER_ID]);
+    const defaultRule = rules.find((rule) => !rule[RR.SUPPLIER_ID]);
     if (defaultRule) {
       return {
         provider_key: defaultRule[RR.PROVIDER_KEY],
@@ -713,7 +746,6 @@ async function findRoutingProviderForInput({ slotKey, input }) {
       };
     }
 
-    // Ưu tiên 3: Rule đầu tiên trong danh sách
     return {
       provider_key: rules[0][RR.PROVIDER_KEY],
       rule_id: Number(rules[0][RR.ID]),

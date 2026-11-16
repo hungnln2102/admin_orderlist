@@ -1,5 +1,6 @@
 const { db, withTransaction } = require("@/db");
-const { TABLES } = require("@/db/tables");
+const { TABLES, COLS } = require("@/db/tables");
+const SS = COLS.ACCOUNT_SLOTS;
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
@@ -25,6 +26,10 @@ const addServiceSlotToAccount = async (accountId, payload) => {
     note,
     variantTag,
   } = payload || {};
+  const rawProviderKey = payload?.providerKey ?? payload?.provider_key;
+  const cleanProviderKey = rawProviderKey === undefined
+    ? null
+    : String(rawProviderKey || "").trim() || null;
 
   const slotName = String(serviceName || category || "").trim();
   if (!slotName) {
@@ -86,6 +91,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
         status: status || "AVAILABLE",
         service_note: note ? String(note).trim() : null,
         variant_tag: variantTag ? String(variantTag).trim() : null,
+        [SS.PROVIDER_KEY]: cleanProviderKey,
         created_at: now,
         updated_at: now,
       })
@@ -97,6 +103,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
       name_id: nameId,
       display_name: slotName,
       variant_tag: insertedSlot.variant_tag || "",
+      provider_key: insertedSlot[SS.PROVIDER_KEY] || "",
       password: insertedSlot.password || "",
       backup_email: insertedSlot.backup_email || "",
       two_fa: insertedSlot.two_fa || "",
@@ -163,7 +170,12 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     note,
     variantTag,
     accountUsername,
-  } = payload;
+  } = payload || {};
+  const hasProviderKey = Object.prototype.hasOwnProperty.call(payload || {}, "providerKey")
+    || Object.prototype.hasOwnProperty.call(payload || {}, "provider_key");
+  const rawProviderKey = Object.prototype.hasOwnProperty.call(payload || {}, "providerKey")
+    ? payload.providerKey
+    : payload?.provider_key;
 
   return await withTransaction(async (trx) => {
     const existingSlot = await trx(TABLES.STOCK_SERVICES)
@@ -184,6 +196,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     if (twoFa !== undefined) updateData.two_fa = twoFa || null;
     if (note !== undefined) updateData.service_note = note || null;
     if (variantTag !== undefined) updateData.variant_tag = String(variantTag || "").trim() || null;
+    if (hasProviderKey) updateData[SS.PROVIDER_KEY] = String(rawProviderKey || "").trim() || null;
     if (status !== undefined) {
       updateData.status = status;
     }
@@ -225,6 +238,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
         "ss.id",
         "ss.account_id",
         "ss.name_id",
+        "ss." + SS.PROVIDER_KEY + " as provider_key",
         "pn.name as display_name",
         "ss.password",
         "ss.backup_email",
@@ -242,6 +256,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
       account_id: Number(updatedSlot.account_id),
       display_name: updatedSlot.display_name || "Dịch vụ",
       variant_tag: updatedSlot.variant_tag || "",
+      provider_key: updatedSlot.provider_key || "",
       password: updatedSlot.password || "",
       backup_email: updatedSlot.backup_email || "",
       two_fa: updatedSlot.two_fa || "",

@@ -11,8 +11,10 @@ import {
   LogIn,
   UserCheck,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { WarehouseAccountItem, WarehouseServiceSlot } from "../types";
+import { getProviderDetails } from "../providerConstants";
 import {
   format2FAChunks,
   formatWarehouseAccountForCopy,
@@ -219,7 +221,7 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                   >
                     {/* 1. DỊCH VỤ */}
                     <td className="px-4 py-3.5 font-bold text-white text-xs">
-                      <div className="inline-flex items-center gap-1.5">
+                      <div className="inline-flex items-center gap-1.5 flex-wrap">
                         <span className={`w-2 h-2 rounded-full ${brand.dotClass}`} />
                         <span className="tracking-wide">
                           {srv.display_name || srv.category}
@@ -229,6 +231,20 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                             [{srv.variant_tag || srv.category}]
                           </span>
                         )}
+                        {(srv.provider_key || srv.otp_type) && (() => {
+                          const prov = getProviderDetails(srv.provider_key || srv.otp_type);
+                          return (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border tracking-normal inline-flex items-center gap-1 ${
+                                prov ? prov.badgeClass : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                              }`}
+                              title={`Cổng OTP: ${prov ? prov.label : srv.provider_key || srv.otp_type}`}
+                            >
+                              <Sparkles className="w-2.5 h-2.5" />
+                              {prov ? prov.shortLabel : srv.provider_key || srv.otp_type}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
 

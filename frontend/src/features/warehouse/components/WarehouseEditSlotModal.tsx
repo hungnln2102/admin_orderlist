@@ -20,6 +20,7 @@ import {
   WarehouseSlotEditFormData,
   WarehouseSlotStatus,
 } from "../types";
+import { AVAILABLE_OTP_PROVIDERS } from "../providerConstants";
 import { format2FAChunks, getServiceBrandStyle } from "./warehouseRowUtils";
 
 interface WarehouseEditSlotModalProps {
@@ -47,6 +48,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     backupEmail: "",
     twoFa: "",
     otpType: "",
+    providerKey: "",
     expiresAt: "",
     status: "AVAILABLE",
     note: "",
@@ -88,7 +90,8 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
         password: slot.password || "",
         backupEmail: slot.backup_email || "",
         twoFa: slot.two_fa || "",
-        otpType: slot.otp_type || "",
+        otpType: slot.provider_key || slot.otp_type || "",
+        providerKey: slot.provider_key || slot.otp_type || "",
         expiresAt: initialExpires,
         status: slot.status || "AVAILABLE",
         note: slot.note || "",
@@ -110,6 +113,28 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     }
     return apiMapping.allApis || [];
   }, [apiMapping, slot]);
+
+  const combinedProviders = useMemo(() => {
+    const list: Array<{ value: string; label: string }> = [];
+    const seen = new Set<string>();
+
+    availableOtpApis.forEach((api: any) => {
+      const key = api.service_key || api.key;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        list.push({ value: key, label: `${api.service_name || key} (${key})` });
+      }
+    });
+
+    AVAILABLE_OTP_PROVIDERS.forEach((prov) => {
+      if (!seen.has(prov.value)) {
+        seen.add(prov.value);
+        list.push({ value: prov.value, label: prov.label });
+      }
+    });
+
+    return list;
+  }, [availableOtpApis]);
 
   if (!open || !slot || !account) return null;
 
@@ -303,16 +328,16 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                 )}
               </label>
               <select
-                value={formData.otpType || ""}
+                value={formData.providerKey || formData.otpType || ""}
                 onChange={(e) =>
-                  setFormData({ ...formData, otpType: e.target.value })
+                  setFormData({ ...formData, providerKey: e.target.value, otpType: e.target.value })
                 }
                 className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition-colors cursor-pointer truncate"
               >
                 <option value="">-- Mặc định / Không OTP --</option>
-                {availableOtpApis.map((api: any) => (
-                  <option key={api.service_key} value={api.service_key}>
-                    {api.service_name} ({api.service_key})
+                {combinedProviders.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
                   </option>
                 ))}
               </select>

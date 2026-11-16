@@ -8,12 +8,14 @@ import {
   Link2,
   HardDrive,
   UserCheck,
+  Sparkles,
 } from "lucide-react";
 import {
   WarehouseAccountFormData,
   ServiceNameCategoryItem,
   WarehouseAccountItem,
 } from "../types";
+import { AVAILABLE_OTP_PROVIDERS } from "../providerConstants";
 import { useNotification } from "@/shared/context/NotificationContext";
 
 interface WarehouseCreateModalProps {
@@ -218,6 +220,29 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 text-xs font-mono"
               />
             </div>
+          </div>
+
+          {/* Cổng Giải Mã OTP (Provider) */}
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Cổng Giải Mã OTP (Provider)</span>
+              </span>
+              <span className="text-[10px] text-cyan-400 font-mono">Tự động điều phối</span>
+            </label>
+            <select
+              value={formData.providerKey || ""}
+              onChange={(e) => onFormChange({ ...formData, providerKey: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
+            >
+              <option value="">-- Mặc định (Không gán cổng OTP) --</option>
+              {AVAILABLE_OTP_PROVIDERS.map((provider) => (
+                <option key={provider.value} value={provider.value}>
+                  {provider.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* ── KHU VỰC TẠO GÓI KHO & TÀI KHOẢN LIÊN KẾT ── */}

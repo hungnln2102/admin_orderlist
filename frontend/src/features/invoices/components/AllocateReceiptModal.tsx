@@ -128,7 +128,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       if (isOut) {
         setAllocationType("FIXED_COST");
         setImportId(generateRandomImportId());
-        setSupplierName(receipt.sender || "");
+        setSupplierName("");
         setTargetCode("");
 
         // Tự động nạp danh sách chi phí cố định để gợi ý khớp
@@ -256,7 +256,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
     }
 
     if (allocationType === "EXTERNAL_IMPORT" && !supplierName.trim()) {
-      setError("Vui lòng nhập Tên Nhà Cung Cấp / Nguồn hàng.");
+      setError("Vui lòng nhập Thông tin nhập hàng.");
       return;
     }
 
@@ -267,7 +267,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       const selectedInstObj = installments.find((i) => String(i.id) === selectedInstallmentId);
 
       const finalNote = allocationType === "EXTERNAL_IMPORT"
-        ? `[${supplierName.trim()}] ${note.trim()}`
+        ? supplierName.trim()
         : allocationType === "PERSONAL_DEBT"
         ? (note.trim() || `Trả bớt nợ "${selectedDebtObj?.name || selectedDebtId}"`)
         : allocationType === "INSTALLMENT"
@@ -718,12 +718,12 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                 </span>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">NHÀ CUNG CẤP / NGUỒN *</label>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">THÔNG TIN NHẬP HÀNG *</label>
                 <input
                   type="text"
                   value={supplierName}
                   onChange={(e) => setSupplierName(e.target.value)}
-                  placeholder="VD: Adobe Global, MAVRYK STORE..."
+                  placeholder="VD: 10 key Adobe, Canva Pro 1 năm, gói nguồn..."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 text-xs focus:outline-none focus:border-amber-500 transition-all"
                 />
               </div>
@@ -733,7 +733,9 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
           {/* Amount Field */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-slate-300">SỐ TIỀN PHÂN BỔ (VND) *</label>
+              <label className="text-xs font-semibold text-slate-300">
+                {allocationType === "EXTERNAL_IMPORT" ? "GIÁ TIỀN (VND) *" : "SỐ TIỀN PHÂN BỔ (VND) *"}
+              </label>
               <div className="flex items-center gap-1.5">
                 {matchedOrder && (
                   <button
@@ -769,7 +771,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
             />
           </div>
 
-          {/* Note Field */}
+          {/* Note Field (Ẩn khi Nhập Ngoài Luồng) */}
+          {allocationType !== "EXTERNAL_IMPORT" && (
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">GHI CHÚ LOG PHÂN BỔ</label>
             <input
@@ -780,6 +783,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
               className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-700 text-xs transition-all"
             />
           </div>
+
+          )}
 
           {/* Submit Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800/80">

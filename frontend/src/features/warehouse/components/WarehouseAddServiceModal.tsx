@@ -11,12 +11,14 @@ import {
   FileText,
   Loader2,
   PackageCheck,
+  Sparkles,
 } from "lucide-react";
 import {
   WarehouseAccountItem,
   WarehouseAddServiceFormData,
   ServiceNameCategoryItem,
 } from "../types";
+import { AVAILABLE_OTP_PROVIDERS } from "../providerConstants";
 import { format2FAChunks } from "./warehouseRowUtils";
 
 interface WarehouseAddServiceModalProps {
@@ -43,6 +45,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
     password: "",
     backupEmail: "",
     twoFa: "",
+    providerKey: "",
     expiresAt: "",
     status: "AVAILABLE",
     note: "",
@@ -63,6 +66,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
         password: "",
         backupEmail: "",
         twoFa: "",
+        providerKey: "",
         expiresAt: "",
         status: "AVAILABLE",
         note: "",
@@ -269,6 +273,35 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
               className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
+
+          {/* CỔNG GIẢI OTP / PROVIDER */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Cổng Giải Mã OTP (Provider)</span>
+              </span>
+              <span className="text-[10px] text-cyan-400 font-mono">Tự động điều phối</span>
+            </label>
+            <select
+              value={formData.providerKey || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, providerKey: e.target.value })
+              }
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
+            >
+              <option value="">-- Mặc định (Không gán cổng OTP) --</option>
+              {AVAILABLE_OTP_PROVIDERS.map((provider) => (
+                <option key={provider.value} value={provider.value}>
+                  {provider.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[10px] text-slate-400">
+              Gắn cổng OTP trực tiếp vào dịch vụ này. Khách lấy OTP sẽ được hệ thống trỏ thẳng tới Provider đã chọn.
+            </p>
+          </div>
+
           {/* HẠN DÙNG & TRẠNG THÁI */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>

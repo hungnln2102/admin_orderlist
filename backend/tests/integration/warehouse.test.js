@@ -3,8 +3,11 @@ const assert = require("node:assert/strict");
 require("module-alias/register");
 
 const warehouseService = require("@/domains/warehouse/services/warehouseService");
+const productApiService = require("@/domains/system/services/productApiService");
 const { db } = require("@/db");
-const { TABLES } = require("@/db/tables");
+const { TABLES, COLS } = require("@/db/tables");
+
+const AK = COLS.ACTIVATION_KEYS;
 const { ensureYoutubeLoginUrl } = require("../fixtures/trustFlowFixtures");
 
 test("Warehouse Integration Tests (V2)", async (t) => {
@@ -161,6 +164,7 @@ test("Warehouse Integration Tests (V2)", async (t) => {
       status: "IN_USE",
       note: "Updated via slot edit modal",
       accountUsername: `slot_edited_user_${Date.now()}@test.com`,
+      providerKey: "tinyhost",
     });
 
     assert.equal(updated.password, "new_super_password_456");
@@ -168,6 +172,7 @@ test("Warehouse Integration Tests (V2)", async (t) => {
     assert.equal(updated.backup_email, "updated_backup@gmail.com");
     assert.equal(updated.status, "IN_USE");
     assert.equal(updated.note, "Updated via slot edit modal");
+    assert.equal(updated.provider_key, "tinyhost");
 
     // Cleanup
     await warehouseService.deleteWarehouseAccount(acc.id);
@@ -193,6 +198,7 @@ test("Warehouse Integration Tests (V2)", async (t) => {
       expiresAt: "2027-12-31",
       status: "AVAILABLE",
       note: "Added via addServiceSlotToAccount",
+      providerKey: "tinyhost",
     });
 
     assert.ok(addedSlot.id);
@@ -200,6 +206,7 @@ test("Warehouse Integration Tests (V2)", async (t) => {
     assert.equal(addedSlot.display_name, "Adobe All Apps 12M Slot");
     assert.equal(addedSlot.password, "adobe_pass_999");
     assert.equal(addedSlot.status, "AVAILABLE");
+    assert.equal(addedSlot.provider_key, "tinyhost");
 
     // 7.3. Verify that listWarehouseAccounts shows 2 services under the same account
     const list = await warehouseService.listWarehouseAccounts();
@@ -208,6 +215,10 @@ test("Warehouse Integration Tests (V2)", async (t) => {
     assert.equal(foundAcc.services.length, 2, "Account must now have exactly 2 service slots");
     assert.ok(foundAcc.services.some((s) => s.display_name === "Mail"));
     assert.ok(foundAcc.services.some((s) => s.display_name === "Adobe All Apps 12M Slot"));
+    assert.equal(
+      foundAcc.services.find((s) => s.id === addedSlot.id)?.provider_key,
+      "tinyhost"
+    );
 
     // 7.4. Delete just the newly added service slot
     const delSlotRes = await warehouseService.deleteWarehouseServiceSlot(addedSlot.id);
@@ -222,5 +233,52 @@ test("Warehouse Integration Tests (V2)", async (t) => {
 
     // 7.6. Cleanup account
     await warehouseService.deleteWarehouseAccount(acc.id);
+  });
+
+  await t.test("8. routes OTP directly from the warehouse slot for account and activation key input", async () => {
+    const accountEmail = `slot_provider_${Date.now()}@test.com`;
+    const keyCode = `TEST-PROVIDER-${Date.now()}`;
+    const account = await warehouseService.createWarehouseAccount({
+      account: accountEmail,
+      serviceName: "Youtube Premium",
+      password: "provider_test_password",
+    });
+
+    try {
+      const accounts = await warehouseService.listWarehouseAccounts();
+      const createdAccount = accounts.find((item) => Number(item.id) === Number(account.id));
+      const slot = createdAccount?.services[0];
+      assert.ok(slot, "Created warehouse account should have a service slot");
+
+      await warehouseService.updateWarehouseServiceSlot(slot.id, { provider_key: "tinyhost" });
+
+      const accountRoute = await productApiService.findRoutingProviderForInput({
+        slotKey: "otp",
+        input: accountEmail,
+      });
+      assert.deepEqual(accountRoute, {
+        provider_key: "tinyhost",
+        match_type: "DIRECT_SLOT_PROVIDER",
+        source: "WAREHOUSE_SLOT",
+      });
+
+      await db(TABLES.ACTIVATION_KEYS).insert({
+        [AK.KEY_CODE]: keyCode,
+        [AK.STATUS]: "ACTIVATED",
+        [AK.ACCOUNT_SLOT_ID]: slot.id,
+        [AK.ASSIGNED_ACCOUNT]: accountEmail,
+        [AK.CREATED_AT]: db.fn.now(),
+        [AK.UPDATED_AT]: db.fn.now(),
+      });
+
+      const keyRoute = await productApiService.findRoutingProviderForInput({
+        slotKey: "otp",
+        input: keyCode,
+      });
+      assert.deepEqual(keyRoute, accountRoute);
+    } finally {
+      await db(TABLES.ACTIVATION_KEYS).where(AK.KEY_CODE, keyCode).del();
+      await warehouseService.deleteWarehouseAccount(account.id);
+    }
   });
 });
