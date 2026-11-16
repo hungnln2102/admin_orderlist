@@ -8,10 +8,14 @@ test("monthly finance notification starts with profit reduced by all monthly obl
   const originalLoad = Module._load;
   const notifierPath = require.resolve("@/domains/notifications/telegram/dispatchers/financeNotifier");
   const messages = [];
+  const filters = [];
   const query = {
-    where: () => query,
+    where: (column, value) => {
+      filters.push([column, value]);
+      return query;
+    },
     sum: () => query,
-    first: async () => ({ total_balance: 0 }),
+    first: async () => ({ total_balance: 7251558 }),
   };
 
   Module._load = (request, parent, isMain) => {
@@ -46,7 +50,11 @@ test("monthly finance notification starts with profit reduced by all monthly obl
   try {
     delete require.cache[notifierPath];
     const { notifyFinanceMonthlyDelta } = require(notifierPath);
-    await notifyFinanceMonthlyDelta({ monthKey: "2026-12", context: "month opening" });
+    await notifyFinanceMonthlyDelta({
+      monthKey: "2026-12",
+      bankBalanceDelta: 300003,
+      context: "month opening",
+    });
 
     assert.equal(messages.length, 1);
     const message = messages[0].text;
@@ -54,6 +62,12 @@ test("monthly finance notification starts with profit reduced by all monthly obl
     assert.ok(message.includes("5.000.000"));
     assert.ok(message.includes("10.000.000"));
     assert.ok(message.includes("15.000.000"));
+    assert.ok(message.includes("6.951.555 --> 7.251.558 (+300.003)"));
+    assert.deepEqual(filters, [
+      ["account_type", "bank"],
+      ["account_scope", "SHOP"],
+      ["is_deleted", false],
+    ]);
   } finally {
     Module._load = originalLoad;
     delete require.cache[notifierPath];

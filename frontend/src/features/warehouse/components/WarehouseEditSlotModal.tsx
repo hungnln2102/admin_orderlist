@@ -13,8 +13,13 @@ import {
   FileText,
   Loader2,
   Sparkles,
+  Tag,
+  Clock,
+  Plus,
 } from "lucide-react";
 import {
+  ServiceNameCategoryItem,
+  SystemProduct,
   WarehouseAccountItem,
   WarehouseServiceSlot,
   WarehouseSlotEditFormData,
@@ -27,6 +32,8 @@ interface WarehouseEditSlotModalProps {
   open: boolean;
   account: WarehouseAccountItem | null;
   slot: WarehouseServiceSlot | null;
+  catalogItems?: ServiceNameCategoryItem[];
+  systemProducts?: SystemProduct[];
   isSubmitting?: boolean;
   onClose: () => void;
   onSubmit: (formData: WarehouseSlotEditFormData) => Promise<void>;
@@ -36,6 +43,8 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
   open,
   account,
   slot,
+  catalogItems = [],
+  systemProducts = [],
   isSubmitting = false,
   onClose,
   onSubmit,
@@ -52,8 +61,10 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     expiresAt: "",
     status: "AVAILABLE",
     note: "",
+    saveTagToCatalog: false,
   });
 
+  const [saveTagToCatalog, setSaveTagToCatalog] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [apiMapping, setApiMapping] = useState<{
@@ -95,10 +106,78 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
         expiresAt: initialExpires,
         status: slot.status || "AVAILABLE",
         note: slot.note || "",
+        saveTagToCatalog: false,
       });
+      setSaveTagToCatalog(false);
       setShowPassword(false);
     }
   }, [open, account, slot]);
+
+  // Tìm dịch vụ kho tương ứng trong catalog
+  const matchingCatalog = useMemo(() => {
+    if (!slot || !catalogItems?.length) return null;
+    const slotName = String(slot.display_name || slot.category || "").trim().toLowerCase();
+    return (
+      catalogItems.find(
+        (c) =>
+          c.name.trim().toLowerCase() === slotName ||
+          (slot.category && c.category.trim().toLowerCase() === slot.category.trim().toLowerCase())
+      ) || null
+    );
+  }, [slot, catalogItems]);
+
+  // Tìm sản phẩm hệ thống tương ứng nếu có
+  const matchingSystemProduct = useMemo(() => {
+    if (!matchingCatalog?.productId || !systemProducts?.length) return null;
+    return systemProducts.find((p) => p.id === matchingCatalog.productId) || null;
+  }, [matchingCatalog, systemProducts]);
+
+  // Tổng hợp danh sách tag có sẵn của sản phẩm này
+  const availableServiceTags = useMemo(() => {
+    const set = new Set<string>();
+
+    if (matchingCatalog?.availableTags) {
+      matchingCatalog.availableTags.forEach((t) => {
+        const trimmed = String(t || "").trim();
+        if (trimmed) set.add(trimmed);
+      });
+    }
+
+    if (matchingCatalog?.variants) {
+      matchingCatalog.variants.forEach((v) => {
+        const trimmed = String(v.tag || "").trim();
+        if (trimmed) set.add(trimmed);
+      });
+    }
+
+    if (matchingCatalog?.category) {
+      const trimmed = String(matchingCatalog.category || "").trim();
+      if (trimmed) set.add(trimmed);
+    }
+
+    if (matchingSystemProduct?.tags) {
+      matchingSystemProduct.tags.forEach((t) => {
+        const trimmed = String(t || "").trim();
+        if (trimmed) set.add(trimmed);
+      });
+    }
+
+    if (slot?.variant_tag) {
+      const trimmed = String(slot.variant_tag || "").trim();
+      if (trimmed) set.add(trimmed);
+    }
+
+    return Array.from(set);
+  }, [matchingCatalog, matchingSystemProduct, slot]);
+
+  // Kiểm tra tag đang gõ có phải là tag mới chưa từng có hay không
+  const trimmedCurrentTag = formData.variantTag.trim();
+  const isCustomNewTag = useMemo(() => {
+    if (!trimmedCurrentTag) return false;
+    return !availableServiceTags.some(
+      (t) => t.toLowerCase() === trimmedCurrentTag.toLowerCase()
+    );
+  }, [trimmedCurrentTag, availableServiceTags]);
 
   const availableOtpApis = useMemo(() => {
     if (!apiMapping || !slot) return [];
@@ -150,22 +229,39 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     setTimeout(() => setCopiedField(null), 1500);
   };
 
+  const handleAddDays = (days: number) => {
+    const baseDate = formData.expiresAt ? new Date(formData.expiresAt) : new Date();
+    const d = isNaN(baseDate.getTime()) ? new Date() : baseDate;
+    d.setDate(d.getDate() + days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    setFormData((prev) => ({ ...prev, expiresAt: `${yyyy}-${mm}-${dd}` }));
+  };
+
+  const handleClearExpiry = () => {
+    setFormData((prev) => ({ ...prev, expiresAt: "" }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit(formData);
+    await onSubmit({
+      ...formData,
+      saveTagToCatalog,
+    });
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-3xl bg-slate-900/95 border border-amber-500/20 shadow-2xl shadow-amber-500/10 p-5 sm:p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 text-slate-200">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+      <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl bg-slate-900/95 border border-amber-500/25 shadow-2xl shadow-amber-500/10 p-5 sm:p-7 space-y-5 animate-in fade-in zoom-in-95 duration-150 text-slate-200">
         {/* MODAL HEADER */}
         <div className="flex items-start justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 shadow-inner">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 shadow-inner shrink-0">
               <Pencil className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                   Chỉnh Sửa Dịch Vụ Kho
                 </h3>
@@ -175,8 +271,8 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                   {formData.serviceName}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[280px] sm:max-w-sm">
-                Tài khoản: {account.account}
+              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-[280px] sm:max-w-md">
+                Tài khoản gốc: <span className="text-slate-200 font-semibold">{account.account}</span>
               </p>
             </div>
           </div>
@@ -184,7 +280,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,90 +288,22 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
 
         {/* MODAL FORM */}
         <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
-          {/* EMAIL TÀI KHOẢN MẸ */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Email Tài Khoản Kho (Username)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.accountUsername}
-              onChange={(e) =>
-                setFormData({ ...formData, accountUsername: e.target.value })
-              }
-              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
-              placeholder="ví dụ: user@gmail.com"
-            />
-          </div>
-
-          {/* MẬT KHẨU */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                <span>Mật Khẩu Dịch Vụ</span>
-              </span>
-              {formData.password && (
-                <button
-                  type="button"
-                  onClick={() => handleCopy(formData.password, "pass")}
-                  className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  {copiedField === "pass" ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">Đã copy</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Sao chép</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                placeholder="Nhập mật khẩu..."
-                className="w-full pl-3.5 pr-10 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* 2FA SECRET, EMAIL BACKUP & LOẠI OTP (3 COLS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          {/* KHỐI 1: THÔNG TIN ĐĂNG NHẬP CƠ BẢN */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* EMAIL TÀI KHOẢN MẸ */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Mã 2FA Secret Key</span>
+                  <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Email Tài Khoản Kho (Username)</span>
                 </span>
-                {formData.twoFa && (
+                {formData.accountUsername && (
                   <button
                     type="button"
-                    onClick={() => handleCopy(formData.twoFa, "2fa")}
+                    onClick={() => handleCopy(formData.accountUsername, "user")}
                     className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    {copiedField === "2fa" ? (
+                    {copiedField === "user" ? (
                       <Check className="w-3 h-3 text-emerald-400" />
                     ) : (
                       <Copy className="w-3 h-3" />
@@ -285,106 +313,417 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
               </label>
               <input
                 type="text"
+                value={formData.accountUsername}
+                onChange={(e) =>
+                  setFormData({ ...formData, accountUsername: e.target.value })
+                }
+                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                placeholder="ví dụ: user@gmail.com"
+              />
+            </div>
+
+            {/* MẬT KHẨU */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Mật Khẩu Dịch Vụ</span>
+                </span>
+                {formData.password && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(formData.password, "pass")}
+                    className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    {copiedField === "pass" ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">Đã copy</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Sao chép</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  placeholder="Nhập mật khẩu dịch vụ..."
+                  className="w-full pl-3.5 pr-10 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* KHỐI 2: BẢO MẬT 2FA & CỔNG ĐIỀU PHỐI OTP */}
+          <div className="rounded-2xl border border-cyan-500/25 bg-slate-950/60 p-4 space-y-3.5 shadow-inner">
+            {/* Header của khối Bảo Mật */}
+            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-bold text-cyan-200 tracking-wide uppercase">
+                  Bảo Mật 2FA & Cổng Điều Phối OTP
+                </span>
+              </div>
+              {availableOtpApis.length > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-medium">
+                  {availableOtpApis.length} cổng khả dụng
+                </span>
+              )}
+            </div>
+
+            {/* Hàng 1 của khối: Cổng OTP & Email Backup (2 cột cân đối) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* CỔNG / LOẠI OTP */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Cổng Giải Mã OTP (Provider)</span>
+                  </span>
+                </label>
+                <select
+                  value={formData.providerKey || formData.otpType || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, providerKey: e.target.value, otpType: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer"
+                >
+                  <option value="">-- Mặc định (Không gán cổng OTP) --</option>
+                  {combinedProviders.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* EMAIL BACKUP KHÔI PHỤC */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Email Backup Khôi Phục</span>
+                  </span>
+                  {formData.backupEmail && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(formData.backupEmail, "backup")}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      {copiedField === "backup" ? (
+                        <Check className="w-3 h-3 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </button>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={formData.backupEmail}
+                  onChange={(e) =>
+                    setFormData({ ...formData, backupEmail: e.target.value })
+                  }
+                  placeholder="ví dụ: recovery@domain.com"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Hàng 2 của khối: Mã 2FA Secret Key (Full Width Thoáng Đãng) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Mã 2FA Secret Key (Base32)</span>
+                </span>
+                {formData.twoFa && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(formData.twoFa, "2fa")}
+                    className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    {copiedField === "2fa" ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">Đã copy</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Sao chép mã 2FA</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </label>
+              <input
+                type="text"
                 value={formData.twoFa}
                 onChange={(e) =>
-                  setFormData({ ...formData, twoFa: e.target.value })
+                  setFormData({ ...formData, twoFa: e.target.value.replace(/\s+/g, "") })
                 }
                 placeholder="ví dụ: JBSWY3DPEHPK3PXP"
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
               />
               {formData.twoFa && (
-                <div className="mt-1 text-[10px] font-mono text-cyan-400/90 tracking-wider">
-                  {format2FAChunks(formData.twoFa)}
+                <div className="mt-2 flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/90 border border-cyan-500/20">
+                  <div className="flex items-center gap-2 font-mono text-xs text-cyan-300 tracking-wider overflow-x-auto py-0.5">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-normal shrink-0">
+                      Định dạng khối:
+                    </span>
+                    <span className="font-semibold select-all">
+                      {format2FAChunks(formData.twoFa)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* KHỐI 3: TRẠNG THÁI & HẠN DÙNG */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* TRẠNG THÁI SLOT */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      formData.status === "AVAILABLE"
+                        ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
+                        : formData.status === "IN_USE"
+                        ? "bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]"
+                        : formData.status === "EXPIRED"
+                        ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.5)]"
+                        : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"
+                    }`}
+                  />
+                  <span>Trạng Thái Slot</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      status: e.target.value as WarehouseSlotStatus,
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                >
+                  <option value="AVAILABLE">TỒN KHO (Sẵn sàng bán)</option>
+                  <option value="IN_USE">ĐANG SỬ DỤNG (Đã gán khách)</option>
+                  <option value="EXPIRED">HẾT HẠN (Cần gia hạn/thay thế)</option>
+                  <option value="RESERVED">GIỮ CHỖ (Đang xử lý)</option>
+                </select>
+              </div>
+
+              {/* NGÀY HẾT HẠN DỊCH VỤ */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Ngày Hết Hạn Dịch Vụ</span>
+                  </label>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => handleAddDays(30)}
+                      className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 cursor-pointer transition-all active:scale-95"
+                    >
+                      +30 ngày
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddDays(90)}
+                      className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 cursor-pointer transition-all active:scale-95"
+                    >
+                      +90 ngày
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddDays(365)}
+                      className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 cursor-pointer transition-all active:scale-95"
+                    >
+                      +1 năm
+                    </button>
+                    {formData.expiresAt && (
+                      <button
+                        type="button"
+                        onClick={handleClearExpiry}
+                        className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-rose-300 hover:bg-slate-700 cursor-pointer transition-all active:scale-95"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  type="date"
+                  value={formData.expiresAt}
+                  onChange={(e) =>
+                    setFormData({ ...formData, expiresAt: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs focus:outline-none focus:border-purple-500 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* KHỐI 4: QUẢN LÝ TAG BIẾN THỂ GÓI & TỰ ĐỘNG TẠO TAG MỚI */}
+          <div className="rounded-2xl border border-amber-500/25 bg-slate-950/60 p-4 space-y-3.5 shadow-inner">
+            {/* Header của khối Tag */}
+            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                  <Tag className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-bold text-amber-200 tracking-wide uppercase">
+                  Tag Biến Thể Gói (Phân Loại Dịch Vụ)
+                </span>
+              </div>
+              {formData.variantTag && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                    [{formData.variantTag}]
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, variantTag: "" });
+                      setSaveTagToCatalog(false);
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors px-1.5 py-0.5 rounded hover:bg-rose-500/10"
+                    title="Gỡ tag riêng của slot để dùng tag mặc định"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Gỡ tag</span>
+                  </button>
                 </div>
               )}
             </div>
 
+            {/* Input điền hoặc tạo tag mới */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-blue-400" />
-                <span>Email Backup Khôi Phục</span>
-              </label>
-              <input
-                type="text"
-                value={formData.backupEmail}
-                onChange={(e) =>
-                  setFormData({ ...formData, backupEmail: e.target.value })
-                }
-                placeholder="ví dụ: recovery@domain.com"
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Cổng / Loại OTP</span>
-                </span>
-                {availableOtpApis.length > 0 && (
-                  <span className="text-[10px] text-cyan-400 font-mono">
-                    {availableOtpApis.length} cổng
-                  </span>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.variantTag}
+                  onChange={(e) =>
+                    setFormData({ ...formData, variantTag: e.target.value })
+                  }
+                  placeholder="Chọn tag có sẵn bên dưới hoặc gõ để tạo tag mới..."
+                  className="w-full pl-3.5 pr-20 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                {formData.variantTag && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, variantTag: "" });
+                      setSaveTagToCatalog(false);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 text-[10px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded cursor-pointer transition-colors"
+                  >
+                    Xóa trống
+                  </button>
                 )}
-              </label>
-              <select
-                value={formData.providerKey || formData.otpType || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, providerKey: e.target.value, otpType: e.target.value })
-                }
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition-colors cursor-pointer truncate"
-              >
-                <option value="">-- Mặc định / Không OTP --</option>
-                {combinedProviders.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+              </div>
             </div>
+
+            {/* Danh sách Tag có sẵn của sản phẩm này */}
+            {availableServiceTags.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1 font-medium text-slate-300">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    Tag có sẵn của sản phẩm này:
+                  </span>
+                  <span className="text-[10px] text-slate-500">(Bấm vào tag để chọn)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                  {availableServiceTags.map((tag) => {
+                    const isSelected =
+                      formData.variantTag.trim().toLowerCase() === tag.trim().toLowerCase();
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, variantTag: tag });
+                          setSaveTagToCatalog(false);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                          isSelected
+                            ? "bg-amber-500/25 border-amber-500 text-amber-200 shadow-sm shadow-amber-500/20 font-semibold"
+                            : "bg-slate-900/90 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600"
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 text-amber-400 shrink-0" />}
+                        <span>{tag}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Banner hiển thị khi tạo Tag mới */}
+            {isCustomNewTag && (
+              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-semibold text-amber-300">
+                      Tự động tạo tag mới:{" "}
+                      <span className="underline decoration-amber-400 font-bold font-mono">
+                        {formData.variantTag.trim()}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Tag này sẽ được gán cho slot này và tự động lưu vào danh mục biến thể sản phẩm trong hệ thống kho!
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 pt-1 border-t border-amber-500/20 text-xs text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={saveTagToCatalog}
+                    onChange={(e) => setSaveTagToCatalog(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-950 cursor-pointer"
+                  />
+                  <span>
+                    Đồng bộ đặt làm Tag phân loại mặc định cho dịch vụ{" "}
+                    <strong className="text-amber-300">{formData.serviceName}</strong> trong Danh Mục Kho
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
 
-          {/* NGÀY HẾT HẠN & TRẠNG THÁI (2 COLS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                <span>Ngày Hết Hạn Dịch Vụ</span>
-              </label>
-              <input
-                type="date"
-                value={formData.expiresAt}
-                onChange={(e) =>
-                  setFormData({ ...formData, expiresAt: e.target.value })
-                }
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs focus:outline-none focus:border-purple-500 transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span>Trạng Thái Slot</span>
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    status: e.target.value as WarehouseSlotStatus,
-                  })
-                }
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer"
-              >
-                <option value="AVAILABLE">TỒN KHO (Sẵn sàng bán)</option>
-                <option value="IN_USE">ĐANG SỬ DỤNG (Đã gán khách)</option>
-                <option value="EXPIRED">HẾT HẠN (Cần gia hạn/thay thế)</option>
-                <option value="RESERVED">GIỮ CHỖ (Đang xử lý)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* GHI CHÚ */}
+          {/* KHỐI 5: GHI CHÚ */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-slate-400" />
@@ -401,23 +740,13 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tag biến thể</label>
-            <input
-              type="text"
-              value={formData.variantTag}
-              onChange={(e) => setFormData({ ...formData, variantTag: e.target.value })}
-              placeholder="Ví dụ: 12M, Family, Premium"
-              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
-            />
-          </div>
           {/* ACTIONS FOOTER */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
+              className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50 active:scale-95"
             >
               Hủy Bỏ
             </button>

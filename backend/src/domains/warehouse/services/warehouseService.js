@@ -468,7 +468,7 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
   const numericId = Number(id);
   if (!numericId) throw new Error("ID dịch vụ không hợp lệ!");
 
-  const { name, category, loginUrl, productId } = payload || {};
+  const { name, category, loginUrl, productId, syncSlotsTag } = payload || {};
   const title = (name || "").trim();
   if (!title) throw new Error("Tên dịch vụ không được để trống!");
 
@@ -494,6 +494,17 @@ const createCatalogItem = async ({ name, category, productId = null, loginUrl = 
     }
 
     await trx(TABLES.PRODUCT_NAMES).where("id", numericId).update(updateData);
+
+    // Đồng bộ tag cho toàn bộ slot kho của dịch vụ này nếu Master tick chọn
+    if (syncSlotsTag && category !== undefined) {
+      const newSlotTag = category && String(category).trim() ? String(category).trim() : null;
+      await trx(TABLES.STOCK_SERVICES)
+        .where("name_id", numericId)
+        .update({
+          variant_tag: newSlotTag,
+          updated_at: now,
+        });
+    }
 
     const updated = await trx(`${TABLES.PRODUCT_NAMES} as pn`)
       .leftJoin(`${TABLES.PRODUCT} as p`, "p.id", "pn.product_id")
@@ -626,7 +637,10 @@ const renameCatalogTag = async ({ productId, oldTag, newTag }) => {
   return await withTransaction(async (trx) => {
     // 1. Cập nhật trong business.variant
     const vQuery = trx(TABLES.VARIANT)
-      .whereRaw("LOWER(TRIM(variant_name)) = ?", [oldName.toLowerCase()]);
+      .where(function () {
+        this.whereRaw("LOWER(TRIM(variant_name)) = ?", [oldName.toLowerCase()])
+          .orWhereRaw("LOWER(TRIM(variant_name)) LIKE ?", [`%${oldName.toLowerCase()}%`]);
+      });
     if (productId) {
       vQuery.andWhere("product_id", Number(productId));
     }
@@ -671,7 +685,10 @@ const deleteCatalogTag = async ({ productId, tag }) => {
   return await withTransaction(async (trx) => {
     // 1. Vô hiệu hóa trong business.variant (is_active = false)
     const vQuery = trx(TABLES.VARIANT)
-      .whereRaw("LOWER(TRIM(variant_name)) = ?", [targetTag.toLowerCase()]);
+      .where(function () {
+        this.whereRaw("LOWER(TRIM(variant_name)) = ?", [targetTag.toLowerCase()])
+          .orWhereRaw("LOWER(TRIM(variant_name)) LIKE ?", [`%${targetTag.toLowerCase()}%`]);
+      });
     if (productId) {
       vQuery.andWhere("product_id", Number(productId));
     }

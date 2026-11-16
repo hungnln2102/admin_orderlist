@@ -92,6 +92,7 @@ async function notifyFinanceMonthlyDelta({
     // 2. Tổng số dư bank shop hiện tại
     const bankRows = await db(TABLES.SHOP_BANK_ACCOUNTS)
       .where("account_type", "bank")
+      .where("account_scope", "SHOP")
       .where("is_deleted", false)
       .sum("balance as total_balance")
       .first();

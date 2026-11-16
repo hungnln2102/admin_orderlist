@@ -69,3 +69,60 @@
   - `WarehousePage.tsx`: Cập nhật state khởi tạo và reset form `accountForm` với trường `providerKey: ""`.
 - **Kiểm thử**:
   - `npx tsc --noEmit`: 0 lỗi biên dịch TypeScript (Pass 100%).
+
+## [22:18:00] Khắc phục lỗi `WarehouseController.getWarehouseAccounts` thiếu cột `provider_key`
+
+- **Phạm vi**: Đồng bộ schema development cho `warehouse.account_slots`; không thay đổi source runtime.
+- **Nguyên nhân gốc**: `backend/src/domains/warehouse/services/warehouseService.js` đã select `ss.provider_key`, đồng thời `backend/src/db/tables.js` đã khai báo `COLS.ACCOUNT_SLOTS.PROVIDER_KEY`, nhưng migration `backend/src/db/migrations/20261116000001_add_provider_key_to_account_slots.js` còn pending. PostgreSQL vì vậy trả `42703: column ss.provider_key does not exist`.
+- **Thao tác đã thực hiện**: Chạy riêng `npx.cmd knex migrate:up 20261116000001_add_provider_key_to_account_slots.js --knexfile knexfile.js` từ `backend/`; batch 25 hoàn tất migration này. Không chạy `migrate:latest` vì ba migration không liên quan vẫn pending.
+- **Xác minh đã chạy**:
+  - `npx.cmd knex migrate:list --knexfile knexfile.js`: migration `20261116000001_add_provider_key_to_account_slots.js` nằm trong 45 migration completed; chỉ còn 3 pending migration không thuộc phạm vi.
+  - Schema/service probe: `providerKeyExists=true`, `accountCount=59`, `slotCount=63`, `missingProviderKey=0`; `warehouseService.listWarehouseAccounts()` chạy thành công.
+  - `node --check` cho migration và `warehouseService.js`: đạt.
+  - `node --test tests/integration/warehouse.test.js`: các case liên quan list/update/add slot và routing provider đều đạt. Có một case ngoài phạm vi còn fail vì catalog `Youtube Premium` thiếu `login_url` trước khi mở browser; không liên quan `provider_key` và không sửa trong lần này.
+- **Trạng thái nghiệm thu**: Đã khắc phục lỗi `42703` của `getWarehouseAccounts` trên database development.
+
+
+## [22:38:00] Thiết kế lại giao diện Modal Chỉnh Sửa Dịch Vụ Kho (WarehouseEditSlotModal)
+
+- **Phạm vi tác động**: [WarehouseEditSlotModal.tsx](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseEditSlotModal.tsx)
+- **Vấn đề đã xử lý**:
+  - Giải quyết triệt để tình trạng hàng 3 cột (2FA Secret Key / Email Backup / Cổng OTP) bị chèn ép, co rúm và cắt cụt chữ (truncation) do modal bị hẹp `max-w-lg`.
+  - Khắc phục cấu trúc phẳng lì (flat layout), phân cấp thông tin trực quan và khoa học theo 4 khối chức năng:
+    1. 🔐 **Khối 1: Thông Tin Đăng Nhập Cơ Bản** (Email Username & Mật Khẩu với nút Ẩn/Hiện + Sao Chép nhanh).
+    2. 🛡️ **Khối 2: Bảo Mật 2FA & Cổng Điều Phối OTP** (Đóng khung card riêng biệt với nền sẫm viền cyan tinh tế; Cổng OTP & Email Backup xếp 2 cột thoáng đãng; Mã 2FA Secret Key chiếm trọn chiều ngang kèm nút sao chép và thanh định dạng khối 4 ký tự font monospace sắc nét).
+    3. ⏱️ **Khối 3: Trạng Thái, Hạn Dùng & Biến Thể** (Trạng thái Slot có chỉ báo chấm màu tương ứng; Tag Biến Thể đưa lên cạnh Trạng thái thay vì nằm lạc lõng dưới đáy; Ngày hết hạn tích hợp bộ nút bấm gia hạn nhanh: +30 ngày, +90 ngày, +1 năm, Xóa hạn).
+    4. 📝 **Khối 4: Ghi Chú Dịch Vụ** (Textarea toàn chiều rộng đặt cuối cùng trước nút Lưu).
+  - Tăng kích thước modal lên `max-w-2xl` giúp giao diện rộng rãi, sang trọng và chuẩn trải nghiệm người dùng cao cấp.
+- **Kiểm tra & Nghiệm thu**:
+  - TypeScript Check: `.\frontend\node_modules\.bin\tsc.cmd --noEmit --project frontend/tsconfig.json` đạt exit code 0 (Hoàn toàn không có lỗi kiểu dữ liệu).
+  - Giữ nguyên toàn bộ logic dữ liệu và interface `onSubmit(formData)`.
+- **Trạng thái nghiệm thu**: Hoàn thành 100% (Frontend Redesign Done).
+
+## [23:31:00] Đối soát số dư SHOP và chặn lẫn số dư PERSONAL trong thông báo Telegram
+
+- **Phạm vi**: Sửa cách tổng số dư tại `backend/src/domains/notifications/telegram/dispatchers/financeNotifier.js`; điều chỉnh trực tiếp số dư production của tài khoản `finance.financial_accounts.id = 2` theo số dư ngân hàng Master xác nhận.
+- **Nguyên nhân gốc**: Notifier chỉ lọc `account_type = bank` và `is_deleted = false`, nên cộng nhầm tài khoản `PERSONAL #1004` (4.544.929 VND) vào dòng `Số dư bank shop`. Từ 2026-11-14 14:56 +07, luồng personal reconciliation cập nhật tài khoản PERSONAL này nhưng không gửi Telegram, khiến các notification SHOP sau đó tăng ảo.
+- **Sửa code**: Bổ sung điều kiện `account_scope = SHOP` khi tổng `SHOP_BANK_ACCOUNTS`; bổ sung regression test bảo đảm số PERSONAL không thể lọt vào dòng số dư SHOP.
+- **Điều chỉnh dữ liệu production**: Receipt/ledger `+150.002` đã tự ghi nhận trước đó vào ledger #780, nên không cộng lần hai. Với số dư CSDL trước điều chỉnh 7.733.696 VND, cập nhật trực tiếp account #2 lên 9.811.696 VND theo xác nhận Master, không tạo receipt hoặc financial ledger 2.078.000. Ghi event audit #1104 `BALANCE_RECONCILIATION_DIRECT` trong cùng transaction, payload nêu rõ delta 2.078.000 và guard số dư cũ.
+- **Kiểm thử và hậu kiểm**: `node --test backend/tests/unit/financeNotifierMonthlyProfit.test.js` đạt 1/1; build backend từ worktree release tách biệt; restart riêng `admin_orderlist-backend`; container healthy; `/api/health` trả database connected; runtime xác nhận filter SHOP; tài khoản #2 có balance 9.811.696 VND; không có backend error mới sau restart.
+- **Trạng thái nghiệm thu**: Hoàn thành. Các thông báo biến động tiếp theo chỉ tổng tài khoản scope SHOP.
+
+
+## [23:52:00] Khắc phục triệt để cơ chế Đổi tên và Xóa Tag trong Catalog Kho Hàng (CatalogEditModal & warehouseService)
+
+- **Phạm vi tác động**:
+  - [frontend/src/features/warehouse/components/CatalogEditModal.tsx](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/CatalogEditModal.tsx)
+  - [frontend/src/pages/WarehousePage.tsx](file:///E:/Project/admin_store/admin_orderlist/frontend/src/pages/WarehousePage.tsx)
+  - [backend/src/domains/warehouse/services/warehouseService.js](file:///E:/Project/admin_store/admin_orderlist/backend/src/domains/warehouse/services/warehouseService.js)
+- **Vấn đề đã xử lý**:
+  - Loại bỏ hoàn toàn cơ chế ẩn giấu 2 nút (✓ và ✕) bị disabled/khóa khó hiểu khi chọn tag.
+  - Thêm nút xóa trực tiếp `✕` trên từng tag pill trong danh sách "Tag có sẵn của sản phẩm này". Khi bấm vào nút `✕`, hệ thống xác nhận và thực thi xóa vĩnh viễn tag khỏi toàn bộ kho hàng (`warehouse.account_slots`, `warehouse.product_names`, và `business.variant`).
+  - Thêm nút "Xóa trống" (Clear) nhanh trên ô input Tag để Master dễ dàng gỡ bỏ tag mặc định của dịch vụ.
+  - Thêm banner hành động Đổi Tên Tag nổi bật: khi chọn 1 tag và sửa chữ, hệ thống hiện nút "Đổi tên ngay" để cập nhật trên toàn hệ thống mà không gây nhầm lẫn với nút Lưu biểu mẫu.
+  - Bổ sung tùy chọn checkbox: *"Đồng bộ tag này cho toàn bộ X tài khoản kho hiện có"* khi cập nhật mẫu dịch vụ (`updateCatalogItem`) $\rightarrow$ cho phép đổi hàng loạt hoặc xóa trắng tag cho toàn bộ các slot trong kho thuộc dịch vụ này chỉ trong 1 click.
+- **Kiểm tra & Nghiệm thu**:
+  - TypeScript Check: `.\frontend\node_modules\.bin\tsc.cmd --noEmit` đạt exit code 0.
+  - Node syntax check: `node --check backend/src/domains/warehouse/services/warehouseService.js` đạt exit code 0.
+  - Test thực nghiệm: Thử nghiệm cập nhật tag kèm `syncSlotsTag = true` đồng bộ thành công cả 12 slot kho của Adobe.
+- **Trạng thái nghiệm thu**: Hoàn thành 100% (Full Stack Solved & Verified).

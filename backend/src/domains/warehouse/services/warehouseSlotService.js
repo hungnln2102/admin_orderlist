@@ -195,7 +195,41 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     if (backupEmail !== undefined) updateData.backup_email = backupEmail || null;
     if (twoFa !== undefined) updateData.two_fa = twoFa || null;
     if (note !== undefined) updateData.service_note = note || null;
-    if (variantTag !== undefined) updateData.variant_tag = String(variantTag || "").trim() || null;
+    if (variantTag !== undefined) {
+      const cleanTag = String(variantTag || "").trim();
+      updateData.variant_tag = cleanTag || null;
+
+      // Tự động ghi nhận tag mới vào hệ thống kho dịch vụ
+      if (cleanTag) {
+        const pn = await trx(TABLES.PRODUCT_NAMES).where("id", existingSlot.name_id).first();
+        if (pn && pn.product_id) {
+          const existingVariant = await trx(TABLES.VARIANT)
+            .where("product_id", pn.product_id)
+            .whereRaw("LOWER(TRIM(variant_name)) = ?", [cleanTag.toLowerCase()])
+            .first();
+
+          if (!existingVariant) {
+            await trx(TABLES.VARIANT).insert({
+              product_id: pn.product_id,
+              variant_name: cleanTag,
+              is_active: true,
+              created_at: now,
+              updated_at: now,
+            });
+          } else if (!existingVariant.is_active) {
+            await trx(TABLES.VARIANT)
+              .where("id", existingVariant.id)
+              .update({ is_active: true, updated_at: now });
+          }
+        }
+
+        if (payload?.saveTagToCatalog) {
+          await trx(TABLES.PRODUCT_NAMES)
+            .where("id", existingSlot.name_id)
+            .update({ category: cleanTag, updated_at: now });
+        }
+      }
+    }
     if (hasProviderKey) updateData[SS.PROVIDER_KEY] = String(rawProviderKey || "").trim() || null;
     if (status !== undefined) {
       updateData.status = status;
@@ -240,6 +274,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
         "ss.name_id",
         "ss." + SS.PROVIDER_KEY + " as provider_key",
         "pn.name as display_name",
+        "ss." + SS.VARIANT_TAG + " as variant_tag",
         "ss.password",
         "ss.backup_email",
         "ss.two_fa",

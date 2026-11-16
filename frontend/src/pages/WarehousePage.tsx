@@ -223,6 +223,7 @@ export const WarehousePage: React.FC = () => {
     category: string;
     loginUrl: string;
     productId: number | null;
+    syncSlotsTag?: boolean;
   }) => {
     setIsUpdatingCatalog(true);
     try {
@@ -764,6 +765,8 @@ export const WarehousePage: React.FC = () => {
         open={!!editingSlotData}
         account={editingSlotData?.account || null}
         slot={editingSlotData?.slot || null}
+        catalogItems={catalog}
+        systemProducts={systemProducts}
         isSubmitting={isUpdatingSlot}
         onClose={() => setEditingSlotData(null)}
         onSubmit={handleUpdateSlot}

@@ -36,6 +36,7 @@ export interface WarehouseSlotEditFormData {
   expiresAt: string;
   status: WarehouseSlotStatus;
   note: string;
+  saveTagToCatalog?: boolean;
 }
 
 export interface WarehouseAccountItem {
