@@ -1,12 +1,12 @@
 const { providerConfig, isProviderConfigured } = require("./providerConfig");
 
-const PROVIDER_KEYS = ["tinyhost", "ades", "fix_ades_status", "yuna_2fa", "yuna_mail", "vivarocky_household", "vivarocky_six_digit", "vivarocky_signin", "totp", "warehouse_2fa", "imap"];
+const PROVIDER_KEYS = ["tinyhost", "ades", "fix_ades_status", "yuna_2fa", "yuna_mail", "vivarocky_household", "vivarocky_six_digit", "vivarocky_signin", "totp", "warehouse_2fa", "package_warehouse", "imap"];
 
 function listProviderCatalog() {
   return PROVIDER_KEYS.map((key) => {
     const provider = providerConfig(key);
     const configured = isProviderConfigured(key);
-    return { key: provider.service_key, name: provider.service_name, category: provider.category, description: provider.description, input: key === "totp" ? "secret" : key === "yuna_2fa" || key === "warehouse_2fa" ? "email_or_order" : "email", enabled: configured, configured, status: configured ? "READY" : "NOT_CONFIGURED" };
+    return { key: provider.service_key, name: provider.service_name, category: provider.category, description: provider.description, input: key === "totp" ? "secret" : key === "package_warehouse" ? "activation_key" : key === "yuna_2fa" || key === "warehouse_2fa" ? "email_or_order" : "email", enabled: configured, configured, status: configured ? "READY" : "NOT_CONFIGURED" };
   });
 }
 

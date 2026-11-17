@@ -142,6 +142,20 @@ async function executeWarehouse2Fa(input) {
   return normalizeExecutionResult(await fetch2FaFromWarehouse(input));
 }
 
+async function executePackageWarehouseAccount(input) {
+  const activationKeyService = require("../../products/services/activationKeyService");
+  const result = await activationKeyService.activateKeyWithTransaction({ keyCode: input });
+  return normalizeExecutionResult({
+    raw_data: result,
+    extra_fields: [
+      { key: "account_username", label: "Tài khoản", value: result.account || "", path: "account" },
+      { key: "password", label: "Mật khẩu", value: result.password || "", path: "password" },
+      { key: "backup_email", label: "Email khôi phục", value: result.backup_email || "", path: "backup_email" },
+      { key: "expires_at", label: "Hết hạn", value: result.expired_at || "", path: "expired_at" },
+    ].filter((field) => field.value !== "" && field.value !== null && field.value !== undefined),
+  });
+}
+
 const OTP_EXECUTION_HANDLERS = Object.freeze({
   MAILBOX_REST: async (config, input) => normalizeExecutionResult(await fetchOtpFromTinyHost(input, { config, includeDetails: true })),
   AUTHENTICATED_OTP: async (config, input) => normalizeExecutionResult(await fetchOtpFromFixAdes(input, { config, includeDetails: true })),
@@ -157,6 +171,7 @@ const OTP_EXECUTION_HANDLERS = Object.freeze({
   })),
   INTERNAL_TOTP: async (_config, input) => executeInternalTotp(input),
   INTERNAL_WAREHOUSE_2FA: async (_config, input) => executeWarehouse2Fa(input),
+  PACKAGE_WAREHOUSE_ACCOUNT: async (_config, input) => executePackageWarehouseAccount(input),
   INTERNAL_IMAP: async (_config, input) => normalizeExecutionResult(await fetchOtpFromImap(input, { includeDetails: true })),
 });
 
@@ -176,7 +191,7 @@ async function probeOtpForEmail({ email, serviceKey, ...options }) {
   if (!serviceConfig) throw new Error(`OTP_PROVIDER_NOT_FOUND: no active OTP configuration for service_key '${serviceKey}'.`);
 
   const executionMode = String(serviceConfig.execution_mode || "").trim().toUpperCase();
-  const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_2FA"].includes(executionMode);
+  const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_2FA", "PACKAGE_WAREHOUSE_ACCOUNT"].includes(executionMode);
   if (!acceptsNonEmailInput && !queryInput.includes("@")) {
     throw new Error("Vui lòng cung cấp email hợp lệ (vd: user@domain.com).");
   }

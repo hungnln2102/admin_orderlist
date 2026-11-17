@@ -22,3 +22,12 @@
   - `.\frontend\node_modules\.bin\tsc.cmd --noEmit --project frontend/tsconfig.json`: Exit code 0 (Hoàn toàn không có lỗi TypeScript).
   - `node --check backend/src/domains/warehouse/services/warehouseSlotService.js`: Exit code 0 (Cú pháp backend chuẩn xác).
   - `node backend/tests/unit/warehouse_service.test.js`: 3/3 test suites pass.
+
+## [17/11/2026] Điều phối OTP theo NCC và Variant
+
+- **Phạm vi**: Thay cấu hình `Ô input + Sản phẩm + NCC + Provider + Priority` bằng `Ô input + Provider của ô + NCC + Variant`; chỉ ô input TOTP (`two_factor_totp`) là cổng dùng chung.
+- **Thay đổi**: Modal lấy toàn bộ provider theo `assigned_services` của ô input đã chọn, tải variant NCC từ `business.supplier_cost`, chip variant có nút `X`, và bảng rule gồm `STT`, `Provider`, `NCC`, `Variant`, `On/Off`. Adobe, Netflix, GPT không bị lọc provider theo tên/category; chỉ `two_factor_totp` khóa điều phối NCC/variant. Alias legacy `fix_ades` được chuẩn hóa thành `ades` ở frontend và provider runtime, nên dropdown `adobe_otp` hiển thị đủ Ades-otp và TinyHost. Thêm provider nội bộ `package_warehouse` để cấp/tra cứu account từ mã key và dùng lại transaction đã cập nhật `order_list.slot`; migration `20261117000002` chèn provider này làm lựa chọn đầu tiên của `gpt_account` đang lưu.
+- **Runtime**: `findRoutingProviderForInput` ưu tiên rule khớp chính xác NCC/variant, sau đó rule legacy theo sản phẩm, rồi direct provider của slot để không mất cấu hình cũ.
+- **Database**: Thêm migration `backend/src/db/migrations/20261117000001_add_variant_to_portal_slot_routing_rules.js`; chưa chạy migration trên database nào trong task này.
+- **Kiểm tra**: `npm.cmd --prefix frontend run build` pass; smoke test provider và dispatcher `package_warehouse` pass; kiểm tra cú pháp Node và `git diff --check` pass. Lệnh `node --test backend/tests/unit/otpProviderService.test.js backend/tests/unit/activationKeyService.test.js` đã in tất cả assertion pass, gồm test mới, nhưng worker không tự thoát do handle nền nên được dừng sau khi đã có kết quả.
+- **Điều kiện nghiệm thu còn lại**: Cần chạy migration ở database được chỉ định và smoke test thao tác lưu/tắt/mở rule với dữ liệu NCC-variant thật.

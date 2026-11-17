@@ -171,7 +171,7 @@ router.get("/product-apis", productApiController.list);
 router.get("/product-apis/rules", productApiController.listRules);
 
 // POST /api/system/product-apis/rules - Tạo mới quy tắc định tuyến
-router.post("/product-apis/rules", productApiController.createRule);
+router.post("/product-apis/rules/variants", productApiController.createRule);
 
 // PUT /api/system/product-apis/rules/:id - Cập nhật quy tắc định tuyến
 router.put("/product-apis/rules/:id", productApiController.updateRule);

@@ -67,14 +67,13 @@ async function getMapping(req, res) {
 
 async function listRules(req, res) {
   try {
-    const { rules, suppliers } = await productApiService.listRoutingRules();
-    res.json({ success: true, rules, suppliers });
+    const data = await productApiService.listRoutingRules();
+    res.json({ success: true, ...data });
   } catch (error) {
     console.error("[ProductApi Controller] Lỗi listRoutingRules:", error);
     res.status(500).json({ success: false, error: getClientErrorMessage(error, "Không thể tải danh sách quy tắc điều phối.") });
   }
 }
-
 async function createRule(req, res) {
   try {
     const result = await productApiService.createRoutingRule(req.body || {});

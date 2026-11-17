@@ -23,10 +23,7 @@ import {
   Bot,
   Cloud,
   Sliders,
-  ArrowRight,
   Building2,
-  Terminal,
-  Pencil,
   Zap,
   Layers,
 } from "lucide-react";
@@ -35,6 +32,7 @@ import type {
   PortalSlotItem,
   PortalSlotRoutingRule,
   SupplierOption,
+  SupplierVariantOption,
 } from "@/features/external-api/types";
 import type { Provider } from "@/features/external-api/hooks/useExternalApiConfig";
 import { useNotification } from "@/shared/context/NotificationContext";
@@ -54,9 +52,9 @@ interface ProductApiMappingTabProps {
   slots?: PortalSlotItem[];
   routingRules?: PortalSlotRoutingRule[];
   suppliers?: SupplierOption[];
+  supplierVariants?: SupplierVariantOption[];
   onCreateRoutingRule?: (data: any) => Promise<boolean>;
   onUpdateRoutingRule?: (id: number, data: any) => Promise<boolean>;
-  onDeleteRoutingRule?: (id: number) => Promise<boolean>;
   onToggleRoutingRuleActive?: (id: number, currentActive: boolean) => Promise<boolean>;
 }
 
@@ -74,16 +72,16 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
   slots = [],
   routingRules = [],
   suppliers = [],
+  supplierVariants = [],
   onCreateRoutingRule,
   onUpdateRoutingRule,
-  onDeleteRoutingRule,
   onToggleRoutingRuleActive,
 }) => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [expandedProductIds, setExpandedProductIds] = useState<Record<number, boolean>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PortalSlotRoutingRule | null>(null);
-  const [showRoutingRules, setShowRoutingRules] = useState(true);
+  const [showRoutingRules] = useState(true);
 
   const notification = useNotification();
 
@@ -95,18 +93,6 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
       ...prev,
       [productId]: !prev[productId],
     }));
-  };
-
-  const handleDeleteRule = (rule: PortalSlotRoutingRule) => {
-    notification.confirm({
-      title: "Xác Nhận Xóa Quy Tắc",
-      message: `Bạn có chắc chắn muốn xóa quy tắc liên kết #${rule.id} (${rule.product_name} - ${rule.supplier_name}) không? Thao tác này sẽ gỡ bỏ định tuyến tự động cho sản phẩm này.`,
-      confirmText: "Xóa Ngay",
-      cancelText: "Hủy Bỏ",
-      onConfirm: () => {
-        void onDeleteRoutingRule?.(rule.id);
-      },
-    });
   };
 
   const handleRemoveProvider = (mappingId: number, serviceName: string, packageName: string) => {
@@ -263,188 +249,51 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* SECTION 1: QUY TẮC ĐIỀU PHỐI THEO Ô INPUT & NCC (ROUTING RULES) */}
-      {/* ========================================================= */}
+      {/* ROUTING RULES: INPUT -> PROVIDER -> SUPPLIER -> VARIANT */}
       <div className="rounded-2xl border border-slate-800/90 bg-slate-900/60 backdrop-blur-xl overflow-hidden transition-all">
-        {/* Section Header */}
         <div className="p-4 sm:px-5 flex items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-950/40">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-              <Zap className="w-4 h-4" />
-            </div>
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400"><Zap className="w-4 h-4" /></div>
             <div>
-              <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
-                Quy Tắc Định Tuyến Tự Động (Routing Rules)
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
-                  {routingRules.length} quy tắc
-                </span>
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                Đối chiếu đơn hàng của khách để gọi chính xác Provider theo Nhà Cung Cấp
-              </p>
+              <h3 className="font-bold text-sm text-slate-100">Điều Phối Provider Theo NCC & Variant</h3>
+              <p className="text-[11px] text-slate-400">Mỗi dòng là một variant: Ô input → Provider đã cấu hình → NCC → Variant</p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleOpenCreateModal}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Thêm mới</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowRoutingRules(!showRoutingRules)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 bg-slate-800/60 transition-colors cursor-pointer"
-              title={showRoutingRules ? "Thu gọn" : "Mở rộng"}
-            >
-              {showRoutingRules ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-          </div>
+          <button type="button" onClick={handleOpenCreateModal} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition-all flex items-center gap-1.5 cursor-pointer"><Plus className="w-3.5 h-3.5" /><span>Thêm liên kết</span></button>
         </div>
 
-        {/* Rules Grid */}
         {showRoutingRules && (
-          <div className="p-4 sm:p-5">
+          <div className="overflow-x-auto">
             {routingRules.length === 0 ? (
-              <div className="p-8 text-center rounded-xl border border-dashed border-slate-800 bg-slate-950/40 space-y-2">
+              <div className="p-8 text-center text-xs text-slate-400 space-y-3">
                 <Sliders className="w-8 h-8 text-slate-600 mx-auto" />
-                <p className="text-xs text-slate-400 font-medium">
-                  Chưa có quy tắc liên kết nào được tạo.
-                </p>
-                <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-                  Hãy bấm nút <strong className="text-cyan-300">&quot;Thêm mới&quot;</strong> để gán Ô Input trên Web với Sản Phẩm, NCC và Provider tương ứng.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleOpenCreateModal}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Tạo quy tắc đầu tiên
-                </button>
+                <p>Chưa có liên kết provider theo NCC và variant.</p>
+                <button type="button" onClick={handleOpenCreateModal} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 text-slate-950"><Plus className="w-3.5 h-3.5" />Tạo liên kết đầu tiên</button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-                {routingRules.map((rule) => {
-                  const matchedSlot = slots.find((s) => s.slot_key === rule.slot_key);
-                  const slotLabel = matchedSlot ? matchedSlot.name : rule.slot_key;
-                  const catMeta = getCategoryMeta(rule.provider_category || rule.product_category || "");
-                  const CatIcon = catMeta.icon;
-
-                  return (
-                    <div
-                      key={rule.id}
-                      className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
-                        rule.is_active
-                          ? "bg-slate-950/80 border-slate-800 hover:border-slate-700 shadow-md"
-                          : "bg-slate-950/40 border-slate-800/40 opacity-60"
-                      }`}
-                    >
-                      {/* Top Row: Flow Chain */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60">
-                              #{rule.id}
-                            </span>
-                            <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
-                              <Terminal className="w-3 h-3" />
-                              {slotLabel}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                              Ưu tiên: <strong>#{rule.priority}</strong>
-                            </span>
-                            {/* Toggle Active */}
-                            <label className="relative inline-flex items-center cursor-pointer" title={rule.is_active ? "Đang bật" : "Đang tắt"}>
-                              <input
-                                type="checkbox"
-                                checked={rule.is_active}
-                                onChange={() => onToggleRoutingRuleActive && onToggleRoutingRuleActive(rule.id, rule.is_active)}
-                                className="sr-only peer"
-                              />
-                              <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-cyan-500" />
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Visual Mapping Arrow Flow */}
-                        <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80 flex items-center justify-between gap-2 text-xs flex-wrap">
-                          {/* Left: Product & Supplier */}
-                          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold truncate">
-                              <Layers className="w-3 h-3" />
-                              {rule.product_name}
-                            </span>
-                            <span className="text-slate-500 font-bold">+</span>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
-                              rule.supplier_id
-                                ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                                : "bg-slate-800 text-slate-400 border-slate-700/60"
-                            }`}>
-                              <Building2 className="w-3 h-3" />
-                              {rule.supplier_name || "Mọi NCC"}
-                            </span>
-                          </div>
-
-                          {/* Right: Target Provider */}
-                          <div className="flex items-center gap-1.5 font-bold text-emerald-300">
-                            <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                              <CatIcon className="w-3 h-3" />
-                              {rule.provider_name || rule.provider_key}
-                            </span>
-                          </div>
-                        </div>
-
-                        {rule.note && (
-                          <p className="text-[11px] text-slate-400 italic">
-                            &quot;{rule.note}&quot;
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Bottom Row: Actions */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs">
-                        <span className="text-[10px] text-slate-500">
-                          {rule.is_active ? "Đang có hiệu lực trên Portal" : "Tạm dừng áp dụng"}
-                        </span>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(rule)}
-                            className="p-1 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer"
-                            title="Sửa quy tắc"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRule(rule)}
-                            className="p-1 rounded-md text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                            title="Xóa quy tắc"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <table className="w-full min-w-[720px] text-left text-xs">
+                <thead className="bg-slate-950/70 text-slate-400 border-b border-slate-800">
+                  <tr><th className="px-4 py-3 font-semibold w-16">STT</th><th className="px-4 py-3 font-semibold">Provider</th><th className="px-4 py-3 font-semibold">NCC</th><th className="px-4 py-3 font-semibold">Variant</th><th className="px-4 py-3 font-semibold text-right">Thao tác</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {routingRules.map((rule, index) => {
+                    const slotLabel = slots.find((slot) => slot.slot_key === rule.slot_key)?.name || rule.slot_key;
+                    return (
+                      <tr key={rule.id} className={rule.is_active ? "hover:bg-slate-800/30" : "opacity-50 hover:bg-slate-800/20"}>
+                        <td className="px-4 py-3 text-slate-500 font-mono">{index + 1}</td>
+                        <td className="px-4 py-3"><button type="button" onClick={() => handleOpenEditModal(rule)} title={`Sửa liên kết của ${slotLabel}`} className="text-left text-cyan-300 hover:text-cyan-100 font-semibold">{rule.provider_name || rule.provider_key}<span className="block mt-0.5 text-[10px] font-normal text-slate-500">{slotLabel}</span></button></td>
+                        <td className="px-4 py-3 text-amber-200"><span className="inline-flex items-center gap-1"><Building2 className="w-3 h-3" />{rule.supplier_name}</span></td>
+                        <td className="px-4 py-3"><button type="button" onClick={() => handleOpenEditModal(rule)} className="inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-100 hover:bg-cyan-500/20"><Layers className="w-3 h-3" />{rule.variant_display_name}</button></td>
+                        <td className="px-4 py-3 text-right"><label className="inline-flex items-center gap-2 cursor-pointer"><span className={rule.is_active ? "text-emerald-300" : "text-slate-500"}>{rule.is_active ? "On" : "Off"}</span><input type="checkbox" checked={rule.is_active} onChange={() => void onToggleRoutingRuleActive?.(rule.id, rule.is_active)} className="h-4 w-4 accent-cyan-400" /></label></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         )}
       </div>
-
-      {/* ========================================================= */}
       {/* SECTION 2: DANH MỤC SẢN PHẨM KHO HÀNG & CỔNG PROVIDER GÁN */}
       {/* ========================================================= */}
 
@@ -567,11 +416,7 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
               const key = api.provider_key || api.service_key;
               return !assignedKeys.has(key);
             });
-
-            // Lấy các quy tắc điều phối riêng của sản phẩm này
-            const productRules = routingRules.filter((r) => r.product_name_id === product.id);
-
-            return (
+return (
               <div
                 key={product.id}
                 className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border bg-slate-900/65 backdrop-blur-xl transition-all flex flex-col justify-between gap-4 ${brand.cardBorder}`}
@@ -597,13 +442,7 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
                       <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 shrink-0">
                         Kho #{product.id}
                       </span>
-                      {productRules.length > 0 && (
-                        <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
-                          <Zap className="w-2.5 h-2.5" />
-                          {productRules.length} quy tắc điều phối
-                        </span>
-                      )}
-                    </div>
+</div>
                   </div>
 
                   {/* Add Provider Dropdown */}
@@ -846,8 +685,9 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleModalSubmit}
         editingRule={editingRule}
+        routingRules={routingRules}
         slots={slots}
-        products={products}
+        supplierVariants={supplierVariants}
         suppliers={suppliers}
         providers={providers}
         availableApis={availableApis}

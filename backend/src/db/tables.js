@@ -657,6 +657,7 @@ const COLS = {
     SLOT_KEY: "slot_key",
     PRODUCT_NAME_ID: "product_name_id",
     SUPPLIER_ID: "supplier_id",
+    VARIANT_ID: "variant_id",
     PROVIDER_KEY: "provider_key",
     PRIORITY: "priority",
     IS_ACTIVE: "is_active",

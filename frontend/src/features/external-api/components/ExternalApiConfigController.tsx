@@ -46,6 +46,7 @@ export const ExternalApiConfigController: React.FC = () => {
 
     routingRules,
     suppliers,
+    supplierVariants,
     createRoutingRule,
     updateRoutingRule,
     deleteRoutingRule,
@@ -180,9 +181,9 @@ export const ExternalApiConfigController: React.FC = () => {
             slots={slots}
             routingRules={routingRules}
             suppliers={suppliers}
+            supplierVariants={supplierVariants}
             onCreateRoutingRule={createRoutingRule}
             onUpdateRoutingRule={updateRoutingRule}
-            onDeleteRoutingRule={deleteRoutingRule}
             onToggleRoutingRuleActive={toggleRoutingRuleActive}
           />
         )}

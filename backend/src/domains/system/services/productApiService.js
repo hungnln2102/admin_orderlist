@@ -8,6 +8,7 @@ const V = COLS.VARIANT;
 const SS = COLS.ACCOUNT_SLOTS;
 const RR = COLS.PORTAL_SLOT_ROUTING_RULES;
 const SUP = COLS.SUPPLIER;
+const SC = COLS.SUPPLIER_COST;
 const ORD = COLS.ORDER_LIST;
 const AK = COLS.ACTIVATION_KEYS;
 
@@ -448,149 +449,165 @@ async function getApisByProductMapping() {
 // ==========================================
 
 async function listRoutingRules() {
-  const [rules, suppliers] = await Promise.all([
+  const [rules, suppliers, supplierVariants] = await Promise.all([
     db(TABLES.PORTAL_SLOT_ROUTING_RULES + " as r")
       .leftJoin(TABLES.PRODUCT_NAMES + " as pn", "pn." + PN.ID, "r." + RR.PRODUCT_NAME_ID)
       .leftJoin(TABLES.SUPPLIER + " as s", "s." + SUP.ID, "r." + RR.SUPPLIER_ID)
+      .leftJoin(TABLES.VARIANT + " as v", "v." + V.ID, "r." + RR.VARIANT_ID)
       .select(
         "r." + RR.ID + " as id",
         "r." + RR.SLOT_KEY + " as slot_key",
         "r." + RR.PRODUCT_NAME_ID + " as product_name_id",
         "r." + RR.SUPPLIER_ID + " as supplier_id",
+        "r." + RR.VARIANT_ID + " as variant_id",
         "r." + RR.PROVIDER_KEY + " as provider_key",
-        "r." + RR.PRIORITY + " as priority",
         "r." + RR.IS_ACTIVE + " as is_active",
-        "r." + RR.NOTE + " as note",
         "r." + RR.CREATED_AT + " as created_at",
         "r." + RR.UPDATED_AT + " as updated_at",
         "pn." + PN.NAME + " as product_name",
-        "pn." + PN.CATEGORY + " as product_category",
-        "s." + SUP.SUPPLIER_NAME + " as supplier_name"
+        "s." + SUP.SUPPLIER_NAME + " as supplier_name",
+        "v." + V.VARIANT_NAME + " as variant_name",
+        "v." + V.DISPLAY_NAME + " as variant_display_name"
       )
-      .orderBy("r." + RR.PRODUCT_NAME_ID, "asc")
-      .orderBy("r." + RR.PRIORITY, "asc")
+      .whereNotNull("r." + RR.VARIANT_ID)
       .orderBy("r." + RR.ID, "asc"),
     db(TABLES.SUPPLIER)
-      .select(
-        SUP.ID + " as id",
-        SUP.SUPPLIER_NAME + " as supplier_name",
-        SUP.ACTIVE_SUPPLY + " as active_supply"
-      )
+      .select(SUP.ID + " as id", SUP.SUPPLIER_NAME + " as supplier_name")
       .where(SUP.ACTIVE_SUPPLY, true)
-      .orderBy(SUP.SUPPLIER_NAME, "asc")
-      .catch((err) => {
-        console.warn("[listRoutingRules] Không thể tải suppliers:", err.message);
-        return [];
-      }),
+      .orderBy(SUP.SUPPLIER_NAME, "asc"),
+    db(TABLES.SUPPLIER_COST + " as sc")
+      .join(TABLES.VARIANT + " as v", "v." + V.ID, "sc." + SC.VARIANT_ID)
+      .join(TABLES.SUPPLIER + " as s", "s." + SUP.ID, "sc." + SC.SUPPLIER_ID)
+      .where("s." + SUP.ACTIVE_SUPPLY, true)
+      .where("v." + V.IS_ACTIVE, true)
+      .select(
+        "sc." + SC.SUPPLIER_ID + " as supplier_id",
+        "v." + V.ID + " as variant_id",
+        "v." + V.PRODUCT_ID + " as product_id",
+        "v." + V.VARIANT_NAME + " as variant_name",
+        "v." + V.DISPLAY_NAME + " as variant_display_name"
+      )
+      .orderBy("v." + V.DISPLAY_NAME, "asc"),
   ]);
 
-  const mappedRules = rules.map((r) => {
-    const provider = providerDetails(r.provider_key) || {
-      service_key: r.provider_key,
-      service_name: r.provider_key,
-      category: "OTP",
-    };
-    return {
-      id: Number(r.id),
-      slot_key: r.slot_key,
-      product_name_id: Number(r.product_name_id),
-      product_name: r.product_name || `Kho #${r.product_name_id}`,
-      product_category: r.product_category || "",
-      supplier_id: r.supplier_id ? Number(r.supplier_id) : null,
-      supplier_name: r.supplier_name || "Mọi NCC (Mặc định)",
-      provider_key: r.provider_key,
-      provider_name: provider.service_name,
-      provider_category: provider.category,
-      priority: Number(r.priority || 1),
-      is_active: Boolean(r.is_active),
-      note: r.note || "",
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-    };
-  });
-
   return {
-    rules: mappedRules,
-    suppliers: (suppliers || []).map((s) => ({
-      id: Number(s.id),
-      supplier_name: s.supplier_name || `NCC #${s.id}`,
+    rules: rules.map((rule) => {
+      const provider = providerDetails(rule.provider_key) || {
+        service_key: rule.provider_key,
+        service_name: rule.provider_key,
+        category: "OTP",
+      };
+      return {
+        id: Number(rule.id),
+        slot_key: rule.slot_key,
+        supplier_id: Number(rule.supplier_id),
+        supplier_name: rule.supplier_name || `NCC #${rule.supplier_id}`,
+        variant_id: Number(rule.variant_id),
+        variant_name: rule.variant_name || "",
+        variant_display_name: rule.variant_display_name || rule.variant_name || `Variant #${rule.variant_id}`,
+        provider_key: rule.provider_key,
+        provider_name: provider.service_name,
+        provider_category: provider.category,
+        is_active: Boolean(rule.is_active),
+        created_at: rule.created_at,
+        updated_at: rule.updated_at,
+      };
+    }),
+    suppliers: suppliers.map((supplier) => ({
+      id: Number(supplier.id),
+      supplier_name: supplier.supplier_name || `NCC #${supplier.id}`,
+    })),
+    supplierVariants: supplierVariants.map((variant) => ({
+      supplier_id: Number(variant.supplier_id),
+      variant_id: Number(variant.variant_id),
+      product_id: Number(variant.product_id),
+      variant_name: variant.variant_name || "",
+      variant_display_name: variant.variant_display_name || variant.variant_name || `Variant #${variant.variant_id}`,
     })),
   };
 }
 
-async function createRoutingRule({ slotKey, productNameId, supplierId, providerKey, priority = 1, isActive = true, note = "" }) {
+async function saveRoutingRuleVariants({ slotKey, supplierId, providerKey, variantIds, isActive = true }) {
   const cleanSlotKey = String(slotKey || "").trim();
-  const prodId = Number(productNameId);
-  const suppId = supplierId ? Number(supplierId) : null;
+  const suppId = Number(supplierId);
   const provKey = String(providerKey || "").trim();
+  const uniqueVariantIds = [...new Set((Array.isArray(variantIds) ? variantIds : []).map(Number))]
+    .filter((id) => Number.isInteger(id) && id > 0);
 
   if (!cleanSlotKey) throw new Error("Vui lòng chọn Ô Input trên Web.");
-  if (!Number.isInteger(prodId) || prodId <= 0) throw new Error("Vui lòng chọn Sản phẩm dịch vụ kho hàng.");
+  if (!Number.isInteger(suppId) || suppId <= 0) throw new Error("Vui lòng chọn Nhà Cung Cấp.");
   if (!provKey) throw new Error("Vui lòng chọn Cổng Provider cần gán.");
+  if (uniqueVariantIds.length === 0) throw new Error("Vui lòng chọn ít nhất một variant cho NCC.");
+  if (!getProviderConfig(provKey)) throw new Error("Provider đã chọn không tồn tại hoặc đã bị vô hiệu hóa.");
 
   return withTransaction(async (trx) => {
-    const existingQuery = trx(TABLES.PORTAL_SLOT_ROUTING_RULES).where({
-      [RR.SLOT_KEY]: cleanSlotKey,
-      [RR.PRODUCT_NAME_ID]: prodId,
-      [RR.PROVIDER_KEY]: provKey,
-    });
-    if (suppId) {
-      existingQuery.where(RR.SUPPLIER_ID, suppId);
-    } else {
-      existingQuery.whereNull(RR.SUPPLIER_ID);
-    }
-    const existing = await existingQuery.first();
-
-    if (existing) {
-      const [updated] = await trx(TABLES.PORTAL_SLOT_ROUTING_RULES)
-        .where(RR.ID, existing[RR.ID])
-        .update({
-          [RR.PRIORITY]: Number(priority) || 1,
-          [RR.IS_ACTIVE]: isActive !== false,
-          [RR.NOTE]: String(note || ""),
-          [RR.UPDATED_AT]: trx.fn.now(),
-        })
-        .returning("*");
-      return { success: true, rule: updated, message: "Đã cập nhật quy tắc liên kết ô input & NCC." };
+    const validVariants = await trx(TABLES.SUPPLIER_COST + " as sc")
+      .join(TABLES.VARIANT + " as v", "v." + V.ID, "sc." + SC.VARIANT_ID)
+      .where("sc." + SC.SUPPLIER_ID, suppId)
+      .whereIn("sc." + SC.VARIANT_ID, uniqueVariantIds)
+      .where("v." + V.IS_ACTIVE, true)
+      .select("sc." + SC.VARIANT_ID + " as variant_id");
+    const validIds = new Set(validVariants.map((variant) => Number(variant.variant_id)));
+    if (validIds.size !== uniqueVariantIds.length) {
+      throw new Error("Có variant không thuộc NCC đã chọn hoặc đã ngừng hoạt động.");
     }
 
-    const [created] = await trx(TABLES.PORTAL_SLOT_ROUTING_RULES)
-      .insert({
+    const existing = await trx(TABLES.PORTAL_SLOT_ROUTING_RULES)
+      .where({
         [RR.SLOT_KEY]: cleanSlotKey,
-        [RR.PRODUCT_NAME_ID]: prodId,
         [RR.SUPPLIER_ID]: suppId,
         [RR.PROVIDER_KEY]: provKey,
-        [RR.PRIORITY]: Number(priority) || 1,
+      })
+      .whereNotNull(RR.VARIANT_ID)
+      .forUpdate();
+    const existingByVariantId = new Map(existing.map((rule) => [Number(rule[RR.VARIANT_ID]), rule]));
+
+    const idsToDelete = existing
+      .filter((rule) => !validIds.has(Number(rule[RR.VARIANT_ID])))
+      .map((rule) => Number(rule[RR.ID]));
+    if (idsToDelete.length > 0) {
+      await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).whereIn(RR.ID, idsToDelete).delete();
+    }
+
+    for (const variantId of uniqueVariantIds) {
+      const existingRule = existingByVariantId.get(variantId);
+      if (existingRule) {
+        await trx(TABLES.PORTAL_SLOT_ROUTING_RULES)
+          .where(RR.ID, existingRule[RR.ID])
+          .update({ [RR.IS_ACTIVE]: isActive !== false, [RR.UPDATED_AT]: trx.fn.now() });
+        continue;
+      }
+      await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).insert({
+        [RR.SLOT_KEY]: cleanSlotKey,
+        [RR.SUPPLIER_ID]: suppId,
+        [RR.VARIANT_ID]: variantId,
+        [RR.PROVIDER_KEY]: provKey,
         [RR.IS_ACTIVE]: isActive !== false,
-        [RR.NOTE]: String(note || ""),
         [RR.CREATED_AT]: trx.fn.now(),
         [RR.UPDATED_AT]: trx.fn.now(),
-      })
-      .returning("*");
+      });
+    }
 
-    return { success: true, rule: created, message: "Đã tạo thành công quy tắc liên kết ô input & NCC." };
+    return { success: true, message: "Đã lưu liên kết Provider, NCC và variant." };
   });
 }
 
-async function updateRoutingRule(ruleId, { slotKey, productNameId, supplierId, providerKey, priority, isActive, note } = {}) {
+async function createRoutingRule(data) {
+  return saveRoutingRuleVariants(data);
+}
+
+async function updateRoutingRule(ruleId, { isActive } = {}) {
   const id = Number(ruleId);
   if (!Number.isInteger(id) || id <= 0) throw new Error("ID quy tắc không hợp lệ.");
+  if (typeof isActive !== "boolean") throw new Error("Chỉ có thể thay đổi trạng thái On/Off của quy tắc.");
 
   return withTransaction(async (trx) => {
     const existing = await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).where(RR.ID, id).first();
-    if (!existing) throw new Error("Không tìm thấy quy tắc #" + id + ".");
-
-    const update = { [RR.UPDATED_AT]: trx.fn.now() };
-    if (slotKey !== undefined) update[RR.SLOT_KEY] = String(slotKey).trim();
-    if (productNameId !== undefined) update[RR.PRODUCT_NAME_ID] = Number(productNameId);
-    if (supplierId !== undefined) update[RR.SUPPLIER_ID] = supplierId ? Number(supplierId) : null;
-    if (providerKey !== undefined) update[RR.PROVIDER_KEY] = String(providerKey).trim();
-    if (priority !== undefined) update[RR.PRIORITY] = Number(priority) || 1;
-    if (typeof isActive === "boolean") update[RR.IS_ACTIVE] = isActive;
-    if (note !== undefined) update[RR.NOTE] = String(note || "");
-
-    const [updated] = await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).where(RR.ID, id).update(update).returning("*");
-    return { success: true, rule: updated, message: "Đã cập nhật quy tắc liên kết." };
+    if (!existing || !existing[RR.VARIANT_ID]) throw new Error("Không tìm thấy quy tắc variant #" + id + ".");
+    await trx(TABLES.PORTAL_SLOT_ROUTING_RULES)
+      .where(RR.ID, id)
+      .update({ [RR.IS_ACTIVE]: isActive, [RR.UPDATED_AT]: trx.fn.now() });
+    return { success: true, message: "Đã cập nhật trạng thái quy tắc." };
   });
 }
 
@@ -600,15 +617,11 @@ async function deleteRoutingRule(ruleId) {
 
   return withTransaction(async (trx) => {
     const existing = await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).where(RR.ID, id).first();
-    if (!existing) throw new Error("Không tìm thấy quy tắc #" + id + ".");
+    if (!existing || !existing[RR.VARIANT_ID]) throw new Error("Không tìm thấy quy tắc variant #" + id + ".");
     await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).where(RR.ID, id).delete();
-    return { success: true, message: "Đã xóa quy tắc liên kết." };
+    return { success: true, message: "Đã xóa liên kết variant." };
   });
 }
-
-/**
- * Tra cứu đơn hàng và tìm Provider chính xác cho yêu cầu từ Web OTP Portal
- */
 async function findRoutingProviderForInput({ slotKey, input }) {
   if (!slotKey || !input) return null;
   const rawInput = String(input).trim();
@@ -621,6 +634,7 @@ async function findRoutingProviderForInput({ slotKey, input }) {
       .select(
         "ss." + SS.ID + " as slot_id",
         "ss." + SS.NAME_ID + " as name_id",
+        "ss." + SS.VARIANT_TAG + " as variant_tag",
         "ss." + SS.PROVIDER_KEY + " as slot_provider_key",
         "a.product_name_id as account_product_name_id"
       );
@@ -664,15 +678,6 @@ async function findRoutingProviderForInput({ slotKey, input }) {
         .first();
     }
 
-    const directProviderKey = String(matchedSlot?.slot_provider_key || "").trim();
-    if (directProviderKey) {
-      return {
-        provider_key: directProviderKey,
-        match_type: "DIRECT_SLOT_PROVIDER",
-        source: "WAREHOUSE_SLOT",
-      };
-    }
-
     if (matchedSlot) {
       matchedProductNameId = Number(matchedSlot.name_id || matchedSlot.account_product_name_id)
         || matchedProductNameId;
@@ -680,15 +685,7 @@ async function findRoutingProviderForInput({ slotKey, input }) {
 
     const linkedOrderId = activationKey?.[AK.ID_ORDER];
     const matchedOrder = await db(TABLES.ORDER_LIST)
-      .select(
-        ORD.ID,
-        ORD.ID_ORDER,
-        ORD.ID_PRODUCT,
-        ORD.SUPPLY_ID,
-        ORD.INFORMATION_ORDER,
-        ORD.SLOT,
-        ORD.STATUS
-      )
+      .select(ORD.ID, ORD.ID_ORDER, ORD.ID_PRODUCT, ORD.SUPPLY_ID, ORD.INFORMATION_ORDER, ORD.SLOT, ORD.STATUS)
       .where(function () {
         this.whereRaw("LOWER(" + ORD.INFORMATION_ORDER + ") = ?", [cleanInput])
           .orWhereRaw("LOWER(" + ORD.ID_ORDER + ") = ?", [cleanInput])
@@ -699,66 +696,94 @@ async function findRoutingProviderForInput({ slotKey, input }) {
       .orderBy(ORD.ID, "desc")
       .first();
 
-    if (matchedOrder) {
-      matchedSupplierId = matchedOrder[ORD.SUPPLY_ID] ? Number(matchedOrder[ORD.SUPPLY_ID]) : null;
-      if (!matchedProductNameId && matchedOrder[ORD.ID_PRODUCT]) {
-        const productName = await db(TABLES.PRODUCT_NAMES)
-          .where(PN.PRODUCT_ID, Number(matchedOrder[ORD.ID_PRODUCT]))
-          .first();
-        if (productName) matchedProductNameId = Number(productName[PN.ID]);
+    let matchedSystemProductId = matchedOrder?.[ORD.ID_PRODUCT]
+      ? Number(matchedOrder[ORD.ID_PRODUCT])
+      : null;
+    if (matchedOrder?.[ORD.SUPPLY_ID]) {
+      matchedSupplierId = Number(matchedOrder[ORD.SUPPLY_ID]);
+    }
+    if (!matchedSystemProductId && matchedProductNameId) {
+      const productName = await db(TABLES.PRODUCT_NAMES)
+        .select(PN.PRODUCT_ID)
+        .where(PN.ID, matchedProductNameId)
+        .first();
+      matchedSystemProductId = productName?.[PN.PRODUCT_ID]
+        ? Number(productName[PN.PRODUCT_ID])
+        : null;
+    }
+
+    const normalizedVariantTag = normalizeKey(matchedSlot?.variant_tag);
+    if (matchedSupplierId && matchedSystemProductId) {
+      const variantRulesQuery = db(TABLES.PORTAL_SLOT_ROUTING_RULES + " as r")
+        .join(TABLES.VARIANT + " as v", "v." + V.ID, "r." + RR.VARIANT_ID)
+        .where({
+          ["r." + RR.SLOT_KEY]: slotKey,
+          ["r." + RR.SUPPLIER_ID]: matchedSupplierId,
+          ["r." + RR.IS_ACTIVE]: true,
+        })
+        .whereNotNull("r." + RR.VARIANT_ID)
+        .where("v." + V.PRODUCT_ID, matchedSystemProductId)
+        .select("r." + RR.ID + " as rule_id", "r." + RR.PROVIDER_KEY + " as provider_key", "v." + V.VARIANT_NAME + " as variant_name", "v." + V.DISPLAY_NAME + " as variant_display_name")
+        .orderBy("r." + RR.ID, "asc");
+      const variantRules = await variantRulesQuery;
+      const exactVariantRule = normalizedVariantTag
+        ? variantRules.find((rule) =>
+            normalizeKey(rule.variant_name) === normalizedVariantTag
+            || normalizeKey(rule.variant_display_name) === normalizedVariantTag
+          )
+        : variantRules.length === 1
+          ? variantRules[0]
+          : null;
+      if (exactVariantRule) {
+        return {
+          provider_key: exactVariantRule.provider_key,
+          rule_id: Number(exactVariantRule.rule_id),
+          match_type: "EXACT_SUPPLIER_VARIANT",
+          supplier_id: matchedSupplierId,
+          variant_tag: matchedSlot?.variant_tag || null,
+        };
       }
     }
 
-    if (!matchedProductNameId) return null;
-
-    const rules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
-      .where({
-        [RR.SLOT_KEY]: slotKey,
-        [RR.PRODUCT_NAME_ID]: matchedProductNameId,
-        [RR.IS_ACTIVE]: true,
-      })
-      .orderBy(RR.PRIORITY, "asc")
-      .orderBy(RR.ID, "asc");
-
-    if (rules.length === 0) return null;
-
-    if (matchedSupplierId) {
-      const supplierRule = rules.find((rule) => Number(rule[RR.SUPPLIER_ID]) === matchedSupplierId);
-      if (supplierRule) {
+    if (matchedProductNameId) {
+      const legacyRules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
+        .where({
+          [RR.SLOT_KEY]: slotKey,
+          [RR.PRODUCT_NAME_ID]: matchedProductNameId,
+          [RR.IS_ACTIVE]: true,
+        })
+        .whereNull(RR.VARIANT_ID)
+        .orderBy(RR.ID, "asc");
+      const exactSupplierRule = matchedSupplierId
+        ? legacyRules.find((rule) => Number(rule[RR.SUPPLIER_ID]) === matchedSupplierId)
+        : null;
+      const defaultRule = legacyRules.find((rule) => !rule[RR.SUPPLIER_ID]);
+      const legacyRule = exactSupplierRule || defaultRule || legacyRules[0];
+      if (legacyRule) {
         return {
-          provider_key: supplierRule[RR.PROVIDER_KEY],
-          rule_id: Number(supplierRule[RR.ID]),
-          match_type: "EXACT_SUPPLIER",
+          provider_key: legacyRule[RR.PROVIDER_KEY],
+          rule_id: Number(legacyRule[RR.ID]),
+          match_type: exactSupplierRule ? "LEGACY_EXACT_SUPPLIER" : "LEGACY_FALLBACK",
           supplier_id: matchedSupplierId,
           product_name_id: matchedProductNameId,
         };
       }
     }
 
-    const defaultRule = rules.find((rule) => !rule[RR.SUPPLIER_ID]);
-    if (defaultRule) {
+    const directProviderKey = String(matchedSlot?.slot_provider_key || "").trim();
+    if (directProviderKey) {
       return {
-        provider_key: defaultRule[RR.PROVIDER_KEY],
-        rule_id: Number(defaultRule[RR.ID]),
-        match_type: "DEFAULT_PRODUCT",
-        supplier_id: matchedSupplierId,
-        product_name_id: matchedProductNameId,
+        provider_key: directProviderKey,
+        match_type: "DIRECT_SLOT_PROVIDER_FALLBACK",
+        source: "WAREHOUSE_SLOT",
       };
     }
-
-    return {
-      provider_key: rules[0][RR.PROVIDER_KEY],
-      rule_id: Number(rules[0][RR.ID]),
-      match_type: "FIRST_RULE",
-      supplier_id: matchedSupplierId,
-      product_name_id: matchedProductNameId,
-    };
+    return null;
   } catch (err) {
     console.warn("[ProductApi Service] Lỗi findRoutingProviderForInput:", err.message);
     return null;
   }
 }
-
 module.exports = {
   listProductApis,
   assignApiToProduct,

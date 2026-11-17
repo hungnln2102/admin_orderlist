@@ -1,4 +1,5 @@
 const PROVIDER_KEY_ALIASES = Object.freeze({
+  fix_ades: "ades",
   yuna2fa: "yuna_2fa",
   yunaMail: "yuna_mail",
   vivarockyHousehold: "vivarocky_household",
@@ -66,6 +67,7 @@ function providerConfig(key) {
     vivarocky_signin: { service_key: "vivarocky_signin", service_name: "VivaRocky Sign-in", category: "NETFLIX", execution_mode: "VIVAROCKY_HTML", description: "Lấy mã đăng nhập Netflix.", base_url: "https://vivarocky.in/signin_code.php", endpoints: {}, auth_config: { timeoutMs: 15_000, access_code: "mvrk56" }, field_mapping: [{ key: "otp", path: "otp", label: "Mã đăng nhập", is_primary: true }] },
     totp: { service_key: "totp", service_name: "TOTP", category: "2FA", execution_mode: "INTERNAL_TOTP", description: "Sinh mã TOTP nội bộ.", base_url: "", endpoints: {}, auth_config: {}, field_mapping: [] },
     warehouse_2fa: { service_key: "warehouse_2fa", service_name: "Warehouse 2FA", category: "2FA", execution_mode: "INTERNAL_WAREHOUSE_2FA", description: "Tra cứu 2FA kho nội bộ.", base_url: "", endpoints: {}, auth_config: {}, field_mapping: [] },
+    package_warehouse: { service_key: "package_warehouse", service_name: "Kho Gói Sản Phẩm", category: "ACCOUNT", execution_mode: "PACKAGE_WAREHOUSE_ACCOUNT", description: "Cấp phát và tra cứu tài khoản từ Kho Gói Sản Phẩm bằng mã key.", base_url: "", endpoints: {}, auth_config: {}, field_mapping: [] },
     imap: { service_key: "imap", service_name: "IMAP Mailbox", category: "OTP", execution_mode: "INTERNAL_IMAP", description: "Đọc OTP qua IMAP.", base_url: "", endpoints: {}, auth_config: getImapConfig(), field_mapping: [] },
   };
   return configs[providerKey] ? { ...configs[providerKey] } : null;

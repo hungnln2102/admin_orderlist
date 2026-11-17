@@ -121,6 +121,13 @@ export const ProviderCatalogTab: React.FC<ProviderCatalogTabProps> = ({
         placeholder: "Nhập secret Base32...",
       };
     }
+    if (input === "activation_key") {
+      return {
+        label: "Mã key kích hoạt",
+        icon: KeyRound,
+        placeholder: "Nhập mã key kích hoạt...",
+      };
+    }
     if (input === "email_or_order") {
       return {
         label: "Email / Mã đơn",

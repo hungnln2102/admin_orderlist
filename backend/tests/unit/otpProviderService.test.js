@@ -308,3 +308,67 @@ test("dispatcher uses hard-coded slots when the portal slot config is missing an
     systemConfigService.get = originalGet;
   }
 });
+
+test("PACKAGE_WAREHOUSE_ACCOUNT cấp và trả thông tin tài khoản từ mã key", { concurrency: false }, async () => {
+  const activationKeyService = require("../../src/domains/products/services/activationKeyService");
+  const originalActivate = activationKeyService.activateKeyWithTransaction;
+  activationKeyService.activateKeyWithTransaction = async ({ keyCode }) => {
+    assert.equal(keyCode, "GPT-ABC123-DEF456");
+    return {
+      success: true,
+      account: "shared@example.com",
+      password: "secret-password",
+      backup_email: "backup@example.com",
+      expired_at: "2026-12-31",
+    };
+  };
+
+  try {
+    const result = await probeOtpForEmail({
+      email: "GPT-ABC123-DEF456",
+      serviceKey: "package_warehouse",
+    });
+    assert.equal(result.found, true);
+    assert.equal(result.service_key, "package_warehouse");
+    assert.equal(result.extra_fields.find((field) => field.key === "account_username")?.value, "shared@example.com");
+    assert.equal(result.extra_fields.find((field) => field.key === "password")?.value, "secret-password");
+  } finally {
+    activationKeyService.activateKeyWithTransaction = originalActivate;
+  }
+});
+test("dispatcher trả dữ liệu tài khoản từ provider Kho Gói Sản Phẩm", { concurrency: false }, async () => {
+  const systemConfigService = require("../../src/domains/system/services/systemConfigService");
+  const otpProviderService = require("../../src/domains/system/services/otpProviderService");
+  const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
+  const originalGet = systemConfigService.get;
+  const originalProbe = otpProviderService.probeOtpForEmail;
+  systemConfigService.get = () => JSON.stringify([{
+    slot_key: "gpt_account",
+    name: "Tra cứu tài khoản",
+    enabled: true,
+    assigned_services: ["package_warehouse"],
+  }]);
+  otpProviderService.probeOtpForEmail = async () => ({
+    found: true,
+    extra_fields: [
+      { key: "account_username", value: "shared@example.com" },
+      { key: "password", value: "secret-password" },
+      { key: "expires_at", value: "2026-12-31" },
+    ],
+    raw_data: { status: "ACTIVE" },
+    message: "Đã cấp tài khoản.",
+  });
+
+  try {
+    const result = await dispatcher.dispatchSlotRequest({
+      slotKey: "gpt_account",
+      input: "GPT-ABC123-DEF456",
+    });
+    assert.equal(result.service_used, "package_warehouse");
+    assert.equal(result.data.account, "shared@example.com");
+    assert.equal(result.data.password, "secret-password");
+  } finally {
+    systemConfigService.get = originalGet;
+    otpProviderService.probeOtpForEmail = originalProbe;
+  }
+});

@@ -109,21 +109,26 @@ export interface PortalSlotItem {
 export interface PortalSlotRoutingRule {
   id: number;
   slot_key: string;
-  product_name_id: number;
-  product_name: string;
-  product_category: string;
-  supplier_id: number | null;
+  supplier_id: number;
   supplier_name: string;
+  variant_id: number;
+  variant_name: string;
+  variant_display_name: string;
   provider_key: string;
   provider_name: string;
   provider_category: string;
-  priority: number;
   is_active: boolean;
-  note: string;
   created_at?: string;
   updated_at?: string;
 }
 
+export interface SupplierVariantOption {
+  supplier_id: number;
+  variant_id: number;
+  product_id: number;
+  variant_name: string;
+  variant_display_name: string;
+}
 export interface SupplierOption {
   id: number;
   supplier_name: string;

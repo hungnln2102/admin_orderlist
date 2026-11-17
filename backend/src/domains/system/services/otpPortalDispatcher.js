@@ -81,7 +81,7 @@ const DEFAULT_SLOTS = [
     slot_key: "gpt_account",
     name: "ChatGPT: Tra Cứu Tài Khoản",
     category: "gpt",
-    assigned_services: ["warehouse_2fa", "yuna_2fa"],
+    assigned_services: ["package_warehouse", "warehouse_2fa", "yuna_2fa"],
     cooldown_seconds: 15,
     btn_text: "Tra Cứu Tài Khoản",
     input_placeholder: "Nhập Email mua hàng hoặc Mã đơn hàng...",

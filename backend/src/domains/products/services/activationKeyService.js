@@ -240,12 +240,23 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
     }
 
     if (key.status === "ACTIVATED") {
-      // Đã kích hoạt trước đó -> trả về thông tin tài khoản đã cấp
+      // Key đã dùng vẫn phải trả đủ thông tin để khách tra cứu lại tài khoản đã cấp.
+      const assignedSlot = key.account_slot_id
+        ? await trx(TABLES.ACCOUNT_SLOTS)
+          .select(COLS.ACCOUNT_SLOTS.PASSWORD, COLS.ACCOUNT_SLOTS.BACKUP_EMAIL, COLS.ACCOUNT_SLOTS.TWO_FA, COLS.ACCOUNT_SLOTS.EXPIRED_AT)
+          .where(COLS.ACCOUNT_SLOTS.ID, key.account_slot_id)
+          .first()
+        : null;
       return {
         success: true,
         already_activated: true,
         account: key.assigned_account,
+        password: assignedSlot?.[COLS.ACCOUNT_SLOTS.PASSWORD] || "",
+        backup_email: assignedSlot?.[COLS.ACCOUNT_SLOTS.BACKUP_EMAIL] || "",
+        two_fa: assignedSlot?.[COLS.ACCOUNT_SLOTS.TWO_FA] || "",
+        expired_at: assignedSlot?.[COLS.ACCOUNT_SLOTS.EXPIRED_AT] || null,
         activated_at: key.activated_at,
+        id_order: key.id_order || null,
         message: `Mã key này đã được kích hoạt trước đó cho tài khoản ${key.assigned_account}.`,
       };
     }

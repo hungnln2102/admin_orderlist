@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { externalApiClient } from "@/features/external-api/api/externalApiClient";
-import type { PortalSlotItem, PortalSlotRoutingRule, ProductItem, SupplierOption } from "@/features/external-api/types";
+import type {
+  PortalSlotItem,
+  PortalSlotRoutingRule,
+  ProductItem,
+  SupplierOption,
+  SupplierVariantOption,
+} from "@/features/external-api/types";
 
 export interface Provider {
   key: string;
@@ -33,6 +39,7 @@ export function useExternalApiConfig() {
   const [slots, setSlots] = useState<PortalSlotItem[]>([]);
   const [routingRules, setRoutingRules] = useState<PortalSlotRoutingRule[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [supplierVariants, setSupplierVariants] = useState<SupplierVariantOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [savingSlots, setSavingSlots] = useState(false);
@@ -63,6 +70,7 @@ export function useExternalApiConfig() {
       setAvailableApis(mappingResponse.availableApis || []);
       setRoutingRules(ruleResponse.rules || []);
       setSuppliers(ruleResponse.suppliers || []);
+      setSupplierVariants(ruleResponse.supplierVariants || []);
       const loadedSlots = (slotResponse.slots || []).map((slot: PortalSlotItem) => {
         const assigned = Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
           ? slot.assigned_services
@@ -321,12 +329,10 @@ export function useExternalApiConfig() {
   // CRUD Routing Rules (Phương Án A)
   const createRoutingRule = async (ruleData: {
     slotKey: string;
-    productNameId: number;
-    supplierId?: number | null;
+    supplierId: number;
     providerKey: string;
-    priority?: number;
+    variantIds: number[];
     isActive?: boolean;
-    note?: string;
   }) => {
     try {
       const response = await externalApiClient.createRoutingRule(ruleData);
@@ -345,31 +351,22 @@ export function useExternalApiConfig() {
 
   const updateRoutingRule = async (
     ruleId: number,
-    ruleData: Partial<{
-      slotKey: string;
-      productNameId: number;
-      supplierId: number | null;
-      providerKey: string;
-      priority: number;
-      isActive: boolean;
-      note: string;
-    }>
+    ruleData: Partial<{ isActive: boolean }>
   ) => {
     try {
       const response = await externalApiClient.updateRoutingRule(ruleId, ruleData);
       const data = await response.json();
       if (!response.ok || data.success === false) {
-        throw new Error(data.error || "Không thể cập nhật quy tắc.");
+        throw new Error(data.error || "Không thể cập nhật trạng thái quy tắc.");
       }
-      showToast("success", "Đã cập nhật quy tắc liên kết.");
+      showToast("success", "Đã cập nhật trạng thái quy tắc.");
       await load();
       return true;
     } catch (error: any) {
-      showToast("error", error.message || "Không thể cập nhật quy tắc.");
+      showToast("error", error.message || "Không thể cập nhật trạng thái quy tắc.");
       return false;
     }
   };
-
   const deleteRoutingRule = async (ruleId: number) => {
     try {
       const response = await externalApiClient.deleteRoutingRule(ruleId);
@@ -513,6 +510,7 @@ export function useExternalApiConfig() {
 
     routingRules,
     suppliers,
+    supplierVariants,
     createRoutingRule,
     updateRoutingRule,
     deleteRoutingRule,

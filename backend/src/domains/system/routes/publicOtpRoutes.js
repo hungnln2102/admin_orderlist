@@ -1,7 +1,6 @@
 const express = require("express");
 
 const activationKeyController = require("@/domains/products/controllers/activationKeyController");
-const activationKeyService = require("@/domains/products/services/activationKeyService");
 const otpPortalDispatcher = require("@/domains/system/services/otpPortalDispatcher");
 
 const router = express.Router();
@@ -92,39 +91,7 @@ router.post("/otp/adobe/switch-team/status", async (req, res) => {
 
 router.post("/otp/activate-key", activationKeyController.publicActivateKey);
 
-router.post("/otp/gpt/account", async (req, res) => {
-  try {
-    const input = req.body?.email || req.body?.order_code || req.body?.search || req.body?.input;
-    if (input && String(input).includes("-")) {
-      try {
-        const keyResult = await activationKeyService.activateKeyWithTransaction({
-          keyCode: input,
-          customerInfo: req.body?.email || req.body?.customer || "",
-        });
-        if (keyResult?.account) {
-          return res.json({
-            success: true,
-            data: {
-              account: keyResult.account,
-              password: keyResult.password,
-              plan: "ChatGPT Plus",
-              status: "ĐANG HOẠT ĐỘNG",
-              note: keyResult.message,
-            },
-            message: keyResult.message,
-          });
-        }
-      } catch (keyErr) {
-        if (!keyErr.message.includes("không tồn tại")) {
-          return res.status(400).json({ success: false, error: keyErr.message });
-        }
-      }
-    }
-    return dispatchSlot(res, "gpt_account", input);
-  } catch (err) {
-    return res.status(400).json({ success: false, error: err.message });
-  }
-});
+router.post("/otp/gpt/account", (req, res) => dispatchSlot(res, "gpt_account", req.body?.email || req.body?.order_code || req.body?.search || req.body?.input));
 
 router.post("/otp/netflix/household", (req, res) => dispatchSlot(res, "netflix_household", req.body?.email || req.body?.input));
 router.post("/otp/netflix/six-digit", (req, res) => dispatchSlot(res, "netflix_six_digit", req.body?.email || req.body?.input));
