@@ -56,6 +56,7 @@ interface ProductApiMappingTabProps {
   onCreateRoutingRule?: (data: any) => Promise<boolean>;
   onUpdateRoutingRule?: (id: number, data: any) => Promise<boolean>;
   onToggleRoutingRuleActive?: (id: number, currentActive: boolean) => Promise<boolean>;
+  onDeleteSupplierVariant?: (supplierCostId: number) => Promise<boolean>;
 }
 
 export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
@@ -76,6 +77,7 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
   onCreateRoutingRule,
   onUpdateRoutingRule,
   onToggleRoutingRuleActive,
+  onDeleteSupplierVariant,
 }) => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [expandedProductIds, setExpandedProductIds] = useState<Record<number, boolean>>({});
@@ -691,6 +693,7 @@ return (
         suppliers={suppliers}
         providers={providers}
         availableApis={availableApis}
+        onDeleteSupplierVariant={onDeleteSupplierVariant}
       />
     </div>
   );

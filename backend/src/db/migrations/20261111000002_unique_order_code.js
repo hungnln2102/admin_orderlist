@@ -14,10 +14,29 @@ const duplicateQuery = (knex) => knex
   .having(knex.raw("COUNT(*) > 1"));
 
 exports.up = async function (knex) {
+  // Chuẩn hóa khoảng trắng id_order
+  await knex.raw(`UPDATE ${schemaOrders}.order_list SET id_order = BTRIM(id_order) WHERE id_order IS NOT NULL AND id_order <> BTRIM(id_order)`);
+
   const duplicates = await duplicateQuery(knex);
   if (duplicates.length > 0) {
-    const details = duplicates.map((row) => String(row.normalized_id_order) + " (" + row.duplicate_count + ")").join(", ");
-    throw new Error("Cannot add unique order code index; duplicate id_order values: " + details);
+    for (const dup of duplicates) {
+      const rows = await knex
+        .withSchema(schemaOrders)
+        .from("order_list")
+        .select("id", "id_order")
+        .whereRaw("UPPER(BTRIM(id_order)) = ?", [dup.normalized_id_order])
+        .orderBy("id", "asc");
+
+      for (let i = 1; i < rows.length; i++) {
+        const baseCode = String(rows[0].id_order || "").trim();
+        const suffix = `-${i + 1}`;
+        await knex
+          .withSchema(schemaOrders)
+          .from("order_list")
+          .where("id", rows[i].id)
+          .update({ id_order: `${baseCode}${suffix}` });
+      }
+    }
   }
 
   await knex.raw(

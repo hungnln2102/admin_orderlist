@@ -7,6 +7,7 @@ import type {
   SupplierVariantOption,
 } from "@/features/external-api/types";
 import type { Provider } from "@/features/external-api/hooks/useExternalApiConfig";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 const PROVIDER_KEY_ALIASES: Record<string, string> = {
   fix_ades: "ades",
@@ -31,6 +32,7 @@ interface SlotProductSupplierRuleModalProps {
   supplierVariants: SupplierVariantOption[];
   providers: Provider[];
   availableApis: Array<Record<string, unknown>>;
+  onDeleteSupplierVariant?: (supplierCostId: number) => Promise<boolean>;
 }
 
 export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModalProps> = ({
@@ -44,7 +46,9 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
   supplierVariants,
   providers,
   availableApis,
+  onDeleteSupplierVariant,
 }) => {
+  const notification = useNotification();
   const [slotKey, setSlotKey] = useState("");
   const [supplierId, setSupplierId] = useState<number | "">("");
   const [providerKey, setProviderKey] = useState("");
@@ -78,10 +82,58 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
     return [...catalog.values()].filter((provider) => assignedKeys.has(provider.key));
   }, [availableApis, providers, selectedSlot]);
 
-  const selectedVariants = useMemo(
-    () => supplierVariants.filter((variant) => variant.supplier_id === Number(supplierId)),
-    [supplierId, supplierVariants]
-  );
+  // Lọc danh sách NCC theo Ô Input: chỉ hiển thị các NCC có sản phẩm tương ứng với slot
+  const filteredSuppliers = useMemo(() => {
+    if (!selectedSlot) return suppliers.map((s) => ({ ...s, variantCount: 0 }));
+    const slotIdentifier = `${selectedSlot.slot_key} ${selectedSlot.name} ${selectedSlot.category || ""}`.toLowerCase();
+
+    const relevantVariants = supplierVariants.filter((v) => {
+      const pName = (v.product_name || "").toLowerCase();
+      const vName = (v.variant_display_name || "").toLowerCase();
+      if (slotIdentifier.includes("adobe")) {
+        return pName.includes("adobe") || vName.includes("adobe");
+      }
+      if (slotIdentifier.includes("netflix")) {
+        return pName.includes("netflix") || vName.includes("netflix");
+      }
+      if (slotIdentifier.includes("gpt") || slotIdentifier.includes("openai") || slotIdentifier.includes("chatgpt")) {
+        return pName.includes("gpt") || vName.includes("gpt") || pName.includes("openai") || vName.includes("openai");
+      }
+      return true;
+    });
+
+    const variantCountBySupplier = new Map<number, number>();
+    relevantVariants.forEach((v) => {
+      variantCountBySupplier.set(v.supplier_id, (variantCountBySupplier.get(v.supplier_id) || 0) + 1);
+    });
+
+    return suppliers
+      .filter((supplier) => variantCountBySupplier.has(supplier.id))
+      .map((supplier) => ({
+        ...supplier,
+        variantCount: variantCountBySupplier.get(supplier.id) || 0,
+      }));
+  }, [selectedSlot, supplierVariants, suppliers]);
+
+  const selectedVariants = useMemo(() => {
+    const list = supplierVariants.filter((variant) => variant.supplier_id === Number(supplierId));
+    if (!selectedSlot) return list;
+    const slotIdentifier = `${selectedSlot.slot_key} ${selectedSlot.name} ${selectedSlot.category || ""}`.toLowerCase();
+    if (slotIdentifier.includes("adobe")) {
+      return list.filter((v) => (v.product_name || "").toLowerCase().includes("adobe") || (v.variant_display_name || "").toLowerCase().includes("adobe"));
+    }
+    if (slotIdentifier.includes("netflix")) {
+      return list.filter((v) => (v.product_name || "").toLowerCase().includes("netflix") || (v.variant_display_name || "").toLowerCase().includes("netflix"));
+    }
+    if (slotIdentifier.includes("gpt") || slotIdentifier.includes("openai") || slotIdentifier.includes("chatgpt")) {
+      return list.filter((v) => {
+        const pName = (v.product_name || "").toLowerCase();
+        const vName = (v.variant_display_name || "").toLowerCase();
+        return pName.includes("gpt") || vName.includes("gpt") || pName.includes("openai") || vName.includes("openai");
+      });
+    }
+    return list;
+  }, [selectedSlot, supplierId, supplierVariants]);
   const isSharedTwoFactor = selectedSlot?.slot_key === "two_factor_totp";
 
   useEffect(() => {
@@ -112,7 +164,10 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
     if (!slotKey || editingRule) return;
     setProviderKey(providerOptions[0]?.key || "");
     setVariantIds([]);
-  }, [editingRule, providerOptions, slotKey]);
+    if (supplierId && !filteredSuppliers.some((s) => s.id === Number(supplierId))) {
+      setSupplierId("");
+    }
+  }, [editingRule, filteredSuppliers, providerOptions, slotKey, supplierId]);
 
   if (!isOpen) return null;
 
@@ -126,11 +181,32 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
     setVariantIds((current) => current.filter((id) => id !== variantId));
   };
 
+  const handleDeleteSupplierVariant = (variant: SupplierVariantOption) => {
+    if (!variant.supplier_cost_id || !onDeleteSupplierVariant) return;
+    notification.confirm({
+      title: "Xác Nhận Xóa Variant Khỏi NCC",
+      message: `Bạn có chắc chắn muốn xóa variant "${variant.variant_display_name}" khỏi danh mục cung cấp của NCC này không?`,
+      confirmText: "Xóa Variant",
+      cancelText: "Hủy Bỏ",
+      onConfirm: async () => {
+        try {
+          const success = await onDeleteSupplierVariant(variant.supplier_cost_id!);
+          if (success) {
+            setVariantIds((prev) => prev.filter((id) => id !== variant.variant_id));
+            notification.success(`Variant "${variant.variant_display_name}" đã được xóa khỏi NCC thành công.`, "Đã Xóa Variant");
+          }
+        } catch (delError: any) {
+          notification.error(delError?.message || "Không thể xóa variant khỏi NCC.", "Lỗi Xóa Variant");
+        }
+      },
+    });
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
-    if (!slotKey || !providerKey || !supplierId || variantIds.length === 0) {
-      setError("Hãy chọn Ô Input, Provider, NCC và ít nhất một variant.");
+    if (!slotKey || !supplierId || !providerKey || variantIds.length === 0) {
+      setError("Hãy chọn Ô Input, NCC, Provider và ít nhất một variant.");
       return;
     }
     if (isSharedTwoFactor) {
@@ -160,7 +236,7 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
             </div>
             <div>
               <h3 className="text-base font-bold text-white">{editingRule ? "Chỉnh Sửa Liên Kết Variant" : "Tạo Liên Kết OTP Theo Variant"}</h3>
-              <p className="text-xs text-slate-400">Ô Input Web → Provider đã cấu hình → NCC → Variant</p>
+              <p className="text-xs text-slate-400">Ô Input Web → NCC cung cấp → Provider → Variant</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
@@ -171,6 +247,7 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5">
           {error && <div className="px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-200">{error}</div>}
 
+          {/* Hàng 1: 1. Ô Input & 2. NCC (Lọc theo ô input) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="space-y-1.5">
               <span className="text-xs font-semibold text-slate-300">1. Ô Input trên Web OTP Portal</span>
@@ -178,6 +255,7 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
                 value={slotKey}
                 onChange={(event) => {
                   setSlotKey(event.target.value);
+                  setSupplierId("");
                   setProviderKey("");
                   setVariantIds([]);
                 }}
@@ -190,35 +268,52 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
             </label>
 
             <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-300">2. Provider của ô input đã chọn</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-300">2. Nhà Cung Cấp (NCC)</span>
+                {slotKey && (
+                  <span className="text-[11px] text-cyan-400 font-normal">
+                    {filteredSuppliers.length} NCC cung cấp
+                  </span>
+                )}
+              </div>
               <select
-                value={providerKey}
+                value={supplierId}
                 onChange={(event) => {
-                  setProviderKey(event.target.value);
+                  setSupplierId(event.target.value ? Number(event.target.value) : "");
                   setVariantIds([]);
                 }}
-                disabled={Boolean(editingRule) || providerOptions.length === 0}
+                disabled={Boolean(editingRule) || isSharedTwoFactor || !slotKey}
                 className="w-full text-xs font-medium bg-slate-950 border border-slate-700/80 focus:border-cyan-500 rounded-xl px-3 py-2 text-slate-100 outline-none disabled:opacity-60"
               >
-                <option value="">{providerOptions.length ? "-- Chọn provider --" : "Ô input chưa có provider --"}</option>
-                {providerOptions.map((provider) => <option key={provider.key} value={provider.key}>{provider.name} ({provider.key})</option>)}
+                <option value="">
+                  {!slotKey
+                    ? "-- Chọn ô input trước --"
+                    : filteredSuppliers.length === 0
+                    ? "-- Không có NCC nào cung cấp sản phẩm này --"
+                    : `-- Chọn NCC (${filteredSuppliers.length} NCC) --`}
+                </option>
+                {filteredSuppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.supplier_name} ({supplier.variantCount} variant)
+                  </option>
+                ))}
               </select>
             </label>
           </div>
 
+          {/* Hàng 2: 3. Provider của ô input đã chọn */}
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-slate-300">3. Nhà Cung Cấp (NCC)</span>
+            <span className="text-xs font-semibold text-slate-300">3. Provider của ô input đã chọn</span>
             <select
-              value={supplierId}
+              value={providerKey}
               onChange={(event) => {
-                setSupplierId(event.target.value ? Number(event.target.value) : "");
-                setVariantIds([]);
+                setProviderKey(event.target.value);
               }}
-              disabled={Boolean(editingRule) || isSharedTwoFactor}
+              disabled={Boolean(editingRule) || providerOptions.length === 0}
               className="w-full text-xs font-medium bg-slate-950 border border-slate-700/80 focus:border-cyan-500 rounded-xl px-3 py-2 text-slate-100 outline-none disabled:opacity-60"
             >
-              <option value="">-- Chọn NCC --</option>
-              {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.supplier_name}</option>)}
+              <option value="">{providerOptions.length ? "-- Chọn provider --" : "Ô input chưa có provider --"}</option>
+              {providerOptions.map((provider) => <option key={provider.key} value={provider.key}>{provider.name} ({provider.key})</option>)}
             </select>
           </label>
 
@@ -236,16 +331,45 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
                 <div className="flex flex-wrap gap-2">
                   {selectedVariants.map((variant) => {
                     const selected = variantIds.includes(variant.variant_id);
+                    const isVariantActive = variant.is_active !== false;
                     return (
-                      <button
+                      <div
                         key={variant.variant_id}
-                        type="button"
-                        onClick={() => toggleVariant(variant.variant_id)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${selected ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100" : "border-slate-700 bg-slate-950 text-slate-400 hover:text-slate-200"}`}
+                        className={`group inline-flex items-center rounded-lg border text-xs transition-all overflow-hidden ${
+                          selected
+                            ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-100 shadow-sm shadow-cyan-950/30"
+                            : isVariantActive
+                            ? "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600 hover:text-white"
+                            : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                        }`}
                       >
-                        <Layers className="w-3 h-3" />
-                        {variant.variant_display_name}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleVariant(variant.variant_id)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer text-left"
+                        >
+                          <Layers className={`w-3 h-3 shrink-0 ${isVariantActive ? "text-cyan-400" : "text-slate-500"}`} />
+                          <span>{variant.variant_display_name}</span>
+                          {!isVariantActive && (
+                            <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
+                              Tắt
+                            </span>
+                          )}
+                        </button>
+                        {onDeleteSupplierVariant && variant.supplier_cost_id && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSupplierVariant(variant);
+                            }}
+                            title={`Xóa variant "${variant.variant_display_name}" khỏi NCC`}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 rounded-r-lg transition-colors border-l border-slate-800/80 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

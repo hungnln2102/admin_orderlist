@@ -104,6 +104,19 @@ async function deleteRule(req, res) {
   }
 }
 
+async function deleteSupplierVariant(req, res) {
+  try {
+    const supplierCostId = Number(req.params.supplierCostId || req.body?.supplierCostId);
+    const supplierId = Number(req.query.supplierId || req.body?.supplierId);
+    const variantId = Number(req.query.variantId || req.body?.variantId);
+    const result = await productApiService.deleteSupplierVariant({ supplierCostId, supplierId, variantId });
+    res.json(result);
+  } catch (error) {
+    console.error("[ProductApi Controller] Lỗi deleteSupplierVariant:", error);
+    res.status(400).json({ success: false, error: getClientErrorMessage(error, "Không thể xóa variant khỏi NCC.") });
+  }
+}
+
 module.exports = {
   list,
   assign,
@@ -115,4 +128,5 @@ module.exports = {
   createRule,
   updateRule,
   deleteRule,
+  deleteSupplierVariant,
 };

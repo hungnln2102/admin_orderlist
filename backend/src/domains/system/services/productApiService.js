@@ -470,24 +470,39 @@ async function listRoutingRules() {
         "v." + V.DISPLAY_NAME + " as variant_display_name"
       )
       .whereNotNull("r." + RR.VARIANT_ID)
-      .orderBy("r." + RR.ID, "asc"),
+      .orderBy("r." + RR.ID, "asc")
+      .catch((err) => {
+        console.warn("[ProductApi Service] Lỗi query portal_slot_routing_rules:", err.message);
+        return [];
+      }),
     db(TABLES.SUPPLIER)
       .select(SUP.ID + " as id", SUP.SUPPLIER_NAME + " as supplier_name")
       .where(SUP.ACTIVE_SUPPLY, true)
-      .orderBy(SUP.SUPPLIER_NAME, "asc"),
+      .orderBy(SUP.SUPPLIER_NAME, "asc")
+      .catch((err) => {
+        console.warn("[ProductApi Service] Lỗi query supplier:", err.message);
+        return [];
+      }),
     db(TABLES.SUPPLIER_COST + " as sc")
       .join(TABLES.VARIANT + " as v", "v." + V.ID, "sc." + SC.VARIANT_ID)
       .join(TABLES.SUPPLIER + " as s", "s." + SUP.ID, "sc." + SC.SUPPLIER_ID)
+      .leftJoin(TABLES.PRODUCT + " as p", "p." + PRD.ID, "v." + V.PRODUCT_ID)
       .where("s." + SUP.ACTIVE_SUPPLY, true)
-      .where("v." + V.IS_ACTIVE, true)
       .select(
+        "sc." + SC.ID + " as supplier_cost_id",
         "sc." + SC.SUPPLIER_ID + " as supplier_id",
         "v." + V.ID + " as variant_id",
         "v." + V.PRODUCT_ID + " as product_id",
+        "p." + PRD.PACKAGE_NAME + " as product_name",
         "v." + V.VARIANT_NAME + " as variant_name",
-        "v." + V.DISPLAY_NAME + " as variant_display_name"
+        "v." + V.DISPLAY_NAME + " as variant_display_name",
+        "v." + V.IS_ACTIVE + " as is_active"
       )
-      .orderBy("v." + V.DISPLAY_NAME, "asc"),
+      .orderBy("v." + V.DISPLAY_NAME, "asc")
+      .catch((err) => {
+        console.warn("[ProductApi Service] Lỗi query supplierVariants:", err.message);
+        return [];
+      }),
   ]);
 
   return {
@@ -518,11 +533,14 @@ async function listRoutingRules() {
       supplier_name: supplier.supplier_name || `NCC #${supplier.id}`,
     })),
     supplierVariants: supplierVariants.map((variant) => ({
+      supplier_cost_id: Number(variant.supplier_cost_id),
       supplier_id: Number(variant.supplier_id),
       variant_id: Number(variant.variant_id),
       product_id: Number(variant.product_id),
+      product_name: variant.product_name || "",
       variant_name: variant.variant_name || "",
       variant_display_name: variant.variant_display_name || variant.variant_name || `Variant #${variant.variant_id}`,
+      is_active: variant.is_active !== false,
     })),
   };
 }
@@ -545,7 +563,6 @@ async function saveRoutingRuleVariants({ slotKey, supplierId, providerKey, varia
       .join(TABLES.VARIANT + " as v", "v." + V.ID, "sc." + SC.VARIANT_ID)
       .where("sc." + SC.SUPPLIER_ID, suppId)
       .whereIn("sc." + SC.VARIANT_ID, uniqueVariantIds)
-      .where("v." + V.IS_ACTIVE, true)
       .select("sc." + SC.VARIANT_ID + " as variant_id");
     const validIds = new Set(validVariants.map((variant) => Number(variant.variant_id)));
     if (validIds.size !== uniqueVariantIds.length) {
@@ -620,6 +637,59 @@ async function deleteRoutingRule(ruleId) {
     if (!existing || !existing[RR.VARIANT_ID]) throw new Error("Không tìm thấy quy tắc variant #" + id + ".");
     await trx(TABLES.PORTAL_SLOT_ROUTING_RULES).where(RR.ID, id).delete();
     return { success: true, message: "Đã xóa liên kết variant." };
+  });
+}
+
+async function deleteSupplierVariant({ supplierCostId, supplierId, variantId }) {
+  const { deleteSupplierCost } = require("@/domains/products/services/productService");
+
+  return withTransaction(async (trx) => {
+    let targetScId = Number(supplierCostId);
+    let targetSupplierId = Number(supplierId);
+    let targetVariantId = Number(variantId);
+
+    if (!targetScId && targetSupplierId && targetVariantId) {
+      const found = await trx(TABLES.SUPPLIER_COST)
+        .where({
+          [SC.SUPPLIER_ID]: targetSupplierId,
+          [SC.VARIANT_ID]: targetVariantId,
+        })
+        .first();
+      if (found) {
+        targetScId = Number(found[SC.ID]);
+      }
+    }
+
+    if (!targetScId) {
+      throw new Error("Không tìm thấy liên kết variant của NCC cần xóa.");
+    }
+
+    const scRow = await trx(TABLES.SUPPLIER_COST).where({ [SC.ID]: targetScId }).first();
+    if (!scRow) {
+      throw new Error("Bản ghi giá NCC không tồn tại hoặc đã bị xóa.");
+    }
+
+    targetSupplierId = Number(scRow[SC.SUPPLIER_ID]);
+    targetVariantId = Number(scRow[SC.VARIANT_ID]);
+
+    // Xóa trong supplier_cost qua productService để phát Domain Events đầy đủ
+    await deleteSupplierCost(targetScId);
+
+    // Dọn dẹp luôn các quy tắc điều phối cổng OTP liên quan tới NCC và variant này nếu có
+    await trx(TABLES.PORTAL_SLOT_ROUTING_RULES)
+      .where({
+        [RR.SUPPLIER_ID]: targetSupplierId,
+        [RR.VARIANT_ID]: targetVariantId,
+      })
+      .delete();
+
+    return {
+      success: true,
+      message: "Đã xóa variant khỏi nhà cung cấp.",
+      supplier_cost_id: targetScId,
+      supplier_id: targetSupplierId,
+      variant_id: targetVariantId,
+    };
   });
 }
 async function findRoutingProviderForInput({ slotKey, input }) {
@@ -795,5 +865,6 @@ module.exports = {
   createRoutingRule,
   updateRoutingRule,
   deleteRoutingRule,
+  deleteSupplierVariant,
   findRoutingProviderForInput,
 };

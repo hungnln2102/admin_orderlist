@@ -62,7 +62,13 @@ export function useExternalApiConfig() {
         fetch("/api/system/providers", { credentials: "include" }).then((response) => response.json()),
         externalApiClient.getProductApis().then((response) => response.json()),
         externalApiClient.getPortalSlots().then((response) => response.json()),
-        externalApiClient.getRoutingRules().then((response) => response.json()).catch(() => ({ rules: [], suppliers: [] })),
+        externalApiClient
+          .getRoutingRules()
+          .then((response) => response.json())
+          .catch((err) => {
+            console.error("Lỗi nạp quy tắc điều phối và NCC:", err);
+            return { rules: [], suppliers: [], supplierVariants: [] };
+          }),
       ]);
 
       setProviders(providerResponse.providers || []);
@@ -387,6 +393,22 @@ export function useExternalApiConfig() {
     return updateRoutingRule(ruleId, { isActive: !currentActive });
   };
 
+  const deleteSupplierVariant = async (supplierCostId: number) => {
+    try {
+      const response = await externalApiClient.deleteSupplierVariant(supplierCostId);
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "Không thể xóa variant khỏi NCC.");
+      }
+      showToast("success", "Đã xóa variant khỏi nhà cung cấp.");
+      await load();
+      return true;
+    } catch (error: any) {
+      showToast("error", error.message || "Không thể xóa variant khỏi nhà cung cấp.");
+      return false;
+    }
+  };
+
   // Metrics
   const configuredCount = useMemo(
     () => providers.filter((provider) => provider.configured).length,
@@ -514,6 +536,7 @@ export function useExternalApiConfig() {
     createRoutingRule,
     updateRoutingRule,
     deleteRoutingRule,
+    deleteSupplierVariant,
     toggleRoutingRuleActive,
 
     loading,

@@ -126,8 +126,11 @@ export interface SupplierVariantOption {
   supplier_id: number;
   variant_id: number;
   product_id: number;
+  supplier_cost_id?: number;
+  product_name?: string;
   variant_name: string;
   variant_display_name: string;
+  is_active?: boolean;
 }
 export interface SupplierOption {
   id: number;

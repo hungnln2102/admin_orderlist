@@ -50,6 +50,7 @@ export const ExternalApiConfigController: React.FC = () => {
     createRoutingRule,
     updateRoutingRule,
     deleteRoutingRule,
+    deleteSupplierVariant,
     toggleRoutingRuleActive,
 
     loading,
@@ -185,6 +186,7 @@ export const ExternalApiConfigController: React.FC = () => {
             onCreateRoutingRule={createRoutingRule}
             onUpdateRoutingRule={updateRoutingRule}
             onToggleRoutingRuleActive={toggleRoutingRuleActive}
+            onDeleteSupplierVariant={deleteSupplierVariant}
           />
         )}
 

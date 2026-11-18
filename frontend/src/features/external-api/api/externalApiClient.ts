@@ -15,4 +15,5 @@ export const externalApiClient = {
   createRoutingRule: (body: Record<string, unknown>) => apiClient(`${apiEndpoints.productApis}/rules/variants`, { method: "POST", body }),
   updateRoutingRule: (id: number, body: Record<string, unknown>) => apiClient(`${apiEndpoints.productApis}/rules/${id}`, { method: "PUT", body }),
   deleteRoutingRule: (id: number) => apiClient(`${apiEndpoints.productApis}/rules/${id}`, { method: "DELETE" }),
+  deleteSupplierVariant: (supplierCostId: number) => apiClient(`${apiEndpoints.productApis}/supplier-variants/${supplierCostId}`, { method: "DELETE" }),
 };
