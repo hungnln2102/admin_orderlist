@@ -189,13 +189,16 @@ async function dispatchSlotRequest({ slotKey, input }) {
   let serviceUsed = effectiveChain[0];
   const attemptedServices = [];
 
+  // Xác định email thực tế để probe: nếu input là mã đơn hàng, ưu tiên lấy resolved_email từ đơn hàng
+  const targetEmail = (cleanInput.includes("@") ? cleanInput : matchedRoutingRule?.resolved_email) || cleanInput;
+
   // Quét qua các cổng API được gán cho ô này để lấy mã OTP
   for (let i = 0; i < effectiveChain.length; i++) {
     const currentService = effectiveChain[i];
     attemptedServices.push(currentService);
     try {
       const probePayload = {
-        email: cleanInput,
+        email: targetEmail,
         serviceKey: currentService,
       };
       const res = await otpProviderService.probeOtpForEmail(probePayload);
@@ -218,7 +221,7 @@ async function dispatchSlotRequest({ slotKey, input }) {
     const extraFields = probeResult?.extra_fields || [];
     const accEmail =
       extraFields.find((f) => f.key === "account_email" || f.key === "account_username" || f.key === "email")?.value ||
-      (cleanInput.includes("@") ? cleanInput : "");
+      (targetEmail.includes("@") ? targetEmail : "");
     const pass = extraFields.find((f) => f.key === "password" || f.key === "acc_pass")?.value || "";
 
     // Phân loại chính xác 3 trạng thái: active | inactive | not_found

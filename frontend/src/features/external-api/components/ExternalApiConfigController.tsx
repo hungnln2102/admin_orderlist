@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Loader2, Radio, Package, Layers } from "lucide-react";
+import { Loader2, Radio, Package, Layers, Zap } from "lucide-react";
 import { useExternalApiConfig } from "@/features/external-api/hooks/useExternalApiConfig";
 import { ExternalApiHeader } from "@/features/external-api/components/ExternalApiHeader";
 import { ProviderCatalogTab } from "@/features/external-api/components/ProviderCatalogTab";
@@ -113,8 +113,8 @@ export const ExternalApiConfigController: React.FC = () => {
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
             }`}
           >
-            <Package className={`w-4 h-4 ${activeTab === "products" ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-400"}`} />
-            <span>Liên Kết Sản Phẩm</span>
+            <Zap className={`w-4 h-4 ${activeTab === "products" ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-400"}`} />
+            <span>Điều Phối OTP Variant</span>
             <span
               className={`ml-1 text-xs px-2 py-0.5 rounded-full ${
                 activeTab === "products"
@@ -122,7 +122,7 @@ export const ExternalApiConfigController: React.FC = () => {
                   : "bg-slate-800 text-slate-400"
               }`}
             >
-              {products.length}
+              {routingRules.length}
             </span>
           </button>
 
@@ -169,22 +169,15 @@ export const ExternalApiConfigController: React.FC = () => {
 
         {activeTab === "products" && (
           <ProductApiMappingTab
-            products={products}
-            filteredProducts={filteredProducts}
-            providers={providers}
-            availableApis={availableApis}
-            searchQuery={productSearch}
-            onSearchChange={setProductSearch}
-            productFilter={productFilter}
-            onFilterChange={setProductFilter}
-            onAssignProvider={assignProvider}
-            onRemoveMapping={removeMapping}
             slots={slots}
             routingRules={routingRules}
             suppliers={suppliers}
             supplierVariants={supplierVariants}
+            providers={providers}
+            availableApis={availableApis}
             onCreateRoutingRule={createRoutingRule}
             onUpdateRoutingRule={updateRoutingRule}
+            onDeleteRoutingRule={deleteRoutingRule}
             onToggleRoutingRuleActive={toggleRoutingRuleActive}
             onDeleteSupplierVariant={deleteSupplierVariant}
           />

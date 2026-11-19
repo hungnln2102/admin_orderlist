@@ -493,3 +493,12 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
   - [x] **Backend Specification (Codex)**: Đã thêm migration `20261116000001_add_provider_key_to_account_slots.js`, khai báo `COLS.ACCOUNT_SLOTS.PROVIDER_KEY`, lưu/trả về `provider_key` cho slot kho, và ưu tiên provider trực tiếp từ slot khi tra theo account/customer/contact hoặc activation key. Đã kiểm tra cú pháp, migration contract và activation-key unit suite; integration test chờ `TEST_DATABASE_URL` cô lập.
 
 - [x] **OTP-PROVIDER-SUPPLIER-VARIANT-ROUTING-2026-11-17**: Đổi rule điều phối OTP sang `Ô input -> Provider đã cấu hình -> NCC -> Variant`; UI bỏ Priority/Ghi chú/Sản phẩm thủ công, chỉ liệt kê provider thuộc `assigned_services` của input, load variant theo `supplier_cost`, chọn nhiều chip và loại chip bằng `X`. Lưu batch transaction theo từng variant; bảng hiển thị `STT | Provider | NCC | Variant | On/Off`. Chỉ ô input TOTP có `slot_key` là `two_factor_totp` dùng chung và không cho điều phối NCC/variant; Adobe, Netflix, GPT vẫn hiển thị toàn bộ provider được gán. Alias legacy `fix_ades` được chuẩn hóa thành `ades` ở modal và provider runtime để dropdown Adobe hiển thị đủ provider. Thêm provider nội bộ `package_warehouse`: nhập mã key để cấp/tra cứu account từ Kho Gói Sản Phẩm, trả lại password cho key đã kích hoạt, cập nhật `order_list.slot` qua transaction có sẵn; migration `20261117000002` gán provider này vào `gpt_account` đang lưu. Migration `20261117000001` thêm `variant_id` và làm `product_name_id` nullable để giữ legacy rule làm fallback. Resolver ưu tiên rule khớp chính xác NCC+variant, sau đó legacy rule, cuối cùng direct provider của slot. Đã chạy frontend build; provider probe và dispatcher smoke cho `package_warehouse` pass. Lệnh `node --test` đã in toàn bộ assertion pass, gồm test provider mới, nhưng worker không tự kết thúc do handle nền nên đã dừng sau khi có kết quả; chưa chạy migration hoặc kiểm chứng database/runtime thực tế.
+
+
+## 2026-11-19 - Sửa lỗi tạo quy tắc điều phối OTP theo variant
+
+- [x] Bổ sung migration tương thích schema legacy có `product_id` hoặc `product_name_id` bắt buộc; regression test, migration/service smoke DB test và migration local runtime batch 18 đã pass.
+
+## 2026-11-19 - Cho phép Web OTP local gọi API
+
+- [x] Whitelist `http://localhost:3005` trong `backend/.env`, restart backend local và xác nhận preflight API OTP trả `204` với `Access-Control-Allow-Origin` đúng origin.

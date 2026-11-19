@@ -98,11 +98,23 @@ async function fetchOtpFromFixAdes(email, { config: configuredConfig, includeDet
   }
 
   const data = await parseJsonResponse(response);
-  // Định dạng chuẩn: { status: 200, success: true, data: { success: true, otp: "699211", emailSubject: "...", emailDate: "..." } }
-  const directCode = extractOtpCode(data?.data?.otp || data?.data?.code || data?.otp);
-  const otp = directCode || collectOtpCandidates(data).map(extractOtpCode).find(Boolean) || null;
+  // Định dạng chuẩn Ades: { status: 200, success: true, data: { success: true, otp: "971849", emailSubject: "...", emailDate: "..." } }
+  let otp = null;
+  let errorMessage = null;
+
+  if (data?.data?.success === false) {
+    errorMessage = data?.data?.error || data?.message || "Không tìm thấy thư chứa mã OTP.";
+  } else {
+    // Chỉ lấy OTP từ các trường đích thực, tuyệt đối không quét bừa qua timestamp
+    otp = extractOtpCode(data?.data?.otp || data?.data?.code || data?.otp);
+  }
+
   if (includeDetails) {
-    return { otp, rawData: data };
+    return {
+      otp: otp || null,
+      rawData: data,
+      error_message: errorMessage,
+    };
   }
   return otp;
 }

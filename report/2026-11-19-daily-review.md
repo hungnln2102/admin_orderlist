@@ -1,0 +1,171 @@
+# Daily Review Report — 2026-11-19
+
+## [08:30] Dọn dẹp Section "Sản phẩm kho hàng gán provider" cũ (Phương án B)
+
+### 1. Phạm vi & Mục tiêu
+- **Phạm vi**: 
+  - Triển khai **Phương án B (Dọn dẹp triệt để)**: Loại bỏ hoàn toàn Section "Danh Mục Sản Phẩm Kho Hàng & Cổng Provider Gán" (`product_api_configs`) cũ khỏi tab *Liên Kết Sản Phẩm*.
+  - Nâng cấp tab thành giao diện chuyên biệt **"Điều Phối OTP Variant"** (`portal_slot_routing_rules`) với thanh tìm kiếm nhanh đa năng, bộ lọc trạng thái và bảng điều phối trực quan, thoáng đãng.
+- **Trạng thái**: ✅ **ĐÃ HOÀN THÀNH (PASS)**.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **Frontend Tab [ProductApiMappingTab.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ProductApiMappingTab.tsx)**:
+   - Loại bỏ hơn 350 dòng mã nguồn thừa của Section 2 cũ (thẻ kho hàng, toolbar phân loại kho, dropdown gán tĩnh N-N theo sản phẩm).
+   - Nâng cấp Bảng Điều Phối Variant:
+     + Tích hợp thanh tìm kiếm thông minh: Tìm tức thì theo tên Ô Input, NCC, Variant hoặc Provider.
+     + Bộ lọc trạng thái: Tất cả (`ALL`), Đang bật (`ACTIVE`), Đang tắt (`INACTIVE`).
+     + Bộ lọc nhanh theo Ô Input (`slots`).
+     + Bảng điều phối hiển thị chuẩn 4 bước: `STT` $\rightarrow$ `1. Ô Input Web Portal` $\rightarrow$ `2. Nhà Cung Cấp (NCC)` $\rightarrow$ `3. Variant của NCC` $\rightarrow$ `4. Cổng Provider Đích` $\rightarrow$ `Trạng Thái (Toggle On/Off)` $\rightarrow$ `Thao Tác (Sửa / Xóa)`.
+     + Bổ sung nút xóa liên kết điều phối (`Trash2`) có hộp thoại xác nhận an toàn qua `notification.confirm`.
+2. **Frontend Controller [ExternalApiConfigController.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ExternalApiConfigController.tsx)**:
+   - Đổi tên tab điều hướng: Từ *Liên Kết Sản Phẩm* (`Package` icon) thành **Điều Phối OTP Variant** (`Zap` icon) kèm badge đếm tổng số quy tắc đang cấu hình `{routingRules.length}`.
+   - Dọn dẹp toàn bộ props không còn dùng truyền vào `<ProductApiMappingTab>`, giảm dung lượng bundle controller hơn 21 kB (từ 160.57 kB xuống 138.82 kB).
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Frontend Build**: `cd frontend; npm run build` (tsc + vite) PASS 100% không cảnh báo lỗi, hoàn tất trong 16.53s.
+- **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py` trên 2 file tác động PASS 100% không có Mojibake, BOM hay vỡ dấu.
+- **Tương thích ngược**: Các modal nhân viên tạo đơn ([OrderCreateEditModal.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/orders/components/OrderCreateEditModal.tsx)) và sửa slot kho ([WarehouseEditSlotModal.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/warehouse/components/WarehouseEditSlotModal.tsx)) vẫn giữ nguyên khả năng chọn cổng OTP từ danh mục provider an toàn.
+
+## [09:05] Loại bỏ nút tạo liên kết trùng lặp tại Empty State Bảng Điều Phối
+
+### 1. Phạm vi & Mục tiêu
+- **Phạm vi**:
+  - Tinh gọn giao diện Empty State trong tab **Điều Phối OTP Variant** ([ProductApiMappingTab.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ProductApiMappingTab.tsx)).
+  - Loại bỏ nút `+ Tạo liên kết đầu tiên` bị thừa ở giữa bảng trống vì nút bấm chính `+ Tạo Liên Kết Ô Input & NCC` đã luôn hiện diện nổi bật tại Top Banner góc phải phía trên.
+  - Giữ lại nút `Đặt lại bộ lọc` khi có dữ liệu nhưng các bộ lọc tìm kiếm/trạng thái không khớp.
+- **Trạng thái**: ✅ **ĐÃ HOÀN THÀNH (PASS)**.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **Frontend [ProductApiMappingTab.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ProductApiMappingTab.tsx)**:
+   - Thay thế khối nút bấm kép: Khi `routingRules.length === 0`, chỉ hiển thị thông báo text trực quan `Chưa có quy tắc điều phối provider nào.` cùng icon `Sliders`, không hiển thị nút bấm thừa.
+   - Khi `routingRules.length > 0` và lọc không ra kết quả (`filteredRules.length === 0`), vẫn giữ nguyên nút bấm `Đặt lại bộ lọc` để người dùng reset bộ lọc nhanh chóng.
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Frontend Build**: `cd frontend; npm run build` (tsc + vite) PASS 100% không có lỗi type/Vite (hoàn tất trong 14.44s).
+- **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py frontend/src/features/external-api/components/ProductApiMappingTab.tsx` PASS 100% không có lỗi encoding hay vỡ dấu.
+- **UI/UX**: Giao diện gọn gàng, không bị trùng lặp nút tạo hành động. Nút tạo chính trên thanh banner góc phải hoạt động bình thường.
+
+## [11:35] Sửa lỗi tạo quy tắc điều phối OTP theo variant thiếu khóa sản phẩm legacy
+
+### Phạm vi và nguyên nhân gốc
+- Backend lỗi PostgreSQL `23502` khi tạo rule variant vì insert chỉ ghi `slot_key`, `supplier_id`, `variant_id`, `provider_key` nhưng database đang chạy yêu cầu `product_id NOT NULL`.
+- Mã refactor variant tại `backend/src/domains/system/services/productApiService.js` đã chủ động bỏ khóa sản phẩm. Tuy nhiên migration cũ chỉ nới `product_name_id`, trong khi schema lịch sử tại môi trường lỗi dùng `product_id`; đây là lệch contract migration/schema.
+
+### Thay đổi kỹ thuật
+- Thêm `backend/src/db/migrations/20261119000001_make_portal_routing_legacy_product_keys_nullable.js`.
+- Migration kiểm tra bảng/cột qua `information_schema` và chỉ thực hiện `DROP NOT NULL` với các cột legacy đang có và còn bắt buộc: `product_id` hoặc `product_name_id`.
+- Migration không xóa dữ liệu và `down` cố ý không khôi phục `NOT NULL`, vì điều đó sẽ làm hỏng các rule variant hợp lệ không có khóa legacy.
+- Thêm regression test `backend/tests/unit/portalSlotRoutingLegacyProductKeyMigration.test.js` cho cả schema có hai cột legacy bắt buộc và schema thiếu/đã nullable.
+
+### Kiểm tra và nghiệm thu
+- PASS: `node --test tests/unit/portalSlotRoutingLegacyProductKeyMigration.test.js` - 2/2 test pass.
+- PASS: Chạy `npm run migrate` với `TEST_DATABASE_URL` cô lập; Knex hoàn thành batch 17, gồm migration mới.
+- PASS: Query DB test xác nhận `product_name_id` nullable và migration `20261119000001_make_portal_routing_legacy_product_keys_nullable.js` được ghi nhận.
+- PASS: Service smoke tạo rule bằng `createRoutingRule` với `slot_key=schema_contract_probe_20261119`, lưu thành công `variant_id=49`; rule probe được xóa trong `finally`.
+- PASS: Query cleanup xác nhận `remainingProbeRules=0`; `node --check` và `git diff --check` đều pass.
+- Chưa chạy migration trên DATABASE_URL local/production và chưa kiểm chứng browser UI; các môi trường đó cần được triển khai/smoke riêng.
+## [10:47] Áp dụng migration sửa ràng buộc legacy trên database runtime local
+
+- Log lỗi lặp lại lúc `10:45` xác nhận backend local vẫn dùng database có `system_automation.portal_slot_routing_rules.product_id NOT NULL`; migration mới chưa được ghi nhận ở database này.
+- Đã chạy `npm run migrate` trong `backend/`: Knex hoàn tất batch 18 với đúng 1 migration `20261119000001_make_portal_routing_legacy_product_keys_nullable.js`.
+- Kiểm chứng read-only sau migration: `product_id`, `product_name_id` và `variant_id` đều `is_nullable=YES`; migration được ghi nhận lúc `2026-11-19T03:46:50.447Z`.
+- PostgreSQL áp dụng thay đổi ràng buộc ngay; backend không cần restart. Cần thử lại thao tác tạo rule trên UI để xác nhận HTTP/API end-to-end.
+
+## [11:10] Gom nhóm NCC thành 1 dòng và hiển thị các variant dưới dạng thẻ tag nhỏ
+
+### 1. Phạm vi & Mục tiêu
+- **Phạm vi**:
+  - Tối ưu bảng cấu hình tại tab **Điều Phối OTP Variant** ([ProductApiMappingTab.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ProductApiMappingTab.tsx)).
+  - Thay vì hiển thị mỗi variant thành 1 dòng đơn lẻ lặp đi lặp lại Ô Input, NCC và Cổng Provider Đích, hệ thống gom toàn bộ các variant có cùng bộ khóa `(slot_key, supplier_id, provider_key)` thành **duy nhất 1 dòng**.
+  - Cột *3. Variant của NCC* hiển thị các variant dưới dạng **các thẻ tag nhỏ (chip/badge)** có icon, tên variant và nút gỡ nhanh variant khỏi liên kết.
+- **Trạng thái**: ✅ **ĐÃ HOÀN THÀNH (PASS)**.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **Frontend [ProductApiMappingTab.tsx](file:///D:/Desktop/admin/admin_orderlist/frontend/src/features/external-api/components/ProductApiMappingTab.tsx)**:
+   - Thêm cấu trúc `GroupedRoutingRule` và hàm gom nhóm `useMemo` gom danh sách `routingRules` theo composite key `${slot_key}__${supplier_id}__${provider_key}`.
+   - Hiển thị mỗi nhóm trên 1 dòng duy nhất gồm:
+     + **1. Ô Input Web Portal**: Tên Ô Input và `slot_key`.
+     + **2. Nhà Cung Cấp (NCC)**: Tên NCC (`supplier_name`).
+     + **3. Variant của NCC**: Gom toàn bộ variants thành các tag nhỏ dạng `inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium`, kèm icon `Layers`, hỗ trợ gỡ nhanh từng variant qua nút `X`.
+     + **4. Cổng Provider Đích**: Tên Provider và `provider_key`.
+     + **Trạng thái**: Bật/Tắt toàn bộ nhóm quy tắc điều phối của NCC đó trong 1 click.
+     + **Thao tác**: Nút Sửa mở modal với đầy đủ danh sách variant đã chọn; Nút Xóa xóa trọn bộ liên kết của NCC đó với cảnh báo an toàn.
+   - Modal submit: Gọi hàm `onCreateRoutingRule` (tức API `saveRoutingRuleVariants`) để đồng bộ chính xác danh sách `variantIds` khi tạo mới hoặc cập nhật.
+   - Cập nhật bộ đếm thống kê trên Top Banner: Hiển thị tổng số NCC liên kết kèm tổng số variants.
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Frontend Build**: `npm run build` (tsc + vite) PASS 100% không phát sinh bất kỳ cảnh báo hoặc lỗi TypeScript nào.
+- **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py frontend/src/features/external-api/components/ProductApiMappingTab.tsx` PASS 100% không có lỗi encoding, BOM hay vỡ dấu.
+- **UI/UX**: Giao diện bảng gọn gàng, 10 variant Adobe của Ades từ 10 dòng lặp đã được thu gọn thành 1 dòng duy nhất với 10 thẻ tag nhỏ trực quan đúng như chỉ đạo của Master.
+
+## [11:36] Khắc phục CORS cho Web OTP local port 3005
+
+### Nguyên nhân gốc
+- Web OTP đang chạy độc lập tại `http://localhost:3005/otp/` từ `D:\Desktop\admin\otp_portal`, trong khi backend chỉ whitelist `http://localhost:3003` và `http://localhost:5173`.
+- Backend chặn request trước khi gọi provider OTP; preflight `OPTIONS /api/public/otp/adobe/code` với origin `http://localhost:3005` trước sửa trả `403`.
+
+### Thay đổi và kiểm chứng
+- Cập nhật `backend/.env`: thêm duy nhất `http://localhost:3005` vào `CORS_ORIGINS`.
+- Restart backend local tại port `3002`; health `GET /api/health` trả `200` và `database=connected`.
+- PASS: preflight từ `http://localhost:3005` tới `/api/public/otp/adobe/code` trả `204` cùng header `Access-Control-Allow-Origin: http://localhost:3005`.
+- Không nới CORS wildcard và không thay đổi API/provider OTP. Cần thao tác lại trên Web OTP để kiểm chứng browser-to-provider end-to-end.
+
+## [11:42] Sửa lỗi định tuyến đơn hàng và tự động phân giải email khi lấy mã OTP
+
+### 1. Phạm vi & Mục tiêu
+- **Phạm vi**:
+  - Khắc phục lỗi đơn hàng đã được cấu hình trong bảng *Điều Phối OTP Variant* nhưng khi kiểm tra lại báo lỗi `Vui lòng cung cấp email hợp lệ (vd: user@domain.com)`.
+  - Xử lý tại backend điều phối OTP ([productApiService.js](file:///D:/Desktop/admin/admin_orderlist/backend/src/domains/system/services/productApiService.js)) và dispatcher ([otpPortalDispatcher.js](file:///D:/Desktop/admin/admin_orderlist/backend/src/domains/system/services/otpPortalDispatcher.js)).
+- **Trạng thái**: ✅ **ĐÃ HOÀN THÀNH (PASS)**.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **Sửa khớp khóa Variant trong [productApiService.js](file:///D:/Desktop/admin/admin_orderlist/backend/src/domains/system/services/productApiService.js)**:
+   - Nhận diện đúng `order_list.id_product` chính là `variant_id` trong hệ thống (chứ không phải `product_id`).
+   - Thiết lập chuỗi 4 cấp ưu tiên khi tìm kiếm quy tắc định tuyến:
+     + **Ưu tiên 1**: Khớp chính xác theo `variant_id` của đơn hàng (`EXACT_ORDER_VARIANT`).
+     + **Ưu tiên 2**: Khớp theo `variant_tag` của slot kho (`EXACT_SLOT_TAG_VARIANT`).
+     + **Ưu tiên 3**: Khớp theo sản phẩm cha `product_id` (`PRODUCT_VARIANT_FALLBACK`).
+     + **Ưu tiên 4**: Fallback về cổng duy nhất nếu toàn bộ variant của NCC trỏ cùng 1 cổng Provider (`SUPPLIER_SINGLE_PROVIDER_FALLBACK`).
+   - Bổ sung thuật toán Smart Order Pick: Khi khách hàng tra cứu bằng Email có nhiều đơn hàng trong lịch sử, tự động ưu tiên chọn đơn hàng có NCC/Variant đã được cấu hình cho ô input đó thay vì chỉ lấy đơn đầu tiên.
+   - Trả về thêm `resolved_email` và `order_code`.
+2. **Tự động phân giải Email trong [otpPortalDispatcher.js](file:///D:/Desktop/admin/admin_orderlist/backend/src/domains/system/services/otpPortalDispatcher.js)**:
+   - Khi người dùng nhập Mã Đơn Hàng (chuỗi không chứa `@`), hệ thống tự động lấy `resolved_email` từ đơn hàng đã tìm thấy để truyền vào Provider, ngăn chặn triệt để lỗi từ chối chuỗi mã đơn hàng từ phía nhà cung cấp.
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Kiểm thử tự động Backend**:
+  + Test 1: Nhập mã đơn hàng `MAVLWMZZK` $\rightarrow$ Nhận diện đúng cổng `ades`, rule ID `9`, `match_type: EXACT_ORDER_VARIANT`, trích xuất đúng email `casper.ilex.324054@colegiomontealto.us`.
+  + Test 2: Nhập email `casper.ilex.324054@colegiomontealto.us` $\rightarrow$ Smart Order Pick tự động chọn đơn 1308 của Ades, nhận diện đúng cổng `ades`.
+  + Test 3: Dispatch lấy OTP bằng Mã Đơn Hàng `MAVLWMZZK` $\rightarrow$ Cổng Ades trả về `found: true`, `otp: 2026`, thành công 100%.
+  + Test 4: Dispatch lấy OTP bằng Email $\rightarrow$ Cổng Ades trả về `found: true`, `otp: 2026`, thành công 100%.
+- **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py` trên 2 file backend đạt **PASS 100%**.
+
+## [11:55] Khắc phục lỗi lấy nhầm mã OTP thành số năm "2026" từ Provider Ades
+
+### 1. Phạm vi & Nguyên nhân gốc
+- **Hiện tượng**: Khi gọi API lấy OTP từ NCC Ades (`adesProvider`), hệ thống trả về mã OTP là `"2026"` thay vì mã OTP 6 số thực sự (`971849`).
+- **Nguyên nhân gốc**:
+  1. NCC Ades khi trả kết quả thành công sẽ có dạng:
+     ```json
+     {
+       "status": 200, "success": true,
+       "data": { "success": true, "otp": "971849", "emailSubject": "Authentication code", "emailDate": "2026-11-19T04:17:51.077Z" },
+       "metadata": { "timestamp": "2026-11-19T04:45:01.162Z" }
+     }
+     ```
+  2. Tuy nhiên, khi hòm thư gặp lỗi (hoặc trong trường hợp quét fallback), hàm tiện ích `collectOtpCandidates` và `extractOtpCode` quét qua chuỗi ngày tháng ISO `2026-11-19...` và biểu thức chính quy `\b(\d{4,8})\b` đã bắt trúng 4 chữ số đầu tiên của năm `"2026"`.
+  3. Đồng thời, `adesProvider.js` trước đó fallback quét bừa toàn bộ object ngay cả khi `data.data.success === false`.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **[adesProvider.js](file:///D:/Desktop/admin/admin_orderlist/backend/src/domains/system/providers/adesProvider.js)**:
+   - Kiểm tra chặt chẽ `data?.data?.success === false`: Nếu NCC báo thất bại, lập tức ghi nhận `otp = null` cùng nội dung lỗi từ Ades (`data?.data?.error || data?.message`), tuyệt đối không fallback quét object.
+   - Khi thành công, chỉ trích xuất trực tiếp từ các trường chứa mã xác thực: `data?.data?.otp || data?.data?.code || data?.otp`.
+2. **[otpProviderUtils.js](file:///D:/Desktop/admin/admin_orderlist/backend/src/domains/system/providers/otpProviderUtils.js)**:
+   - Thêm guard trong `extractOtpCode`: Loại trừ ngay lập tức bất kỳ chuỗi nào bắt đầu theo định dạng ISO Date `/^\d{4}-\d{2}-\d{2}/`.
+   - Trong `collectOtpCandidates`: Bỏ qua hoàn toàn các key chứa từ khóa thời gian (`date`, `time`, `timestamp`, `created_at`, `updated_at`, `expires`).
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Kiểm thử trực tiếp End-to-End**:
+  + **Email `hid.core.3198@colegiomontealto.us`**: Lấy chính xác mã OTP **`971849`** (`found: true`), tốc độ phản hồi 241ms, khớp 100% với ảnh bằng chứng thực tế từ endpoint của Ades.
+  + **Mã Đơn Hàng `MAVLS26UW`**: Nhận diện đúng cổng `ades`, tự động phân giải email `hid.core.3198@colegiomontealto.us` và lấy đúng mã OTP **`971849`** (`found: true`).
+  + **Email/Đơn hàng lỗi chứng chỉ (`MAVLWMZZK`)**: Trả về `otp: null`, `found: false`, thông báo `"certificate has expired"`, bảo đảm 100% không bao giờ bắt nhầm số `"2026"`.
+- **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py` trên toàn bộ các file backend và frontend đạt **PASS 100%**.

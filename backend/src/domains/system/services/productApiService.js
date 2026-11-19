@@ -754,7 +754,7 @@ async function findRoutingProviderForInput({ slotKey, input }) {
     }
 
     const linkedOrderId = activationKey?.[AK.ID_ORDER];
-    const matchedOrder = await db(TABLES.ORDER_LIST)
+    const matchedOrders = await db(TABLES.ORDER_LIST)
       .select(ORD.ID, ORD.ID_ORDER, ORD.ID_PRODUCT, ORD.SUPPLY_ID, ORD.INFORMATION_ORDER, ORD.SLOT, ORD.STATUS)
       .where(function () {
         this.whereRaw("LOWER(" + ORD.INFORMATION_ORDER + ") = ?", [cleanInput])
@@ -764,54 +764,135 @@ async function findRoutingProviderForInput({ slotKey, input }) {
       })
       .whereNotIn(ORD.STATUS, ["CANCELED", "REFUNDED"])
       .orderBy(ORD.ID, "desc")
-      .first();
+      .limit(15);
 
-    let matchedSystemProductId = matchedOrder?.[ORD.ID_PRODUCT]
-      ? Number(matchedOrder[ORD.ID_PRODUCT])
-      : null;
+    // Ưu tiên chọn đơn hàng có NCC/Variant đã được cấu hình cho slot_key này
+    const slotRules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
+      .where({ [RR.SLOT_KEY]: slotKey, [RR.IS_ACTIVE]: true })
+      .whereNotNull(RR.VARIANT_ID);
+    const configuredSuppliers = new Set(slotRules.map((r) => Number(r[RR.SUPPLIER_ID])));
+    const configuredVariants = new Set(slotRules.map((r) => Number(r[RR.VARIANT_ID])));
+
+    let matchedOrder = matchedOrders.find(
+      (o) => configuredSuppliers.has(Number(o[ORD.SUPPLY_ID])) && configuredVariants.has(Number(o[ORD.ID_PRODUCT]))
+    );
+    if (!matchedOrder) {
+      matchedOrder = matchedOrders.find((o) => configuredSuppliers.has(Number(o[ORD.SUPPLY_ID])));
+    }
+    if (!matchedOrder) {
+      matchedOrder = matchedOrders[0] || null;
+    }
+
+    const resolvedEmail = matchedOrder?.[ORD.INFORMATION_ORDER] || matchedSlot?.customer || null;
+    const orderCode = matchedOrder?.[ORD.ID_ORDER] || linkedOrderId || null;
+    const orderVariantId = matchedOrder?.[ORD.ID_PRODUCT] ? Number(matchedOrder[ORD.ID_PRODUCT]) : null;
+
     if (matchedOrder?.[ORD.SUPPLY_ID]) {
       matchedSupplierId = Number(matchedOrder[ORD.SUPPLY_ID]);
     }
-    if (!matchedSystemProductId && matchedProductNameId) {
+
+    let matchedParentProductId = null;
+    if (orderVariantId) {
+      const matchedVariant = await db(TABLES.VARIANT).where(V.ID, orderVariantId).first();
+      if (matchedVariant) {
+        matchedParentProductId = matchedVariant[V.PRODUCT_ID] ? Number(matchedVariant[V.PRODUCT_ID]) : null;
+      }
+    }
+
+    if (!matchedParentProductId && matchedProductNameId) {
       const productName = await db(TABLES.PRODUCT_NAMES)
         .select(PN.PRODUCT_ID)
         .where(PN.ID, matchedProductNameId)
         .first();
-      matchedSystemProductId = productName?.[PN.PRODUCT_ID]
+      matchedParentProductId = productName?.[PN.PRODUCT_ID]
         ? Number(productName[PN.PRODUCT_ID])
         : null;
     }
 
-    const normalizedVariantTag = normalizeKey(matchedSlot?.variant_tag);
-    if (matchedSupplierId && matchedSystemProductId) {
-      const variantRulesQuery = db(TABLES.PORTAL_SLOT_ROUTING_RULES + " as r")
-        .join(TABLES.VARIANT + " as v", "v." + V.ID, "r." + RR.VARIANT_ID)
+    if (matchedSupplierId) {
+      const supplierRules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES + " as r")
+        .leftJoin(TABLES.VARIANT + " as v", "v." + V.ID, "r." + RR.VARIANT_ID)
         .where({
           ["r." + RR.SLOT_KEY]: slotKey,
           ["r." + RR.SUPPLIER_ID]: matchedSupplierId,
           ["r." + RR.IS_ACTIVE]: true,
         })
         .whereNotNull("r." + RR.VARIANT_ID)
-        .where("v." + V.PRODUCT_ID, matchedSystemProductId)
-        .select("r." + RR.ID + " as rule_id", "r." + RR.PROVIDER_KEY + " as provider_key", "v." + V.VARIANT_NAME + " as variant_name", "v." + V.DISPLAY_NAME + " as variant_display_name")
+        .select(
+          "r." + RR.ID + " as rule_id",
+          "r." + RR.PROVIDER_KEY + " as provider_key",
+          "r." + RR.VARIANT_ID + " as variant_id",
+          "v." + V.PRODUCT_ID + " as product_id",
+          "v." + V.VARIANT_NAME + " as variant_name",
+          "v." + V.DISPLAY_NAME + " as variant_display_name"
+        )
         .orderBy("r." + RR.ID, "asc");
-      const variantRules = await variantRulesQuery;
-      const exactVariantRule = normalizedVariantTag
-        ? variantRules.find((rule) =>
+
+      if (supplierRules.length > 0) {
+        // [Ưu tiên 1]: Khớp chính xác theo variant_id của đơn hàng
+        if (orderVariantId) {
+          const exactOrderRule = supplierRules.find((rule) => Number(rule.variant_id) === orderVariantId);
+          if (exactOrderRule) {
+            return {
+              provider_key: exactOrderRule.provider_key,
+              rule_id: Number(exactOrderRule.rule_id),
+              match_type: "EXACT_ORDER_VARIANT",
+              supplier_id: matchedSupplierId,
+              variant_id: orderVariantId,
+              resolved_email: resolvedEmail,
+              order_code: orderCode,
+            };
+          }
+        }
+
+        // [Ưu tiên 2]: Khớp theo variant_tag của kho
+        const normalizedVariantTag = normalizeKey(matchedSlot?.variant_tag);
+        if (normalizedVariantTag) {
+          const exactTagRule = supplierRules.find((rule) =>
             normalizeKey(rule.variant_name) === normalizedVariantTag
             || normalizeKey(rule.variant_display_name) === normalizedVariantTag
-          )
-        : variantRules.length === 1
-          ? variantRules[0]
-          : null;
-      if (exactVariantRule) {
-        return {
-          provider_key: exactVariantRule.provider_key,
-          rule_id: Number(exactVariantRule.rule_id),
-          match_type: "EXACT_SUPPLIER_VARIANT",
-          supplier_id: matchedSupplierId,
-          variant_tag: matchedSlot?.variant_tag || null,
-        };
+          );
+          if (exactTagRule) {
+            return {
+              provider_key: exactTagRule.provider_key,
+              rule_id: Number(exactTagRule.rule_id),
+              match_type: "EXACT_SLOT_TAG_VARIANT",
+              supplier_id: matchedSupplierId,
+              variant_tag: matchedSlot?.variant_tag || null,
+              resolved_email: resolvedEmail,
+              order_code: orderCode,
+            };
+          }
+        }
+
+        // [Ưu tiên 3]: Khớp theo sản phẩm cha (product_id)
+        if (matchedParentProductId) {
+          const productRules = supplierRules.filter((rule) => Number(rule.product_id) === matchedParentProductId);
+          if (productRules.length > 0) {
+            return {
+              provider_key: productRules[0].provider_key,
+              rule_id: Number(productRules[0].rule_id),
+              match_type: "PRODUCT_VARIANT_FALLBACK",
+              supplier_id: matchedSupplierId,
+              product_id: matchedParentProductId,
+              resolved_email: resolvedEmail,
+              order_code: orderCode,
+            };
+          }
+        }
+
+        // [Ưu tiên 4]: Fallback về cổng duy nhất nếu toàn bộ variant của NCC trỏ cùng 1 provider
+        const uniqueProviderKeys = [...new Set(supplierRules.map((r) => r.provider_key))];
+        if (uniqueProviderKeys.length === 1) {
+          return {
+            provider_key: uniqueProviderKeys[0],
+            rule_id: Number(supplierRules[0].rule_id),
+            match_type: "SUPPLIER_SINGLE_PROVIDER_FALLBACK",
+            supplier_id: matchedSupplierId,
+            resolved_email: resolvedEmail,
+            order_code: orderCode,
+          };
+        }
       }
     }
 
