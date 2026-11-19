@@ -44,3 +44,28 @@ export interface CatalogProductOption {
   name: string;
 }
 
+export interface ActivationKeyRule {
+  id: number;
+  variant_id: number;
+  variant_name?: string;
+  variant_display_name?: string;
+  product_name?: string;
+  supplier_id: number;
+  supplier_name?: string;
+  product_name_id: number;
+  target_warehouse_name?: string;
+  is_active: boolean;
+  note?: string | null;
+  available_slots_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SaveActivationKeyRulePayload {
+  variant_id: number;
+  supplier_id: number;
+  product_name_id: number;
+  is_active?: boolean;
+  note?: string;
+}
+

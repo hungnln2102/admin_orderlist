@@ -29,7 +29,7 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
     return products.filter(
       (p) =>
         (p.package_product && p.package_product.toLowerCase().includes(term)) ||
-        p.san_pham.toLowerCase().includes(term)
+        (p.san_pham && p.san_pham.toLowerCase().includes(term))
     );
   }, [products, search]);
 

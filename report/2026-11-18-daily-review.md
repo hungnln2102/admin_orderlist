@@ -107,3 +107,27 @@
 - **Unit test backend**: `cd backend; node --test tests/unit/productApiService.test.js` PASS 7/7 tests (345ms).
 - **Frontend Build**: `cd frontend; npm run build` (tsc + vite) PASS 100% không cảnh báo lỗi, hoàn tất trong 16.07s.
 - **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py` trên 4 file tác động PASS 100% không có Mojibake, BOM hay vỡ dấu.
+
+---
+
+## [20:19] Khắc phục schema drift `portal_slot_routing_rules.variant_id`
+
+### 1. Phạm vi & trạng thái
+- **Phạm vi**: Khôi phục cột `variant_id` mà Product API đã dùng để tạo và liệt kê rule điều phối OTP theo NCC và variant.
+- **Trạng thái**: PASS. Không sửa mã nguồn ứng dụng và không thay đổi dữ liệu routing hiện có.
+
+### 2. Nguyên nhân gốc đã xác minh
+- Bảng `system_automation.portal_slot_routing_rules` có tồn tại nhưng thiếu cột `variant_id`.
+- Runtime tại `backend/src/domains/system/services/productApiService.js` đã truy vấn và ghi cột này, do đó PostgreSQL trả lỗi `42703`.
+- Migration `20261117000001_add_variant_to_portal_slot_routing_rules.js` chưa có trong `public.knex_migrations_v2`.
+
+### 3. Thay đổi kỹ thuật
+- Áp dụng riêng migration `backend/src/db/migrations/20261117000001_add_variant_to_portal_slot_routing_rules.js` qua `knex migrate:up`.
+- Schema sau migration có `variant_id BIGINT NULL`, FK `portal_slot_routing_rules_variant_id_fkey` đến `business.variant(id) ON DELETE CASCADE`, cùng hai partial index variant.
+- Migration được ghi nhận ở batch `26` trong `knex_migrations_v2`.
+
+### 4. Kiểm tra & điều kiện còn lại
+- Preflight không phát hiện duplicate legacy key trước khi tạo unique index.
+- `listRoutingRules()` smoke PASS: trả về `rules: 0`, `suppliers: 18`, `supplierVariants: 141`; không còn lỗi thiếu cột.
+- `node --check` PASS cho service và migration; `knex migrate:list` xác nhận migration variant đã Completed.
+- Còn 4 migration pending khác: `20261111000001`, `20261111000002`, `20261114000001`, `20261117000002`. Không chạy `migrate:latest` cho đến khi đối soát riêng vì migration unique order code có thể cập nhật dữ liệu lịch sử.

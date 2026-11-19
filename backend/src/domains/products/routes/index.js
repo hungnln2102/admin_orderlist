@@ -10,6 +10,13 @@ router.post("/activation-keys", activationKeyController.createActivationKeys);
 router.post("/activation-keys/:id/revoke", activationKeyController.revokeActivationKey);
 router.delete("/activation-keys/:id", activationKeyController.deleteActivationKey);
 
+// Quản lý Quy Tắc Cấp Key Tự Động theo Variant + NCC (Activation Key Rules)
+router.get("/activation-key-rules", activationKeyController.getActivationKeyRules);
+router.post("/activation-key-rules", activationKeyController.saveActivationKeyRule);
+router.put("/activation-key-rules/:id/toggle", activationKeyController.toggleActivationKeyRule);
+router.delete("/activation-key-rules/:id", activationKeyController.deleteActivationKeyRule);
+router.get("/activation-key-rules/check", activationKeyController.checkMatchingKeyRule);
+
 router.get("/prices", productController.getProductPrices);
 router.get("/packages", productController.getPackageProducts);
 router.post("/packages", productController.createPackageProduct);

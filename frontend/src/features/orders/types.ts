@@ -84,6 +84,8 @@ export interface OrderFormData {
   warehouse_backup_email?: string;
   warehouse_two_fa?: string;
   warehouse_otp_type?: string;
+  is_auto_key?: boolean;
+  activation_key?: string;
 }
 
 export const DEFAULT_FORM_DATA: OrderFormData = {
@@ -111,6 +113,8 @@ export const DEFAULT_FORM_DATA: OrderFormData = {
   warehouse_backup_email: "",
   warehouse_two_fa: "",
   warehouse_otp_type: "",
+  is_auto_key: false,
+  activation_key: "",
 };
 
 export interface CatalogProduct {

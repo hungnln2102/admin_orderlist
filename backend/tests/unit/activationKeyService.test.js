@@ -46,4 +46,38 @@ describe("Activation Key Generation & Format Suite", () => {
       }
     );
   });
+
+  it("saveActivationKeyRule ném lỗi khi thiếu variant_id, supplier_id hoặc product_name_id", async () => {
+    await assert.rejects(
+      async () => {
+        await activationKeyService.saveActivationKeyRule({ variant_id: null, supplier_id: 1, product_name_id: 1 });
+      },
+      {
+        message: "Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!",
+      }
+    );
+    await assert.rejects(
+      async () => {
+        await activationKeyService.saveActivationKeyRule({ variant_id: 1, supplier_id: null, product_name_id: 1 });
+      },
+      {
+        message: "Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!",
+      }
+    );
+    await assert.rejects(
+      async () => {
+        await activationKeyService.saveActivationKeyRule({ variant_id: 1, supplier_id: 1, product_name_id: null });
+      },
+      {
+        message: "Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!",
+      }
+    );
+  });
+
+  it("findMatchingKeyRule trả về null khi không truyền đủ variantId hoặc supplierId", async () => {
+    const res1 = await activationKeyService.findMatchingKeyRule({ variantId: null, supplierId: 1 });
+    assert.equal(res1, null);
+    const res2 = await activationKeyService.findMatchingKeyRule({ variantId: 1, supplierId: null });
+    assert.equal(res2, null);
+  });
 });

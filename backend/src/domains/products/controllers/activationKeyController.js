@@ -63,11 +63,64 @@ const publicActivateKey = async (req, res) => {
   }
 };
 
+const getActivationKeyRules = async (_req, res) => {
+  try {
+    const rules = await activationKeyService.listActivationKeyRules();
+    return res.json({ success: true, data: rules });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message, message: "Lỗi tải danh sách cấu hình cấp key" });
+  }
+};
+
+const saveActivationKeyRule = async (req, res) => {
+  try {
+    const rule = await activationKeyService.saveActivationKeyRule(req.body);
+    return res.status(201).json({ success: true, data: rule, message: "Đã lưu cấu hình cấp key thành công!" });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+};
+
+const toggleActivationKeyRule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rule = await activationKeyService.toggleActivationKeyRule(id);
+    return res.json({ success: true, data: rule, message: "Đã đổi trạng thái cấu hình!" });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+};
+
+const deleteActivationKeyRule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await activationKeyService.deleteActivationKeyRule(id);
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+};
+
+const checkMatchingKeyRule = async (req, res) => {
+  try {
+    const { variantId, supplierId } = req.query;
+    const rule = await activationKeyService.findMatchingKeyRule({ variantId, supplierId });
+    return res.json({ success: true, matched: Boolean(rule), rule });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   getActivationKeys,
   createActivationKeys,
   revokeActivationKey,
   deleteActivationKey,
   publicActivateKey,
+  getActivationKeyRules,
+  saveActivationKeyRule,
+  toggleActivationKeyRule,
+  deleteActivationKeyRule,
+  checkMatchingKeyRule,
 };
 

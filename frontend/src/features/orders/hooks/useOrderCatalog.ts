@@ -35,6 +35,7 @@ export function useOrderCatalog() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -92,6 +93,10 @@ export function useOrderCatalog() {
     catalogPromiseRef.current = promise;
     return promise;
   }, [applyCatalog]);
+
+  useEffect(() => {
+    void ensureOrderCatalog().catch(() => {});
+  }, [ensureOrderCatalog]);
 
   const fetchSuppliersForProduct = useCallback(async (productId: number) => {
     setLoadingSuppliers(true);

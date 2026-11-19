@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff, Sparkles, ChevronDown } from "lucide-react";
+import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff, Sparkles, ChevronDown, RefreshCw, Copy, Check } from "lucide-react";
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
@@ -51,7 +51,11 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
   hasPackage = true,
   requiresStorage = false,
 }) => {
+  const currentPrefix = formData.order_prefix || (isImportTab ? ORDER_PREFIX.MAVN : ORDER_PREFIX.MAVC);
+  const isImportMode = isImportTab || currentPrefix === ORDER_PREFIX.MAVN;
+
   const [showWarehousePassword, setShowWarehousePassword] = useState(false);
+  const [matchedKeyRule, setMatchedKeyRule] = useState<any | null>(null);
   const [apiMapping, setApiMapping] = useState<{
     byProductId: Record<string, any[]>;
     byVariantId: Record<string, any[]>;
@@ -60,6 +64,68 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
     byPackageName: Record<string, any[]>;
     allApis: any[];
   } | null>(null);
+
+  // Tự động kiểm tra quy tắc cấp key khi chọn Variant + NCC -> Tự động random key vào information_order
+  useEffect(() => {
+    if (!isOpen || isImportMode || isEdit) return;
+    if (!formData.id_product || !formData.supply_id) {
+      setMatchedKeyRule(null);
+      return;
+    }
+
+    let isMounted = true;
+    const variantId = formData.id_product;
+    const supplierId = formData.supply_id;
+
+    fetch(`/api/products/activation-key-rules/check?variantId=${variantId}&supplierId=${supplierId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.success && data.matched && data.rule) {
+          setMatchedKeyRule(data.rule);
+          setFormData((prev) => {
+            const prefix = (data.rule.product_name || data.rule.variant_name || "KEY")
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, "")
+              .substring(0, 4) || "KEY";
+            const randHex = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+            const autoKey = `${prefix}-${randHex()}-${randHex()}`;
+
+            const currentInfo = String(prev.information_order || "").trim();
+            const isKeyPattern = /^[A-Z0-9]{3,5}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(currentInfo);
+            if (!currentInfo || isKeyPattern) {
+              return {
+                ...prev,
+                information_order: autoKey,
+              };
+            }
+            return prev;
+          });
+        } else {
+          setMatchedKeyRule(null);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setMatchedKeyRule(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, isImportMode, isEdit, formData.id_product, formData.supply_id]);
+
+  const handleRegenerateKey = () => {
+    const prefix = (matchedKeyRule?.product_name || matchedKeyRule?.variant_name || matchedProduct?.san_pham || "KEY")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .substring(0, 4) || "KEY";
+    const randHex = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newKey = `${prefix}-${randHex()}-${randHex()}`;
+    setFormData((prev) => ({
+      ...prev,
+      information_order: newKey,
+    }));
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -139,9 +205,6 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
   }, [availableOtpApis]);
 
   if (!isOpen) return null;
-
-  const currentPrefix = formData.order_prefix || (isImportTab ? ORDER_PREFIX.MAVN : ORDER_PREFIX.MAVC);
-  const isImportMode = isImportTab || currentPrefix === ORDER_PREFIX.MAVN;
 
   const handleDateRangeChange = (
     start: string,
@@ -346,7 +409,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 Chi Tiết Đơn Hàng & Tài Khoản
               </div>
 
-              {/* 2 công tắc trượt mini cạnh thông tin sản phẩm */}
+              {/* 2 công tắc trượt mini cạnh thông tin sản phẩm (Chế độ Nhập hàng) */}
               {isImportMode && (
                 <div className="flex items-center gap-2.5">
                   {/* Switch Lưu Kho */}
@@ -400,19 +463,46 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                   </div>
                 </div>
               )}
+
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Thông Tin Sản Phẩm (Tài khoản) *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: noah.singh.b69642@vnglink.cc..."
-                  value={formData.information_order}
-                  onChange={(e) => setFormData({ ...formData, information_order: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-400 font-medium">
+                    Thông Tin Sản Phẩm (Tài khoản) <span className="text-rose-500">*</span>
+                  </label>
+                  {matchedKeyRule && (
+                    <span className="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-cyan-400" />
+                      Tự động cấp key (Kho: {matchedKeyRule.target_warehouse_name || "Slot"})
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ví dụ: noah.singh.b69642@vnglink.cc..."
+                    value={formData.information_order}
+                    onChange={(e) => setFormData({ ...formData, information_order: e.target.value })}
+                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none ${
+                      matchedKeyRule
+                        ? "border-cyan-500/50 text-cyan-300 font-mono font-bold pr-9"
+                        : "border-slate-800 focus:border-cyan-500"
+                    }`}
+                  />
+                  {matchedKeyRule && (
+                    <button
+                      type="button"
+                      onClick={handleRegenerateKey}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Tạo lại mã key ngẫu nhiên khác"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div>

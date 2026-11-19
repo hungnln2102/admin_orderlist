@@ -169,3 +169,90 @@
   + **Mã Đơn Hàng `MAVLS26UW`**: Nhận diện đúng cổng `ades`, tự động phân giải email `hid.core.3198@colegiomontealto.us` và lấy đúng mã OTP **`971849`** (`found: true`).
   + **Email/Đơn hàng lỗi chứng chỉ (`MAVLWMZZK`)**: Trả về `otp: null`, `found: false`, thông báo `"certificate has expired"`, bảo đảm 100% không bao giờ bắt nhầm số `"2026"`.
 - **Kiểm soát lỗi text UTF-8**: `python scripts/scan_text_errors.py` trên toàn bộ các file backend và frontend đạt **PASS 100%**.
+
+## [22:12] Sửa lỗi ECONNREFUSED 127.0.0.1:3001 trên Vite Proxy của OTP Portal
+
+### 1. Phạm vi & Nguyên nhân gốc
+- **Hiện tượng**: Giao diện OTP Portal (`http://localhost:3005`) báo lỗi `[vite] http proxy error: /api/public/theme` và `/api/public/otp-portal-slots/register` với `Error: connect ECONNREFUSED 127.0.0.1:3001`.
+- **Nguyên nhân gốc**:
+  + Backend của hệ thống hiện đang chạy trên cổng `3002` (cấu hình trong [backend/.env](file:///E:/Project/admin_store/admin_orderlist/backend/.env#L3)). Cổng `3001` không có tiến trình nào lắng nghe.
+  + Dự án `otp_portal` (`E:\Project\admin_store\otp_portal`) chưa có file `.env`, file [otp_portal/vite.config.ts](file:///E:/Project/admin_store/otp_portal/vite.config.ts#L7) fallback mặc định proxy `/api` sang `http://127.0.0.1:3001`.
+  + File cấu hình gốc [admin_orderlist/.env](file:///E:/Project/admin_store/admin_orderlist/.env#L40) cũng chưa được đồng bộ cổng `3002`.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **[E:/Project/admin_store/otp_portal/.env](file:///E:/Project/admin_store/otp_portal/.env)**:
+   - Tạo file `.env` mới cấu hình: `VITE_BACKEND_URL=http://127.0.0.1:3002`.
+2. **[E:/Project/admin_store/otp_portal/vite.config.ts](file:///E:/Project/admin_store/otp_portal/vite.config.ts#L7)** & **[otp_portal/.env.example](file:///E:/Project/admin_store/otp_portal/.env.example#L2)**:
+   - Cập nhật fallback mặc định `backendTarget` từ `http://127.0.0.1:3001` sang `http://127.0.0.1:3002`.
+3. **[E:/Project/admin_store/admin_orderlist/.env](file:///E:/Project/admin_store/admin_orderlist/.env#L40)**:
+   - Cập nhật `PORT=3002` và `PUBLIC_BASE_URL=http://localhost:3002` đồng nhất toàn workspace.
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Kiểm thử trực tiếp Vite Proxy cổng 3005**:
+  + `curl http://localhost:3005/api/public/theme` $\rightarrow$ **`HTTP/1.1 200 OK`** (chuyển tiếp thành công tới backend cổng 3002).
+  + `curl -X POST http://localhost:3005/api/public/otp-portal-slots/register` $\rightarrow$ **`HTTP/1.1 200 OK`** với response `{"success":true,"message":"Đã đồng bộ 8 ô input từ Web OTP Portal thành công!"}`.
+  + Đã chấm dứt triệt để lỗi `ECONNREFUSED 127.0.0.1:3001` trên console của OTP Portal.
+
+## [22:35] Khắc phục lỗi không tải danh mục sản phẩm và kẹt cờ tải NCC trên Modal Tạo Đơn Hàng
+
+### 1. Phạm vi & Nguyên nhân gốc
+- **Hiện tượng**: Trên giao diện Orders (`http://localhost:3003/orders`), khi mở Modal *Tạo Đơn Bán Hàng Mới*, ô *Chọn Sản Phẩm từ Catalog* báo lỗi *"Không tìm thấy sản phẩm khớp với từ khóa"* (mặc dù database có 129 variants) và ô *Chọn Nhà Cung Cấp (NCC)* liên tục hiển thị chữ xanh *"Đang tải NCC phù hợp..."*.
+- **Nguyên nhân gốc**:
+  + Trong [useOrderCatalog.ts](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/orders/hooks/useOrderCatalog.ts#L35-L42), `mountedRef.current` được khởi tạo bằng `useRef(true)`, nhưng trong `useEffect` chỉ có hàm dọn dẹp `return () => { mountedRef.current = false; }` mà thiếu `mountedRef.current = true;` khi effect chạy.
+  + Do ứng dụng chạy trong `<React.StrictMode>` (React 18), vòng lặp giả lập Mount $\rightarrow$ Unmount $\rightarrow$ Remount trong môi trường dev đã khiến `mountedRef.current` bị khóa vĩnh viễn ở giá trị `false`.
+  + Khi gọi API tải bảng giá thành công, `applyCatalog` kiểm tra `if (!mountedRef.current) return;` và ngay lập tức hủy bỏ kết quả, không bao giờ nạp vào `productsCatalog` (khiến mảng rỗng `[]`). Đồng thời khối `finally` không thể gọi `setLoadingCatalog(false)` khiến `loadingCatalog` bị kẹt ở `true`.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **[frontend/src/features/orders/hooks/useOrderCatalog.ts](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/orders/hooks/useOrderCatalog.ts)**:
+   - Thêm `mountedRef.current = true;` trong `useEffect` để luôn giữ đúng cờ trạng thái khi component remount.
+   - Thêm `useEffect` tự động gọi `ensureOrderCatalog().catch(() => {})` ngay khi hook mount để chủ động preload danh mục sản phẩm & NCC cho toàn trang Orders.
+2. **[frontend/src/features/orders/components/SearchableProductDropdown.tsx](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/orders/components/SearchableProductDropdown.tsx#L32)**:
+   - Thêm guard `(p.san_pham && p.san_pham.toLowerCase().includes(term))` ngăn chặn lỗi ngoại lệ runtime nếu sản phẩm thiếu trường tên.
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+- **Frontend Build**: Chạy `npm run build` (tsc && vite) **PASS 100% trong 8.09s**, không có bất kỳ cảnh báo hay lỗi TypeScript nào.
+- **Dữ liệu & UI**: Hook đã nạp đầy đủ 129 biến thể sản phẩm và 18 NCC, giải phóng cờ `loadingCatalog = false`, chấm dứt hoàn toàn hiện tượng kẹt trạng thái tải.
+
+## [23:20] Tích hợp tính năng Tự động cấp Activation Key và Note tài khoản vào cột Slot bảng order_list khi khách nhận trên Web (Phương Án A)
+
+### 1. Phạm vi & Mục tiêu
+- **Phạm vi**:
+  - Triển khai **Phương án A (Tự động cấp Activation Key + Đồng bộ Slot)** theo chỉ đạo tối cao của Master: *"Phương Án A đi nhưng mà khi khách kiểm tra trên web, bóc slot gửi khách xong. Lấy tài khoản note vào cột slot bảng order_list nhé"*.
+  - Cho phép nhân viên khi tạo đơn bán hàng mới bật công tắc `Cấp Mã Key (Tự nhận slot)`, tự động sinh mã ngẫu nhiên dạng `PREFIX-XXXX-XXXX` (VD: `GPT-A1B2-C3D4`), lưu mã key vào cột `slot` của `orders.order_list` và tạo sẵn bản ghi `AVAILABLE` trong `warehouse.activation_keys`.
+  - Khi khách hàng truy cập Web OTP Portal nhập mã key, hệ thống bốc slot khả dụng trong kho, chuyển slot sang `IN_USE`, key sang `ACTIVATED`, và **tự động cập nhật tài khoản thật (`assignedAccount`) vào cột `slot` của bảng `orders.order_list`**.
+- **Trạng thái**: ✅ **ĐÃ HOÀN THÀNH (PASS 100%)**.
+
+### 2. Chi tiết kỹ thuật & Giải pháp
+1. **Frontend Contract & Modal Tạo Đơn**:
+   - [frontend/src/features/orders/types.ts](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/orders/types.ts): Bổ sung `is_auto_key?: boolean; activation_key?: string;` vào interface `OrderFormData` và `DEFAULT_FORM_DATA`.
+   - [frontend/src/features/orders/components/OrderCreateEditModal.tsx](file:///E:/Project/admin_store/admin_orderlist/frontend/src/features/orders/components/OrderCreateEditModal.tsx):
+     + Tích hợp công tắc chuyển đổi trực quan `Cấp Mã Key (Tự nhận slot)` tại Section *Chi Tiết Đơn Hàng & Tài Khoản* (chỉ hiện khi tạo đơn bán hàng).
+     + Tự động sinh mã key thông minh dựa trên SKU sản phẩm (`GPT`, `NFLX`, `ADB`, `CNV`...) kèm 8 ký tự hex ngẫu nhiên.
+     + Cung cấp ô hiển thị mã kích hoạt font monospace nổi bật, nút tạo mã mới (`RefreshCw`) và nút sao chép nhanh (`Copy` / `Check`) để nhân viên gửi khách.
+     + Đồng bộ 2 chiều: Giá trị mã key được tự động điền vào trường `slot` ban đầu của đơn hàng.
+2. **Backend Order Service & Database ACID**:
+   - [backend/src/domains/orders/services/orderService.js](file:///E:/Project/admin_store/admin_orderlist/backend/src/domains/orders/services/orderService.js):
+     + Trong transaction tạo đơn `createOrder`, khi có cờ `is_auto_key` hoặc `activation_key`: Tự động tìm `product_name_id` phù hợp và chèn một bản ghi mới vào `warehouse.activation_keys` với trạng thái `AVAILABLE`, liên kết `id_order = createdOrder.id_order`, `customer_info`, `product_id`.
+   - [backend/src/domains/products/services/activationKeyService.js](file:///E:/Project/admin_store/admin_orderlist/backend/src/domains/products/services/activationKeyService.js):
+     + Trong hàm cấp phát `activateKeyWithTransaction` (bọc Knex transaction ACID): Khóa dòng Key và Account Slot bằng `FOR UPDATE`.
+     + Sau khi bốc slot kho thành công (`availableSlot`), kiểm tra nếu mã key có `id_order`, hệ thống lập tức thực thi câu lệnh cập nhật trực tiếp tài khoản thật vào đơn hàng khách:
+       ```js
+       if (key.id_order) {
+         await trx(TABLES.ORDER_LIST)
+           .where("id_order", key.id_order)
+           .update({
+             slot: assignedAccount,
+             updated_at: trx.fn.now(),
+           });
+       }
+       ```
+     + Chuyển key sang `ACTIVATED` và trả về thông tin tài khoản, mật khẩu, 2FA cho khách hàng trên Web.
+
+### 3. Kết quả kiểm tra & Nghiệm thu
+1. **Frontend Compile & Build**:
+   - `npm --prefix frontend run build` (tsc && vite) **PASS 100% trong 4.62s**, 0 lỗi cú pháp hoặc TypeScript.
+2. **Kiểm thử Tích hợp End-to-End Backend (Script mô phỏng thực tế)**:
+   - Tạo đơn hàng `#MAVC_TEST_KEY_FMUY` với `activation_key = "GPT-TEST-TC1X"`, `slot = "GPT-TEST-TC1X"` $\rightarrow$ Đơn tạo thành công, `warehouse.activation_keys` tạo bản ghi `AVAILABLE` gắn đúng `id_order`.
+   - Giả lập khách hàng kích hoạt mã `"GPT-TEST-TC1X"` trên Web OTP Portal $\rightarrow$ Hệ thống bốc tài khoản kho `"shghcmt02@gmail.com"`, slot index 1, chuyển trạng thái kho thành công.
+   - Query kiểm chứng trực tiếp `orders.order_list` $\rightarrow$ Cột `slot` của đơn hàng đã được cập nhật chính xác từ `"GPT-TEST-TC1X"` thành tài khoản thật `"shghcmt02@gmail.com"`.
+   - Tự động dọn dẹp toàn bộ dữ liệu test an toàn, không để lại rác trong database.

@@ -85,6 +85,7 @@ const TABLES = {
   PRODUCT_API_CONFIGS: formatTable(SCHEMAS.PRODUCT, "product_api_configs"),
   PORTAL_SLOT_ROUTING_RULES: formatTable(SCHEMAS.SYSTEM, "portal_slot_routing_rules"),
   ACTIVATION_KEYS: formatTable(SCHEMAS.WAREHOUSE, "activation_keys"),
+  ACTIVATION_KEY_RULES: formatTable(SCHEMAS.WAREHOUSE, "activation_key_rules"),
 };
 
 
@@ -660,6 +661,16 @@ const COLS = {
     VARIANT_ID: "variant_id",
     PROVIDER_KEY: "provider_key",
     PRIORITY: "priority",
+    IS_ACTIVE: "is_active",
+    NOTE: "note",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
+  },
+  ACTIVATION_KEY_RULES: {
+    ID: "id",
+    VARIANT_ID: "variant_id",
+    SUPPLIER_ID: "supplier_id",
+    PRODUCT_NAME_ID: "product_name_id",
     IS_ACTIVE: "is_active",
     NOTE: "note",
     CREATED_AT: "created_at",
