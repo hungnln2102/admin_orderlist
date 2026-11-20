@@ -1,4 +1,4 @@
-const { db, TABLES, withTransaction } = require("@/db");
+const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getVietnamDateString } = require("@/utils/time");
@@ -7,7 +7,9 @@ const { getVietnamDateString } = require("@/utils/time");
  * Service lấy danh sách Kho Gói Sản Phẩm từ bảng warehouse.package_products
  * Kết hợp với warehouse.product_names và warehouse.accounts (Tài khoản gốc & Tài khoản liên kết)
  */
-const getPackageProducts = async () => {
+const getPackageProducts = async ({ connection = db, productNameId = null } = {}) => {
+  const slot = COLS.ACCOUNT_SLOTS;
+  const pack = COLS.PACKAGE_PRODUCT;
   const query = `
     SELECT
       pp.id,
@@ -20,6 +22,14 @@ const getPackageProducts = async () => {
       COALESCE(acc_slot.password, acc.password) AS password,
       acc_slot.two_fa,
       acc_slot.backup_email,
+      ARRAY(
+        SELECT DISTINCT BTRIM(tag_slot.${slot.VARIANT_TAG})
+        FROM ${TABLES.ACCOUNT_SLOTS} tag_slot
+        WHERE tag_slot.${slot.ACCOUNT_ID} = pp.${pack.ACCOUNT_ID}
+          AND tag_slot.${slot.NAME_ID} = pp.${pack.PRODUCT_NAME_ID}
+          AND BTRIM(tag_slot.${slot.VARIANT_TAG}) <> ''
+        ORDER BY 1
+      ) AS variant_tags,
       storage_acc.account_username AS storage_account_info,
       COALESCE(storage_slot.password, storage_acc.password) AS storage_password,
       storage_slot.two_fa AS storage_two_fa,
@@ -48,12 +58,43 @@ const getPackageProducts = async () => {
       ORDER BY id ASC
       LIMIT 1
     ) storage_slot ON true
+    ${productNameId === null ? "" : `WHERE pp.${pack.PRODUCT_NAME_ID} = ?`}
     ORDER BY pp.id DESC;
   `;
 
-  const result = await db.raw(query);
+  const result = await connection.raw(query, productNameId === null ? [] : [productNameId]);
   const rows = result.rows || [];
   if (rows.length === 0) return [];
+
+  const key = COLS.ACTIVATION_KEYS;
+  const allocations = await connection(TABLES.ACTIVATION_KEYS)
+    .whereIn(key.PACKAGE_PRODUCT_ID, rows.map((row) => row.id))
+    .whereNotNull(key.ACTIVATED_AT)
+    .where((query) => {
+      query.where((standalone) => {
+        standalone.whereNull(key.ID_ORDER).where(key.STATUS, "ACTIVATED")
+          .where((expiry) => expiry.whereNull(key.EXPIRED_AT).orWhere(key.EXPIRED_AT, ">=", connection.fn.now()));
+      }).orWhereExists(
+        connection(TABLES.ORDER_LIST)
+          .whereRaw("UPPER(BTRIM(??)) = UPPER(BTRIM(??))", [
+            `${TABLES.ORDER_LIST}.${COLS.ORDER_LIST.ID_ORDER}`,
+            `${TABLES.ACTIVATION_KEYS}.${key.ID_ORDER}`,
+          ])
+          .whereNotIn(COLS.ORDER_LIST.STATUS, [ORDER_STATUS.CANCELED, ORDER_STATUS.REFUNDED, "Đã Hủy", "Đã Hoàn Tiền"])
+          .whereRaw("(?? IS NULL OR ??::date >= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)", [
+            COLS.ORDER_LIST.EXPIRED_AT, COLS.ORDER_LIST.EXPIRED_AT,
+          ])
+      );
+    })
+    .select(key.PACKAGE_PRODUCT_ID, key.ID_ORDER);
+
+  const allocationsByPackage = new Map();
+  for (const allocation of allocations) {
+    const id = String(allocation[key.PACKAGE_PRODUCT_ID]);
+    const list = allocationsByPackage.get(id) || [];
+    list.push(allocation[key.ID_ORDER]);
+    allocationsByPackage.set(id, list);
+  }
 
   // Lọc chỉ các từ khóa tài khoản thực sự tồn tại trong danh sách gói để truy vấn có mục tiêu
   const targetAccounts = Array.from(
@@ -67,7 +108,7 @@ const getPackageProducts = async () => {
   let ordersList = [];
   let variantMap = new Map();
   if (targetAccounts.length > 0) {
-    ordersList = await db(TABLES.ORDER_LIST)
+    ordersList = await connection(TABLES.ORDER_LIST)
       .select("id", "id_order", "id_product", "customer", "contact", "information_order", "slot", "status", "expired_at", "cost", "supply_id")
       .whereIn("status", [
         ORDER_STATUS.PAID,
@@ -88,7 +129,7 @@ const getPackageProducts = async () => {
 
     const vIds = Array.from(new Set(ordersList.map((o) => parseInt(o.id_product, 10)).filter((id) => Number.isInteger(id) && id > 0)));
     if (vIds.length > 0) {
-      const variants = await db(`${TABLES.VARIANT} as v`)
+      const variants = await connection(`${TABLES.VARIANT} as v`)
         .leftJoin(`${TABLES.PRODUCT} as p`, "p.id", "v.product_id")
         .whereIn("v.id", vIds)
         .select("v.id", "v.product_id", "v.variant_name", "v.display_name", "p.package_name as product_package_name");
@@ -249,7 +290,14 @@ const getPackageProducts = async () => {
     });
 
     const totalSlots = parseInt(r.total_slots || 2, 10);
-    const usedSlots = Math.min(totalSlots, matchingOrders.length);
+    const matchedCodes = new Set(matchingOrders.map((order) => String(order.id_order).trim().toUpperCase()));
+    const assignedCodes = new Set();
+    let standaloneKeys = 0;
+    for (const orderCode of allocationsByPackage.get(String(r.id)) || []) {
+      if (orderCode) assignedCodes.add(String(orderCode).trim().toUpperCase());
+      else standaloneKeys += 1;
+    }
+    const usedSlots = Math.min(totalSlots, new Set([...matchedCodes, ...assignedCodes]).size + standaloneKeys);
 
     const slotAssignments = matchingOrders.map((ord, idx) => {
       const v = ord.id_product ? variantMap.get(String(ord.id_product)) : null;
@@ -321,10 +369,12 @@ const getPackageProducts = async () => {
         return {
           id: r.id,
           productName: r.product_name || "",
+          productNameId: Number(r.product_name_id),
           category: r.category || r.product_name || "Khác",
           requiresStorage: Boolean(r.category_requires_storage),
           name: r.product_name || (r.category ? `${r.category} #${r.id}` : `Gói #${r.id}`),
           accountInfo: r.account_info,
+          variantTags: r.variant_tags,
           password: r.password || null,
           twoFa: r.two_fa || null,
           backupEmail: r.backup_email || null,

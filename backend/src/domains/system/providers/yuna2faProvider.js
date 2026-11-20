@@ -1,4 +1,5 @@
 const { requestProviderApi } = require("./providerRequest");
+const { readExternalResponse } = require("@/utils/safeExternalRequest");
 const { extractOtpCode, parseJsonResponse } = require("./otpProviderUtils");
 
 const yunaSessionCache = new Map();
@@ -12,6 +13,7 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
   }
 
   const pageResponse = await requestProviderApi(config, {
+    endpoint: config.endpoints?.session,
     headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
     timeoutMs,
   });
@@ -37,7 +39,7 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
 }
 
 /**
- * 4. Luồng Yuna 2FA Center (hub.yunagrp.com/2fa/):
+ * Luồng Yuna 2FA Center (mmo.yunagrp.com/2fa/):
  * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
  * - Hoặc tra cứu mã 2FA từ secret (get_manual)
  */

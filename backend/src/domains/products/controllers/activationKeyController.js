@@ -74,7 +74,7 @@ const getActivationKeyRules = async (_req, res) => {
 
 const saveActivationKeyRule = async (req, res) => {
   try {
-    const rule = await activationKeyService.saveActivationKeyRule(req.body);
+    const rule = await activationKeyService.saveActivationKeyRule(req.body, req.params.id);
     return res.status(201).json({ success: true, data: rule, message: "Đã lưu cấu hình cấp key thành công!" });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message, message: err.message });
@@ -105,7 +105,10 @@ const checkMatchingKeyRule = async (req, res) => {
   try {
     const { variantId, supplierId } = req.query;
     const rule = await activationKeyService.findMatchingKeyRule({ variantId, supplierId });
-    return res.json({ success: true, matched: Boolean(rule), rule });
+    const previewKey = rule ? activationKeyService.generateOrderActivationKey() : null;
+    return res.set("Cache-Control", "no-store").json({
+      success: true, matched: Boolean(rule), rule, previewKey,
+    });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }

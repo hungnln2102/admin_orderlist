@@ -6,7 +6,8 @@ const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
-const { generateRandomKeyCode } = require("@/domains/products/services/activationKeyService");
+const { generateOrderActivationKey } = require("@/domains/products/services/activationKeyService");
+const { listImportWarehouseTags } = require("@/domains/warehouse/services/importWarehouseTagService");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -318,6 +319,14 @@ async function createOrder(payload) {
       }
     }
 
+    const warehouseTag = typeof payload.warehouse_variant_tag === "string"
+      ? payload.warehouse_variant_tag.trim() : "";
+    if (isMavn && payload.save_to_warehouse === true) {
+      if (!warehouseTag) throw new Error("Vui lòng chọn tag sản phẩm khi lưu kho.");
+      const tags = await listImportWarehouseTags(Number(newOrderData.id_product), trx);
+      if (!tags.includes(warehouseTag)) throw new Error("Tag không thuộc sản phẩm đã chọn.");
+    }
+
     let createdOrder;
     try {
       [createdOrder] = await getOrderTable(trx)
@@ -332,13 +341,13 @@ async function createOrder(payload) {
 
     // Tự động kiểm tra hoặc tạo bản ghi Activation Key trong warehouse.activation_keys (nếu đơn hàng bán có tạo mã key hoặc khớp rule)
     if (!isMavn) {
+      let matchedRule = null;
       try {
         let finalKeyCode = null;
         let targetProductNameId = null;
         let sysProductId = null;
 
         // 1. Kiểm tra quy tắc khớp trong TABLES.ACTIVATION_KEY_RULES theo Variant + NCC
-        let matchedRule = null;
         if (newOrderData.id_product && newOrderData.supply_id) {
           matchedRule = await trx(TABLES.ACTIVATION_KEY_RULES)
             .join(`${TABLES.VARIANT} as v`, "v.id", `${TABLES.ACTIVATION_KEY_RULES}.variant_id`)
@@ -353,7 +362,12 @@ async function createOrder(payload) {
             .where(`${TABLES.ACTIVATION_KEY_RULES}.variant_id`, Number(newOrderData.id_product))
             .where(`${TABLES.ACTIVATION_KEY_RULES}.supplier_id`, Number(newOrderData.supply_id))
             .where(`${TABLES.ACTIVATION_KEY_RULES}.is_active`, true)
+            .whereNotNull(`${TABLES.ACTIVATION_KEY_RULES}.${COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG}`)
             .first();
+        }
+
+        if (payload.require_activation_key_rule === true && !matchedRule) {
+          throw new Error("Quy tắc cấp key đã thay đổi. Vui lòng chọn lại sản phẩm và NCC.");
         }
 
         if (matchedRule) {
@@ -366,11 +380,7 @@ async function createOrder(payload) {
             finalKeyCode = currentInfo.toUpperCase();
           } else {
             // Nếu information_order đang rỗng -> Tự động sinh key và lưu vào information_order
-            const prefix = (matchedRule.product_name || matchedRule.variant_name || "KEY")
-              .toUpperCase()
-              .replace(/[^A-Z0-9]/g, "")
-              .substring(0, 4) || "KEY";
-            finalKeyCode = generateRandomKeyCode(prefix);
+            finalKeyCode = generateOrderActivationKey();
             await getOrderTable(trx).where("id", createdOrder.id).update({ information_order: finalKeyCode });
             createdOrder.information_order = finalKeyCode;
           }
@@ -419,10 +429,12 @@ async function createOrder(payload) {
           }
 
           if (targetProductNameId) {
-            await trx(TABLES.ACTIVATION_KEYS)
+            const insertKey = trx(TABLES.ACTIVATION_KEYS)
               .insert({
                 key_code: finalKeyCode,
                 product_name_id: targetProductNameId,
+                [COLS.ACTIVATION_KEYS.TARGET_VARIANT_TAG]:
+                  matchedRule?.[COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG] || null,
                 product_id: sysProductId,
                 id_order: createdOrder.id_order,
                 status: "AVAILABLE",
@@ -431,13 +443,17 @@ async function createOrder(payload) {
                 created_by: matchedRule ? "AutoRule" : "Admin",
                 created_at: db.fn.now(),
                 updated_at: db.fn.now(),
-              })
-              .onConflict("key_code")
-              .merge();
+              });
+            if (matchedRule) {
+              await insertKey;
+            } else {
+              await insertKey.onConflict("key_code").merge();
+            }
             console.log(`🔑 [ActivationKey] Đã lưu mã key ${finalKeyCode} vào kho (product_name_id: ${targetProductNameId}) cho đơn #${createdOrder.id_order}`);
           }
         }
       } catch (keyErr) {
+        if (matchedRule || payload.require_activation_key_rule === true) throw keyErr;
         console.error("[OrderService] Lỗi tạo Activation Key liên kết:", keyErr.message);
       }
     }
@@ -524,6 +540,7 @@ async function createOrder(payload) {
               // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
               const updateData = {
                 password: payload.warehouse_password || payload.slot || existingService.password,
+                [AS.VARIANT_TAG]: warehouseTag,
                 expired_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expired_at,
                 status: "AVAILABLE",
                 service_note: payload.note || existingService.service_note,
@@ -551,6 +568,7 @@ async function createOrder(payload) {
                 name_id: nameId,
                 slot_index: 1,
                 password: payload.warehouse_password || payload.slot || null,
+                [AS.VARIANT_TAG]: warehouseTag,
                 backup_email: payload.warehouse_backup_email || "",
                 two_fa: payload.warehouse_two_fa || null,
                 otp_type: payload.warehouse_otp_type || payload.otp_type || null,
@@ -564,7 +582,7 @@ async function createOrder(payload) {
           }
 
           if (stockId) {
-            await emitOrderEvent(trx, EVENTS.WAREHOUSE_STOCK_CREATED, {
+            await emitOrderEvent(subTrx, EVENTS.WAREHOUSE_STOCK_CREATED, {
               id: stockId,
               account: accountUsername,
               source: "order_sync",
@@ -629,6 +647,7 @@ async function createOrder(payload) {
           }
         });
       } catch (err) {
+        if (payload.save_to_warehouse === true) throw err;
         console.error("[OrderService] Lỗi tự động lưu/đồng bộ kho/gói:", err.message);
       }
     }

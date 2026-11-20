@@ -7,34 +7,23 @@ import {
   Check,
   Ban,
   Trash2,
-  Sparkles,
+  Pencil,
   Loader2,
   Sliders,
   Warehouse,
   Building2,
   Package,
-  Layers,
-  X,
   AlertCircle,
   ToggleLeft,
   ToggleRight,
+  Tag,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
-import { ActivationKeyRule, CatalogProductOption, SaveActivationKeyRulePayload } from "../types";
+import { ActivationKeyRule, CatalogProductOption } from "../types";
+import { ActivationKeyRuleModal } from "./ActivationKeyRuleModal";
 
 interface Props {
   warehouseProducts: CatalogProductOption[];
-}
-
-interface VariantOption {
-  id: number;
-  name: string;
-  packageName: string;
-}
-
-interface SupplierOption {
-  id: number;
-  name: string;
 }
 
 export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) => {
@@ -42,24 +31,8 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
   const [rules, setRules] = useState<ActivationKeyRule[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-
-  // Modal thêm quy tắc
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
-  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(false);
-
-  // Form state
-  const [formData, setFormData] = useState<SaveActivationKeyRulePayload>({
-    variant_id: 0,
-    supplier_id: 0,
-    product_name_id: warehouseProducts[0]?.id || 0,
-    is_active: true,
-    note: "",
-  });
-  const [variantSearch, setVariantSearch] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [editingRule, setEditingRule] = useState<ActivationKeyRule | null>(null);
 
   // Fetch danh sách quy tắc
   const fetchRules = useCallback(async () => {
@@ -83,55 +56,9 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
     fetchRules();
   }, [fetchRules]);
 
-  // Fetch variants và suppliers cho modal
-  const fetchCatalogData = useCallback(async () => {
-    if (variantOptions.length > 0 && supplierOptions.length > 0) return;
-    setLoadingCatalog(true);
-    try {
-      const [pricesRes, suppliersRes] = await Promise.all([
-        fetch("/api/products/prices?limit=1000"),
-        fetch("/api/products/all-suppliers"),
-      ]);
-
-      const [pricesJson, suppliersJson] = await Promise.all([
-        pricesRes.json().catch(() => ({})),
-        suppliersRes.json().catch(() => []),
-      ]);
-
-      if (pricesRes.ok && pricesJson.data) {
-        const vList: VariantOption[] = (pricesJson.data || []).map((row: any) => ({
-          id: Number(row.id),
-          name: row.package_product || row.variant_name || row.display_name || `Variant #${row.id}`,
-          packageName: row.san_pham || row.package_name || "Chung",
-        }));
-        setVariantOptions(vList);
-      }
-
-      const rawSuppliers = Array.isArray(suppliersJson) ? suppliersJson : suppliersJson.data || [];
-      const sList: SupplierOption[] = rawSuppliers.map((s: any) => ({
-        id: Number(s.id),
-        name: s.supplier_name || s.ncc_name || `NCC #${s.id}`,
-      }));
-      setSupplierOptions(sList);
-    } catch (err: any) {
-      console.error("Lỗi tải catalog options cho rule modal:", err);
-    } finally {
-      setLoadingCatalog(false);
-    }
-  }, [variantOptions.length, supplierOptions.length]);
-
   const handleOpenModal = () => {
+    setEditingRule(null);
     setIsModalOpen(true);
-    setFormError(null);
-    setVariantSearch("");
-    setFormData({
-      variant_id: 0,
-      supplier_id: supplierOptions[0]?.id || 0,
-      product_name_id: warehouseProducts[0]?.id || 0,
-      is_active: true,
-      note: "",
-    });
-    fetchCatalogData();
   };
 
   const handleToggleRule = async (rule: ActivationKeyRule) => {
@@ -180,43 +107,6 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
     }
   };
 
-  const handleSubmitRule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.variant_id) {
-      setFormError("Vui lòng chọn Sản phẩm (Variant) áp dụng!");
-      return;
-    }
-    if (!formData.supplier_id) {
-      setFormError("Vui lòng chọn Nhà cung cấp (NCC)!");
-      return;
-    }
-    if (!formData.product_name_id) {
-      setFormError("Vui lòng chọn Kho slot đích!");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setFormError(null);
-      const res = await fetch("/api/products/activation-key-rules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Không thể lưu quy tắc cấp key.");
-      }
-      notify.success("Đã lưu quy tắc cấp key tự động thành công!", "Thành Công");
-      setIsModalOpen(false);
-      fetchRules();
-    } catch (err: any) {
-      setFormError(err.message || "Lỗi xử lý.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   // Filtered rules
   const filteredRules = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -228,23 +118,10 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
         (r.product_name && r.product_name.toLowerCase().includes(q)) ||
         (r.supplier_name && r.supplier_name.toLowerCase().includes(q)) ||
         (r.target_warehouse_name && r.target_warehouse_name.toLowerCase().includes(q)) ||
+        (r.target_variant_tag && r.target_variant_tag.toLowerCase().includes(q)) ||
         (r.note && r.note.toLowerCase().includes(q))
     );
   }, [rules, search]);
-
-  // Filtered variant options in modal
-  const filteredVariantOptions = useMemo(() => {
-    const q = variantSearch.trim().toLowerCase();
-    if (!q) return variantOptions.slice(0, 50);
-    return variantOptions
-      .filter(
-        (v) =>
-          v.name.toLowerCase().includes(q) ||
-          v.packageName.toLowerCase().includes(q) ||
-          String(v.id).includes(q)
-      )
-      .slice(0, 50);
-  }, [variantOptions, variantSearch]);
 
   const activeRulesCount = rules.filter((r) => r.is_active).length;
 
@@ -399,6 +276,10 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
                         <Warehouse className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                         <span>{rule.target_warehouse_name || `Kho #${rule.product_name_id}`}</span>
                       </div>
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+                        <Tag className="h-3 w-3" />
+                        <span>{rule.target_variant_tag || "Chưa gán tag"}</span>
+                      </div>
                     </td>
 
                     {/* Slot Khả Dụng */}
@@ -451,6 +332,18 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <button
                         type="button"
+                        onClick={() => {
+                          setEditingRule(rule);
+                          setIsModalOpen(true);
+                        }}
+                        className="mr-1 p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                        aria-label="Sửa cấu hình cấp key"
+                        title="Sửa cấu hình cấp key"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleDeleteRule(rule)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                         title="Xóa cấu hình này"
@@ -466,171 +359,14 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
         </div>
       )}
 
-      {/* Modal Thêm Quy Tắc Mới */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-800/80 bg-slate-950/50">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  <Sliders className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">Cấu Hình Cấp Key Tự Động</h3>
-                  <p className="text-xs text-slate-400">
-                    Ánh xạ cặp (Variant + NCC) vào Kho Slot đích
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleSubmitRule} className="p-5 space-y-4">
-              {formError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* Chọn Variant */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  1. Chọn Sản Phẩm (Variant) <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={variantSearch}
-                  onChange={(e) => setVariantSearch(e.target.value)}
-                  placeholder="Gõ để lọc variant..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-1.5 text-xs text-slate-200 mb-1.5 focus:outline-none focus:border-cyan-500 transition-colors"
-                />
-                <select
-                  value={formData.variant_id}
-                  onChange={(e) => setFormData({ ...formData, variant_id: Number(e.target.value) })}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
-                >
-                  <option value={0} disabled>
-                    {loadingCatalog ? "-- Đang tải danh sách variant... --" : "-- Chọn Variant --"}
-                  </option>
-                  {filteredVariantOptions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      [{v.packageName}] {v.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Chọn NCC */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  2. Chọn Nhà Cung Cấp (NCC) <span className="text-rose-400">*</span>
-                </label>
-                <select
-                  value={formData.supplier_id}
-                  onChange={(e) => setFormData({ ...formData, supplier_id: Number(e.target.value) })}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
-                >
-                  <option value={0} disabled>-- Chọn Nhà Cung Cấp --</option>
-                  {supplierOptions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Chọn Kho Slot Đích */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  3. Kho Slot Đích (Nơi Khách Kích Hoạt Lấy Tài Khoản) <span className="text-rose-400">*</span>
-                </label>
-                <select
-                  value={formData.product_name_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, product_name_id: Number(e.target.value) })
-                  }
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
-                >
-                  <option value={0} disabled>-- Chọn Kho Slot Đích --</option>
-                  {warehouseProducts.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Ghi Chú */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Ghi Chú (Tùy chọn)
-                </label>
-                <input
-                  type="text"
-                  value={formData.note || ""}
-                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                  placeholder="VD: Cấp key tự động cho gói ChatGPT Plus..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
-                />
-              </div>
-
-              {/* Trạng thái Kích Hoạt */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-xs font-medium text-slate-300">
-                  Kích hoạt quy tắc ngay sau khi lưu
-                </span>
-                <input
-                  type="checkbox"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="w-4 h-4 rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={submitting}
-                  className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-cyan-500/20 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Đang lưu...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Lưu Cấu Hình</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal Thêm Cấu Hình Quy Tắc Cấp Key Mới */}
+      <ActivationKeyRuleModal
+        isOpen={isModalOpen}
+        editingRule={editingRule}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchRules}
+        warehouseProducts={warehouseProducts}
+      />
     </div>
   );
 };

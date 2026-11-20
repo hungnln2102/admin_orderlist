@@ -84,6 +84,7 @@ export interface OrderFormData {
   warehouse_backup_email?: string;
   warehouse_two_fa?: string;
   warehouse_otp_type?: string;
+  warehouse_variant_tag?: string;
   is_auto_key?: boolean;
   activation_key?: string;
 }

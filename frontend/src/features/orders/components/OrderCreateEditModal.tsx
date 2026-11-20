@@ -1,5 +1,6 @@
+import { apiClient } from "@/shared/api/apiClient";
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff, Sparkles, ChevronDown, RefreshCw, Copy, Check } from "lucide-react";
+import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive, Package, KeyRound, Mail, ShieldCheck, Eye, EyeOff, Sparkles, ChevronDown, Copy, Check } from "lucide-react";
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
@@ -13,7 +14,7 @@ interface OrderCreateEditModalProps {
   isEdit: boolean;
   isImportTab?: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent, keyRuleSelection?: { variantId: number; supplierId: number; key: string }) => void;
   formData: OrderFormData;
   setFormData: React.Dispatch<React.SetStateAction<OrderFormData>>;
   productsCatalog: CatalogProduct[];
@@ -53,9 +54,28 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
 }) => {
   const currentPrefix = formData.order_prefix || (isImportTab ? ORDER_PREFIX.MAVN : ORDER_PREFIX.MAVC);
   const isImportMode = isImportTab || currentPrefix === ORDER_PREFIX.MAVN;
+  const warehouseTagVariantId = isOpen && !isEdit && isImportMode && formData.save_to_warehouse !== false
+    ? selectedProductId : null;
+  const [warehouseTags, setWarehouseTags] = useState<{ variantId: number; tags: string[]; failed?: boolean } | null>(null);
+  const currentWarehouseTags = warehouseTags?.variantId === warehouseTagVariantId ? warehouseTags : null;
+  useEffect(() => {
+    setWarehouseTags(null);
+    if (!warehouseTagVariantId) return;
+    let active = true;
+    apiClient(`/api/orders/warehouse-tags/${warehouseTagVariantId}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Không thể tải tag sản phẩm.");
+        const tags: string[] = await response.json();
+        if (active) setWarehouseTags({ variantId: warehouseTagVariantId, tags });
+      })
+      .catch(() => {
+        if (active) setWarehouseTags({ variantId: warehouseTagVariantId, tags: [], failed: true });
+      });
+    return () => { active = false; };
+  }, [warehouseTagVariantId]);
 
   const [showWarehousePassword, setShowWarehousePassword] = useState(false);
-  const [matchedKeyRule, setMatchedKeyRule] = useState<any | null>(null);
+  const [keyRuleCheck, setKeyRuleCheck] = useState<{ selection: string; key?: string; error?: boolean } | null>(null);
   const [apiMapping, setApiMapping] = useState<{
     byProductId: Record<string, any[]>;
     byVariantId: Record<string, any[]>;
@@ -65,67 +85,42 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
     allApis: any[];
   } | null>(null);
 
-  // Tự động kiểm tra quy tắc cấp key khi chọn Variant + NCC -> Tự động random key vào information_order
+  const supplier = productSuppliersCatalog.find(
+    (item) => item.variant_id === selectedProductId &&
+      ((item.supplier_name || item.ncc_name) === formData.supply_id || String(item.supplier_id) === formData.supply_id),
+  );
+  const fallbackSupplier = allSuppliersCatalog.find(
+    (item) => (item.supplier_name || item.ncc_name) === formData.supply_id || String(item.id) === formData.supply_id,
+  );
+  const supplierId = supplier?.supplier_id ?? fallbackSupplier?.id;
+  const ruleSelection = isOpen && !isImportMode && !isEdit && selectedProductId && supplierId
+    ? `${selectedProductId}:${supplierId}`
+    : null;
+  const currentRuleCheck = keyRuleCheck?.selection === ruleSelection ? keyRuleCheck : null;
+  const previewKey = currentRuleCheck?.key;
+  const matchedKeyRule = Boolean(previewKey);
+  const checkingKeyRule = Boolean(ruleSelection && !currentRuleCheck);
+
   useEffect(() => {
-    if (!isOpen || isImportMode || isEdit) return;
-    if (!formData.id_product || !formData.supply_id) {
-      setMatchedKeyRule(null);
-      return;
-    }
+    setKeyRuleCheck(null);
+    if (!ruleSelection) return;
 
-    let isMounted = true;
-    const variantId = formData.id_product;
-    const supplierId = formData.supply_id;
-
-    fetch(`/api/products/activation-key-rules/check?variantId=${variantId}&supplierId=${supplierId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.success && data.matched && data.rule) {
-          setMatchedKeyRule(data.rule);
-          setFormData((prev) => {
-            const prefix = (data.rule.product_name || data.rule.variant_name || "KEY")
-              .toUpperCase()
-              .replace(/[^A-Z0-9]/g, "")
-              .substring(0, 4) || "KEY";
-            const randHex = () => Math.random().toString(36).substring(2, 6).toUpperCase();
-            const autoKey = `${prefix}-${randHex()}-${randHex()}`;
-
-            const currentInfo = String(prev.information_order || "").trim();
-            const isKeyPattern = /^[A-Z0-9]{3,5}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(currentInfo);
-            if (!currentInfo || isKeyPattern) {
-              return {
-                ...prev,
-                information_order: autoKey,
-              };
-            }
-            return prev;
-          });
-        } else {
-          setMatchedKeyRule(null);
+    let active = true;
+    apiClient(`/api/products/activation-key-rules/check?variantId=${selectedProductId}&supplierId=${supplierId}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error("Không thể kiểm tra quy tắc cấp key.");
+        if (data.matched && (typeof data.previewKey !== "string" || !data.previewKey)) {
+          throw new Error("Không thể lấy mã key.");
         }
+        if (active) setKeyRuleCheck({ selection: ruleSelection, key: data.matched ? data.previewKey : undefined });
       })
       .catch(() => {
-        if (isMounted) setMatchedKeyRule(null);
+        if (active) setKeyRuleCheck({ selection: ruleSelection, error: true });
       });
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, isImportMode, isEdit, formData.id_product, formData.supply_id]);
-
-  const handleRegenerateKey = () => {
-    const prefix = (matchedKeyRule?.product_name || matchedKeyRule?.variant_name || matchedProduct?.san_pham || "KEY")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "")
-      .substring(0, 4) || "KEY";
-    const randHex = () => Math.random().toString(36).substring(2, 6).toUpperCase();
-    const newKey = `${prefix}-${randHex()}-${randHex()}`;
-    setFormData((prev) => ({
-      ...prev,
-      information_order: newKey,
-    }));
-  };
+    return () => { active = false; };
+  }, [ruleSelection, selectedProductId, supplierId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -275,7 +270,14 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
         </div>
 
         {/* Modal Body / Form */}
-        <form onSubmit={onSubmit} className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4 text-xs">
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          if (checkingKeyRule || currentRuleCheck?.error) return;
+          if (warehouseTagVariantId && !currentWarehouseTags?.tags.includes(formData.warehouse_variant_tag || "")) return;
+          onSubmit(event, previewKey && selectedProductId && supplierId
+            ? { variantId: selectedProductId, supplierId, key: previewKey }
+            : undefined);
+        }} className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4 text-xs">
           {/* Section 1: Customer Information & Order Type (Only for non-import mode) */}
           {!isImportMode && (
             <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
@@ -472,19 +474,14 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                   <label className="text-slate-400 font-medium">
                     Thông Tin Sản Phẩm (Tài khoản) <span className="text-rose-500">*</span>
                   </label>
-                  {matchedKeyRule && (
-                    <span className="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-cyan-400" />
-                      Tự động cấp key (Kho: {matchedKeyRule.target_warehouse_name || "Slot"})
-                    </span>
-                  )}
                 </div>
                 <div className="relative">
                   <input
                     type="text"
-                    required
+                    required={!matchedKeyRule}
+                    readOnly={matchedKeyRule}
                     placeholder="Ví dụ: noah.singh.b69642@vnglink.cc..."
-                    value={formData.information_order}
+                    value={previewKey ?? formData.information_order}
                     onChange={(e) => setFormData({ ...formData, information_order: e.target.value })}
                     className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none ${
                       matchedKeyRule
@@ -492,16 +489,6 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                         : "border-slate-800 focus:border-cyan-500"
                     }`}
                   />
-                  {matchedKeyRule && (
-                    <button
-                      type="button"
-                      onClick={handleRegenerateKey}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                      title="Tạo lại mã key ngẫu nhiên khác"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -509,8 +496,9 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 <label className="block text-slate-400 mb-1 font-medium">Slot</label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Slot 1 - user@gmail.com | pass123"
-                  value={formData.slot}
+                  readOnly={matchedKeyRule}
+                  placeholder={matchedKeyRule ? "Tự động gán khi kích hoạt key" : "Ví dụ: Slot 1 - user@gmail.com | pass123"}
+                  value={matchedKeyRule ? "" : formData.slot}
                   onChange={(e) => setFormData({ ...formData, slot: e.target.value })}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
                 />
@@ -531,6 +519,28 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {!isEdit && (
+                    <label className="col-span-full flex flex-col gap-1 text-slate-400">
+                      <span>Tag sản phẩm <span className="text-rose-500">*</span></span>
+                      <select
+                        required
+                        value={formData.warehouse_variant_tag || ""}
+                        onChange={(event) => {
+                          const tag = event.target.value;
+                          setFormData((prev) => ({ ...prev, warehouse_variant_tag: tag }));
+                        }}
+                        className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-white"
+                      >
+                        <option value="">
+                          {!warehouseTagVariantId ? "Chọn sản phẩm trước" :
+                            !currentWarehouseTags ? "Đang tải tag…" :
+                            currentWarehouseTags.failed ? "Không thể tải tag sản phẩm" :
+                            currentWarehouseTags.tags.length === 0 ? "Sản phẩm chưa có tag" : "Chọn tag sản phẩm"}
+                        </option>
+                        {currentWarehouseTags?.tags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+                      </select>
+                    </label>
+                  )}
                   {/* Mật Khẩu Kho */}
                   <div>
                     <label className="block text-slate-400 mb-1 font-medium flex items-center gap-1">
@@ -752,9 +762,12 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
             >
               Hủy
             </button>
+            {currentRuleCheck?.error && (
+              <span role="alert" className="text-rose-400">Không thể kiểm tra quy tắc cấp key. Hãy chọn lại sản phẩm hoặc NCC.</span>
+            )}
             <button
               type="submit"
-              disabled={!selectedProductId && !formData.id_product || !formData.supply_id}
+              disabled={checkingKeyRule || currentRuleCheck?.error || (!selectedProductId && !formData.id_product) || !formData.supply_id}
               title={(!selectedProductId && !formData.id_product) ? "Vui lòng chọn sản phẩm" : !formData.supply_id ? "Vui lòng chọn nhà cung cấp" : ""}
               className={`px-5 py-2 text-slate-950 rounded-xl font-bold transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 isEdit

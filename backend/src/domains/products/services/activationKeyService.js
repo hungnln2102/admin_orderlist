@@ -1,6 +1,11 @@
 const crypto = require("crypto");
 const { db } = require("@/db");
 const { TABLES, COLS } = require("@/db/tables");
+const { getPackageProducts } = require("./packageProductService");
+
+function matchesPackageTag(pack, targetTag) {
+  return pack.variantTags?.includes(targetTag);
+}
 
 /**
  * Sinh chuỗi mã key ngẫu nhiên dạng: PREFIX-XXXX-XXXX
@@ -13,6 +18,9 @@ const generateRandomKeyCode = (prefix = "GPT") => {
   const part2 = crypto.randomBytes(3).toString("hex").toUpperCase(); // 6 chars
   return `${cleanPrefix}-${part1}-${part2}`;
 };
+
+const generateOrderActivationKey = () =>
+  `MAVKEY${crypto.randomInt(36 ** 6).toString(36).toUpperCase().padStart(6, "0")}`;
 
 /**
  * Lấy danh sách mã kích hoạt có phân trang, bộ lọc và tìm kiếm
@@ -35,6 +43,7 @@ const listActivationKeys = async ({
       "ak.id",
       "ak.key_code",
       "ak.product_name_id",
+      `ak.${COLS.ACTIVATION_KEYS.TARGET_VARIANT_TAG}`,
       "pn.name as product_name",
       "ak.id_order",
       "ak.status",
@@ -278,7 +287,23 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
     }
 
     // 2. Tìm 1 slot trống (AVAILABLE) trong kho thuộc sản phẩm này
-    const availableSlot = await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
+    const keyCols = COLS.ACTIVATION_KEYS;
+    const targetTag = key[keyCols.TARGET_VARIANT_TAG];
+    let packageId = null;
+    if (targetTag && key.product_name_id) {
+      const pack = COLS.PACKAGE_PRODUCT;
+      await trx(TABLES.PACKAGE_PRODUCT)
+        .where(pack.PRODUCT_NAME_ID, key.product_name_id)
+        .orderBy("id", "asc")
+        .forUpdate()
+        .select("id");
+      const packages = await getPackageProducts({ connection: trx, productNameId: key.product_name_id });
+      packageId = packages.find((item) =>
+        matchesPackageTag(item, targetTag) && item.usedSlots < item.totalSlots
+      )?.id ?? null;
+    }
+
+    const availableSlot = (targetTag && !packageId) ? null : await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
       .join(`${TABLES.PRODUCT_KEYS} as acc`, "acc.id", "ss.account_id")
       .select(
         "ss.id as slot_id",
@@ -293,7 +318,15 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
         "acc.account_username"
       )
       .where("ss.name_id", key.product_name_id)
-      .whereIn("ss.status", ["AVAILABLE", "available"])
+      .modify((builder) => {
+        if (targetTag) {
+          builder.whereRaw(`BTRIM(ss.${COLS.ACCOUNT_SLOTS.VARIANT_TAG}) = ?`, [targetTag]);
+          builder.where("ss.account_id", trx(TABLES.PACKAGE_PRODUCT)
+            .where("id", packageId).select(COLS.PACKAGE_PRODUCT.ACCOUNT_ID));
+        } else {
+          builder.whereIn("ss.status", ["AVAILABLE", "available"]);
+        }
+      })
       .orderBy("ss.id", "asc")
       .forUpdate()
       .first();
@@ -308,7 +341,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
     const finalCustomer = String(customerInfo || key.customer_info || "").trim();
 
     // 3. Cập nhật slot trong Kho thành IN_USE
-    await trx(TABLES.ACCOUNT_SLOTS)
+    if (!packageId) await trx(TABLES.ACCOUNT_SLOTS)
       .where("id", availableSlot.slot_id)
       .update({
         status: "IN_USE",
@@ -333,6 +366,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
       .update({
         status: "ACTIVATED",
         account_slot_id: availableSlot.slot_id,
+        ...(packageId ? { [keyCols.PACKAGE_PRODUCT_ID]: packageId } : {}),
         assigned_account: assignedAccount,
         customer_info: finalCustomer || null,
         activated_at: trx.fn.now(),
@@ -372,32 +406,39 @@ const listActivationKeyRules = async () => {
       "s.supplier_name",
       "akr.product_name_id",
       "pn.name as target_warehouse_name",
-      "akr.is_active",
+      `akr.${COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG}`,
+      db.raw(`(
+        akr.${COLS.ACTIVATION_KEY_RULES.IS_ACTIVE}
+        AND akr.${COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG} IS NOT NULL
+      ) as is_active`),
       "akr.note",
       "akr.created_at",
-      "akr.updated_at",
-      db.raw(`(
-        SELECT COUNT(*)::int 
-        FROM ${TABLES.ACCOUNT_SLOTS} ss 
-        WHERE ss.name_id = akr.product_name_id 
-          AND UPPER(ss.status) = 'AVAILABLE'
-      ) as available_slots_count`)
+      "akr.updated_at"
     )
     .orderBy("akr.id", "desc");
 
-  return rules;
+  if (!rules.length) return rules;
+  const packages = await getPackageProducts();
+  return rules.map((rule) => ({
+    ...rule,
+    available_slots_count: packages.reduce((count, item) =>
+      item.productNameId === Number(rule.product_name_id) && matchesPackageTag(item, rule.target_variant_tag)
+        ? count + Math.max(0, item.totalSlots - item.usedSlots)
+        : count, 0),
+  }));
 };
 
 /**
  * Tạo mới hoặc cập nhật quy tắc cấp key theo Variant + NCC
  */
-const saveActivationKeyRule = async ({ variant_id, supplier_id, product_name_id, is_active = true, note = "" }) => {
+const saveActivationKeyRule = async ({ variant_id, supplier_id, product_name_id, target_variant_tag, is_active = true, note = "" }, id) => {
   const vId = Number(variant_id);
   const sId = Number(supplier_id);
   const pnId = Number(product_name_id);
+  const targetVariantTag = String(target_variant_tag || "").trim();
 
-  if (!vId || !sId || !pnId) {
-    throw new Error("Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!");
+  if (!vId || !sId || !pnId || !targetVariantTag) {
+    throw new Error("Vui lòng chọn đầy đủ Variant, Nhà cung cấp, Sản phẩm kho và Tag đích!");
   }
 
   const [variant, supplier, pName] = await Promise.all([
@@ -410,11 +451,42 @@ const saveActivationKeyRule = async ({ variant_id, supplier_id, product_name_id,
   if (!supplier) throw new Error(`Không tìm thấy Nhà cung cấp #${sId}`);
   if (!pName) throw new Error(`Không tìm thấy Kho slot #${pnId}`);
 
+  const targetTagExists = await db(TABLES.ACCOUNT_SLOTS)
+    .where(COLS.ACCOUNT_SLOTS.NAME_ID, pnId)
+    .whereRaw("BTRIM(??) = ?", [COLS.ACCOUNT_SLOTS.VARIANT_TAG, targetVariantTag])
+    .first(COLS.ACCOUNT_SLOTS.ID);
+  if (!targetTagExists) {
+    throw new Error(`Tag "${targetVariantTag}" không thuộc sản phẩm kho đã chọn.`);
+  }
+
+  if (id !== undefined) {
+    const ruleId = Number(id);
+    if (!Number.isSafeInteger(ruleId) || ruleId <= 0) throw new Error("ID quy tắc không hợp lệ.");
+    const cols = COLS.ACTIVATION_KEY_RULES;
+    try {
+      const [updated] = await db(TABLES.ACTIVATION_KEY_RULES).where(cols.ID, ruleId).update({
+        [cols.VARIANT_ID]: vId,
+        [cols.SUPPLIER_ID]: sId,
+        [cols.PRODUCT_NAME_ID]: pnId,
+        [cols.TARGET_VARIANT_TAG]: targetVariantTag,
+        [cols.IS_ACTIVE]: is_active !== false,
+        [cols.NOTE]: note ? String(note).trim() : null,
+        [cols.UPDATED_AT]: db.fn.now(),
+      }).returning("*");
+      if (!updated) throw new Error("Quy tắc cấp key không còn tồn tại.");
+      return updated;
+    } catch (error) {
+      if (error.code === "23505") throw new Error("Sản phẩm và NCC này đã có quy tắc cấp key.");
+      throw error;
+    }
+  }
+
   const [saved] = await db(TABLES.ACTIVATION_KEY_RULES)
     .insert({
       variant_id: vId,
       supplier_id: sId,
       product_name_id: pnId,
+      [COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG]: targetVariantTag,
       is_active: is_active !== false,
       note: note ? String(note).trim() : null,
       created_at: db.fn.now(),
@@ -423,6 +495,7 @@ const saveActivationKeyRule = async ({ variant_id, supplier_id, product_name_id,
     .onConflict(["variant_id", "supplier_id"])
     .merge({
       product_name_id: pnId,
+      [COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG]: targetVariantTag,
       is_active: is_active !== false,
       note: note ? String(note).trim() : null,
       updated_at: db.fn.now(),
@@ -441,11 +514,15 @@ const toggleActivationKeyRule = async (id) => {
 
   const existing = await db(TABLES.ACTIVATION_KEY_RULES).where("id", ruleId).first();
   if (!existing) throw new Error(`Không tìm thấy quy tắc #${ruleId}`);
+  const nextActive = !Boolean(existing[COLS.ACTIVATION_KEY_RULES.IS_ACTIVE]);
+  if (!existing[COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG] && nextActive) {
+    throw new Error("Vui lòng sửa quy tắc và chọn tag trước khi kích hoạt.");
+  }
 
   const [updated] = await db(TABLES.ACTIVATION_KEY_RULES)
     .where("id", ruleId)
     .update({
-      is_active: !existing.is_active,
+      [COLS.ACTIVATION_KEY_RULES.IS_ACTIVE]: nextActive,
       updated_at: db.fn.now(),
     })
     .returning("*");
@@ -484,11 +561,13 @@ const findMatchingKeyRule = async ({ variantId, supplierId }) => {
     .where("akr.variant_id", Number(variantId))
     .where("akr.supplier_id", Number(supplierId))
     .where("akr.is_active", true)
+    .whereNotNull(`akr.${COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG}`)
     .first();
 };
 
 module.exports = {
   generateRandomKeyCode,
+  generateOrderActivationKey,
   listActivationKeys,
   createActivationKeys,
   revokeActivationKey,

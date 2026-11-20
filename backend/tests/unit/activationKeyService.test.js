@@ -47,13 +47,14 @@ describe("Activation Key Generation & Format Suite", () => {
     );
   });
 
-  it("saveActivationKeyRule ném lỗi khi thiếu variant_id, supplier_id hoặc product_name_id", async () => {
+  it("saveActivationKeyRule ném lỗi khi thiếu variant_id, supplier_id, product_name_id hoặc target_variant_tag", async () => {
+    const requiredFieldsMessage = "Vui lòng chọn đầy đủ Variant, Nhà cung cấp, Sản phẩm kho và Tag đích!";
     await assert.rejects(
       async () => {
         await activationKeyService.saveActivationKeyRule({ variant_id: null, supplier_id: 1, product_name_id: 1 });
       },
       {
-        message: "Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!",
+        message: requiredFieldsMessage,
       }
     );
     await assert.rejects(
@@ -61,7 +62,7 @@ describe("Activation Key Generation & Format Suite", () => {
         await activationKeyService.saveActivationKeyRule({ variant_id: 1, supplier_id: null, product_name_id: 1 });
       },
       {
-        message: "Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!",
+        message: requiredFieldsMessage,
       }
     );
     await assert.rejects(
@@ -69,8 +70,12 @@ describe("Activation Key Generation & Format Suite", () => {
         await activationKeyService.saveActivationKeyRule({ variant_id: 1, supplier_id: 1, product_name_id: null });
       },
       {
-        message: "Vui lòng chọn đầy đủ Variant, Nhà cung cấp và Kho slot đích!",
+        message: requiredFieldsMessage,
       }
+    );
+    await assert.rejects(
+      () => activationKeyService.saveActivationKeyRule({ variant_id: 1, supplier_id: 1, product_name_id: 1 }),
+      { message: requiredFieldsMessage }
     );
   });
 

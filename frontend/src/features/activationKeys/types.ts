@@ -42,6 +42,7 @@ export interface CreateActivationKeyPayload {
 export interface CatalogProductOption {
   id: number;
   name: string;
+  availableTags?: string[];
 }
 
 export interface ActivationKeyRule {
@@ -54,6 +55,7 @@ export interface ActivationKeyRule {
   supplier_name?: string;
   product_name_id: number;
   target_warehouse_name?: string;
+  target_variant_tag: string;
   is_active: boolean;
   note?: string | null;
   available_slots_count?: number;
@@ -65,6 +67,7 @@ export interface SaveActivationKeyRulePayload {
   variant_id: number;
   supplier_id: number;
   product_name_id: number;
+  target_variant_tag: string;
   is_active?: boolean;
   note?: string;
 }

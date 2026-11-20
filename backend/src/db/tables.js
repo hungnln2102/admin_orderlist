@@ -392,6 +392,10 @@ const COLS = {
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
   },
+  PACKAGE_PRODUCT: {
+    ACCOUNT_ID: "account_id",
+    PRODUCT_NAME_ID: "product_name_id",
+  },
   PRODUCT_NAMES: {
     ID: "id",
     NAME: "name",
@@ -629,6 +633,7 @@ const COLS = {
     ID: "id",
     KEY_CODE: "key_code",
     PRODUCT_NAME_ID: "product_name_id",
+    TARGET_VARIANT_TAG: "target_variant_tag",
     PRODUCT_ID: "product_id",
     PACKAGE_PRODUCT_ID: "package_product_id",
     ID_ORDER: "id_order",
@@ -671,6 +676,7 @@ const COLS = {
     VARIANT_ID: "variant_id",
     SUPPLIER_ID: "supplier_id",
     PRODUCT_NAME_ID: "product_name_id",
+    TARGET_VARIANT_TAG: "target_variant_tag",
     IS_ACTIVE: "is_active",
     NOTE: "note",
     CREATED_AT: "created_at",

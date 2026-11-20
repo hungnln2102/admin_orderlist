@@ -43,6 +43,7 @@ Tài liệu tham chiếu kiến trúc: **`docs/STRUCTURE-SINGLE-DIRECTION.md`**.
 
 Thứ tự gợi ý: **nhỏ / ít phụ thuộc → trung bình → nặng (orders, payments, renew).**
 
+| 2026-11-20 | Tái Thiết Kế Toàn Diện Modal Cấu Hình Cấp Key Tự Động (Flow Mapping & Searchable Dropdowns) | ✅ | Đã bóc tách Modal thành component ActivationKeyRuleModal.tsx độc lập theo chuẩn Feature-Driven Architecture; thay thế hoàn toàn 3 native select bằng Custom Searchable Dropdown (tích hợp tìm kiếm trực tiếp bên trong); thiết kế luồng 2 tầng trực quan (Điều Kiện Đơn Hàng -> Kho Slot Đích), Live Rule Preview thời gian thực và Toggle Switch hiện đại. Frontend production build đạt 100% không lỗi. |
 | 2026-11-16 | Tinh Gọn Giao Diện Nhập Ngoài Luồng: 2 Trường (Thông Tin Nhập Hàng & Giá Tiền) | ✅ | Đã cập nhật AllocateReceiptModal.tsx: Khi chọn mục đích Nhập Ngoài Luồng, form chỉ hiển thị đúng 2 trường: 'THÔNG TIN NHẬP HÀNG *' (không tự điền số tài khoản) và 'GIÁ TIỀN (VND) *'. Ẩn hoàn toàn trường 'GHI CHÚ LOG PHÂN BỔ'. TypeScript compilation pass 0 error. |
 | 2026-11-14 | Chuẩn Hóa 100% Popup Xác Nhận Sang NotificationModal Của Hệ Thống (Loại Bỏ window.confirm) | ✅ | Thay thế triệt để window.confirm() tại nút Xóa quy tắc và Gỡ provider trong ProductApiMappingTab.tsx bằng hook useNotification() và NotificationModal.tsx chuẩn Dark Glass của hệ thống. Build frontend pass 100% trong 4.28s. |
 | 2026-11-14 | Triển Khai Phương Án A: Thiết Lập Tự Động Quy Tắc Điều Phối Động 4 Yếu Tố (Ô Input + Sản Phẩm + NCC ➔ Provider) | ✅ | Hoàn thiện 100% Phương Án A theo chỉ đạo của Master: 1. Database: Tạo bảng system_automation.portal_slot_routing_rules và 2 indexes trên LOWER(information_order), LOWER(id_order); 2. Backend: CRUD API và hàm findRoutingProviderForInput tự động đối chiếu đơn hàng để lấy Provider của NCC; otpPortalDispatcher.js ưu tiên gọi Provider đích lên đầu chuỗi serviceChain; 3. Frontend: Modal Form SlotProductSupplierRuleModal.tsx và Tab ProductApiMappingTab.tsx hiển thị danh sách quy tắc động trực quan, hỗ trợ bật/tắt, sửa, xóa; build frontend pass 100% 0 lỗi TypeScript. |
@@ -502,3 +503,35 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 ## 2026-11-19 - Cho phép Web OTP local gọi API
 
 - [x] Whitelist `http://localhost:3005` trong `backend/.env`, restart backend local và xác nhận preflight API OTP trả `204` với `Access-Control-Allow-Origin` đúng origin.
+## 2026-11-20 - Khóa thông tin đơn khi tự cấp key
+
+- [x] Tra quy tắc theo ID variant và NCC, khóa hai ô khi khớp, hiển thị key từ đơn đã tạo.
+- [x] Chặn lưu đơn nếu quy tắc đã xác nhận không còn hiệu lực lúc tạo hoặc thao tác cấp key thất bại.
+- [ ] Nghiệm thu với database test và trình duyệt. Runner yêu cầu TEST_DATABASE_URL.
+
+- [x] Hiển thị key ngay khi khớp quy tắc, bỏ nhãn và chỉ ghi key khi tạo đơn thành công. Build frontend và kiểm tra cú pháp đạt.
+
+- [x] Đổi key tự cấp cho đơn sang tiền tố MAVKEY và 6 ký tự ngẫu nhiên.
+
+- [x] Bắt buộc chọn tag theo sản phẩm khi tạo đơn MAVN bật Lưu kho. Backend xác thực và ghi variant_tag.
+
+- [x] Chuyển hai provider Yuna sang MMO Center và kiểm tra trang 2FA cùng API rules Mail công khai.
+
+- [x] Hiển thị tag từ slot liên quan trên bảng Gói sản phẩm và thẻ di động.
+
+- [x] Gộp tag vào tên gói trên bảng và thẻ di động. TypeScript đạt.
+
+- [x] Thu hẹp cột Thông tin gói và giữ tên gói kèm tag trên một dòng ở bảng desktop. TypeScript đạt.
+
+- [x] Chỉnh cột Thông tin gói rộng khoảng 320 px theo ảnh. TypeScript đạt.
+
+- [x] Hiển thị tên gói và tag theo kiểu Kho hàng trên desktop và di động. TypeScript đạt.
+
+- [x] Thêm thao tác sửa cấu hình cấp key theo ID, từ chối cặp variant và NCC bị trùng.
+
+- [x] Bắt buộc chọn tag kho đích cho quy tắc cấp key; modal lọc tag theo kho, hỗ trợ sửa/prefill, bảng hiển thị tag và số slot khả dụng. TypeScript đạt.
+
+- [x] Bổ sung cấu hình đích `Sản phẩm kho + Tag`, snapshot tag vào activation key và chỉ khóa/cấp slot đúng `product_name_id + variant_tag`.
+- [x] Chạy migration batch 28; xác nhận hai cột `target_variant_tag` và cấu hình legacy thiếu tag đã bị tắt.
+- [/] Nghiệm thu integration cấp key theo tag: đã bổ sung regression test; chờ `TEST_DATABASE_URL` cô lập để chạy DB test.
+- [x] Dùng sức chứa Kho Gói Sản Phẩm để đếm vị trí và cấp key theo tag. Đã đối chiếu gói Adobe Renew và thử kích hoạt trong giao dịch hoàn nguyên.

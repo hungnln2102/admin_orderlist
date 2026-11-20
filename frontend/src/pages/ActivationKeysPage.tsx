@@ -38,13 +38,21 @@ export const ActivationKeysPage: React.FC = () => {
   const [products, setProducts] = useState<CatalogProductOption[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Fetch Danh mục Sản phẩm để chọn khi tạo key
+  // Dùng trực tiếp danh mục kho để ID và tag cùng thuộc warehouse.product_names.
   const fetchProducts = async () => {
     try {
-      const res = await fetch("/api/products/packages/catalog-names");
+      const res = await fetch("/api/warehouse/catalog");
       const json = await res.json();
-      if (res.ok && json.data) {
-        setProducts(json.data);
+      if (res.ok && Array.isArray(json)) {
+        setProducts(json.map((item: any) => ({
+          id: Number(item.id),
+          name: item.name,
+          availableTags: Array.isArray(item.variants)
+            ? item.variants
+              .map((variant: any) => String(variant.tag || "").trim())
+              .filter((tag: string) => tag && tag !== "Chưa gắn tag")
+            : [],
+        })));
       }
     } catch {
       // ignore

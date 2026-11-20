@@ -12,6 +12,7 @@ export interface PackageItem {
   category: string;
   name: string;
   accountInfo: string;
+  variantTags?: string[];
   password?: string | null;
   twoFa?: string | null;
   backupEmail?: string | null;

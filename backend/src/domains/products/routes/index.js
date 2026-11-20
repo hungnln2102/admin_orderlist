@@ -13,6 +13,7 @@ router.delete("/activation-keys/:id", activationKeyController.deleteActivationKe
 // Quản lý Quy Tắc Cấp Key Tự Động theo Variant + NCC (Activation Key Rules)
 router.get("/activation-key-rules", activationKeyController.getActivationKeyRules);
 router.post("/activation-key-rules", activationKeyController.saveActivationKeyRule);
+router.put("/activation-key-rules/:id", activationKeyController.saveActivationKeyRule);
 router.put("/activation-key-rules/:id/toggle", activationKeyController.toggleActivationKeyRule);
 router.delete("/activation-key-rules/:id", activationKeyController.deleteActivationKeyRule);
 router.get("/activation-key-rules/check", activationKeyController.checkMatchingKeyRule);

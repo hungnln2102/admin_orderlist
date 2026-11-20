@@ -10,6 +10,23 @@ import {
   HardDrive,
 } from "lucide-react";
 import { PackageItem } from "../types";
+import { getServiceBrandStyle } from "../../warehouse/components/warehouseRowUtils";
+
+function PackageNameBadge({ item }: { item: PackageItem }) {
+  const brand = getServiceBrandStyle(item.name, item.status !== "expired" && item.usedSlots < item.totalSlots);
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${brand.badgeClass}`}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${brand.dotClass}`} />
+      <span>{item.name}</span>
+      {item.variantTags?.map((tag) => (
+        <span key={tag} className="rounded border border-white/15 bg-white/15 px-1.5 py-0.2 text-[9px] font-semibold tracking-normal text-white">
+          {tag}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 interface PackageTableProps {
   loading: boolean;
@@ -41,8 +58,8 @@ export const PackageTable: React.FC<PackageTableProps> = ({
         <table className="w-full min-w-[850px] border-collapse text-left">
           <thead>
             <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
-              <th className="py-3.5 px-4 w-36">TÊN GÓI</th>
-              <th className="py-3.5 px-4 min-w-[200px]">THÔNG TIN GÓI</th>
+              <th className="py-3.5 px-4 min-w-48">TÊN GÓI</th>
+              <th className="py-3.5 px-4 w-80">THÔNG TIN GÓI</th>
               <th className="py-3.5 px-4 w-44">SỐ LƯỢNG</th>
               <th className="py-3.5 px-4 w-28">NCC</th>
               <th className="py-3.5 px-4 w-32 text-right">GIÁ NHẬP</th>
@@ -96,18 +113,18 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                           ) : (
                             <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 shrink-0" />
                           )}
-                          <span>{item.name}</span>
+                          <PackageNameBadge item={item} />
                         </div>
                       </td>
 
                       {/* Thông tin gói / Email */}
                       <td className="py-3.5 px-4 font-mono text-slate-300">
-                        <div className="space-y-1">
+                        <div className="max-w-72 space-y-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-sans font-bold tracking-wider">
                               GỐC
                             </span>
-                            <span className="truncate max-w-[260px]">{item.accountInfo}</span>
+                            <span className="min-w-0 truncate" title={item.accountInfo}>{item.accountInfo}</span>
                           </div>
                           {item.storageAccountInfo && (
                             <div className="flex items-center gap-1.5 text-xs text-amber-300/90">
@@ -381,7 +398,9 @@ export const PackageTable: React.FC<PackageTableProps> = ({
             return (
               <div key={item.id} className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 shadow-md mt-3 first:mt-0 relative overflow-hidden">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-white text-base">{item.name}</span>
+                  <div className="min-w-0 overflow-x-auto">
+                    <PackageNameBadge item={item} />
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => onEditItem(item)}

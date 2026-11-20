@@ -4,7 +4,7 @@ function joinUrl(baseUrl, endpoint) {
   const normalizedBase = String(baseUrl || "").replace(/\/+$/, "");
   const normalizedEndpoint = String(endpoint || "").replace(/^\/+/, "");
   if (/^(https?:)?\/\//i.test(normalizedEndpoint)) throw new Error("Endpoint must be a relative path.");
-  return normalizedEndpoint ? normalizedBase + "/" + normalizedEndpoint : normalizedBase;
+  return normalizedEndpoint || endpoint === "/" ? normalizedBase + "/" + normalizedEndpoint : normalizedBase;
 }
 
 async function requestProviderApi(config, { method = "GET", body = null, endpoint = "", headers: extraHeaders = {}, signal = null, timeoutMs = 12_000 } = {}) {

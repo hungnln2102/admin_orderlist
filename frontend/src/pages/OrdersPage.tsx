@@ -230,6 +230,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     setFormData((prev) => ({
       ...prev,
       id_product: prod.san_pham,
+      warehouse_variant_tag: "",
       price: isImport ? 0 : (existingSuffix > 0 ? sellingPrice + existingSuffix : sellingPrice),
       gross_selling_price: isImport ? 0 : sellingPrice,
       supply_id: "",
@@ -409,7 +410,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
     setIsDeleteModalOpen(true);
   };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleCreateSubmit = async (
+    e: React.FormEvent,
+    keyRuleSelection?: { variantId: number; supplierId: number; key: string },
+  ) => {
     e.preventDefault();
     const isImportTab = activeTab === "import" || formData.order_prefix === ORDER_PREFIX.MAVN;
     if (!selectedProductId && !formData.id_product) {
@@ -424,7 +428,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       notify.error("Vui lòng nhập tên khách hàng", "Thiếu Thông Tin");
       return;
     }
-    if (!formData.information_order || !formData.information_order.trim()) {
+    if (!keyRuleSelection && !formData.information_order.trim()) {
       notify.error("Vui lòng nhập thông tin sản phẩm", "Thiếu Thông Tin");
       return;
     }
@@ -434,6 +438,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
 
       const payload = {
         ...formData,
+        ...(isImportTab && selectedProductId && { id_product: String(selectedProductId) }),
+        ...(keyRuleSelection && {
+          id_product: String(keyRuleSelection.variantId),
+          supply_id: String(keyRuleSelection.supplierId),
+          information_order: keyRuleSelection.key,
+          slot: "",
+          require_activation_key_rule: true,
+        }),
         order_prefix: prefix,
         id_order: generatedCode,
         status: isImportTab ? ORDER_STATUS.PAID : ORDER_STATUS.UNPAID,

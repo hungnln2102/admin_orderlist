@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const orderService = require("./services/orderService");
+const { listImportWarehouseTags } = require("../warehouse/services/importWarehouseTagService");
 const { getClientErrorMessage } = require("@/utils/clientError");
 
 // GET /api/orders - Lấy danh sách đơn hàng
@@ -23,6 +24,14 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/orders/:id - Lấy chi tiết 1 đơn hàng
+router.get("/warehouse-tags/:variantId", async (req, res) => {
+  try {
+    res.json(await listImportWarehouseTags(Number(req.params.variantId)));
+  } catch (err) {
+    res.status(500).json({ error: getClientErrorMessage(err, "Không thể tải tag sản phẩm.") });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const order = await orderService.getOrderById(req.params.id);
