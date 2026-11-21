@@ -31,7 +31,15 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 echo "[1/5] Pulling latest code from Git..."
-git pull origin main || git pull origin master
+if [ "${1:-}" = "--commit" ]; then
+  [[ "${2:-}" =~ ^[0-9a-f]{40}$ ]]
+  git fetch origin main
+  git merge-base --is-ancestor "$2" FETCH_HEAD
+  git merge --ff-only "$2"
+  test "$(git rev-parse HEAD)" = "$2"
+else
+  git pull --ff-only origin main || git pull --ff-only origin master
+fi
 
 echo ""
 if [ -n "$NO_CACHE" ]; then
@@ -54,12 +62,14 @@ fi
 
 echo ""
 echo "[4/5] Starting updated application containers without tearing down healthy services..."
-"${DC[@]}" -f docker-compose.yml up -d --remove-orphans
+"${DC[@]}" -f docker-compose.yml up -d --wait --wait-timeout 120 --remove-orphans
 
 echo ""
 echo "[5/5] Checking container status..."
-sleep 3
 "${DC[@]}" ps
+curl --fail --silent --show-error --retry 5 --retry-all-errors --max-time 10 \
+  https://admin.mavrykpremium.com/api/health
+echo ""
 
 echo ""
 echo "======================================"

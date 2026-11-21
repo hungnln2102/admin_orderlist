@@ -570,3 +570,7 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] Tích hợp tra cứu và nhận lại tài khoản theo mã, cùng giao diện kiểm tra và khắc phục trên OTP Portal.
 - [ ] Kiểm thử tích hợp cấp lại, bấm đồng thời và chuyển team trước khi triển khai.
+## CI/CD cho Admin Order List
+
+- [x] Tạo workflow kiểm tra và triển khai commit đã xác thực. Build frontend và kiểm tra cú pháp thành công.
+- [ ] Cấu hình secrets cho môi trường GitHub production và xác minh lần chạy đầu tiên.
