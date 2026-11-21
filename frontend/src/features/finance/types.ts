@@ -240,12 +240,27 @@ export interface SavingGoalsOverviewData {
   recentTransactions: SavingFundTransaction[];
 }
 
+export interface FixedCostPaymentLog {
+  id: number;
+  targetId: number;
+  targetName: string | null;
+  periodMonth: string;
+  paymentDate: string | null;
+  amount: number;
+  note: string;
+  hasReceiptAllocation: boolean;
+  hasFinancialAccount: boolean;
+  receiptCode: string | number | null;
+  accountLabel: string | null;
+}
+
 export interface FinanceSummaryData {
   month: string;
   breakEven: BreakEvenMetrics;
   dailyBreakEven: DailyBreakEvenStats;
   netWorth: NetWorthMetrics;
   fixedCosts: FixedCost[];
+  fixedCostPayments?: FixedCostPaymentLog[];
   installments: Installment[];
   personalAssets: PersonalAsset[];
   shopBankAccounts: ShopBankAccount[];

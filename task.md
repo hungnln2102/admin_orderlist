@@ -549,3 +549,12 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Dùng sức chứa Kho Gói Sản Phẩm để đếm vị trí và cấp key theo tag. Đã đối chiếu gói Adobe Renew và thử kích hoạt trong giao dịch hoàn nguyên.
 - [x] **VPS-CONSOLIDATION-AND-WEBHOOK-RECEIPT-REPAIR-2026-11-16**: Chuẩn hóa production về duy nhất `/var/www/admin_orderlist` theo GitHub `origin/main` commit `9c7c0161`; backup dữ liệu runtime tại `/root/admin_orderlist-consolidation-20261116-103904`, xóa `/var/www/admin_orderlist-release` sau healthcheck. Repair transactional 14 receipt webhook `OUT` `UNALLOCATED` thiếu `financial_account_id`: liên kết tài khoản Shop MB `#2`, tạo 14 debit ledger tổng `2,078,000 VND` và 14 audit events. Backend/PostgreSQL/Redis healthy. Còn 29 receipt `FULLY_ALLOCATED` lịch sử thiếu liên kết tài khoản, chưa replay tự động để tránh thay đổi kế toán lịch sử.
 - [x] **PRODUCTION-MIGRATION-20261114000001-2026-11-16**: Áp dụng batch 26 từ GitHub source chuẩn: tạo `system_automation.portal_slot_routing_rules` và hai index tìm kiếm không phân biệt hoa thường cho `business.order_list`; `knex migrate:status` xác nhận 47 migration completed, 0 pending.
+## 2026-11-21 – Thẻ chi phí cố định và thanh toán tiền mặt
+
+- [x] Chuyển danh sách chi phí cố định sang dạng thẻ và bổ sung lựa chọn ghi nhận tiền mặt. Frontend build thành công.
+- [x] Tự điền số tiền còn chưa phân bổ khi chọn biên lai thanh toán chi phí cố định. Frontend build thành công.
+- [x] Hiển thị nhật ký thanh toán chi phí cố định theo kỳ, gồm số tiền thực trả, nguồn tiền và mã biên lai.
+## Phân trang nhật ký nợ và trả góp
+
+- [x] Hiển thị tối đa 10 giao dịch mỗi trang và về trang đầu khi đổi bộ lọc.
+

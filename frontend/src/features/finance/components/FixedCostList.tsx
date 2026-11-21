@@ -2,7 +2,8 @@ import React, { useState, useMemo } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
-import { FixedCost, FixedCostCategory } from "../types";
+import { FixedCost, FixedCostCategory, FixedCostPaymentLog } from "../types";
+import { FixedCostPaymentHistory } from "./FixedCostPaymentHistory";
 import {
   CheckCircle2,
   DollarSign,
@@ -23,6 +24,8 @@ import { CreditCard } from "lucide-react";
 
 interface Props {
   items: FixedCost[];
+  payments?: FixedCostPaymentLog[];
+  periodMonth: string;
   onAdd: (payload: any) => Promise<void>;
   onEdit: (id: number, payload: any) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
@@ -31,6 +34,8 @@ interface Props {
 
 export const FixedCostList: React.FC<Props> = ({
   items,
+  payments = [],
+  periodMonth,
   onAdd,
   onEdit,
   onDelete,
@@ -196,121 +201,71 @@ export const FixedCostList: React.FC<Props> = ({
           </p>
         </GlassCard>
       ) : (
-        <GlassCard className="!p-0 bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-800">
-                <tr>
-                  <th className="py-3.5 px-4">Khoản Chi</th>
-                  <th className="py-3.5 px-4">Phân Loại</th>
-                  <th className="py-3.5 px-4 text-right">Số Tiền / Tháng</th>
-                  <th className="py-3.5 px-4 text-center">Thanh Toán Tháng Này</th>
-                  <th className="py-3.5 px-4 text-center">Trạng Thái Tính Hòa Vốn</th>
-                  <th className="py-3.5 px-4">Ghi Chú</th>
-                  <th className="py-3.5 px-4 text-right">Thao Tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {filteredItems.map((item) => {
-                  const categoryMeta = categoryBadgeMap[item.category] || categoryBadgeMap.OTHER;
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {filteredItems.map((item) => {
+            const category = categoryBadgeMap[item.category] || categoryBadgeMap.OTHER;
 
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`hover:bg-slate-800/40 transition-colors ${
-                        !item.isActive ? "opacity-50" : ""
-                      }`}
+            return (
+              <article key={item.id} className="flex min-w-0 flex-col rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="break-words text-sm font-bold text-white">{item.name}</h3>
+                    <span className={`mt-1 inline-block rounded border px-2 py-0.5 text-[11px] font-semibold ${category.color}`}>
+                      {category.label}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button type="button" onClick={() => handleOpenEdit(item)} aria-label="Sửa chi phí" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-cyan-300">
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" onClick={() => confirmDelete(item)} aria-label="Xóa chi phí" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-slate-800 pt-3">
+                  <div>
+                    <div className="text-[10px] uppercase text-slate-400">Số tiền / tháng</div>
+                    <div className="font-mono text-sm font-bold text-amber-300">{formatVND(item.amount)}</div>
+                  </div>
+                  <button type="button" onClick={() => handleToggleActive(item)} aria-pressed={item.isActive}
+                    title="Trạng thái tính hòa vốn"
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold ${item.isActive
+                      ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                      : "border-slate-700 bg-slate-800 text-slate-400"}`}
+                  >
+                    <Power className="h-3 w-3" />
+                    {item.isActive ? "ĐANG ÁP DỤNG" : "ĐÃ TẮT"}
+                  </button>
+                </div>
+                {item.note && <p className="mt-2 break-words text-xs text-slate-400">{item.note}</p>}
+                <div className="mt-auto pt-3">
+                  {item.isPaidThisMonth ? (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>Đã trả {item.paidDate ? `(ngày ${item.paidDate.split("-")[2]})` : ""}</span>
+                    </div>
+                  ) : item.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayingItem(item);
+                        setPayModalOpen(true);
+                      }}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/25"
                     >
-                      <td className="py-3.5 px-4 font-bold text-white">
-                        <div className="flex items-center gap-2">
-                          <span>{item.name}</span>
-                          {!item.isActive && (
-                            <span className="text-[10px] font-normal text-slate-500">(Tạm bỏ qua)</span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${categoryMeta.color}`}>
-                          {categoryMeta.label}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-300 text-sm">
-                        {formatVND(item.amount)}
-                      </td>
-
-                      {/* Thanh toán tháng này */}
-                      <td className="py-3.5 px-4 text-center">
-                        {item.isPaidThisMonth ? (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Đã trả {item.paidDate ? `(ngày ${item.paidDate.split("-")[2]})` : ""}</span>
-                          </div>
-                        ) : item.isActive ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPayingItem(item);
-                              setPayModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer shadow-sm active:scale-95"
-                          >
-                            <CreditCard className="w-3 h-3 text-amber-400" />
-                            <span>Chưa trả • Thanh toán</span>
-                          </button>
-                        ) : (
-                          <span className="text-slate-600">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleActive(item)}
-                          className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm ${
-                            item.isActive
-                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
-                              : "bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-700"
-                          }`}
-                        >
-                          <Power className={`w-3 h-3 ${item.isActive ? "text-emerald-400" : "text-slate-500"}`} />
-                          {item.isActive ? "ĐANG ÁP DỤNG" : "ĐÃ TẮT"}
-                        </button>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-xs text-slate-400 truncate max-w-[200px]">
-                        {item.note || "—"}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(item)}
-                            className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                            title="Sửa chi phí"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => confirmDelete(item)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                            title="Xóa chi phí"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </GlassCard>
+                      <CreditCard className="h-3.5 w-3.5" />
+                      Chưa trả • Thanh toán
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
       )}
+
+      <FixedCostPaymentHistory payments={payments} />
 
       {/* Modal Add/Edit */}
       <FixedCostModal
@@ -327,6 +282,7 @@ export const FixedCostList: React.FC<Props> = ({
           setPayingItem(null);
         }}
         fixedCost={payingItem}
+        defaultPeriodMonth={periodMonth}
         onSuccess={() => {
           notify.success(`Đã xác nhận thanh toán chi phí "${payingItem?.name}"`);
           if (onRefresh) onRefresh();

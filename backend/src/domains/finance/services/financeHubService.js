@@ -288,12 +288,44 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     .select("*")
     .orderBy("id", "asc");
 
-  const fixedCostPaymentLogs = await db(TABLES.DEBT_PAYMENT_LOGS)
-    .where("target_type", "FIXED_COST")
-    .where("period_month", currentMonthStr);
+  const log = COLS.DEBT_PAYMENT_LOGS;
+  const allocation = COLS.PAYMENT_RECEIPT_ALLOCATIONS;
+  const receipt = COLS.PAYMENT_RECEIPT;
+  const account = COLS.FINANCIAL_ACCOUNTS;
+  const fixedCostPaymentLogs = await db({ payment: TABLES.DEBT_PAYMENT_LOGS })
+    .leftJoin({ allocation: TABLES.PAYMENT_RECEIPT_ALLOCATIONS }, `allocation.${allocation.ID}`, `payment.${log.RECEIPT_ALLOCATION_ID}`)
+    .leftJoin({ receipt: TABLES.PAYMENT_RECEIPT }, `receipt.${receipt.ID}`, `allocation.${allocation.RECEIPT_ID}`)
+    .leftJoin({ account: TABLES.FINANCIAL_ACCOUNTS }, `account.${account.ID}`, `payment.${log.FINANCIAL_ACCOUNT_ID}`)
+    .where(`payment.${log.TARGET_TYPE}`, "FIXED_COST")
+    .where(`payment.${log.PERIOD_MONTH}`, currentMonthStr)
+    .select("payment.*", {
+      receiptId: `receipt.${receipt.ID}`,
+      receiptReference: `receipt.${receipt.REFERENCE_CODE}`,
+      receiptTransactionId: `receipt.${receipt.SEPAY_TRANSACTION_ID}`,
+      accountLabel: `account.${account.LABEL}`,
+    })
+    .orderBy(`payment.${log.PAYMENT_DATE}`, "desc")
+    .orderBy(`payment.${log.ID}`, "desc");
 
   const paymentLogMap = new Map();
-  fixedCostPaymentLogs.forEach((l) => paymentLogMap.set(Number(l.target_id), l));
+  for (const row of fixedCostPaymentLogs) {
+    const id = Number(row[log.TARGET_ID]);
+    if (!paymentLogMap.has(id)) paymentLogMap.set(id, row);
+  }
+  const fixedCostNames = new Map(fixedCostRows.map((row) => [Number(row.id), row.name]));
+  const fixedCostPayments = fixedCostPaymentLogs.map((row) => ({
+    id: Number(row[log.ID]),
+    targetName: fixedCostNames.get(Number(row[log.TARGET_ID])) || null,
+    targetId: Number(row[log.TARGET_ID]),
+    periodMonth: row[log.PERIOD_MONTH],
+    paymentDate: row[log.PAYMENT_DATE] ? new Date(row[log.PAYMENT_DATE]).toISOString().slice(0, 10) : null,
+    amount: toNumber(row[log.AMOUNT]),
+    note: row[log.NOTE] || "",
+    hasReceiptAllocation: Boolean(row[log.RECEIPT_ALLOCATION_ID]),
+    hasFinancialAccount: Boolean(row[log.FINANCIAL_ACCOUNT_ID]),
+    receiptCode: row.receiptReference || row.receiptTransactionId || row.receiptId || null,
+    accountLabel: row.accountLabel || null,
+  }));
 
   const fixedCosts = fixedCostRows.map((r) => {
     const paidLog = paymentLogMap.get(Number(r.id));
@@ -766,6 +798,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       },
     },
     fixedCosts,
+    fixedCostPayments,
     installments,
     personalAssets,
     shopBankAccounts,

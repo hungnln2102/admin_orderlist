@@ -468,6 +468,8 @@ export const FinanceHubPage: React.FC = () => {
             <div className="animate-in fade-in duration-200">
               <FixedCostList
                 items={data.fixedCosts}
+                payments={data.fixedCostPayments}
+                periodMonth={data.month}
                 onAdd={handleAddFixedCost}
                 onEdit={handleEditFixedCost}
                 onDelete={handleDeleteFixedCost}

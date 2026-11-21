@@ -6,6 +6,7 @@ import {
   Building2,
   Warehouse,
   ArrowDown,
+  ArrowRight,
   Sparkles,
   Check,
   Search,
@@ -35,6 +36,7 @@ interface VariantOption {
 interface SupplierOption {
   id: number;
   name: string;
+  costPrice?: number;
 }
 
 export const ActivationKeyRuleModal: React.FC<Props> = ({
@@ -50,6 +52,7 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
 
   // Form states
   const [selectedVariantId, setSelectedVariantId] = useState<number>(0);
@@ -80,20 +83,55 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Fetch variants & suppliers when modal opens
+  // Fetch danh sách NCC theo đúng Variant được chọn
+  const fetchSuppliersForVariant = useCallback(
+    async (variantId: number, defaultSupplierId?: number) => {
+      if (!variantId || variantId <= 0) {
+        setSupplierOptions([]);
+        setSelectedSupplierId(0);
+        return;
+      }
+      setLoadingSuppliers(true);
+      try {
+        const res = await fetch(`/api/products/${variantId}/suppliers`);
+        const json = await res.json().catch(() => ({}));
+        const rawList = Array.isArray(json) ? json : json.data || [];
+        const sList: SupplierOption[] = rawList.map((item: any) => ({
+          id: Number(item.supplier_id || item.id),
+          name: item.supplier_name || item.ncc_name || `NCC #${item.supplier_id || item.id}`,
+          costPrice: Number(item.gia_nhap || item.price || 0),
+        }));
+        setSupplierOptions(sList);
+
+        // Tự động gán selectedSupplierId:
+        // 1. Ưu tiên defaultSupplierId khi mở modal sửa (nếu nằm trong sList)
+        // 2. Hoặc giữ lại ID hiện tại nếu vẫn còn trong sList của variant mới
+        // 3. Fallback về NCC đầu tiên của variant đó
+        setSelectedSupplierId((prevId) => {
+          const targetId = defaultSupplierId !== undefined ? defaultSupplierId : prevId;
+          if (targetId && sList.some((s) => s.id === targetId)) {
+            return targetId;
+          }
+          return sList[0]?.id || 0;
+        });
+      } catch (err: any) {
+        console.error("Lỗi tải NCC cho variant:", err);
+        setSupplierOptions([]);
+        setSelectedSupplierId(0);
+      } finally {
+        setLoadingSuppliers(false);
+      }
+    },
+    []
+  );
+
+  // Fetch variants catalog khi modal opens
   const fetchCatalogData = useCallback(async () => {
-    if (variantOptions.length > 0 && supplierOptions.length > 0) return;
+    if (variantOptions.length > 0) return;
     setLoadingCatalog(true);
     try {
-      const [pricesRes, suppliersRes] = await Promise.all([
-        fetch("/api/products/prices?limit=1000"),
-        fetch("/api/products/all-suppliers"),
-      ]);
-
-      const [pricesJson, suppliersJson] = await Promise.all([
-        pricesRes.json().catch(() => ({})),
-        suppliersRes.json().catch(() => []),
-      ]);
+      const pricesRes = await fetch("/api/products/prices?limit=1000");
+      const pricesJson = await pricesRes.json().catch(() => ({}));
 
       if (pricesRes.ok && pricesJson.data) {
         const vList: VariantOption[] = (pricesJson.data || []).map((row: any) => ({
@@ -103,19 +141,12 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
         }));
         setVariantOptions(vList);
       }
-
-      const rawSuppliers = Array.isArray(suppliersJson) ? suppliersJson : suppliersJson.data || [];
-      const sList: SupplierOption[] = rawSuppliers.map((s: any) => ({
-        id: Number(s.id),
-        name: s.supplier_name || s.ncc_name || `NCC #${s.id}`,
-      }));
-      setSupplierOptions(sList);
     } catch (err: any) {
       console.error("Lỗi tải catalog options:", err);
     } finally {
       setLoadingCatalog(false);
     }
-  }, [variantOptions.length, supplierOptions.length]);
+  }, [variantOptions.length]);
 
   useEffect(() => {
     if (isOpen) {
@@ -124,8 +155,11 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
       setVariantSearch("");
       setSupplierSearch("");
       setWarehouseSearch("");
-      setSelectedVariantId(Number(editingRule?.variant_id) || 0);
-      setSelectedSupplierId(Number(editingRule?.supplier_id) || supplierOptions[0]?.id || 0);
+
+      const initialVariantId = Number(editingRule?.variant_id) || 0;
+      const initialSupplierId = Number(editingRule?.supplier_id) || 0;
+
+      setSelectedVariantId(initialVariantId);
       setSelectedWarehouseId(Number(editingRule?.product_name_id) || warehouseProducts[0]?.id || 0);
       setSelectedTargetTag(editingRule?.target_variant_tag || "");
       setNote(editingRule?.note || "");
@@ -133,8 +167,15 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
       setIsVariantOpen(false);
       setIsSupplierOpen(false);
       setIsWarehouseOpen(false);
+
+      if (initialVariantId > 0) {
+        fetchSuppliersForVariant(initialVariantId, initialSupplierId);
+      } else {
+        setSupplierOptions([]);
+        setSelectedSupplierId(0);
+      }
     }
-  }, [isOpen, fetchCatalogData, supplierOptions, warehouseProducts, editingRule]);
+  }, [isOpen, fetchCatalogData, fetchSuppliersForVariant, warehouseProducts, editingRule]);
 
   // Click outside listener for all custom dropdowns
   useEffect(() => {
@@ -277,7 +318,7 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl shadow-2xl shadow-cyan-950/30 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl xl:max-w-5xl shadow-2xl shadow-cyan-950/30 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 bg-slate-950/60 shrink-0">
           <div className="flex items-center gap-3">
@@ -317,449 +358,543 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* KHỐI 1: ĐIỀU KIỆN ĐƠN HÀNG (VARIANT + NCC) */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3.5 relative">
-            <div className="flex items-center gap-2 pb-1 border-b border-slate-800/60">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[11px] font-bold">
-                1
-              </span>
-              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                Điều Kiện Đơn Hàng (Đầu Vào)
-              </span>
-            </div>
-
-            {/* Field: Chọn Variant */}
-            <div className="space-y-1.5" ref={variantRef}>
-              <label className="block text-xs font-semibold text-slate-300">
-                Sản phẩm (Variant) áp dụng <span className="text-rose-400">*</span>
-              </label>
-
-              {/* Custom Searchable Trigger */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsVariantOpen(!isVariantOpen);
-                    setIsSupplierOpen(false);
-                    setIsWarehouseOpen(false);
-                  }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-left flex items-center justify-between transition-all min-h-[42px] ${
-                    isVariantOpen
-                      ? "border-cyan-500 ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/10"
-                      : "border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
-                    <Package className="w-4 h-4 text-cyan-400 shrink-0" />
-                    {loadingCatalog ? (
-                      <span className="text-xs text-cyan-400 animate-pulse">
-                        Đang tải danh sách variant...
-                      </span>
-                    ) : currentVariant ? (
-                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                        <span className="text-xs font-bold text-white truncate max-w-[280px]">
-                          {currentVariant.name}
-                        </span>
-                        <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80">
-                          {currentVariant.packageName}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">
-                        -- Tìm & chọn Sản phẩm (Variant) --
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
-                      isVariantOpen ? "rotate-180 text-cyan-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isVariantOpen && (
-                  <div className="absolute top-full left-0 w-full mt-1.5 z-40 bg-slate-900/95 border border-cyan-500/30 rounded-2xl shadow-2xl backdrop-blur-xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        autoFocus
-                        value={variantSearch}
-                        onChange={(e) => setVariantSearch(e.target.value)}
-                        placeholder="Gõ tìm kiếm variant, tên gói..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-                      />
-                    </div>
-
-                    <div className="max-h-56 overflow-y-auto custom-scrollbar space-y-1">
-                      {filteredVariants.length === 0 ? (
-                        <div className="p-3 text-center text-xs text-slate-500 italic">
-                          Không tìm thấy variant khớp với từ khóa
-                        </div>
-                      ) : (
-                        filteredVariants.map((v) => {
-                          const isSelected = v.id === selectedVariantId;
-                          return (
-                            <button
-                              key={v.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedVariantId(v.id);
-                                setIsVariantOpen(false);
-                                setVariantSearch("");
-                              }}
-                              className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 group ${
-                                isSelected
-                                  ? "bg-cyan-500/20 text-cyan-200 font-bold border border-cyan-500/30"
-                                  : "hover:bg-slate-800/80 text-slate-300"
-                              }`}
-                            >
-                              <div className="flex-1 min-w-0 pr-2">
-                                <div className="text-xs font-semibold text-slate-100 group-hover:text-cyan-300 truncate">
-                                  {v.name}
-                                </div>
-                                <div className="text-[10.5px] text-slate-400 font-mono mt-0.5">
-                                  Gói: {v.packageName}
-                                </div>
-                              </div>
-                              {isSelected && (
-                                <Check className="w-4 h-4 text-cyan-400 shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Field: Chọn Nhà Cung Cấp */}
-            <div className="space-y-1.5" ref={supplierRef}>
-              <label className="block text-xs font-semibold text-slate-300">
-                Nhà cung cấp (NCC) <span className="text-rose-400">*</span>
-              </label>
-
-              {/* Custom Supplier Trigger */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSupplierOpen(!isSupplierOpen);
-                    setIsVariantOpen(false);
-                    setIsWarehouseOpen(false);
-                  }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-left flex items-center justify-between transition-all min-h-[42px] ${
-                    isSupplierOpen
-                      ? "border-cyan-500 ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/10"
-                      : "border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
-                    <Building2 className="w-4 h-4 text-indigo-400 shrink-0" />
-                    {currentSupplier ? (
-                      <span className="text-xs font-bold text-white truncate">
-                        {currentSupplier.name}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-400">
-                        -- Tìm & chọn Nhà Cung Cấp --
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
-                      isSupplierOpen ? "rotate-180 text-cyan-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isSupplierOpen && (
-                  <div className="absolute top-full left-0 w-full mt-1.5 z-40 bg-slate-900/95 border border-cyan-500/30 rounded-2xl shadow-2xl backdrop-blur-xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        autoFocus
-                        value={supplierSearch}
-                        onChange={(e) => setSupplierSearch(e.target.value)}
-                        placeholder="Gõ tìm kiếm tên NCC..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-                      />
-                    </div>
-
-                    <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
-                      {filteredSuppliers.length === 0 ? (
-                        <div className="p-3 text-center text-xs text-slate-500 italic">
-                          Không tìm thấy nhà cung cấp nào
-                        </div>
-                      ) : (
-                        filteredSuppliers.map((s) => {
-                          const isSelected = s.id === selectedSupplierId;
-                          return (
-                            <button
-                              key={s.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedSupplierId(s.id);
-                                setIsSupplierOpen(false);
-                                setSupplierSearch("");
-                              }}
-                              className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 group ${
-                                isSelected
-                                  ? "bg-indigo-500/20 text-indigo-200 font-bold border border-indigo-500/30"
-                                  : "hover:bg-slate-800/80 text-slate-300"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                <span className="text-xs font-semibold text-slate-100 group-hover:text-indigo-300 truncate">
-                                  {s.name}
-                                </span>
-                              </div>
-                              {isSelected && (
-                                <Check className="w-4 h-4 text-indigo-400 shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Pipeline Connector Flow Arrow */}
-          <div className="flex items-center justify-center -my-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-[11px] font-bold text-cyan-400 shadow-md">
-              <ArrowDown className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
-              <span>Ánh xạ tự động cấp slot</span>
-            </div>
-          </div>
-
-          {/* KHỐI 2: KHO SLOT ĐÍCH (FULFILLMENT DESTINATION) */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3.5">
-            <div className="flex items-center gap-2 pb-1 border-b border-slate-800/60">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-bold">
-                2
-              </span>
-              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                Kho Slot Đích (Nơi Khách Nhận Tài Khoản)
-              </span>
-            </div>
-
-            <div className="space-y-1.5" ref={warehouseRef}>
-              <label className="block text-xs font-semibold text-slate-300">
-                Kho slot cung ứng <span className="text-rose-400">*</span>
-              </label>
-
-              {/* Warehouse Trigger */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsWarehouseOpen(!isWarehouseOpen);
-                    setIsVariantOpen(false);
-                    setIsSupplierOpen(false);
-                  }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-left flex items-center justify-between transition-all min-h-[42px] ${
-                    isWarehouseOpen
-                      ? "border-emerald-500 ring-1 ring-emerald-500/30 shadow-lg shadow-emerald-500/10"
-                      : "border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
-                    <Warehouse className="w-4 h-4 text-emerald-400 shrink-0" />
-                    {currentWarehouse ? (
-                      <span className="text-xs font-bold text-emerald-300 truncate">
-                        {currentWarehouse.name}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-400">
-                        -- Chọn Kho Slot Đích --
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
-                      isWarehouseOpen ? "rotate-180 text-emerald-400" : ""
-                    }`}
-                  />
-                </button>
-
-                {/* Warehouse Dropdown */}
-                {isWarehouseOpen && (
-                  <div className="absolute top-full left-0 w-full mt-1.5 z-40 bg-slate-900/95 border border-emerald-500/30 rounded-2xl shadow-2xl backdrop-blur-xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        autoFocus
-                        value={warehouseSearch}
-                        onChange={(e) => setWarehouseSearch(e.target.value)}
-                        placeholder="Tìm tên kho slot..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-
-                    <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
-                      {filteredWarehouses.length === 0 ? (
-                        <div className="p-3 text-center text-xs text-slate-500 italic">
-                          Không tìm thấy kho slot nào
-                        </div>
-                      ) : (
-                        filteredWarehouses.map((w) => {
-                          const isSelected = w.id === selectedWarehouseId;
-                          return (
-                            <button
-                              key={w.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedWarehouseId(w.id);
-                                if (!(w.availableTags || []).includes(selectedTargetTag)) {
-                                  setSelectedTargetTag("");
-                                }
-                                setIsWarehouseOpen(false);
-                                setWarehouseSearch("");
-                              }}
-                              className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 group ${
-                                isSelected
-                                  ? "bg-emerald-500/20 text-emerald-200 font-bold border border-emerald-500/30"
-                                  : "hover:bg-slate-800/80 text-slate-300"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <Warehouse className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <span className="text-xs font-semibold text-slate-100 group-hover:text-emerald-300 truncate">
-                                  {w.name}
-                                </span>
-                              </div>
-                              {isSelected && (
-                                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-300">
-                Tag kho đích <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <Tag className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <select
-                  value={selectedTargetTag}
-                  onChange={(event) => setSelectedTargetTag(event.target.value)}
-                  disabled={!selectedWarehouseId || availableTargetTags.length === 0}
-                  required
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {availableTargetTags.length > 0
-                      ? "-- Chọn tag dùng để cấp slot --"
-                      : "-- Kho này chưa có tag khả dụng --"}
-                  </option>
-                  {availableTargetTags.map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Hệ thống chỉ cấp slot còn trống thuộc đúng tag đã chọn.
-              </p>
-            </div>
-          </div>
-
-          {/* LIVE RULE PREVIEW CARD */}
-          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/30 via-slate-950 to-indigo-950/30 border border-cyan-800/40 text-xs text-slate-300 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-cyan-400">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Mô Phỏng Quy Tắc Cấp Key Thực Tế:</span>
-            </div>
-            <p className="text-xs leading-relaxed text-slate-300">
-              {currentVariant && currentSupplier && currentWarehouse && selectedTargetTag ? (
-                <>
-                  Khi khách đặt mua variant{" "}
-                  <span className="font-bold text-white bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
-                    {currentVariant.name}
-                  </span>{" "}
-                  từ NCC{" "}
-                  <span className="font-bold text-indigo-300 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
-                    {currentSupplier.name}
-                  </span>
-                  , hệ thống sẽ tự động phát sinh mã key liên kết trực tiếp vào kho{" "}
-                  <span className="font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
-                    {currentWarehouse.name}
-                  </span>
-                  {" "}với tag{" "}
-                  <span className="font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
-                    {selectedTargetTag}
-                  </span>
-                  .
-                </>
-              ) : (
-                <span className="text-slate-500 italic">
-                  Vui lòng chọn đầy đủ Variant, NCC, Kho Slot đích và tag để xem mô phỏng...
-                </span>
-              )}
-            </p>
-          </div>
-
-          {/* GHI CHÚ */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-300">
-              Ghi chú nội bộ (Tùy chọn)
-            </label>
-            <div className="relative">
-              <FileText className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="VD: Cấp key tự động cho gói ChatGPT Plus 1 Tháng..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* TRẠNG THÁI (TOGGLE SWITCH) */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-            <div>
-              <div className="text-xs font-bold text-white">
-                Kích hoạt quy tắc ngay sau khi lưu
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Quy tắc sẽ lập tức có hiệu lực khi khách hàng kích hoạt đơn
-              </div>
-            </div>
-
-            {/* Toggle Switch Button */}
-            <button
-              type="button"
-              onClick={() => setIsActive(!isActive)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                isActive ? "bg-cyan-500" : "bg-slate-700"
+          {/* GRID 2 CỘT NGANG: NGUỒN ĐƠN HÀNG (TRÁI) & KHO SLOT ĐÍCH (PHẢI) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 relative items-start">
+            {/* KHỐI 1: ĐIỀU KIỆN ĐƠN HÀNG (VARIANT + NCC) */}
+            <div
+              className={`p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3.5 relative transition-all ${
+                isVariantOpen || isSupplierOpen ? "z-30 ring-1 ring-cyan-500/30" : "z-10"
               }`}
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isActive ? "translate-x-6" : "translate-x-1"
+              <div className="flex items-center gap-2 pb-1 border-b border-slate-800/60">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[11px] font-bold">
+                  1
+                </span>
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  Điều Kiện Đơn Hàng (Đầu Vào)
+                </span>
+              </div>
+
+              {/* Field: Chọn Variant */}
+              <div className="space-y-1.5" ref={variantRef}>
+                <label className="block text-xs font-semibold text-slate-300">
+                  Sản phẩm (Variant) áp dụng <span className="text-rose-400">*</span>
+                </label>
+
+                {/* Custom Searchable Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsVariantOpen(!isVariantOpen);
+                      setIsSupplierOpen(false);
+                      setIsWarehouseOpen(false);
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-left flex items-center justify-between transition-all min-h-[42px] ${
+                      isVariantOpen
+                        ? "border-cyan-500 ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/10"
+                        : "border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
+                      <Package className="w-4 h-4 text-cyan-400 shrink-0" />
+                      {loadingCatalog ? (
+                        <span className="text-xs text-cyan-400 animate-pulse">
+                          Đang tải danh sách variant...
+                        </span>
+                      ) : currentVariant ? (
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <span className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-[280px]">
+                            {currentVariant.name}
+                          </span>
+                          <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80">
+                            {currentVariant.packageName}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          -- Tìm & chọn Sản phẩm (Variant) --
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
+                        isVariantOpen ? "rotate-180 text-cyan-400" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isVariantOpen && (
+                    <div className="absolute top-full left-0 w-full mt-1.5 z-50 bg-slate-900/98 border border-cyan-500/40 rounded-2xl shadow-2xl shadow-cyan-950/60 backdrop-blur-2xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={variantSearch}
+                          onChange={(e) => setVariantSearch(e.target.value)}
+                          placeholder="Gõ tìm kiếm variant, tên gói..."
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                        />
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto custom-scrollbar space-y-1">
+                        {filteredVariants.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-500 italic">
+                            Không tìm thấy variant khớp với từ khóa
+                          </div>
+                        ) : (
+                          filteredVariants.map((v) => {
+                            const isSelected = v.id === selectedVariantId;
+                            return (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVariantId(v.id);
+                                  setIsVariantOpen(false);
+                                  setVariantSearch("");
+                                  fetchSuppliersForVariant(v.id);
+                                }}
+                                className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 group ${
+                                  isSelected
+                                    ? "bg-cyan-500/20 text-cyan-200 font-bold border border-cyan-500/30"
+                                    : "hover:bg-slate-800/80 text-slate-300"
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <div className="text-xs font-semibold text-slate-100 group-hover:text-cyan-300 truncate">
+                                    {v.name}
+                                  </div>
+                                  <div className="text-[10.5px] text-slate-400 font-mono mt-0.5">
+                                    Gói: {v.packageName}
+                                  </div>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Field: Chọn Nhà Cung Cấp */}
+              <div className="space-y-1.5" ref={supplierRef}>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Nhà cung cấp (NCC) <span className="text-rose-400">*</span>
+                  </label>
+                  {selectedVariantId > 0 && !loadingSuppliers && supplierOptions.length > 0 && (
+                    <span className="text-[10.5px] text-cyan-400 font-medium">
+                      {supplierOptions.length} NCC cung ứng
+                    </span>
+                  )}
+                </div>
+
+                {/* Custom Supplier Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={!selectedVariantId || loadingSuppliers}
+                    onClick={() => {
+                      if (!selectedVariantId || loadingSuppliers) return;
+                      setIsSupplierOpen(!isSupplierOpen);
+                      setIsVariantOpen(false);
+                      setIsWarehouseOpen(false);
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-left flex items-center justify-between transition-all min-h-[42px] ${
+                      !selectedVariantId
+                        ? "opacity-60 cursor-not-allowed border-slate-800/60"
+                        : isSupplierOpen
+                        ? "border-cyan-500 ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-500/10"
+                        : "border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
+                      <Building2
+                        className={`w-4 h-4 shrink-0 ${
+                          !selectedVariantId ? "text-slate-500" : "text-indigo-400"
+                        }`}
+                      />
+                      {loadingSuppliers ? (
+                        <div className="flex items-center gap-2 text-xs text-cyan-400 animate-pulse">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span>Đang lọc NCC của sản phẩm...</span>
+                        </div>
+                      ) : !selectedVariantId ? (
+                        <span className="text-xs text-slate-500 italic">
+                          -- Vui lòng chọn Sản phẩm (Variant) trước --
+                        </span>
+                      ) : supplierOptions.length === 0 ? (
+                        <span className="text-xs text-amber-400 font-medium truncate">
+                          -- Variant này chưa có NCC nào trong Bảng Giá --
+                        </span>
+                      ) : currentSupplier ? (
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="text-xs font-bold text-white truncate max-w-[200px]">
+                            {currentSupplier.name}
+                          </span>
+                          {currentSupplier.costPrice ? (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-700/60">
+                              Giá nhập: {currentSupplier.costPrice.toLocaleString("vi-VN")} đ
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          -- Chọn Nhà Cung Cấp ({supplierOptions.length} khả dụng) --
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
+                        isSupplierOpen ? "rotate-180 text-cyan-400" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isSupplierOpen && selectedVariantId > 0 && (
+                    <div className="absolute top-full left-0 w-full mt-1.5 z-50 bg-slate-900/98 border border-cyan-500/40 rounded-2xl shadow-2xl shadow-cyan-950/60 backdrop-blur-2xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={supplierSearch}
+                          onChange={(e) => setSupplierSearch(e.target.value)}
+                          placeholder="Gõ tìm kiếm tên NCC..."
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                        />
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                        {filteredSuppliers.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-400 space-y-1">
+                            <p className="font-semibold text-amber-300">
+                              {supplierOptions.length === 0
+                                ? "Chưa có NCC nào cung ứng sản phẩm này"
+                                : "Không tìm thấy NCC khớp từ khóa"}
+                            </p>
+                            {supplierOptions.length === 0 && (
+                              <p className="text-[11px] text-slate-500">
+                                Vui lòng thêm nguồn NCC cho sản phẩm này trong mục Bảng Giá!
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          filteredSuppliers.map((s) => {
+                            const isSelected = s.id === selectedSupplierId;
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSupplierId(s.id);
+                                  setIsSupplierOpen(false);
+                                  setSupplierSearch("");
+                                }}
+                                className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 group ${
+                                  isSelected
+                                    ? "bg-indigo-500/20 text-indigo-200 font-bold border border-indigo-500/30"
+                                    : "hover:bg-slate-800/80 text-slate-300"
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <div className="flex items-center gap-2 truncate">
+                                    <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                    <span className="text-xs font-semibold text-slate-100 group-hover:text-indigo-300 truncate">
+                                      {s.name}
+                                    </span>
+                                  </div>
+                                  {s.costPrice ? (
+                                    <div className="text-[10.5px] text-slate-400 font-mono mt-0.5 pl-5">
+                                      Giá nhập:{" "}
+                                      <span className="text-amber-300 font-semibold">
+                                        {s.costPrice.toLocaleString("vi-VN")} đ
+                                      </span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-indigo-400 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {selectedVariantId > 0 && supplierOptions.length === 0 && !loadingSuppliers && (
+                  <p className="text-[11px] text-amber-400 flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Variant này chưa được cấu hình NCC nào trong Bảng giá sản phẩm.</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* PIPELINE CONNECTOR MAPPING BADGE (MOBILE: DỌC, DESKTOP: GIỮA 2 CỘT) */}
+            <div className="flex lg:hidden items-center justify-center -my-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-[11px] font-bold text-cyan-400 shadow-md">
+                <ArrowDown className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
+                <span>Ánh xạ tự động cấp slot</span>
+              </div>
+            </div>
+
+            {/* KHỐI 2: KHO SLOT ĐÍCH (FULFILLMENT DESTINATION) */}
+            <div
+              className={`p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3.5 relative transition-all ${
+                isWarehouseOpen ? "z-30 ring-1 ring-emerald-500/30" : "z-10"
+              }`}
+            >
+              <div className="flex items-center gap-2 pb-1 border-b border-slate-800/60">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-bold">
+                  2
+                </span>
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  Kho Slot Đích (Nơi Khách Nhận Tài Khoản)
+                </span>
+              </div>
+
+              {/* Field: Kho slot cung ứng */}
+              <div className="space-y-1.5" ref={warehouseRef}>
+                <label className="block text-xs font-semibold text-slate-300">
+                  Kho slot cung ứng <span className="text-rose-400">*</span>
+                </label>
+
+                {/* Warehouse Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsWarehouseOpen(!isWarehouseOpen);
+                      setIsVariantOpen(false);
+                      setIsSupplierOpen(false);
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-left flex items-center justify-between transition-all min-h-[42px] ${
+                      isWarehouseOpen
+                        ? "border-emerald-500 ring-1 ring-emerald-500/30 shadow-lg shadow-emerald-500/10"
+                        : "border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
+                      <Warehouse className="w-4 h-4 text-emerald-400 shrink-0" />
+                      {currentWarehouse ? (
+                        <span className="text-xs font-bold text-emerald-300 truncate">
+                          {currentWarehouse.name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          -- Chọn Kho Slot Đích --
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
+                        isWarehouseOpen ? "rotate-180 text-emerald-400" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Warehouse Dropdown */}
+                  {isWarehouseOpen && (
+                    <div className="absolute top-full left-0 w-full mt-1.5 z-50 bg-slate-900/98 border border-emerald-500/40 rounded-2xl shadow-2xl shadow-emerald-950/60 backdrop-blur-2xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={warehouseSearch}
+                          onChange={(e) => setWarehouseSearch(e.target.value)}
+                          placeholder="Tìm tên kho slot..."
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                        />
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                        {filteredWarehouses.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-500 italic">
+                            Không tìm thấy kho slot nào
+                          </div>
+                        ) : (
+                          filteredWarehouses.map((w) => {
+                            const isSelected = w.id === selectedWarehouseId;
+                            return (
+                              <button
+                                key={w.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedWarehouseId(w.id);
+                                  if (!(w.availableTags || []).includes(selectedTargetTag)) {
+                                    setSelectedTargetTag("");
+                                  }
+                                  setIsWarehouseOpen(false);
+                                  setWarehouseSearch("");
+                                }}
+                                className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 group ${
+                                  isSelected
+                                    ? "bg-emerald-500/20 text-emerald-200 font-bold border border-emerald-500/30"
+                                    : "hover:bg-slate-800/80 text-slate-300"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <Warehouse className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  <span className="text-xs font-semibold text-slate-100 group-hover:text-emerald-300 truncate">
+                                    {w.name}
+                                  </span>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Field: Tag kho đích */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Tag kho đích <span className="text-rose-400">*</span>
+                </label>
+                <div className="relative">
+                  <Tag className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    value={selectedTargetTag}
+                    onChange={(event) => setSelectedTargetTag(event.target.value)}
+                    disabled={!selectedWarehouseId || availableTargetTags.length === 0}
+                    required
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[42px]"
+                  >
+                    <option value="">
+                      {availableTargetTags.length > 0
+                        ? "-- Chọn tag dùng để cấp slot --"
+                        : "-- Kho này chưa có tag khả dụng --"}
+                    </option>
+                    {availableTargetTags.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Hệ thống chỉ cấp slot còn trống thuộc đúng tag đã chọn.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* LIVE RULE PREVIEW CARD: VISUAL PIPELINE BANNER */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-950 to-emerald-950/40 border border-cyan-800/40 text-xs text-slate-300 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-cyan-400 text-xs tracking-wide">
+                <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+                <span>Mô Phỏng Quy Tắc Cấp Key Thực Tế:</span>
+              </div>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline-block">
+                Tự Động Ánh Xạ
+              </span>
+            </div>
+
+            {currentVariant && currentSupplier && currentWarehouse && selectedTargetTag ? (
+              <div className="space-y-2">
+                {/* Visual Pipeline Flow Chips */}
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <span className="font-bold text-white bg-slate-800/90 px-2.5 py-1 rounded-lg border border-slate-700/80 shadow-sm">
+                    {currentVariant.name}
+                  </span>
+                  <span className="text-slate-400 text-xs font-semibold">+</span>
+                  <span className="font-bold text-indigo-300 bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-700/60 shadow-sm">
+                    {currentSupplier.name}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/30">
+                    <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Cấp Slot Vào</span>
+                  </span>
+
+                  <span className="font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-700/60 shadow-sm">
+                    {currentWarehouse.name}
+                  </span>
+                  <span className="font-bold text-amber-300 bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-700/60 shadow-sm">
+                    Tag: {selectedTargetTag}
+                  </span>
+                </div>
+
+                <p className="text-xs leading-relaxed text-slate-300 pt-1 border-t border-slate-800/60">
+                  Khi khách đặt mua variant{" "}
+                  <span className="font-bold text-white">{currentVariant.name}</span> từ NCC{" "}
+                  <span className="font-bold text-indigo-300">{currentSupplier.name}</span>, hệ thống sẽ tự động phát sinh mã key liên kết trực tiếp vào kho{" "}
+                  <span className="font-bold text-emerald-400">{currentWarehouse.name}</span> với tag{" "}
+                  <span className="font-bold text-amber-300">{selectedTargetTag}</span>.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 italic">
+                Vui lòng chọn đầy đủ Variant, NCC, Kho Slot đích và tag ở 2 cột phía trên để xem luồng mô phỏng...
+              </p>
+            )}
+          </div>
+
+          {/* GRID CẤU HÌNH BỔ SUNG: GHI CHÚ NỘI BỘ + TOGGLE TRẠNG THÁI */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-stretch">
+            {/* GHI CHÚ NỘI BỘ (CHIẾM 7 CỘT) */}
+            <div className="md:col-span-7 space-y-1.5 flex flex-col justify-between">
+              <label className="block text-xs font-semibold text-slate-300">
+                Ghi chú nội bộ (Tùy chọn)
+              </label>
+              <div className="relative">
+                <FileText className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="VD: Cấp key tự động cho gói ChatGPT Plus 1 Tháng..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* TRẠNG THÁI KÍCH HOẠT (CHIẾM 5 CỘT) */}
+            <div className="md:col-span-5 flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+              <div className="pr-2">
+                <div className="text-xs font-bold text-white">
+                  Kích hoạt quy tắc
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Có hiệu lực ngay khi lưu
+                </div>
+              </div>
+
+              {/* Toggle Switch Button */}
+              <button
+                type="button"
+                onClick={() => setIsActive(!isActive)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
+                  isActive ? "bg-cyan-500" : "bg-slate-700"
                 }`}
-              />
-            </button>
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isActive ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
           {/* FOOTER ACTION BUTTONS */}

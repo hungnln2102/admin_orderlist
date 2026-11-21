@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
+import { TablePagination } from "@/shared/components/TablePagination";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { DebtPaymentLogItem, Installment, PersonalAsset } from "../types";
@@ -120,6 +121,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
   // --- Nhật Ký Biến Động Nợ State ---
   const [logs, setLogs] = useState<DebtPaymentLogItem[]>(debtLogs || []);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [logPage, setLogPage] = useState(1);
   const [logFilter, setLogFilter] = useState<"ALL" | "BORROW" | "PAY" | "INSTALLMENT">("ALL");
 
   useEffect(() => {
@@ -299,6 +301,10 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
     return true;
   });
 
+  const logPageSize = 10;
+  const logTotalPages = Math.max(1, Math.ceil(filteredLogs.length / logPageSize));
+  const currentLogPage = Math.min(logPage, logTotalPages);
+  const logPageOffset = (currentLogPage - 1) * logPageSize;
   const borrowCount = logs.filter((l) => l.targetType === "PERSONAL_DEBT_BORROW").length;
   const payCount = logs.filter((l) => l.targetType === "PERSONAL_DEBT").length;
   const installmentCount = logs.filter((l) => l.targetType === "INSTALLMENT").length;
@@ -598,7 +604,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
             <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
               <button
                 type="button"
-                onClick={() => setLogFilter("ALL")}
+                onClick={() => { setLogFilter("ALL"); setLogPage(1); }}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
                   logFilter === "ALL"
                     ? "bg-slate-800 text-white shadow-sm"
@@ -609,7 +615,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setLogFilter("BORROW")}
+                onClick={() => { setLogFilter("BORROW"); setLogPage(1); }}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                   logFilter === "BORROW"
                     ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
@@ -620,7 +626,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setLogFilter("PAY")}
+                onClick={() => { setLogFilter("PAY"); setLogPage(1); }}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                   logFilter === "PAY"
                     ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
@@ -631,7 +637,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setLogFilter("INSTALLMENT")}
+                onClick={() => { setLogFilter("INSTALLMENT"); setLogPage(1); }}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                   logFilter === "INSTALLMENT"
                     ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
@@ -677,7 +683,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredLogs.map((item) => {
+                {filteredLogs.slice(logPageOffset, logPageOffset + logPageSize).map((item) => {
                   const isBorrow = item.targetType === "PERSONAL_DEBT_BORROW";
                   const isPay = item.targetType === "PERSONAL_DEBT";
                   const isInstallment = item.targetType === "INSTALLMENT";
@@ -766,6 +772,15 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
               </tbody>
             </table>
           </div>
+        )}
+        {logTotalPages > 1 && (
+          <TablePagination
+            currentPage={currentLogPage}
+            totalPages={logTotalPages}
+            pageSize={logPageSize}
+            onPageChange={setLogPage}
+            className="mt-3"
+          />
         )}
       </GlassCard>
 
