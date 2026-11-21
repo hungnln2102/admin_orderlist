@@ -9,8 +9,8 @@
 - Các tag hiện thành danh sách nút. Nút đang chọn sáng lên và có thể bấm lại để bỏ chọn.
 - `npm run build` thành công. Chưa kiểm tra thao tác lưu trên trình duyệt hoặc triển khai lên hệ thống đang chạy.
 
-## H?p nh?t thay ??i t? VPS
+## Hợp nhất thay đổi từ VPS
 
-- Gi? logic chu?n h?a tr?ng th?i ??n, migration, ghi chi ph? nh? cung c?p v? ghi ch? v?n h?nh.
-- D?ng route tham s? t?y ch?n t??ng th?ch Express 4. Migration email receipt tr?n VPS tr?ng n?i dung v?i file ?? c? trong Git.
-- Frontend build, `node --check` v? `git diff --cached --check` th?nh c?ng. Truy v?n ch? ??c x?c nh?n d? li?u tr?ng th?i v? r?ng bu?c t??ng ?ng tr?n production. Ch?a ki?m th? giao d?ch thanh to?n end-to-end.
+- Giữ logic chuẩn hóa trạng thái đơn, migration, ghi chi phí nhà cung cấp và ghi chú vận hành.
+- Giữ cú pháp route tương thích Express 4. Migration email receipt trên VPS trùng nội dung với file đã có trong Git.
+- Frontend build, `node --check` và `git diff --cached --check` thành công. Truy vấn chỉ đọc xác nhận trạng thái và ràng buộc tương ứng trên production. Chưa kiểm thử thanh toán end-to-end.
