@@ -206,7 +206,7 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
               </tr>
             ) : (
               services.map((srv, idx) => {
-                const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
+                const isAvailable = srv.status === "AVAILABLE";
                 const brand = getServiceBrandStyle(
                   srv.display_name || srv.category,
                   isAvailable
@@ -226,9 +226,9 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                         <span className="tracking-wide">
                           {srv.display_name || srv.category}
                         </span>
-                        {(srv.variant_tag || (srv.category !== srv.display_name ? srv.category : "")) && (
+                        {(srv.variant_tag) && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-white/10 text-indigo-200 border border-white/15 tracking-normal">
-                            [{srv.variant_tag || srv.category}]
+                            [{srv.variant_tag}]
                           </span>
                         )}
                         {(srv.provider_key || srv.otp_type) && (() => {

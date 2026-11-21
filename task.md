@@ -589,3 +589,8 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] Tạo liên kết theo slot, đọc hạn từ Kho Hàng và kiểm tra xóa dây chuyền trên DB local.
 - [ ] Nghiệm thu gia hạn và xử lý các gói cũ thiếu slot trên dữ liệu triển khai.
+## Gỡ tag dịch vụ Kho Hàng
+
+- [x] Tự xác định trạng thái theo liên kết gói và bỏ chỉnh trạng thái thủ công.
+
+- [x] Hiển thị tag theo slot trên desktop và mobile, bỏ giá trị lấy từ danh mục.

@@ -158,3 +158,8 @@
 
 - Đã chạy migration local và kiểm tra xóa slot kéo theo gói trong transaction được hoàn tác. Số bản ghi đơn hàng giữ nguyên.
 - Dịch vụ đọc được 26 gói, 24 gói có ngày hết hạn và 56 tài khoản kho. Có 10 gói cũ chưa có slot liên kết, được giữ trong DB và loại khỏi danh sách gói.
+## Gỡ tag dịch vụ Kho Hàng
+
+- Kiểm tra local xác nhận 26 slot liên kết gói đều trả trạng thái đang sử dụng, gồm 3 slot có số vị trí đã dùng bằng 0. Frontend build thành công.
+
+- API và giao diện lấy nhãn tag từ slot. Kiểm tra cú pháp backend và build frontend đạt.

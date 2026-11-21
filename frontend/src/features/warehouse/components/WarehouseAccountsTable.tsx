@@ -66,7 +66,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
           .trim()
           .toLowerCase();
         const srvTags = item.services
-          .map((s) => s.variant_tag || (s.category !== s.display_name ? s.category : ""))
+          .map((s) => s.variant_tag)
           .filter(Boolean)
           .join(", ")
           .trim()
@@ -176,12 +176,12 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         {services.length > 0 ? (
                           services.map((srv, idx) => {
-                            const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
+                            const isAvailable = srv.status === "AVAILABLE";
                             const brand = getServiceBrandStyle(
                               srv.display_name || srv.category,
                               isAvailable
                             );
-                            const tag = srv.variant_tag || (srv.category !== srv.display_name ? srv.category : "");
+                            const tag = srv.variant_tag;
                             return (
                               <span
                                 key={srv.id || idx}

@@ -68,7 +68,7 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1">
             {services.map((srv, idx) => {
-              const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
+              const isAvailable = srv.status === "AVAILABLE";
               const brand = getServiceBrandStyle(
                 srv.display_name || srv.category,
                 isAvailable
@@ -79,9 +79,9 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
                   className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border inline-flex items-center gap-1 ${brand.badgeClass}`}
                 >
                   <span>{srv.display_name || srv.category}</span>
-                  {(srv.variant_tag || (srv.category !== srv.display_name ? srv.category : "")) && (
+                  {(srv.variant_tag) && (
                     <span className="px-1 py-0.2 rounded text-[8px] font-semibold bg-white/15 text-white border border-white/15">
-                      {srv.variant_tag || srv.category}
+                      {srv.variant_tag}
                     </span>
                   )}
                 </span>
@@ -161,7 +161,7 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
 
           <div className="space-y-2.5">
             {services.map((srv, idx) => {
-              const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
+              const isAvailable = srv.status === "AVAILABLE";
               const brand = getServiceBrandStyle(
                 srv.display_name || srv.category,
                 isAvailable

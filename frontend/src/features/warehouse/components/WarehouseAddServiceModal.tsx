@@ -49,7 +49,6 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
     twoFa: "",
     providerKey: "",
     expiresAt: "",
-    status: "AVAILABLE",
     note: "",
   });
 
@@ -70,7 +69,6 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
         twoFa: "",
         providerKey: "",
         expiresAt: "",
-        status: "AVAILABLE",
         note: "",
       });
       setIsCustomService(false);
@@ -339,24 +337,6 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Trạng Thái Tài Khoản
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    status: e.target.value as any,
-                  })
-                }
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors"
-              >
-                <option value="AVAILABLE">TỒN KHO (AVAILABLE)</option>
-                <option value="IN_USE">ĐANG SỬ DỤNG (IN_USE)</option>
-              </select>
-            </div>
           </div>
 
           {/* GHI CHÚ */}

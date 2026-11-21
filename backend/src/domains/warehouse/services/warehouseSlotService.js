@@ -23,7 +23,6 @@ const addServiceSlotToAccount = async (accountId, payload) => {
     backupEmail,
     twoFa,
     expiresAt,
-    status = "AVAILABLE",
     note,
     variantTag,
   } = payload || {};
@@ -89,7 +88,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
         backup_email: backupEmail ? String(backupEmail).trim() : null,
         two_fa: twoFa ? String(twoFa).trim() : null,
         expired_at: parsedExpiredAt,
-        status: status || "AVAILABLE",
+        status: "AVAILABLE",
         service_note: note ? String(note).trim() : null,
         variant_tag: variantTag ? String(variantTag).trim() : null,
         [SS.PROVIDER_KEY]: cleanProviderKey,
@@ -168,7 +167,6 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     backupEmail,
     twoFa,
     expiresAt,
-    status,
     note,
     variantTag,
     accountUsername,
@@ -234,9 +232,6 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
     }
     if (hasProviderKey) updateData[SS.PROVIDER_KEY] = String(rawProviderKey || "").trim() || null;
     Object.assign(updateData, slotProviderSettings(payload || {}));
-    if (status !== undefined) {
-      updateData.status = status;
-    }
 
     if (expiresAt !== undefined) {
       if (!expiresAt || !String(expiresAt).trim()) {

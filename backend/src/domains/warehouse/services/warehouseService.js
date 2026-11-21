@@ -43,7 +43,6 @@ const listWarehouseAccounts = async () => {
       "ss." + SS.STATUS_CHECK_ENABLED,
       "ss." + SS.STATUS_PROVIDER_KEY,
       "pn.name as display_name",
-      "pn.category as catalog_tag",
       "pn.login_url as login_url",
       "ss.password",
       "ss.backup_email",
@@ -59,6 +58,9 @@ const listWarehouseAccounts = async () => {
     .whereIn("ss.account_id", stockIds)
     .orderBy("ss.id", "asc");
 
+  const packageSlotColumn = COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID;
+  const linkedSlotIds = new Set((await db(TABLES.PACKAGE_PRODUCT)
+    .whereNotNull(packageSlotColumn).pluck(packageSlotColumn)).map(Number));
   const usageBySlot = new Map();
   for (const pkg of await getPackageProducts()) {
     const usage = usageBySlot.get(pkg.warehouseSlotId) || { used: 0, total: 0 };
@@ -72,7 +74,7 @@ const listWarehouseAccounts = async () => {
     if (!servicesByStock.has(sId)) {
       servicesByStock.set(sId, []);
     }
-    const resolvedTag = srv.variant_tag || srv.catalog_tag || "";
+    const resolvedTag = srv.variant_tag || "";
     const packageUsage = usageBySlot.get(Number(srv.id));
     servicesByStock.get(sId).push({
       id: Number(srv.id),
@@ -89,7 +91,8 @@ const listWarehouseAccounts = async () => {
       two_fa: srv.two_fa || "",
       expires_at: formatDateDisplay(srv.expires_at),
       raw_expires_at: srv.expires_at ? new Date(srv.expires_at).toISOString().split("T")[0] : "",
-      status: srv.status === "UNAVAILABLE" ? "IN_USE" : (srv.status || "AVAILABLE"),
+      status: linkedSlotIds.has(Number(srv.id)) || srv.status === "UNAVAILABLE"
+        ? "IN_USE" : (srv.status || "AVAILABLE"),
       package_usage: packageUsage,
       note: srv.note || "",
       is_authenticated: srv.session_is_authenticated === true,
@@ -201,7 +204,6 @@ const createWarehouseAccount = async (payload) => {
             backup_email: slot.backup_email || existingService.backup_email,
             two_fa: slot.two_fa || existingService.two_fa,
             expired_at: expiry ?? existingService.expired_at,
-            status: slot.status || existingService.status || "AVAILABLE",
             service_note: slot.note || existingService.service_note,
             variant_tag: variantTag || null,
             ...providerSettings,
@@ -215,7 +217,7 @@ const createWarehouseAccount = async (payload) => {
           backup_email: slot.backup_email || null,
           two_fa: slot.two_fa || null,
           expired_at: expiry,
-          status: slot.status || "AVAILABLE",
+          status: "AVAILABLE",
           service_note: slot.note || null,
           variant_tag: variantTag || null,
           ...providerSettings,

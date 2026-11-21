@@ -24,7 +24,6 @@ import {
   WarehouseAccountItem,
   WarehouseServiceSlot,
   WarehouseSlotEditFormData,
-  WarehouseSlotStatus,
 } from "../types";
 import { AVAILABLE_OTP_PROVIDERS } from "../providerConstants";
 import { format2FAChunks, getServiceBrandStyle } from "./warehouseRowUtils";
@@ -60,7 +59,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     otpType: "",
     providerKey: "",
     expiresAt: "",
-    status: "AVAILABLE",
     note: "",
     saveTagToCatalog: false,
   });
@@ -108,7 +106,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
         statusCheckEnabled: slot.status_check_enabled ?? undefined,
         statusProviderKey: slot.status_provider_key || "",
         expiresAt: initialExpires,
-        status: slot.status || "AVAILABLE",
         note: slot.note || "",
         saveTagToCatalog: false,
       });
@@ -223,7 +220,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
 
   const brand = getServiceBrandStyle(
     slot.display_name || slot.category,
-    formData.status === "AVAILABLE"
+    slot.status === "AVAILABLE"
   );
 
   const handleCopy = (text: string, fieldKey: string) => {
@@ -653,37 +650,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* TRẠNG THÁI SLOT */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          formData.status === "AVAILABLE"
-                            ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
-                            : formData.status === "IN_USE"
-                            ? "bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]"
-                            : formData.status === "EXPIRED"
-                            ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.5)]"
-                            : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"
-                        }`}
-                      />
-                      <span>Trạng Thái Slot</span>
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          status: e.target.value as WarehouseSlotStatus,
-                        })
-                      }
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-                    >
-                      <option value="AVAILABLE">TỒN KHO (Sẵn sàng bán)</option>
-                      <option value="IN_USE">ĐANG SỬ DỤNG (Đã gán khách)</option>
-                      <option value="EXPIRED">HẾT HẠN (Cần gia hạn/thay thế)</option>
-                      <option value="RESERVED">GIỮ CHỖ (Đang xử lý)</option>
-                    </select>
-                  </div>
 
                   {/* NGÀY HẾT HẠN DỊCH VỤ */}
                   <div>

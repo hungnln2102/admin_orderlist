@@ -41,7 +41,6 @@ export interface WarehouseSlotEditFormData {
   statusCheckEnabled?: boolean;
   statusProviderKey?: string;
   expiresAt: string;
-  status: WarehouseSlotStatus;
   note: string;
   saveTagToCatalog?: boolean;
 }
@@ -125,7 +124,6 @@ export interface WarehouseAddServiceFormData {
   backupEmail: string;
   twoFa: string;
   expiresAt: string;
-  status: WarehouseSlotStatus;
   note: string;
   providerKey?: string;
 }
