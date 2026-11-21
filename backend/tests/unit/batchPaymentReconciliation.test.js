@@ -116,9 +116,11 @@ describe("Batch Payment & Slot Suffix Reconciliation Suite", () => {
 
       const mockQueryDb = (tableName) => {
         const isPriceTable = String(tableName).includes("variant_price");
-        const rows = isPriceTable ? mockPrices : mockVariants;
+        const rows = isPriceTable ? mockPrices : String(tableName).endsWith("supplier_cost") ? [] : mockVariants;
         const builder = {
           where: () => builder,
+          whereIn: () => builder,
+          orderBy: () => builder,
           whereILike: () => builder,
           orWhereILike: () => builder,
           first: async () => isPriceTable ? null : mockVariants[0],

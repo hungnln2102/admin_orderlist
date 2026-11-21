@@ -39,6 +39,7 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
   const [tabCounts, setTabCounts] = useState({ active: 0, import: 0, expired: 0, canceled: 0 });
   const [serverSummary, setServerSummary] = useState<OrdersSummary | null>(null);
   const requestSequenceRef = useRef(0);
+  const lastStatsFilterKeyRef = useRef<string | null>(null);
 
   const setActiveTab = useCallback((tab: OrderDatasetKey) => {
     setActiveTabValue(tab);
@@ -60,8 +61,10 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     setPage(1);
   }, [setPage]);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (forceStats: boolean = false) => {
     const requestSequence = ++requestSequenceRef.current;
+    const filterKey = `${activeTabValue}|${searchValue}|${statusFilterValue}`;
+    const shouldIncludeStats = forceStats || lastStatsFilterKeyRef.current !== filterKey;
     setLoading(true);
 
     try {
@@ -71,7 +74,7 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
         search: searchValue,
         status: statusFilterValue,
         tab: activeTabValue,
-        includeStats: true,
+        includeStats: shouldIncludeStats,
       });
       if (requestSequence !== requestSequenceRef.current) return;
 
@@ -80,6 +83,9 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
       setTotalOrders(data.pagination?.total || 0);
       if (data.tabCounts) setTabCounts(data.tabCounts);
       if (data.summary) setServerSummary(data.summary);
+      if (shouldIncludeStats) {
+        lastStatsFilterKeyRef.current = filterKey;
+      }
     } catch (err: any) {
       if (requestSequence === requestSequenceRef.current) {
         console.error("Lỗi lấy danh sách đơn:", err?.message || err);
@@ -89,8 +95,10 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     }
   }, [activeTabValue, page, pageSize, searchValue, statusFilterValue]);
 
+  const refreshOrders = useCallback(() => fetchOrders(true), [fetchOrders]);
+
   useEffect(() => {
-    void fetchOrders();
+    void fetchOrders(false);
   }, [fetchOrders]);
 
   const summaryData = useMemo(() => {
@@ -152,6 +160,6 @@ export function useOrders(initialTab: OrderDatasetKey = "active") {
     tabCounts,
     summaryData,
     fetchOrders,
-    refreshOrders: fetchOrders,
+    refreshOrders,
   };
 }

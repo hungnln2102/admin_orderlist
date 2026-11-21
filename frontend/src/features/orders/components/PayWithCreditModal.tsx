@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, CreditCard, Check, AlertCircle, Search, DollarSign } from "lucide-react";
 import { Order } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { formatCurrency } from "@/shared/utils";
 import { ordersApiClient } from "../api/ordersApiClient";
 
 interface CreditNote {
@@ -75,7 +76,7 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
     if (!selected) return;
 
     if (selected.available_amount < orderPrice) {
-      notify.warning(`Số dư credit (${selected.available_amount.toLocaleString()} ₫) không đủ để thanh toán đơn hàng (${orderPrice.toLocaleString()} ₫).`);
+      notify.warning(`Số dư credit (${formatCurrency(selected.available_amount)}) không đủ để thanh toán đơn hàng (${formatCurrency(orderPrice)}).`);
       return;
     }
 
@@ -105,7 +106,7 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
             <div>
               <h3 className="text-sm font-bold text-white">Thanh Toán Bằng Credit</h3>
               <p className="text-[10px] text-slate-400">
-                Đơn hàng: <span className="text-cyan-300 font-mono font-bold">#{order.id_order}</span> (Cần: {orderPrice.toLocaleString()} ₫)
+                Đơn hàng: <span className="text-cyan-300 font-mono font-bold">#{order.id_order}</span> (Cần: {formatCurrency(orderPrice)})
               </p>
             </div>
           </div>
@@ -158,7 +159,7 @@ export const PayWithCreditModal: React.FC<PayWithCreditModalProps> = ({
                         <span className="text-xs text-slate-400">({c.customer_name || "Khách lẻ"})</span>
                       </div>
                       <div className="text-[11px] text-emerald-400 font-mono font-semibold">
-                        Số dư: {c.available_amount.toLocaleString()} ₫
+                        Số dư: {formatCurrency(c.available_amount)}
                       </div>
                       {!isEnough && (
                         <div className="text-[10px] text-rose-400">Không đủ số dư để thanh toán đơn này</div>

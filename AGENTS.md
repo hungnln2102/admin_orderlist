@@ -156,6 +156,18 @@ Bất kể làm việc trên thiết bị nào (máy công ty hay máy ở nhà)
 
 ---
 
+### Nguyên Tắc 8: Hiến Pháp Frontend — Kho Thư Viện Dùng Chung Bắt Buộc (Design System & Component Library SSOT)
+- **CẤM TUYỆT ĐỐI TỰ Ý CODE LẠI GIAO DIỆN (ZERO INLINE RE-IMPLEMENTATION)**:
+  - Mọi thành phần giao diện (Modal, Popup, Form layout ngang, Button, Input, Select, Switch On/Off, Card, Badge, Notification, Tooltip...) **TUYỆT ĐỐI KHÔNG ĐƯỢC tự viết lại thủ công inline** trong từng màn hình/feature riêng lẻ làm phình to mã nguồn và gây lệch chuẩn giao diện.
+- **KHO THƯ VIỆN DÙNG CHUNG DUY NHẤT (SSOT)**:
+  - Toàn bộ thành phần UI chuẩn hóa của dự án được tập trung duy nhất tại `frontend/src/shared/components/` (Single Entry Point: `@/shared/components`) và danh mục tra cứu sống tại [docs/design-system/COMPONENT_LIBRARY.md](file:///e:/Project/admin_store/admin_orderlist/docs/design-system/COMPONENT_LIBRARY.md).
+- **CỔNG KIỂM TOÁN THƯ VIỆN BẮT BUỘC (MANDATORY LIBRARY-FIRST AUDIT GATE)**:
+  - Trước khi thực hiện bất kỳ sửa đổi hoặc tạo mới giao diện nào, Frontend Lead và mọi Subagent **BẮT BUỘC phải mở kho thư viện dùng chung ra đối chiếu trước**:
+    1. **Nếu thành phần đã có trong kho**: BẮT BUỘC phải import tái sử dụng 100%, nghiêm cấm tự ý viết biến thể song song.
+    2. **Nếu thành phần chưa có trong kho**: BẮT BUỘC phải đóng gói thành component dùng chung vào `frontend/src/shared/components/` trước, export tại `index.ts`, cập nhật tài liệu danh mục thư viện, sau đó mới được import sử dụng trong màn hình cụ thể.
+
+---
+
 ## 🎯 3. TIÊU CHUẨN HOÀN THÀNH (DEFINITION OF DONE)
 
 Một nhiệm vụ CHỈ ĐƯỢC XEM LÀ HOÀN THÀNH khi:

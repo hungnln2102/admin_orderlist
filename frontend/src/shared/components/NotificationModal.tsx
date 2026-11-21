@@ -124,8 +124,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const displayTitle = title || defaultTitle;
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-[#0b0f19] border border-slate-800/90 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-5 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar bg-[#0b0f19] border border-slate-800/90 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200">
         {/* Top Glow Bar */}
         <div
           className={`absolute top-0 left-0 right-0 h-1 ${

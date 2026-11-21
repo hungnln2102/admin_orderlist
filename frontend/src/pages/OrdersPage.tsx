@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { ShoppingBag, Plus } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
@@ -12,12 +12,29 @@ import {
   useOrderCatalog,
   OrderFilterBar,
   OrderTable,
-  OrderCreateEditModal,
-  OrderDetailModal,
-  OrderDeleteModal,
-  PayWithCreditModal,
   ordersApiClient,
 } from "../features/orders";
+
+const OrderCreateEditModal = lazy(() =>
+  import("../features/orders/components/OrderCreateEditModal").then((m) => ({
+    default: m.OrderCreateEditModal,
+  }))
+);
+const OrderDetailModal = lazy(() =>
+  import("../features/orders/components/OrderDetailModal").then((m) => ({
+    default: m.OrderDetailModal,
+  }))
+);
+const OrderDeleteModal = lazy(() =>
+  import("../features/orders/components/OrderDeleteModal").then((m) => ({
+    default: m.OrderDeleteModal,
+  }))
+);
+const PayWithCreditModal = lazy(() =>
+  import("../features/orders/components/PayWithCreditModal").then((m) => ({
+    default: m.PayWithCreditModal,
+  }))
+);
 import {
   ORDER_PREFIX,
   getOrderPrefixConfig,
@@ -595,30 +612,58 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         onRenewOrder={handleRenewOrder}
       />
 
-      {/* Create Order Modal */}
-      {(() => {
-        const selectedProduct = productsCatalog.find((p) => p.id === selectedProductId);
-        const selectedProductName = selectedProduct ? (selectedProduct.san_pham || "").trim().toLowerCase() : "";
-        const hasPackage = selectedProductName
-          ? packageProductsList.some((pkg) => {
-              const pkgName = (pkg.product_name || "").trim().toLowerCase();
-              return pkgName === selectedProductName || selectedProductName.includes(pkgName) || pkgName.includes(selectedProductName);
-            })
-          : true;
+      {/* Lazy-loaded Modals (FE-08) */}
+      <Suspense fallback={null}>
+        {/* Create Order Modal */}
+        {isCreateModalOpen && (() => {
+          const selectedProduct = productsCatalog.find((p) => p.id === selectedProductId);
+          const selectedProductName = selectedProduct ? (selectedProduct.san_pham || "").trim().toLowerCase() : "";
+          const hasPackage = selectedProductName
+            ? packageProductsList.some((pkg) => {
+                const pkgName = (pkg.product_name || "").trim().toLowerCase();
+                return pkgName === selectedProductName || selectedProductName.includes(pkgName) || pkgName.includes(selectedProductName);
+              })
+            : true;
 
-        const matchedCategory = packageCategoriesList.find((cat) => {
-          const catName = (cat.name || "").trim().toLowerCase();
-          return selectedProductName === catName || selectedProductName.includes(catName) || catName.includes(selectedProductName);
-        });
-        const requiresStorage = matchedCategory ? Boolean(matchedCategory.requiresStorage) : false;
+          const matchedCategory = packageCategoriesList.find((cat) => {
+            const catName = (cat.name || "").trim().toLowerCase();
+            return selectedProductName === catName || selectedProductName.includes(catName) || catName.includes(selectedProductName);
+          });
+          const requiresStorage = matchedCategory ? Boolean(matchedCategory.requiresStorage) : false;
 
-        return (
+          return (
+            <OrderCreateEditModal
+              isOpen={isCreateModalOpen}
+              isEdit={false}
+              isImportTab={activeTab === "import"}
+              onClose={() => setIsCreateModalOpen(false)}
+              onSubmit={handleCreateSubmit}
+              formData={formData}
+              setFormData={setFormData}
+              productsCatalog={productsCatalog}
+              allSuppliersCatalog={allSuppliersCatalog}
+              productSuppliersCatalog={productSuppliersCatalog}
+              loadingSuppliers={loadingSuppliers || loadingCatalog}
+              selectedProductId={selectedProductId}
+              onProductChange={handleProductChange}
+              onSupplierChange={handleSupplierChange}
+              onPrefixChange={handlePrefixChange}
+              isCustomPriceMode={isCustomPriceMode}
+              setIsCustomPriceMode={setIsCustomPriceMode}
+              hasPackage={hasPackage}
+              requiresStorage={requiresStorage}
+            />
+          );
+        })()}
+
+        {/* Edit Order Modal */}
+        {isEditModalOpen && (
           <OrderCreateEditModal
-            isOpen={isCreateModalOpen}
-            isEdit={false}
+            isOpen={isEditModalOpen}
+            isEdit={true}
             isImportTab={activeTab === "import"}
-            onClose={() => setIsCreateModalOpen(false)}
-            onSubmit={handleCreateSubmit}
+            onClose={() => setIsEditModalOpen(false)}
+            onSubmit={handleEditSubmit}
             formData={formData}
             setFormData={setFormData}
             productsCatalog={productsCatalog}
@@ -631,58 +676,41 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
             onPrefixChange={handlePrefixChange}
             isCustomPriceMode={isCustomPriceMode}
             setIsCustomPriceMode={setIsCustomPriceMode}
-            hasPackage={hasPackage}
-            requiresStorage={requiresStorage}
           />
-        );
-      })()}
+        )}
 
-      {/* Edit Order Modal */}
-      <OrderCreateEditModal
-        isOpen={isEditModalOpen}
-        isEdit={true}
-        isImportTab={activeTab === "import"}
-        onClose={() => setIsEditModalOpen(false)}
-        onSubmit={handleEditSubmit}
-        formData={formData}
-        setFormData={setFormData}
-        productsCatalog={productsCatalog}
-        allSuppliersCatalog={allSuppliersCatalog}
-        productSuppliersCatalog={productSuppliersCatalog}
-        loadingSuppliers={loadingSuppliers || loadingCatalog}
-        selectedProductId={selectedProductId}
-        onProductChange={handleProductChange}
-        onSupplierChange={handleSupplierChange}
-        onPrefixChange={handlePrefixChange}
-        isCustomPriceMode={isCustomPriceMode}
-        setIsCustomPriceMode={setIsCustomPriceMode}
-      />
+        {/* View Order Detail Modal */}
+        {isViewModalOpen && (
+          <OrderDetailModal
+            isOpen={isViewModalOpen}
+            onClose={() => setIsViewModalOpen(false)}
+            order={selectedOrder}
+            productsCatalog={productsCatalog}
+          />
+        )}
 
-      {/* View Order Detail Modal */}
-      <OrderDetailModal
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-        order={selectedOrder}
-        productsCatalog={productsCatalog}
-      />
+        {/* Delete Order Confirmation Modal */}
+        {isDeleteModalOpen && (
+          <OrderDeleteModal
+            isOpen={isDeleteModalOpen}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onConfirmDelete={handleDeleteSubmit}
+            order={selectedOrder}
+          />
+        )}
 
-      {/* Delete Order Confirmation Modal */}
-      <OrderDeleteModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirmDelete={handleDeleteSubmit}
-        order={selectedOrder}
-      />
-
-      {/* Pay With Credit Modal */}
-      <PayWithCreditModal
-        isOpen={isPayWithCreditModalOpen}
-        onClose={() => setIsPayWithCreditModalOpen(false)}
-        order={selectedOrder}
-        onSuccess={() => {
-          refreshOrders();
-        }}
-      />
+        {/* Pay With Credit Modal */}
+        {isPayWithCreditModalOpen && (
+          <PayWithCreditModal
+            isOpen={isPayWithCreditModalOpen}
+            onClose={() => setIsPayWithCreditModalOpen(false)}
+            order={selectedOrder}
+            onSuccess={() => {
+              refreshOrders();
+            }}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

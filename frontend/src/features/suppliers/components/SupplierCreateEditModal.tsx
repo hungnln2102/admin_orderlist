@@ -27,7 +27,7 @@ export const SupplierCreateEditModal: React.FC<SupplierCreateEditModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-md bg-[#0b0f19] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto custom-scrollbar bg-[#0b0f19] border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             {isEdit ? (
@@ -74,7 +74,7 @@ export const SupplierCreateEditModal: React.FC<SupplierCreateEditModalProps> = (
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-400 mb-1 font-semibold">Mã Ngân Hàng (Bin Bank)</label>
               <input

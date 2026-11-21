@@ -1,7 +1,20 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
-const { redact, dispatchStoredEventWith } = require("../../src/events/eventStoreService");
+const { redact, dispatchStoredEventWith, replayPendingEvents } = require("../../src/events/eventStoreService");
+
+test("replay continues after one event fails and counts successful publications", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const attempted = [];
+  const published = await replayPendingEvents([{ id: 1 }, { id: 2 }], async (event) => {
+    attempted.push(event.id);
+    if (event.id === 1) throw new Error("subscriber failed");
+  });
+
+  assert.deepEqual(attempted, [1, 2]);
+  assert.equal(published, 1);
+  assert.equal(console.error.mock.callCount(), 1);
+});
 
 test("redact removes sensitive nested fields without mutating the source", () => {
   const input = { email: "admin@example.com", password: "secret", nested: { apiKey: "key", safe: true } };

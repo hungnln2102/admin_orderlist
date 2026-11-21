@@ -117,7 +117,7 @@ export const PersonalTransactionCreateModal: React.FC<Props> = ({
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/60">
           <div className="flex items-center gap-3">

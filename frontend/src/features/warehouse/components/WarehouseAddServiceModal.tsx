@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { CustomSelect, DateInputVN } from "@/shared/components";
 import {
   PlusCircle,
   X,
@@ -160,10 +161,11 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
                 className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-indigo-500/50 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-400 transition-colors"
               />
             ) : (
-              <select
+              <CustomSelect
                 value={formData.serviceName}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
+                accent="indigo"
+                className="bg-slate-950/80"
+                onChange={(selectedName) => {
                   const foundCat = catalogItems.find((c) => c.name === selectedName);
                   setFormData({
                     ...formData,
@@ -171,24 +173,21 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
                     category: foundCat ? foundCat.category : selectedName,
                   });
                 }}
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
-              >
-                {catalogItems.length > 0 ? (
-                  catalogItems.map((item) => (
-                    <option key={item.id} value={item.name}>
-                      {item.name} {item.category ? `(${item.category})` : ""}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Adobe All Apps 12M Slot">Adobe All Apps 12M Slot</option>
-                    <option value="Canva Pro Team Slot">Canva Pro Team Slot</option>
-                    <option value="Netflix Premium 4K Slot">Netflix Premium 4K Slot</option>
-                    <option value="ChatGPT Plus Shared Slot">ChatGPT Plus Shared Slot</option>
-                    <option value="Mail">Mail</option>
-                  </>
-                )}
-              </select>
+                options={
+                  catalogItems.length > 0
+                    ? catalogItems.map((item) => ({
+                        value: item.name,
+                        label: `${item.name}${item.category ? ` (${item.category})` : ""}`,
+                      }))
+                    : [
+                        { value: "Adobe All Apps 12M Slot", label: "Adobe All Apps 12M Slot" },
+                        { value: "Canva Pro Team Slot", label: "Canva Pro Team Slot" },
+                        { value: "Netflix Premium 4K Slot", label: "Netflix Premium 4K Slot" },
+                        { value: "ChatGPT Plus Shared Slot", label: "ChatGPT Plus Shared Slot" },
+                        { value: "Mail", label: "Mail" },
+                      ]
+                }
+              />
             )}
           </div>
 
@@ -283,20 +282,22 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
               </span>
               <span className="text-[10px] text-cyan-400 font-mono">Tự động điều phối</span>
             </label>
-            <select
+            <CustomSelect
               value={formData.providerKey || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, providerKey: e.target.value })
+              accent="amber"
+              size="sm"
+              className="bg-slate-950/80"
+              onChange={(val) =>
+                setFormData({ ...formData, providerKey: val })
               }
-              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
-            >
-              <option value="">-- Mặc định (Không gán cổng OTP) --</option>
-              {AVAILABLE_OTP_PROVIDERS.map((provider) => (
-                <option key={provider.value} value={provider.value}>
-                  {provider.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "-- Mặc định (Không gán cổng OTP) --" },
+                ...AVAILABLE_OTP_PROVIDERS.map((provider) => ({
+                  value: provider.value,
+                  label: provider.label,
+                })),
+              ]}
+            />
             <p className="mt-1 text-[10px] text-slate-400">
               Gắn cổng OTP trực tiếp vào dịch vụ này. Khách lấy OTP sẽ được hệ thống trỏ thẳng tới Provider đã chọn.
             </p>
@@ -327,13 +328,14 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
                   </button>
                 </div>
               </div>
-              <input
-                type="date"
+              <DateInputVN
                 value={formData.expiresAt}
-                onChange={(e) =>
-                  setFormData({ ...formData, expiresAt: e.target.value })
+                onChange={(iso) =>
+                  setFormData({ ...formData, expiresAt: iso })
                 }
-                className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-purple-500 transition-colors"
+                placeholder="dd/mm/yyyy"
+                focusBorderClass="focus:border-purple-500"
+                className="px-3.5 py-2.5 bg-slate-950/80 border-slate-700/80"
               />
             </div>
 

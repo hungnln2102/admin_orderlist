@@ -1,5 +1,6 @@
 import React from "react";
 import { RefreshCw, X } from "lucide-react";
+import { DateInputVN } from "@/shared/components";
 
 interface WarehouseFinanceBackfillModalProps {
   isOpen: boolean;
@@ -25,8 +26,8 @@ export function WarehouseFinanceBackfillModal(props: WarehouseFinanceBackfillMod
   if (!isBackfillModalOpen) return null;
 
   return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-md w-full max-h-[92vh] overflow-y-auto custom-scrollbar shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400">
@@ -51,11 +52,12 @@ export function WarehouseFinanceBackfillModal(props: WarehouseFinanceBackfillMod
                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   Từ ngày (Bắt đầu)
                 </label>
-                <input
-                  type="date"
+                <DateInputVN
                   value={backfillFrom}
-                  onChange={(e) => setBackfillFrom(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-cyan-500/50"
+                  onChange={setBackfillFrom}
+                  placeholder="dd/mm/yyyy"
+                  focusBorderClass="focus:border-cyan-500/50"
+                  className="bg-slate-900"
                 />
               </div>
 
@@ -63,11 +65,12 @@ export function WarehouseFinanceBackfillModal(props: WarehouseFinanceBackfillMod
                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   Đến ngày (Kết thúc)
                 </label>
-                <input
-                  type="date"
+                <DateInputVN
                   value={backfillTo}
-                  onChange={(e) => setBackfillTo(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-cyan-500/50"
+                  onChange={setBackfillTo}
+                  placeholder="dd/mm/yyyy"
+                  focusBorderClass="focus:border-cyan-500/50"
+                  className="bg-slate-900"
                 />
               </div>
             </div>

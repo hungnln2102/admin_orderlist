@@ -59,8 +59,8 @@ async function recordEventInTrx(trx, input) {
   return insertEvent(trx, input, "PENDING");
 }
 
-async function markEventPublished(eventId) {
-  await db(TABLES.DOMAIN_EVENT_STORE)
+async function markEventPublished(eventId, connection) {
+  await connection(TABLES.DOMAIN_EVENT_STORE)
     .where({ [E.ID]: eventId })
     .update({
       [E.STATUS]: "PUBLISHED",
@@ -70,8 +70,8 @@ async function markEventPublished(eventId) {
     });
 }
 
-async function markEventDispatchFailed(eventId, error) {
-  await db(TABLES.DOMAIN_EVENT_STORE)
+async function markEventDispatchFailed(eventId, error, connection) {
+  await connection(TABLES.DOMAIN_EVENT_STORE)
     .where({ [E.ID]: eventId })
     .increment(E.ATTEMPTS, 1)
     .update({ [E.ERROR_MESSAGE]: error.message || String(error) });
@@ -94,11 +94,27 @@ async function dispatchStoredEventWith(event, { emitAsync, markPublishedFn, mark
 }
 
 async function dispatchStoredEvent(event) {
-  return dispatchStoredEventWith(event, {
-    emitAsync: eventBus.emitAsync.bind(eventBus),
-    markPublishedFn: markEventPublished,
-    markFailedFn: markEventDispatchFailed,
+  const outcome = await db.transaction(async (trx) => {
+    const pending = await trx(TABLES.DOMAIN_EVENT_STORE)
+      .where({ [E.ID]: event[E.ID], [E.STATUS]: "PENDING" })
+      .forUpdate()
+      .skipLocked()
+      .first();
+    if (!pending) return { published: false };
+
+    try {
+      await dispatchStoredEventWith(pending, {
+        emitAsync: eventBus.emitAsync.bind(eventBus),
+        markPublishedFn: (id) => markEventPublished(id, trx),
+        markFailedFn: (id, error) => markEventDispatchFailed(id, error, trx),
+      });
+      return { published: true };
+    } catch (error) {
+      return { error };
+    }
   });
+  if (outcome.error) throw outcome.error;
+  return outcome.published;
 }
 
 async function publishEventInTrx(trx, input) {
@@ -115,16 +131,38 @@ async function publishEventInTrx(trx, input) {
 }
 
 async function dispatchPendingEvents({ limit = 100 } = {}) {
-  const events = await db(TABLES.DOMAIN_EVENT_STORE)
-    .where({ [E.STATUS]: "PENDING" })
-    .orderBy(E.CREATED_AT, "asc")
-    .limit(Math.max(1, Math.min(Number(limit) || 100, 1000)));
+  const batchSize = Math.max(1, Math.min(Math.trunc(Number(limit)) || 100, 1000));
+  const pending = () => db(TABLES.DOMAIN_EVENT_STORE).where(E.STATUS, "PENDING");
+  const { lastId } = await pending().max({ lastId: E.ID }).first();
+  if (lastId == null) return 0;
 
-  for (const event of events) {
-    await dispatchStoredEvent(event);
+  let cursor = null;
+  let published = 0;
+  while (true) {
+    const events = await pending()
+      .where(E.ID, "<=", lastId)
+      .modify((query) => {
+        if (cursor !== null) query.where(E.ID, ">", cursor);
+      })
+      .orderBy(E.ID, "asc")
+      .limit(batchSize);
+    if (events.length === 0) return published;
+
+    published += await replayPendingEvents(events);
+    cursor = events[events.length - 1][E.ID];
   }
+}
 
-  return events.length;
+async function replayPendingEvents(events, dispatch = dispatchStoredEvent) {
+  let published = 0;
+  for (const event of events) {
+    try {
+      if (await dispatch(event) !== false) published += 1;
+    } catch (error) {
+      console.error(`[EventStore] Unable to replay event ${event[E.ID]}:`, error.message);
+    }
+  }
+  return published;
 }
 
 async function recordEvent(input) {
@@ -141,5 +179,6 @@ module.exports = {
   publishEventInTrx,
   recordEvent,
   recordEventInTrx,
+  replayPendingEvents,
   redact,
 };

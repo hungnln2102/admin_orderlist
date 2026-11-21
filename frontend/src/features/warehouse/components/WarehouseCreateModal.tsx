@@ -1,5 +1,5 @@
 import { SlotProviderControls } from "./SlotProviderControls";
-import { DateInputVN } from "@/shared/components/DateInputVN";
+import { CustomSelect, DateInputVN, ToggleSwitch } from "@/shared/components";
 import React, { useState } from "react";
 import {
   Archive,
@@ -282,11 +282,13 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                 <label htmlFor="warehouse-create-product" className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Sản phẩm (*)
                 </label>
-                <select
-                  id="warehouse-create-product"
+                <CustomSelect
+                  ariaLabel="Sản phẩm"
                   value={formData.serviceName}
-                  onChange={(e) => {
-                    const selectedName = e.target.value;
+                  placeholder="Chọn sản phẩm"
+                  accent="cyan"
+                  size="sm"
+                  onChange={(selectedName) => {
                     const foundCat = catalogItems.find((c) => c.name === selectedName);
                     const shouldCreatePkg = Boolean(foundCat?.isPackage);
                     onFormChange({
@@ -297,24 +299,17 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                       createPackage: shouldCreatePkg ? true : formData.createPackage,
                     });
                   }}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 focus:outline-none focus:border-cyan-500 text-xs transition-colors cursor-pointer"
-                >
-                  <option value="" disabled>Chọn sản phẩm</option>
-                  {productNames.length > 0 ? (
-                    productNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Adobe">Adobe</option>
-                      <option value="Youtube Premium">Youtube Premium</option>
-                      <option value="Netflix Premium 4K">Netflix Premium 4K</option>
-                      <option value="ChatGPT Plus">ChatGPT Plus</option>
-                    </>
-                  )}
-                </select>
+                  options={
+                    productNames.length > 0
+                      ? productNames.map((name) => ({ value: name, label: name }))
+                      : [
+                          { value: "Adobe", label: "Adobe" },
+                          { value: "Youtube Premium", label: "Youtube Premium" },
+                          { value: "Netflix Premium 4K", label: "Netflix Premium 4K" },
+                          { value: "ChatGPT Plus", label: "ChatGPT Plus" },
+                        ]
+                  }
+                />
               </div>
 
               {/* Danh Sách Tag */}
@@ -364,19 +359,13 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onFormChange({ ...formData, createPackage: !formData.createPackage })}
-                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer focus:outline-none shrink-0 ${
-                    formData.createPackage ? "bg-cyan-500 shadow-md shadow-cyan-500/30" : "bg-slate-800"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${
-                      formData.createPackage ? "translate-x-5" : ""
-                    }`}
-                  />
-                </button>
+                <ToggleSwitch
+                  checked={!!formData.createPackage}
+                  onChange={(checked) => onFormChange({ ...formData, createPackage: checked })}
+                  variant="cyan"
+                  size="lg"
+                />
+
               </div>
 
               {/* Nếu bật Tạo Gói Kho: Cho phép cấu hình tài khoản liên kết */}
@@ -395,25 +384,18 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
+                    <ToggleSwitch
+                      checked={!!formData.hasLinkedAccount}
+                      onChange={(checked) =>
                         onFormChange({
                           ...formData,
-                          hasLinkedAccount: !formData.hasLinkedAccount,
+                          hasLinkedAccount: checked,
                           linkedAccountRole: formData.linkedAccountRole || "storage",
                         })
                       }
-                      className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer focus:outline-none shrink-0 ${
-                        formData.hasLinkedAccount ? "bg-cyan-500 shadow-md shadow-cyan-500/30" : "bg-slate-800"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform ${
-                          formData.hasLinkedAccount ? "translate-x-5" : ""
-                        }`}
-                      />
-                    </button>
+                      variant="cyan"
+                      size="md"
+                    />
                   </div>
 
                   {/* Nếu chọn CÓ tài khoản liên kết */}
@@ -468,25 +450,33 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                         <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
                           Chọn Tài Khoản Từ Kho Tồn (*)
                         </label>
-                        <select
-                          value={formData.linkedAccountId || ""}
-                          onChange={(e) =>
+                        <CustomSelect
+                          ariaLabel="Chọn Tài Khoản Từ Kho Tồn"
+                          value={formData.linkedAccountId ? String(formData.linkedAccountId) : ""}
+                          placeholder="-- Bấm để chọn tài khoản tồn kho --"
+                          accent="cyan"
+                          size="sm"
+                          searchable
+                          onChange={(val) =>
                             onFormChange({
                               ...formData,
-                              linkedAccountId: e.target.value ? Number(e.target.value) : null,
+                              linkedAccountId: val ? Number(val) : null,
                             })
                           }
-                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer transition-colors"
-                        >
-                          <option value="">-- Bấm để chọn tài khoản tồn kho --</option>
-                          {existingAccounts
-                            .filter((acc) => acc.account.toLowerCase() !== String(formData.account || "").toLowerCase().trim())
-                            .map((acc) => (
-                              <option key={acc.id} value={acc.id}>
-                                {acc.account} ({acc.services.map((s) => s.display_name).join(", ") || "Chưa có DV"})
-                              </option>
-                            ))}
-                        </select>
+                          options={[
+                            { value: "", label: "-- Bấm để chọn tài khoản tồn kho --" },
+                            ...existingAccounts
+                              .filter(
+                                (acc) =>
+                                  acc.account.toLowerCase() !==
+                                  String(formData.account || "").toLowerCase().trim()
+                              )
+                              .map((acc) => ({
+                                value: String(acc.id),
+                                label: `${acc.account} (${acc.services.map((s) => s.display_name).join(", ") || "Chưa có DV"})`,
+                              })),
+                          ]}
+                        />
                       </div>
 
                       {/* BƯỚC 3: Dung lượng (Tùy chọn) */}

@@ -1,11 +1,11 @@
 import { SlotProviderControls } from "./SlotProviderControls";
+import { CopyButton, DateInputVN, QuickDateAddButtons, ToggleSwitch } from "@/shared/components";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Pencil,
   X,
   Eye,
   EyeOff,
-  Copy,
   Check,
   Calendar,
   KeyRound,
@@ -65,7 +65,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
 
   const [saveTagToCatalog, setSaveTagToCatalog] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [apiMapping, setApiMapping] = useState<{
     byDisplayName: Record<string, any[]>;
     byPackageName: Record<string, any[]>;
@@ -223,13 +222,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
     slot.status === "AVAILABLE"
   );
 
-  const handleCopy = (text: string, fieldKey: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldKey);
-    setTimeout(() => setCopiedField(null), 1500);
-  };
-
   const handleAddDays = (days: number) => {
     const baseDate = formData.expiresAt ? new Date(formData.expiresAt) : new Date();
     const d = isNaN(baseDate.getTime()) ? new Date() : baseDate;
@@ -312,17 +304,13 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                         <span>Email (Username)</span>
                       </span>
                       {formData.accountUsername && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(formData.accountUsername, "user")}
-                          className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          {copiedField === "user" ? (
-                            <Check className="w-3 h-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
+                        <CopyButton
+                          text={formData.accountUsername}
+                          copiedLabel=""
+                          itemKey="user"
+                          size="xs"
+                          variant="ghost"
+                        />
                       )}
                     </label>
                     <input
@@ -344,23 +332,14 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                         <span>Mật Khẩu Dịch Vụ</span>
                       </span>
                       {formData.password && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(formData.password, "pass")}
-                          className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          {copiedField === "pass" ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-400" />
-                              <span className="text-emerald-400 font-semibold">Đã copy</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Sao chép</span>
-                            </>
-                          )}
-                        </button>
+                        <CopyButton
+                          text={formData.password}
+                          label="Sao chép"
+                          copiedLabel="Đã sao chép"
+                          itemKey="pass"
+                          size="xs"
+                          variant="ghost"
+                        />
                       )}
                     </label>
                     <div className="relative">
@@ -437,17 +416,13 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                       <span>Email Backup Khôi Phục</span>
                     </span>
                     {formData.backupEmail && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(formData.backupEmail, "backup")}
-                        className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        {copiedField === "backup" ? (
-                          <Check className="w-3 h-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
+                      <CopyButton
+                        text={formData.backupEmail}
+                        copiedLabel=""
+                        itemKey="backup"
+                        size="xs"
+                        variant="ghost"
+                      />
                     )}
                   </label>
                   <input
@@ -469,23 +444,14 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                       <span>Mã 2FA Secret Key (Base32)</span>
                     </span>
                     {formData.twoFa && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(formData.twoFa, "2fa")}
-                        className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        {copiedField === "2fa" ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-400" />
-                            <span className="text-emerald-400 font-semibold">Đã copy</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Sao chép mã 2FA</span>
-                          </>
-                        )}
-                      </button>
+                      <CopyButton
+                        text={formData.twoFa}
+                        label="Sao chép mã 2FA"
+                        copiedLabel="Đã sao chép"
+                        itemKey="2fa"
+                        size="xs"
+                        variant="ghost"
+                      />
                     )}
                   </label>
                   <input
@@ -630,18 +596,18 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-2 pt-1 border-t border-amber-500/20 text-xs text-slate-300 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={saveTagToCatalog}
-                        onChange={(e) => setSaveTagToCatalog(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-950 cursor-pointer"
-                      />
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-amber-500/20 text-xs text-slate-300">
                       <span>
                         Đồng bộ đặt làm Tag phân loại mặc định cho dịch vụ{" "}
                         <strong className="text-amber-300">{formData.serviceName}</strong> trong Danh Mục Kho
                       </span>
-                    </label>
+                      <ToggleSwitch
+                        checked={saveTagToCatalog}
+                        onChange={setSaveTagToCatalog}
+                        variant="amber"
+                        size="sm"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -658,46 +624,20 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
                         <Calendar className="w-3.5 h-3.5 text-purple-400" />
                         <span>Ngày Hết Hạn Dịch Vụ</span>
                       </label>
-                      <div className="flex items-center gap-1 text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => handleAddDays(30)}
-                          className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 cursor-pointer transition-all active:scale-95"
-                        >
-                          +30d
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAddDays(90)}
-                          className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 cursor-pointer transition-all active:scale-95"
-                        >
-                          +90d
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAddDays(365)}
-                          className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 cursor-pointer transition-all active:scale-95"
-                        >
-                          +1y
-                        </button>
-                        {formData.expiresAt && (
-                          <button
-                            type="button"
-                            onClick={handleClearExpiry}
-                            className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-rose-300 hover:bg-slate-700 cursor-pointer transition-all active:scale-95"
-                          >
-                            Xóa
-                          </button>
-                        )}
-                      </div>
+                      <QuickDateAddButtons
+                        onAddDays={handleAddDays}
+                        onClear={handleClearExpiry}
+                        hasValue={!!formData.expiresAt}
+                      />
                     </div>
-                    <input
-                      type="date"
+                    <DateInputVN
                       value={formData.expiresAt}
-                      onChange={(e) =>
-                        setFormData({ ...formData, expiresAt: e.target.value })
+                      onChange={(isoDate) =>
+                        setFormData({ ...formData, expiresAt: isoDate })
                       }
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 font-mono text-xs focus:outline-none focus:border-purple-500 transition-colors"
+                      placeholder="dd/mm/yyyy"
+                      focusBorderClass="focus:border-purple-500"
+                      className="px-3.5 py-2.5 bg-slate-900 border-slate-700/80 font-normal"
                     />
                   </div>
                 </div>

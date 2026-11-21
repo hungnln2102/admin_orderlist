@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Installment } from "../types";
 import { X, Save, Calendar, Clock, Hash } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { CurrencyInputVN, ToggleSwitch } from "@/shared/components";
 
 interface Props {
   isOpen: boolean;
@@ -9,13 +10,6 @@ interface Props {
   onSave: (payload: any) => Promise<void>;
   editingItem?: Installment | null;
 }
-
-const formatAmountInput = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  return digits ? Number(digits).toLocaleString("vi-VN") : "";
-};
-
-const parseAmountInput = (value: string) => Number(value.replace(/\D/g, ""));
 
 export const InstallmentModal: React.FC<Props> = ({
   isOpen,
@@ -25,8 +19,7 @@ export const InstallmentModal: React.FC<Props> = ({
 }) => {
   const notify = useNotification();
   const [name, setName] = useState("");
-  const [monthlyAmount, setMonthlyAmount] = useState("");
-  const amountInputRef = useRef<HTMLInputElement>(null);
+  const [monthlyAmount, setMonthlyAmount] = useState<number>(0);
   const [totalPeriods, setTotalPeriods] = useState<number | "">(12);
   const [startPeriod, setStartPeriod] = useState("");
   const [dueDay, setDueDay] = useState<number>(15);
@@ -37,7 +30,7 @@ export const InstallmentModal: React.FC<Props> = ({
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
-      setMonthlyAmount(formatAmountInput(String(editingItem.monthlyAmount)));
+      setMonthlyAmount(Number(editingItem.monthlyAmount) || 0);
       setTotalPeriods(editingItem.totalPeriods);
       setStartPeriod(editingItem.startPeriod);
       setDueDay(editingItem.dueDay || 15);
@@ -45,7 +38,7 @@ export const InstallmentModal: React.FC<Props> = ({
       setIsActive(editingItem.isActive);
     } else {
       setName("");
-      setMonthlyAmount("");
+      setMonthlyAmount(0);
       setTotalPeriods(12);
       const now = new Date();
       setStartPeriod(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
@@ -57,30 +50,9 @@ export const InstallmentModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
-  const handleMonthlyAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value;
-    const caretPosition = event.target.selectionStart ?? rawValue.length;
-    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
-    const formattedValue = formatAmountInput(rawValue);
-
-    setMonthlyAmount(formattedValue);
-    requestAnimationFrame(() => {
-      const input = amountInputRef.current;
-      if (!input) return;
-      let nextCaret = 0;
-      let digitCount = 0;
-      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
-        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
-        nextCaret += 1;
-      }
-      input.setSelectionRange(nextCaret, nextCaret);
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const monthlyAmountValue = parseAmountInput(monthlyAmount);
-    if (!name.trim() || monthlyAmountValue < 1000 || !totalPeriods || !startPeriod) {
+    if (!name.trim() || monthlyAmount < 1000 || !totalPeriods || !startPeriod) {
       notify.warning("Vui lòng điền đầy đủ thông tin khoản trả góp", "Thiếu Thông Tin");
       return;
     }
@@ -89,7 +61,7 @@ export const InstallmentModal: React.FC<Props> = ({
       setSubmitting(true);
       await onSave({
         name: name.trim(),
-        monthlyAmount: monthlyAmountValue,
+        monthlyAmount,
         totalPeriods: Number(totalPeriods),
         startPeriod,
         dueDay: Number(dueDay),
@@ -105,137 +77,152 @@ export const InstallmentModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <Clock className="w-5 h-5" />
             </div>
-            <h3 className="text-lg font-bold text-white">
-              {editingItem ? "Sửa Khoản Trả Góp" : "Thêm Khoản Trả Góp Mới"}
-            </h3>
+            <div>
+              <h3 className="text-lg font-bold text-white">
+                {editingItem ? "Sửa Khoản Trả Góp" : "Thêm Khoản Trả Góp Mới"}
+              </h3>
+              <p className="text-xs text-slate-400">
+                Quản lý số tiền mỗi kỳ, tổng kỳ hạn và lịch đến hạn hàng tháng
+              </p>
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-              Tên khoản trả góp <span className="text-rose-400">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="VD: Trả góp MacBook Pro M3, Góp xe máy..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Số tiền mỗi kỳ (₫) <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
+        {/* Form Body — Form Ngang 2 Cột */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            {/* Cột 1: Thông tin khoản vay & số tiền */}
+            <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                  Tên khoản trả góp <span className="text-rose-400">*</span>
+                </label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  placeholder="3.000.000"
-                  value={monthlyAmount}
-                  onChange={(e) => setMonthlyAmount(formatAmountInput(e.target.value))}
+                  placeholder="VD: Trả góp MacBook Pro M3, Góp xe máy..."
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 pl-9 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400"
                 />
-                <span className="absolute left-3 top-2.5 text-sm text-slate-500">₫</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                    Số tiền mỗi kỳ (₫) <span className="text-rose-400">*</span>
+                  </label>
+                  <CurrencyInputVN
+                    value={monthlyAmount}
+                    onChange={setMonthlyAmount}
+                    accentColor="amber"
+                    suffix="₫"
+                    placeholder="3.000.000"
+                    required
+                    className="py-2.5"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                    Tổng số kỳ (Tháng) <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      placeholder="12"
+                      value={totalPeriods}
+                      onChange={(e) => setTotalPeriods(e.target.value ? Number(e.target.value) : "")}
+                      required
+                      min="1"
+                      max="120"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 pl-9 font-mono"
+                    />
+                    <Hash className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+                <div>
+                  <span className="text-xs font-semibold text-slate-200 block">
+                    Đang hoạt động
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    Kích hoạt tính vào chi phí tháng
+                  </span>
+                </div>
+                <ToggleSwitch
+                  checked={isActive}
+                  onChange={setIsActive}
+                  variant="amber"
+                  size="md"
+                />
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Tổng số kỳ (Tháng) <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  placeholder="12"
-                  value={totalPeriods}
-                  onChange={(e) => setTotalPeriods(e.target.value ? Number(e.target.value) : "")}
-                  required
-                  min="1"
-                  max="120"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 pl-9 font-mono"
+            {/* Cột 2: Kỳ hạn, ngày đến hạn & ghi chú */}
+            <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                    Tháng bắt đầu kỳ 1 <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="month"
+                      value={startPeriod}
+                      onChange={(e) => setStartPeriod(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 pl-9 font-mono"
+                    />
+                    <Calendar className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                    Ngày đến hạn hàng tháng
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={dueDay}
+                    onChange={(e) => setDueDay(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                  Ghi chú thêm
+                </label>
+                <textarea
+                  placeholder="VD: Góp thẻ tín dụng HSBC, hạn trả ngày 15..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={4}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 resize-none"
                 />
-                <Hash className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Tháng bắt đầu kỳ 1 <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="month"
-                  value={startPeriod}
-                  onChange={(e) => setStartPeriod(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 pl-9 font-mono"
-                />
-                <Calendar className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Ngày đến hạn hàng tháng
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={dueDay}
-                onChange={(e) => setDueDay(Number(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 font-mono"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-              Ghi chú thêm
-            </label>
-            <textarea
-              placeholder="VD: Góp thẻ tín dụng HSBC, hạn trả ngày 15..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-400 resize-none"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              type="checkbox"
-              id="isActiveInstallment"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="rounded bg-slate-950 border-slate-800 text-amber-500 focus:ring-0 w-4 h-4 cursor-pointer"
-            />
-            <label htmlFor="isActiveInstallment" className="text-xs text-slate-300 cursor-pointer">
-              Đang hoạt động (Kích hoạt tính vào chi phí tháng)
-            </label>
           </div>
 
           {/* Footer */}
@@ -243,7 +230,7 @@ export const InstallmentModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Hủy
             </button>

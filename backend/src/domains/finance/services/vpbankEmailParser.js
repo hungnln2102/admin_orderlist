@@ -155,12 +155,17 @@ function extractMerchant(lines, isCreditCard, isPaymentToCard) {
   return "Giao dich the ghi no";
 }
 
+const DEBIT_ACCOUNT_LABEL = /^(?:tai khoan trich no|debit account)\b/;
+const DEBIT_AMOUNT_LABEL = /^(?:so tien trich no|debit amount)\b/;
+
 function extractDebitAccountNumber(lines) {
   for (let index = 0; index < lines.length; index += 1) {
-    if (!/tai khoan trich no|debit account/i.test(normalizeForMatch(lines[index]))) continue;
-    const candidates = [lines[index], lines[index + 1]].filter(Boolean).join(" ");
-    const match = candidates.match(/\b\d{6,20}\b/);
-    if (match) return match[0];
+    const line = normalizeForMatch(lines[index]);
+    if (!DEBIT_ACCOUNT_LABEL.test(line)) continue;
+    const inline = line.replace(DEBIT_ACCOUNT_LABEL, "").trim();
+    const match = inline.match(/^:?\s*(\d{6,20})\b/)
+      || lines[index + 1]?.match(/^(\d{6,20})\b/);
+    if (match) return match[1];
   }
   return null;
 }
@@ -169,6 +174,11 @@ function parseVpbankEmail(email) {
   const rawSender = email.from ? (typeof email.from === "object" ? (email.from.text || email.from.value?.[0]?.address) : String(email.from)) : "";
   const linesText = normalizeHtmlToLines(email.text || email.html || "");
   const lines = linesText.split("\n").map((line) => line.trim()).filter(Boolean);
+  const htmlCells = normalizeHtmlToLines(String(email.html || "").replace(/<\/(?:td|th)>/gi, "\n"))
+    .split("\n").map((line) => line.trim()).filter(Boolean);
+  const htmlDebitAccount = extractDebitAccountNumber(htmlCells);
+  const debitLines = htmlDebitAccount ? htmlCells : lines;
+  const sourceAccountNumber = htmlDebitAccount || extractDebitAccountNumber(lines);
   const fullContent = `${subject}\n${linesText}`;
   const normalizedContent = normalizeForMatch(fullContent);
   const normalizedSubject = normalizeForMatch(subject);
@@ -188,7 +198,11 @@ function parseVpbankEmail(email) {
   const isCreditCard = /the tin dung|credit card|han muc kha dung|visa|mastercard|jcb/.test(normalizedContent);
   const isPaymentToCard = /thanh toan (thanh cong )?the|thanh toan du no|nap tien the|hoan tat thanh toan/.test(normalizedContent)
     || (isCreditCard && /\+\s*[\d.,]+\s*(?:vnd|\u0111)/i.test(fullContent));
-  let rawAmount = extractAdjacentAmount(lines, /so tien|changed amount|amount/);
+  const debitAmountIndex = debitLines.findIndex((line) => DEBIT_AMOUNT_LABEL.test(normalizeForMatch(line)));
+  let rawAmount = debitAmountIndex < 0 ? null
+    : extractAmountCandidate(debitLines[debitAmountIndex]) || extractAmountCandidate(debitLines[debitAmountIndex + 1]);
+  const hasDebitAmount = Boolean(rawAmount);
+  rawAmount ||= extractAdjacentAmount(lines, /so tien|changed amount|amount/);
   if (!rawAmount) {
     const amountMatch = fullContent.match(/([+\-]\s*[\d.,]+\s*(?:VND|\u0111))/i);
     rawAmount = amountMatch ? amountMatch[1] : null;
@@ -203,7 +217,6 @@ function parseVpbankEmail(email) {
   }
   const merchant = extractMerchant(lines, isCreditCard, isPaymentToCard).replace(/\s+/g, " ").trim();
   const maskedSuffix = extractCardSuffix(fullContent);
-  const sourceAccountNumber = extractDebitAccountNumber(lines);
   const rawAvailable = extractAdjacentAmount(lines, /han muc kha dung sau thanh toan|han muc kha dung con lai|han muc sau thanh toan|han muc con lai|han muc kha dung|so du kha dung sau giao dich|so du kha dung con lai|so du kha dung|so du con lai|so du tai khoan|available limit|available balance/);
   const observedBalance = parseVNDAmount(rawAvailable);
 
@@ -212,8 +225,8 @@ function parseVpbankEmail(email) {
   }
 
   const isOutflow = /-\s*[\d.,]+/.test(rawAmount || "") || /rut tien|thanh toan|chuyen tien di|chi tieu/.test(normalizedContent);
-  const direction = /trich no/.test(normalizedContent) ? "OUTFLOW" : (isOutflow ? "OUTFLOW" : "INFLOW");
-  return { documentKind: "DEBIT_CARD_TRANSACTION", instrumentKind: maskedSuffix ? "DEBIT_CARD" : "UNKNOWN", maskedSuffix, sourceAccountNumber, transactionKind: direction, direction, amount, occurredAt, merchantNormalized: merchant, referenceCode: referenceCode || null, observedBalanceAfter: observedBalance, availableLimitObserved: null, confidence: amount && (maskedSuffix || sourceAccountNumber) ? "HIGH" : "MEDIUM", senderValid, isFinancial: Boolean(amount && amount > 0) };
+  const direction = hasDebitAmount || /trich no/.test(normalizedContent) || isOutflow ? "OUTFLOW" : "INFLOW";
+  return { documentKind: "DEBIT_CARD_TRANSACTION", instrumentKind: maskedSuffix || sourceAccountNumber ? "DEBIT_CARD" : "UNKNOWN", maskedSuffix, sourceAccountNumber, transactionKind: direction, direction, amount, occurredAt, merchantNormalized: merchant, referenceCode: referenceCode || null, observedBalanceAfter: observedBalance, availableLimitObserved: null, confidence: amount && (maskedSuffix || sourceAccountNumber) ? "HIGH" : "MEDIUM", senderValid, isFinancial: Boolean(amount && amount > 0) };
 }
 
 module.exports = { TRUSTED_SENDER_ADDRESSES, extractCardSuffix, extractSenderAddress, isSenderValid, normalizeHtmlToLines, parseDateTimeVN, parseVNDAmount, parseVpbankEmail };

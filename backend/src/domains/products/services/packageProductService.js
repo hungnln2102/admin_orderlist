@@ -17,7 +17,7 @@ async function requirePackageSlot(trx, accountId, nameId, slotId) {
  * Service lấy danh sách Kho Gói Sản Phẩm từ bảng warehouse.package_products
  * Kết hợp với warehouse.product_names và warehouse.accounts (Tài khoản gốc & Tài khoản liên kết)
  */
-const getPackageProducts = async ({ connection = db, productNameId = null } = {}) => {
+const getPackageProducts = async ({ connection = db, productNameId = null, usageOnly = false } = {}) => {
   const slot = COLS.ACCOUNT_SLOTS;
   const pack = COLS.PACKAGE_PRODUCT;
   const query = `
@@ -151,7 +151,7 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
   let accumulatedMap = new Map();
   let todayLogMap = new Map();
 
-  if (pkgIds.length > 0) {
+  if (!usageOnly && pkgIds.length > 0) {
     try {
       const statsRows = await db(TABLES.PACKAGE_SLOT_DAILY_LOGS)
         .whereIn("package_product_id", pkgIds)
@@ -179,7 +179,7 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
   // Lấy các đơn nhập hàng MAVN khớp theo tài khoản (cả đơn active hôm nay và đơn mới nhất)
   let mavnOrderByAccount = new Map();
   let latestMavnByAccount = new Map();
-  if (targetAccounts.length > 0) {
+  if (!usageOnly && targetAccounts.length > 0) {
     try {
       const allMavnOrders = await db(TABLES.ORDER_LIST)
         .where("id_order", "ilike", "MAVN%")
@@ -297,6 +297,7 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
       else standaloneKeys += 1;
     }
     const usedSlots = Math.min(totalSlots, new Set([...matchedCodes, ...assignedCodes]).size + standaloneKeys);
+    if (usageOnly) return { warehouseSlotId: Number(r.warehouse_slot_id), usedSlots, totalSlots };
 
     const slotAssignments = matchingOrders.map((ord, idx) => {
       const v = ord.id_product ? variantMap.get(String(ord.id_product)) : null;

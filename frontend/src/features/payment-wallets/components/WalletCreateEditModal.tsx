@@ -1,5 +1,6 @@
 import React from "react";
 import { Building2, Wallet, XCircle, Loader2 } from "lucide-react";
+import { CustomSelect, ToggleSwitch } from "@/shared/components";
 import { PaymentTabKey, BankAccountItem, UsdtWalletItem, WalletFormData } from "../types";
 
 interface WalletCreateEditModalProps {
@@ -40,8 +41,7 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
 }) => {
   if (!open) return null;
 
-  const handleBankSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedName = e.target.value;
+  const handleBankSelect = (selectedName: string) => {
     const found = POPULAR_BANKS.find((b) => b.name === selectedName);
     if (found) {
       onFormChange({
@@ -55,7 +55,7 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-150">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar shadow-2xl animate-in fade-in zoom-in duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             {activeTab === "bank" ? <Building2 className="w-5 h-5 text-cyan-400" /> : <Wallet className="w-5 h-5 text-purple-400" />}
@@ -69,7 +69,7 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           {activeTab === "bank" ? (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Số Tài Khoản (STK) *</label>
                   <input
@@ -94,20 +94,20 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
-                  <select
+                  <CustomSelect
                     value={formData.bankDisplayName}
                     onChange={handleBankSelect}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
-                  >
-                    {POPULAR_BANKS.map((b) => (
-                      <option key={b.shortCode} value={b.name}>
-                        {b.name} ({b.shortCode})
-                      </option>
-                    ))}
-                  </select>
+                    size="sm"
+                    accent="cyan"
+                    className="bg-slate-950"
+                    options={POPULAR_BANKS.map((b) => ({
+                      value: b.name,
+                      label: `${b.name} (${b.shortCode})`,
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -138,14 +138,18 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Phạm Vi Tài Khoản</label>
-                <select
+                <CustomSelect
                   value={formData.accountScope || "SHOP"}
-                  onChange={(e) => onFormChange({ ...formData, accountScope: e.target.value as "SHOP" | "PERSONAL" })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none"
-                >
-                  <option value="SHOP">🏢 Tài khoản kinh doanh Shop (Nhận tiền, thanh toán đơn)</option>
-                  <option value="PERSONAL">💳 Tài khoản / Ngân hàng cá nhân (Cash Bank / Thanh khoản)</option>
-                </select>
+                  onChange={(val) => onFormChange({ ...formData, accountScope: val as "SHOP" | "PERSONAL" })}
+                  size="sm"
+                  accent="cyan"
+                  searchable={false}
+                  className="bg-slate-950"
+                  options={[
+                    { value: "SHOP", label: "🏢 Tài khoản kinh doanh Shop (Nhận tiền, thanh toán đơn)" },
+                    { value: "PERSONAL", label: "💳 Tài khoản / Ngân hàng cá nhân (Cash Bank / Thanh khoản)" },
+                  ]}
+                />
               </div>
             </>
           ) : (
@@ -162,19 +166,23 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Mạng Lưới (Network)</label>
-                  <select
+                  <CustomSelect
                     value={formData.network}
-                    onChange={(e) => onFormChange({ ...formData, network: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="TRC20">TRC20 (Tron Network)</option>
-                    <option value="BEP20">BEP20 (Binance Smart Chain)</option>
-                    <option value="ERC20">ERC20 (Ethereum)</option>
-                    <option value="POLYGON">POLYGON (Polygon)</option>
-                  </select>
+                    onChange={(val) => onFormChange({ ...formData, network: val })}
+                    size="sm"
+                    accent="purple"
+                    searchable={false}
+                    className="bg-slate-950"
+                    options={[
+                      { value: "TRC20", label: "TRC20 (Tron Network)" },
+                      { value: "BEP20", label: "BEP20 (Binance Smart Chain)" },
+                      { value: "ERC20", label: "ERC20 (Ethereum)" },
+                      { value: "POLYGON", label: "POLYGON (Polygon)" },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Nhãn / Ghi chú</label>
@@ -190,25 +198,21 @@ export const WalletCreateEditModal: React.FC<WalletCreateEditModalProps> = ({
             </>
           )}
 
-          <div className="flex items-center gap-6 pt-2">
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.isDefault}
-                onChange={(e) => onFormChange({ ...formData, isDefault: e.target.checked })}
-                className="rounded border-slate-700 text-cyan-500 focus:ring-0"
-              />
-              <span>Đặt làm mặc định</span>
-            </label>
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.isActive}
-                onChange={(e) => onFormChange({ ...formData, isActive: e.target.checked })}
-                className="rounded border-slate-700 text-emerald-500 focus:ring-0"
-              />
-              <span>Kích hoạt (Bật nhận tiền)</span>
-            </label>
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-2">
+            <ToggleSwitch
+              checked={formData.isDefault}
+              onChange={(checked) => onFormChange({ ...formData, isDefault: checked })}
+              label="Đặt làm mặc định"
+              variant="cyan"
+              size="sm"
+            />
+            <ToggleSwitch
+              checked={formData.isActive}
+              onChange={(checked) => onFormChange({ ...formData, isActive: checked })}
+              label="Kích hoạt (Bật nhận tiền)"
+              variant="emerald"
+              size="sm"
+            />
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">

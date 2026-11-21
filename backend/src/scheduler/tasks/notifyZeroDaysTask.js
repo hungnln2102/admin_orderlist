@@ -1,10 +1,11 @@
-const { db, TABLES } = require("@/db");
+const { db, TABLES, COLS } = require("@/db");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const systemConfigService = require("@/domains/system/services/systemConfigService");
 const { withAdvisoryLock } = require("../withAdvisoryLock");
 const { notifyZeroDaysRemaining } = require("@/domains/notifications/telegram/dispatchers/orderNotifier");
 
 const TARGET_TABLE = TABLES.ORDER_LIST;
+const ORDER = COLS.ORDER_LIST;
 
 /**
  * Task rà soát & thông báo cho các đơn hàng đúng 0 ngày còn lại (Hết hạn trong ngày)
@@ -30,12 +31,13 @@ async function notifyZeroDaysTask(trigger = "cron") {
       const todaySql = "(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date";
 
       const result = await db.raw(`
-        SELECT *, (expired_at::date - ${todaySql}) AS days_left
-        FROM ${TARGET_TABLE}
-        WHERE (expired_at::date - ${todaySql}) = 0
-          AND status = ?
-        ORDER BY id DESC;
-      `, [ORDER_STATUS.RENEW_REQUIRED]);
+        SELECT *, 0 AS days_left
+        FROM ??
+        WHERE ?? >= (${todaySql}::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')
+          AND ?? < ((${todaySql} + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')
+          AND ?? = ?
+        ORDER BY ?? DESC;
+      `, [TARGET_TABLE, ORDER.EXPIRED_AT, ORDER.EXPIRED_AT, ORDER.STATUS, ORDER_STATUS.RENEW_REQUIRED, ORDER.ID]);
 
       const orders = result.rows || [];
       console.log(`[CRON 0-DAYS] Tìm thấy ${orders.length} đơn hàng đúng 0 ngày còn lại.`);

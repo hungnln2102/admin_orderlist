@@ -1,5 +1,6 @@
 import React from "react";
 import { Clock, History, X } from "lucide-react";
+import { DateInputVN } from "@/shared/components";
 import type { PackageFinancialItem, SlotDailyLogItem } from "./warehouseFinanceTypes";
 
 interface WarehouseFinanceLedgerProps {
@@ -48,20 +49,24 @@ export function WarehouseFinanceLedger(props: WarehouseFinanceLedgerProps) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5 text-xs">
                 {/* Lọc theo ngày cụ thể */}
-                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-                  <span className="text-slate-500 text-[11px] font-semibold">Ngày:</span>
-                  <input
-                    type="date"
-                    value={logFilterDate}
-                    onChange={(e) => {
-                      setLogFilterDate(e.target.value);
-                      setLogFilterFromDate("");
-                      setLogFilterToDate("");
-                    }}
-                    className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer"
-                  />
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1">
+                  <span className="text-slate-500 text-[11px] font-semibold shrink-0">Ngày:</span>
+                  <div className="w-36">
+                    <DateInputVN
+                      value={logFilterDate}
+                      onChange={(iso) => {
+                        setLogFilterDate(iso);
+                        setLogFilterFromDate("");
+                        setLogFilterToDate("");
+                      }}
+                      placeholder="dd/mm/yyyy"
+                      focusBorderClass="focus:border-cyan-500"
+                      className="border-0 bg-transparent px-1 py-1"
+                    />
+                  </div>
                   {logFilterDate && (
                     <button
+                      type="button"
                       onClick={() => setLogFilterDate("")}
                       className="text-slate-500 hover:text-white ml-1 cursor-pointer"
                     >
@@ -71,27 +76,33 @@ export function WarehouseFinanceLedger(props: WarehouseFinanceLedgerProps) {
                 </div>
 
                 {/* Hoặc Lọc theo khoảng ngày (From - To) */}
-                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-                  <span className="text-slate-500 text-[11px] font-semibold">Từ:</span>
-                  <input
-                    type="date"
-                    value={logFilterFromDate}
-                    onChange={(e) => {
-                      setLogFilterFromDate(e.target.value);
-                      setLogFilterDate("");
-                    }}
-                    className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer"
-                  />
-                  <span className="text-slate-500 text-[11px] font-semibold">Đến:</span>
-                  <input
-                    type="date"
-                    value={logFilterToDate}
-                    onChange={(e) => {
-                      setLogFilterToDate(e.target.value);
-                      setLogFilterDate("");
-                    }}
-                    className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer"
-                  />
+                <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1">
+                  <span className="text-slate-500 text-[11px] font-semibold shrink-0">Từ:</span>
+                  <div className="w-36">
+                    <DateInputVN
+                      value={logFilterFromDate}
+                      onChange={(iso) => {
+                        setLogFilterFromDate(iso);
+                        setLogFilterDate("");
+                      }}
+                      placeholder="dd/mm/yyyy"
+                      focusBorderClass="focus:border-cyan-500"
+                      className="border-0 bg-transparent px-1 py-1"
+                    />
+                  </div>
+                  <span className="text-slate-500 text-[11px] font-semibold shrink-0">Đến:</span>
+                  <div className="w-36">
+                    <DateInputVN
+                      value={logFilterToDate}
+                      onChange={(iso) => {
+                        setLogFilterToDate(iso);
+                        setLogFilterDate("");
+                      }}
+                      placeholder="dd/mm/yyyy"
+                      focusBorderClass="focus:border-cyan-500"
+                      className="border-0 bg-transparent px-1 py-1"
+                    />
+                  </div>
                   {(logFilterFromDate || logFilterToDate) && (
                     <button
                       onClick={() => {

@@ -1,3 +1,9 @@
+## 2026-11-21 – Ban hành Nguyên Tắc 8 vào Hiến Pháp & Thiết lập Kho Thư Viện Dùng Chung (Design System SSOT)
+
+- [x] Ban hành Nguyên Tắc 8 (Kho Thư Viện Dùng Chung Bắt Buộc) vào AGENTS.md, .agents/AGENTS.md, .agents/rules/AGENTS.md và skill frontend-lead.
+- [x] Xây dựng Cẩm nang thư viện sống COMPONENT_LIBRARY.md và frontend/src/shared/README.md.
+- [x] Đóng gói ToggleSwitch, CopyButton, QuickDateAddButtons vào frontend/src/shared/components/ và export tại index.ts; nâng cấp hook useClipboard.ts tự động reset. Tái sử dụng trực tiếp trong SlotProviderControls. Build pass 100% trong 4.44s.
+
 ## 2026-11-21 – Thiết kế lại modal Thêm Tài Khoản Kho Mới sang dạng Form Ngang 2 Cột
 
 - [x] Tái thiết kế modal "Thêm Tài Khoản Kho Mới" (WarehouseCreateModal.tsx) sang dạng form ngang 2 cột rộng rãi (max-w-5xl đến max-w-6xl) theo đúng khung viền đỏ của Master. Tích hợp Switch Toggle trượt On/Off và phân bổ 2 cột cân xứng. Frontend build pass 100% trong 4.45s.
@@ -593,4 +599,40 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] Tự xác định trạng thái theo liên kết gói và bỏ chỉnh trạng thái thủ công.
 
+## Tối ưu backend
+
+- [x] Triển khai gom truy vấn giá và giảm truy vấn phụ khi lấy mức sử dụng slot. Đối chiếu dữ liệu local và chạy 24 unit test mục tiêu.
+- [ ] Nghiệm thu integration thanh toán, đo outbox và thực hiện các đợt backend còn lại theo blueprint.
+- [x] Xử lý lỗi từng event khi phát lại outbox và kiểm tra hồi quy bằng unit test.
+- [x] Đo thời gian chờ callback sau commit và chạy 7 kịch bản integration credit/webhook trên PostgreSQL kiểm thử.
+- [x] Phát lại toàn bộ backlog theo lô và xác minh 125 sự kiện qua ba tiến trình Node riêng.
+- [x] Chặn hai tiến trình phát đồng thời cùng một event outbox và xác minh trên PostgreSQL kiểm thử.
+- [x] Tách chốt số dư và quỹ tiết kiệm khỏi Finance Hub. Kiểm tra API export, báo cáo tháng/năm và integration snapshot.
+- [x] Tách routing slot và gia hạn đơn. Kiểm tra 18 ca mục tiêu, gia hạn đơn bán và nạp/rút quỹ trên DB kiểm thử.
+- [x] Giới hạn bộ đệm SSE khi client đọc chậm và dùng khoảng ngày nghiệp vụ cho truy vấn nhắc hết hạn.
+- [x] Nghiệm thu hoàn tất thanh toán gộp và gia hạn đơn nhập đồng bộ slot Kho trên PostgreSQL kiểm thử.
+
 - [x] Hiển thị tag theo slot trên desktop và mobile, bỏ giá trị lấy từ danh mục.
+
+- [x] Cấu hình marketplace Codex, cài plugin Admin Orderlist và xác thực 7 tệp TOML cho custom agent.
+
+
+## Tái cấu trúc Frontend (FE-01 đến FE-08)
+
+- [x] FE-01–03: Chuẩn hóa UI Kho (`WarehouseCreateModal`, `WarehouseEditSlotModal`, `WarehouseAccountsTable`, `WarehouseSlotSubTable`) dùng `ToggleSwitch`, `CopyButton`, `QuickDateAddButtons`, `DateInputVN`.
+- [x] FE-04–06: Chuẩn hóa Form Ngang 2 cột + `CurrencyInputVN` + `ToggleSwitch` cho `FixedCostModal`, `InstallmentModal`, `SavingFundModal`.
+- [x] FE-07: Thay `toLocaleString` thủ công bằng `formatCurrency`/`formatNumber` tại `PayWithCreditModal`, `DashboardPage`, `ReceiptsPage`.
+- [x] FE-08: Lazy-load 3 modal Biên lai trong `ReceiptsPage.tsx` (giảm chunk ban đầu từ 238,60 kB xuống 59,93 kB). `tsc && vite build` đạt 0 lỗi (4,55s).
+- [x] FE-09: Tối ưu tải danh sách (`useWarehouseData` lazy-load `system-products`; `useOrders` gửi `includeStats: false` khi chỉ đổi trang).
+- [x] FE-10 & FE-08 mở rộng: Tách `useWarehouseData.ts` khỏi `WarehousePage.tsx`, lazy-load toàn bộ modal của Kho (`314,16 kB → 109,07 kB`) và Đơn hàng (`195,22 kB → 83,55 kB`).
+- [x] FE-11: Đóng gói `SearchableCombobox` vào `@/shared/components`, cập nhật `COMPONENT_LIBRARY.md` và thay thế `AccountCombobox` inline trong `PackageCreateEditModal.tsx`. `tsc && vite build` đạt 0 lỗi (4,71s).
+
+## Responsive Mobile/Tablet & Design System SSOT (Ưu tiên 1 + 2)
+
+- [x] Đóng gói `<BaseModal />` vào `@/shared/components` và cập nhật `COMPONENT_LIBRARY.md`.
+- [x] Chuẩn hóa responsive `max-h-[92vh] overflow-y-auto`, `grid-cols-1 sm:grid-cols-2` và header `flex-wrap` trên 15+ modal/trang nhập liệu trọng yếu & `NotificationModal`.
+- [x] Dọn sạch 100% raw `<input type="date">` ngoài `shared/` sang `<DateInputVN />` (10 → 0) và nâng cấp checkbox sang `<ToggleSwitch />` tại `WalletCreateEditModal`, `BalanceSnapshotModal`, `WarehouseEditSlotModal`. `tsc && vite build` đạt 0 lỗi (4,49s).
+
+- [x] Sửa parser VPBank và đối soát lại bản ghi #602.
+- [x] Đóng gói `<CustomSelect />` vào `@/shared/components` (React Portal, auto-flip, keyboard + search) và thay sạch 100% `<select>` gốc phân hệ Kho Hàng (`0` còn sót), cùng `FixedCostModal`, `WalletCreateEditModal`, `ReceiptsPage`.
+- [x] Thay nốt toàn bộ 7 checkbox On/Off còn lại sang `<ToggleSwitch />` (chỉ còn 1 checkbox multi-select dòng đơn trong `CreateReceiptModal`). `tsc && vite build` đạt 0 lỗi (4,74s).

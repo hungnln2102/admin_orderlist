@@ -165,7 +165,7 @@ export const SystemPage: React.FC = () => {
             <Settings className="w-8 h-8 animate-spin-slow" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex flex-wrap items-center gap-2 sm:gap-3">
               Cấu Hình Hệ Thống (System Configs)
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">
                 V2 Enterprise

@@ -1,5 +1,6 @@
 import React from "react";
 import { Sparkles, Search, Plus, Eye, Trash2 } from "lucide-react";
+import { ToggleSwitch } from "@/shared/components";
 import { ThemeDateRule, ThemeScheduleConfig } from "../../../shared/utils/themeSchedule";
 import { RuleCalendarFilter, ThemeItem } from "../types";
 
@@ -151,11 +152,11 @@ export const HolidayRulesTable: React.FC<HolidayRulesTableProps> = ({
                     }`}
                   >
                     <td className="p-2.5 text-center">
-                      <input
-                        type="checkbox"
+                      <ToggleSwitch
                         checked={rule.enabled}
-                        onChange={(e) => updateHolidayRule(rule.id, { enabled: e.target.checked })}
-                        className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-400 cursor-pointer"
+                        onChange={(checked) => updateHolidayRule(rule.id, { enabled: checked })}
+                        variant="rose"
+                        size="sm"
                         title={rule.enabled ? "Đang bật" : "Đang tắt"}
                       />
                     </td>

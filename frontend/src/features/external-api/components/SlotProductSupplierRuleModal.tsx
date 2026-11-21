@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Layers, Sliders, X } from "lucide-react";
+import { ToggleSwitch } from "@/shared/components";
 import type {
   PortalSlotItem,
   PortalSlotRoutingRule,
@@ -389,7 +390,12 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
             <div><span className="text-xs font-bold text-slate-200">Kích hoạt các liên kết này</span><p className="text-[11px] text-slate-500">On/Off từng variant vẫn chỉnh được ở bảng sau khi lưu.</p></div>
-            <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="h-5 w-5 accent-cyan-400" />
+            <ToggleSwitch
+              checked={isActive}
+              onChange={setIsActive}
+              variant="cyan"
+              size="md"
+            />
           </div>
 
           <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">

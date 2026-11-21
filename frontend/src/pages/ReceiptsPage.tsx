@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import {
   Receipt,
   Search,
@@ -22,12 +22,26 @@ import {
   Link2,
   Layers,
 } from "lucide-react";
-import { AllocateReceiptModal } from "../features/invoices/components/AllocateReceiptModal";
-import { CreateReceiptModal } from "../features/invoices/components/CreateReceiptModal";
-import { PendingBatchesModal } from "../features/invoices/components/PendingBatchesModal";
 import { useUrlPagination } from "@/shared/hooks/useUrlPagination";
-import { TablePagination } from "@/shared/components/TablePagination";
+import { CustomSelect, TablePagination } from "@/shared/components";
 import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
+import { formatCurrency, formatNumber } from "@/shared/utils";
+
+const AllocateReceiptModal = lazy(() =>
+  import("../features/invoices/components/AllocateReceiptModal").then((m) => ({
+    default: m.AllocateReceiptModal,
+  }))
+);
+const CreateReceiptModal = lazy(() =>
+  import("../features/invoices/components/CreateReceiptModal").then((m) => ({
+    default: m.CreateReceiptModal,
+  }))
+);
+const PendingBatchesModal = lazy(() =>
+  import("../features/invoices/components/PendingBatchesModal").then((m) => ({
+    default: m.PendingBatchesModal,
+  }))
+);
 
 interface InvoiceAllocation {
   id: number;
@@ -180,9 +194,6 @@ export const ReceiptsPage: React.FC = () => {
     resetPage();
   };
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat("vi-VN").format(val) + " ₫";
-
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
@@ -216,7 +227,7 @@ export const ReceiptsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => setIsPendingBatchesOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 text-xs font-semibold rounded-xl border border-cyan-500/30 hover:border-cyan-500/60 transition-all shadow-sm active:scale-95 cursor-pointer"
@@ -267,7 +278,7 @@ export const ReceiptsPage: React.FC = () => {
               TỔNG BIÊN LAI ĐƠN
             </span>
             <div className="text-2xl font-bold text-slate-100 mt-1">
-              {tabCounts.orders.toLocaleString("vi-VN")}{" "}
+              {formatNumber(tabCounts.orders)}{" "}
               <span className="text-xs text-slate-400 font-normal">biên lai</span>
             </div>
             <div className="text-[11.5px] text-emerald-400 flex items-center gap-1 mt-1">
@@ -294,7 +305,7 @@ export const ReceiptsPage: React.FC = () => {
               CHƯA ĐƯỢC LIỆT KÊ
             </span>
             <div className="text-2xl font-bold text-cyan-300 mt-1">
-              {tabCounts.unlisted.toLocaleString("vi-VN")}{" "}
+              {formatNumber(tabCounts.unlisted)}{" "}
               <span className="text-xs text-slate-400 font-normal">biên lai</span>
             </div>
             <div className="text-[11.5px] text-cyan-400 flex items-center gap-1 mt-1">
@@ -321,7 +332,7 @@ export const ReceiptsPage: React.FC = () => {
               CHI PHÍ & NGOÀI LUỒNG
             </span>
             <div className="text-2xl font-bold text-purple-300 mt-1">
-              {tabCounts.other.toLocaleString("vi-VN")}{" "}
+              {formatNumber(tabCounts.other)}{" "}
               <span className="text-xs text-slate-400 font-normal">biên lai</span>
             </div>
             <div className="text-[11.5px] text-purple-400 flex items-center gap-1 mt-1">
@@ -351,20 +362,26 @@ export const ReceiptsPage: React.FC = () => {
 
         {/* Transfer Type Filter */}
         <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-          <div className="flex items-center gap-1.5 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                resetPage();
-              }}
-              className="bg-transparent text-xs text-slate-300 font-medium focus:outline-none cursor-pointer"
-            >
-              <option value="all" className="bg-slate-900">Bộ lọc tất cả</option>
-              <option value="in" className="bg-slate-900">Tiền Vào (Khách chuyển)</option>
-              <option value="out" className="bg-slate-900">Tiền Ra (Chi phí / NCC)</option>
-            </select>
+          <div className="flex items-center gap-1.5 bg-slate-950/60 px-2.5 py-1 rounded-xl border border-slate-800">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="min-w-[185px]">
+              <CustomSelect
+                value={typeFilter}
+                onChange={(val) => {
+                  setTypeFilter(val);
+                  resetPage();
+                }}
+                size="sm"
+                accent="cyan"
+                searchable={false}
+                className="border-0 bg-transparent py-1 px-1.5"
+                options={[
+                  { value: "all", label: "Bộ lọc tất cả" },
+                  { value: "in", label: "Tiền Vào (Khách chuyển)" },
+                  { value: "out", label: "Tiền Ra (Chi phí / NCC)" },
+                ]}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -865,27 +882,33 @@ export const ReceiptsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Allocate Receipt Modal */}
-      <AllocateReceiptModal
-        receipt={allocatingReceipt}
-        isOpen={!!allocatingReceipt}
-        onClose={() => setAllocatingReceipt(null)}
-        onSuccess={fetchInvoices}
-      />
+      {/* Lazy-loaded Modals (FE-08) */}
+      <Suspense fallback={null}>
+        {allocatingReceipt && (
+          <AllocateReceiptModal
+            receipt={allocatingReceipt}
+            isOpen={!!allocatingReceipt}
+            onClose={() => setAllocatingReceipt(null)}
+            onSuccess={fetchInvoices}
+          />
+        )}
 
-      {/* Create Receipt & VietQR Modal */}
-      <CreateReceiptModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={fetchInvoices}
-      />
+        {isCreateModalOpen && (
+          <CreateReceiptModal
+            isOpen={isCreateModalOpen}
+            onClose={() => setIsCreateModalOpen(false)}
+            onSuccess={fetchInvoices}
+          />
+        )}
 
-      {/* Pending Batches Management Modal */}
-      <PendingBatchesModal
-        isOpen={isPendingBatchesOpen}
-        onClose={() => setIsPendingBatchesOpen(false)}
-        onRefresh={fetchInvoices}
-      />
+        {isPendingBatchesOpen && (
+          <PendingBatchesModal
+            isOpen={isPendingBatchesOpen}
+            onClose={() => setIsPendingBatchesOpen(false)}
+            onRefresh={fetchInvoices}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

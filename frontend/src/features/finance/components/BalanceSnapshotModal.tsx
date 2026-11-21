@@ -1,6 +1,7 @@
 import React from "react";
 import { Landmark, Loader2, Plus, Trash2, Wallet, XCircle } from "lucide-react";
 import { formatVND } from "@/shared/utils";
+import { DateInputVN, ToggleSwitch } from "@/shared/components";
 
 export interface BalanceSnapshotFormItem {
   id?: string;
@@ -71,12 +72,11 @@ export const BalanceSnapshotModal: React.FC<BalanceSnapshotModalProps> = ({
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                   Ngày Chốt
                 </label>
-                <input
-                  type="date"
+                <DateInputVN
                   value={formDate}
-                  onChange={(e) => onFormDateChange(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:outline-none focus:border-cyan-500"
+                  onChange={onFormDateChange}
+                  placeholder="dd/mm/yyyy"
+                  focusBorderClass="focus:border-cyan-500"
                 />
               </div>
 
@@ -178,24 +178,22 @@ export const BalanceSnapshotModal: React.FC<BalanceSnapshotModalProps> = ({
                 </span>
               </div>
 
-              {/* Checkbox Đồng bộ 2 chiều cho tài sản cá nhân */}
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formAutoSync}
-                    onChange={(e) => onAutoSyncChange(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-700 text-emerald-500 focus:ring-0 cursor-pointer"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-white block">
-                      Tự động đồng bộ vào số dư hiện thời
-                    </span>
-                    <span className="text-[11px] text-slate-400 block mt-0.5">
-                      Cập nhật luôn số dư hiện tại trong danh mục tài sản cá nhân và chỉ số Net Worth.
-                    </span>
-                  </div>
-                </label>
+              {/* Công tắc Đồng bộ 2 chiều cho tài sản cá nhân */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    Tự động đồng bộ vào số dư hiện thời
+                  </span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    Cập nhật luôn số dư hiện tại trong danh mục tài sản cá nhân và chỉ số Net Worth.
+                  </span>
+                </div>
+                <ToggleSwitch
+                  checked={formAutoSync}
+                  onChange={onAutoSyncChange}
+                  variant="emerald"
+                  size="md"
+                />
               </div>
 
               {/* Actions */}

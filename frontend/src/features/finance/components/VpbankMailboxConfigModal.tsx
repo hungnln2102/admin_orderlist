@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { GlassCard } from "@/shared/components/GlassCard";
+import { GlassCard, ToggleSwitch } from "@/shared/components";
 import { useNotification } from "@/shared/context/NotificationContext";
 import {
   Mail,
@@ -215,15 +215,12 @@ export const VpbankMailboxConfigModal: React.FC<Props> = ({ isOpen, onClose, onS
                   </span>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-pink-500 peer-checked:to-rose-500"></div>
-              </label>
+              <ToggleSwitch
+                checked={isActive}
+                onChange={setIsActive}
+                variant="rose"
+                size="sm"
+              />
             </div>
 
             {/* 2. Tài khoản Gmail */}

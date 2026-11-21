@@ -1,4 +1,5 @@
 import React from "react";
+import { CopyButton } from "@/shared/components";
 import {
   Copy,
   Check,
@@ -289,29 +290,21 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                           <span className="font-mono text-xs text-indigo-200 tracking-wider bg-slate-900/90 px-2 py-0.5 rounded border border-white/10 select-all">
                             {format2FAChunks(srv.two_fa)}
                           </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          <CopyButton
+                            text={srv.two_fa}
+                            copiedLabel=""
+                            itemKey={`2fa_${srv.id}`}
+                            size="xs"
+                            variant="ghost"
+                            title="Sao chép 2FA"
+                            onCopied={() =>
                               onCopy(
                                 srv.two_fa!,
                                 "Mã 2FA",
                                 `2fa_${srv.id}`
-                              );
-                            }}
-                            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                            title={
-                              copiedKeyMap[`2fa_${srv.id}`]
-                                ? "Đã sao chép"
-                                : "Sao chép 2FA"
+                              )
                             }
-                          >
-                            {copiedKeyMap[`2fa_${srv.id}`] ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                          />
                         </div>
                       ) : (
                         <span className="text-slate-500">—</span>

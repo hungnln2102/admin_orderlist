@@ -30,17 +30,28 @@ class RealtimeStreamService {
       timestamp: Date.now(),
       message: "Kết nối Realtime SSE thành công",
     });
-    res.write(`data: ${initialPayload}\n\n`);
 
     // 3. Lưu client vào danh sách hoạt động
     this.clients.add(res);
+    if (!this.writeToClient(res, `data: ${initialPayload}\n\n`)) return;
     console.log(`📡 [RealtimeSSE] Client kết nối thành công. Tổng clients online: ${this.clients.size}`);
 
     // 4. Lắng nghe sự kiện ngắt kết nối khi Admin đóng tab hoặc rớt mạng
-    req.on("close", () => {
+    res.on("close", () => {
       this.clients.delete(res);
       console.log(`📡 [RealtimeSSE] Client đã ngắt kết nối. Còn lại: ${this.clients.size}`);
     });
+  }
+
+  writeToClient(client, message) {
+    try {
+      if (client.write(message)) return true;
+    } catch (error) {
+      console.error("[RealtimeSSE] Write failed:", error.message);
+    }
+    this.clients.delete(client);
+    client.destroy();
+    return false;
   }
 
   /**
@@ -59,12 +70,7 @@ class RealtimeStreamService {
     const message = `data: ${data}\n\n`;
 
     for (const client of this.clients) {
-      try {
-        client.write(message);
-      } catch (err) {
-        console.error("[RealtimeSSE] Lỗi gửi dữ liệu tới client, dọn dẹp:", err.message);
-        this.clients.delete(client);
-      }
+      this.writeToClient(client, message);
     }
   }
 
@@ -78,11 +84,7 @@ class RealtimeStreamService {
       if (this.clients.size === 0) return;
       const ping = `: keep-alive\n\n`;
       for (const client of this.clients) {
-        try {
-          client.write(ping);
-        } catch {
-          this.clients.delete(client);
-        }
+        this.writeToClient(client, ping);
       }
     }, 20000);
   }

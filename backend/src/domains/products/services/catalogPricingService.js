@@ -61,7 +61,7 @@ async function findCatalogVariant(queryDb, order) {
   return null;
 }
 
-async function resolveOrderCatalogPricing(queryDb, order) {
+async function resolveOrderCatalogPricing(queryDb, order, batch) {
   if (!order) {
     return {
       catalogBasePrice: 0,
@@ -88,7 +88,7 @@ async function resolveOrderCatalogPricing(queryDb, order) {
   }
 
   const dbClient = queryDb || db;
-  const variant = await findCatalogVariant(dbClient, order);
+  const variant = batch ? await batch.findVariant(order) : await findCatalogVariant(dbClient, order);
   const fallbackCost = Number(order?.[O_COLS.COST] || 0);
 
   if (!variant) {
@@ -103,7 +103,7 @@ async function resolveOrderCatalogPricing(queryDb, order) {
     };
   }
 
-  const prices = await dbClient(TABLES.VARIANT_PRICE)
+  const prices = batch ? batch.prices.get(String(variant[V_COLS.ID])) : await dbClient(TABLES.VARIANT_PRICE)
     .where({ [VP_COLS.VARIANT_ID]: variant[V_COLS.ID] });
   const catalogBasePrice = selectCatalogPrice(prefix, variant, Array.isArray(prices) ? prices : []) || getFallbackPrice(order);
 
@@ -112,15 +112,18 @@ async function resolveOrderCatalogPricing(queryDb, order) {
   let resolvedSupplierId = order?.[O_COLS.SUPPLY_ID] ? Number(order[O_COLS.SUPPLY_ID]) : null;
 
   try {
-    let scQuery = dbClient(TABLES.SUPPLIER_COST).where({ [SC_COLS.VARIANT_ID]: variant[V_COLS.ID] });
-    if (resolvedSupplierId && typeof scQuery.andWhere === "function") {
+    let scQuery = batch ? null : dbClient(TABLES.SUPPLIER_COST).where({ [SC_COLS.VARIANT_ID]: variant[V_COLS.ID] });
+    if (resolvedSupplierId && scQuery && typeof scQuery.andWhere === "function") {
       scQuery = scQuery.andWhere({ [SC_COLS.SUPPLIER_ID]: resolvedSupplierId });
-    } else if (typeof scQuery.orderBy === "function") {
+    } else if (scQuery && typeof scQuery.orderBy === "function") {
       scQuery = scQuery.orderBy(SC_COLS.PRICE, "asc");
     }
 
-    if (scQuery && typeof scQuery.first === "function") {
-      const supplierCostRow = await scQuery.first();
+    if (batch || (scQuery && typeof scQuery.first === "function")) {
+      const costs = batch?.costs.get(String(variant[V_COLS.ID])) || [];
+      const supplierCostRow = batch
+        ? (resolvedSupplierId ? costs.find((row) => Number(row[SC_COLS.SUPPLIER_ID]) === resolvedSupplierId) : costs[0])
+        : await scQuery.first();
       if (supplierCostRow && Number.isFinite(Number(supplierCostRow[SC_COLS.PRICE]))) {
         catalogCostPrice = Number(supplierCostRow[SC_COLS.PRICE]);
         if (!resolvedSupplierId) {
@@ -144,9 +147,48 @@ async function resolveOrderCatalogPricing(queryDb, order) {
   };
 }
 
+function groupByVariant(rows, column) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const id = String(row[column]);
+    if (!grouped.has(id)) grouped.set(id, []);
+    grouped.get(id).push(row);
+  }
+  return grouped;
+}
+
 async function resolveOrdersWithCatalogPrices(queryDb, orders = []) {
-  return Promise.all((orders || []).map(async (order) => {
-    const pricing = await resolveOrderCatalogPricing(queryDb, order);
+  if (!orders?.length) return [];
+  const client = queryDb || db;
+  const billable = orders.filter((order) => getOrderPrefix(order[O_COLS.ID_ORDER]) !== "MAVT");
+  const ids = [...new Set(billable.map((order) => Number(order[O_COLS.ID_PRODUCT]))
+    .filter((id) => Number.isFinite(id) && id > 0))];
+  const variants = ids.length ? await client(TABLES.VARIANT).whereIn(V_COLS.ID, ids) : [];
+  const byId = new Map(variants.map((row) => [Number(row[V_COLS.ID]), row]));
+  const legacy = new Map();
+  const resolved = new Map();
+  for (const order of billable) {
+    let variant = byId.get(Number(order[O_COLS.ID_PRODUCT]));
+    if (!variant) {
+      const key = JSON.stringify([order[O_COLS.ID_PRODUCT], order[O_COLS.INFORMATION_ORDER]]);
+      if (!legacy.has(key)) legacy.set(key, await findCatalogVariant(client, order));
+      variant = legacy.get(key);
+    }
+    resolved.set(order, variant);
+  }
+
+  const matchedIds = [...new Set([...resolved.values()].filter(Boolean).map((row) => row[V_COLS.ID]))];
+  const [prices, costs] = matchedIds.length ? await Promise.all([
+    client(TABLES.VARIANT_PRICE).whereIn(VP_COLS.VARIANT_ID, matchedIds),
+    client(TABLES.SUPPLIER_COST).whereIn(SC_COLS.VARIANT_ID, matchedIds).orderBy(SC_COLS.PRICE, "asc"),
+  ]) : [[], []];
+  const batch = {
+    findVariant: (order) => resolved.get(order),
+    prices: groupByVariant(prices, VP_COLS.VARIANT_ID),
+    costs: groupByVariant(costs, SC_COLS.VARIANT_ID),
+  };
+  return Promise.all(orders.map(async (order) => {
+    const pricing = await resolveOrderCatalogPricing(client, order, batch);
     return {
       ...order,
       orderPrefix: getOrderPrefix(order[O_COLS.ID_ORDER]),

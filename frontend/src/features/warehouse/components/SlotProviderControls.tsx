@@ -1,4 +1,5 @@
 import { AVAILABLE_OTP_PROVIDERS } from "../providerConstants";
+import { CustomSelect, ToggleSwitch } from "@/shared/components";
 
 interface Props {
   label: string;
@@ -31,41 +32,33 @@ export function SlotProviderControls({
     >
       <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-200">
         <span className="font-semibold text-slate-200">{label}</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          onClick={() => onToggle(!enabled)}
-          className={`w-10 h-[22px] rounded-full transition-colors relative cursor-pointer focus:outline-none shrink-0 ${
-            enabled ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]" : "bg-slate-800 border border-slate-700/60"
-          }`}
-          title={`${enabled ? "Đang bật" : "Đang tắt"} - Bấm để chuyển`}
-        >
-          <span
-            className={`absolute top-[2px] left-[2px] bg-white w-[18px] h-[18px] rounded-full shadow-md transition-transform duration-200 ease-in-out ${
-              enabled ? "translate-x-[18px]" : "translate-x-0"
-            }`}
-          />
-        </button>
+        <ToggleSwitch
+          checked={enabled}
+          onChange={onToggle}
+          variant="cyan"
+          size="md"
+        />
       </div>
 
       {enabled && (
-        <select
-          aria-label={label}
+        <CustomSelect
+          ariaLabel={label}
           value={provider}
-          onChange={(event) => onProviderChange(event.target.value)}
-          className="w-full rounded-xl border border-slate-700/80 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer"
-        >
-          <option value="">Tự động điều phối</option>
-          {provider && !options.some(({ value }) => value === provider) && (
-            <option value={provider}>{provider}</option>
-          )}
-          {options.map(({ value, label: name }) => (
-            <option key={value} value={value}>
-              {name}
-            </option>
-          ))}
-        </select>
+          onChange={onProviderChange}
+          size="sm"
+          accent="cyan"
+          className="bg-slate-950"
+          options={[
+            { value: "", label: "Tự động điều phối" },
+            ...(provider && !options.some(({ value }) => value === provider)
+              ? [{ value: provider, label: provider }]
+              : []),
+            ...options.map(({ value, label: name }) => ({
+              value,
+              label: name,
+            })),
+          ]}
+        />
       )}
     </div>
   );

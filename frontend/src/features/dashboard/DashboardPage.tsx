@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { StatCard } from "@/shared/components/StatCard";
-import { GlassCard } from "@/shared/components/GlassCard";
-import { DateRangePicker } from "@/shared/components/DateRangePicker";
+import { StatCard, GlassCard, DateRangePicker } from "@/shared/components";
+import { formatNumber } from "@/shared/utils";
 import {
   ShoppingCart,
   DollarSign,
@@ -401,7 +400,7 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Tổng Đơn Hàng"
-          value={summary.totalOrders.toLocaleString("vi-VN")}
+          value={formatNumber(summary.totalOrders)}
           subtitle="Đơn hàng được ghi nhận"
           icon={ShoppingCart}
           trend={{
@@ -412,7 +411,7 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Tổng Đơn Hủy"
-          value={summary.canceledOrders.toLocaleString("vi-VN")}
+          value={formatNumber(summary.canceledOrders)}
           subtitle="Số đơn hàng bị hủy"
           icon={XCircle}
           trend={{

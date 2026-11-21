@@ -62,7 +62,7 @@ const listWarehouseAccounts = async () => {
   const linkedSlotIds = new Set((await db(TABLES.PACKAGE_PRODUCT)
     .whereNotNull(packageSlotColumn).pluck(packageSlotColumn)).map(Number));
   const usageBySlot = new Map();
-  for (const pkg of await getPackageProducts()) {
+  for (const pkg of await getPackageProducts({ usageOnly: true })) {
     const usage = usageBySlot.get(pkg.warehouseSlotId) || { used: 0, total: 0 };
     usage.used += pkg.usedSlots;
     usage.total += pkg.totalSlots;

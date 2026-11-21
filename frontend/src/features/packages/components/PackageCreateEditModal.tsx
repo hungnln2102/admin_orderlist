@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Package,
   X,
@@ -9,155 +9,13 @@ import {
   DollarSign,
   Calendar,
   FileText,
-  ChevronDown,
   Check,
   Link2,
   Hash,
   Layers as LayersIcon,
 } from "lucide-react";
+import { DateInputVN, SearchableCombobox, ToggleSwitch } from "@/shared/components";
 import { PackageItem, PackageFormData, PackageCategory } from "../types";
-
-interface AccountComboboxProps {
-  value: string;
-  onChange: (val: string) => void;
-  options: string[];
-  placeholder?: string;
-  required?: boolean;
-  accent?: "blue" | "amber";
-}
-
-const AccountCombobox: React.FC<AccountComboboxProps> = ({
-  value,
-  onChange,
-  options,
-  placeholder,
-  required,
-  accent = "blue",
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const filtered = useMemo(() => {
-    if (!value) return options;
-    return options.filter((item) =>
-      item.toLowerCase().includes(value.toLowerCase())
-    );
-  }, [options, value]);
-
-  const isCustomValue = Boolean(
-    value && !options.some((o) => o.toLowerCase() === value.toLowerCase())
-  );
-
-  const borderFocusClass =
-    accent === "blue"
-      ? "focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400/30"
-      : "border-amber-500/40 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/30";
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <div
-        className={`flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 transition-all ${borderFocusClass}`}
-      >
-        <input
-          type="text"
-          required={required}
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            if (!isOpen) setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          placeholder={placeholder}
-          className="w-full bg-transparent text-white font-mono text-xs focus:outline-none"
-        />
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="text-slate-500 hover:text-slate-300 p-1 cursor-pointer transition-colors"
-            title="Xóa giá trị"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="text-slate-400 hover:text-cyan-400 p-1 cursor-pointer transition-colors"
-          title="Chọn từ kho tài khoản"
-        >
-          <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform duration-200 ${
-              isOpen ? "rotate-180 text-cyan-400" : ""
-            }`}
-          />
-        </button>
-      </div>
-
-      {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-y-auto custom-scrollbar bg-[#0f172a] border border-slate-700/85 rounded-xl shadow-2xl p-1 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-2 py-1 text-[10px] font-semibold text-slate-400 flex items-center justify-between border-b border-slate-800 mb-1">
-            <span>Kho tài khoản ({options.length})</span>
-            {value && (
-              <span className="text-cyan-400">Khớp: {filtered.length}</span>
-            )}
-          </div>
-
-          {filtered.length > 0 ? (
-            filtered.map((item, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  onChange(item);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between transition-colors cursor-pointer ${
-                  item.toLowerCase() === value.toLowerCase()
-                    ? "bg-cyan-500/20 text-cyan-300 font-semibold"
-                    : "text-slate-200 hover:bg-slate-850 hover:text-white"
-                }`}
-              >
-                <span className="truncate">{item}</span>
-                {item.toLowerCase() === value.toLowerCase() && (
-                  <Check className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 ml-2" />
-                )}
-              </button>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-center text-[11px] text-slate-400">
-              Không tìm thấy tài khoản nào khớp trong kho
-            </div>
-          )}
-
-          {isCustomValue && (
-            <div className="border-t border-slate-800 mt-1 pt-1">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <span className="truncate">
-                  Dùng tài khoản nhập tay: <strong>{value}</strong>
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 interface PackageCreateEditModalProps {
   open: boolean;
@@ -291,13 +149,17 @@ export const PackageCreateEditModal: React.FC<PackageCreateEditModalProps> = ({
               <label className="block text-slate-400 mb-1 font-medium">
                 Tài Khoản / Email Gốc *
               </label>
-              <AccountCombobox
+              <SearchableCombobox
                 value={formData.accountInfo}
                 onChange={(val) => onFormChange({ ...formData, accountInfo: val })}
                 options={warehouseAccounts}
                 placeholder="Chọn hoặc nhập username/email kho (VD: stock_canva@gmail.com)"
                 required
                 accent="blue"
+                listHeaderLabel="Kho tài khoản"
+                emptyText="Không tìm thấy tài khoản nào khớp trong kho"
+                customValuePrefix="Dùng tài khoản nhập tay:"
+                toggleTitle="Chọn từ kho tài khoản"
               />
             </div>
 
@@ -330,29 +192,26 @@ export const PackageCreateEditModal: React.FC<PackageCreateEditModalProps> = ({
           </div>
 
           {/* ════ TOGGLE STORAGE ACCOUNT ════ */}
-          <div className="flex items-center justify-between px-1 py-1">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={hasStorageAccount}
-                onChange={(e) => {
-                  const val = e.target.checked;
-                  setHasStorageAccount(val);
-                  if (!val) {
-                    onFormChange({
-                      ...formData,
-                      storageAccountInfo: "",
-                      storageTotal: "",
-                    });
-                  }
-                }}
-                className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-900 cursor-pointer"
-              />
-              <span className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
-                <HardDrive className="w-3.5 h-3.5 text-amber-400" />
-                Gói này có sử dụng Tài khoản dung lượng / liên kết (Storage Account)
-              </span>
-            </label>
+          <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+            <span className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+              <HardDrive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              Gói này có sử dụng Tài khoản dung lượng / liên kết (Storage Account)
+            </span>
+            <ToggleSwitch
+              checked={hasStorageAccount}
+              variant="amber"
+              size="sm"
+              onChange={(val) => {
+                setHasStorageAccount(val);
+                if (!val) {
+                  onFormChange({
+                    ...formData,
+                    storageAccountInfo: "",
+                    storageTotal: "",
+                  });
+                }
+              }}
+            />
           </div>
 
           {/* ════ BLOCK 2: TÀI KHOẢN LIÊN KẾT / DUNG LƯỢNG ════ */}
@@ -372,13 +231,17 @@ export const PackageCreateEditModal: React.FC<PackageCreateEditModalProps> = ({
                 <label className="block text-slate-300 mb-1 font-medium">
                   Tài Khoản Liên Kết *
                 </label>
-                <AccountCombobox
+                <SearchableCombobox
                   value={formData.storageAccountInfo || ""}
                   onChange={(val) => onFormChange({ ...formData, storageAccountInfo: val })}
                   options={warehouseAccounts}
                   placeholder="Chọn hoặc nhập tài khoản dung lượng (VD: storage_google@gmail.com)"
                   required
                   accent="amber"
+                  listHeaderLabel="Kho tài khoản"
+                  emptyText="Không tìm thấy tài khoản nào khớp trong kho"
+                  customValuePrefix="Dùng tài khoản nhập tay:"
+                  toggleTitle="Chọn từ kho tài khoản"
                 />
               </div>
 
@@ -506,11 +369,12 @@ export const PackageCreateEditModal: React.FC<PackageCreateEditModalProps> = ({
                 <Calendar className="w-3 h-3 text-amber-400" />
                 Ngày Hết Hạn
               </label>
-              <input
-                type="date"
+              <DateInputVN
                 value={formData.expiredAt}
-                onChange={(e) => onFormChange({ ...formData, expiredAt: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-400 font-bold font-mono focus:outline-none focus:border-cyan-500"
+                onChange={(iso) => onFormChange({ ...formData, expiredAt: iso })}
+                placeholder="dd/mm/yyyy"
+                focusBorderClass="focus:border-cyan-500"
+                className="text-amber-400"
               />
             </div>
           </div>

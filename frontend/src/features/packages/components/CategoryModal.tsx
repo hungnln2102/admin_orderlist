@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Layers, X, Plus, List, Sparkles, HardDrive } from "lucide-react";
+import { ToggleSwitch } from "@/shared/components";
 
 interface CategoryModalProps {
   open: boolean;
@@ -142,14 +143,13 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
         {/* Cấu hình Storage Account */}
         <div className="pt-3 border-t border-slate-800/80">
           <label className="flex items-start gap-3 cursor-pointer group">
-            <div className="relative flex items-center mt-0.5">
-              <input
-                type="checkbox"
+            <div className="mt-0.5 shrink-0">
+              <ToggleSwitch
                 checked={requiresStorage}
-                onChange={(e) => onRequiresStorageChange?.(e.target.checked)}
-                className="sr-only peer"
+                onChange={(checked) => onRequiresStorageChange?.(checked)}
+                variant="cyan"
+                size="sm"
               />
-              <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
             </div>
             <div className="space-y-0.5">
               <span className="text-xs font-semibold text-slate-200 group-hover:text-white transition-colors flex items-center gap-1.5">

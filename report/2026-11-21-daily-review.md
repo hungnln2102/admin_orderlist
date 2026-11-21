@@ -163,3 +163,153 @@
 - Kiểm tra local xác nhận 26 slot liên kết gói đều trả trạng thái đang sử dụng, gồm 3 slot có số vị trí đã dùng bằng 0. Frontend build thành công.
 
 - API và giao diện lấy nhãn tag từ slot. Kiểm tra cú pháp backend và build frontend đạt.
+
+
+## [22:30] Ban hành Nguyên Tắc 8 vào Hiến Pháp & Thiết lập Kho Thư Viện Dùng Chung (Design System SSOT)
+
+- **Phạm vi tác động**:
+  - Toàn bộ hệ thống Hiến Pháp:
+    - [AGENTS.md](file:///e:/Project/admin_store/admin_orderlist/AGENTS.md)
+    - [.agents/AGENTS.md](file:///e:/Project/admin_store/admin_orderlist/.agents/AGENTS.md)
+    - [.agents/rules/AGENTS.md](file:///e:/Project/admin_store/admin_orderlist/.agents/rules/AGENTS.md)
+    - [SKILL.md (frontend-lead)](file:///e:/Project/admin_store/admin_orderlist/.agents/plugins/subagent-team/skills/frontend-lead/SKILL.md)
+  - Kho thư viện dùng chung & Danh mục tra cứu:
+    - [COMPONENT_LIBRARY.md](file:///e:/Project/admin_store/admin_orderlist/docs/design-system/COMPONENT_LIBRARY.md) (Living Catalog)
+    - [frontend/src/shared/README.md](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/README.md)
+    - [ToggleSwitch.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/ToggleSwitch.tsx) (Component công tắc trượt On/Off chuẩn 6 màu)
+    - [CopyButton.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/CopyButton.tsx) (Nút sao chép kèm icon Check và feedback)
+    - [QuickDateAddButtons.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/QuickDateAddButtons.tsx) (Cụm nút bấm cộng ngày +30d, +90d, +1y)
+    - [useClipboard.ts](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/hooks/useClipboard.ts) (Nâng cấp timer tự động 1.5s)
+    - [index.ts](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/index.ts) (Export tập trung Single Entry Point)
+    - [SlotProviderControls.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/SlotProviderControls.tsx) (Tái sử dụng ngay ToggleSwitch)
+- **Thay đổi kỹ thuật**:
+  - **Ban hành Nguyên Tắc 8**: Nghiêm cấm tự ý code lại giao diện inline. Mọi sửa đổi hay tạo mới UI bắt buộc phải kiểm toán kho thư viện `frontend/src/shared/components/` trước. Nếu chưa có, phải đóng gói vào kho dùng chung trước rồi mới sử dụng.
+  - **Khởi tạo Living Design System**: Biên soạn cẩm nang tra cứu chi tiết gồm 6 nhóm thành phần, bảng props, code mẫu và nguyên tắc áp dụng.
+  - **Đóng gói các Shared Component nền tảng**: Đưa `ToggleSwitch`, `CopyButton`, `QuickDateAddButtons` vào kho dùng chung, tái sử dụng trực tiếp trong `SlotProviderControls`.
+- **Kiểm tra kỹ thuật**:
+  - `npm run build` trong `frontend` (`tsc && vite build`) hoàn tất thành công trong 4.44s không phát sinh bất kỳ lỗi nào.
+
+
+## [23:05] Lập Bản Đánh Giá Toàn Diện Hệ Thống & Kế Hoạch Check Đợt 2 (Kèm Vùng Cấm Bất Khả Xâm Phạm)
+
+- **Phạm vi tác động**:
+  - [2026-11-21_system_optimization_and_modularization_audit.md](file:///e:/Project/admin_store/admin_orderlist/docs/plans/2026-11-21_system_optimization_and_modularization_audit.md)
+  - [2026-11-21_phase2_warehouse_shared_components_migration_plan.md](file:///e:/Project/admin_store/admin_orderlist/docs/plans/2026-11-21_phase2_warehouse_shared_components_migration_plan.md)
+- **Thay đổi kỹ thuật**:
+  - **Bản Đánh Giá Hệ Thống Toàn Diện Dành Cho Đội Ngũ Subagents**:
+    * Thiết lập danh sách **Ranh giới bất khả xâm phạm (Redlines)**: Cấm tuyệt đối đụng chạm đến hệ thống sổ cái kế toán kép, các bảng `financial_*`, webhook SePay/MB Bank/VietQR, tiến trình đối soát VPBank IMAP; Cấm rollback migration hoặc sửa đổi batch 1-28; Cấm đụng chạm code Master đang làm dở (`AdobeAccountRecovery.tsx`, tabs activation); Cấm phá vỡ logic cấp key theo tag và cơ chế Transactional Lock.
+    * Bóc tách tiềm năng tái sử dụng thư viện chung Frontend: 2 switch inline còn sót lại, 4 nút copy thủ công, cụm nút cộng ngày, chuẩn hóa Form Ngang 2 cột cho các modal tài chính, và quy hoạch 53 file format tiền tệ thủ công.
+    * Bóc tách tiềm năng phân rã Backend & Event Bus: Phân rã `orderService.js` thành query, status mutation và notification subscriber.
+    * Phân công vai trò rạch ròi cho từng Subagent (`frontend-lead`, `backend-specialist`, `finance-specialist`, `qa-automation`, `security-auditor`).
+  - **Kế Hoạch Check Đợt 2 (Warehouse Modals Refactoring)**:
+    * Biên soạn Spec-Kit SDD với kịch bản Gherkin chuẩn xác cho việc loại bỏ switch inline và copy button thủ công trong `WarehouseCreateModal` và `WarehouseEditSlotModal`.
+    * Pre-Flight Check với code diff dự kiến chi tiết từng dòng, bảo đảm 100% tuân thủ Form Ngang 2 Cột và thư viện chung `@/shared/components`.
+
+## [23:11] Cấu hình plugin và custom agent cho Codex
+
+- Đã đăng ký marketplace cục bộ và xác nhận plugin phiên bản 1.0.0 ở trạng thái installed, enabled bằng Codex CLI.
+- Đã xác thực 7 tệp TOML trong .codex/agents/ và đường dẫn đến SKILL.md của từng vai trò. Hướng dẫn vai trò được đọc trực tiếp từ bộ skill hiện có.
+- Cần mở phiên extension mới để xác nhận việc gọi custom agent từ giao diện IDE.
+
+
+## [23:16] Phân Rã Kế Hoạch Hệ Thống Thành Hai Bản Thiết Kế Độc Lập Frontend & Backend
+
+- **Phạm vi tác động**:
+  - [2026-11-21_system_optimization_frontend_blueprint.md](file:///e:/Project/admin_store/admin_orderlist/docs/plans/2026-11-21_system_optimization_frontend_blueprint.md)
+  - [2026-11-21_system_optimization_backend_blueprint.md](file:///e:/Project/admin_store/admin_orderlist/docs/plans/2026-11-21_system_optimization_backend_blueprint.md)
+- **Thay đổi kỹ thuật**:
+  - **Phân tách Frontend Blueprint thành 7 Task biệt lập tuyệt đối (Zero Collision)**:
+    * Mỗi task sở hữu tập hợp file riêng biệt 100%, không có bất kỳ file nào trùng lặp giữa các task để các Agent có thể làm song song mà không xung đột Git.
+    * FE-01: `WarehouseCreateModal.tsx` (ToggleSwitch)
+    * FE-02: `WarehouseEditSlotModal.tsx` (CopyButton, QuickDateAddButtons)
+    * FE-03: `WarehouseAccountsTable.tsx`, `WarehouseSlotSubTable.tsx` (CopyButton trong bảng)
+    * FE-04: `FixedCostModal.tsx` (Form Ngang 2 Cột, DateInputVN)
+    * FE-05: `InstallmentModal.tsx` (Form Ngang 2 Cột, DateInputVN)
+    * FE-06: `SavingFundModal.tsx` (Form Ngang 2 Cột)
+    * FE-07: `OrderStatsCards.tsx`, `FinanceOverviewCards.tsx` (formatCurrency)
+  - **Phân tách Backend Blueprint thành 4 Task phân rã kiến trúc**:
+    * Thiết lập danh mục Ranh giới bất khả xâm phạm (Redlines) tuyệt đối cho Backend: Sổ cái kế toán kép, các bảng `financial_*`, webhook SePay/MB Bank/VietQR/VPBank IMAP, Database migrations Batch 1-28, Transactional Lock.
+    * BE-01: Bóc tách `orderQueryService.js`
+    * BE-02: Bóc tách `orderTelegramSubscriber.js` (Event Bus)
+    * BE-03: Bóc tách `warehouseSlotProviderService.js` (Third-party adapters)
+    * BE-04: Chuẩn hóa `apiResponse.js`
+
+## [23:27] Tối ưu backend đợt đầu
+
+- Tìm đơn gán biên lai giảm 70 xuống 4 SQL. Danh sách Kho giảm 10 xuống 7 SQL. Đối chiếu chỉ đọc 915 đơn và 26 gói khớp bản trước.
+- 24 unit test mục tiêu đạt. Benchmark và phần còn lại ghi trong [blueprint backend](../docs/plans/2026-11-21_system_optimization_backend_blueprint.md). Chưa nghiệm thu thanh toán ghi dữ liệu hoặc production.
+
+## Outbox backend
+
+- Phát lại tiếp tục xử lý các event phía sau khi một event lỗi. 21 unit test mục tiêu đạt. Integration thanh toán còn chờ TEST_DATABASE_URL.
+
+## [23:31] Nghiệm thu credit, webhook và độ trễ outbox
+
+- PostgreSQL kiểm thử mydtbmav_test đạt 7/7 kịch bản credit/webhook. EventStore và EventBus đạt 6/6 unit test.
+- Đo chỉ đọc với subscriber mô phỏng 25/100 ms cho p50 toàn luồng 31,37/108,65 ms. Còn đo subscriber thật, restart/backlog và batch end-to-end.
+
+## [23:33] Phát lại outbox qua nhiều lô
+
+- Kiểm thử 125 event trên PostgreSQL kiểm thử. Lượt đầu phát 124 event dù event đầu lỗi. Lượt sau phát thành công event còn lại. Lượt thứ ba trả 0. 6 unit test đạt. Probe gọi cùng tiến trình, chưa mô phỏng restart thực.
+- Kiểm tra bổ sung qua ba tiến trình Node riêng đạt lần lượt 124, 1 và 0 event.
+
+## [23:36] Khóa sự kiện outbox khi phát đồng thời
+
+- Trước sửa: hai lượt phát cùng một event gọi subscriber hai lần. Sau sửa: hai tiến trình Node riêng gọi subscriber tổng cộng một lần trên PostgreSQL kiểm thử.
+- 6 unit test Event Store và Event Bus đạt. Cần đo mức sử dụng pool với subscriber thật và kiểm tra idempotency khi tiến trình chết sau side effect.
+
+
+## [23:41] Thực Thi Tái Cấu Trúc Frontend (FE-01 đến FE-08)
+
+- **Phạm vi tác động**:
+  - **FE-01**: [WarehouseCreateModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseCreateModal.tsx) — Thay 2 switch inline (`createPackage`, `hasLinkedAccount`) bằng `<ToggleSwitch />` từ `@/shared/components`.
+  - **FE-02**: [WarehouseEditSlotModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseEditSlotModal.tsx) — Xóa state `copiedField`/`handleCopy` thủ công, thay 4 nút copy bằng `<CopyButton />`, thay cụm nút `+30d/+90d/+1y/Xóa` bằng `<QuickDateAddButtons />` và thay `<input type="date">` bằng `<DateInputVN />`.
+  - **FE-03**: [WarehouseAccountsTable.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseAccountsTable.tsx), [WarehouseSlotSubTable.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseSlotSubTable.tsx) — Thay nút copy email & 2FA bằng `<CopyButton />` (giữ nguyên toast qua `onCopied`).
+  - **FE-04**: [FixedCostModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/FixedCostModal.tsx) — Chuyển sang Form Ngang 2 cột (`max-w-4xl`), dùng `<CurrencyInputVN />` và `<ToggleSwitch variant="rose" />`.
+  - **FE-05**: [InstallmentModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/InstallmentModal.tsx) — Chuyển sang Form Ngang 2 cột (`max-w-4xl`), dùng `<CurrencyInputVN />` và `<ToggleSwitch variant="amber" />`.
+  - **FE-06**: [SavingFundModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/SavingFundModal.tsx) — Chuyển sang Form Ngang 2 cột (`max-w-3xl`), dùng `<CurrencyInputVN />`.
+  - **FE-07**: [PayWithCreditModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/orders/components/PayWithCreditModal.tsx), [DashboardPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/dashboard/DashboardPage.tsx) — Chuẩn hóa `toLocaleString` sang `formatCurrency` và `formatNumber` từ `@/shared/utils` (ghi chú: `OrderStatsCards.tsx` và `FinanceOverviewCards.tsx` trong blueprint cũ không tồn tại trong repo).
+  - **FE-08**: [ReceiptsPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ReceiptsPage.tsx) — Lazy-load 3 modal (`AllocateReceiptModal`, `CreateReceiptModal`, `PendingBatchesModal`) qua `React.lazy` + `Suspense`, chỉ mount khi mở; đồng bộ `formatCurrency`/`formatNumber` từ `@/shared/utils`.
+- **Kết quả kiểm tra & đo bundle (`tsc && vite build` — 4,55s, 0 lỗi)**:
+  - `ReceiptsPage`: **238,60 kB (31,52 kB gzip) → 59,93 kB (8,21 kB gzip)** (**giảm 74,9%** JS tải ban đầu).
+  - `WarehousePage`: **314,16 kB (38,65 kB gzip) → 308,30 kB (38,54 kB gzip)**.
+  - Redlines được bảo vệ 100%: Không chạm backend, không chạm `AdobeAccountRecovery.tsx`, `ActivationKeyRulesTab.tsx`, không đổi API payload/contract.
+
+## [23:44] Tách service Finance Hub
+
+- Tách chốt số dư cá nhân và quỹ tiết kiệm. Export, báo cáo tháng/năm và tổng quan tiết kiệm khớp HEAD trên DB local.
+- 4 unit test đạt và integration snapshot đạt. Còn kiểm thử ghi quỹ tiết kiệm, gia hạn đơn và routing slot.
+
+## [23:47] Tách routing slot và gia hạn đơn
+
+- 18 bài kiểm thử mục tiêu đạt. Probe PostgreSQL kiểm thử xác nhận gia hạn đơn bán, nạp/rút quỹ và từ chối rút vượt số dư.
+- EXPLAIN thử bộ lọc hạn theo khoảng ngày chuyển sang Index Scan và giảm buffer hit từ 10 xuống 4. Một mẫu đơn lẻ chưa chứng minh giảm độ trễ.
+
+
+## [23:49] Hoàn Tất Tái Cấu Trúc Frontend Đợt 2 (FE-08 mở rộng, FE-09, FE-10, FE-11)
+
+- **Phạm vi tác động**:
+  - **FE-09 (Điều phối tải API)**:
+    - [useWarehouseData.ts](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/hooks/useWarehouseData.ts): Lazy-fetch `/api/warehouse/system-products` qua `ensureSystemProducts()` chỉ khi mở tab Danh mục hoặc các modal cần danh mục sản phẩm hệ thống.
+    - [useOrders.ts](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/orders/hooks/useOrders.ts): Gửi `includeStats: false` khi chỉ đổi trang/pageSize (giảm 5 truy vấn tổng hợp SQL/lần chuyển trang); vẫn gửi `includeStats: true` khi đổi tab/filter/search hoặc `refreshOrders()`.
+  - **FE-08 mở rộng & FE-10 (Thin Page Orchestrator + Code-splitting)**:
+    - [WarehousePage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/WarehousePage.tsx): Tách toàn bộ state/CRUD sang `useWarehouseData.ts` và lazy-load 7 modal + `WarehouseCatalogGrid`.
+    - [OrdersPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/OrdersPage.tsx): Lazy-load 4 modal (`OrderCreateEditModal`, `OrderDetailModal`, `OrderDeleteModal`, `PayWithCreditModal`).
+  - **FE-11 (Shared SearchableCombobox)**:
+    - Tạo mới [SearchableCombobox.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/SearchableCombobox.tsx), export tại [index.ts](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/index.ts), bổ sung tài liệu vào [COMPONENT_LIBRARY.md](file:///e:/Project/admin_store/admin_orderlist/docs/design-system/COMPONENT_LIBRARY.md) và thay thế `AccountCombobox` inline tại [PackageCreateEditModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/packages/components/PackageCreateEditModal.tsx).
+- **Benchmark Build (`tsc && vite build` — 4,71s, 0 lỗi)**:
+  - `WarehousePage`: **314,16 kB (38,65 kB gzip) → 109,07 kB (16,58 kB gzip)** (**-65,3%** thô).
+  - `ReceiptsPage`: **238,60 kB (31,52 kB gzip) → 59,93 kB (8,21 kB gzip)** (**-74,9%** thô).
+  - `OrdersPage`: **195,22 kB (29,97 kB gzip) → 83,55 kB (15,89 kB gzip)** (**-57,2%** thô).
+  - Tổng 3 trang nặng nhất giảm từ **747,98 kB** xuống **252,55 kB** (**-66,2%**).
+
+## [23:50] Kiểm tra backend cuối đợt
+
+- 168/168 unit test đạt với --test-force-exit. SSE probe 1.000 bản tin đạt. Cron 0 ngày lọc theo khoảng giờ Việt Nam và đối chiếu DB local cho cùng tập đơn.
+- Các phần còn thiếu nghiệm thu ghi trong [kế hoạch backend](../docs/plans/2026-11-21_system_optimization_backend_blueprint.md).
+
+## [23:52] Nghiệm thu thanh toán gộp và gia hạn đơn nhập
+
+- PostgreSQL kiểm thử: hai đơn chuyển PAID, tổng biên lai và phân bổ 57.003 đồng, tài khoản tăng đúng số tiền, có một dòng ledger và lần hoàn tất lặp bị từ chối.
+- Gia hạn đơn MAVN đồng bộ đúng hạn và số ngày của slot Kho. Đã dọn fixture theo ID sau kiểm thử.
+- Probe gọi service hoàn tất thanh toán gộp. Luồng tạo yêu cầu QR và nhận webhook theo mã batch còn cần kiểm tra riêng.

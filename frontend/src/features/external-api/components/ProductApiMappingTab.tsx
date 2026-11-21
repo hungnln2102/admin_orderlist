@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { ToggleSwitch } from "@/shared/components";
 import {
   Search,
   Plus,
@@ -448,12 +449,12 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
 
                       {/* Trạng thái On/Off Nhóm */}
                       <td className="px-4 py-3.5 text-center">
-                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
+                        <div className="inline-flex items-center gap-2">
+                          <ToggleSwitch
                             checked={group.is_active}
                             onChange={() => void handleToggleGroupActive(group)}
-                            className="h-4 w-4 accent-cyan-400 cursor-pointer"
+                            variant="cyan"
+                            size="sm"
                           />
                           <span
                             className={`text-[11px] font-semibold ${
@@ -462,7 +463,7 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
                           >
                             {group.is_active ? "Bật" : "Tắt"}
                           </span>
-                        </label>
+                        </div>
                       </td>
 
                       {/* Thao tác (Sửa / Xóa Nhóm) */}

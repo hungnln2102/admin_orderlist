@@ -1,5 +1,6 @@
 import React from "react";
 import { Search, Filter, Archive, Layers } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 
 interface WarehouseFilterBarProps {
   activeTab: "accounts" | "catalog";
@@ -80,35 +81,42 @@ export const WarehouseFilterBar: React.FC<WarehouseFilterBarProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300">
-              <Filter className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Dịch vụ:</span>
-              <select
-                value={categoryFilter}
-                onChange={(e) => onCategoryFilterChange(e.target.value)}
-                className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer max-w-[150px] truncate"
-              >
-                <option value="all" className="bg-slate-900 text-slate-200">Tất cả</option>
-                {availableCategories.map((cat) => (
-                  <option key={cat} value={cat} className="bg-slate-900 text-slate-200">
-                    {cat}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300">
+              <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="shrink-0">Dịch vụ:</span>
+              <div className="min-w-[130px]">
+                <CustomSelect
+                  value={categoryFilter}
+                  onChange={onCategoryFilterChange}
+                  size="sm"
+                  accent="indigo"
+                  className="border-0 bg-transparent py-1 px-1.5"
+                  options={[
+                    { value: "all", label: "Tất cả" },
+                    ...availableCategories.map((cat) => ({ value: cat, label: cat })),
+                  ]}
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300">
-              <span>Trạng thái:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => onStatusFilterChange(e.target.value)}
-                className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="all" className="bg-slate-900 text-slate-200">Tất cả</option>
-                <option value="AVAILABLE" className="bg-slate-900 text-slate-200">Có Slot Tồn Kho</option>
-                <option value="RESERVED" className="bg-slate-900 text-slate-200">Đang Sử Dụng</option>
-                <option value="EXPIRED" className="bg-slate-900 text-slate-200">Hết Hạn</option>
-              </select>
+            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300">
+              <span className="shrink-0">Trạng thái:</span>
+              <div className="min-w-[140px]">
+                <CustomSelect
+                  value={statusFilter}
+                  onChange={onStatusFilterChange}
+                  size="sm"
+                  accent="indigo"
+                  searchable={false}
+                  className="border-0 bg-transparent py-1 px-1.5"
+                  options={[
+                    { value: "all", label: "Tất cả" },
+                    { value: "AVAILABLE", label: "Có Slot Tồn Kho" },
+                    { value: "RESERVED", label: "Đang Sử Dụng" },
+                    { value: "EXPIRED", label: "Hết Hạn" },
+                  ]}
+                />
+              </div>
             </div>
           </div>
         </div>

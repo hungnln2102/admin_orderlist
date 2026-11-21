@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Layers, X, Package, Tag } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { CatalogFormData, SystemProduct } from "../types";
 
 interface CatalogCreateModalProps {
@@ -69,24 +70,25 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
               <Package className="w-3.5 h-3.5 text-cyan-400" />
               <span>Sản Phẩm Hệ Thống Liên Kết (Tùy chọn)</span>
             </label>
-            <select
-              value={formData.productId || ""}
-              onChange={(e) => {
-                const newProductId = e.target.value ? Number(e.target.value) : null;
+            <CustomSelect
+              value={formData.productId ? String(formData.productId) : ""}
+              accent="purple"
+              className="bg-slate-950"
+              onChange={(val) => {
+                const newProductId = val ? Number(val) : null;
                 onFormChange({
                   ...formData,
                   productId: newProductId,
                 });
               }}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
-            >
-              <option value="">-- Không liên kết (Dịch vụ tự do) --</option>
-              {systemProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "-- Không liên kết (Dịch vụ tự do) --" },
+                ...systemProducts.map((p) => ({
+                  value: String(p.id),
+                  label: p.name,
+                })),
+              ]}
+            />
             <p className="text-[11px] text-slate-400 mt-1">
               💡 Dùng để liên kết với loại sản phẩm bán hàng trong hệ thống (VD: Google One, Adobe...).
             </p>

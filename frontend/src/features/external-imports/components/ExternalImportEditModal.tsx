@@ -8,6 +8,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import { DateInputVN } from "@/shared/components";
 import { PaymentAccount, StoreExpenseItem, ExpenseFormData } from "../types";
 
 interface ExternalImportEditModalProps {
@@ -39,7 +40,7 @@ export const ExternalImportEditModal: React.FC<ExternalImportEditModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
@@ -147,12 +148,12 @@ export const ExternalImportEditModal: React.FC<ExternalImportEditModalProps> = (
           {/* Ngày */}
           <div>
             <label className="block text-slate-400 mb-1 font-semibold">Ngày Phát Sinh *</label>
-            <input
-              type="date"
-              required
+            <DateInputVN
               value={formData.expense_date}
-              onChange={(e) => setFormData((prev) => ({ ...prev, expense_date: e.target.value }))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              onChange={(iso) => setFormData((prev) => ({ ...prev, expense_date: iso }))}
+              placeholder="dd/mm/yyyy"
+              focusBorderClass="focus:border-cyan-500"
+              className="bg-slate-800 border-slate-700"
             />
           </div>
 

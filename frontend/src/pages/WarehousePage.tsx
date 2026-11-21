@@ -1,8 +1,7 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import {
   RefreshCw,
   Plus,
-  Download,
   Key,
   Package,
   AlertTriangle,
@@ -14,48 +13,108 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
-import { fetchCachedJson, invalidateApiCache } from "@/shared/api/apiCache";
 import {
   WarehouseAccountItem,
   WarehouseServiceSlot,
-  WarehouseSlotEditFormData,
   ServiceNameCategoryItem,
-  SystemProduct,
   WarehouseAccountFormData,
-  WarehouseAddServiceFormData,
   CatalogFormData,
   WarehouseFilterBar,
   WarehouseAccountsTable,
-  WarehouseCatalogGrid,
-  WarehouseCreateModal,
-  WarehouseAddServiceModal,
-  WarehouseEditSlotModal,
-  WarehouseEditAccountModal,
-  CatalogCreateModal,
-  CatalogDeleteModal,
-  CatalogEditModal,
 } from "@/features/warehouse";
+import {
+  useWarehouseData,
+  INITIAL_ACCOUNT_FORM,
+  INITIAL_CATALOG_FORM,
+} from "@/features/warehouse/hooks/useWarehouseData";
+
+// Lazy-load Tab 2 & toàn bộ 7 Modals (FE-08 / FE-10) để giảm mạnh JS tải ban đầu
+const WarehouseCatalogGrid = lazy(() =>
+  import("@/features/warehouse/components/WarehouseCatalogGrid").then((m) => ({
+    default: m.WarehouseCatalogGrid,
+  }))
+);
+const WarehouseCreateModal = lazy(() =>
+  import("@/features/warehouse/components/WarehouseCreateModal").then((m) => ({
+    default: m.WarehouseCreateModal,
+  }))
+);
+const WarehouseAddServiceModal = lazy(() =>
+  import("@/features/warehouse/components/WarehouseAddServiceModal").then((m) => ({
+    default: m.WarehouseAddServiceModal,
+  }))
+);
+const WarehouseEditSlotModal = lazy(() =>
+  import("@/features/warehouse/components/WarehouseEditSlotModal").then((m) => ({
+    default: m.WarehouseEditSlotModal,
+  }))
+);
+const WarehouseEditAccountModal = lazy(() =>
+  import("@/features/warehouse/components/WarehouseEditAccountModal").then((m) => ({
+    default: m.WarehouseEditAccountModal,
+  }))
+);
+const CatalogCreateModal = lazy(() =>
+  import("@/features/warehouse/components/CatalogCreateModal").then((m) => ({
+    default: m.CatalogCreateModal,
+  }))
+);
+const CatalogDeleteModal = lazy(() =>
+  import("@/features/warehouse/components/CatalogDeleteModal").then((m) => ({
+    default: m.CatalogDeleteModal,
+  }))
+);
+const CatalogEditModal = lazy(() =>
+  import("@/features/warehouse/components/CatalogEditModal").then((m) => ({
+    default: m.CatalogEditModal,
+  }))
+);
 
 export const WarehousePage: React.FC = () => {
   const notification = useNotification();
 
+  const {
+    accounts,
+    catalog,
+    systemProducts,
+    loading,
+    searchTerm,
+    setSearchTerm,
+    categoryFilter,
+    setCategoryFilter,
+    statusFilter,
+    setStatusFilter,
+    expandedAccountIds,
+    showPasswordMap,
+    copiedKeyMap,
+    loggedSlotsMap,
+    openingSlotId,
+    filteredAccounts,
+    availableCategories,
+    stats,
+    loadWarehouseData,
+    ensureSystemProducts,
+    invalidateAndReload,
+    toggleExpand,
+    toggleShowPassword,
+    copyToClipboard,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+    addServiceToAccount,
+    updateSlot,
+    deleteSlot,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    toggleCatalogPackage,
+    openBrowserForUrl,
+    openBrowserForSlot,
+  } = useWarehouseData();
+
   const [activeTab, setActiveTab] = useState<"accounts" | "catalog">("accounts");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [expandedAccountIds, setExpandedAccountIds] = useState<number[]>([]);
-  const [showPasswordMap, setShowPasswordMap] = useState<Record<number, boolean>>({});
-  const [copiedKeyMap, setCopiedKeyMap] = useState<Record<string, boolean>>({});
-  const [loggedSlotsMap, setLoggedSlotsMap] = useState<Record<number, boolean>>({});
-  const [openingSlotId, setOpeningSlotId] = useState<number | null>(null);
 
-  // Dynamic state from PostgreSQL
-  const [accounts, setAccounts] = useState<WarehouseAccountItem[]>([]);
-  const [catalog, setCatalog] = useState<ServiceNameCategoryItem[]>([]);
-  const [systemProducts, setSystemProducts] = useState<SystemProduct[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // Modals
+  // Modal open states
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [deletingCatalogItem, setDeletingCatalogItem] = useState<ServiceNameCategoryItem | null>(null);
@@ -71,403 +130,29 @@ export const WarehousePage: React.FC = () => {
   } | null>(null);
   const [isUpdatingSlot, setIsUpdatingSlot] = useState(false);
 
-  // Form states
-  const [accountForm, setAccountForm] = useState<WarehouseAccountFormData>({
-    account: "",
-    serviceName: "",
-    category: "",
-    variantTag: "",
-    password: "",
-    backupEmail: "",
-    twoFa: "",
-    providerKey: "",
-    otpEnabled: false,
-    statusCheckEnabled: false,
-    expiresAt: "",
-    note: "",
-    createPackage: false,
-    hasLinkedAccount: false,
-    linkedAccountRole: "storage",
-    linkedAccountId: null,
-    storageTotal: "",
-  });
+  const [accountForm, setAccountForm] = useState<WarehouseAccountFormData>(INITIAL_ACCOUNT_FORM);
+  const [catalogForm, setCatalogForm] = useState<CatalogFormData>(INITIAL_CATALOG_FORM);
 
-  const [catalogForm, setCatalogForm] = useState<CatalogFormData>({
-    name: "",
-    category: "",
-    productId: null,
-    loginUrl: "",
-  });
-
-  const hasAutoExpandedRef = useRef(false);
-
-  // Load live data from API
-  const loadWarehouseData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [accRes, catalogResult, systemProductsResult] = await Promise.all([
-        fetch("/api/warehouse", { credentials: "include" }),
-        fetchCachedJson<ServiceNameCategoryItem[]>("/api/warehouse/catalog", { ttlMs: 5 * 60 * 1000, staleWhileRevalidateMs: 5 * 60 * 1000 }),
-        fetchCachedJson<SystemProduct[]>("/api/warehouse/system-products", { ttlMs: 5 * 60 * 1000, staleWhileRevalidateMs: 5 * 60 * 1000 }),
-      ]);
-
-      if (!accRes.ok) throw new Error("Không thể tải danh sách kho.");
-      const accData: WarehouseAccountItem[] = await accRes.json();
-      const nextAccounts = Array.isArray(accData) ? accData : [];
-      setAccounts(nextAccounts);
-      setLoggedSlotsMap(
-        Object.fromEntries(
-          nextAccounts.flatMap((account) =>
-            account.services.map((service) => [service.id, service.is_authenticated === true])
-          )
-        )
-      );
-      setCatalog(Array.isArray(catalogResult.data) ? catalogResult.data : []);
-      setSystemProducts(Array.isArray(systemProductsResult.data) ? systemProductsResult.data : []);
-
-      void catalogResult.revalidate?.then((data) => setCatalog(Array.isArray(data) ? data : [])).catch(() => undefined);
-      void systemProductsResult.revalidate?.then((data) => setSystemProducts(Array.isArray(data) ? data : [])).catch(() => undefined);
-    } catch (err) {
-      console.error("Error loading warehouse data:", err);
-      notification.error("Không thể kết nối đến cơ sở dữ liệu kho hàng.");
-    } finally {
-      setLoading(false);
-    }
-  }, [notification]);
-
-  useEffect(() => {
-    loadWarehouseData();
-  }, [loadWarehouseData]);
-
-  const toggleExpand = (id: number) => {
-    const numericId = Number(id);
-    setExpandedAccountIds((prev) =>
-      prev.map(Number).includes(numericId)
-        ? prev.filter((i) => Number(i) !== numericId)
-        : [...prev, numericId]
-    );
-  };
-
-  const toggleShowPassword = (serviceId: number) => {
-    setShowPasswordMap((prev) => ({ ...prev, [serviceId]: !prev[serviceId] }));
-  };
-
-  const copyToClipboard = (text: string, label: string, keyId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKeyMap((prev) => ({ ...prev, [keyId]: true }));
-    notification.success(`Đã sao chép ${label} vào bộ nhớ tạm!`, "Sao chép thành công");
-    setTimeout(() => {
-      setCopiedKeyMap((prev) => ({ ...prev, [keyId]: false }));
-    }, 2000);
-  };
-
-  // Filtered accounts
-  const filteredAccounts = useMemo(() => {
-    return accounts.filter((acc) => {
-      const matchSearch =
-        searchTerm === "" ||
-        acc.account.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        acc.services.some(
-          (s) =>
-            s.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (s.note && s.note.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-
-      const matchCategory =
-        categoryFilter === "all" ||
-        acc.services.some((s) => s.category === categoryFilter || s.display_name === categoryFilter);
-
-      const matchStatus =
-        statusFilter === "all" ||
-        (statusFilter === "AVAILABLE" && acc.services.some((s) => s.status === "AVAILABLE")) ||
-        (statusFilter === "EXPIRED" && acc.services.some((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE")) ||
-        (statusFilter === "RESERVED" && acc.services.some((s) => s.status === "IN_USE" || s.status === "RESERVED"));
-
-      return matchSearch && matchCategory && matchStatus;
-    });
-  }, [accounts, searchTerm, categoryFilter, statusFilter]);
-
-  // Available categories list for filter
-  const availableCategories = useMemo(() => {
-    const set = new Set<string>();
-    catalog.forEach((c) => {
-      if (c.name) set.add(c.name);
-    });
-    accounts.forEach((a) => {
-      (a.services || []).forEach((s) => {
-        if (s.display_name) set.add(s.display_name);
-        else if (s.category) set.add(s.category);
-      });
-    });
-    return Array.from(set).sort();
-  }, [catalog, accounts]);
-
-  // Statistics calculation from live database
-  const totalAccounts = accounts.length;
-  const totalAvailableSlots = accounts.reduce(
-    (acc, item) => acc + item.services.filter((s) => s.status === "AVAILABLE").length,
-    0
-  );
-  const totalReservedSlots = accounts.reduce(
-    (acc, item) =>
-      acc + item.services.filter((s) => s.status === "IN_USE" || s.status === "RESERVED").length,
-    0
-  );
-  const totalExpiredSlots = accounts.reduce(
-    (acc, item) =>
-      acc + item.services.filter((s) => s.status === "EXPIRED" || s.status === "UNAVAILABLE").length,
-    0
-  );
-
-  const handleUpdateCatalogSubmit = async (data: {
-    id: number;
-    name: string;
-    category: string;
-    loginUrl: string;
-    productId: number | null;
-    syncSlotsTag?: boolean;
-  }) => {
-    setIsUpdatingCatalog(true);
-    try {
-      const res = await fetch(`/api/warehouse/catalog/${data.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const resData = await res.json();
-      if (!res.ok) {
-        throw new Error(resData.error || "Không thể cập nhật dịch vụ kho");
-      }
-      notification.success(
-        `Đã cập nhật dịch vụ "${data.name}" thành công!`,
-        "Cập Nhật Thành Công"
-      );
-      setEditingCatalogItem(null);
-      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-    } catch (err: any) {
-      console.error("Lỗi cập nhật catalog item:", err);
-      notification.error(err.message || "Cập nhật dịch vụ thất bại");
-    } finally {
-      setIsUpdatingCatalog(false);
+  const handleTabChange = (tab: "accounts" | "catalog") => {
+    setActiveTab(tab);
+    if (tab === "catalog") {
+      void ensureSystemProducts();
     }
   };
 
-  const handleTogglePackage = async (item: ServiceNameCategoryItem) => {
-    try {
-      const nextVal = !item.isPackage;
-      const res = await fetch(`/api/warehouse/catalog/${item.id}/toggle-package`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPackage: nextVal }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Không thể cập nhật cấu hình gói kho");
-      }
-      notification.success(
-        `Đã ${nextVal ? "BẬT" : "TẮT"} chế độ tự động tạo gói kho cho dịch vụ "${item.name}"!`,
-        "Cập Nhật Dịch Vụ"
-      );
-      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-      await loadWarehouseData();
-    } catch (err: any) {
-      console.error("Lỗi toggle package:", err);
-      notification.error(err.message || "Lỗi cập nhật cấu hình gói kho");
-    }
+  const handleOpenCreateCatalog = () => {
+    void ensureSystemProducts();
+    setIsCatalogModalOpen(true);
   };
 
-  const handleOpenBrowserForUrl = (url: string, serviceName: string) => {
-    const rawUrl = url.trim();
-    if (!rawUrl) {
-      notification.warning(`Dịch vụ ${serviceName} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng.`, "Thiếu đường link");
-      return;
-    }
-    const targetUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-    if (targetUrl && navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(targetUrl).catch(() => {});
-    }
-    const browserWindow = window.open(
-      "/browser/",
-      "MavrykCloudBrowser",
-      "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-    );
-    if (browserWindow) browserWindow.focus();
-    notification.info(
-      `Đang mở Trình duyệt Đám Mây cho ${serviceName}. Link (${targetUrl}) đã được sao chép vào bộ nhớ tạm để dán trong cửa sổ stream.`,
-      "Trình Duyệt Đám Mây"
-    );
+  const handleOpenEditCatalog = (cat: ServiceNameCategoryItem) => {
+    void ensureSystemProducts();
+    setEditingCatalogItem(cat);
   };
 
-  const handleConfirmDeleteCatalog = async () => {
-    if (!deletingCatalogItem) return;
-    setIsDeletingCatalog(true);
-    try {
-      const res = await fetch(`/api/warehouse/catalog/${deletingCatalogItem.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Không thể xóa dịch vụ kho");
-      }
-      notification.success(
-        data.message || `Đã xóa dịch vụ "${deletingCatalogItem.name}" khỏi danh mục kho thành công!`,
-        "Xóa Dịch Vụ Kho"
-      );
-      setDeletingCatalogItem(null);
-      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-    } catch (err: any) {
-      console.error("Lỗi xóa dịch vụ kho:", err);
-      notification.error(err.message || "Xóa dịch vụ kho thất bại", "Lỗi Xóa Dịch Vụ");
-    } finally {
-      setIsDeletingCatalog(false);
-    }
-  };
-
-  const handleOpenBrowser = async (account: WarehouseAccountItem, service: any) => {
-    if (openingSlotId) return;
-    setOpeningSlotId(service.id);
-    try {
-      // 1. Trích xuất link đăng nhập động từ slot hoặc danh mục (loại bỏ hoàn toàn link hardcode)
-      const rawUrl = (service.login_url || "").trim() ||
-        (catalog.find((c) => c.name === service.display_name || c.name === service.category)?.loginUrl || "").trim();
-
-      const targetUrl = rawUrl
-        ? (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") ? rawUrl : `https://${rawUrl}`)
-        : "";
-
-      if (!targetUrl) {
-        notification.warning(
-          `Dịch vụ ${service.display_name || service.category} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng.`,
-          "Thiếu đường link"
-        );
-        return;
-      }
-
-      // Tự động sao chép link đăng nhập vào bộ nhớ tạm để Master tiện dán trong cửa sổ stream nếu cần
-      if (targetUrl && navigator?.clipboard?.writeText) {
-        navigator.clipboard.writeText(targetUrl).catch(() => {});
-      }
-
-      // Mở cửa sổ popup Trình duyệt Đám Mây Streaming trên VPS (KasmVNC Chromium)
-      const browserWindow = window.open(
-        "/browser/",
-        "MavrykCloudBrowser",
-        "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-      );
-      if (browserWindow) {
-        browserWindow.focus();
-      }
-
-      notification.info(
-        targetUrl
-          ? `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account} (${service.display_name || service.category}). Link đăng nhập (${targetUrl}) đã được chép vào bộ nhớ tạm. Hãy thao tác trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu vĩnh viễn trên VPS.`
-          : `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account}. Hãy thao tác đăng nhập trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu vĩnh viễn trên VPS.`,
-        "Trình Duyệt Đám Mây"
-      );
-
-      // 2. Gửi request backend để xác minh hoặc lưu phiên
-      const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          serviceName: service.display_name || service.category,
-          slotId: service.id,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
-        setLoggedSlotsMap((previous) => ({ ...previous, [service.id]: hasAuthenticatedSession }));
-        if (hasAuthenticatedSession) {
-          notification.success("Đã xác minh phiên đăng nhập của tài khoản này.", "Đã Đăng Nhập");
-        }
-      }
-    } catch (err: any) {
-      console.warn("Lưu ý probe session:", err);
-    } finally {
-      setOpeningSlotId(null);
-    }
-  };
-
-  const handleUpdateSlot = async (formData: WarehouseSlotEditFormData) => {
-    if (!editingSlotData) return;
-    setIsUpdatingSlot(true);
-    try {
-      const res = await fetch(`/api/warehouse/services/${editingSlotData.slot.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Không thể cập nhật slot dịch vụ");
-      }
-      notification.success("Cập nhật thông tin slot thành công!");
-      setEditingSlotData(null);
-      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-    } catch (err: any) {
-      console.error("Lỗi cập nhật slot:", err);
-      notification.error(err.message || "Lỗi cập nhật slot");
-    } finally {
-      setIsUpdatingSlot(false);
-    }
-  };
-
-  const handleUpdateAccount = async (accountId: number, newAccountName: string) => {
-    try {
-      const res = await fetch(`/api/warehouse/accounts/${accountId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account: newAccountName }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Không thể cập nhật tài khoản kho");
-      }
-      notification.success(
-        `Đã cập nhật tài khoản "${newAccountName}" thành công!`,
-        "Cập Nhật Thành Công"
-      );
-      setEditingAccount(null);
-      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-    } catch (err: any) {
-      console.error("Lỗi cập nhật tài khoản kho:", err);
-      notification.error(err.message || "Cập nhật tài khoản kho thất bại");
-      throw err;
-    }
-  };
-
-  const handleAddServiceSubmit = async (formData: WarehouseAddServiceFormData) => {
-    if (!addingServiceAccount) return;
-    setIsAddingService(true);
-    try {
-      const res = await fetch(`/api/warehouse/accounts/${addingServiceAccount.id}/services`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Không thể thêm dịch vụ vào tài khoản");
-      }
-      notification.success(
-        `Đã thêm dịch vụ "${formData.serviceName}" vào tài khoản ${addingServiceAccount.account} thành công!`,
-        "Thêm dịch vụ kho"
-      );
-      setAddingServiceAccount(null);
-      invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-    } catch (err: any) {
-      console.error("Lỗi thêm dịch vụ kho:", err);
-      notification.error(err.message || "Không thể thêm dịch vụ vào tài khoản");
-    } finally {
-      setIsAddingService(false);
-    }
+  const handleOpenEditSlot = (acc: WarehouseAccountItem, srv: WarehouseServiceSlot) => {
+    void ensureSystemProducts();
+    setEditingSlotData({ account: acc, slot: srv });
   };
 
   return (
@@ -512,7 +197,6 @@ export const WarehousePage: React.FC = () => {
 
       {/* STATISTICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-cyan-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">TỔNG TÀI KHOẢN GỐC</span>
@@ -521,7 +205,7 @@ export const WarehousePage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl lg:text-3xl font-bold text-white tracking-tight">{totalAccounts}</span>
+            <span className="text-2xl lg:text-3xl font-bold text-white tracking-tight">{stats.totalAccounts}</span>
             <span className="text-xs text-slate-400">tài khoản</span>
           </div>
           <div className="mt-2 text-xs text-cyan-400/80 font-medium flex items-center gap-1">
@@ -530,7 +214,6 @@ export const WarehousePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2 */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-emerald-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">SLOT SẴN SÀNG (TỒN KHO)</span>
@@ -539,7 +222,7 @@ export const WarehousePage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl lg:text-3xl font-bold text-emerald-400 tracking-tight">{totalAvailableSlots}</span>
+            <span className="text-2xl lg:text-3xl font-bold text-emerald-400 tracking-tight">{stats.totalAvailableSlots}</span>
             <span className="text-xs text-slate-400">slot trống</span>
           </div>
           <div className="mt-2 text-xs text-emerald-300/80 font-medium flex items-center gap-1">
@@ -548,7 +231,6 @@ export const WarehousePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3 */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-indigo-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">SLOT ĐANG SỬ DỤNG</span>
@@ -557,7 +239,7 @@ export const WarehousePage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl lg:text-3xl font-bold text-indigo-400 tracking-tight">{totalReservedSlots}</span>
+            <span className="text-2xl lg:text-3xl font-bold text-indigo-400 tracking-tight">{stats.totalReservedSlots}</span>
             <span className="text-xs text-slate-400">slot</span>
           </div>
           <div className="mt-2 text-xs text-indigo-300/80 font-medium flex items-center gap-1">
@@ -566,7 +248,6 @@ export const WarehousePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 4 */}
         <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 shadow-xl backdrop-blur-xl group hover:border-amber-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">CẢNH BÁO HẾT HẠN</span>
@@ -575,7 +256,7 @@ export const WarehousePage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl lg:text-3xl font-bold text-amber-400 tracking-tight">{totalExpiredSlots}</span>
+            <span className="text-2xl lg:text-3xl font-bold text-amber-400 tracking-tight">{stats.totalExpiredSlots}</span>
             <span className="text-xs text-slate-400">Cần xử lý</span>
           </div>
           <div className="mt-2 text-xs text-amber-300/80 font-medium flex items-center gap-1">
@@ -588,13 +269,13 @@ export const WarehousePage: React.FC = () => {
       {/* FILTER & TABS TOOLBAR */}
       <WarehouseFilterBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         searchTerm={searchTerm}
-        onSearchChange={(value) => { setSearchTerm(value); }}
+        onSearchChange={setSearchTerm}
         categoryFilter={categoryFilter}
-        onCategoryFilterChange={(value) => { setCategoryFilter(value); }}
+        onCategoryFilterChange={setCategoryFilter}
         statusFilter={statusFilter}
-        onStatusFilterChange={(value) => { setStatusFilter(value); }}
+        onStatusFilterChange={setStatusFilter}
         accountCount={filteredAccounts.length}
         catalogCount={catalog.length}
         availableCategories={availableCategories}
@@ -612,21 +293,14 @@ export const WarehousePage: React.FC = () => {
           onCopy={copyToClipboard}
           onAddService={(acc) => setAddingServiceAccount(acc)}
           onEditAccount={(acc) => setEditingAccount(acc)}
-          onEditSlot={(acc, srv) => setEditingSlotData({ account: acc, slot: srv })}
+          onEditSlot={handleOpenEditSlot}
           onDeleteSlot={(acc, srv) =>
             notification.confirm({
               title: "Xóa dịch vụ kho?",
               message: `Bạn có chắc muốn xóa dịch vụ "${srv.display_name || srv.category}" khỏi tài khoản ${acc.account}?`,
               onConfirm: async () => {
                 try {
-                  const res = await fetch(`/api/warehouse/services/${srv.id}`, { method: "DELETE" });
-                  if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || "Lỗi xóa dịch vụ kho");
-                  }
-                  notification.success(`Đã xóa dịch vụ "${srv.display_name || srv.category}" thành công!`);
-                  invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
+                  await deleteSlot(srv);
                 } catch (err: any) {
                   notification.error(err.message || "Không thể xóa dịch vụ kho");
                 }
@@ -639,164 +313,178 @@ export const WarehousePage: React.FC = () => {
               message: `Bạn có chắc muốn xóa tài khoản ${acc.account}? các slot bên trong sẽ bị gỡ bỏ!`,
               onConfirm: async () => {
                 try {
-                  const res = await fetch(`/api/warehouse/${acc.id}`, { method: "DELETE" });
-                  if (!res.ok) throw new Error("Lỗi xóa tài khoản");
-                  notification.success("Đã xóa tài khoản kho thành công!");
-                  invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
+                  await deleteAccount(acc);
                 } catch (err: any) {
                   notification.error(err.message || "Không thể xóa tài khoản");
                 }
               },
             })
           }
-          onOpenBrowser={handleOpenBrowser}
+          onOpenBrowser={openBrowserForSlot}
           loggedSlotsMap={loggedSlotsMap}
-          onVerifySession={handleOpenBrowser}
+          onVerifySession={openBrowserForSlot}
           openingSlotId={openingSlotId}
         />
       )}
 
-        
-      {/* TAB 2: CATALOG GRID */}
-      {activeTab === "catalog" && (
-        <WarehouseCatalogGrid
-          catalogItems={catalog}
-          onOpenCreateCatalog={() => setIsCatalogModalOpen(true)}
-          onEditCatalog={(cat) => setEditingCatalogItem(cat)}
-          onDeleteCatalog={(cat) => setDeletingCatalogItem(cat)}
-          onOpenBrowserWithUrl={handleOpenBrowserForUrl}
-          onTogglePackage={handleTogglePackage}
-        />
-      )}
+      {/* TAB 2 & MODALS (Lazy-loaded) */}
+      <Suspense fallback={null}>
+        {activeTab === "catalog" && (
+          <WarehouseCatalogGrid
+            catalogItems={catalog}
+            onOpenCreateCatalog={handleOpenCreateCatalog}
+            onEditCatalog={handleOpenEditCatalog}
+            onDeleteCatalog={(cat) => setDeletingCatalogItem(cat)}
+            onOpenBrowserWithUrl={openBrowserForUrl}
+            onTogglePackage={toggleCatalogPackage}
+          />
+        )}
 
-      {/* MODAL CREATE ACCOUNT */}
-      <WarehouseCreateModal
-        open={isAccountModalOpen}
-        formData={accountForm}
-        catalogItems={catalog}
-        existingAccounts={accounts}
-        onClose={() => setIsAccountModalOpen(false)}
-        onFormChange={setAccountForm}
-        onSubmit={async () => {
-          try {
-            const res = await fetch("/api/warehouse", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(accountForm),
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.error || "Lỗi tạo tài khoản kho");
-            }
-            notification.success("Đã tạo mới tài khoản kho thành công!", "Tạo tài khoản");
-            setIsAccountModalOpen(false);
-            setAccountForm({
-              account: "",
-              serviceName: "",
-              category: "",
-              variantTag: "",
-              password: "",
-              backupEmail: "",
-              twoFa: "",
-              providerKey: "",
-              otpEnabled: false,
-              statusCheckEnabled: false,
-              expiresAt: "",
-              note: "",
-              createPackage: false,
-              hasLinkedAccount: false,
-              linkedAccountRole: "storage",
-              linkedAccountId: null,
-              storageTotal: "",
-            });
-            invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-          } catch (err: any) {
-            notification.error(err.message || "Tạo tài khoản kho thất bại");
-          }
-        }}
-      />
+        {isAccountModalOpen && (
+          <WarehouseCreateModal
+            open={isAccountModalOpen}
+            formData={accountForm}
+            catalogItems={catalog}
+            existingAccounts={accounts}
+            onClose={() => setIsAccountModalOpen(false)}
+            onFormChange={setAccountForm}
+            onSubmit={async () => {
+              try {
+                await createAccount(accountForm);
+                setIsAccountModalOpen(false);
+                setAccountForm(INITIAL_ACCOUNT_FORM);
+              } catch (err: any) {
+                notification.error(err.message || "Tạo tài khoản kho thất bại");
+              }
+            }}
+          />
+        )}
 
-      {/* MODAL CREATE CATALOG */}
-      <CatalogCreateModal
-        open={isCatalogModalOpen}
-        formData={catalogForm}
-        systemProducts={systemProducts}
-        onClose={() => setIsCatalogModalOpen(false)}
-        onFormChange={setCatalogForm}
-        onSubmit={async () => {
-          try {
-            const res = await fetch("/api/warehouse/catalog", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(catalogForm),
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.error || "Lỗi tạo dịch vụ danh mục");
-            }
-            notification.success("Đã thêm dịch vụ vào danh mục thành công!", "Tạo dịch vụ");
-            setIsCatalogModalOpen(false);
-            invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-            await loadWarehouseData();
-          } catch (err: any) {
-            notification.error(err.message || "Tạo dịch vụ thất bại");
-          }
-        }}
-      />
+        {isCatalogModalOpen && (
+          <CatalogCreateModal
+            open={isCatalogModalOpen}
+            formData={catalogForm}
+            systemProducts={systemProducts}
+            onClose={() => setIsCatalogModalOpen(false)}
+            onFormChange={setCatalogForm}
+            onSubmit={async () => {
+              try {
+                await createCatalogItem(catalogForm);
+                setIsCatalogModalOpen(false);
+              } catch (err: any) {
+                notification.error(err.message || "Tạo dịch vụ thất bại");
+              }
+            }}
+          />
+        )}
 
-      {/* MODAL ADD SERVICE TO ACCOUNT */}
-      <WarehouseAddServiceModal
-        open={!!addingServiceAccount}
-        account={addingServiceAccount}
-        catalogItems={catalog}
-        isSubmitting={isAddingService}
-        onClose={() => setAddingServiceAccount(null)}
-        onSubmit={handleAddServiceSubmit}
-      />
+        {addingServiceAccount && (
+          <WarehouseAddServiceModal
+            open={!!addingServiceAccount}
+            account={addingServiceAccount}
+            catalogItems={catalog}
+            isSubmitting={isAddingService}
+            onClose={() => setAddingServiceAccount(null)}
+            onSubmit={async (formData) => {
+              setIsAddingService(true);
+              try {
+                await addServiceToAccount(addingServiceAccount, formData);
+                setAddingServiceAccount(null);
+              } catch (err: any) {
+                console.error("Lỗi thêm dịch vụ kho:", err);
+                notification.error(err.message || "Không thể thêm dịch vụ vào tài khoản");
+              } finally {
+                setIsAddingService(false);
+              }
+            }}
+          />
+        )}
 
-      {/* MODAL DELETE CATALOG */}
-      <CatalogDeleteModal
-        item={deletingCatalogItem}
-        onClose={() => setDeletingCatalogItem(null)}
-        onConfirmDelete={handleConfirmDeleteCatalog}
-        submitting={isDeletingCatalog}
-      />
+        {deletingCatalogItem && (
+          <CatalogDeleteModal
+            item={deletingCatalogItem}
+            onClose={() => setDeletingCatalogItem(null)}
+            onConfirmDelete={async () => {
+              setIsDeletingCatalog(true);
+              try {
+                await deleteCatalogItem(deletingCatalogItem);
+                setDeletingCatalogItem(null);
+              } catch (err: any) {
+                console.error("Lỗi xóa dịch vụ kho:", err);
+                notification.error(err.message || "Xóa dịch vụ kho thất bại", "Lỗi Xóa Dịch Vụ");
+              } finally {
+                setIsDeletingCatalog(false);
+              }
+            }}
+            submitting={isDeletingCatalog}
+          />
+        )}
 
-      {/* MODAL EDIT SLOT */}
-      <WarehouseEditSlotModal
-        open={!!editingSlotData}
-        account={editingSlotData?.account || null}
-        slot={editingSlotData?.slot || null}
-        catalogItems={catalog}
-        systemProducts={systemProducts}
-        isSubmitting={isUpdatingSlot}
-        onClose={() => setEditingSlotData(null)}
-        onSubmit={handleUpdateSlot}
-      />
+        {editingSlotData && (
+          <WarehouseEditSlotModal
+            open={!!editingSlotData}
+            account={editingSlotData.account}
+            slot={editingSlotData.slot}
+            catalogItems={catalog}
+            systemProducts={systemProducts}
+            isSubmitting={isUpdatingSlot}
+            onClose={() => setEditingSlotData(null)}
+            onSubmit={async (formData) => {
+              setIsUpdatingSlot(true);
+              try {
+                await updateSlot(editingSlotData.slot.id, formData);
+                setEditingSlotData(null);
+              } catch (err: any) {
+                console.error("Lỗi cập nhật slot:", err);
+                notification.error(err.message || "Lỗi cập nhật slot");
+              } finally {
+                setIsUpdatingSlot(false);
+              }
+            }}
+          />
+        )}
 
-      {/* MODAL EDIT ACCOUNT (TÀI KHOẢN GỐC) */}
-      <WarehouseEditAccountModal
-        open={!!editingAccount}
-        account={editingAccount}
-        onClose={() => setEditingAccount(null)}
-        onSubmit={handleUpdateAccount}
-      />
+        {editingAccount && (
+          <WarehouseEditAccountModal
+            open={!!editingAccount}
+            account={editingAccount}
+            onClose={() => setEditingAccount(null)}
+            onSubmit={async (accountId, newAccountName) => {
+              try {
+                await updateAccount(accountId, newAccountName);
+                setEditingAccount(null);
+              } catch (err: any) {
+                console.error("Lỗi cập nhật tài khoản kho:", err);
+                notification.error(err.message || "Cập nhật tài khoản kho thất bại");
+                throw err;
+              }
+            }}
+          />
+        )}
 
-      {/* MODAL EDIT CATALOG (SỬA THÔNG TIN & CẤU HÌNH LINK) */}
-      <CatalogEditModal
-        open={!!editingCatalogItem}
-        item={editingCatalogItem}
-        systemProducts={systemProducts}
-        isSubmitting={isUpdatingCatalog}
-        onClose={() => setEditingCatalogItem(null)}
-        onSubmit={handleUpdateCatalogSubmit}
-        onTagChanged={async () => {
-          invalidateApiCache(["/api/warehouse/catalog", "/api/warehouse/system-products"]);
-          await loadWarehouseData();
-        }}
-      />
+        {editingCatalogItem && (
+          <CatalogEditModal
+            open={!!editingCatalogItem}
+            item={editingCatalogItem}
+            systemProducts={systemProducts}
+            isSubmitting={isUpdatingCatalog}
+            onClose={() => setEditingCatalogItem(null)}
+            onSubmit={async (data) => {
+              setIsUpdatingCatalog(true);
+              try {
+                await updateCatalogItem(data);
+                setEditingCatalogItem(null);
+              } catch (err: any) {
+                console.error("Lỗi cập nhật catalog item:", err);
+                notification.error(err.message || "Cập nhật dịch vụ thất bại");
+              } finally {
+                setIsUpdatingCatalog(false);
+              }
+            }}
+            onTagChanged={invalidateAndReload}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

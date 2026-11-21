@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { CustomSelect, ToggleSwitch } from "@/shared/components";
 import {
   Edit2,
   X,
@@ -287,18 +288,19 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
               <Package className="w-3.5 h-3.5 text-cyan-400" />
               <span>Sản Phẩm Hệ Thống Liên Kết (Tùy chọn)</span>
             </label>
-            <select
-              value={productId || ""}
-              onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500 text-xs sm:text-sm transition-colors cursor-pointer"
-            >
-              <option value="">-- Không liên kết (Dịch vụ tự do) --</option>
-              {systemProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              value={productId ? String(productId) : ""}
+              accent="purple"
+              className="bg-slate-950/80"
+              onChange={(val) => setProductId(val ? Number(val) : null)}
+              options={[
+                { value: "", label: "-- Không liên kết (Dịch vụ tự do) --" },
+                ...systemProducts.map((p) => ({
+                  value: String(p.id),
+                  label: p.name,
+                })),
+              ]}
+            />
             <p className="text-[11px] text-slate-400 mt-1">
               💡 Liên kết dịch vụ kho này với loại sản phẩm bán hàng trong hệ thống (VD: Adobe, Google One).
             </p>
@@ -437,26 +439,24 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
               )}
             </div>
 
-            {/* Checkbox: Đồng bộ tag cho toàn bộ tài khoản kho hiện có */}
-            <div className="pt-2 border-t border-white/5">
-              <label className="flex items-start gap-2.5 cursor-pointer text-xs select-none group">
-                <input
-                  type="checkbox"
-                  checked={syncSlotsTag}
-                  onChange={(e) => setSyncSlotsTag(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-700 bg-slate-950 text-purple-600 focus:ring-purple-500 cursor-pointer h-4 w-4"
-                />
-                <div className="flex-1">
-                  <span className="font-semibold text-slate-200 group-hover:text-purple-300 transition-colors">
-                    Đồng bộ tag này cho toàn bộ {item.totalAccounts || 0} tài khoản kho hiện có
-                  </span>
-                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
-                    {category.trim()
-                      ? `Tất cả các tài khoản của "${item.name}" sẽ được cập nhật sang tag "[${category.trim()}]".`
-                      : `Gỡ bỏ toàn bộ tag của các tài khoản "${item.name}" về trạng thái không có tag.`}
-                  </p>
-                </div>
-              </label>
+            {/* Công tắc: Đồng bộ tag cho toàn bộ tài khoản kho hiện có */}
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-3 text-xs">
+              <div className="flex-1">
+                <span className="font-semibold text-slate-200 block">
+                  Đồng bộ tag này cho toàn bộ {item.totalAccounts || 0} tài khoản kho hiện có
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                  {category.trim()
+                    ? `Tất cả các tài khoản của "${item.name}" sẽ được cập nhật sang tag "[${category.trim()}]".`
+                    : `Gỡ bỏ toàn bộ tag của các tài khoản "${item.name}" về trạng thái không có tag.`}
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={syncSlotsTag}
+                onChange={setSyncSlotsTag}
+                variant="purple"
+                size="sm"
+              />
             </div>
 
             {/* Live Preview Badge */}

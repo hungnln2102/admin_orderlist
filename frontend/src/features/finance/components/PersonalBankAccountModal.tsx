@@ -131,7 +131,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-150">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar shadow-2xl animate-in fade-in zoom-in duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <Building2 className="w-5 h-5 text-cyan-400" />
@@ -143,7 +143,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Số Tài Khoản (STK) *</label>
               <input
@@ -168,7 +168,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
               <select
@@ -199,7 +199,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Số Dư / Số Tiền (₫) *</label>
               <div className="relative">

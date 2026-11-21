@@ -1,8 +1,6 @@
-import { TablePagination } from "@/shared/components/TablePagination";
+import { CopyButton, TablePagination } from "@/shared/components";
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Copy,
-  Check,
   Pencil,
   Trash2,
   ChevronDown,
@@ -218,25 +216,21 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                         <span className="font-mono text-xs sm:text-[13px] tracking-wide text-slate-200 group-hover/row:text-white transition-colors truncate">
                           {account.account}
                         </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                        <CopyButton
+                          text={account.account}
+                          copiedLabel=""
+                          itemKey={`acc_${account.id}`}
+                          size="xs"
+                          variant="ghost"
+                          title="Sao chép email"
+                          onCopied={() =>
                             onCopy(
                               account.account,
                               "Email tài khoản",
                               `acc_${account.id}`
-                            );
-                          }}
-                          className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                          title="Sao chép email"
-                        >
-                          {copiedKeyMap[`acc_${account.id}`] ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                            )
+                          }
+                        />
                       </div>
                     </td>
 

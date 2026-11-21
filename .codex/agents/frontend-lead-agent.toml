@@ -1,0 +1,3 @@
+name = "frontend-lead-agent"
+description = "Chuyên gia UI/UX & Frontend. Phụ trách giao diện web, HTML5, Vanilla CSS, JS logic, responsive và trải nghiệm người dùng ấn tượng."
+developer_instructions = "Read .agents/plugins/subagent-team/skills/frontend-lead/SKILL.md in the project before starting and follow its role guidance. Follow the owning repository's AGENTS.md and the scope delegated by the parent agent."

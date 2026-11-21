@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FixedCost, FixedCostCategory } from "../types";
-import { X, Save, Home, Tag } from "lucide-react";
+import { X, Save, Home } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { CurrencyInputVN, CustomSelect, ToggleSwitch } from "@/shared/components";
 
 interface Props {
   isOpen: boolean;
@@ -9,13 +10,6 @@ interface Props {
   onSave: (payload: any) => Promise<void>;
   editingItem?: FixedCost | null;
 }
-
-const formatAmountInput = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  return digits ? Number(digits).toLocaleString("vi-VN") : "";
-};
-
-const parseAmountInput = (value: string) => Number(value.replace(/\D/g, ""));
 
 export const FixedCostModal: React.FC<Props> = ({
   isOpen,
@@ -25,8 +19,7 @@ export const FixedCostModal: React.FC<Props> = ({
 }) => {
   const notify = useNotification();
   const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const amountInputRef = useRef<HTMLInputElement>(null);
+  const [amount, setAmount] = useState<number>(0);
   const [category, setCategory] = useState<FixedCostCategory>("LIVING");
   const [note, setNote] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -35,13 +28,13 @@ export const FixedCostModal: React.FC<Props> = ({
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
-      setAmount(formatAmountInput(String(editingItem.amount)));
+      setAmount(Number(editingItem.amount) || 0);
       setCategory(editingItem.category || "LIVING");
       setNote(editingItem.note || "");
       setIsActive(editingItem.isActive);
     } else {
       setName("");
-      setAmount("");
+      setAmount(0);
       setCategory("LIVING");
       setNote("");
       setIsActive(true);
@@ -50,30 +43,9 @@ export const FixedCostModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value;
-    const caretPosition = event.target.selectionStart ?? rawValue.length;
-    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
-    const formattedValue = formatAmountInput(rawValue);
-
-    setAmount(formattedValue);
-    requestAnimationFrame(() => {
-      const input = amountInputRef.current;
-      if (!input) return;
-      let nextCaret = 0;
-      let digitCount = 0;
-      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
-        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
-        nextCaret += 1;
-      }
-      input.setSelectionRange(nextCaret, nextCaret);
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amountValue = parseAmountInput(amount);
-    if (!name.trim() || amountValue < 1000) {
+    if (!name.trim() || amount < 1000) {
       notify.warning("Vui lòng điền tên và số tiền chi phí hợp lệ (>= 1.000₫)", "Thiếu Thông Tin");
       return;
     }
@@ -82,7 +54,7 @@ export const FixedCostModal: React.FC<Props> = ({
       setSubmitting(true);
       await onSave({
         name: name.trim(),
-        amount: amountValue,
+        amount,
         category,
         note: note.trim(),
         isActive,
@@ -96,103 +68,119 @@ export const FixedCostModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
               <Home className="w-5 h-5" />
             </div>
-            <h3 className="text-lg font-bold text-white">
-              {editingItem ? "Sửa Chi Phí Cố Định" : "Thêm Chi Phí Cố Định"}
-            </h3>
+            <div>
+              <h3 className="text-lg font-bold text-white">
+                {editingItem ? "Sửa Chi Phí Cố Định" : "Thêm Chi Phí Cố Định"}
+              </h3>
+              <p className="text-xs text-slate-400">
+                Thiết lập định mức chi phí hàng tháng để tính mục tiêu hòa vốn
+              </p>
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-              Tên khoản chi phí <span className="text-rose-400">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="VD: Tiền thuê nhà, Tiền ăn uống, Internet..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Số tiền mỗi tháng (₫) <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
+        {/* Form Body — Form Ngang 2 Cột */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            {/* Cột Trái: Thông tin khoản chi & Số tiền */}
+            <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                  Tên khoản chi phí <span className="text-rose-400">*</span>
+                </label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  placeholder="5.000.000"
-                  ref={amountInputRef}
-                  value={amount}
-                  onChange={handleAmountChange}
+                  placeholder="VD: Tiền thuê nhà, Tiền ăn uống, Internet..."
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400 pl-9 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400"
                 />
-                <span className="absolute left-3 top-2.5 text-sm text-slate-500">₫</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                    Số tiền mỗi tháng (₫) <span className="text-rose-400">*</span>
+                  </label>
+                  <CurrencyInputVN
+                    value={amount}
+                    onChange={setAmount}
+                    accentColor="rose"
+                    suffix="₫"
+                    placeholder="5.000.000"
+                    required
+                    className="py-2.5"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                    Phân loại
+                  </label>
+                  <CustomSelect
+                    value={category}
+                    onChange={(val) => setCategory(val as FixedCostCategory)}
+                    accent="rose"
+                    className="bg-slate-950 border-slate-800"
+                    options={[
+                      { value: "LIVING", label: "Sinh hoạt (Nhà/Ăn/Ở)" },
+                      { value: "SHOP_OPERATIONS", label: "Vận hành Shop" },
+                      { value: "SOFTWARE", label: "Phần mềm / Dịch vụ" },
+                      { value: "OTHER", label: "Khác" },
+                    ]}
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Phân loại
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as FixedCostCategory)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400"
-              >
-                <option value="LIVING">Sinh hoạt (Nhà/Ăn/Ở)</option>
-                <option value="SHOP_OPERATIONS">Vận hành Shop</option>
-                <option value="SOFTWARE">Phần mềm / Dịch vụ</option>
-                <option value="OTHER">Khác</option>
-              </select>
+            {/* Cột Phải: Ghi chú & Trạng thái áp dụng */}
+            <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                  Ghi chú thêm
+                </label>
+                <textarea
+                  placeholder="Ghi chú chi tiết nếu có..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={3}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+                <div>
+                  <span className="text-xs font-semibold text-slate-200 block">
+                    Đang áp dụng
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    Trừ vào mục tiêu hòa vốn tháng này
+                  </span>
+                </div>
+                <ToggleSwitch
+                  checked={isActive}
+                  onChange={setIsActive}
+                  variant="rose"
+                  size="md"
+                />
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-              Ghi chú thêm
-            </label>
-            <textarea
-              placeholder="Ghi chú chi tiết nếu có..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-400 resize-none"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              type="checkbox"
-              id="isActiveFixedCost"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="rounded bg-slate-950 border-slate-800 text-rose-500 focus:ring-0 w-4 h-4 cursor-pointer"
-            />
-            <label htmlFor="isActiveFixedCost" className="text-xs text-slate-300 cursor-pointer">
-              Đang áp dụng (Trừ vào mục tiêu hòa vốn tháng này)
-            </label>
           </div>
 
           {/* Footer */}
@@ -200,7 +188,7 @@ export const FixedCostModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Hủy
             </button>
