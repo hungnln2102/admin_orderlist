@@ -143,7 +143,7 @@ const createWarehouseAccount = async (payload) => {
         password,
         backup_email: backupEmail,
         two_fa: twoFa,
-        expires_at: expiresAt ? new Date(expiresAt) : null,
+        expires_at: expiresAt,
         note,
         variant_tag: variantTag ? String(variantTag).trim() : null,
         status: "AVAILABLE",
@@ -155,6 +155,14 @@ const createWarehouseAccount = async (payload) => {
     }
 
     for (const slot of slotsToInsert) {
+      const inputExpiry = String(slot.expires_at ?? "").trim();
+      const vnDate = inputExpiry.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      const dateInput = vnDate ? `${vnDate[3]}-${vnDate[2]}-${vnDate[1]}` : inputExpiry;
+      const expiry = dateInput ? new Date(dateInput) : null;
+      if (expiry && (!Number.isFinite(expiry.getTime()) ||
+        (/^\d{4}-\d{2}-\d{2}$/.test(dateInput) && expiry.toISOString().slice(0, 10) !== dateInput))) {
+        throw new Error("Ngày hết hạn không hợp lệ. Vui lòng nhập theo dd/mm/yyyy.");
+      }
       const providerSettings = slotProviderSettings(slot);
       const slotName = slot.display_name || slot.category || "Dịch vụ";
       let pName = await trx(TABLES.PRODUCT_NAMES)
@@ -182,7 +190,7 @@ const createWarehouseAccount = async (payload) => {
             password: slot.password || existingService.password,
             backup_email: slot.backup_email || existingService.backup_email,
             two_fa: slot.two_fa || existingService.two_fa,
-            expired_at: slot.expires_at ? new Date(slot.expires_at) : existingService.expired_at,
+            expired_at: expiry ?? existingService.expired_at,
             status: slot.status || existingService.status || "AVAILABLE",
             service_note: slot.note || existingService.service_note,
             variant_tag: variantTag || null,
@@ -196,7 +204,7 @@ const createWarehouseAccount = async (payload) => {
           password: slot.password || null,
           backup_email: slot.backup_email || null,
           two_fa: slot.two_fa || null,
-          expired_at: slot.expires_at ? new Date(slot.expires_at) : null,
+          expired_at: expiry,
           status: slot.status || "AVAILABLE",
           service_note: slot.note || null,
           variant_tag: variantTag || null,

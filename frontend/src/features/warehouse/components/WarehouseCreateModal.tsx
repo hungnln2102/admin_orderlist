@@ -1,4 +1,5 @@
 import { SlotProviderControls } from "./SlotProviderControls";
+import { DateInputVN } from "@/shared/components/DateInputVN";
 import React, { useState } from "react";
 import {
   Archive,
@@ -249,12 +250,10 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">Ngày Hết Hạn</label>
-              <input
-                type="text"
-                placeholder="Ví dụ: 2026-12-31 hoặc 31/12/2026"
+              <DateInputVN
+                placeholder="dd/mm/yyyy"
                 value={formData.expiresAt}
-                onChange={(e) => onFormChange({ ...formData, expiresAt: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 text-xs font-mono"
+                onChange={(expiresAt) => onFormChange({ ...formData, expiresAt })}
               />
             </div>
           </div>

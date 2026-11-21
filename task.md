@@ -573,4 +573,7 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 ## CI/CD cho Admin Order List
 
 - [x] Tạo workflow kiểm tra và triển khai commit đã xác thực. Build frontend và kiểm tra cú pháp thành công.
-- [ ] Cấu hình secrets cho môi trường GitHub production và xác minh lần chạy đầu tiên.
+- [x] Cấu hình secrets cho môi trường GitHub production và xác minh lần chạy đầu tiên. Run 44905775495 thành công, API health xác nhận kết nối DB.
+## Ngày hết hạn tài khoản kho
+
+- [x] Hiển thị ô nhập theo dd/mm/yyyy, tự chèn dấu gạch chéo và xác thực ngày trước khi lưu.

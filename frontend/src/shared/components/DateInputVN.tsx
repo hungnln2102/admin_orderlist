@@ -73,7 +73,7 @@ export const DateInputVN: React.FC<DateInputVNProps> = ({
 
     // Tự động chèn dấu '/' khi người dùng gõ chuỗi số liên tục (ví dụ 16102027)
     const digitsOnly = raw.replace(/\D/g, "");
-    if (digitsOnly.length > 2 && !raw.includes("/")) {
+    if (digitsOnly.length > 2 && (!raw.includes("/") || /^\d{2}\/\d{3,6}$/.test(raw))) {
       if (digitsOnly.length <= 4) {
         raw = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
       } else {
@@ -87,6 +87,7 @@ export const DateInputVN: React.FC<DateInputVNProps> = ({
     }
 
     setDisplayText(raw);
+    if (!raw) onChange("");
 
     // Khi người dùng nhập đủ 10 ký tự dạng DD/MM/YYYY
     if (raw.length === 10) {
