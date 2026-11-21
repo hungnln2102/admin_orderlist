@@ -1,5 +1,7 @@
 ## 2026-11-21 – Hiển thị đầy đủ ngày trong danh sách đơn hàng
 
+- [x] Sửa khai báo route gỡ variant nhà cung cấp để tương thích Express 4 và 5.
+
 - [x] Form Thêm tài khoản kho hiển thị các tag của sản phẩm thành nút và làm nổi bật tag đang chọn. Frontend build thành công.
 
 - [x] Hiển thị ngày đăng ký và ngày hết hạn trên cùng một hàng theo dạng `dd/mm/yyyy - dd/mm/yyyy`. Frontend build thành công.
