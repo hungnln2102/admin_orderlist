@@ -80,7 +80,7 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
             `${TABLES.ORDER_LIST}.${COLS.ORDER_LIST.ID_ORDER}`,
             `${TABLES.ACTIVATION_KEYS}.${key.ID_ORDER}`,
           ])
-          .whereNotIn(COLS.ORDER_LIST.STATUS, [ORDER_STATUS.CANCELED, ORDER_STATUS.REFUNDED, "Đã Hủy", "Đã Hoàn Tiền"])
+          .whereNotIn(COLS.ORDER_LIST.STATUS, [ORDER_STATUS.CANCELED, ORDER_STATUS.REFUNDED ?? "REFUNDED", "Đã Hủy", "Đã Hoàn Tiền", "Đã Hoàn"])
           .whereRaw("(?? IS NULL OR ??::date >= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)", [
             COLS.ORDER_LIST.EXPIRED_AT, COLS.ORDER_LIST.EXPIRED_AT,
           ])

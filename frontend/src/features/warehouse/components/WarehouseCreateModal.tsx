@@ -43,6 +43,13 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
 
   if (!open) return null;
 
+  const productNames = [...new Set(catalogItems.map((item) => item.name))];
+  const availableTags = [...new Set(
+    catalogItems
+      .filter((item) => item.name === formData.serviceName)
+      .flatMap((item) => item.availableTags ?? []),
+  )];
+
   // 1. Đồng bộ ngày hết hạn từ đơn nhập MAVN theo email (TUYỆT ĐỐI KHÔNG LƯU id_order)
   const handleSyncOrderDate = async () => {
     const emailToSearch = String(formData.account || "").trim();
@@ -136,10 +143,11 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
 
           {/* Loại Dịch Vụ */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Loại Dịch Vụ (*)
+            <label htmlFor="warehouse-create-product" className="block text-xs font-medium text-slate-300 mb-1">
+              Sản phẩm (*)
             </label>
             <select
+              id="warehouse-create-product"
               value={formData.serviceName}
               onChange={(e) => {
                 const selectedName = e.target.value;
@@ -149,21 +157,23 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
                 onFormChange({
                   ...formData,
                   serviceName: selectedName,
-                  category: foundCat ? foundCat.category : selectedName,
+                  category: selectedName,
+                  variantTag: "",
                   createPackage: shouldCreatePkg ? true : formData.createPackage,
                 });
               }}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 text-xs"
             >
-              {catalogItems.length > 0 ? (
-                catalogItems.map((item) => (
-                  <option key={item.id} value={item.name}>
-                    {item.name} {item.category ? `(${item.category})` : ""} {item.isPackage ? "[Gói Kho]" : ""}
+              <option value="" disabled>Chọn sản phẩm</option>
+              {productNames.length > 0 ? (
+                productNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))
               ) : (
                 <>
-                  <option value="Adobe (1PC Cố Định)">Adobe (1PC Cố Định)</option>
+                  <option value="Adobe">Adobe</option>
                   <option value="Youtube Premium">Youtube Premium</option>
                   <option value="Netflix Premium 4K">Netflix Premium 4K</option>
                   <option value="ChatGPT Plus">ChatGPT Plus</option>
@@ -171,6 +181,34 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
               )}
             </select>
           </div>
+
+          {availableTags.length > 0 && (
+            <fieldset>
+              <legend className="text-xs font-medium text-slate-300 mb-1">
+                Tag
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map((tag) => {
+                  const selected = formData.variantTag === tag;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => onFormChange({ ...formData, variantTag: selected ? "" : tag })}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400 ${
+                        selected
+                          ? "border-cyan-400 bg-cyan-400/20 text-cyan-100"
+                          : "border-slate-700 bg-slate-950 text-slate-300 hover:border-cyan-500 hover:text-cyan-200"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
 
           {/* Mật khẩu & Mã 2FA */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -416,7 +454,8 @@ export const WarehouseCreateModal: React.FC<WarehouseCreateModalProps> = ({
           </button>
           <button
             onClick={onSubmit}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-lg shadow-blue-600/25 transition-all cursor-pointer active:scale-95"
+            disabled={!formData.serviceName || (productNames.length > 0 && !productNames.includes(formData.serviceName))}
+            className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-lg shadow-blue-600/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Lưu Tài Khoản
           </button>

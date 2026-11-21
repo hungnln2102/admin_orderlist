@@ -1,3 +1,9 @@
+## 2026-11-21 – Hiển thị đầy đủ ngày trong danh sách đơn hàng
+
+- [x] Form Thêm tài khoản kho hiển thị các tag của sản phẩm thành nút và làm nổi bật tag đang chọn. Frontend build thành công.
+
+- [x] Hiển thị ngày đăng ký và ngày hết hạn trên cùng một hàng theo dạng `dd/mm/yyyy - dd/mm/yyyy`. Frontend build thành công.
+
 ## 2026-11-10 – Ban hành Quy Trình Vận Hành & Nghiệp Vụ Chuẩn Cửa Hàng (SOP)
 
 - [x] Chuyển đổi và hoàn thiện tài liệu [docs/business-rules/core-business-flows.md](file:///d:/Desktop/admin/admin_orderlist/docs/business-rules/core-business-flows.md) thành Quy Trình Nghiệp Vụ Chuẩn (SOP) thuần túy ngôn ngữ kinh doanh/vận hành dành cho khách hàng và quản trị viên (loại bỏ hoàn toàn thuật ngữ code). Chuẩn hóa 9 luồng thao tác thực tế (bao gồm Nhập hàng, phân loại NCC Mavryk vs NCC ngoài, và 3 kịch bản Lưu kho/Tạo gói): Biến động dòng tiền Bank, Tự động khớp thanh toán đơn hàng & sản phẩm Mavryk, Thanh toán bằng số dư Credit (Đủ/Thiếu mã QR/Dư liên kết cha-con), Lưu vết sửa đơn hàng, Hủy đơn bảo vệ quyền lợi & hoàn NCC, Tự động gia hạn 0h áp dụng giá mới, Thanh toán nợ NCC không tính trùng chi phí, và Rào chắn an toàn cấm xóa sản phẩm đang hoạt động. Tham chiếu tại [docs/KNOWLEDGE_BASE.md](file:///d:/Desktop/admin/admin_orderlist/docs/KNOWLEDGE_BASE.md).

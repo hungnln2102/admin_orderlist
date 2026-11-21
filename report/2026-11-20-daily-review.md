@@ -262,3 +262,43 @@
 
 - Adobe Renew #46 có 2 vị trí khả dụng. Thử hai key nhận cùng gói, tra cứu lại key đầu và từ chối key thứ ba trong giao dịch hoàn nguyên.
 - Unit test đạt 6/6. Bộ integration chuẩn vẫn yêu cầu `TEST_DATABASE_URL`.
+
+## [23:42] Đóng Gói Container Docker Cho OTP Portal & Chuẩn Hóa Deploy Tương Tự Admin Order List
+
+### 1. Bối cảnh & Yêu Cầu Từ Master
+- **Chỉ đạo của Master**:
+  - *"tôi không cần dùng dist nữa tránh việc cache các bản cũ. chạy code luôn. tạo container cho otp_portal trên vps"*
+  - Loại bỏ hoàn toàn phương thức đồng bộ thư mục tĩnh `dist/` cũ trên VPS để tránh tình trạng trình duyệt/CDN bị cache bản build cũ.
+  - Chuẩn hóa toàn bộ quy trình đóng gói và triển khai của `otp_portal` thành Container Docker độc lập giống như `admin_orderlist`.
+
+### 2. Thay Đổi Kỹ Thuật (Architecture & Implementation)
+1. **Container Hóa Dự Án `otp_portal`**:
+   - [otp_portal/Dockerfile](file:///E:/Project/admin_store/otp_portal/Dockerfile): Multi-stage build (Node 20 build stage $\rightarrow$ Nginx 1.27 Alpine runtime).
+   - [otp_portal/nginx.conf](file:///E:/Project/admin_store/otp_portal/nginx.conf): Cấu hình Nginx trong container:
+     - `index.html`: Gắn header `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` (ngăn cache tuyệt đối).
+     - Hashed assets: Gắn `Cache-Control: public, immutable` với thời hạn 1 năm.
+     - Định tuyến dự phòng cho `/assets/` (ảnh minh họa holidays, font chữ) và `/scripts/` (anime canvas engine).
+   - [otp_portal/docker-compose.yml](file:///E:/Project/admin_store/otp_portal/docker-compose.yml): Định nghĩa container `otp_portal` mở cổng nội bộ `127.0.0.1:3005:80`, giới hạn tài nguyên 256MB RAM / 0.5 CPU.
+   - [otp_portal/deploy.sh](file:///E:/Project/admin_store/otp_portal/deploy.sh): Script triển khai tự động 4 bước tương tự `admin_orderlist/deploy.sh`:
+     - [1/4] `git pull origin main` (có auto-stash bảo vệ worktree).
+     - [2/4] `docker compose build` (tận dụng BuildKit & layer cache).
+     - [3/4] `docker compose up -d --remove-orphans`.
+     - [4/4] Kiểm tra cú pháp và tự động reload Host Nginx (`nginx -t && nginx -s reload`).
+
+2. **Triển Khai & Khắc Phục Mạng Trên VPS (`180.93.43.169`)**:
+   - **Xử lý sự cố TLS Timeout Docker Hub**: Phát hiện máy chủ bị nghẽn kết nối IPv6 khi truy vấn `registry-1.docker.io`. Đã kích hoạt ưu tiên IPv4 trong `/etc/gai.conf` (`precedence ::ffff:0:0/96 100`), giúp kết nối Docker Hub giảm từ timeout >5s xuống còn 0.2s.
+   - **Thiết lập Repo**: Backup thư mục tĩnh cũ sang `/var/www/otp_portal_static_backup`, clone mã nguồn Git chính thức vào `/var/www/otp_portal`.
+   - **Cấu hình Reverse Proxy Host Nginx**: Cập nhật `/etc/nginx/sites-available/mavrykpremium`:
+     - Chuyển `location ^~ /otp/` từ đọc đĩa tĩnh `alias /var/www/otp_portal/dist/` sang `proxy_pass http://127.0.0.1:3005;`.
+     - Chuyển `location /assets/holidays/` và `/assets/fonts/` sang proxy trực tiếp vào container `127.0.0.1:3005`.
+
+### 3. Kết Quả Kiểm Thử & Đo Đạc (Verification)
+1. **Kiểm tra Container Status trên VPS**:
+   - `docker ps --filter name=otp_portal`: Container `otp_portal` trạng thái `Up`, lắng nghe tại `127.0.0.1:3005->80/tcp`.
+2. **Kiểm tra Kịch bản Deploy Tự Động**:
+   - Chạy thử nghiệm `./deploy.sh` trên VPS: Build và khởi động lại container hoàn tất thành công trong 19s (exit code 0), Host Nginx tự động reload 0-downtime.
+3. **Kiểm tra Live URL Production (Playwright & HTTP Headers)**:
+   - `curl -I https://www.mavrykpremium.com/otp/`: Trả về `HTTP/2 200 OK`.
+   - Header `Cache-Control`: `no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` (Xóa bỏ hoàn toàn nguy cơ dính cache file cũ).
+   - Kiểm thử Playwright trên `https://www.mavrykpremium.com/otp/`: Title *"Mavryk Premium — Cổng Nhận Mã OTP & Kích Hoạt"*, 0 lỗi Javascript (`errors: []`), hiệu ứng Canvas Anime (`HolidayEffects`) hoạt động mượt mà.
+

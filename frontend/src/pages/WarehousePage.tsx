@@ -74,8 +74,8 @@ export const WarehousePage: React.FC = () => {
   // Form states
   const [accountForm, setAccountForm] = useState<WarehouseAccountFormData>({
     account: "",
-    serviceName: "Youtube Premium",
-    category: "Youtube Premium",
+    serviceName: "",
+    category: "",
     variantTag: "",
     password: "",
     backupEmail: "",
@@ -691,8 +691,8 @@ export const WarehousePage: React.FC = () => {
             setIsAccountModalOpen(false);
             setAccountForm({
               account: "",
-              serviceName: catalog[0]?.name || "Adobe (1PC Cố Định)",
-              category: catalog[0]?.category || "Adobe (1PC Cố Định)",
+              serviceName: "",
+              category: "",
               variantTag: "",
               password: "",
               backupEmail: "",

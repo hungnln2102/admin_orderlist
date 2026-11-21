@@ -92,14 +92,14 @@ export const OrderTable: React.FC<OrderTableProps> = ({
     <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-xl overflow-hidden flex flex-col w-full">
       {/* 1. Desktop & Laptop Table View */}
       <div className="hidden sm:block overflow-x-auto custom-scrollbar flex-1 min-h-[420px] w-full">
-        <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
+        <table className="w-full min-w-[830px] table-fixed border-collapse text-left">
           <thead>
             <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
               <th className="py-3.5 px-2 w-9 sm:w-10 text-center">#</th>
               <th className={`py-3.5 px-2.5 sm:px-3 ${activeTab === "import" ? "w-[20%]" : "w-[24%]"}`}>Mã Đơn & Sản Phẩm</th>
               <th className={`py-3.5 px-2.5 sm:px-3 ${activeTab === "import" ? "w-[16%]" : "w-[18%]"}`}>Khách Hàng & Liên Hệ</th>
               <th className={`py-3.5 px-2.5 sm:px-3 ${activeTab === "import" ? "w-[17%]" : "w-[19%]"}`}>Thông Tin & Slot</th>
-              <th className="py-3.5 px-2 w-[110px] text-center whitespace-nowrap">
+              <th className="py-3.5 px-2 w-[180px] text-center whitespace-nowrap">
                 <span className="hidden xl:inline">Ngày Đăng Ký - </span>Hết Hạn
               </th>
               <th className="py-3.5 px-2 w-24 text-right whitespace-nowrap">Giá Bán</th>
@@ -233,14 +233,13 @@ export const OrderTable: React.FC<OrderTableProps> = ({
 
                       {/* Registration & Expiration Dates */}
                       <td
-                        className="py-3.5 px-2 text-center whitespace-nowrap overflow-hidden"
+                        className="py-3.5 px-2 text-center whitespace-nowrap"
                         title={`Đăng ký: ${formatDateDisplay(order.order_date || order.created_at)} - Hết hạn: ${formatDateDisplay(order.expired_at)}`}
                       >
-                        <div className="text-amber-300 font-semibold flex items-center justify-center font-mono text-[11px] truncate">
-                          <span className="hidden xl:inline text-slate-400 font-normal">
+                        <div className="text-amber-300 font-semibold font-mono text-[11px]">
+                          <span className="text-slate-400 font-normal">
                             {formatDateDisplay(order.order_date || order.created_at)}
-                            <span className="text-slate-500 font-bold px-1">-</span>
-                          </span>
+                          </span>{" - "}
                           <span>{formatDateDisplay(order.expired_at)}</span>
                         </div>
                         {activeTab !== "canceled" && (
@@ -549,7 +548,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                 <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs">
                   <div>
                     <div className="text-[10.5px] text-slate-400">Thời hạn sử dụng</div>
-                    <div className="font-mono text-slate-200 font-medium">
+                    <div className="whitespace-nowrap font-mono text-slate-200 font-medium">
                       {formatDateDisplay(order.order_date || order.created_at)} -{" "}
                       <span className="text-amber-300 font-semibold">{formatDateDisplay(order.expired_at)}</span>
                     </div>
