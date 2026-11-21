@@ -35,8 +35,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const remainingValue = calculateRemainingValue(order);
 
   const isPaid = order.status === ORDER_STATUS.PAID;
-  const isRefunded = order.status === ORDER_STATUS.REFUNDED;
-  const isPendingRefund = order.status === ORDER_STATUS.REFUND_PENDING;
   const isCanceled = order.status === ORDER_STATUS.CANCELED;
 
   const handleCopy = (text: string, field: string) => {
@@ -217,36 +215,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   <div className="text-emerald-400 font-bold text-sm">Thanh toán thành công</div>
                   <p className="text-xs text-slate-400">Đơn hàng đã hoàn tất thanh toán. Không cần quét QR thu tiền.</p>
                 </div>
-              ) : isRefunded ? (
-                <div className="rounded-xl border border-pink-500/30 bg-pink-950/20 p-4 text-center space-y-2 h-full flex flex-col items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <div className="text-pink-400 font-bold text-sm">Đã hoàn tiền</div>
-                  <p className="text-xs text-slate-400">Đơn hàng này đã hoàn tất thủ tục hoàn tiền.</p>
-                </div>
-              ) : isPendingRefund ? (
-                <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-4 text-center space-y-2.5 h-full flex flex-col items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-300">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <div className="text-purple-300 font-bold text-sm">Đang chờ hoàn tiền</div>
-                  <p className="text-xs text-slate-400">
-                    Số tiền hoàn: <strong className="text-purple-300 text-sm">{fmt(remainingValue || Number(order.price || 0))} ₫</strong>
-                  </p>
-                  {order.contact && (
-                    <div className="text-[11px] text-slate-300 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 w-full">
-                      Thông tin liên hệ: <span className="font-bold text-cyan-300">{order.contact}</span>
-                    </div>
-                  )}
-                </div>
               ) : isCanceled ? (
                 <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-4 text-center space-y-2 h-full flex flex-col items-center justify-center">
                   <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
                     <X className="w-6 h-6" />
                   </div>
-                  <div className="text-rose-400 font-bold text-sm">Đơn hàng đã hủy</div>
-                  <p className="text-xs text-slate-400">Mã QR thanh toán không khả dụng cho đơn hàng đã hủy.</p>
+                  <div className="text-rose-400 font-bold text-sm">Đơn hàng đã hoàn</div>
+                  <p className="text-xs text-slate-400">Đơn hàng này đã được chuyển sang luồng hoàn tiền.</p>
                 </div>
               ) : order.is_variant_inactive ? (
                 <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-center space-y-2 h-full flex flex-col items-center justify-center">

@@ -179,8 +179,11 @@ router.put("/product-apis/rules/:id", productApiController.updateRule);
 // DELETE /api/system/product-apis/rules/:id - Xóa quy tắc định tuyến
 router.delete("/product-apis/rules/:id", productApiController.deleteRule);
 
-// DELETE /api/system/product-apis/supplier-variants/:supplierCostId? - Gỡ variant khỏi NCC
-router.delete("/product-apis/supplier-variants/:supplierCostId?", productApiController.deleteSupplierVariant);
+// Gỡ variant khỏi NCC bằng ID trên URL hoặc dữ liệu gửi trong request.
+router.delete(
+  ["/product-apis/supplier-variants", "/product-apis/supplier-variants/:supplierCostId"],
+  productApiController.deleteSupplierVariant,
+);
 
 // GET /api/system/product-apis/mapping - Lấy dictionary map theo product_id/variant_id/display_name
 router.get("/product-apis/mapping", productApiController.getMapping);

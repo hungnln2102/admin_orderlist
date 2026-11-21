@@ -13,3 +13,9 @@
 - Form hiển thị tên sản phẩm, lấy tag từ `availableTags` và xóa tag cũ khi đổi sản phẩm. Tag đã chọn được gửi qua trường `variantTag` khi lưu.
 - Các tag hiện thành danh sách nút. Nút đang chọn sáng lên và có thể bấm lại để bỏ chọn.
 - `npm run build` thành công. Chưa kiểm tra thao tác lưu trên trình duyệt hoặc triển khai lên hệ thống đang chạy.
+
+## Hợp nhất thay đổi từ VPS
+
+- Giữ logic chuẩn hóa trạng thái đơn, migration, ghi chi phí nhà cung cấp và ghi chú vận hành.
+- Giữ cú pháp route tương thích Express 4. Migration email receipt trên VPS trùng nội dung với file đã có trong Git.
+- Frontend build, `node --check` và `git diff --cached --check` thành công. Truy vấn chỉ đọc xác nhận trạng thái và ràng buộc tương ứng trên production. Chưa kiểm thử thanh toán end-to-end.

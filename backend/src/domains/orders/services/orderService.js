@@ -8,6 +8,7 @@ const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
 const { generateOrderActivationKey } = require("@/domains/products/services/activationKeyService");
 const { listImportWarehouseTags } = require("@/domains/warehouse/services/importWarehouseTagService");
+const { ensureSupplierCostLog } = require("./supplierCostLogService");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -219,12 +220,12 @@ async function resolveSupplyId(trx, supplyInput) {
   const num = Number(supplyInput);
   if (!isNaN(num) && num > 0) {
     const foundById = await trx(TABLES.SUPPLIER).where({ id: num }).first();
-    if (foundById) return foundById.id;
+    if (foundById) return Number(foundById.id);
   }
   const foundByName = await trx(TABLES.SUPPLIER)
     .whereILike(COLS.SUPPLIER.SUPPLIER_NAME, String(supplyInput).trim())
     .first();
-  if (foundByName) return foundByName.id;
+  if (foundByName) return Number(foundByName.id);
   return null;
 }
 
@@ -823,10 +824,12 @@ async function updateOrder(id, payload) {
     let resolvedNewSupplyId = oldSupplyId;
     if (payload.supply_id !== undefined) {
       resolvedNewSupplyId = await resolveSupplyId(trx, payload.supply_id);
-      updateFields.supply_id = resolvedNewSupplyId;
+      if (resolvedNewSupplyId !== oldSupplyId) {
+        updateFields.supply_id = resolvedNewSupplyId;
+      }
     }
 
-    const isSupplierChanged = updateFields.supply_id !== undefined && resolvedNewSupplyId !== oldSupplyId;
+    const isSupplierChanged = resolvedNewSupplyId !== oldSupplyId;
     const isOrderPaid = existingOrder.status === ORDER_STATUS.PAID || Boolean(existingOrder.was_paid);
 
     if (isOrderPaid && isSupplierChanged) {
@@ -1552,34 +1555,20 @@ async function processCompleteOrder(trxContext, order, amount, options = {}) {
     const supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
 
     // Quản lý công nợ NCC khi gia hạn thành công (chu kỳ mới, chỉ áp dụng cho NCC ngoài)
-    if (isRenewal && !isSupplierMavryk && supplyId && effectiveCost > 0) {
-      const existingCostLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
-        .where({
-          order_list_id: updatedOrder.id,
-          supply_id: supplyId,
-        })
-        .andWhere(trx.raw("logged_at >= CURRENT_DATE"))
-        .first();
-
-      if (!existingCostLog) {
-        await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
-          order_list_id: updatedOrder.id,
-          supply_id: supplyId,
-          id_order: updatedOrder.id_order,
-          import_cost: effectiveCost,
-          ncc_payment_status: "Chưa Thanh Toán",
-          logged_at: trx.fn.now(),
-        });
-
-        const formatCostMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
-        await emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
-          cost: effectiveCost,
-          supplier_id: supplyId,
-          order_id: updatedOrder.id,
-          id_order: updatedOrder.id_order,
-          summary: `Thêm chi phí gia hạn nhập hàng cho đơn #${updatedOrder.id_order}: ${formatCostMoney(effectiveCost)}`,
-        });
-      }
+    const supplierCostLog = await ensureSupplierCostLog({
+      trx,
+      order: updatedOrder,
+      isRenewal,
+    });
+    if (supplierCostLog.inserted) {
+      const formatCostMoney = (v) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+      await emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
+        cost: supplierCostLog.importCost,
+        supplier_id: supplierCostLog.supplierId,
+        order_id: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+        summary: `Thêm chi phí ${isRenewal ? "gia hạn " : ""}nhập hàng cho đơn #${updatedOrder.id_order}: ${formatCostMoney(supplierCostLog.importCost)}`,
+      });
     }
 
     await emitOrderEvent(trx, EVENTS.ORDER_PAID, {
