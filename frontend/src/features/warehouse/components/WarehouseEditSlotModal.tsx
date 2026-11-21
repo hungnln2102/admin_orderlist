@@ -1,3 +1,4 @@
+import { SlotProviderControls } from "./SlotProviderControls";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Pencil,
@@ -103,6 +104,9 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
         twoFa: slot.two_fa || "",
         otpType: slot.provider_key || slot.otp_type || "",
         providerKey: slot.provider_key || slot.otp_type || "",
+        otpEnabled: slot.otp_enabled ?? undefined,
+        statusCheckEnabled: slot.status_check_enabled ?? undefined,
+        statusProviderKey: slot.status_provider_key || "",
         expiresAt: initialExpires,
         status: slot.status || "AVAILABLE",
         note: slot.note || "",
@@ -397,27 +401,15 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
             {/* Hàng 1 của khối: Cổng OTP & Email Backup (2 cột cân đối) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* CỔNG / LOẠI OTP */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Cổng Giải Mã OTP (Provider)</span>
-                  </span>
-                </label>
-                <select
-                  value={formData.providerKey || formData.otpType || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, providerKey: e.target.value, otpType: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer"
-                >
-                  <option value="">-- Mặc định (Không gán cổng OTP) --</option>
-                  {combinedProviders.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-2">
+                <SlotProviderControls label="Lấy OTP"
+                  enabled={formData.otpEnabled ?? true} provider={formData.providerKey || ""} providers={combinedProviders}
+                  onToggle={(enabled) => setFormData({ ...formData, otpEnabled: enabled })}
+                  onProviderChange={(key) => setFormData({ ...formData, providerKey: key })} />
+                <SlotProviderControls label="Kiểm tra trạng thái"
+                  enabled={formData.statusCheckEnabled ?? true} provider={formData.statusProviderKey || ""} status
+                  onToggle={(enabled) => setFormData({ ...formData, statusCheckEnabled: enabled })}
+                  onProviderChange={(key) => setFormData({ ...formData, statusProviderKey: key })} />
               </div>
 
               {/* EMAIL BACKUP KHÔI PHỤC */}

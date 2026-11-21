@@ -192,13 +192,19 @@ export const PersonalCategoryManageModal: React.FC<Props> = ({
     await onSaveCategories(updated);
   };
 
-  const handleDelete = async (id: number, catName: string) => {
-    if (window.confirm(`Master có chắc muốn xóa danh mục "${catName}" không?`)) {
-      const updated = categories.filter((c) => c.id !== id);
-      if (!await onSaveCategories(updated)) return;
-      notify.success(`Đã xóa danh mục "${catName}"`);
-      if (editingId === id) resetForm();
-    }
+  const handleDelete = (id: number, catName: string) => {
+    notify.confirm({
+      title: "Xác Nhận Xóa Danh Mục",
+      message: `Master có chắc muốn xóa danh mục "${catName}" không?`,
+      confirmText: "Xóa Danh Mục",
+      danger: true,
+      onConfirm: async () => {
+        const updated = categories.filter((c) => c.id !== id);
+        if (!await onSaveCategories(updated)) return;
+        notify.success(`Đã xóa danh mục "${catName}"`);
+        if (editingId === id) resetForm();
+      },
+    });
   };
 
   // Tính toán tóm tắt & lọc danh sách

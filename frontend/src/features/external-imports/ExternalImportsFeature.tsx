@@ -238,22 +238,26 @@ export const ExternalImportsFeature: React.FC = () => {
   };
 
   const handleDelete = async (item: StoreExpenseItem) => {
-    if (!window.confirm(`Xác nhận xóa bản ghi chi phí "${item.reason}" (${item.amount.toLocaleString("vi-VN")} ₫)?`)) {
-      return;
-    }
+    notify.confirm({
+      title: "Xác Nhận Xóa Chi Phí",
+      message: `Xác nhận xóa bản ghi chi phí "${item.reason}" (${item.amount.toLocaleString("vi-VN")} ₫)?`,
+      confirmText: "Xóa Bản Ghi",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/store-profit-expenses/${item.id}`, {
+            method: "DELETE",
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.error || "Xóa thất bại");
 
-    try {
-      const res = await fetch(`/api/store-profit-expenses/${item.id}`, {
-        method: "DELETE",
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Xóa thất bại");
-
-      notify.success("Đã xóa bản ghi chi phí thành công!", "Đã Xóa");
-      fetchExpenses();
-    } catch (err: any) {
-      notify.error(err.message || "Lỗi khi xóa chi phí", "Thất Bại");
-    }
+          notify.success("Đã xóa bản ghi chi phí thành công!", "Đã Xóa");
+          fetchExpenses();
+        } catch (err: any) {
+          notify.error(err.message || "Lỗi khi xóa chi phí", "Thất Bại");
+        }
+      },
+    });
   };
 
   const formatVND = (val: number) =>

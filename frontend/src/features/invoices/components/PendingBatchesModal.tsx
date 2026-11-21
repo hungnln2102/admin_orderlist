@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Eye,
 } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 import { BatchDetailModal } from "./BatchDetailModal";
 
 interface BatchItem {
@@ -41,6 +42,7 @@ export const PendingBatchesModal: React.FC<PendingBatchesModalProps> = ({
   onClose,
   onRefresh,
 }) => {
+  const notify = useNotification();
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [cancelingId, setCancelingId] = useState<number | null>(null);
@@ -87,33 +89,40 @@ export const PendingBatchesModal: React.FC<PendingBatchesModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleCancelBatch = async (batch: BatchItem, e?: React.MouseEvent) => {
+  const handleCancelBatch = (batch: BatchItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const reason = window.prompt(
-      `Master có chắc chắn muốn hủy đợt gộp #${batch.batch_code}?\nSlot Suffix (+${batch.slot_suffix}₫) sẽ được giải phóng ngay lập tức.\nNhập lý do hủy (tùy chọn):`
-    );
-    if (reason === null) return;
+    notify.prompt({
+      title: "Hủy Đợt Gộp Đơn",
+      message: `Master có chắc chắn muốn hủy đợt gộp #${batch.batch_code}? Slot Suffix (+${batch.slot_suffix}₫) sẽ được giải phóng ngay lập tức.`,
+      placeholder: "Nhập lý do hủy (tùy chọn)...",
+      confirmText: "Hủy Đợt Gộp",
+      danger: true,
+      onConfirm: async (reason) => {
+        setCancelingId(batch.id);
+        setErrorMessage(null);
+        try {
+          const res = await fetch(`/api/invoices/batches/${batch.id}/cancel`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: reason || "Admin hủy đợt gộp" }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Không thể hủy đợt gộp.");
 
-    setCancelingId(batch.id);
-    setErrorMessage(null);
-    try {
-      const res = await fetch(`/api/invoices/batches/${batch.id}/cancel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: reason || "Admin hủy đợt gộp" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Không thể hủy đợt gộp.");
-
-      setSuccessMessage(data.message || `Đã hủy đợt gộp #${batch.batch_code}!`);
-      await fetchBatches();
-      if (onRefresh) onRefresh();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hủy đợt gộp.";
-      setErrorMessage(msg);
-    } finally {
-      setCancelingId(null);
-    }
+          const msg = data.message || `Đã hủy đợt gộp #${batch.batch_code}!`;
+          setSuccessMessage(msg);
+          notify.success(msg, "Đã Hủy");
+          await fetchBatches();
+          if (onRefresh) onRefresh();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hủy đợt gộp.";
+          setErrorMessage(msg);
+          notify.error(msg, "Lỗi Hủy Đợt Gộp");
+        } finally {
+          setCancelingId(null);
+        }
+      },
+    });
   };
 
   if (!isOpen) return null;

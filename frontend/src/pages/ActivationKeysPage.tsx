@@ -131,45 +131,55 @@ export const ActivationKeysPage: React.FC = () => {
   };
 
   const handleRevoke = async (item: ActivationKeyItem) => {
-    if (!window.confirm(`Bạn có chắc muốn thu hồi mã key "${item.key_code}" không?`)) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/products/activation-keys/${item.id}/revoke`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Admin thu hồi từ bảng quản lý" }),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        notify.success(json.message || "Đã thu hồi mã key thành công!", "Thành Công");
-        fetchKeys();
-      } else {
-        notify.error(json.message || "Thu hồi thất bại.", "Lỗi");
-      }
-    } catch (err: any) {
-      notify.error(err.message || "Lỗi kết nối", "Lỗi");
-    }
+    notify.confirm({
+      title: "Xác Nhận Thu Hồi Mã Key",
+      message: `Master có chắc muốn thu hồi mã key "${item.key_code}" không? Thao tác này sẽ vô hiệu hóa key.`,
+      confirmText: "Thu Hồi Key",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/products/activation-keys/${item.id}/revoke`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: "Admin thu hồi từ bảng quản lý" }),
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            notify.success(json.message || "Đã thu hồi mã key thành công!", "Thành Công");
+            fetchKeys();
+          } else {
+            notify.error(json.message || "Thu hồi thất bại.", "Lỗi");
+          }
+        } catch (err: any) {
+          notify.error(err.message || "Lỗi kết nối", "Lỗi");
+        }
+      },
+    });
   };
 
   const handleDelete = async (item: ActivationKeyItem) => {
-    if (!window.confirm(`Xóa vĩnh viễn mã key "${item.key_code}" chưa kích hoạt này?`)) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/products/activation-keys/${item.id}`, {
-        method: "DELETE",
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        notify.success("Đã xóa mã key thành công!", "Thành Công");
-        fetchKeys();
-      } else {
-        notify.error(json.message || "Xóa thất bại.", "Lỗi");
-      }
-    } catch (err: any) {
-      notify.error(err.message || "Lỗi kết nối", "Lỗi");
-    }
+    notify.confirm({
+      title: "Xác Nhận Xóa Vĩnh Viễn",
+      message: `Xóa vĩnh viễn mã key "${item.key_code}" chưa kích hoạt này khỏi hệ thống?`,
+      confirmText: "Xóa Vĩnh Viễn",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/products/activation-keys/${item.id}`, {
+            method: "DELETE",
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            notify.success("Đã xóa mã key thành công!", "Thành Công");
+            fetchKeys();
+          } else {
+            notify.error(json.message || "Xóa thất bại.", "Lỗi");
+          }
+        } catch (err: any) {
+          notify.error(err.message || "Lỗi kết nối", "Lỗi");
+        }
+      },
+    });
   };
 
   const handleCopyText = (text: string, label: string) => {

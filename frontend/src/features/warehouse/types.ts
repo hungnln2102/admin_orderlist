@@ -16,6 +16,9 @@ export interface WarehouseServiceSlot {
   two_fa?: string;
   otp_type?: string;
   provider_key?: string | null;
+  otp_enabled?: boolean | null;
+  status_check_enabled?: boolean | null;
+  status_provider_key?: string | null;
   expires_at?: string;
   raw_expires_at?: string;
   note?: string;
@@ -33,6 +36,9 @@ export interface WarehouseSlotEditFormData {
   twoFa: string;
   otpType?: string;
   providerKey?: string;
+  otpEnabled?: boolean;
+  statusCheckEnabled?: boolean;
+  statusProviderKey?: string;
   expiresAt: string;
   status: WarehouseSlotStatus;
   note: string;
@@ -75,6 +81,9 @@ export interface ServiceNameCategoryItem {
 }
 
 export interface WarehouseAccountFormData {
+  otpEnabled?: boolean;
+  statusCheckEnabled?: boolean;
+  statusProviderKey?: string;
   account: string;
   serviceName: string;
   category: string;

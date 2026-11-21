@@ -1,6 +1,7 @@
 const { db, withTransaction } = require("@/db");
 const { TABLES, COLS } = require("@/db/tables");
 const SS = COLS.ACCOUNT_SLOTS;
+const { slotProviderSettings } = require("./slotProviderSettings");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
@@ -92,6 +93,7 @@ const addServiceSlotToAccount = async (accountId, payload) => {
         service_note: note ? String(note).trim() : null,
         variant_tag: variantTag ? String(variantTag).trim() : null,
         [SS.PROVIDER_KEY]: cleanProviderKey,
+        ...slotProviderSettings(payload || {}),
         created_at: now,
         updated_at: now,
       })
@@ -231,6 +233,7 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
       }
     }
     if (hasProviderKey) updateData[SS.PROVIDER_KEY] = String(rawProviderKey || "").trim() || null;
+    Object.assign(updateData, slotProviderSettings(payload || {}));
     if (status !== undefined) {
       updateData.status = status;
     }

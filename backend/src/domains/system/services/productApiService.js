@@ -706,6 +706,10 @@ async function findRoutingProviderForInput({ slotKey, input }) {
         "ss." + SS.NAME_ID + " as name_id",
         "ss." + SS.VARIANT_TAG + " as variant_tag",
         "ss." + SS.PROVIDER_KEY + " as slot_provider_key",
+        "ss." + SS.OTP_ENABLED,
+        "ss." + SS.STATUS_CHECK_ENABLED,
+        "ss." + SS.STATUS_PROVIDER_KEY,
+        "a.account_username as slot_email",
         "a.product_name_id as account_product_name_id"
       );
 
@@ -749,6 +753,14 @@ async function findRoutingProviderForInput({ slotKey, input }) {
     }
 
     if (matchedSlot) {
+      const capability = slotKey === "adobe_check" ? "status"
+        : /_otp$|^netflix_/.test(slotKey) ? "otp" : null;
+      const enabled = capability === "status" ? matchedSlot[SS.STATUS_CHECK_ENABLED]
+        : capability === "otp" ? matchedSlot[SS.OTP_ENABLED] : null;
+      if (enabled === false) return { disabled: true };
+      const provider = capability === "status" ? matchedSlot[SS.STATUS_PROVIDER_KEY]
+        : capability === "otp" ? matchedSlot.slot_provider_key : null;
+      if (enabled === true && provider) return { provider_key: provider, resolved_email: matchedSlot.slot_email };
       matchedProductNameId = Number(matchedSlot.name_id || matchedSlot.account_product_name_id)
         || matchedProductNameId;
     }
@@ -921,7 +933,8 @@ async function findRoutingProviderForInput({ slotKey, input }) {
       }
     }
 
-    const directProviderKey = String(matchedSlot?.slot_provider_key || "").trim();
+    const directProviderKey = slotKey === "adobe_check" && matchedSlot?.[SS.STATUS_CHECK_ENABLED] === true
+      ? "" : String(matchedSlot?.slot_provider_key || "").trim();
     if (directProviderKey) {
       return {
         provider_key: directProviderKey,
@@ -932,7 +945,7 @@ async function findRoutingProviderForInput({ slotKey, input }) {
     return null;
   } catch (err) {
     console.warn("[ProductApi Service] Lỗi findRoutingProviderForInput:", err.message);
-    return null;
+    throw err;
   }
 }
 module.exports = {

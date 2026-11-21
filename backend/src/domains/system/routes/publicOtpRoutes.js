@@ -2,6 +2,7 @@ const express = require("express");
 
 const activationKeyController = require("@/domains/products/controllers/activationKeyController");
 const otpPortalDispatcher = require("@/domains/system/services/otpPortalDispatcher");
+const { activateKeyWithTransaction } = require("@/domains/products/services/activationKeyService");
 
 const router = express.Router();
 
@@ -53,6 +54,39 @@ router.post("/otp/probe-slot", async (req, res) => {
 router.post("/otp/adobe/code", (req, res) => dispatchSlot(res, "adobe_otp", req.body?.email || req.body?.input));
 router.post("/otp/adobe/account", (req, res) => dispatchSlot(res, "adobe_account", req.body?.email || req.body?.order_code || req.body?.search || req.body?.input));
 router.post(["/otp/adobe/check", "/otp/adobe/status"], (req, res) => dispatchSlot(res, "adobe_check", req.body?.email || req.body?.account || req.body?.search || req.body?.input));
+
+router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const recovery = req.path.endsWith("/claim") ? "claim" : "check";
+  try {
+    const result = await activateKeyWithTransaction({
+      keyCode: req.body?.code,
+      orderContact: req.body?.contact,
+      recovery,
+    });
+    if (result.replacementRequired) return res.json({ success: true, ...result });
+    const status = await otpPortalDispatcher.dispatchSlotRequest({
+      slotKey: "adobe_check", input: result.account,
+    }).catch(() => null);
+    const details = status?.success ? status.data : null;
+    const verified = ["active", "inactive"].includes(details?.status_type);
+    return res.json({
+      success: true,
+      replaced: Boolean(result.replaced),
+      data: {
+        ...result,
+        status: verified ? details.status : "CHƯA XÁC MINH ĐƯỢC",
+        status_type: verified ? details.status_type : "unknown",
+        organization: details?.organization,
+      },
+    });
+  } catch (error) {
+    if (recovery === "check" && !String(req.body?.contact ?? "").trim()) {
+      return res.json({ success: true, contactRequired: true });
+    }
+    return res.status(400).json({ success: false, error: "Không thể xác minh hoặc cấp tài khoản cho mã đã nhập." });
+  }
+});
 
 const switchTeamPendingLocks = new Set();
 

@@ -7,7 +7,20 @@ interface ConfirmOptions {
   message: string;
   confirmText?: string;
   cancelText?: string;
+  danger?: boolean;
   onConfirm: () => void;
+  onCancel?: () => void;
+}
+
+interface PromptOptions {
+  title?: string;
+  message: string;
+  placeholder?: string;
+  defaultValue?: string;
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+  onConfirm: (value: string) => void;
   onCancel?: () => void;
 }
 
@@ -17,6 +30,7 @@ interface NotificationContextType {
   warning: (message: string, title?: string) => void;
   error: (message: string, title?: string) => void;
   confirm: (options: ConfirmOptions) => void;
+  prompt: (options: PromptOptions) => void;
   close: () => void;
 }
 
@@ -29,7 +43,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Danh sách Toasts góc phải (tối đa 4 thẻ)
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // State riêng cho Modal Xác Nhận (confirm) ở giữa màn hình
+  // State riêng cho Modal Xác Nhận (confirm / prompt) ở giữa màn hình
   const [confirmModalState, setConfirmModalState] = useState<NotificationState>({
     isOpen: false,
     message: "",
@@ -71,14 +85,35 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       title: options.title,
       confirmText: options.confirmText || "Xác Nhận",
       cancelText: options.cancelText || "Hủy Bỏ",
-      onConfirm: options.onConfirm,
+      danger: options.danger,
+      onConfirm: () => {
+        options.onConfirm();
+      },
+      onCancel: options.onCancel,
+    });
+  }, []);
+
+  const prompt = useCallback((options: PromptOptions) => {
+    setConfirmModalState({
+      isOpen: true,
+      type: "prompt",
+      message: options.message,
+      title: options.title || "Nhập Thông Tin",
+      placeholder: options.placeholder,
+      defaultValue: options.defaultValue || "",
+      confirmText: options.confirmText || "Xác Nhận",
+      cancelText: options.cancelText || "Hủy Bỏ",
+      danger: options.danger,
+      onConfirm: (val?: string) => {
+        options.onConfirm(val ?? "");
+      },
       onCancel: options.onCancel,
     });
   }, []);
 
   const contextValue = useMemo(
-    () => ({ info, success, warning, error, confirm, close }),
-    [info, success, warning, error, confirm, close]
+    () => ({ info, success, warning, error, confirm, prompt, close }),
+    [info, success, warning, error, confirm, prompt, close]
   );
 
   return (
@@ -88,7 +123,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       {/* 1. Hệ thống Toast góc phải: 5s mờ dần, tối đa 4 thẻ, thẻ thứ 5 đẩy thẻ 1 */}
       <ToastNotificationContainer toasts={toasts} onClose={removeToast} />
 
-      {/* 2. Giữ nguyên modal confirm ở giữa màn hình cho thao tác xác nhận an toàn */}
+      {/* 2. Giữ nguyên modal confirm / prompt ở giữa màn hình cho thao tác xác nhận an toàn */}
       <NotificationModal {...confirmModalState} onClose={close} />
     </NotificationContext.Provider>
   );

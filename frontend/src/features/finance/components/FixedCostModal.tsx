@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FixedCost, FixedCostCategory } from "../types";
 import { X, Save, Home, Tag } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const FixedCostModal: React.FC<Props> = ({
   onSave,
   editingItem,
 }) => {
+  const notify = useNotification();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const amountInputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +74,7 @@ export const FixedCostModal: React.FC<Props> = ({
     e.preventDefault();
     const amountValue = parseAmountInput(amount);
     if (!name.trim() || amountValue < 1000) {
-      alert("Vui lòng điền tên và số tiền chi phí");
+      notify.warning("Vui lòng điền tên và số tiền chi phí hợp lệ (>= 1.000₫)", "Thiếu Thông Tin");
       return;
     }
 
@@ -87,7 +89,7 @@ export const FixedCostModal: React.FC<Props> = ({
       });
       onClose();
     } catch (err: any) {
-      alert("Lỗi khi lưu chi phí: " + err.message);
+      notify.error("Lỗi khi lưu chi phí: " + err.message, "Lỗi Lưu Trữ");
     } finally {
       setSubmitting(false);
     }

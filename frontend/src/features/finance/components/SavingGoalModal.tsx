@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { SavingGoalItem } from "../types";
 import { X, Save, Target } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const SavingGoalModal: React.FC<Props> = ({
   onSave,
   editingItem,
 }) => {
+  const notify = useNotification();
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const amountInputRef = useRef<HTMLInputElement>(null);
@@ -66,7 +68,7 @@ export const SavingGoalModal: React.FC<Props> = ({
     e.preventDefault();
     const amountVal = parseAmountInput(targetAmount);
     if (!name.trim() || amountVal <= 0) {
-      alert("Vui lòng nhập tên mục tiêu và số tiền lớn hơn 0");
+      notify.warning("Vui lòng nhập tên mục tiêu và số tiền lớn hơn 0", "Thiếu Thông Tin");
       return;
     }
 
@@ -79,7 +81,7 @@ export const SavingGoalModal: React.FC<Props> = ({
       });
       onClose();
     } catch (err: any) {
-      alert("Lỗi khi lưu mục tiêu: " + err.message);
+      notify.error("Lỗi khi lưu mục tiêu: " + err.message, "Lỗi");
     } finally {
       setSubmitting(false);
     }

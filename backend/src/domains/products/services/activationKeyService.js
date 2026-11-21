@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { db } = require("@/db");
 const { TABLES, COLS } = require("@/db/tables");
 const { getPackageProducts } = require("./packageProductService");
+const { EVENTS, publishEventInTrx } = require("@/events");
 
 function matchesPackageTag(pack, targetTag) {
   return pack.variantTags?.includes(targetTag);
@@ -231,7 +232,7 @@ const deleteActivationKey = async (id) => {
  * - Cập nhật activation_keys sang ACTIVATED.
  * - Trả về tài khoản cho khách.
  */
-const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
+const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery, orderContact }) => {
   const code = String(keyCode || "").trim().toUpperCase();
   if (!code) {
     throw new Error("Vui lòng nhập mã key kích hoạt!");
@@ -256,6 +257,22 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
       throw new Error(`Mã kích hoạt hoặc Mã đơn hàng "${code}" không tồn tại trên hệ thống!`);
     }
 
+    let recoveryOrder;
+    if (recovery) {
+      const O = COLS.ORDER_LIST;
+      const checkKey = String(key[COLS.ACTIVATION_KEYS.KEY_CODE] || "").trim().toUpperCase() === code;
+      const product = await trx(TABLES.PRODUCT_NAMES).where(COLS.PRODUCT_NAMES.ID, key.product_name_id).first();
+      recoveryOrder = key.id_order && await trx(TABLES.ORDER_LIST).where(O.ID_ORDER, key.id_order).forUpdate().first();
+      const contact = String(orderContact || "").trim().toLowerCase();
+      if (key.status !== "ACTIVATED" || !recoveryOrder ||
+          !["PAID", "RENEW_REQUIRED"].includes(recoveryOrder[O.STATUS]) ||
+          !recoveryOrder[O.EXPIRED_AT] || !(new Date(recoveryOrder[O.EXPIRED_AT]) > new Date()) ||
+          !/^adobe\b/i.test(product?.[COLS.PRODUCT_NAMES.NAME] || "") ||
+          (!checkKey && (!contact || contact !== String(recoveryOrder[O.CONTACT] || "").trim().toLowerCase()))) {
+        throw new Error("Không xác minh được quyền sử dụng tài khoản.");
+      }
+    }
+
     if (key.status === "ACTIVATED") {
       // Key đã dùng vẫn phải trả đủ thông tin để khách tra cứu lại tài khoản đã cấp.
       const assignedSlot = key.account_slot_id
@@ -264,7 +281,21 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
           .where(COLS.ACCOUNT_SLOTS.ID, key.account_slot_id)
           .first()
         : null;
-      return {
+      if (recovery && assignedSlot) {
+        const S = COLS.ACCOUNT_SLOTS;
+        const A = COLS.ACCOUNTS;
+        const assignedAccount = await trx({ slot: TABLES.ACCOUNT_SLOTS })
+          .join({ account: TABLES.ACCOUNTS }, `account.${A.ID}`, `slot.${S.ACCOUNT_ID}`)
+          .where(`slot.${S.ID}`, key.account_slot_id)
+          .where(`slot.${S.NAME_ID}`, key.product_name_id)
+          .where(`account.${A.ACCOUNT_USERNAME}`, key.assigned_account)
+          .first(`account.${A.ACCOUNT_USERNAME}`);
+        if (assignedAccount) {
+          return { account: key.assigned_account, password: assignedSlot[COLS.ACCOUNT_SLOTS.PASSWORD] || "" };
+        }
+      }
+      if (recovery === "check") return { replacementRequired: true };
+      if (!recovery) return {
         success: true,
         already_activated: true,
         account: key.assigned_account,
@@ -282,7 +313,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
       throw new Error("Mã kích hoạt này đã bị thu hồi hoặc vô hiệu hóa!");
     }
 
-    if (key.status === "EXPIRED" || (key.expired_at && new Date(key.expired_at) < new Date())) {
+    if (!recovery && (key.status === "EXPIRED" || (key.expired_at && new Date(key.expired_at) < new Date()))) {
       throw new Error("Mã kích hoạt này đã hết hạn sử dụng!");
     }
 
@@ -299,7 +330,8 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
         .select("id");
       const packages = await getPackageProducts({ connection: trx, productNameId: key.product_name_id });
       packageId = packages.find((item) =>
-        matchesPackageTag(item, targetTag) && item.usedSlots < item.totalSlots
+        matchesPackageTag(item, targetTag) && item.usedSlots < item.totalSlots &&
+        (!recovery || Number(item.id) !== Number(key[keyCols.PACKAGE_PRODUCT_ID]))
       )?.id ?? null;
     }
 
@@ -319,6 +351,12 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
       )
       .where("ss.name_id", key.product_name_id)
       .modify((builder) => {
+        if (recovery) {
+          builder.whereNot("acc.account_username", key.assigned_account || "")
+            .where((expiry) => expiry.whereNull("ss.expired_at").orWhere("ss.expired_at", ">", trx.fn.now()));
+        }
+      })
+      .modify((builder) => {
         if (targetTag) {
           builder.whereRaw(`BTRIM(ss.${COLS.ACCOUNT_SLOTS.VARIANT_TAG}) = ?`, [targetTag]);
           builder.where("ss.account_id", trx(TABLES.PACKAGE_PRODUCT)
@@ -332,6 +370,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
       .first();
 
     if (!availableSlot) {
+      if (recovery) return { replacementRequired: true, outOfStock: true };
       throw new Error(
         "Hiện tại kho đã hết slot trống cho sản phẩm này. Vui lòng liên hệ Admin qua kênh hỗ trợ để được nạp thêm tài khoản!"
       );
@@ -369,9 +408,21 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "" }) => {
         ...(packageId ? { [keyCols.PACKAGE_PRODUCT_ID]: packageId } : {}),
         assigned_account: assignedAccount,
         customer_info: finalCustomer || null,
-        activated_at: trx.fn.now(),
+        activated_at: recovery ? key.activated_at : trx.fn.now(),
         updated_at: trx.fn.now(),
       });
+
+    if (recovery) {
+      await publishEventInTrx(trx, {
+        eventName: EVENTS.ORDER_UPDATED,
+        aggregateType: "ORDER",
+        aggregateId: recoveryOrder[COLS.ORDER_LIST.ID],
+        action: "UPDATE",
+        source: "ADOBE_ACCOUNT_RECOVERY",
+        payload: { id: recoveryOrder[COLS.ORDER_LIST.ID], id_order: key.id_order },
+      });
+      return { account: assignedAccount, password: availableSlot.slot_password || "", replaced: true };
+    }
 
     return {
       success: true,

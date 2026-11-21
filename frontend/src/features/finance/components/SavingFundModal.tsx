@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, ArrowDownRight, ArrowUpRight, DollarSign } from "lucide-react";
 import { formatVND } from "@/shared/utils";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const SavingFundModal: React.FC<Props> = ({
   onClose,
   onSubmit,
 }) => {
+  const notify = useNotification();
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -66,12 +68,12 @@ export const SavingFundModal: React.FC<Props> = ({
     e.preventDefault();
     const amountVal = parseAmountInput(amount);
     if (amountVal <= 0) {
-      alert("Vui lòng nhập số tiền lớn hơn 0");
+      notify.warning("Vui lòng nhập số tiền lớn hơn 0", "Lỗi Dữ Liệu");
       return;
     }
 
     if (!isDeposit && amountVal > currentFund) {
-      alert(`Số dư quỹ hiện tại (${formatVND(currentFund)}) không đủ để rút ${formatVND(amountVal)}`);
+      notify.warning(`Số dư quỹ hiện tại (${formatVND(currentFund)}) không đủ để rút ${formatVND(amountVal)}`, "Không Đủ Số Dư");
       return;
     }
 
@@ -83,7 +85,7 @@ export const SavingFundModal: React.FC<Props> = ({
       });
       onClose();
     } catch (err: any) {
-      alert("Thao tác thất bại: " + err.message);
+      notify.error("Thao tác thất bại: " + err.message, "Lỗi");
     } finally {
       setSubmitting(false);
     }

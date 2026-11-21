@@ -57,3 +57,60 @@
 
 
 
+
+
+## [14:05] Loại bỏ triệt để toàn bộ popup hệ thống trình duyệt và thay thế bằng hệ thống Notification/Modal của dự án
+
+- **Phạm vi tác động**:
+  - Hạ tầng thông báo chung:
+    - [NotificationModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/NotificationModal.tsx)
+    - [NotificationContext.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/context/NotificationContext.tsx)
+  - Các module và modal nghiệp vụ:
+    - [CatalogEditModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/CatalogEditModal.tsx) (Kho & Tag phân loại)
+    - [WarehouseAddServiceModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseAddServiceModal.tsx) (Thêm dịch vụ tài khoản kho)
+    - [ActivationKeyRulesTab.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/activationKeys/components/ActivationKeyRulesTab.tsx) (Xóa quy tắc cấp key)
+    - [ActivationKeysPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/pages/ActivationKeysPage.tsx) (Thu hồi & Xóa vĩnh viễn key)
+    - [ExternalImportsFeature.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/external-imports/ExternalImportsFeature.tsx) (Xóa chi phí nhập ngoài luồng)
+    - [PersonalCategoryManageModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/PersonalCategoryManageModal.tsx) (Xóa danh mục chi tiêu)
+    - [DebtPaymentModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/DebtPaymentModal.tsx) (Validation & Xử lý thanh toán nợ)
+    - [FixedCostModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/FixedCostModal.tsx) (Validation & Lưu chi phí cố định)
+    - [InstallmentModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/InstallmentModal.tsx) (Validation & Lưu trả góp)
+    - [SavingFundModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/SavingFundModal.tsx) (Validation & Nạp/rút quỹ tích lũy)
+    - [SavingGoalModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/finance/components/SavingGoalModal.tsx) (Validation & Lưu mục tiêu)
+    - [BatchDetailModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/invoices/components/BatchDetailModal.tsx) (Hủy đợt gộp & Hoàn tất gia hạn đơn lẻ)
+    - [PendingBatchesModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/invoices/components/PendingBatchesModal.tsx) (Hủy đợt gộp chờ thanh toán)
+- **Thay đổi kỹ thuật**:
+  - **Nâng cấp hạ tầng Notification của dự án**:
+    - Mở rộng `NotificationModal` và `NotificationContext` hỗ trợ thêm chế độ `type: "prompt"` cho phép nhập text/input trực tiếp trên UI hiện đại của dự án (thay thế cho `window.prompt`).
+    - Bổ sung tùy chọn `danger?: boolean` cho modal xác nhận: Tự động đổi màu nút hành động sang gradient đỏ cảnh báo (`from-rose-500 to-red-600`) đối với các hành động nguy hiểm như xóa vĩnh viễn dữ liệu, hủy đợt gộp hoặc thu hồi key.
+  - **Thay thế triệt để 100%**:
+    - Quét toàn bộ mã nguồn frontend, xóa bỏ toàn bộ các lời gọi popup native của hệ điều hành/trình duyệt (`window.confirm`, `window.alert`, `window.prompt`, `alert(`, `confirm(`, `prompt(`).
+    - Đồng bộ sang giao diện Dark Theme cao cấp của dự án:
+      - Cảnh báo/Thông báo lỗi: `notify.warning(msg, title)` / `notify.error(msg, title)`.
+      - Xác nhận hành động: `notify.confirm({ title, message, confirmText, danger, onConfirm })`.
+      - Nhập lý do hủy: `notify.prompt({ title, message, placeholder, onConfirm })`.
+- **Kiểm tra kỹ thuật**:
+  - Node.js AST/Regex scanner trên toàn bộ thư mục `frontend/src`: Xác nhận **0 kết quả** tồn đọng `window.alert/confirm/prompt` hoặc `alert/confirm/prompt`.
+  - `npm run build` chạy thành công 100% trong 4.72s không lỗi cú pháp hoặc kiểu dữ liệu TypeScript.
+## Kiểm tra và nhận tài khoản Adobe thay thế
+
+- Tích hợp tra cứu tài khoản đã cấp, nhận tài khoản thay thế theo yêu cầu và kiểm tra trạng thái tại chỗ.
+- OTP Portal build thành công. Các file backend thay đổi qua kiểm tra cú pháp. Chưa chạy kiểm thử tích hợp với PostgreSQL và provider.
+
+
+## [14:35] Nâng cấp giao diện Kiểm Tra & Cấp Lại Tài Khoản Adobe (otp_portal)
+
+- **Phạm vi tác động**:
+  - [AdobeAccountRecovery.tsx](file:///E:/Project/admin_store/otp_portal/src/features/adobe/components/AdobeAccountRecovery.tsx)
+  - [AdobeSection.tsx](file:///E:/Project/admin_store/otp_portal/src/features/adobe/components/AdobeSection.tsx)
+- **Thay đổi kỹ thuật**:
+  - Viết lại toàn bộ form tra cứu & cấp lại tài khoản Adobe theo chuẩn **Cyberpunk Dark Glassmorphism** đồng bộ với toàn bộ cổng OTP Portal:
+    - Ô 1: "Mã đơn hoặc mã kích hoạt" gắn icon `KeyRound`, placeholder hướng dẫn `VD: MAVR-123456 hoặc mã key kích hoạt...`, phông mono rõ nét.
+    - Ô 2: "Thông tin liên hệ khi mua hàng" gắn icon `UserCheck`, badge ghi chú `(Nếu dùng mã đơn hàng)`, viền phát sáng màu hổ phách khi hệ thống yêu cầu thông tin đối soát.
+    - Cả 2 ô input được bọc nền kính mờ `rgba(0, 0, 0, 0.45)` với viền `border-[var(--line)]`, loại bỏ hoàn toàn hiện tượng nền đen tàng hình.
+    - Nút hành động: Sử dụng `.btn-cta w-full` với màu nền gradient theo theme lễ hội/cyberpunk, hiệu ứng phát sáng `boxShadow: 0 8px 24px var(--glow)`, chữ và icon `Search` rõ nét, spinner `RefreshCw` xoay tròn khi đang kiểm tra tài khoản.
+    - Bổ sung icon `ShieldCheck` cho nút toggle sub-tab "Kiểm Tra Tài Khoản" trong header để cân xứng với `Zap Nhận OTP`.
+    - Thẻ cảnh báo lỗi, thẻ cấp tài khoản thay thế và thẻ mật khẩu được thiết kế đồng bộ với nền kính bo tròn 2xl.
+- **Kiểm tra kỹ thuật**:
+  - `npm run build` trong `otp_portal` (`tsc && vite build`) hoàn thành thành công trong 1.98s không phát sinh bất kỳ lỗi TypeScript hay Vite build nào.
+  - Hot Reload đã tự động cập nhật lên cổng OTP Portal đang chạy tại port 3005.

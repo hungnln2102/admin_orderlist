@@ -18,6 +18,7 @@ import {
   User,
   Package,
 } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 interface BatchOrderDetail {
   id: number;
@@ -73,6 +74,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   onClose,
   onCancelSuccess,
 }) => {
+  const notify = useNotification();
   const [data, setData] = useState<BatchDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -132,39 +134,46 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleCancelBatch = async () => {
+  const handleCancelBatch = () => {
     if (!data?.batch) return;
-    const reason = window.prompt(
-      `Master có chắc chắn muốn hủy đợt gộp #${data.batch.batch_code}?\nSlot Suffix (+${data.batch.slot_suffix}₫) sẽ được giải phóng ngay lập tức.\nNhập lý do hủy (tùy chọn):`
-    );
-    if (reason === null) return;
-
-    setCanceling(true);
-    setErrorMessage(null);
-    try {
-      const res = await fetch(`/api/invoices/batches/${data.batch.id}/cancel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: reason || "Admin hủy đợt gộp" }),
-      });
-      const resJson = await res.json();
-      if (!res.ok) {
-        throw new Error(resJson.error || "Không thể hủy đợt gộp.");
-      }
-      setSuccessMessage(resJson.message || `Đã hủy đợt gộp #${data.batch.batch_code}!`);
-      if (onCancelSuccess) onCancelSuccess();
-      setTimeout(() => {
-        onClose();
-      }, 1000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hủy đợt gộp.";
-      setErrorMessage(msg);
-    } finally {
-      setCanceling(false);
-    }
+    notify.prompt({
+      title: "Hủy Đợt Gộp Đơn",
+      message: `Master có chắc chắn muốn hủy đợt gộp #${data.batch.batch_code}? Slot Suffix (+${data.batch.slot_suffix}₫) sẽ được giải phóng ngay lập tức.`,
+      placeholder: "Nhập lý do hủy (tùy chọn)...",
+      confirmText: "Hủy Đợt Gộp",
+      danger: true,
+      onConfirm: async (reason) => {
+        setCanceling(true);
+        setErrorMessage(null);
+        try {
+          const res = await fetch(`/api/invoices/batches/${data.batch.id}/cancel`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: reason || "Admin hủy đợt gộp" }),
+          });
+          const resJson = await res.json();
+          if (!res.ok) {
+            throw new Error(resJson.error || "Không thể hủy đợt gộp.");
+          }
+          const msg = resJson.message || `Đã hủy đợt gộp #${data.batch.batch_code}!`;
+          setSuccessMessage(msg);
+          notify.success(msg, "Đã Hủy");
+          if (onCancelSuccess) onCancelSuccess();
+          setTimeout(() => {
+            onClose();
+          }, 1000);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hủy đợt gộp.";
+          setErrorMessage(msg);
+          notify.error(msg, "Lỗi Hủy Đợt Gộp");
+        } finally {
+          setCanceling(false);
+        }
+      },
+    });
   };
 
-  const handleFulfillRemaining = async () => {
+  const handleFulfillRemaining = () => {
     if (!data?.batch) return;
     const isBatchPaid = Boolean(data.batch.payment_receipt_id) || data.batch.status === "COMPLETED";
     const failedOrders = (data.orders || []).filter(
@@ -172,31 +181,38 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     );
     if (!isBatchPaid || failedOrders.length === 0) return;
 
-    const confirmMsg = `Master có chắc chắn muốn hoàn tất gia hạn cho ${failedOrders.length} đơn còn lại trong đợt gộp #${data.batch.batch_code}?\n(Tài chính sẽ được giữ nguyên 100%, không bị cộng trùng tiền).`;
-    if (!window.confirm(confirmMsg)) return;
+    notify.confirm({
+      title: "Xác Nhận Hoàn Tất Gia Hạn",
+      message: `Master có chắc chắn muốn hoàn tất gia hạn cho ${failedOrders.length} đơn còn lại trong đợt gộp #${data.batch.batch_code}? (Tài chính sẽ được giữ nguyên 100%, không bị cộng trùng tiền).`,
+      confirmText: "Hoàn Tất Đơn",
+      onConfirm: async () => {
+        setFulfilling(true);
+        setErrorMessage(null);
+        setSuccessMessage(null);
 
-    setFulfilling(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await fetch(`/api/invoices/batches/${data.batch.id}/fulfill-remaining`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const resJson = await res.json();
-      if (!res.ok) {
-        throw new Error(resJson.error || "Không thể hoàn tất các đơn còn lại.");
-      }
-      setSuccessMessage(resJson.message || `Đã hoàn tất gia hạn cho ${failedOrders.length} đơn còn lại thành công!`);
-      await fetchDetail();
-      if (onCancelSuccess) onCancelSuccess();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hoàn tất các đơn còn lại.";
-      setErrorMessage(msg);
-    } finally {
-      setFulfilling(false);
-    }
+        try {
+          const res = await fetch(`/api/invoices/batches/${data.batch.id}/fulfill-remaining`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+          const resJson = await res.json();
+          if (!res.ok) {
+            throw new Error(resJson.error || "Không thể hoàn tất các đơn còn lại.");
+          }
+          const msg = resJson.message || `Đã hoàn tất gia hạn cho ${failedOrders.length} đơn còn lại thành công!`;
+          setSuccessMessage(msg);
+          notify.success(msg, "Thành Công");
+          await fetchDetail();
+          if (onCancelSuccess) onCancelSuccess();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi hoàn tất các đơn còn lại.";
+          setErrorMessage(msg);
+          notify.error(msg, "Lỗi Xử Lý");
+        } finally {
+          setFulfilling(false);
+        }
+      },
+    });
   };
 
   const buildPaymentMessage = () => {

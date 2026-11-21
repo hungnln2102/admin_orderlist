@@ -13,6 +13,7 @@ import {
   PackageCheck,
   Sparkles,
 } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 import {
   WarehouseAccountItem,
   WarehouseAddServiceFormData,
@@ -38,6 +39,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
   onClose,
   onSubmit,
 }) => {
+  const notify = useNotification();
   const [formData, setFormData] = useState<WarehouseAddServiceFormData>({
     serviceName: "",
     category: "",
@@ -86,7 +88,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
       : formData.serviceName.trim();
 
     if (!finalServiceName) {
-      alert("Vui lòng chọn hoặc nhập tên loại dịch vụ!");
+      notify.warning("Vui lòng chọn hoặc nhập tên loại dịch vụ!", "Thiếu Thông Tin");
       return;
     }
 

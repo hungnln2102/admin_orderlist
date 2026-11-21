@@ -5,6 +5,7 @@ const { EVENTS, publishEventInTrx } = require("@/events");
 const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const warehouseAutomationService = require("./warehouseAutomationService");
 const warehouseSlotService = require("./warehouseSlotService");
+const { slotProviderSettings } = require("./slotProviderSettings");
 const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
   eventName,
   aggregateType: "WAREHOUSE",
@@ -37,6 +38,9 @@ const listWarehouseAccounts = async () => {
       "ss.name_id",
       "ss.variant_tag",
       "ss." + SS.PROVIDER_KEY + " as provider_key",
+      "ss." + SS.OTP_ENABLED,
+      "ss." + SS.STATUS_CHECK_ENABLED,
+      "ss." + SS.STATUS_PROVIDER_KEY,
       "pn.name as display_name",
       "pn.category as catalog_tag",
       "pn.login_url as login_url",
@@ -68,6 +72,9 @@ const listWarehouseAccounts = async () => {
       category: resolvedTag || srv.display_name || "Dịch vụ",
       variant_tag: resolvedTag,
       provider_key: srv.provider_key || "",
+      otp_enabled: srv[SS.OTP_ENABLED],
+      status_check_enabled: srv[SS.STATUS_CHECK_ENABLED],
+      status_provider_key: srv[SS.STATUS_PROVIDER_KEY],
       password: srv.password || "",
       backup_email: srv.backup_email || "",
       two_fa: srv.two_fa || "",
@@ -140,10 +147,15 @@ const createWarehouseAccount = async (payload) => {
         note,
         variant_tag: variantTag ? String(variantTag).trim() : null,
         status: "AVAILABLE",
+        otpEnabled: payload.otpEnabled,
+        statusCheckEnabled: payload.statusCheckEnabled,
+        statusProviderKey: payload.statusProviderKey,
+        providerKey: payload.providerKey,
       });
     }
 
     for (const slot of slotsToInsert) {
+      const providerSettings = slotProviderSettings(slot);
       const slotName = slot.display_name || slot.category || "Dịch vụ";
       let pName = await trx(TABLES.PRODUCT_NAMES)
         .whereRaw("LOWER(name) = ?", [slotName.toLowerCase().trim()])
@@ -174,6 +186,7 @@ const createWarehouseAccount = async (payload) => {
             status: slot.status || existingService.status || "AVAILABLE",
             service_note: slot.note || existingService.service_note,
             variant_tag: variantTag || null,
+            ...providerSettings,
             updated_at: now,
           });
       } else {
@@ -187,6 +200,7 @@ const createWarehouseAccount = async (payload) => {
           status: slot.status || "AVAILABLE",
           service_note: slot.note || null,
           variant_tag: variantTag || null,
+          ...providerSettings,
           created_at: now,
           updated_at: now,
         });

@@ -10,6 +10,7 @@ import {
   Tag,
   AlertCircle,
 } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 import { ServiceNameCategoryItem, SystemProduct } from "../types";
 
 interface CatalogEditModalProps {
@@ -38,6 +39,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
   onSubmit,
   onTagChanged,
 }) => {
+  const notify = useNotification();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [loginUrl, setLoginUrl] = useState("");
@@ -109,46 +111,53 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
       category.trim().toLowerCase() !== selectedPillTag.toLowerCase()
   );
 
-  // Xóa vĩnh viễn tag khỏi hệ thống
-  const handleDeleteTagDirect = async (tagToDelete: string) => {
+  // Xóa vĩnh viễn tag khỏi hệ thống (Dùng popup xác nhận dự án)
+  const handleDeleteTagDirect = (tagToDelete: string) => {
     const activeProductId = productId !== null ? productId : item?.productId;
-    const confirmDelete = window.confirm(
-      `Master có chắc chắn muốn XÓA VĨNH VIỄN tag "${tagToDelete}" khỏi toàn bộ các slot kho và sản phẩm trong hệ thống không?`
-    );
-    if (!confirmDelete) return;
 
-    setIsTagActionLoading(true);
-    setTagActionMessage("");
-    setError("");
+    notify.confirm({
+      title: "Xác Nhận Xóa Vĩnh Viễn Tag",
+      message: `Master có chắc chắn muốn XÓA VĨNH VIỄN tag "${tagToDelete}" khỏi toàn bộ các slot kho và sản phẩm trong hệ thống không?`,
+      confirmText: "Xóa Vĩnh Viễn",
+      cancelText: "Hủy Bỏ",
+      danger: true,
+      onConfirm: async () => {
+        setIsTagActionLoading(true);
+        setTagActionMessage("");
+        setError("");
 
-    try {
-      const res = await fetch("/api/warehouse/catalog/tags", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: activeProductId,
-          tag: tagToDelete,
-        }),
-      });
-      const result = await res.json();
-      if (!res.ok) {
-        throw new Error(result.error || result.message || "Lỗi khi xóa tag");
-      }
+        try {
+          const res = await fetch("/api/warehouse/catalog/tags", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productId: activeProductId,
+              tag: tagToDelete,
+            }),
+          });
+          const result = await res.json();
+          if (!res.ok) {
+            throw new Error(result.error || result.message || "Lỗi khi xóa tag");
+          }
 
-      setDeletedTags((prev) => new Set(prev).add(tagToDelete));
-      setTagActionMessage(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi toàn bộ hệ thống!`);
-      if (category.trim().toLowerCase() === tagToDelete.toLowerCase()) {
-        setCategory("");
-      }
-      if (selectedPillTag?.toLowerCase() === tagToDelete.toLowerCase()) {
-        setSelectedPillTag(null);
-      }
-      onTagChanged?.();
-    } catch (err: any) {
-      setError(err?.message || "Không thể xóa tag.");
-    } finally {
-      setIsTagActionLoading(false);
-    }
+          setDeletedTags((prev) => new Set(prev).add(tagToDelete));
+          notify.success(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi toàn bộ hệ thống!`, "Xóa Thành Công");
+          setTagActionMessage(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi toàn bộ hệ thống!`);
+          if (category.trim().toLowerCase() === tagToDelete.toLowerCase()) {
+            setCategory("");
+          }
+          if (selectedPillTag?.toLowerCase() === tagToDelete.toLowerCase()) {
+            setSelectedPillTag(null);
+          }
+          onTagChanged?.();
+        } catch (err: any) {
+          setError(err?.message || "Không thể xóa tag.");
+          notify.error(err?.message || "Không thể xóa tag.", "Lỗi");
+        } finally {
+          setIsTagActionLoading(false);
+        }
+      },
+    });
   };
 
   // Đổi tên tag trên toàn hệ thống

@@ -1,3 +1,7 @@
+## 2026-11-21 – Nâng cấp giao diện Kiểm Tra & Cấp Lại Tài Khoản Adobe (otp_portal)
+
+- [x] Thiết kế lại giao diện Kiểm Tra & Cấp Lại Tài Khoản Adobe theo chuẩn Cyberpunk Glassmorphism: Thêm icon KeyRound, UserCheck, Search, RefreshCw, nút CTA gradient glow, viền kính input, thẻ cảnh báo và thẻ mật khẩu. Bổ sung icon ShieldCheck cho sub-tab header. `tsc && vite build` hoàn tất 100%.
+
 ## 2026-11-21 – Ẩn nút thanh toán kỳ trả góp đã trả
 
 - [x] Đọc nhật ký thanh toán theo hợp đồng và kỳ đang xem để ẩn nút, đồng thời mở biểu mẫu đúng kỳ đã chọn. Frontend build thành công.
@@ -558,3 +562,11 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] Hiển thị tối đa 10 giao dịch mỗi trang và về trang đầu khi đổi bộ lọc.
 
+## Cổng OTP và kiểm tra trạng thái của tài khoản kho
+
+- [x] Thêm công tắc, provider riêng và migration cấu hình theo slot. Frontend build và kiểm tra cú pháp backend đạt.
+- [ ] Áp dụng migration và kiểm thử các tổ hợp bật/tắt với dữ liệu tích hợp.
+## Kiểm tra và nhận tài khoản Adobe thay thế
+
+- [x] Tích hợp tra cứu và nhận lại tài khoản theo mã, cùng giao diện kiểm tra và khắc phục trên OTP Portal.
+- [ ] Kiểm thử tích hợp cấp lại, bấm đồng thời và chuyển team trước khi triển khai.

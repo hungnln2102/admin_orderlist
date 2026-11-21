@@ -84,27 +84,28 @@ export const ActivationKeyRulesTab: React.FC<Props> = ({ warehouseProducts }) =>
   };
 
   const handleDeleteRule = async (rule: ActivationKeyRule) => {
-    if (
-      !window.confirm(
-        `Xác nhận xóa quy tắc tự động cấp key cho [${rule.variant_name}] + [${rule.supplier_name}]?`
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/products/activation-key-rules/${rule.id}`, {
-        method: "DELETE",
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        notify.success("Đã xóa quy tắc thành công!", "Thành Công");
-        setRules((prev) => prev.filter((r) => r.id !== rule.id));
-      } else {
-        notify.error(json.message || "Xóa quy tắc thất bại", "Lỗi");
-      }
-    } catch (err: any) {
-      notify.error(err.message || "Lỗi kết nối", "Lỗi");
-    }
+    notify.confirm({
+      title: "Xác Nhận Xóa Quy Tắc",
+      message: `Xác nhận xóa quy tắc tự động cấp key cho [${rule.variant_name || "Variant"}] + [${rule.supplier_name || "NCC"}]?`,
+      confirmText: "Xóa Quy Tắc",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/products/activation-key-rules/${rule.id}`, {
+            method: "DELETE",
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            notify.success("Đã xóa quy tắc thành công!", "Thành Công");
+            setRules((prev) => prev.filter((r) => r.id !== rule.id));
+          } else {
+            notify.error(json.message || "Xóa quy tắc thất bại", "Lỗi");
+          }
+        } catch (err: any) {
+          notify.error(err.message || "Lỗi kết nối", "Lỗi");
+        }
+      },
+    });
   };
 
   // Filtered rules

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Installment } from "../types";
 import { X, Save, Calendar, Clock, Hash } from "lucide-react";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const InstallmentModal: React.FC<Props> = ({
   onSave,
   editingItem,
 }) => {
+  const notify = useNotification();
   const [name, setName] = useState("");
   const [monthlyAmount, setMonthlyAmount] = useState("");
   const amountInputRef = useRef<HTMLInputElement>(null);
@@ -79,7 +81,7 @@ export const InstallmentModal: React.FC<Props> = ({
     e.preventDefault();
     const monthlyAmountValue = parseAmountInput(monthlyAmount);
     if (!name.trim() || monthlyAmountValue < 1000 || !totalPeriods || !startPeriod) {
-      alert("Vui lòng điền đầy đủ thông tin khoản trả góp");
+      notify.warning("Vui lòng điền đầy đủ thông tin khoản trả góp", "Thiếu Thông Tin");
       return;
     }
 
@@ -96,7 +98,7 @@ export const InstallmentModal: React.FC<Props> = ({
       });
       onClose();
     } catch (err: any) {
-      alert("Lỗi khi lưu khoản trả góp: " + err.message);
+      notify.error("Lỗi khi lưu khoản trả góp: " + err.message, "Lỗi Lưu Trữ");
     } finally {
       setSubmitting(false);
     }

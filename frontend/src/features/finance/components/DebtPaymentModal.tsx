@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Installment, PersonalAsset } from "../types";
 import { X, CreditCard, DollarSign, Calendar, FileText, PlusCircle, MinusCircle, Wallet, Receipt } from "lucide-react";
 import { formatVND } from "@/shared/utils";
+import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const DebtPaymentModal: React.FC<Props> = ({
   defaultMode = "INSTALLMENT",
   defaultPeriodMonth,
 }) => {
+  const notify = useNotification();
   const [mode, setMode] = useState<"INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW">(defaultMode);
   const [fundingSource, setFundingSource] = useState<"DIRECT_EXPENSE" | "ACCOUNT" | "RECEIPT">("DIRECT_EXPENSE");
   const [merchantName, setMerchantName] = useState<string>("");
@@ -157,20 +159,20 @@ export const DebtPaymentModal: React.FC<Props> = ({
     e.preventDefault();
     const numAmount = Number(amount.replace(/\D/g, ""));
     if (numAmount <= 0) {
-      alert("Vui lòng nhập số tiền hợp lệ lớn hơn 0");
+      notify.warning("Vui lòng nhập số tiền hợp lệ lớn hơn 0", "Lỗi Dữ Liệu");
       return;
     }
     const isDirectExpense = mode === "DEBT_BORROW" && fundingSource === "DIRECT_EXPENSE";
     if (!isDirectExpense && fundingSource === "ACCOUNT" && !selectedAccountId) {
-      alert("Vui lòng chọn tài khoản thanh khoản");
+      notify.warning("Vui lòng chọn tài khoản thanh khoản", "Thiếu Thông Tin");
       return;
     }
     if (!isDirectExpense && fundingSource === "RECEIPT" && !selectedReceiptId) {
-      alert("Vui lòng chọn biên lai ngân hàng");
+      notify.warning("Vui lòng chọn biên lai ngân hàng", "Thiếu Thông Tin");
       return;
     }
     if (mode === "INSTALLMENT" && !periodMonth) {
-      alert("Vui lòng chỉ định kỳ tháng thanh toán");
+      notify.warning("Vui lòng chỉ định kỳ tháng thanh toán", "Thiếu Thông Tin");
       return;
     }
 
@@ -188,7 +190,7 @@ export const DebtPaymentModal: React.FC<Props> = ({
       });
       onClose();
     } catch (err: any) {
-      alert("Lỗi thực hiện: " + (err.message || "Thao tác thất bại"));
+      notify.error("Lỗi thực hiện: " + (err.message || "Thao tác thất bại"), "Thao Tác Thất Bại");
     } finally {
       setSubmitting(false);
     }

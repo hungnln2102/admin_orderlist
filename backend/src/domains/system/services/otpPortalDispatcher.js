@@ -179,7 +179,10 @@ async function dispatchSlotRequest({ slotKey, input }) {
     }
   } catch (err) {
     console.warn(`[OTP Dispatcher] Lỗi kiểm tra quy tắc định tuyến cho [${slotKey}]:`, err.message);
+    throw new Error("Không thể xác minh cấu hình tài khoản.");
   }
+
+  if (matchedRoutingRule?.disabled) throw new Error("Chức năng đang tắt cho tài khoản này.");
 
   if (effectiveChain.length === 0) {
     throw new Error(`OTP service chain is not configured for slot '${slotKey}'.`);
@@ -249,6 +252,9 @@ async function dispatchSlotRequest({ slotKey, input }) {
     } else if (String(rawStatus || "").toLowerCase() === "inactive") {
       statusType = "inactive";
       statusText = "CẦN CHUYỂN TEAM";
+    } else if (slotKey === "adobe_check" && String(rawStatus || "").toLowerCase() !== "active") {
+      statusType = "unknown";
+      statusText = "CHƯA XÁC MINH ĐƯỢC";
     } else {
       statusType = "active";
       statusText = rawStatus ? String(rawStatus).toUpperCase() : "ĐANG HOẠT ĐỘNG";
