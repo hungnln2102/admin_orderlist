@@ -11,6 +11,7 @@ const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { publishEventInTrx, EVENTS } = require("@/events");
 const { getVietnamDateString } = require("@/utils/time");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
+const { ensureSupplierCostLog } = require("./supplierCostLogService");
 
 /**
  * Trích xuất số tháng (X) của gói từ biến thể sản phẩm (--xm) hoặc order.days.
@@ -255,19 +256,12 @@ async function processOrderPayment(trx, order, amount, options = {}) {
   const supplyId = order.supply_id ? Number(order.supply_id) : null;
 
   // Ghi nhận chi phí nhập NCC khi gia hạn thành công (chu kỳ mới, chỉ áp dụng cho NCC ngoài)
-  let supplierCostInserted = false;
-  if (isRenewal && !isSupplierMavryk && effectiveCost > 0 && supplyId) {
-    await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
-      order_list_id: updatedOrder.id,
-      supply_id: supplyId,
-      id_order: updatedOrder.id_order,
-      import_cost: effectiveCost,
-      ncc_payment_status: "Chưa Thanh Toán",
-      logged_at: trx.fn.now(),
-    });
-    supplierCostInserted = true;
-  }
-
+  const supplierCostLog = await ensureSupplierCostLog({
+    trx,
+    order: updatedOrder,
+    isRenewal,
+  });
+  const supplierCostInserted = supplierCostLog.inserted;
   await publishEventInTrx(trx, {
     eventName: EVENTS.ORDER_PAID,
     aggregateType: "ORDER",
@@ -348,6 +342,27 @@ async function processOrderPayment(trx, order, amount, options = {}) {
   }
 
   // Tự động đối soát và loại trừ đơn hàng khỏi các đợt gộp PENDING còn hiệu lực (nếu có)
+  if (supplierCostInserted && !isRenewal) {
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.SUPPLIER_COST_ADDED,
+      aggregateType: "SUPPLIER_COST",
+      aggregateId: updatedOrder.id,
+      action: "CREATE",
+      afterState: {
+        order_list_id: updatedOrder.id,
+        supply_id: supplierCostLog.supplierId,
+        id_order: updatedOrder.id_order,
+        import_cost: supplierCostLog.importCost,
+      },
+      source: "ORDER_PAYMENT_SERVICE",
+      payload: {
+        cost: supplierCostLog.importCost,
+        supplier_id: supplierCostLog.supplierId,
+        order_id: updatedOrder.id,
+        id_order: updatedOrder.id_order,
+      },
+    });
+  }
   try {
     const { excludeOrderFromPendingBatches } = require("@/domains/invoices/services/batchPaymentService");
     await excludeOrderFromPendingBatches(trx, updatedOrder.id_order, "Đã thanh toán");

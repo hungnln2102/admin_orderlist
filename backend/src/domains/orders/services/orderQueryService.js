@@ -39,13 +39,7 @@ async function getDefaultShopBank(trx) {
 }
 
 function applyCanceledFilter(builder) {
-  builder.where(function(b) {
-    b.whereIn("status", [ORDER_STATUS.REFUND_PENDING, ORDER_STATUS.REFUNDED])
-     .orWhere(function(sub) {
-       sub.where("status", ORDER_STATUS.CANCELED)
-          .where("was_paid", true);
-     });
-  });
+  builder.where("status", ORDER_STATUS.CANCELED);
 }
 
 function applyExpiredFilter(builder) {
@@ -463,19 +457,13 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
         COALESCE(SUM(cost), 0)::numeric as "totalCost",
         COALESCE(SUM(
           CASE
-            WHEN status = '${ORDER_STATUS.REFUND_PENDING}' THEN price
-            ELSE 0
-          END
-        ), 0)::numeric as "refundCustomerAmount",
-        COALESCE(SUM(
-          CASE
-            WHEN status IN ('${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN price
+            WHEN status = '${ORDER_STATUS.CANCELED}' THEN price
             ELSE 0
           END
         ), 0)::numeric as "refundedCustomerAmount",
         COALESCE(SUM(
           CASE
-            WHEN status IN ('${ORDER_STATUS.REFUND_PENDING}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.CANCELED}') THEN cost
+            WHEN status = '${ORDER_STATUS.CANCELED}' THEN cost
             ELSE 0
           END
         ), 0)::numeric as "refundSupplierAmount",
@@ -491,12 +479,7 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
         COUNT(*) FILTER (
           WHERE status = '${ORDER_STATUS.UNPAID}'
         ) as "pendingCount",
-        COUNT(*) FILTER (
-          WHERE status = '${ORDER_STATUS.REFUND_PENDING}'
-        ) as "pendingRefundCount",
-        COUNT(*) FILTER (
-          WHERE status = '${ORDER_STATUS.REFUNDED}'
-        ) as "refundedCount",
+
         COUNT(*) FILTER (
           WHERE status = '${ORDER_STATUS.CANCELED}'
         ) as "canceledCount",
@@ -510,14 +493,14 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
       db.raw(`
         COALESCE(SUM(
           CASE
-            WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
+            WHEN status <> '${ORDER_STATUS.CANCELED}' AND expired_at > CURRENT_DATE
             THEN ROUND((price::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
             ELSE 0
           END
         ), 0)::numeric as "totalRemainingValue",
         COALESCE(SUM(
           CASE
-            WHEN status NOT IN ('${ORDER_STATUS.CANCELED}', '${ORDER_STATUS.REFUNDED}', '${ORDER_STATUS.REFUND_PENDING}') AND expired_at > CURRENT_DATE
+            WHEN status <> '${ORDER_STATUS.CANCELED}' AND expired_at > CURRENT_DATE
             THEN ROUND((cost::numeric / GREATEST(COALESCE(NULLIF(days::numeric, 0), 365), 1)) * GREATEST((expired_at::date - CURRENT_DATE), 0))
             ELSE 0
           END
@@ -530,15 +513,15 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
       totalCost: Number(summaryRow?.totalCost || 0),
       totalRemainingValue: Number(remRow?.totalRemainingValue || 0),
       supplierRemainingValue: Number(remRow?.supplierRemainingValue || 0),
-      refundCustomerAmount: Number(summaryRow?.refundCustomerAmount || 0),
+      refundCustomerAmount: 0,
       refundedCustomerAmount: Number(summaryRow?.refundedCustomerAmount || 0),
       refundSupplierAmount: Number(summaryRow?.refundSupplierAmount || 0),
       paidCount: Number(summaryRow?.paidCount || 0),
       renewCount: Number(summaryRow?.renewCount || 0),
       processingCount: Number(summaryRow?.processingCount || 0),
       pendingCount: Number(summaryRow?.pendingCount || 0),
-      pendingRefundCount: Number(summaryRow?.pendingRefundCount || 0),
-      refundedCount: Number(summaryRow?.refundedCount || 0),
+      pendingRefundCount: 0,
+      refundedCount: Number(summaryRow?.canceledCount || 0),
       canceledCount: Number(summaryRow?.canceledCount || 0),
       todayCount: Number(summaryRow?.todayCount || 0),
       totalOrders: total,

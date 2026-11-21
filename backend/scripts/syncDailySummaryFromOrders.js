@@ -36,10 +36,10 @@ async function syncDailySummaryFromOrders() {
         SELECT
           v_date,
           COUNT(*) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED'))::integer AS sales_orders_count,
-          COUNT(*) FILTER (WHERE status = 'REFUNDED')::integer AS canceled_count,
+          COUNT(*) FILTER (WHERE status = 'CANCELED')::integer AS canceled_count,
           COALESCE(SUM(COALESCE(gross_selling_price, price, 0)) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED')), 0)::numeric AS earned_revenue,
           COALESCE(SUM(COALESCE(cost, 0)) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED')), 0)::numeric AS sales_cost,
-          COALESCE(SUM(COALESCE(refund, price, 0)) FILTER (WHERE status = 'REFUNDED'), 0)::numeric AS revenue_reversed
+          COALESCE(SUM(COALESCE(refund, price, 0)) FILTER (WHERE status = 'CANCELED'), 0)::numeric AS revenue_reversed
         FROM order_dates
         WHERE id_order NOT LIKE 'MAVN%'
         GROUP BY v_date

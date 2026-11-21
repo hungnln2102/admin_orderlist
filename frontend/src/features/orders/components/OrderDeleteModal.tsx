@@ -98,7 +98,7 @@ export const OrderDeleteModal: React.FC<OrderDeleteModalProps> = ({
             <div className="p-3.5 rounded-xl border text-slate-300 leading-relaxed space-y-1 bg-rose-500/10 border-rose-500/20">
               <p>
                 Đơn hàng đã thanh toán. Thao tác này sẽ chuyển trạng thái đơn hàng thành{" "}
-                <strong className="text-rose-400 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}"</strong> (Đã Hủy).
+                <strong className="text-rose-400 font-bold">"{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}"</strong> (tab Hoàn Tiền).
               </p>
               <p className="text-[11px] text-rose-300/80">
                 ✓ Hệ thống sẽ tự động tạo credit note hoàn tiền cho khách theo số ngày sử dụng còn lại.

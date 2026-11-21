@@ -91,8 +91,8 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
     },
     {
       key: "canceled" as OrderDatasetKey,
-      label: "Đơn Đã Hủy",
-      description: "Danh sách đơn hàng đã hủy",
+      label: "Hoàn Tiền",
+      description: "Danh sách đơn hàng đã chuyển sang hoàn tiền",
       count: tabCounts.canceled,
       gradient: "from-rose-500/20 via-pink-500/10 to-transparent",
       borderColor: "border-rose-500/40",
@@ -143,19 +143,19 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
     if (activeTab === "canceled") {
       return [
         {
-          title: "TỔNG ĐƠN ĐÃ HỦY",
+          title: "TỔNG ĐƠN HOÀN TIỀN",
           mainValue: `${totalOrdersCount} đơn`,
-          subLabel: "Chờ hoàn trả:",
-          subValue: `${pendingRefundCount} đơn`,
+          subLabel: "Đơn đã hoàn:",
+          subValue: `${canceledCount} đơn`,
           subColor: "text-pink-400",
           icon: <Calendar className="w-4 h-4" />,
           iconBg: "bg-rose-500/10 text-rose-400 border-rose-500/20",
         },
         {
-          title: "TỔNG TIỀN HOÀN KHÁCH",
-          mainValue: `${fmt(refundCustomerAmount + refundedCustomerAmount)} ₫`,
-          subLabel: "Cần hoàn:",
-          subValue: `${fmt(refundCustomerAmount)} ₫ (Đã hoàn: ${fmt(refundedCustomerAmount)} ₫)`,
+          title: "TỔNG GIÁ TRỊ ĐƠN HOÀN",
+          mainValue: `${fmt(refundedCustomerAmount)} ₫`,
+          subLabel: "Chi phí NCC:",
+          subValue: `${fmt(refundSupplierAmount)} ₫`,
           subColor: "text-emerald-400",
           icon: <DollarSign className="w-4 h-4" />,
           iconBg: "bg-rose-500/10 text-rose-400 border-rose-500/20",
@@ -321,8 +321,6 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
               <option value={ORDER_STATUS.UNPAID} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.UNPAID]}</option>
               <option value={ORDER_STATUS.RENEW_REQUIRED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.RENEW_REQUIRED]}</option>
               <option value={ORDER_STATUS.EXPIRED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.EXPIRED]}</option>
-              <option value={ORDER_STATUS.REFUND_PENDING} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.REFUND_PENDING]}</option>
-              <option value={ORDER_STATUS.REFUNDED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.REFUNDED]}</option>
               <option value={ORDER_STATUS.CANCELED} className="bg-slate-900 text-white">{ORDER_STATUS_LABELS[ORDER_STATUS.CANCELED]}</option>
             </select>
           </div>

@@ -150,11 +150,7 @@ export interface CatalogSupplier {
 
 // Global Helper functions for Orders
 export function calculateRemainingDays(order: Order): number {
-  if (
-    order.status === ORDER_STATUS.CANCELED ||
-    order.status === ORDER_STATUS.REFUNDED ||
-    order.status === ORDER_STATUS.REFUND_PENDING
-  )
+  if (order.status === ORDER_STATUS.CANCELED)
     return 0;
 
   if (order.expired_at) {

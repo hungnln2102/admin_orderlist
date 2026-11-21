@@ -45,8 +45,8 @@ const TARGET = {
 const STATUS_MAP = new Map([
   ['Hết Hạn', 'EXPIRED'],
   ['Đã Thanh Toán', 'PAID'],
-  ['Đã Hoàn', 'REFUNDED'],
-  ['Đã Hoàn Tiền', 'REFUNDED'],
+  ['Đã Hoàn', 'CANCELED'],
+  ['Đã Hoàn Tiền', 'CANCELED'],
   ['Cần Gia Hạn', 'RENEW_REQUIRED'],
   ['Chưa Thanh Toán', 'UNPAID'],
   ['Đang Xử Lý', 'PROCESSING'],
@@ -54,7 +54,7 @@ const STATUS_MAP = new Map([
   ['PROCESSING', 'PROCESSING'],
   ['EXPIRED', 'EXPIRED'],
   ['PAID', 'PAID'],
-  ['REFUNDED', 'REFUNDED'],
+  ['REFUNDED', 'CANCELED'],
   ['RENEW_REQUIRED', 'RENEW_REQUIRED'],
   ['UNPAID', 'UNPAID'],
 ]);
@@ -177,8 +177,8 @@ function getVietnamTodayMidnight() {
 function determineOrderStatus(rawStatus, expiredAtInput, refundInput, todayMidnight, warnDays = 4) {
   const statusStr = String(rawStatus || '').trim();
 
-  if (['Đã Hoàn Tiền', 'Đã Hoàn', 'REFUNDED'].includes(statusStr) || (refundInput != null && Number(refundInput) > 0)) {
-    return 'REFUNDED';
+  if (['Đã Hoàn Tiền', 'Đã Hoàn', 'REFUNDED', 'REFUND_PENDING', 'Đã Hủy', 'Hủy'].includes(statusStr) || (refundInput != null && Number(refundInput) > 0)) {
+    return 'CANCELED';
   }
   if (['Chưa Thanh Toán', 'UNPAID'].includes(statusStr)) {
     return 'UNPAID';
@@ -187,7 +187,7 @@ function determineOrderStatus(rawStatus, expiredAtInput, refundInput, todayMidni
     return 'PROCESSING';
   }
   if (['Đã Hủy', 'CANCELED', 'CANCELLED'].includes(statusStr)) {
-    return 'REFUNDED';
+    return 'CANCELED';
   }
 
   if (!expiredAtInput) {
@@ -272,10 +272,10 @@ async function syncDailyRevenueSummary(trx) {
       SELECT
         v_date,
         COUNT(*) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED'))::integer AS sales_orders_count,
-        COUNT(*) FILTER (WHERE status = 'REFUNDED')::integer AS canceled_count,
+        COUNT(*) FILTER (WHERE status = 'CANCELED')::integer AS canceled_count,
         COALESCE(SUM(COALESCE(gross_selling_price, price, 0)) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED')), 0)::numeric AS earned_revenue,
         COALESCE(SUM(COALESCE(cost, 0)) FILTER (WHERE status IN ('PAID', 'EXPIRED', 'RENEW_REQUIRED')), 0)::numeric AS sales_cost,
-        COALESCE(SUM(COALESCE(refund, price, 0)) FILTER (WHERE status = 'REFUNDED'), 0)::numeric AS revenue_reversed
+        COALESCE(SUM(COALESCE(refund, price, 0)) FILTER (WHERE status = 'CANCELED'), 0)::numeric AS revenue_reversed
       FROM order_dates
       WHERE id_order NOT LIKE 'MAVN%'
       GROUP BY v_date
@@ -379,7 +379,7 @@ async function importData(targetDb, sourceDb, source, report) {
   });
 
   const todayMidnight = getVietnamTodayMidnight();
-  const statusStats = { EXPIRED: 0, RENEW_REQUIRED: 0, PAID: 0, REFUNDED: 0, UNPAID: 0 };
+  const statusStats = { EXPIRED: 0, RENEW_REQUIRED: 0, PAID: 0, CANCELED: 0, UNPAID: 0 };
   let slotWithTextCount = 0;
 
   const orders = source.orders.map((row) => {

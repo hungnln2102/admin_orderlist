@@ -2,9 +2,9 @@ const { db, TABLES, withTransaction } = require("@/db");
 const { publishEventInTrx, EVENTS } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
-const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 const { getDefaultShopBank } = require("./orderQueryService");
 const { buildVietQrImageUrl } = require("@/utils/qrUrl");
+const { ensureSupplierCostLog } = require("./supplierCostLogService");
 
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
 
@@ -151,30 +151,16 @@ async function payOrderWithCredit(id, creditNoteId) {
         vietqr_url: qrUrl,
       };
     }
-    const isSupplierMavryk = await isMavrykSupplier(trx, updatedOrder);
-    const existingLog = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
-      .where({ order_list_id: updatedOrder.id })
-      .first();
-    const importCost = Number(updatedOrder.cost || 0);
-    if (!isSupplierMavryk && !existingLog && importCost > 0) {
-      let supplyId = updatedOrder.supply_id ? Number(updatedOrder.supply_id) : null;
-      if (!supplyId) {
-        const defaultSupplier = await trx(TABLES.SUPPLIER).orderBy("id", "asc").first();
-        supplyId = defaultSupplier ? defaultSupplier.id : 1;
-      }
-      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
-        order_list_id: updatedOrder.id,
-        supply_id: supplyId,
-        id_order: updatedOrder.id_order,
-        import_cost: importCost,
-        ncc_payment_status: 'Chưa Thanh Toán',
-        logged_at: db.fn.now(),
-      });
-
+    const supplierCostLog = await ensureSupplierCostLog({
+      trx,
+      order: updatedOrder,
+      isRenewal,
+    });
+    if (supplierCostLog.inserted) {
       await emitOrderEvent(trx, EVENTS.SUPPLIER_COST_ADDED, {
-        cost: importCost,
-        supplier_id: updatedOrder.supply_id,
-        summary: `Thêm chi phí nhập hàng cho đơn #${updatedOrder.id_order} thanh toán bằng credit: ${importCost} ₫`,
+        cost: supplierCostLog.importCost,
+        supplier_id: supplierCostLog.supplierId,
+        summary: `Thêm chi phí nhập hàng cho đơn #${updatedOrder.id_order} thanh toán bằng credit: ${supplierCostLog.importCost} ₫`,
       });
     }
 
