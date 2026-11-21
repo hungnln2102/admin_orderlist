@@ -1,3 +1,7 @@
+## 2026-11-21 – Ẩn nút thanh toán kỳ trả góp đã trả
+
+- [x] Đọc nhật ký thanh toán theo hợp đồng và kỳ đang xem để ẩn nút, đồng thời mở biểu mẫu đúng kỳ đã chọn. Frontend build thành công.
+
 ## 2026-11-21 – Hiển thị đầy đủ ngày trong danh sách đơn hàng
 
 - [x] Form Thêm tài khoản kho hiển thị các tag của sản phẩm thành nút và làm nổi bật tag đang chọn. Frontend build thành công.

@@ -21,6 +21,7 @@ interface Props {
   ) => Promise<void>;
   item?: Installment | PersonalAsset | null;
   defaultMode?: "INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW";
+  defaultPeriodMonth?: string;
 }
 
 interface LiquidityAccount {
@@ -36,6 +37,7 @@ export const DebtPaymentModal: React.FC<Props> = ({
   onConfirm,
   item,
   defaultMode = "INSTALLMENT",
+  defaultPeriodMonth,
 }) => {
   const [mode, setMode] = useState<"INSTALLMENT" | "DEBT_PAY" | "DEBT_BORROW">(defaultMode);
   const [fundingSource, setFundingSource] = useState<"DIRECT_EXPENSE" | "ACCOUNT" | "RECEIPT">("DIRECT_EXPENSE");
@@ -64,7 +66,7 @@ export const DebtPaymentModal: React.FC<Props> = ({
       const inst = item as Installment;
       setAmount(String(inst.monthlyAmount || 0));
       const now = new Date();
-      setPeriodMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+      setPeriodMonth(defaultPeriodMonth ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
       setNote("");
     } else {
       const debt = item as PersonalAsset;
@@ -78,7 +80,7 @@ export const DebtPaymentModal: React.FC<Props> = ({
         setNote("");
       }
     }
-  }, [isOpen, item, defaultMode]);
+  }, [isOpen, item, defaultMode, defaultPeriodMonth]);
 
   // Fetch liquidity accounts & receipts
   useEffect(() => {

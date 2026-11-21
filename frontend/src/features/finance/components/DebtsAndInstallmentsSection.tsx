@@ -22,6 +22,7 @@ import { DebtPaymentModal } from "./DebtPaymentModal";
 
 interface Props {
   installments: Installment[];
+  periodMonth: string;
   personalDebts: PersonalAsset[];
   supplierDebtTotal?: number;
   totalInstallmentsRemainingDebt: number;
@@ -91,6 +92,7 @@ const formatTimeVN = (dateStr?: string | null) => {
 
 export const DebtsAndInstallmentsSection: React.FC<Props> = ({
   installments,
+  periodMonth,
   personalDebts,
   totalInstallmentsRemainingDebt,
   monthlyDebtBurden = 0,
@@ -446,7 +448,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
                         </div>
                       </div>
 
-                      {!isCompleted && (
+                      {!isCompleted && !item.isPaidThisMonth && (
                         <button
                           type="button"
                           onClick={() => openPaymentModal(item)}
@@ -789,6 +791,7 @@ export const DebtsAndInstallmentsSection: React.FC<Props> = ({
         onConfirm={handleConfirmPayment}
         item={payingInstallment}
         defaultMode="INSTALLMENT"
+        defaultPeriodMonth={periodMonth}
       />
       <DebtPaymentModal
         isOpen={debtActionModalOpen}

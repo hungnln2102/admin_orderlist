@@ -1,3 +1,8 @@
+## Ẩn nút thanh toán kỳ trả góp đã trả
+
+- Đối chiếu nhật ký thanh toán theo hợp đồng và kỳ đang xem. API đã có kiểm tra trùng kỳ trong transaction.
+- Frontend build và kiểm tra cú pháp backend thành công. Chưa triển khai lên production.
+
 ## Hiển thị đầy đủ ngày trong danh sách đơn hàng
 
 - Cột ngày rộng 180 px để hiển thị ngày đăng ký và ngày hết hạn trên cùng một hàng theo dạng `dd/mm/yyyy - dd/mm/yyyy`. [OrderTable.tsx](../frontend/src/features/orders/components/OrderTable.tsx#L234)

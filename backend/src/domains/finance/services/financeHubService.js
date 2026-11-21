@@ -331,6 +331,12 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
   let installmentsInMonthTotal = 0;
   let totalInstallmentsRemainingDebt = 0;
 
+  const paymentColumns = COLS.DEBT_PAYMENT_LOGS;
+  const paidInstallmentIds = new Set((await db(TABLES.DEBT_PAYMENT_LOGS)
+    .where(paymentColumns.TARGET_TYPE, "INSTALLMENT")
+    .where(paymentColumns.PERIOD_MONTH, currentMonthStr)
+    .pluck(paymentColumns.TARGET_ID)).map(Number));
+
   const installments = installmentRows.map((r) => {
     const rawItem = {
       ...r,
@@ -352,6 +358,7 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
       startPeriod: r.start_period,
       dueDay: Number(r.due_day || 15),
       currentPeriod: state.currentPeriod,
+      isPaidThisMonth: paidInstallmentIds.has(Number(r.id)),
       remainingPeriods: state.remainingPeriods,
       remainingDebt: state.remainingDebt,
       isEffective: state.isEffective,

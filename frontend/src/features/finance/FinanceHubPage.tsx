@@ -442,6 +442,7 @@ export const FinanceHubPage: React.FC = () => {
             <div className="animate-in fade-in duration-200">
               <DebtsAndInstallmentsSection
                 installments={data.installments}
+                periodMonth={data.month}
                 personalDebts={data.personalAssets}
                 totalInstallmentsRemainingDebt={
                   data.netWorth.breakdown.totalInstallmentsRemainingDebt
