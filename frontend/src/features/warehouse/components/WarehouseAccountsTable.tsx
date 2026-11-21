@@ -176,7 +176,7 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         {services.length > 0 ? (
                           services.map((srv, idx) => {
-                            const isAvailable = srv.status === "AVAILABLE";
+                            const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
                             const brand = getServiceBrandStyle(
                               srv.display_name || srv.category,
                               isAvailable

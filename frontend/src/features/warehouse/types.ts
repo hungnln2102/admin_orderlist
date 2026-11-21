@@ -16,6 +16,7 @@ export interface WarehouseServiceSlot {
   two_fa?: string;
   otp_type?: string;
   provider_key?: string | null;
+  package_usage?: { used: number; total: number };
   otp_enabled?: boolean | null;
   status_check_enabled?: boolean | null;
   status_provider_key?: string | null;

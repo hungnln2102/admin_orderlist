@@ -124,9 +124,14 @@ async function syncExistingImportOrderToWarehouseInTrx(trx, { existingOrder, upd
     .first();
   if (!account) return null;
 
-  const matchingSlots = await trx(TABLES.ACCOUNT_SLOTS)
+  let matchingSlots = await trx(TABLES.ACCOUNT_SLOTS)
     .where({ [AS.ACCOUNT_ID]: account[A.ID], [AS.NAME_ID]: oldProductNameId })
     .forUpdate();
+  if (matchingSlots.length === 0) return null;
+  if (matchingSlots.length > 1 && Number(existingOrder.id_product) > 0) {
+    const tags = await listImportWarehouseTags(Number(existingOrder.id_product), trx);
+    matchingSlots = matchingSlots.filter((slot) => tags.includes(slot[AS.VARIANT_TAG]));
+  }
   if (matchingSlots.length === 0) return null;
   if (matchingSlots.length > 1) {
     throw new Error(`Không thể đồng bộ kho: tài khoản ${oldAccountUsername} có nhiều slot cùng dịch vụ.`);
@@ -322,7 +327,7 @@ async function createOrder(payload) {
 
     const warehouseTag = typeof payload.warehouse_variant_tag === "string"
       ? payload.warehouse_variant_tag.trim() : "";
-    if (isMavn && payload.save_to_warehouse === true) {
+    if (isMavn && (payload.save_to_warehouse === true || payload.save_to_package === true)) {
       if (!warehouseTag) throw new Error("Vui lòng chọn tag sản phẩm khi lưu kho.");
       const tags = await listImportWarehouseTags(Number(newOrderData.id_product), trx);
       if (!tags.includes(warehouseTag)) throw new Error("Tag không thuộc sản phẩm đã chọn.");
@@ -464,7 +469,7 @@ async function createOrder(payload) {
     if (shouldSyncWarehouseOrPackage) {
       try {
         await trx.savepoint(async (subTrx) => {
-          const isSaveToWarehouse = payload.save_to_warehouse === true;
+          const isSaveToWarehouse = payload.save_to_warehouse === true || payload.save_to_package === true;
           const isSaveToPackage = payload.save_to_package === true;
           const accountUsername = payload.information_order
             ? String(payload.information_order).trim().toLowerCase()
@@ -529,21 +534,23 @@ async function createOrder(payload) {
             }
           }
 
+          let warehouseSlotId;
           if (stockId && nameId && isSaveToWarehouse) {
             const existingService = await subTrx(TABLES.STOCK_SERVICES)
               .where({
                 account_id: stockId,
                 name_id: nameId,
               })
-              .first();
+              .where(AS.VARIANT_TAG, warehouseTag)
+              .forUpdate().first();
 
             if (existingService) {
+              warehouseSlotId = existingService.id;
               // Đã có trong kho -> Luôn đồng bộ dữ liệu mới (kể cả khi không lưu kho)
               const updateData = {
                 password: payload.warehouse_password || payload.slot || existingService.password,
                 [AS.VARIANT_TAG]: warehouseTag,
                 expired_at: payload.expired_at ? new Date(payload.expired_at) : existingService.expired_at,
-                status: "AVAILABLE",
                 service_note: payload.note || existingService.service_note,
                 updated_at: new Date(),
               };
@@ -564,7 +571,7 @@ async function createOrder(payload) {
               console.log(`✅ [WarehouseSync] Đã đồng bộ dữ liệu mới cho tài khoản "${accountUsername}" từ đơn ${id_order}`);
             } else {
               // Chưa có trong kho nhưng bật lưu kho -> tạo mới
-              await subTrx(TABLES.STOCK_SERVICES).insert({
+              const [warehouseSlot] = await subTrx(TABLES.STOCK_SERVICES).insert({
                 account_id: stockId,
                 name_id: nameId,
                 slot_index: 1,
@@ -578,7 +585,8 @@ async function createOrder(payload) {
                 service_note: payload.note || null,
                 created_at: new Date(),
                 updated_at: new Date(),
-              });
+              }).returning(AS.ID);
+              warehouseSlotId = warehouseSlot[AS.ID];
             }
           }
 
@@ -594,10 +602,12 @@ async function createOrder(payload) {
 
           // 4. Check & Sync Package Product (warehouse.package_products)
           if (isSaveToPackage && stockId && nameId) {
+            if (!warehouseSlotId) throw new Error("Chưa lưu được dịch vụ vào Kho Hàng.");
             const existingPackage = await subTrx(TABLES.PACKAGE_PRODUCT)
               .where({
                 product_name_id: nameId,
                 account_id: stockId,
+                [PP.ACCOUNT_SLOT_ID]: warehouseSlotId,
               })
               .first();
 
@@ -628,6 +638,7 @@ async function createOrder(payload) {
               }
 
               await subTrx(TABLES.PACKAGE_PRODUCT).insert({
+                [PP.ACCOUNT_SLOT_ID]: warehouseSlotId,
                 product_name_id: nameId,
                 account_id: stockId,
                 package_name: productName.trim(),
@@ -648,7 +659,7 @@ async function createOrder(payload) {
           }
         });
       } catch (err) {
-        if (payload.save_to_warehouse === true) throw err;
+        if (payload.save_to_warehouse === true || payload.save_to_package === true) throw err;
         console.error("[OrderService] Lỗi tự động lưu/đồng bộ kho/gói:", err.message);
       }
     }
@@ -1130,67 +1141,17 @@ async function renewOrder(id, payload = {}) {
       });
 
       // D. Đồng bộ ngày hết hạn và liên kết sang Kho Gói Sản Phẩm (warehouse.package_products & warehouse.account_slots)
-      try {
-        const infoAcc = String(updatedOrder.information_order || "").trim().toLowerCase();
-        if (infoAcc) {
-          // 1. Tìm tài khoản kho tương ứng theo account_username hoặc đã liên kết id_order
-          const matchedAcc = await trx(TABLES.PRODUCT_KEYS)
-            .whereRaw("LOWER(TRIM(account_username)) = ?", [infoAcc])
-            .orWhere("id_order", updatedOrder.id_order)
-            .first();
-
-          if (matchedAcc) {
-            // Cập nhật id_order vào warehouse.accounts nếu chưa có
-            await trx(TABLES.PRODUCT_KEYS)
-              .where({ id: matchedAcc.id })
-              .update({
-                id_order: updatedOrder.id_order,
-                updated_at: trx.fn.now(),
-              });
-
-            // 2. Tìm các gói trong Kho Gói Sản Phẩm thuộc tài khoản này
-            const pkgProducts = await trx(TABLES.PACKAGE_PRODUCT)
-              .where({ account_id: matchedAcc.id });
-
-            if (pkgProducts.length > 0) {
-              // Cập nhật giá vốn gói nếu có chi phí gia hạn mới
-              if (renewCost > 0) {
-                await trx(TABLES.PACKAGE_PRODUCT)
-                  .where({ account_id: matchedAcc.id })
-                  .update({
-                    cost: renewCost,
-                    updated_at: trx.fn.now(),
-                  });
-              }
-
-              // 3. Cập nhật ngày hết hạn cho các vị trí/slot TRỐNG (AVAILABLE) của gói trong kho
-              // Giữ nguyên tuyệt đối hạn của các slot khách đang thuê (IN_USE)
-              await trx(TABLES.ACCOUNT_SLOTS)
-                .where({ account_id: matchedAcc.id })
-                .whereIn("status", ["AVAILABLE", "available"])
-                .update({
-                  expired_at: renewal.newExpiredAt,
-                  days: renewal.days,
-                  updated_at: trx.fn.now(),
-                });
-
-              for (const pkg of pkgProducts) {
-                await emitOrderEvent(trx, EVENTS.PACKAGE_PRODUCT_UPDATED, {
-                  packageId: pkg.id,
-                  accountId: matchedAcc.id,
-                  accountUsername: matchedAcc.account_username,
-                  importOrderCode: updatedOrder.id_order,
-                  newExpiredAt: updatedOrder.expired_at,
-                  newOrderDate: updatedOrder.order_date,
-                  cost: renewCost,
-                  action: "RENEW_PACKAGE_IMPORT",
-                });
-              }
-            }
-          }
-        }
-      } catch (whSyncErr) {
-        console.error("[OrderService] Lỗi đồng bộ Kho Gói Sản Phẩm khi gia hạn MAVN:", whSyncErr.message);
+      const warehouseSync = await syncExistingImportOrderToWarehouseInTrx(trx, {
+        existingOrder,
+        updatedOrder,
+        payload: { expired_at: renewal.newExpiredAt, days: renewal.days },
+      });
+      if (warehouseSync) {
+        await emitOrderEvent(trx, EVENTS.WAREHOUSE_STOCK_UPDATED, {
+          id: warehouseSync.slotId,
+          orderId: updatedOrder.id,
+          orderCode: updatedOrder.id_order,
+        });
       }
 
       // E. Kích hoạt tính lại chi phí slot trong ngày sau khi commit

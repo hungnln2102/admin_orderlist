@@ -321,6 +321,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     const keyCols = COLS.ACTIVATION_KEYS;
     const targetTag = key[keyCols.TARGET_VARIANT_TAG];
     let packageId = null;
+    let packageSlotId = null;
     if (targetTag && key.product_name_id) {
       const pack = COLS.PACKAGE_PRODUCT;
       await trx(TABLES.PACKAGE_PRODUCT)
@@ -329,10 +330,12 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         .forUpdate()
         .select("id");
       const packages = await getPackageProducts({ connection: trx, productNameId: key.product_name_id });
-      packageId = packages.find((item) =>
+      const availablePackage = packages.find((item) =>
         matchesPackageTag(item, targetTag) && item.usedSlots < item.totalSlots &&
         (!recovery || Number(item.id) !== Number(key[keyCols.PACKAGE_PRODUCT_ID]))
-      )?.id ?? null;
+      );
+      packageId = availablePackage?.id ?? null;
+      packageSlotId = availablePackage?.warehouseSlotId ?? null;
     }
 
     const availableSlot = (targetTag && !packageId) ? null : await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
@@ -359,8 +362,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .modify((builder) => {
         if (targetTag) {
           builder.whereRaw(`BTRIM(ss.${COLS.ACCOUNT_SLOTS.VARIANT_TAG}) = ?`, [targetTag]);
-          builder.where("ss.account_id", trx(TABLES.PACKAGE_PRODUCT)
-            .where("id", packageId).select(COLS.PACKAGE_PRODUCT.ACCOUNT_ID));
+          builder.where(`ss.${COLS.ACCOUNT_SLOTS.ID}`, packageSlotId);
         } else {
           builder.whereIn("ss.status", ["AVAILABLE", "available"]);
         }

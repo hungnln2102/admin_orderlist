@@ -3,6 +3,16 @@ const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getVietnamDateString } = require("@/utils/time");
 
+async function requirePackageSlot(trx, accountId, nameId, slotId) {
+  const S = COLS.ACCOUNT_SLOTS;
+  const rows = await trx(TABLES.ACCOUNT_SLOTS)
+    .where({ [S.ACCOUNT_ID]: accountId, [S.NAME_ID]: nameId })
+    .modify((query) => { if (slotId) query.where(S.ID, slotId); })
+    .forUpdate().limit(2);
+  if (rows.length !== 1) throw new Error("Gói phải liên kết với đúng một dịch vụ trong Kho Hàng.");
+  return rows[0];
+}
+
 /**
  * Service lấy danh sách Kho Gói Sản Phẩm từ bảng warehouse.package_products
  * Kết hợp với warehouse.product_names và warehouse.accounts (Tài khoản gốc & Tài khoản liên kết)
@@ -13,6 +23,7 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
   const query = `
     SELECT
       pp.id,
+      pp.${pack.ACCOUNT_SLOT_ID} AS warehouse_slot_id,
       pp.product_name_id,
       pn.name AS product_name,
       pn.product_id AS category_product_id,
@@ -22,14 +33,8 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
       COALESCE(acc_slot.password, acc.password) AS password,
       acc_slot.two_fa,
       acc_slot.backup_email,
-      ARRAY(
-        SELECT DISTINCT BTRIM(tag_slot.${slot.VARIANT_TAG})
-        FROM ${TABLES.ACCOUNT_SLOTS} tag_slot
-        WHERE tag_slot.${slot.ACCOUNT_ID} = pp.${pack.ACCOUNT_ID}
-          AND tag_slot.${slot.NAME_ID} = pp.${pack.PRODUCT_NAME_ID}
-          AND BTRIM(tag_slot.${slot.VARIANT_TAG}) <> ''
-        ORDER BY 1
-      ) AS variant_tags,
+      acc_slot.${slot.EXPIRED_AT} AS warehouse_expired_at,
+      ARRAY_REMOVE(ARRAY[NULLIF(BTRIM(acc_slot.${slot.VARIANT_TAG}), '')], NULL) AS variant_tags,
       storage_acc.account_username AS storage_account_info,
       COALESCE(storage_slot.password, storage_acc.password) AS storage_password,
       storage_slot.two_fa AS storage_two_fa,
@@ -43,13 +48,7 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
     FROM ${TABLES.PACKAGE_PRODUCT} pp
     LEFT JOIN ${TABLES.PRODUCT_NAMES} pn ON pn.id = pp.product_name_id
     LEFT JOIN ${TABLES.PRODUCT_KEYS} acc ON acc.id = pp.account_id
-    LEFT JOIN LATERAL (
-      SELECT password, two_fa, backup_email
-      FROM ${TABLES.STOCK_SERVICES}
-      WHERE account_id = pp.account_id
-      ORDER BY id ASC
-      LIMIT 1
-    ) acc_slot ON true
+    JOIN ${TABLES.ACCOUNT_SLOTS} acc_slot ON acc_slot.${slot.ID} = pp.${pack.ACCOUNT_SLOT_ID}
     LEFT JOIN ${TABLES.PRODUCT_KEYS} storage_acc ON storage_acc.id = pp.storage_account_id
     LEFT JOIN LATERAL (
       SELECT password, two_fa, backup_email
@@ -387,10 +386,11 @@ const getPackageProducts = async ({ connection = db, productNameId = null } = {}
           capacityUsed: capacityLimit ? capacityUsed : null,
           remainingCapacity: capacityLimit ? remainingCapacity : null,
           usedSlots,
+          warehouseSlotId: Number(r.warehouse_slot_id),
           totalSlots,
           supplier: r.supplier,
           costPrice,
-          expiredAt: effectiveMavn?.expired_at ? getVietnamDateString(effectiveMavn.expired_at) : null,
+          expiredAt: r.warehouse_expired_at ? getVietnamDateString(r.warehouse_expired_at) : null,
           note: r.package_note || "",
           matchRule: r.match_rule || "information",
           status: usedSlots >= totalSlots ? "expired" : usedSlots > 0 ? "warning" : "active",
@@ -700,6 +700,7 @@ const createPackageProduct = async (payload) => withTransaction(async (trx) => {
 
   // 2. Tìm hoặc tạo Tài khoản gốc trong warehouse.accounts
   const mainAccount = await findOrCreateAccount(trx, mainAccUser);
+  const warehouseSlot = await requirePackageSlot(trx, mainAccount.id, pnRecord.id, payload.accountSlotId);
 
   // 3. Tìm hoặc tạo Tài khoản dung lượng/liên kết (nếu có)
   const storageAccUser = storageAccountUsername || storageAccountInfo;
@@ -713,6 +714,7 @@ const createPackageProduct = async (payload) => withTransaction(async (trx) => {
     .insert({
       product_name_id: pnRecord.id,
       account_id: mainAccount.id,
+      [COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID]: warehouseSlot.id,
       supplier: supplier || "Mavryk",
       cost: parseFloat(costPrice || 0),
       slot: parseInt(totalSlots || 2, 10),
@@ -814,6 +816,14 @@ const updatePackageProduct = async (id, payload) => withTransaction(async (trx) 
   if (costPrice !== undefined) updateFields.cost = parseFloat(costPrice || 0);
   if (totalSlots !== undefined) updateFields.slot = parseInt(totalSlots || 2, 10);
   if (note !== undefined) updateFields.package_note = note;
+
+  const nextAccountId = updateFields.account_id ?? existing.account_id;
+  const nextNameId = updateFields.product_name_id ?? existing.product_name_id;
+  const sameIdentity = Number(nextAccountId) === Number(existing.account_id)
+    && Number(nextNameId) === Number(existing.product_name_id);
+  const warehouseSlot = await requirePackageSlot(trx, nextAccountId, nextNameId,
+    payload.accountSlotId || (sameIdentity ? existing[COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID] : null));
+  updateFields[COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID] = warehouseSlot.id;
 
   const [updated] = await trx(TABLES.PACKAGE_PRODUCT)
     .where("id", pkgId)

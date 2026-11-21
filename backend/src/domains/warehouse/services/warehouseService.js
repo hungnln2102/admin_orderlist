@@ -6,6 +6,7 @@ const { getVietnamDateString, formatDateDisplay } = require("@/utils/time");
 const warehouseAutomationService = require("./warehouseAutomationService");
 const warehouseSlotService = require("./warehouseSlotService");
 const { slotProviderSettings } = require("./slotProviderSettings");
+const { getPackageProducts } = require("@/domains/products/services/packageProductService");
 const publishWarehouseEvent = (trx, eventName, payload) => publishEventInTrx(trx, {
   eventName,
   aggregateType: "WAREHOUSE",
@@ -58,6 +59,13 @@ const listWarehouseAccounts = async () => {
     .whereIn("ss.account_id", stockIds)
     .orderBy("ss.id", "asc");
 
+  const usageBySlot = new Map();
+  for (const pkg of await getPackageProducts()) {
+    const usage = usageBySlot.get(pkg.warehouseSlotId) || { used: 0, total: 0 };
+    usage.used += pkg.usedSlots;
+    usage.total += pkg.totalSlots;
+    usageBySlot.set(pkg.warehouseSlotId, usage);
+  }
   const servicesByStock = new Map();
   services.forEach((srv) => {
     const sId = Number(srv.account_id);
@@ -65,6 +73,7 @@ const listWarehouseAccounts = async () => {
       servicesByStock.set(sId, []);
     }
     const resolvedTag = srv.variant_tag || srv.catalog_tag || "";
+    const packageUsage = usageBySlot.get(Number(srv.id));
     servicesByStock.get(sId).push({
       id: Number(srv.id),
       display_name: srv.display_name || "Dịch vụ",
@@ -81,6 +90,7 @@ const listWarehouseAccounts = async () => {
       expires_at: formatDateDisplay(srv.expires_at),
       raw_expires_at: srv.expires_at ? new Date(srv.expires_at).toISOString().split("T")[0] : "",
       status: srv.status === "UNAVAILABLE" ? "IN_USE" : (srv.status || "AVAILABLE"),
+      package_usage: packageUsage,
       note: srv.note || "",
       is_authenticated: srv.session_is_authenticated === true,
       session_checked_at: srv.session_checked_at ? new Date(srv.session_checked_at).toISOString() : null,
@@ -255,11 +265,17 @@ const createWarehouseAccount = async (payload) => {
 
       const lowerName = String(slotName).toLowerCase();
       const defaultSlots = lowerName.includes("youtube") ? 5 : lowerName.includes("adobe") ? 2 : lowerName.includes("netflix") ? 5 : 2;
+      const packageSlots = await trx(TABLES.ACCOUNT_SLOTS)
+        .where({ [SS.ACCOUNT_ID]: resolvedMainAccountId, [SS.NAME_ID]: pnRecord.id })
+        .modify((query) => { if (variantTag) query.where(SS.VARIANT_TAG, variantTag.trim()); })
+        .forUpdate().limit(2);
+      if (packageSlots.length !== 1) throw new Error("Gói phải liên kết với đúng một dịch vụ trong Kho Hàng.");
 
       // TUYỆT ĐỐI KHÔNG LƯU id_order theo chỉ đạo của Master
       await trx(TABLES.PACKAGE_PRODUCT).insert({
         product_name_id: pnRecord.id,
         account_id: resolvedMainAccountId,
+        [COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID]: packageSlots[0][SS.ID],
         storage_account_id: resolvedStorageAccountId,
         storage_total: storageTotal ? String(storageTotal).trim() : null,
         supplier: "Mavryk",

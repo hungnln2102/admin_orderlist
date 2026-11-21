@@ -206,7 +206,7 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
               </tr>
             ) : (
               services.map((srv, idx) => {
-                const isAvailable = srv.status === "AVAILABLE";
+                const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
                 const brand = getServiceBrandStyle(
                   srv.display_name || srv.category,
                   isAvailable
@@ -374,7 +374,7 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                               : "bg-rose-400"
                           }`}
                         />
-                        <span>{isAvailable ? "TỒN KHO" : "ĐANG SỬ DỤNG"}</span>
+                        <span>{isAvailable ? "TỒN KHO" : "ĐANG SỬ DỤNG"}{srv.package_usage && ` · ${srv.package_usage.used}/${srv.package_usage.total}`}</span>
                       </span>
                     </td>
 

@@ -114,3 +114,47 @@
 - **Kiểm tra kỹ thuật**:
   - `npm run build` trong `otp_portal` (`tsc && vite build`) hoàn thành thành công trong 1.98s không phát sinh bất kỳ lỗi TypeScript hay Vite build nào.
   - Hot Reload đã tự động cập nhật lên cổng OTP Portal đang chạy tại port 3005.
+
+
+## [20:50] Thiết kế lại modal Chỉnh Sửa Dịch Vụ Kho dạng ngang 2 cột & Switch Toggle trượt On/Off
+
+- **Phạm vi tác động**:
+  - [SlotProviderControls.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/SlotProviderControls.tsx)
+  - [WarehouseEditSlotModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseEditSlotModal.tsx)
+- **Thay đổi kỹ thuật**:
+  - **Loại bỏ checkbox tick chọn**: Thay thế toàn bộ `<input type="checkbox" />` native ở cụm Lấy OTP và Kiểm tra trạng thái bằng **Switch Button trượt On/Off** (`w-10 h-[22px]` với dot tròn `w-[18px] h-[18px]` trượt `translate-x-[18px]` mượt mà, hiệu ứng phát sáng Cyan khi bật, nền xám Slate khi tắt).
+  - **Tái cấu trúc Form Ngang 2 Cột Cân Xứng (2-Column Dashboard Layout)**:
+    - Mở rộng container modal từ `max-w-2xl` lên **`max-w-5xl xl:max-w-6xl`** (1024px - 1152px), mở rộng tầm nhìn, triệt tiêu việc cuộn dọc chật hẹp.
+    - **Cột Trái (6/12 - Thông tin tài khoản & Bảo mật OTP)**:
+      * Khối Thông tin đăng nhập: Email tài khoản kho + Mật khẩu dịch vụ (có icon copy nhanh, ẩn/hiện mật khẩu).
+      * Khối Bảo mật 2FA & Cổng điều phối OTP: Switch trượt On/Off Lấy OTP + Switch trượt Kiểm tra trạng thái (xếp song song 2 cột con) + Email Backup Khôi Phục + Mã 2FA Secret Key (định dạng chunks đẹp mắt, nút copy).
+    - **Cột Phải (6/12 - Phân loại gói, Vận hành & Hạn dùng)**:
+      * Khối Quản lý Tag Biến Thể Gói: Input tag, nút xóa trống/gỡ tag, danh sách tag có sẵn dạng chips bấm chọn nhanh, banner tự động tạo tag mới nếu có.
+      * Khối Trạng Thái Slot & Ngày Hết Hạn: Dropdown trạng thái slot (có chấm tròn màu trực quan) + Ngày hết hạn dịch vụ kèm các nút tắt nhanh `+30d`, `+90d`, `+1y`, `Xóa`.
+      * Khối Ghi Chú Dịch Vụ: Textarea ghi chú nội bộ cho slot.
+    - **Footer**: Nút Hủy Bỏ và Lưu Thay Đổi nằm toàn chiều ngang bên dưới gọn gàng.
+  - **Tương thích đồng bộ**: Giúp cả `WarehouseCreateModal.tsx` cũng tự động thừa hưởng nút trượt On/Off hiện đại từ `SlotProviderControls`.
+- **Kiểm tra kỹ thuật**:
+  - `npm run build` trong `frontend` (`tsc && vite build`) hoàn tất thành công trong 4.79s không có bất kỳ lỗi cú pháp hay kiểu dữ liệu TypeScript nào.
+
+
+## [20:58] Thiết kế lại modal Thêm Tài Khoản Kho Mới sang dạng Form Ngang 2 Cột (WarehouseCreateModal.tsx)
+
+- **Phạm vi tác động**:
+  - [WarehouseCreateModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/warehouse/components/WarehouseCreateModal.tsx)
+- **Thay đổi kỹ thuật**:
+  - **Mở rộng kích thước sang form ngang**: Tăng kích thước modal từ `max-w-lg` (512px) lên **`max-w-5xl xl:max-w-6xl`** (1024px – 1152px) chuẩn màn hình desktop, phủ trọn không gian ngang theo đúng chỉ đạo và khung viền đỏ của Master.
+  - **Tái cấu trúc Grid 2 Cột Ngang Cân Xứng (`grid grid-cols-1 lg:grid-cols-12 gap-5 items-start`)**:
+    - **Cột Trái (6/12 - Thông tin tài khoản & Bảo mật OTP)**:
+      * Khối Thông tin đăng nhập: Email tài khoản kho + Nút "Đồng Bộ Đơn Nhập" MAVN; Mật khẩu & Mã 2FA Secret Key (2 cột con); Email Backup & Ngày Hết Hạn (`DateInputVN`).
+      * Khối Bảo mật 2FA & Cổng OTP: 2 Switch Toggle trượt On/Off (Lấy OTP & Kiểm tra trạng thái) chia 2 cột con song song.
+    - **Cột Phải (6/12 - Sản phẩm, Tag & Tạo gói kho liên kết)**:
+      * Khối Sản phẩm & Tag: Dropdown chọn sản phẩm + Danh sách Tag có sẵn của sản phẩm dạng chips bấm chọn nhanh trực quan.
+      * Khối Tạo Gói Kho Liên Kết: Toggle Switch "Tạo Gói Kho Cho Tài Khoản Này" + Toggle Switch "Cần tài khoản liên kết cùng gói này không?" + 2 nút chọn Vai trò (TK Dung Lượng / TK Chính) + Dropdown chọn tài khoản tồn kho + Ô nhập dung lượng.
+    - **Footer**: Nút Hủy Bỏ và Lưu Tài Khoản nằm trải dài toàn chiều ngang bên dưới gọn gàng.
+- **Kiểm tra kỹ thuật**:
+  - `npm run build` trong `frontend` (`tsc && vite build`) hoàn tất thành công trong 4.45s không phát sinh bất kỳ lỗi cú pháp hoặc kiểu dữ liệu TypeScript nào.
+## Liên kết gói sản phẩm với Kho Hàng
+
+- Đã chạy migration local và kiểm tra xóa slot kéo theo gói trong transaction được hoàn tác. Số bản ghi đơn hàng giữ nguyên.
+- Dịch vụ đọc được 26 gói, 24 gói có ngày hết hạn và 56 tài khoản kho. Có 10 gói cũ chưa có slot liên kết, được giữ trong DB và loại khỏi danh sách gói.

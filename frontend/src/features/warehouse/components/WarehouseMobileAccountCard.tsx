@@ -68,7 +68,7 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1">
             {services.map((srv, idx) => {
-              const isAvailable = srv.status === "AVAILABLE";
+              const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
               const brand = getServiceBrandStyle(
                 srv.display_name || srv.category,
                 isAvailable
@@ -161,7 +161,7 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
 
           <div className="space-y-2.5">
             {services.map((srv, idx) => {
-              const isAvailable = srv.status === "AVAILABLE";
+              const isAvailable = srv.status === "AVAILABLE" && !srv.package_usage?.used;
               const brand = getServiceBrandStyle(
                 srv.display_name || srv.category,
                 isAvailable

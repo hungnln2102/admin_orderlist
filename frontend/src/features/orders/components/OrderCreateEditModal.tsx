@@ -420,6 +420,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                     <span className="text-[11px] font-semibold text-slate-300">Lưu kho:</span>
                     <button
                       type="button"
+                      disabled={formData.save_to_package === true}
                       onClick={() =>
                         setFormData({
                           ...formData,
@@ -449,6 +450,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                         setFormData({
                           ...formData,
                           save_to_package: formData.save_to_package === false ? true : false,
+                          save_to_warehouse: formData.save_to_package === false ? true : formData.save_to_warehouse,
                         })
                       }
                       className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${

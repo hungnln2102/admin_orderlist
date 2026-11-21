@@ -1,3 +1,11 @@
+## 2026-11-21 – Thiết kế lại modal Thêm Tài Khoản Kho Mới sang dạng Form Ngang 2 Cột
+
+- [x] Tái thiết kế modal "Thêm Tài Khoản Kho Mới" (WarehouseCreateModal.tsx) sang dạng form ngang 2 cột rộng rãi (max-w-5xl đến max-w-6xl) theo đúng khung viền đỏ của Master. Tích hợp Switch Toggle trượt On/Off và phân bổ 2 cột cân xứng. Frontend build pass 100% trong 4.45s.
+
+## 2026-11-21 – Thiết kế lại modal Chỉnh Sửa Dịch Vụ Kho dạng ngang 2 cột & Switch Toggle trượt On/Off
+
+- [x] Tái thiết kế form modal "Chỉnh Sửa Dịch Vụ Kho" (WarehouseEditSlotModal.tsx) sang dạng ngang 2 cột cân xứng (max-w-5xl đến max-w-6xl). Thay thế triệt để checkbox tick chọn tại Lấy OTP và Kiểm tra trạng thái bằng Switch Button trượt On/Off hiện đại (SlotProviderControls.tsx). Frontend build pass 100% trong 4.79s.
+
 ## 2026-11-21 – Nâng cấp giao diện Kiểm Tra & Cấp Lại Tài Khoản Adobe (otp_portal)
 
 - [x] Thiết kế lại giao diện Kiểm Tra & Cấp Lại Tài Khoản Adobe theo chuẩn Cyberpunk Glassmorphism: Thêm icon KeyRound, UserCheck, Search, RefreshCw, nút CTA gradient glow, viền kính input, thẻ cảnh báo và thẻ mật khẩu. Bổ sung icon ShieldCheck cho sub-tab header. `tsc && vite build` hoàn tất 100%.
@@ -577,3 +585,7 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 ## Ngày hết hạn tài khoản kho
 
 - [x] Hiển thị ô nhập theo dd/mm/yyyy, tự chèn dấu gạch chéo và xác thực ngày trước khi lưu.
+## Liên kết gói sản phẩm với Kho Hàng
+
+- [x] Tạo liên kết theo slot, đọc hạn từ Kho Hàng và kiểm tra xóa dây chuyền trên DB local.
+- [ ] Nghiệm thu gia hạn và xử lý các gói cũ thiếu slot trên dữ liệu triển khai.
