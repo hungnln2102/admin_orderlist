@@ -61,3 +61,9 @@
   - Tự động gắn `dropdown-menu-down` (origin-top) khi mở xuống và `dropdown-menu-up` (origin-bottom) khi lật lên trên mép màn hình trong [CustomSelect.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/shared/components/CustomSelect.tsx).
 - **Kiểm tra kỹ thuật**:
   - `tsc && vite build` trong `frontend/`: PASS 100% (0 lỗi, 1794 modules transformed, 4.73s).
+
+## Tra cứu Adobe theo slot hiện hành của Kho Gói Sản Phẩm
+
+- Backend dùng liên kết hiện hành của gói để đọc tài khoản, đồng bộ đơn và mã kích hoạt trong transaction, tự cấp suất phù hợp khi mất liên kết.
+- Kiểm thử tích hợp PostgreSQL local đạt 6/6, gồm đổi liên kết, hết kho và hai yêu cầu đồng thời. Build OTP portal đạt.
+- API local xác nhận mã đã báo trả email hiện hành và giữ nguyên slot. Slot hiện thiếu mật khẩu và cấu hình xác minh tình trạng.

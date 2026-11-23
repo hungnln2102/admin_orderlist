@@ -142,6 +142,96 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       await db(TABLES.PRODUCT_NAMES).where("id", product.id).del();
     }
   });
+  it("Khôi phục Adobe theo slot hiện tại của gói và tự cấp lại khi gói bị xóa", async () => {
+    const suffix = randomUUID();
+    const orderCode = `TEST-ADOBE-PACKAGE-${suffix}`;
+    const contact = "package-customer@example.test";
+    const expiredAt = new Date(Date.now() + 2 * 86_400_000);
+    const [product] = await db(TABLES.PRODUCT_NAMES)
+      .insert({ name: `Adobe Test ${suffix}` }).returning("id");
+
+    try {
+      const addSlot = async (label, tag = suffix) => {
+        const account = `${label}-${suffix}@example.test`;
+        const password = `test-${label}`;
+        const [accountRow] = await db(TABLES.ACCOUNTS)
+          .insert({ product_name_id: product.id, account_username: account }).returning("id");
+        const [slot] = await db(TABLES.ACCOUNT_SLOTS).insert({
+          account_id: accountRow.id, name_id: product.id, variant_tag: tag,
+          status: "AVAILABLE", password, expired_at: expiredAt,
+        }).returning("id");
+        return { id: slot.id, accountId: accountRow.id, account, password };
+      };
+      const addPackage = async (slot) => {
+        const [row] = await db(TABLES.PACKAGE_PRODUCT).insert({
+          product_name_id: product.id, account_id: slot.accountId, account_slot_id: slot.id, slot: 1,
+        }).returning("id");
+        return row.id;
+      };
+      const original = await addSlot("original");
+      const updated = await addSlot("updated");
+      const packageId = await addPackage(original);
+      await db(TABLES.ORDER_LIST).insert({ id_order: orderCode, contact, status: "UNPAID", expired_at: expiredAt });
+      const [key] = await activationKeyService.createActivationKeys({ product_name_id: product.id, id_order: orderCode });
+      const keyQuery = () => db(TABLES.ACTIVATION_KEYS).where("id", key.id);
+      const orderQuery = () => db(TABLES.ORDER_LIST).where("id_order", orderCode);
+      await keyQuery().update({ target_variant_tag: suffix });
+      await orderQuery().update({ status: "PAID" });
+      const recover = (recovery, byOrder = false) => activationKeyService.activateKeyWithTransaction({
+        keyCode: byOrder ? orderCode : key.key_code,
+        orderContact: byOrder ? contact : undefined,
+        recovery,
+      });
+      assert.equal((await recover("check")).account, original.account);
+      const initialKey = await keyQuery().first();
+      assert.equal(initialKey.package_product_id, packageId);
+
+      await db(TABLES.PACKAGE_PRODUCT).where("id", packageId)
+        .update({ account_id: updated.accountId, account_slot_id: updated.id });
+      assert.equal((await recover("lookup", true)).account, updated.account);
+      assert.equal((await keyQuery().first()).account_slot_id, original.id);
+      assert.equal((await orderQuery().first()).slot, original.account);
+      const refreshed = await recover("check", true);
+      assert.equal(refreshed.account, updated.account);
+      assert.equal(refreshed.password, updated.password);
+      assert.equal(Boolean(refreshed.replaced), false);
+      const refreshedKey = await keyQuery().first();
+      assert.equal(refreshedKey.package_product_id, packageId);
+      assert.equal(refreshedKey.account_slot_id, updated.id);
+      assert.equal(refreshedKey.assigned_account, updated.account);
+      assert.deepEqual(refreshedKey.activated_at, initialKey.activated_at);
+      assert.equal((await orderQuery().first()).slot, updated.account);
+
+      await db(TABLES.PACKAGE_PRODUCT).where("id", packageId).del();
+      assert.deepEqual(await recover("lookup"), { replacementRequired: true });
+      await addPackage(await addSlot("different-tag", randomUUID()));
+      const beforeNoStockKey = await keyQuery().first();
+      const beforeNoStockOrder = await orderQuery().first();
+      assert.deepEqual(await recover("check"), { replacementRequired: true, outOfStock: true });
+      assert.deepEqual(await keyQuery().first(), beforeNoStockKey);
+      assert.deepEqual(await orderQuery().first(), beforeNoStockOrder);
+
+      const replacement = await addSlot("replacement");
+      const replacementPackageId = await addPackage(replacement);
+      const results = await Promise.all([recover("check"), recover("check", true)]);
+      for (const result of results) {
+        assert.equal(result.account, replacement.account);
+        assert.equal(result.password, replacement.password);
+      }
+      assert.equal(results.filter((result) => result.replaced).length, 1);
+      const finalKey = await keyQuery().first();
+      assert.equal(finalKey.package_product_id, replacementPackageId);
+      assert.equal(finalKey.account_slot_id, replacement.id);
+      assert.equal(finalKey.assigned_account, replacement.account);
+      assert.deepEqual(finalKey.activated_at, initialKey.activated_at);
+      assert.equal((await orderQuery().first()).slot, replacement.account);
+    } finally {
+      await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).del();
+      await db(TABLES.ORDER_LIST).where("id_order", orderCode).del();
+      await db(TABLES.PRODUCT_NAMES).where("id", product.id).del();
+    }
+  });
+
   it("Lưu cấu hình quy tắc (Variant + NCC -> Kho slot) thành công", async () => {
     const savedRule = await activationKeyService.saveActivationKeyRule({
       variant_id: variant.id,

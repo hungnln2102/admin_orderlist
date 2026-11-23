@@ -251,6 +251,9 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
   return withTransaction(async (trx) => {
     const keyCols = COLS.ACTIVATION_KEYS;
     const O = COLS.ORDER_LIST;
+    const S = COLS.ACCOUNT_SLOTS;
+    const A = COLS.ACCOUNTS;
+    const pack = COLS.PACKAGE_PRODUCT;
     const findKey = (column) => trx(TABLES.ACTIVATION_KEYS)
       .whereRaw("UPPER(TRIM(??)) = ?", [column, code])
       .orderBy(keyCols.ID, "desc")
@@ -303,7 +306,75 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       throw new Error("Mã kích hoạt này đã hết hạn sử dụng!");
     }
 
-    if (key.status === "ACTIVATED" && wasAssigned) {
+    const targetTag = key[keyCols.TARGET_VARIANT_TAG];
+    const previousPackageId = key[keyCols.PACKAGE_PRODUCT_ID];
+    const lockPackages = () => trx(TABLES.PACKAGE_PRODUCT)
+      .where(pack.PRODUCT_NAME_ID, key[keyCols.PRODUCT_NAME_ID])
+      .orderBy(pack.ID, "asc")
+      .forUpdate()
+      .select(pack.ID, pack.ACCOUNT_SLOT_ID);
+
+    const updateOrderAccount = async (assignedAccount) => {
+      if (!order || order[O.SLOT] === assignedAccount) return;
+      await trx(TABLES.ORDER_LIST).where(O.ID, order[O.ID]).update({
+        [O.SLOT]: assignedAccount,
+        [O.UPDATED_AT]: trx.fn.now(),
+      });
+    };
+    const publishOrderUpdated = () => publishEventInTrx(trx, {
+      eventName: EVENTS.ORDER_UPDATED,
+      aggregateType: "ORDER",
+      aggregateId: order[O.ID],
+      action: "UPDATE",
+      source: recovery ? "ADOBE_ACCOUNT_RECOVERY" : "ACTIVATION_KEY",
+      payload: { id: order[O.ID], id_order: orderCode },
+    });
+
+    const packageManaged = Boolean(targetTag || previousPackageId);
+    const lockedPackages = recovery && recovery !== "lookup" && targetTag ? await lockPackages() : null;
+    if (recovery) {
+      const currentPackage = lockedPackages
+        ? lockedPackages.find((entry) => String(entry[pack.ID]) === String(previousPackageId))
+        : previousPackageId
+        ? await trx(TABLES.PACKAGE_PRODUCT)
+          .where({ [pack.ID]: previousPackageId, [pack.PRODUCT_NAME_ID]: key[keyCols.PRODUCT_NAME_ID] })
+          .forShare()
+          .first(pack.ACCOUNT_SLOT_ID)
+        : null;
+      const slotId = packageManaged ? currentPackage?.[pack.ACCOUNT_SLOT_ID] : key[keyCols.ACCOUNT_SLOT_ID];
+      const assignedSlot = slotId && await trx({ slot: TABLES.ACCOUNT_SLOTS })
+        .join({ account: TABLES.ACCOUNTS }, `account.${A.ID}`, `slot.${S.ACCOUNT_ID}`)
+        .where(`slot.${S.ID}`, slotId)
+        .where(`slot.${S.NAME_ID}`, key[keyCols.PRODUCT_NAME_ID])
+        .forShare()
+        .first(`slot.${S.PASSWORD}`, `slot.${S.STATUS_CHECK_ENABLED}`,
+          `slot.${S.STATUS_PROVIDER_KEY}`, `account.${A.ACCOUNT_USERNAME}`);
+      if (assignedSlot) {
+        const assignedAccount = assignedSlot[A.ACCOUNT_USERNAME];
+        if (recovery !== "lookup") {
+          const keyChanged = String(key[keyCols.ACCOUNT_SLOT_ID]) !== String(slotId) ||
+            key[keyCols.ASSIGNED_ACCOUNT] !== assignedAccount;
+          const orderChanged = order[O.SLOT] !== assignedAccount;
+          if (keyChanged) {
+            await trx(TABLES.ACTIVATION_KEYS).where(keyCols.ID, key[keyCols.ID]).update({
+              [keyCols.ACCOUNT_SLOT_ID]: slotId,
+              [keyCols.ASSIGNED_ACCOUNT]: assignedAccount,
+              [keyCols.UPDATED_AT]: trx.fn.now(),
+            });
+          }
+          if (orderChanged) await updateOrderAccount(assignedAccount);
+          if (keyChanged || orderChanged) await publishOrderUpdated();
+        }
+        const statusProviderKey = assignedSlot[S.STATUS_CHECK_ENABLED] ? assignedSlot[S.STATUS_PROVIDER_KEY] : null;
+        return { account: assignedAccount, password: assignedSlot[S.PASSWORD] || "", statusProviderKey };
+      }
+      if (recovery === "lookup" || (recovery === "check" && wasAssigned && !packageManaged)) {
+        return { replacementRequired: true };
+      }
+      if (packageManaged && !targetTag) return { replacementRequired: wasAssigned, outOfStock: true };
+    }
+
+    if (!recovery && key.status === "ACTIVATED" && wasAssigned) {
       // Key đã dùng vẫn phải trả đủ thông tin để khách tra cứu lại tài khoản đã cấp.
       const assignedSlot = key.account_slot_id
         ? await trx(TABLES.ACCOUNT_SLOTS)
@@ -312,22 +383,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           .where(COLS.ACCOUNT_SLOTS.ID, key.account_slot_id)
           .first()
         : null;
-      if (recovery && assignedSlot) {
-        const S = COLS.ACCOUNT_SLOTS;
-        const A = COLS.ACCOUNTS;
-        const assignedAccount = await trx({ slot: TABLES.ACCOUNT_SLOTS })
-          .join({ account: TABLES.ACCOUNTS }, `account.${A.ID}`, `slot.${S.ACCOUNT_ID}`)
-          .where(`slot.${S.ID}`, key.account_slot_id)
-          .where(`slot.${S.NAME_ID}`, key.product_name_id)
-          .where(`account.${A.ACCOUNT_USERNAME}`, key.assigned_account)
-          .first(`account.${A.ACCOUNT_USERNAME}`);
-        if (assignedAccount) {
-          const statusProviderKey = assignedSlot[S.STATUS_CHECK_ENABLED] ? assignedSlot[S.STATUS_PROVIDER_KEY] : null;
-          return { account: key.assigned_account, password: assignedSlot[S.PASSWORD] || "", statusProviderKey };
-        }
-      }
-      if (recovery === "check" || recovery === "lookup") return { replacementRequired: true };
-      if (!recovery) return {
+      return {
         success: true,
         already_activated: true,
         account: key.assigned_account,
@@ -349,29 +405,18 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       throw new Error("Mã kích hoạt này chưa được thanh toán.");
     }
 
-    if (recovery === "lookup") return { replacementRequired: true };
-
     // 2. Tìm 1 slot trống (AVAILABLE) trong kho thuộc sản phẩm này
-    const targetTag = key[keyCols.TARGET_VARIANT_TAG];
-    let packageId = null;
-    let packageSlotId = null;
+    let availablePackages = [];
     if (targetTag && key.product_name_id) {
-      const pack = COLS.PACKAGE_PRODUCT;
-      await trx(TABLES.PACKAGE_PRODUCT)
-        .where(pack.PRODUCT_NAME_ID, key.product_name_id)
-        .orderBy("id", "asc")
-        .forUpdate()
-        .select("id");
+      if (!lockedPackages) await lockPackages();
       const packages = await getPackageProducts({ connection: trx, productNameId: key.product_name_id });
-      const availablePackage = packages.find((item) =>
+      availablePackages = packages.filter((item) =>
         matchesPackageTag(item, targetTag) && item.usedSlots < item.totalSlots &&
-        (!wasAssigned || Number(item.id) !== Number(key[keyCols.PACKAGE_PRODUCT_ID]))
+        (!wasAssigned || String(item.id) !== String(previousPackageId))
       );
-      packageId = availablePackage?.id ?? null;
-      packageSlotId = availablePackage?.warehouseSlotId ?? null;
     }
 
-    const availableSlot = (targetTag && !packageId) ? null : await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
+    const availableSlot = (targetTag && !availablePackages.length) ? null : await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
       .join(`${TABLES.PRODUCT_KEYS} as acc`, "acc.id", "ss.account_id")
       .select(
         "ss.id as slot_id",
@@ -390,14 +435,18 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .where("ss.name_id", key.product_name_id)
       .modify((builder) => {
         if (recovery) {
-          builder.whereNot("acc.account_username", key.assigned_account || "")
-            .where((expiry) => expiry.whereNull("ss.expired_at").orWhere("ss.expired_at", ">", trx.fn.now()));
+          if (!packageManaged) builder.whereNot(`acc.${A.ACCOUNT_USERNAME}`, key[keyCols.ASSIGNED_ACCOUNT] || "");
+          builder.where((expiry) => expiry.whereNull(`ss.${S.EXPIRED_AT}`).orWhere(`ss.${S.EXPIRED_AT}`, ">", trx.fn.now()));
         }
       })
       .modify((builder) => {
         if (targetTag) {
           builder.whereRaw(`BTRIM(ss.${COLS.ACCOUNT_SLOTS.VARIANT_TAG}) = ?`, [targetTag]);
-          builder.where(`ss.${COLS.ACCOUNT_SLOTS.ID}`, packageSlotId);
+          const slotIds = availablePackages.map((item) => item.warehouseSlotId);
+          builder.whereIn(`ss.${S.ID}`, slotIds);
+          builder.orderByRaw(`array_position(ARRAY[${slotIds.map(() => "?").join(", ")}]::bigint[], ??)`, [
+            ...slotIds, `ss.${S.ID}`,
+          ]);
         } else {
           builder.whereIn("ss.status", ["AVAILABLE", "available"]);
         }
@@ -413,6 +462,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       );
     }
 
+    const packageId = availablePackages.find((item) => String(item.warehouseSlotId) === String(availableSlot.slot_id))?.id ?? null;
     const assignedAccount = availableSlot.account_username;
     const finalCustomer = String(customerInfo || key.customer_info || "").trim();
 
@@ -427,14 +477,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       });
 
     // 4. Nếu có id_order: Cập nhật tài khoản vào cột `slot` của đơn hàng khách
-    if (order) {
-      await trx(TABLES.ORDER_LIST)
-        .where(O.ID, order[O.ID])
-        .update({
-          [O.SLOT]: assignedAccount,
-          [O.UPDATED_AT]: trx.fn.now(),
-        });
-    }
+    await updateOrderAccount(assignedAccount);
 
     // 5. Cập nhật trạng thái mã Key thành ACTIVATED
     await trx(TABLES.ACTIVATION_KEYS)
@@ -449,18 +492,8 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         updated_at: trx.fn.now(),
       });
 
-    if (order) {
-      await publishEventInTrx(trx, {
-        eventName: EVENTS.ORDER_UPDATED,
-        aggregateType: "ORDER",
-        aggregateId: order[O.ID],
-        action: "UPDATE",
-        source: recovery ? "ADOBE_ACCOUNT_RECOVERY" : "ACTIVATION_KEY",
-        payload: { id: order[O.ID], id_order: orderCode },
-      });
-    }
+    if (order) await publishOrderUpdated();
     if (recovery) {
-      const S = COLS.ACCOUNT_SLOTS;
       const statusProviderKey = availableSlot[S.STATUS_CHECK_ENABLED] ? availableSlot[S.STATUS_PROVIDER_KEY] : null;
       return { account: assignedAccount, password: availableSlot.slot_password || "", replaced: wasAssigned, statusProviderKey };
     }

@@ -655,3 +655,4 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Bỏ thứ tự ưu tiên provider OTP và thêm lựa chọn cổng mặc định. Đã xác nhận migration local qua API, chạy unit test backend và build frontend.
 - [x] Lưu ngay thao tác gỡ provider khỏi ô OTP. Đã kiểm tra ghi và đọc lại trên PostgreSQL thử nghiệm.
 - [x] Bỏ nút lưu chung và tự lưu các thao tác cấu hình ô OTP.
+- [x] Tra cứu Adobe theo slot hiện hành của Kho Gói Sản Phẩm và tự cấp lại khi mất liên kết. Kiểm thử tích hợp 6/6 ca đạt.
