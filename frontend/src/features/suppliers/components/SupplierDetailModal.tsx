@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { X, Loader2 } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { SupplierDetailData } from "../types";
 
 interface SupplierDetailModalProps {
@@ -21,6 +22,7 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   onPayDebtSubmit,
   submitting,
 }) => {
+  const [selectedBankId, setSelectedBankId] = useState<string>("");
   if (selectedSupplierDetailId === null) return null;
 
   return (
@@ -238,13 +240,19 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                   <label className="block text-[10.5px] font-bold text-slate-400 uppercase mb-1">
                     STK CHI TRẢ
                   </label>
-                  <select className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200">
-                    {supplierDetail.unpaid_cycle.shop_bank_accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.label}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={selectedBankId || String(supplierDetail.unpaid_cycle.shop_bank_accounts[0]?.id || "")}
+                    onChange={setSelectedBankId}
+                    size="sm"
+                    accent="cyan"
+                    searchable={false}
+                    className="bg-slate-950/80 border-slate-800"
+                    placeholder="Chọn STK chi trả..."
+                    options={supplierDetail.unpaid_cycle.shop_bank_accounts.map((acc) => ({
+                      value: String(acc.id),
+                      label: acc.label,
+                    }))}
+                  />
                 </div>
 
                 {/* VietQR Image */}

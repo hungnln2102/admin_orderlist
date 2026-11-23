@@ -1,3 +1,4 @@
+import { useWarehouseProviderNames } from "./WarehouseProviderCatalog";
 import React, { useState, useEffect } from "react";
 import { CustomSelect, DateInputVN } from "@/shared/components";
 import {
@@ -40,6 +41,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
   onClose,
   onSubmit,
 }) => {
+  const providerNames = useWarehouseProviderNames();
   const notify = useNotification();
   const [formData, setFormData] = useState<WarehouseAddServiceFormData>({
     serviceName: "",
@@ -294,7 +296,7 @@ export const WarehouseAddServiceModal: React.FC<WarehouseAddServiceModalProps> =
                 { value: "", label: "-- Mặc định (Không gán cổng OTP) --" },
                 ...AVAILABLE_OTP_PROVIDERS.map((provider) => ({
                   value: provider.value,
-                  label: provider.label,
+                  label: providerNames[provider.value] || provider.value,
                 })),
               ]}
             />

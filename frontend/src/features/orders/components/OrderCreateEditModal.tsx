@@ -4,6 +4,7 @@ import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
+import { CustomSelect } from "@/shared/components";
 import { Order, CatalogProduct, CatalogSupplierCost, CatalogSupplier, OrderFormData } from "../types";
 import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../constants/orderStatus";
 import { ORDER_PREFIX, ORDER_PREFIX_CONFIGS } from "../constants/orderPrefix";
@@ -290,24 +291,27 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1 font-medium">Loại Mã Đơn (Prefix) *</label>
-                  <select
+                  <CustomSelect
                     value={currentPrefix}
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       if (onPrefixChange) {
                         onPrefixChange(val);
                       } else {
                         setFormData({ ...formData, order_prefix: val });
                       }
                     }}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-cyan-300 font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
-                  >
-                    <option value={ORDER_PREFIX.MAVC}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].shortLabel}</option>
-                    <option value={ORDER_PREFIX.MAVL}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].shortLabel}</option>
-                    <option value={ORDER_PREFIX.MAVK}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].shortLabel}</option>
-                    <option value={ORDER_PREFIX.MAVS}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].shortLabel}</option>
-                    <option value={ORDER_PREFIX.MAVT}>{ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].prefix} — {ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].shortLabel} (0đ)</option>
-                  </select>
+                    size="sm"
+                    accent="cyan"
+                    searchable={false}
+                    className="bg-slate-900 font-bold"
+                    options={[
+                      { value: ORDER_PREFIX.MAVC, label: `${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].prefix} — ${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVC].shortLabel}` },
+                      { value: ORDER_PREFIX.MAVL, label: `${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].prefix} — ${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVL].shortLabel}` },
+                      { value: ORDER_PREFIX.MAVK, label: `${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].prefix} — ${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVK].shortLabel}` },
+                      { value: ORDER_PREFIX.MAVS, label: `${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].prefix} — ${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVS].shortLabel}` },
+                      { value: ORDER_PREFIX.MAVT, label: `${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].prefix} — ${ORDER_PREFIX_CONFIGS[ORDER_PREFIX.MAVT].shortLabel} (0đ)` },
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -522,26 +526,29 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   {!isEdit && (
-                    <label className="col-span-full flex flex-col gap-1 text-slate-400">
-                      <span>Tag sản phẩm <span className="text-rose-500">*</span></span>
-                      <select
-                        required
+                    <div className="col-span-full flex flex-col gap-1 text-slate-400">
+                      <label className="block font-medium">Tag sản phẩm <span className="text-rose-500">*</span></label>
+                      <CustomSelect
                         value={formData.warehouse_variant_tag || ""}
-                        onChange={(event) => {
-                          const tag = event.target.value;
+                        onChange={(tag) => {
                           setFormData((prev) => ({ ...prev, warehouse_variant_tag: tag }));
                         }}
-                        className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-white"
-                      >
-                        <option value="">
-                          {!warehouseTagVariantId ? "Chọn sản phẩm trước" :
-                            !currentWarehouseTags ? "Đang tải tag…" :
-                            currentWarehouseTags.failed ? "Không thể tải tag sản phẩm" :
-                            currentWarehouseTags.tags.length === 0 ? "Sản phẩm chưa có tag" : "Chọn tag sản phẩm"}
-                        </option>
-                        {currentWarehouseTags?.tags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-                      </select>
-                    </label>
+                        size="sm"
+                        accent="cyan"
+                        disabled={!warehouseTagVariantId || !currentWarehouseTags || currentWarehouseTags.failed || currentWarehouseTags.tags.length === 0}
+                        placeholder={
+                          !warehouseTagVariantId ? "Chọn sản phẩm trước" :
+                          !currentWarehouseTags ? "Đang tải tag…" :
+                          currentWarehouseTags.failed ? "Không thể tải tag sản phẩm" :
+                          currentWarehouseTags.tags.length === 0 ? "Sản phẩm chưa có tag" : "Chọn tag sản phẩm"
+                        }
+                        className="bg-slate-900 border-slate-800"
+                        options={(currentWarehouseTags?.tags || []).map((tag) => ({
+                          value: tag,
+                          label: tag,
+                        }))}
+                      />
+                    </div>
                   )}
                   {/* Mật Khẩu Kho */}
                   <div>
@@ -611,27 +618,19 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                         </span>
                       )}
                     </label>
-                    <div className="relative">
-                      <select
-                        value={formData.warehouse_otp_type || ""}
-                        onChange={(e) => setFormData({ ...formData, warehouse_otp_type: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-2.5 pr-7 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 font-mono text-xs appearance-none cursor-pointer truncate"
-                      >
-                        {availableOtpApis.length === 0 ? (
-                          <option value="">Không có cổng OTP</option>
-                        ) : (
-                          <>
-                            <option value="">-- Chọn Loại OTP --</option>
-                            {availableOtpApis.map((api: any) => (
-                              <option key={api.service_key} value={api.service_key}>
-                                {api.service_name} ({api.service_key}){api.is_default ? " ★ Mặc định" : ""}
-                              </option>
-                            ))}
-                          </>
-                        )}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                    <CustomSelect
+                      value={formData.warehouse_otp_type || ""}
+                      onChange={(val) => setFormData({ ...formData, warehouse_otp_type: val })}
+                      size="sm"
+                      accent="cyan"
+                      disabled={availableOtpApis.length === 0}
+                      placeholder={availableOtpApis.length === 0 ? "Không có cổng OTP" : "-- Chọn Loại OTP --"}
+                      className="bg-slate-900 border-slate-800 font-mono"
+                      options={availableOtpApis.map((api: any) => ({
+                        value: api.service_key,
+                        label: `${api.service_name} (${api.service_key})${api.is_default ? " ★ Mặc định" : ""}`,
+                      }))}
+                    />
                   </div>
                 </div>
               </div>
@@ -659,15 +658,19 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
 
                   <div>
                     <label className="block text-slate-400 mb-1 font-medium">Quy Tắc Khớp Đơn *</label>
-                    <select
+                    <CustomSelect
                       value={formData.package_match_rule || "information"}
-                      onChange={(e) => setFormData({ ...formData, package_match_rule: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
-                    >
-                      <option value="information">Khớp theo Thông Tin SP</option>
-                      <option value="slot">Khớp theo Tài khoản / Slot</option>
-                      <option value="both">Khớp cả hai (Information & Slot)</option>
-                    </select>
+                      onChange={(val) => setFormData({ ...formData, package_match_rule: val })}
+                      size="sm"
+                      accent="purple"
+                      searchable={false}
+                      className="bg-slate-900 border-slate-800 font-bold"
+                      options={[
+                        { value: "information", label: "Khớp theo Thông Tin SP" },
+                        { value: "slot", label: "Khớp theo Tài khoản / Slot" },
+                        { value: "both", label: "Khớp cả hai (Information & Slot)" },
+                      ]}
+                    />
                   </div>
                 </div>
 

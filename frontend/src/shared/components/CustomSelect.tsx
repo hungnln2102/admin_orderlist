@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
 
@@ -89,6 +89,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   menuClassName = "",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isUpward, setIsUpward] = useState(false);
   const [search, setSearch] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -118,6 +119,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpward = spaceBelow < estimatedHeight && rect.top > spaceBelow;
 
+    setIsUpward(openUpward);
     setMenuStyle({
       position: "fixed",
       left: Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 180) - 8)),
@@ -129,7 +131,17 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     });
   };
 
-  useEffect(() => {
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!isOpen) {
+      updatePosition();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  useLayoutEffect(() => {
     if (!isOpen) {
       setSearch("");
       return;
@@ -141,6 +153,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     if (showSearch) {
       requestAnimationFrame(() => searchInputRef.current?.focus());
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -188,6 +204,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     if (!isOpen) {
       if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
         e.preventDefault();
+        updatePosition();
         setIsOpen(true);
       }
       return;
@@ -228,7 +245,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         aria-haspopup="listbox"
         aria-label={ariaLabel}
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        onClick={handleToggle}
         onKeyDown={handleKeyDown}
         className={`w-full flex items-center justify-between gap-2 text-left bg-slate-900 border border-slate-700/80 text-slate-100 transition-all focus:outline-none ${sizeClass} ${
           isOpen ? accentStyle.openBorder : "hover:border-slate-600"
@@ -252,7 +269,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             style={menuStyle}
             role="listbox"
             onKeyDown={handleKeyDown}
-            className={`rounded-2xl border border-slate-700/90 bg-[#0b1222]/98 backdrop-blur-xl shadow-2xl shadow-black/70 overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${menuClassName}`}
+            className={`rounded-2xl border border-slate-700/90 bg-[#0b1222]/98 backdrop-blur-xl shadow-2xl shadow-black/80 overflow-hidden ${
+              isUpward ? "dropdown-menu-up" : "dropdown-menu-down"
+            } ${menuClassName}`}
           >
             {showSearch && (
               <div className="p-2 border-b border-slate-800">

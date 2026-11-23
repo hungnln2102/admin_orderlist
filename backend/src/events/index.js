@@ -7,7 +7,24 @@ const {
   recordEventInTrx,
 } = require("./eventStoreService");
 
+const PENDING_RETRY_INTERVAL_MS = 60_000;
+let retryTimer;
+let replayInProgress = false;
+
+async function replayPendingEvents() {
+  if (replayInProgress) return;
+  replayInProgress = true;
+  try {
+    await dispatchPendingEvents();
+  } catch (error) {
+    console.error("[EventStore] Unable to replay pending events:", error.message);
+  } finally {
+    replayInProgress = false;
+  }
+}
+
 function registerAllSubscribers() {
+  if (retryTimer) return;
   console.log("[EventBus] Registering subscribers...");
 
   const { registerOrderEventSubscribers } = require("./subscribers/orderEventSubscriber");
@@ -26,9 +43,9 @@ function registerAllSubscribers() {
   registerDailySummaryListeners();
   registerRealtimeSubscriber();
 
-  dispatchPendingEvents().catch((error) =>
-    console.error("[EventStore] Unable to replay pending events:", error.message)
-  );
+  retryTimer = setInterval(replayPendingEvents, PENDING_RETRY_INTERVAL_MS);
+  retryTimer.unref();
+  void replayPendingEvents();
 }
 
 module.exports = {

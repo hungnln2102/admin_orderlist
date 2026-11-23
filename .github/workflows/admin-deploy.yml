@@ -13,6 +13,20 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: admin_ci_test
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d admin_ci_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,6 +36,20 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
+      - run: npm ci
+        working-directory: backend
+      - run: npm test
+        working-directory: backend
+        env:
+          # Required by backend config; unit tests must not connect.
+          DATABASE_URL: postgresql://unit:unit@127.0.0.1:1/unit
+      - name: Verify bank reconciliation against PostgreSQL
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/admin_ci_test
+        run: |
+          DATABASE_URL="$TEST_DATABASE_URL" npm run migrate
+          npm run test:integration -- tests/integration/vpbankEmailIngestion.test.js tests/integration/webhook_financial_account_balance.test.js
       - run: npm run build
         working-directory: frontend
       - run: |

@@ -15,14 +15,13 @@ async function processOutboundReceiptInTrx({
   gateway,
   noteContent,
   bankTransactionId,
+  isReplay = false,
 }) {
   const outgoingAccount = await resolveWebhookAccount(trx, payload.accountNumber, gateway);
-  if (!outgoingAccount) {
+  if (!outgoingAccount || (isReplay && !outgoingAccount[COLS.FINANCIAL_ACCOUNTS.IS_ACTIVE])) {
     return { success: true, matched: false, receiptId, transferType: TRANSFER_TYPE.OUT, amount: transferAmount, reason: "ACCOUNT_NOT_RESOLVED" };
-}
-await trx(TABLES.PAYMENT_RECEIPT).where(COLS.PAYMENT_RECEIPT.ID, receiptId)
-  .update({ [COLS.PAYMENT_RECEIPT.FINANCIAL_ACCOUNT_ID]: outgoingAccount.id });
-await debitFinancialAccount(trx, {
+  }
+  const debit = await debitFinancialAccount(trx, {
   accountId: outgoingAccount.id,
   gateway,
   accountScope: "SHOP",
@@ -31,7 +30,12 @@ await debitFinancialAccount(trx, {
   sourceKind: "payment_receipt",
   sourceId: bankTransactionId || `receipt:${receiptId}`,
   note: noteContent || `Webhook Tiền ra #${receiptId}`,
-});
+  });
+  if (debit.skipped) {
+    return { success: true, matched: false, receiptId, transferType: TRANSFER_TYPE.OUT, amount: transferAmount, reason: "DEBIT_NOT_APPLIED" };
+  }
+  await trx(TABLES.PAYMENT_RECEIPT).where(COLS.PAYMENT_RECEIPT.ID, receiptId)
+    .update({ [COLS.PAYMENT_RECEIPT.FINANCIAL_ACCOUNT_ID]: outgoingAccount.id });
 
 const candidateSuppliers = await trx(`${TABLES.SUPPLIER} as s`)
   .leftJoin(`${TABLES.SUPPLIER_ORDER_COST_LOG} as l`, `l.${COLS.SUPPLIER_ORDER_COST_LOG.SUPPLY_ID}`, `s.${COLS.SUPPLIER.ID}`)

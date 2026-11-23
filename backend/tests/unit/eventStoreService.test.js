@@ -60,3 +60,39 @@ test("dispatchStoredEventWith keeps failed replay retryable", async () => {
   assert.equal(calls[0][1], 43);
   assert.equal(calls[0][2], expected);
 });
+
+test("dispatch rolls back subscriber writes before recording a publication error", async () => {
+  const transaction = {};
+  const calls = [];
+  const error = new Error("could not publish");
+
+  await assert.rejects(
+    dispatchStoredEventWith({ id: 44, event_name: "ORDER_RENEWED", payload: {} }, {
+      withSavepoint: async (work) => {
+        try {
+          await work(transaction);
+        } catch (failure) {
+          calls.push("rolled back");
+          throw failure;
+        }
+      },
+      emitAsync: async (name, payload, context) => {
+        assert.equal(context.trx, transaction);
+        calls.push("subscriber write");
+      },
+      markPublishedFn: async (id, connection) => {
+        assert.equal(id, 44);
+        assert.equal(connection, transaction);
+        throw error;
+      },
+      markFailedFn: async (id, failure) => {
+        assert.equal(id, 44);
+        assert.equal(failure, error);
+        calls.push("failure recorded");
+      },
+    }),
+    error
+  );
+
+  assert.deepEqual(calls, ["subscriber write", "rolled back", "failure recorded"]);
+});

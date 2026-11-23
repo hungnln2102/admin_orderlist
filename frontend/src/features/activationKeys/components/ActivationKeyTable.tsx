@@ -37,18 +37,18 @@ export const ActivationKeyTable: React.FC<Props> = ({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "AVAILABLE":
+      case "INACTIVE":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Khả Dụng
+            Chưa kích hoạt
           </span>
         );
       case "ACTIVATED":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30">
             <Check className="w-3 h-3" />
-            Đã Kích Hoạt
+            Đã kích hoạt
           </span>
         );
       case "REVOKED":
@@ -121,7 +121,8 @@ export const ActivationKeyTable: React.FC<Props> = ({
             <th className="py-3.5 px-4">Sản Phẩm</th>
             <th className="py-3.5 px-4">Đơn Hàng</th>
             <th className="py-3.5 px-4">Trạng Thái</th>
-            <th className="py-3.5 px-4">Tài Khoản / Slot Đã Cấp</th>
+            <th className="py-3.5 px-4">Tài khoản đã cấp</th>
+            <th className="py-3.5 px-4">Slot đã cấp</th>
             <th className="py-3.5 px-4">Khách Hàng / Ghi Chú</th>
             <th className="py-3.5 px-4">Thời Gian</th>
             <th className="py-3.5 px-4 text-right">Thao Tác</th>
@@ -182,7 +183,7 @@ export const ActivationKeyTable: React.FC<Props> = ({
                   {getStatusBadge(item.status)}
                 </td>
 
-                {/* Tài Khoản / Slot Đã Cấp */}
+                {/* Tài khoản đã cấp */}
                 <td className="py-3 px-4">
                   {item.assigned_account ? (
                     <div className="space-y-0.5">
@@ -205,15 +206,14 @@ export const ActivationKeyTable: React.FC<Props> = ({
                           <Copy className="w-3 h-3" />
                         </button>
                       </div>
-                      {item.slot_index && (
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          Slot #{item.slot_index}
-                        </span>
-                      )}
                     </div>
                   ) : (
                     <span className="text-slate-500 text-xs italic">Chưa cấp phát</span>
                   )}
+                </td>
+
+                <td className="py-3 px-4 whitespace-nowrap text-xs text-slate-400 font-mono">
+                  {item.slot_index != null ? `#${item.slot_index}` : "—"}
                 </td>
 
                 {/* Khách Hàng / Ghi Chú */}
@@ -254,7 +254,7 @@ export const ActivationKeyTable: React.FC<Props> = ({
                 <td className="py-3 px-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1.5">
                     {/* Thu hồi key */}
-                    {item.status === "AVAILABLE" && (
+                    {item.status === "INACTIVE" && (
                       <button
                         type="button"
                         onClick={() => onRevoke(item)}

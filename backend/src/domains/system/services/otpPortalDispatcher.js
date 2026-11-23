@@ -119,7 +119,7 @@ function getActiveSlots({ allowMissing = false } = {}) {
     throw new Error("OTP_PORTAL_SLOTS_CONFIG_INVALID");
   }
 
-  return parsed;
+  return parsed.map(({ default_service_key: _removedDefault, ...slot }) => slot);
 }
 
 /**
@@ -149,75 +149,56 @@ async function dispatchSlotRequest({ slotKey, input }) {
     };
   }
 
-  // Load the configured OTP service chain.
-  // 1. Lấy danh sách các cổng API / NCC được gán cho ô này (theo thứ tự ưu tiên)
-  const rawChain = Array.isArray(slot.assigned_services)
+  const rawServices = Array.isArray(slot.assigned_services)
     ? slot.assigned_services
     : [slot.primary_service_key, slot.fallback_service_key];
 
-  const serviceChain = Array.from(
+  const assignedServices = Array.from(
     new Set(
-      rawChain
-        .filter((s) => typeof s === "string" && s.trim() && s !== "none")
-        .map((s) => s.trim())
+      rawServices
+        .filter((service) => typeof service === "string")
+        .map((service) => service.trim())
+        .filter((service) => service && service !== "none")
     )
   );
 
-  // [ĐIỀU PHỐI ĐỘNG THEO ĐƠN HÀNG & NCC] (Phương Án A)
-  // Tra cứu đơn hàng theo input để nhận diện sản phẩm & NCC, ưu tiên gọi thẳng Provider đích
-  let effectiveChain = [...serviceChain];
+  const isTotp = slotKey === "two_factor_totp";
   let matchedRoutingRule = null;
-  try {
-    const productApiService = require("./productApiService");
-    matchedRoutingRule = await productApiService.findRoutingProviderForInput({
-      slotKey,
-      input: cleanInput,
-    });
-    if (matchedRoutingRule && matchedRoutingRule.provider_key) {
-      const targetProvider = matchedRoutingRule.provider_key.trim();
-      effectiveChain = [targetProvider, ...effectiveChain.filter((k) => k !== targetProvider)];
+  if (!isTotp) {
+    try {
+      const productApiService = require("./productApiService");
+      matchedRoutingRule = await productApiService.findRoutingProviderForInput({
+        slotKey,
+        input: cleanInput,
+      });
+    } catch (err) {
+      console.warn(`[OTP Dispatcher] Lỗi kiểm tra quy tắc định tuyến cho [${slotKey}]:`, err.message);
+      throw new Error("Không thể xác minh cấu hình tài khoản.");
     }
-  } catch (err) {
-    console.warn(`[OTP Dispatcher] Lỗi kiểm tra quy tắc định tuyến cho [${slotKey}]:`, err.message);
-    throw new Error("Không thể xác minh cấu hình tài khoản.");
   }
 
   if (matchedRoutingRule?.disabled) throw new Error("Chức năng đang tắt cho tài khoản này.");
 
-  if (effectiveChain.length === 0) {
-    throw new Error(`OTP service chain is not configured for slot '${slotKey}'.`);
+  const serviceUsed = isTotp && assignedServices.includes("totp")
+    ? "totp"
+    : String(matchedRoutingRule?.provider_key || "").trim();
+  if (!serviceUsed) {
+    throw new Error(`Không xác định được provider khớp cấu hình cho ô '${slotKey}'.`);
   }
-
-  let probeResult = null;
-  let serviceUsed = effectiveChain[0];
-  const attemptedServices = [];
 
   // Xác định email thực tế để probe: nếu input là mã đơn hàng, ưu tiên lấy resolved_email từ đơn hàng
-  const targetEmail = (cleanInput.includes("@") ? cleanInput : matchedRoutingRule?.resolved_email) || cleanInput;
+  const targetEmail = serviceUsed === "package_warehouse"
+    ? cleanInput : matchedRoutingRule?.resolved_email || cleanInput;
 
-  // Quét qua các cổng API được gán cho ô này để lấy mã OTP
-  for (let i = 0; i < effectiveChain.length; i++) {
-    const currentService = effectiveChain[i];
-    attemptedServices.push(currentService);
-    try {
-      const probePayload = {
-        email: targetEmail,
-        serviceKey: currentService,
-      };
-      const res = await otpProviderService.probeOtpForEmail(probePayload);
-      if (res && res.found && (res.otp || res.extra_fields?.length > 0)) {
-        probeResult = res;
-        serviceUsed = currentService;
-        break; // Đã tìm thấy OTP từ cổng này, dừng quét
-      }
-      if (!probeResult || (!probeResult.found && res)) {
-        probeResult = res;
-        serviceUsed = currentService;
-      }
-    } catch (err) {
-      console.warn(`[OTP Dispatcher] Lỗi cổng [${currentService}]:`, err.message);
-    }
-  }
+  const probeResult = await otpProviderService.probeOtpForEmail({
+    email: targetEmail,
+    serviceKey: serviceUsed,
+    ...(isTotp ? { requiredExecutionMode: "INTERNAL_TOTP" } : {}),
+  }).catch((error) => {
+    if (isTotp) throw new Error("Không thể sinh mã TOTP bằng cấu hình hiện tại.");
+    console.warn(`[OTP Dispatcher] Lỗi cổng [${serviceUsed}]:`, error.message);
+    return null;
+  });
 
   let accountData = null;
   if (slotKey.includes("account") || slotKey.includes("check")) {
@@ -310,11 +291,11 @@ async function dispatchSlotRequest({ slotKey, input }) {
     slot_key: slotKey,
     slot_name: slot.name,
     service_used: serviceUsed,
-    assigned_services: effectiveChain,
-    default_assigned_services: serviceChain,
+    assigned_services: [...new Set([...assignedServices, serviceUsed])],
+    default_assigned_services: assignedServices,
     routing_rule: matchedRoutingRule || null,
-    attempted_services: attemptedServices,
-    input: cleanInput,
+    attempted_services: [serviceUsed],
+    input: isTotp ? null : cleanInput,
     data: accountData,
     otp: probeResult?.otp || null,
     link: netflixLink,
@@ -324,84 +305,6 @@ async function dispatchSlotRequest({ slotKey, input }) {
     extra_fields: probeResult?.extra_fields || [],
     message: probeResult?.message || "Không tìm thấy mã OTP trong hộp thư.",
   };
-}
-
-/**
- * Đăng ký / Đồng bộ tự động danh sách các ô input từ web otp_portal sang Backend & Admin.
- * Thuật toán Smart Merge:
- * - Bảo toàn 100% các cổng API (assigned_services) và trạng thái (enabled) Master đã cấu hình.
- * - Bổ sung ngay lập tức bất kỳ slot/form mới nào vừa xuất hiện trên otp_portal.
- */
-async function registerSlotsFromPortal(incomingSlots = [], updatedBy = "PORTAL_SYNC") {
-  if (!Array.isArray(incomingSlots) || incomingSlots.length === 0) {
-    return getActiveSlots();
-  }
-
-  const currentSlots = getActiveSlots({ allowMissing: true });
-  const currentMap = new Map(currentSlots.map((s) => [s.slot_key, s]));
-  let hasChanges = false;
-
-  const merged = [...currentSlots];
-
-  for (const slot of incomingSlots) {
-    if (!slot || !slot.slot_key) continue;
-    if (currentMap.has(slot.slot_key)) {
-      // Slot đã có: Cập nhật nhãn và placeholder nếu có thay đổi từ phía UI, giữ nguyên cấu hình cổng API của Master
-      const existing = currentMap.get(slot.slot_key);
-      let updatedField = false;
-      if (slot.name && existing.name !== slot.name) {
-        existing.name = slot.name;
-        updatedField = true;
-      }
-      if (slot.input_placeholder && existing.input_placeholder !== slot.input_placeholder) {
-        existing.input_placeholder = slot.input_placeholder;
-        updatedField = true;
-      }
-      if (slot.btn_text && existing.btn_text !== slot.btn_text) {
-        existing.btn_text = slot.btn_text;
-        updatedField = true;
-      }
-      if (slot.category && existing.category !== slot.category) {
-        existing.category = slot.category;
-        updatedField = true;
-      }
-      if (updatedField) hasChanges = true;
-    } else {
-      // Slot mới xuất hiện trên web otp_portal: Thêm mới vào danh sách!
-      const newSlot = {
-        slot_key: slot.slot_key,
-        name: slot.name || `Ô Input [${slot.slot_key}]`,
-        category: slot.category || "otp",
-        assigned_services:
-          Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
-            ? slot.assigned_services
-            : [],
-        primary_service_key: slot.assigned_services?.[0] || null,
-        fallback_service_key: slot.assigned_services?.[1] || null,
-        cooldown_seconds: Number(slot.cooldown_seconds) || 30,
-        btn_text: slot.btn_text || "Lấy Mã Xác Nhận",
-        input_placeholder: slot.input_placeholder || "Nhập thông tin cần tra cứu...",
-        enabled: slot.enabled !== false,
-      };
-      merged.push(newSlot);
-      currentMap.set(slot.slot_key, newSlot);
-      hasChanges = true;
-    }
-  }
-
-  if (hasChanges) {
-    try {
-      await systemConfigService.set(
-        "OTP_PORTAL_SLOTS_CONFIG",
-        JSON.stringify(merged),
-        updatedBy
-      );
-    } catch (err) {
-      console.warn("[OTP Dispatcher] Lỗi lưu cấu hình slots sau khi sync:", err.message);
-    }
-  }
-
-  return merged;
 }
 
 /**
@@ -438,7 +341,6 @@ module.exports = {
   DEFAULT_SLOTS,
   getActiveSlots,
   dispatchSlotRequest,
-  registerSlotsFromPortal,
   requestAdobeSwitchTeam,
   getAdobeSwitchTeamStatus,
 };

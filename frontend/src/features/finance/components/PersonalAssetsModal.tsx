@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DebtKind, DebtRepaymentFrequency, PersonalAsset, PersonalAssetType, ProfitDestination, ProfitFrequency } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { DateInputVN } from "@/shared/components/DateInputVN";
+import { CustomSelect } from "@/shared/components";
 import { PersonalAssetPreview } from "./PersonalAssetPreview";
 import {
   Calendar,
@@ -402,16 +403,19 @@ export const PersonalAssetsModal: React.FC<Props> = ({
               {/* 1. Category Selector */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-300">Phân loại danh mục</label>
-                <select
+                <CustomSelect
                   value={type}
-                  onChange={(event) => setType(event.target.value as PersonalAssetType)}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-slate-700 cursor-pointer"
-                >
-                  <option value="DEBT_PAYABLE">🔴 Nợ cá nhân phải trả (Nợ phải trả)</option>
-                  <option value="DEBT_RECEIVABLE">🟢 Khoản cho vay (Phải thu cá nhân)</option>
-                  <option value="SAVINGS">🟣 Quỹ Tích Lũy / Tiết kiệm (Tài sản sinh lời)</option>
-                  <option value="GOLD_INVESTMENT">🟡 Vàng / Đầu tư / Crypto (Tài sản đầu tư)</option>
-                </select>
+                  onChange={(val) => setType(val as PersonalAssetType)}
+                  accent={type === "DEBT_PAYABLE" ? "rose" : type === "DEBT_RECEIVABLE" ? "emerald" : type === "GOLD_INVESTMENT" ? "amber" : type === "SAVINGS" ? "purple" : "cyan"}
+                  searchable={false}
+                  className="bg-slate-950 border-slate-800"
+                  options={[
+                    { value: "DEBT_PAYABLE", label: "🔴 Nợ cá nhân phải trả (Nợ phải trả)" },
+                    { value: "DEBT_RECEIVABLE", label: "🟢 Khoản cho vay (Phải thu cá nhân)" },
+                    { value: "SAVINGS", label: "🟣 Quỹ Tích Lũy / Tiết kiệm (Tài sản sinh lời)" },
+                    { value: "GOLD_INVESTMENT", label: "🟡 Vàng / Đầu tư / Crypto (Tài sản đầu tư)" },
+                  ]}
+                />
               </div>
 
               {/* 2. Name & Amount (2-column Subgrid) */}
@@ -573,13 +577,22 @@ export const PersonalAssetsModal: React.FC<Props> = ({
 
                     {type === "DEBT_PAYABLE" && (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                        <label className="text-[11px] text-slate-300 font-medium">Loại sổ nợ
-                          <select value={debtKind} onChange={(event) => setDebtKind(event.target.value as DebtKind)} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none">
-                            <option value="PERSONAL_EXTERNAL">Nợ cá nhân ngoài, không lãi</option>
-                            <option value="CREDIT_CARD">Thẻ tín dụng</option>
-                            <option value="OVERDRAFT">Thấu chi</option>
-                          </select>
-                        </label>
+                        <div>
+                          <label className="mb-1 block text-[11px] text-slate-300 font-medium">Loại sổ nợ</label>
+                          <CustomSelect
+                            value={debtKind}
+                            onChange={(val) => setDebtKind(val as DebtKind)}
+                            size="sm"
+                            accent="rose"
+                            searchable={false}
+                            className="bg-slate-950 border-slate-800"
+                            options={[
+                              { value: "PERSONAL_EXTERNAL", label: "Nợ cá nhân ngoài, không lãi" },
+                              { value: "CREDIT_CARD", label: "Thẻ tín dụng" },
+                              { value: "OVERDRAFT", label: "Thấu chi" },
+                            ]}
+                          />
+                        </div>
                         <label className="text-[11px] text-slate-300 font-medium">{debtKind === "PERSONAL_EXTERNAL" ? "STK đối chiếu (nếu có)" : debtKind === "CREDIT_CARD" ? "Hạn mức tín dụng" : "Hạn mức thấu chi"}
                           <input type={debtKind === "PERSONAL_EXTERNAL" ? "text" : "number"} min={debtKind === "PERSONAL_EXTERNAL" ? undefined : "1"} required={debtKind !== "PERSONAL_EXTERNAL"} value={debtKind === "PERSONAL_EXTERNAL" ? debtAccountNumber : debtInitialLimit} onChange={(event) => debtKind === "PERSONAL_EXTERNAL" ? setDebtAccountNumber(event.target.value.replace(/\D/g, "")) : setDebtInitialLimit(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
                         </label>
@@ -652,14 +665,18 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                           <label className="mb-1.5 block text-xs font-medium text-slate-300">
                             Chu kỳ tính lãi suất
                           </label>
-                          <select
+                          <CustomSelect
                             value={debtInterestFrequency}
-                            onChange={(event) => setDebtInterestFrequency(event.target.value as "DAILY" | "MONTHLY")}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none cursor-pointer"
-                          >
-                            <option value="DAILY">⚡ Lãi theo ngày (Chạy lúc 18:00 hàng ngày)</option>
-                            <option value="MONTHLY">🗓️ Lãi theo tháng (Chạy định kỳ hàng tháng)</option>
-                          </select>
+                            onChange={(val) => setDebtInterestFrequency(val as "DAILY" | "MONTHLY")}
+                            size="sm"
+                            accent="rose"
+                            searchable={false}
+                            className="bg-slate-950 border-slate-800"
+                            options={[
+                              { value: "DAILY", label: "⚡ Lãi theo ngày (Chạy lúc 18:00 hàng ngày)" },
+                              { value: "MONTHLY", label: "🗓️ Lãi theo tháng (Chạy định kỳ hàng tháng)" },
+                            ]}
+                          />
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -704,14 +721,18 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                     <label className="mb-1.5 block text-xs font-medium text-slate-300">
                       Chu kỳ rút tiền thanh toán
                     </label>
-                    <select
+                    <CustomSelect
                       value={debtRepaymentFrequency}
-                      onChange={(event) => setDebtRepaymentFrequency(event.target.value as DebtRepaymentFrequency)}
-                      className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-rose-400 focus:outline-none cursor-pointer"
-                    >
-                      <option value="MONTHLY">🗓️ Đóng định kỳ hàng tháng (Đến ngày {debtDueDay || 15} mới trả)</option>
-                      <option value="DAILY">⚡ Rút tiền trả hàng ngày (Bốc bát họ / Trả nợ theo ngày)</option>
-                    </select>
+                      onChange={(val) => setDebtRepaymentFrequency(val as DebtRepaymentFrequency)}
+                      size="sm"
+                      accent="rose"
+                      searchable={false}
+                      className="bg-slate-950 border-slate-800"
+                      options={[
+                        { value: "MONTHLY", label: `🗓️ Đóng định kỳ hàng tháng (Đến ngày ${debtDueDay || 15} mới trả)` },
+                        { value: "DAILY", label: "⚡ Rút tiền trả hàng ngày (Bốc bát họ / Trả nợ theo ngày)" },
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -752,15 +773,19 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="mb-1.5 block text-[11px] text-slate-400">Kỳ nhận lãi</label>
-                          <select
+                          <CustomSelect
                             value={profitFrequency}
-                            onChange={(event) => setProfitFrequency(event.target.value as ProfitFrequency)}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
-                          >
-                            <option value="DAILY">Theo ngày</option>
-                            <option value="MONTHLY">Theo tháng</option>
-                            <option value="YEARLY">Theo năm</option>
-                          </select>
+                            onChange={(val) => setProfitFrequency(val as ProfitFrequency)}
+                            size="sm"
+                            accent="purple"
+                            searchable={false}
+                            className="bg-slate-950 border-slate-800"
+                            options={[
+                              { value: "DAILY", label: "Theo ngày" },
+                              { value: "MONTHLY", label: "Theo tháng" },
+                              { value: "YEARLY", label: "Theo năm" },
+                            ]}
+                          />
                         </div>
 
                         <div>
@@ -783,20 +808,21 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="mb-1.5 block text-[11px] text-slate-400">Lãi chuyển về đâu?</label>
-                          <select
+                          <CustomSelect
                             value={profitDestination}
-                            onChange={(event) => {
-                              setProfitDestination(event.target.value as ProfitDestination);
+                            onChange={(val) => {
+                              setProfitDestination(val as ProfitDestination);
                               setProfitAccountId("");
                             }}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
-                          >
-                            {Object.entries(profitDestinationLabels).map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
+                            size="sm"
+                            accent="purple"
+                            searchable={false}
+                            className="bg-slate-950 border-slate-800"
+                            options={Object.entries(profitDestinationLabels).map(([value, label]) => ({
+                              value,
+                              label,
+                            }))}
+                          />
                         </div>
 
                         <div>
@@ -815,24 +841,21 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                           <label className="mb-1.5 block text-[11px] text-slate-400">
                             Chọn tài khoản nhận lãi <span className="text-rose-400">*</span>
                           </label>
-                          <select
+                          <CustomSelect
                             value={profitAccountId}
-                            onChange={(event) => setProfitAccountId(event.target.value)}
+                            onChange={(val) => setProfitAccountId(val)}
                             disabled={loadingProfitAccounts}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-purple-400 focus:outline-none"
-                          >
-                            <option value="">
-                              {loadingProfitAccounts ? "Đang tải tài khoản..." : "Chọn tài khoản cụ thể"}
-                            </option>
-                            {profitAccounts
+                            size="sm"
+                            accent="purple"
+                            placeholder={loadingProfitAccounts ? "Đang tải tài khoản..." : "Chọn tài khoản cụ thể"}
+                            className="bg-slate-950 border-slate-800"
+                            options={profitAccounts
                               .filter((account) => profitDestination === "SHOP_BALANCE" || account.kind === "bank")
-                              .map((account) => (
-                                <option key={`${account.kind}-${account.id}`} value={account.id}>
-                                  {account.label}
-                                  {account.detail ? ` · ${account.detail}` : ""}
-                                </option>
-                              ))}
-                          </select>
+                              .map((account) => ({
+                                value: String(account.id),
+                                label: `${account.label}${account.detail ? ` · ${account.detail}` : ""}`,
+                              }))}
+                          />
                         </div>
                       )}
                     </div>

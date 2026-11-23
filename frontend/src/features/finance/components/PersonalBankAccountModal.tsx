@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Building2, XCircle, Loader2 } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
@@ -78,8 +79,7 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
 
   if (!isOpen) return null;
 
-  const handleBankSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedName = e.target.value;
+  const handleBankSelect = (selectedName: string) => {
     const found = POPULAR_BANKS.find((b) => b.name === selectedName);
     if (found) {
       setFormData({
@@ -171,17 +171,21 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn Ngân Hàng / Ví *</label>
-              <select
-                value={formData.bankDisplayName}
+              <CustomSelect
+                value={
+                  POPULAR_BANKS.find(
+                    (b) => b.name === formData.bankDisplayName || formData.bankDisplayName.startsWith(b.name)
+                  )?.name || formData.bankDisplayName
+                }
                 onChange={handleBankSelect}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-cyan-500 focus:outline-none cursor-pointer"
-              >
-                {POPULAR_BANKS.map((b) => (
-                  <option key={b.shortCode} value={b.name}>
-                    {b.name} ({b.shortCode})
-                  </option>
-                ))}
-              </select>
+                size="sm"
+                accent="cyan"
+                className="bg-slate-950"
+                options={POPULAR_BANKS.map((b) => ({
+                  value: b.name,
+                  label: `${b.name} (${b.shortCode})`,
+                }))}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">

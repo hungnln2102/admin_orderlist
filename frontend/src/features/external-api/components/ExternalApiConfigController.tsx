@@ -34,15 +34,15 @@ export const ExternalApiConfigController: React.FC = () => {
     availableApis,
     assignProvider,
     setDefaultProvider,
+    renameProvider,
     removeMapping,
 
     slots,
     addServiceToSlot,
     removeServiceFromSlot,
-    moveServiceInSlot,
     toggleSlotEnabled,
-    saveSlots,
-    savingSlots,
+    updatingSlot,
+    removingSlotProvider,
 
     routingRules,
     suppliers,
@@ -75,7 +75,7 @@ export const ExternalApiConfigController: React.FC = () => {
         configuredCount={configuredCount}
         unconfiguredCount={unconfiguredCount}
         totalSlots={slots.length}
-        refreshing={refreshing}
+        refreshing={refreshing || updatingSlot || Boolean(removingSlotProvider)}
         onRefresh={() => void load(true)}
       />
 
@@ -154,6 +154,7 @@ export const ExternalApiConfigController: React.FC = () => {
       <main className="transition-all duration-200">
         {activeTab === "providers" && (
           <ProviderCatalogTab
+            onRenameProvider={renameProvider}
             providers={providers}
             filteredProviders={filteredProviders}
             categories={categories}
@@ -187,12 +188,11 @@ export const ExternalApiConfigController: React.FC = () => {
           <OtpPortalSlotsTab
             slots={slots}
             providers={providers}
-            savingSlots={savingSlots}
+            updatingSlot={updatingSlot}
+            removingSlotProvider={removingSlotProvider}
             onAddService={addServiceToSlot}
             onRemoveService={removeServiceFromSlot}
-            onMoveService={moveServiceInSlot}
             onToggleEnabled={toggleSlotEnabled}
-            onSaveSlots={() => void saveSlots()}
           />
         )}
       </main>

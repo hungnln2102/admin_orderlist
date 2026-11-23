@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Layers, Sliders, X } from "lucide-react";
-import { ToggleSwitch } from "@/shared/components";
+import { BaseModal, CustomSelect, ToggleSwitch } from "@/shared/components";
 import type {
   PortalSlotItem,
   PortalSlotRoutingRule,
@@ -15,6 +15,14 @@ const PROVIDER_KEY_ALIASES: Record<string, string> = {
 };
 
 const canonicalProviderKey = (providerKey: string) => PROVIDER_KEY_ALIASES[providerKey] || providerKey;
+
+const ADOBE_ACCOUNT_SLOT: PortalSlotItem = {
+  slot_key: "adobe_account",
+  name: "Adobe — Lấy tài khoản (Yuna)",
+  category: "adobe",
+  assigned_services: ["yuna_2fa"],
+  enabled: true,
+};
 
 interface SlotProductSupplierRuleModalProps {
   isOpen: boolean;
@@ -58,7 +66,20 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const selectedSlot = slots.find((slot) => slot.slot_key === slotKey);
+  const mappingSlots = useMemo(() => slots.some((slot) => slot.slot_key === ADOBE_ACCOUNT_SLOT.slot_key)
+    ? slots
+    : [...slots, ADOBE_ACCOUNT_SLOT], [slots]);
+  const selectedSlot = mappingSlots.find((slot) => slot.slot_key === slotKey);
+  const slotOptions = useMemo(() => mappingSlots
+    .filter((slot) => slot.slot_key === editingRule?.slot_key || slot.enabled !== false)
+    .map((slot) => ({
+      value: slot.slot_key,
+      label: slot.slot_key === "adobe_check"
+        ? "Adobe — Kiểm tra tài khoản (Ades)"
+        : slot.slot_key === ADOBE_ACCOUNT_SLOT.slot_key
+          ? ADOBE_ACCOUNT_SLOT.name
+          : `${slot.name} (${slot.slot_key})`,
+    })), [editingRule?.slot_key, mappingSlots]);
   const providerOptions = useMemo(() => {
     const assignedKeys = new Set(
       (selectedSlot?.assigned_services || [selectedSlot?.primary_service_key, selectedSlot?.fallback_service_key])
@@ -80,7 +101,9 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
         category: String(api.category || "OTP"),
       });
     });
-    return [...catalog.values()].filter((provider) => assignedKeys.has(provider.key));
+    return [...catalog.values()].filter((provider) => selectedSlot?.slot_key === ADOBE_ACCOUNT_SLOT.slot_key
+      ? provider.key === "yuna_2fa"
+      : assignedKeys.has(provider.key));
   }, [availableApis, providers, selectedSlot]);
 
   // Lọc danh sách NCC theo Ô Input: chỉ hiển thị các NCC có sản phẩm tương ứng với slot
@@ -151,15 +174,14 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
       setVariantIds(group.map((rule) => rule.variant_id));
       setIsActive(editingRule.is_active !== false);
     } else {
-      const firstSlot = slots[0];
-      setSlotKey(firstSlot?.slot_key || "");
+      setSlotKey(slotOptions[0]?.value || "");
       setSupplierId("");
       setProviderKey("");
       setVariantIds([]);
       setIsActive(true);
     }
     setError("");
-  }, [editingRule, isOpen, routingRules, slots]);
+  }, [editingRule, isOpen, routingRules, slotOptions]);
 
   useEffect(() => {
     if (!slotKey || editingRule) return;
@@ -228,182 +250,197 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-slate-700/80 bg-slate-900/95 shadow-2xl shadow-cyan-950/40 overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4.5 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/40 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-300">
-              <Sliders className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white">{editingRule ? "Chỉnh Sửa Liên Kết Variant" : "Tạo Liên Kết OTP Theo Variant"}</h3>
-              <p className="text-xs text-slate-400">Ô Input Web → NCC cung cấp → Provider → Variant</p>
-            </div>
-          </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-            <X className="w-5 h-5" />
-          </button>
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      borderClassName="border-slate-700/80 shadow-cyan-950/40"
+      title={editingRule ? "Chỉnh Sửa Liên Kết Variant" : "Tạo Liên Kết OTP Theo Variant"}
+      subtitle="Ô Input Web → NCC cung cấp → Provider → Variant"
+      icon={
+        <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-300">
+          <Sliders className="w-5 h-5" />
         </div>
+      }
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="submit"
+            form="slot-product-supplier-rule-form"
+            disabled={submitting || isSharedTwoFactor}
+            className="px-5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/25 flex items-center gap-2 transition-all hover:brightness-110 cursor-pointer disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {submitting ? "Đang lưu..." : "Lưu Liên Kết Variant"}
+          </button>
+        </>
+      }
+    >
+      <form id="slot-product-supplier-rule-form" onSubmit={handleSubmit} className="space-y-5">
+        {error && <div className="px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-200">{error}</div>}
 
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5">
-          {error && <div className="px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-200">{error}</div>}
-
-          {/* Hàng 1: 1. Ô Input & 2. NCC (Lọc theo ô input) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-300">1. Ô Input trên Web OTP Portal</span>
-              <select
-                value={slotKey}
-                onChange={(event) => {
-                  setSlotKey(event.target.value);
-                  setSupplierId("");
-                  setProviderKey("");
-                  setVariantIds([]);
-                }}
-                disabled={Boolean(editingRule)}
-                className="w-full text-xs font-medium bg-slate-950 border border-slate-700/80 focus:border-cyan-500 rounded-xl px-3 py-2 text-slate-100 outline-none disabled:opacity-60"
-              >
-                <option value="">-- Chọn ô input --</option>
-                {slots.filter((slot) => slot.enabled !== false).map((slot) => <option key={slot.slot_key} value={slot.slot_key}>{slot.name} ({slot.slot_key})</option>)}
-              </select>
-            </label>
-
-            <label className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-300">2. Nhà Cung Cấp (NCC)</span>
-                {slotKey && (
-                  <span className="text-[11px] text-cyan-400 font-normal">
-                    {filteredSuppliers.length} NCC cung cấp
-                  </span>
-                )}
-              </div>
-              <select
-                value={supplierId}
-                onChange={(event) => {
-                  setSupplierId(event.target.value ? Number(event.target.value) : "");
-                  setVariantIds([]);
-                }}
-                disabled={Boolean(editingRule) || isSharedTwoFactor || !slotKey}
-                className="w-full text-xs font-medium bg-slate-950 border border-slate-700/80 focus:border-cyan-500 rounded-xl px-3 py-2 text-slate-100 outline-none disabled:opacity-60"
-              >
-                <option value="">
-                  {!slotKey
-                    ? "-- Chọn ô input trước --"
-                    : filteredSuppliers.length === 0
-                    ? "-- Không có NCC nào cung cấp sản phẩm này --"
-                    : `-- Chọn NCC (${filteredSuppliers.length} NCC) --`}
-                </option>
-                {filteredSuppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.supplier_name} ({supplier.variantCount} variant)
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {/* Hàng 2: 3. Provider của ô input đã chọn */}
-          <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-slate-300">3. Provider của ô input đã chọn</span>
-            <select
-              value={providerKey}
-              onChange={(event) => {
-                setProviderKey(event.target.value);
+        {/* Hàng 1: 1. Ô Input & 2. NCC (Lọc theo ô input) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-300">1. Ô Input trên Web OTP Portal</label>
+            <CustomSelect
+              value={slotKey}
+              onChange={(val) => {
+                setSlotKey(val);
+                setSupplierId("");
+                setProviderKey("");
+                setVariantIds([]);
               }}
-              disabled={Boolean(editingRule) || providerOptions.length === 0}
-              className="w-full text-xs font-medium bg-slate-950 border border-slate-700/80 focus:border-cyan-500 rounded-xl px-3 py-2 text-slate-100 outline-none disabled:opacity-60"
-            >
-              <option value="">{providerOptions.length ? "-- Chọn provider --" : "Ô input chưa có provider --"}</option>
-              {providerOptions.map((provider) => <option key={provider.key} value={provider.key}>{provider.name} ({provider.key})</option>)}
-            </select>
-          </label>
-
-          {isSharedTwoFactor ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">Cổng TOTP dùng chung, không tạo điều phối theo NCC và variant.</div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold text-slate-300">4. Variant của NCC</span>
-                <span className="text-[11px] text-cyan-300">Đã chọn: {variantIds.length}</span>
-              </div>
-              {supplierId && selectedVariants.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/50 p-4 text-xs text-slate-400">NCC này chưa có variant đang hoạt động để gán.</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {selectedVariants.map((variant) => {
-                    const selected = variantIds.includes(variant.variant_id);
-                    const isVariantActive = variant.is_active !== false;
-                    return (
-                      <div
-                        key={variant.variant_id}
-                        className={`group inline-flex items-center rounded-lg border text-xs transition-all overflow-hidden ${
-                          selected
-                            ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-100 shadow-sm shadow-cyan-950/30"
-                            : isVariantActive
-                            ? "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600 hover:text-white"
-                            : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-300"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleVariant(variant.variant_id)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer text-left"
-                        >
-                          <Layers className={`w-3 h-3 shrink-0 ${isVariantActive ? "text-cyan-400" : "text-slate-500"}`} />
-                          <span>{variant.variant_display_name}</span>
-                          {!isVariantActive && (
-                            <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
-                              Tắt
-                            </span>
-                          )}
-                        </button>
-                        {onDeleteSupplierVariant && variant.supplier_cost_id && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSupplierVariant(variant);
-                            }}
-                            title={`Xóa variant "${variant.variant_display_name}" khỏi NCC`}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 rounded-r-lg transition-colors border-l border-slate-800/80 cursor-pointer"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {variantIds.length > 0 && (
-                <div className="flex flex-wrap gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                  {selectedVariants.filter((variant) => variantIds.includes(variant.variant_id)).map((variant) => (
-                    <span key={variant.variant_id} className="inline-flex items-center gap-1 rounded-md bg-cyan-500/15 border border-cyan-500/30 px-2 py-1 text-[11px] text-cyan-100">
-                      {variant.variant_display_name}
-                      <button type="button" onClick={() => removeVariant(variant.variant_id)} title="Loại variant" className="rounded text-cyan-300 hover:text-white"><X className="w-3 h-3" /></button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-            <div><span className="text-xs font-bold text-slate-200">Kích hoạt các liên kết này</span><p className="text-[11px] text-slate-500">On/Off từng variant vẫn chỉnh được ở bảng sau khi lưu.</p></div>
-            <ToggleSwitch
-              checked={isActive}
-              onChange={setIsActive}
-              variant="cyan"
-              size="md"
+              disabled={Boolean(editingRule)}
+              size="sm"
+              accent="cyan"
+              placeholder="-- Chọn ô input --"
+              className="bg-slate-950"
+              options={slotOptions}
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
-            <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">Hủy bỏ</button>
-            <button type="submit" disabled={submitting || isSharedTwoFactor} className="px-5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/25 flex items-center gap-2 disabled:opacity-50"><CheckCircle2 className="w-4 h-4" />{submitting ? "Đang lưu..." : "Lưu Liên Kết Variant"}</button>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-300">2. Nhà Cung Cấp (NCC)</label>
+              {slotKey && (
+                <span className="text-[11px] text-cyan-400 font-normal">
+                  {filteredSuppliers.length} NCC cung cấp
+                </span>
+              )}
+            </div>
+            <CustomSelect
+              value={supplierId ? String(supplierId) : ""}
+              onChange={(val) => {
+                setSupplierId(val ? Number(val) : "");
+                setVariantIds([]);
+              }}
+              disabled={Boolean(editingRule) || isSharedTwoFactor || !slotKey}
+              size="sm"
+              accent="cyan"
+              placeholder={
+                !slotKey
+                  ? "-- Chọn ô input trước --"
+                  : filteredSuppliers.length === 0
+                  ? "-- Không có NCC nào cung cấp sản phẩm này --"
+                  : `-- Chọn NCC (${filteredSuppliers.length} NCC) --`
+              }
+              className="bg-slate-950"
+              options={filteredSuppliers.map((supplier) => ({
+                value: String(supplier.id),
+                label: `${supplier.supplier_name} (${supplier.variantCount} variant)`,
+              }))}
+            />
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        {/* Hàng 2: 3. Provider của ô input đã chọn */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-slate-300">3. Provider của ô input đã chọn</label>
+          <CustomSelect
+            value={providerKey}
+            onChange={(val) => setProviderKey(val)}
+            disabled={Boolean(editingRule) || providerOptions.length === 0}
+            size="sm"
+            accent="cyan"
+            searchable={false}
+            placeholder={providerOptions.length ? "-- Chọn provider --" : "Ô input chưa có provider --"}
+            className="bg-slate-950"
+            options={providerOptions.map((provider) => ({
+              value: provider.key,
+              label: `${provider.name} (${provider.key})`,
+            }))}
+          />
+        </div>
+
+        {isSharedTwoFactor ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">Cổng TOTP dùng chung, không tạo điều phối theo NCC và variant.</div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-slate-300">4. Variant của NCC</span>
+              <span className="text-[11px] text-cyan-300">Đã chọn: {variantIds.length}</span>
+            </div>
+            {supplierId && selectedVariants.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/50 p-4 text-xs text-slate-400">NCC này chưa có variant đang hoạt động để gán.</div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {selectedVariants.map((variant) => {
+                  const selected = variantIds.includes(variant.variant_id);
+                  const isVariantActive = variant.is_active !== false;
+                  return (
+                    <div
+                      key={variant.variant_id}
+                      className={`group inline-flex items-center rounded-lg border text-xs transition-all overflow-hidden ${
+                        selected
+                          ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-100 shadow-sm shadow-cyan-950/30"
+                          : isVariantActive
+                          ? "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600 hover:text-white"
+                          : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleVariant(variant.variant_id)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer text-left"
+                      >
+                        <Layers className={`w-3 h-3 shrink-0 ${isVariantActive ? "text-cyan-400" : "text-slate-500"}`} />
+                        <span>{variant.variant_display_name}</span>
+                        {!isVariantActive && (
+                          <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
+                            Tắt
+                          </span>
+                        )}
+                      </button>
+                      {onDeleteSupplierVariant && variant.supplier_cost_id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSupplierVariant(variant);
+                          }}
+                          title={`Xóa variant "${variant.variant_display_name}" khỏi NCC`}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 rounded-r-lg transition-colors border-l border-slate-800/80 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {variantIds.length > 0 && (
+              <div className="flex flex-wrap gap-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                {selectedVariants.filter((variant) => variantIds.includes(variant.variant_id)).map((variant) => (
+                  <span key={variant.variant_id} className="inline-flex items-center gap-1 rounded-md bg-cyan-500/15 border border-cyan-500/30 px-2 py-1 text-[11px] text-cyan-100">
+                    {variant.variant_display_name}
+                    <button type="button" onClick={() => removeVariant(variant.variant_id)} title="Loại variant" className="rounded text-cyan-300 hover:text-white"><X className="w-3 h-3" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+          <div><span className="text-xs font-bold text-slate-200">Kích hoạt các liên kết này</span><p className="text-[11px] text-slate-500">On/Off từng variant vẫn chỉnh được ở bảng sau khi lưu.</p></div>
+          <ToggleSwitch
+            checked={isActive}
+            onChange={setIsActive}
+            variant="cyan"
+            size="md"
+          />
+        </div>
+      </form>
+    </BaseModal>
   );
 };

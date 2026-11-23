@@ -3,108 +3,111 @@ const EVENTS = require("../eventTypes");
 const { recordEvent } = require("../eventStoreService");
 const { db, TABLES, COLS } = require("@/db");
 
-async function syncWarehouseExpiryOnRenewal(data) {
-  try {
-    const orderCode = data.id_order || data.orderCode;
-    if (!orderCode || !String(orderCode).toUpperCase().startsWith("MAVN")) return;
+const O = COLS.ORDER_LIST;
+const A = COLS.ACCOUNTS;
+const S = COLS.ACCOUNT_SLOTS;
+const N = COLS.PRODUCT_NAMES;
+const P = COLS.PRODUCT;
+const V = COLS.VARIANT;
 
-    const newExpiredAt = data.newExpiredAt || data.expired_at;
-    if (!newExpiredAt) return;
+async function syncWarehouseExpiryOnRenewal(data, trx) {
+  const orderCode = data.id_order || data.orderCode;
+  if (!orderCode || !String(orderCode).toUpperCase().startsWith("MAVN")) return;
 
-    const order = await db(TABLES.ORDER_LIST).where({ id_order: orderCode }).first();
-    if (!order) return;
+  const newExpiredAt = data.newExpiredAt || data.expired_at;
+  if (!newExpiredAt) return;
 
-    const accountUsername = order.information_order 
-      ? String(order.information_order).trim().toLowerCase()
-      : (order.slot ? (order.slot.split('|')[0] || order.customer).trim().toLowerCase() : String(order.customer || "").trim().toLowerCase());
+  const order = await trx(TABLES.ORDER_LIST).where(O.ID_ORDER, orderCode).first();
+  if (!order) return;
 
-    if (!accountUsername) return;
+  const username = order[O.INFORMATION_ORDER] ||
+    order[O.SLOT]?.split("|")[0] || order[O.CUSTOMER];
+  const accountUsername = String(username || "").trim().toLowerCase();
+  if (!accountUsername) return;
 
-    let productName = order.information_order || "Dịch vụ";
-    if (order.id_product) {
-      try {
-        const variantRow = await db(TABLES.VARIANT)
-          .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.id`, `${TABLES.VARIANT}.${COLS.VARIANT.PRODUCT_ID || 'product_id'}`)
-          .select(
-            `${TABLES.VARIANT}.display_name as variant_display`,
-            `${TABLES.VARIANT}.variant_name as variant_name`,
-            `${TABLES.PRODUCT}.package_name as parent_package_name`
-          )
-          .where(`${TABLES.VARIANT}.id`, Number(order.id_product))
-          .first();
-
-        if (variantRow) {
-          productName = variantRow.parent_package_name || variantRow.variant_name || variantRow.variant_display || productName;
-        }
-      } catch (e) {
-        console.log("[WarehouseSync] Không resolve được sản phẩm chính khi gia hạn:", e.message);
-      }
-    }
-
-    // 1. Ensure product name exists in warehouse.product_names
-    let pName = await db(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(name) = ?", [productName.toLowerCase().trim()])
-      .first();
-
-    let nameId = pName?.id;
-    if (!nameId) {
-      const [insertedP] = await db(TABLES.PRODUCT_NAMES)
-        .insert({ name: productName.trim() })
-        .returning("id");
-      nameId = insertedP.id || insertedP;
-    }
-
-    // 2. Ensure stock (product_keys) exists for this account
-    let stock = await db(TABLES.PRODUCT_KEYS)
-      .whereRaw("LOWER(account_username) = ?", [accountUsername])
-      .first();
-
-    let stockId = stock?.id;
-    if (!stockId) {
-      const [newStock] = await db(TABLES.PRODUCT_KEYS)
-        .insert({
-          account_username: accountUsername,
-          created_at: new Date(),
-        })
-        .returning("*");
-      stockId = newStock.id;
-    }
-
-    // 3. Check if stock_service exists for this account_id and name_id
-    const existingService = await db(TABLES.STOCK_SERVICES)
-      .where({
-        account_id: stockId,
-        name_id: nameId,
+  let productName = order[O.INFORMATION_ORDER] || "Dịch vụ";
+  const variantId = Number(order[O.ID_PRODUCT]);
+  if (Number.isSafeInteger(variantId) && variantId > 0) {
+    const variant = await trx(TABLES.VARIANT)
+      .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.${P.ID}`, `${TABLES.VARIANT}.${V.PRODUCT_ID}`)
+      .select({
+        variantDisplay: `${TABLES.VARIANT}.${V.DISPLAY_NAME}`,
+        variantName: `${TABLES.VARIANT}.${V.VARIANT_NAME}`,
+        packageName: `${TABLES.PRODUCT}.${P.PACKAGE_NAME}`,
       })
+      .where(`${TABLES.VARIANT}.${V.ID}`, variantId)
       .first();
 
-    if (existingService) {
-      await db(TABLES.STOCK_SERVICES)
-        .where({ id: existingService.id })
-        .update({
-          expired_at: new Date(newExpiredAt),
-          status: "AVAILABLE",
-          updated_at: new Date(),
-        });
-      console.log(`✅ [WarehouseSync] Đã cập nhật và tái liên kết hạn kho cho tài khoản "${accountUsername}" - dịch vụ "${productName}" thành ${newExpiredAt}`);
-    } else {
-      await db(TABLES.STOCK_SERVICES).insert({
-        account_id: stockId,
-        name_id: nameId,
-        password: order.slot || null,
-        backup_email: "",
-        two_fa: null,
-        expired_at: new Date(newExpiredAt),
-        status: "AVAILABLE",
-        service_note: order.note || null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
-      console.log(`✅ [WarehouseSync] Đã tự động tạo mới dòng kho và liên kết cho tài khoản "${accountUsername}" - dịch vụ "${productName}" (Hạn: ${newExpiredAt})`);
-    }
-  } catch (err) {
-    console.error("❌ [WarehouseSync] Lỗi đồng bộ kho khi gia hạn đơn MAVN:", err);
+    productName = variant?.packageName || variant?.variantName || variant?.variantDisplay || productName;
   }
+  productName = productName.trim();
+
+  // Serialize lookups and inserts by normalized key, even when the row does not exist yet.
+  const normalizedProductName = productName.toLowerCase();
+  await trx.raw("SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))", [
+    TABLES.PRODUCT_NAMES, normalizedProductName,
+  ]);
+  await trx.raw("SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))", [
+    TABLES.PRODUCT_KEYS, accountUsername,
+  ]);
+
+  let product = await trx(TABLES.PRODUCT_NAMES)
+    .whereRaw("LOWER(??) = ?", [N.NAME, normalizedProductName])
+    .orderBy(N.ID)
+    .first();
+  if (!product) {
+    [product] = await trx(TABLES.PRODUCT_NAMES)
+      .insert({ [N.NAME]: productName })
+      .returning(N.ID);
+  }
+
+  const now = new Date();
+  let account = await trx(TABLES.PRODUCT_KEYS)
+    .whereRaw("LOWER(??) = ?", [A.ACCOUNT_USERNAME, accountUsername])
+    .orderBy(A.ID)
+    .first();
+  if (!account) {
+    [account] = await trx(TABLES.PRODUCT_KEYS)
+      .insert({ [A.ACCOUNT_USERNAME]: accountUsername, [A.CREATED_AT]: now })
+      .returning(A.ID);
+  }
+
+  const serviceKey = { [S.ACCOUNT_ID]: account[A.ID], [S.NAME_ID]: product[N.ID] };
+  const service = await trx(TABLES.STOCK_SERVICES)
+    .where(serviceKey)
+    .orderBy(S.ID)
+    .forUpdate()
+    .first();
+
+  const expiry = new Date(newExpiredAt);
+  if (!Number.isFinite(expiry.getTime())) throw new Error("Invalid renewal expiry");
+
+  if (service) {
+    const currentExpiry = new Date(service[S.EXPIRED_AT]).getTime();
+    if (service[S.EXPIRED_AT] != null && (
+      currentExpiry > expiry.getTime() ||
+      (currentExpiry === expiry.getTime() && service[S.STATUS] === "AVAILABLE")
+    )) return;
+
+    await trx(TABLES.STOCK_SERVICES).where(S.ID, service[S.ID]).update({
+      [S.EXPIRED_AT]: expiry,
+      [S.STATUS]: "AVAILABLE",
+      [S.UPDATED_AT]: now,
+    });
+    return;
+  }
+
+  await trx(TABLES.STOCK_SERVICES).insert({
+    ...serviceKey,
+    [S.PASSWORD]: order[O.SLOT] || null,
+    [S.BACKUP_EMAIL]: "",
+    [S.TWO_FA]: null,
+    [S.EXPIRED_AT]: expiry,
+    [S.STATUS]: "AVAILABLE",
+    [S.SERVICE_NOTE]: order[O.NOTE] || null,
+    [S.CREATED_AT]: now,
+    [S.UPDATED_AT]: now,
+  });
 }
 
 function registerOrderEventSubscribers() {
@@ -169,16 +172,20 @@ function registerOrderEventSubscribers() {
   });
 
   // Lắng nghe sự kiện Gia hạn hoàn tất (Webhook khớp gia hạn)
-  eventBus.on(EVENTS.ORDER_RENEWED, async (data) => {
+  eventBus.on(EVENTS.ORDER_RENEWED, async (data, context) => {
     console.log(`🔄 [EventSubscriber] Tiếp nhận event ORDER_RENEWED cho đơn #${data.orderId} (${data.id_order})`);
-    await recordEvent({
-      eventName: EVENTS.ORDER_RENEWED,
-      aggregateType: "ORDER",
-      aggregateId: data.orderId || data.id_order,
-      payload: data,
-      status: "PROCESSED",
-    });
-    await syncWarehouseExpiryOnRenewal(data);
+    const syncAndRecord = async (trx) => {
+      await syncWarehouseExpiryOnRenewal(data, trx);
+      await recordEvent({
+        eventName: EVENTS.ORDER_RENEWED,
+        aggregateType: "ORDER",
+        aggregateId: data.orderId || data.id_order,
+        payload: data,
+        status: "PROCESSED",
+      }, trx);
+    };
+    if (context?.trx) await syncAndRecord(context.trx);
+    else await db.transaction(syncAndRecord);
   });
 
   // Lắng nghe sự kiện Hủy đơn Đã Thanh Toán → Chờ Hoàn Tiền

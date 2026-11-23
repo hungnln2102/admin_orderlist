@@ -19,6 +19,7 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
     const originalConfig = await db(TABLES.SYSTEM_CONFIGS).where(COLS.SYSTEM_CONFIGS.CONFIG_KEY, configKey).first();
     let accountId;
     let mappingId;
+    let ambiguousMappingId;
     let creditDebtAssetId;
     let replayDebtAssetId;
     const debitSuffix = String(Date.now()).slice(-4);
@@ -59,6 +60,29 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
       assert.equal(manual.status, "MANUAL_REVIEW");
       const checkpoint = await db(TABLES.EMAIL_SYNC_CHECKPOINTS).where("mailbox_alias", "test.vpbank@gmail.com").first();
       assert.equal(Number(checkpoint.last_terminal_uid), 99902);
+
+      const fullAccountEmail = {
+        ...email,
+        uid: 99905,
+        text: email.text.replace("FT99901", "FT99905") + `\nDebit Account: ${debitAccountNumber}`,
+      };
+      const legacyMappingResult = await ingestEmailMessage(fullAccountEmail, { mailboxAlias: "test.vpbank@gmail.com" });
+      assert.equal(legacyMappingResult.status, "APPLIED");
+      const wrongAccount = await ingestEmailMessage({
+        ...fullAccountEmail,
+        uid: 99906,
+        text: fullAccountEmail.text.replace(debitAccountNumber, `92344541${debitSuffix}`),
+      }, { mailboxAlias: "test.vpbank@gmail.com" });
+      assert.equal(wrongAccount.failureCode, "UNMAPPED_BANK_INSTRUMENT");
+      const debitAccountAfter = await db(TABLES.FINANCIAL_ACCOUNTS).where("id", accountId).first();
+      assert.equal(Number(debitAccountAfter.balance), 7000000);
+
+      const [ambiguousMapping] = await db(TABLES.BANK_INSTRUMENT_MAPPINGS).insert({
+        provider: "VPBANK", instrument_kind: "DEBIT_CARD", masked_suffix: `*${debitSuffix}`, linked_financial_account_id: accountId, status: "ACTIVE",
+      }).returning("id");
+      ambiguousMappingId = ambiguousMapping.id || ambiguousMapping;
+      const ambiguous = await ingestEmailMessage({ ...email, uid: 99907 }, { mailboxAlias: "test.vpbank@gmail.com" });
+      assert.equal(ambiguous.failureCode, "AMBIGUOUS_BANK_INSTRUMENT");
 
       await ingestEmailMessage({ ...email, uid: 1, uidValidity: "test-uid-validity-2", from: "attacker@example.com" }, {
         mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity-2",
@@ -108,6 +132,25 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
       assert.equal(debtLog.reference_code, creditReference);
       assert.match(debtLog.note, /Hạn mức còn lại: 17[.]870[.]822 VND/);
 
+      const debtOptions = { mailboxAlias: "test.vpbank@gmail.com" };
+      const duplicateDebt = await ingestEmailMessage({ ...creditEmail, uid: 99908 }, debtOptions);
+      assert.equal(duplicateDebt.status, "APPLIED");
+      assert.equal(String(duplicateDebt.personalDebtPaymentLogId), String(debtLog.id));
+      const changedDebt = await ingestEmailMessage({
+        ...creditEmail,
+        uid: 99909,
+        text: creditEmail.text.replace("06/11/2026 13:13:37", "06/11/2026 13:14:37"),
+      }, debtOptions);
+      assert.equal(changedDebt.failureCode, "PERSONAL_DEBT_REFERENCE_CONFLICT");
+      const missingDebtReference = await ingestEmailMessage({
+        ...creditEmail,
+        uid: 99910,
+        text: creditEmail.text.replace(`\n${creditReference}\nMa giao dich / Transaction Code`, ""),
+      }, debtOptions);
+      assert.equal(missingDebtReference.failureCode, "PERSONAL_DEBT_REFERENCE_REQUIRED");
+      const debtAfterRetries = await db(TABLES.PERSONAL_ASSETS).where("id", creditDebtAssetId).first();
+      assert.equal(Number(debtAfterRetries.amount), 6631808);
+
       const replayEmail = { ...creditEmail, uid: 99904, text: creditEmail.text.replace(`*${creditSuffix}`, `*${replaySuffix}`).replace(creditReference, replayReference) };
       const awaitingMapping = await ingestEmailMessage(replayEmail, { mailboxAlias: "test.vpbank@gmail.com", uidValidity: "test-uid-validity-2" });
       assert.equal(awaitingMapping.status, "MANUAL_REVIEW");
@@ -119,6 +162,12 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
         card_last_digits: replaySuffix,
       }).returning("id");
       replayDebtAssetId = replayDebtAsset.id || replayDebtAsset;
+      const crossAssetCollision = await ingestEmailMessage({
+        ...creditEmail,
+        uid: 99911,
+        text: creditEmail.text.replace(`*${creditSuffix}`, `*${replaySuffix}`),
+      }, debtOptions);
+      assert.equal(crossAssetCollision.failureCode, "PERSONAL_DEBT_REFERENCE_CONFLICT");
       const replayed = await ingestEmailMessage(replayEmail, {
         mailboxAlias: "test.vpbank@gmail.com",
         uidValidity: "test-uid-validity-2",
@@ -128,13 +177,15 @@ if (!testDatabaseUrl || !/(^|[_-])test([_-]|$)/i.test(databaseName)) {
       const replayedAsset = await db(TABLES.PERSONAL_ASSETS).where("id", replayDebtAssetId).first();
       assert.equal(Number(replayedAsset.amount), 163550);
     } finally {
-      await db(TABLES.EMAIL_INGESTION_RECEIPTS).whereIn("email_uid", [99901, 99902, 99903, 99904, 1]).del();
+      await db(TABLES.EMAIL_INGESTION_RECEIPTS).where("mailbox_alias", "test.vpbank@gmail.com")
+        .whereIn("email_uid", [1, 99901, 99902, 99903, 99904, 99905, 99906, 99907, 99908, 99909, 99910, 99911]).del();
       if (creditDebtAssetId || replayDebtAssetId) {
         await db(TABLES.DEBT_PAYMENT_LOGS).whereIn("reference_code", [creditReference, replayReference]).del();
       }
       if (creditDebtAssetId) await db(TABLES.PERSONAL_ASSETS).where("id", creditDebtAssetId).del();
       if (replayDebtAssetId) await db(TABLES.PERSONAL_ASSETS).where("id", replayDebtAssetId).del();
       if (mappingId) await db(TABLES.BANK_INSTRUMENT_MAPPINGS).where("id", mappingId).del();
+      if (ambiguousMappingId) await db(TABLES.BANK_INSTRUMENT_MAPPINGS).where("id", ambiguousMappingId).del();
       if (accountId) {
         await db(TABLES.PERSONAL_DEBIT_TRANSACTION_LOGS).where("financial_account_id", accountId).del();
         await db(TABLES.FINANCIAL_ACCOUNT_LEDGER).where("financial_account_id", accountId).del();

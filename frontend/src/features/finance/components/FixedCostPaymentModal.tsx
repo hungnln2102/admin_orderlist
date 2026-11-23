@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FixedCost } from "../types";
 import { X, CreditCard, DollarSign, Calendar, FileText, CheckCircle2, Wallet, Receipt, AlertCircle, RefreshCw, Banknote } from "lucide-react";
 import { formatVND } from "@/shared/utils";
+import { CustomSelect } from "@/shared/components";
 
 interface Props {
   isOpen: boolean;
@@ -271,18 +272,18 @@ export const FixedCostPaymentModal: React.FC<Props> = ({
                   Không có biên lai tiền ra nào chưa phân bổ. Bạn có thể chọn "Trừ Số Dư Ví / TK" hoặc gán trực tiếp tại trang Biên Lai.
                 </div>
               ) : (
-                <select
-                  value={selectedReceiptId}
-                  onChange={(e) => selectReceipt(Number(e.target.value) || "")}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-cyan-300 font-semibold focus:outline-none focus:border-cyan-500 text-xs"
-                >
-                  <option value="">-- Chọn biên lai tiền ra --</option>
-                  {unallocatedReceipts.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      #{r.sepay_transaction_id || r.reference_code || r.id} • {formatVND(r.unallocated_amount ?? r.amount)} • {r.note || r.sender || "Tiền ra"}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={selectedReceiptId ? String(selectedReceiptId) : ""}
+                  onChange={(val) => selectReceipt(val ? Number(val) : "")}
+                  size="sm"
+                  accent="cyan"
+                  placeholder="-- Chọn biên lai tiền ra --"
+                  className="bg-slate-950/80 border-slate-800 font-semibold"
+                  options={unallocatedReceipts.map((r) => ({
+                    value: String(r.id),
+                    label: `#${r.sepay_transaction_id || r.reference_code || r.id} • ${formatVND(r.unallocated_amount ?? r.amount)} • ${r.note || r.sender || "Tiền ra"}`,
+                  }))}
+                />
               )}
             </div>
           )}
@@ -293,18 +294,18 @@ export const FixedCostPaymentModal: React.FC<Props> = ({
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 TÀI KHOẢN NGÂN HÀNG CHI TIỀN *
               </label>
-              <select
-                value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(Number(e.target.value) || "")}
-                className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-purple-300 font-semibold focus:outline-none focus:border-purple-500 text-xs"
-              >
-                <option value="">-- Chọn tài khoản ngân hàng --</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label} ({formatVND(a.balance || 0)})
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={selectedAccountId ? String(selectedAccountId) : ""}
+                onChange={(val) => setSelectedAccountId(val ? Number(val) : "")}
+                size="sm"
+                accent="purple"
+                placeholder="-- Chọn tài khoản ngân hàng --"
+                className="bg-slate-950/80 border-slate-800 font-semibold"
+                options={accounts.map((a) => ({
+                  value: String(a.id),
+                  label: `${a.label} (${formatVND(a.balance || 0)})`,
+                }))}
+              />
             </div>
           )}
 

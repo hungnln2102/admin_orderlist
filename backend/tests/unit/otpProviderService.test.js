@@ -3,6 +3,20 @@ require("module-alias/register");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const dns = require("node:dns");
+
+const productApiServicePath = require.resolve("../../src/domains/system/services/productApiService");
+const originalProductApiService = require.cache[productApiServicePath];
+require.cache[productApiServicePath] = {
+  id: productApiServicePath,
+  filename: productApiServicePath,
+  loaded: true,
+  exports: { findRoutingProviderForInput: async () => null },
+};
+
+test.after(() => {
+  if (originalProductApiService) require.cache[productApiServicePath] = originalProductApiService;
+  else delete require.cache[productApiServicePath];
+});
 const { executeOtpConfig, probeOtpForEmail } = require("../../src/domains/system/services/otpProviderService");
 const { listProviderCatalog } = require("../../src/domains/system/providers/registry");
 
@@ -122,7 +136,9 @@ test("FIX_ADES_STATUS posts email and returns the requested status fields", { co
   });
 });
 
-test("dispatcher classifies inactive organizationStatus as CẦN CHUYỂN TEAM", { concurrency: false }, async () => {
+test("dispatcher classifies inactive organizationStatus as CẦN CHUYỂN TEAM", { concurrency: false }, async (t) => {
+  t.mock.method(require("../../src/domains/system/services/productApiService"), "findRoutingProviderForInput",
+    async () => ({ provider_key: "fix_ades_status" }));
   const { dispatchSlotRequest } = require("../../src/domains/system/services/otpPortalDispatcher");
   await withMockedExternalFetch(async (url) => {
     assert.equal(String(url), "https://reseller.ado-besoft.com/api/user-status");
@@ -182,10 +198,25 @@ test("FIX_ADES_STATUS returns the upstream missing-subscription message", { conc
   });
 });
 
-test("provider catalog keeps Ades OTP and Fix-Ades status distinct", () => {
+test("provider catalog and name seed keep Ades OTP and Fix-Ades status distinct", async () => {
+  const migration = require("../../src/db/migrations/20261123000004_seed_provider_display_names");
+  let seededNames;
+  await migration.up({
+    withSchema: () => ({
+      table: () => ({
+        insert: (row) => {
+          seededNames = JSON.parse(row.config_value);
+          return { onConflict: () => ({ ignore: async () => {} }) };
+        },
+      }),
+    }),
+  });
   const catalog = listProviderCatalog();
-  assert.equal(catalog.find((provider) => provider.key === "ades")?.name, "Ades-otp");
-  assert.equal(catalog.find((provider) => provider.key === "fix_ades_status")?.name, "Fix-Ades");
+  assert.deepEqual(Object.keys(seededNames), catalog.map(({ key }) => key));
+  assert.equal(seededNames.ades, "Ades-otp");
+  assert.equal(seededNames.fix_ades_status, "Fix-Ades");
+  assert.equal(catalog.find((provider) => provider.key === "ades")?.name, "ades");
+  assert.equal(catalog.find((provider) => provider.key === "fix_ades_status")?.name, "fix_ades_status");
   assert.equal(catalog.find((provider) => provider.key === "vivarocky_signin")?.status, "READY");
 });
 
@@ -203,10 +234,12 @@ test("unsupported execution modes fail clearly", async () => {
   );
 });
 
-test("dispatcher uses the configured TOTP service instead of a slot-key bypass", { concurrency: false }, async () => {
+test("dispatcher uses the configured TOTP service without routing or echoing the secret", { concurrency: false }, async (t) => {
   const systemConfigService = require("../../src/domains/system/services/systemConfigService");
   const otpProviderService = require("../../src/domains/system/services/otpProviderService");
   const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
+  const productApiService = require("../../src/domains/system/services/productApiService");
+  const route = t.mock.method(productApiService, "findRoutingProviderForInput", async () => null);
   const originalGet = systemConfigService.get;
   const originalProbe = otpProviderService.probeOtpForEmail;
   const calls = [];
@@ -227,13 +260,26 @@ test("dispatcher uses the configured TOTP service instead of a slot-key bypass",
       slotKey: "two_factor_totp",
       input: "JBSWY3DPEHPK3PXP",
     });
-    assert.deepEqual(calls, [{ email: "JBSWY3DPEHPK3PXP", serviceKey: "totp" }]);
+    assert.deepEqual(calls, [{ email: "JBSWY3DPEHPK3PXP", serviceKey: "totp", requiredExecutionMode: "INTERNAL_TOTP" }]);
+    assert.equal(route.mock.callCount(), 0);
+    assert.equal(result.input, null);
     assert.equal(result.service_used, "totp");
     assert.equal(result.otp, "123456");
   } finally {
     systemConfigService.get = originalGet;
     otpProviderService.probeOtpForEmail = originalProbe;
   }
+});
+
+test("provider rejects a TOTP secret when the selected service is external", async () => {
+  await assert.rejects(
+    require("../../src/domains/system/services/otpProviderService").probeOtpForEmail({
+      email: "JBSWY3DPEHPK3PXP",
+      serviceKey: "yuna_2fa",
+      requiredExecutionMode: "INTERNAL_TOTP",
+    }),
+    /OTP_PROVIDER_EXECUTION_MODE_MISMATCH/
+  );
 });
 
 test("dispatcher rejects slots without a configured service chain", { concurrency: false }, async () => {
@@ -250,11 +296,36 @@ test("dispatcher rejects slots without a configured service chain", { concurrenc
   try {
     await assert.rejects(
       dispatcher.dispatchSlotRequest({ slotKey: "unconfigured", input: "user@example.com" }),
-      /OTP service chain is not configured/ 
+      /Không xác định được provider khớp cấu hình/
     );
   } finally {
     systemConfigService.get = originalGet;
   }
+});
+
+test("dispatcher requires a matching rule even when a legacy default or sole provider exists", { concurrency: false }, async (t) => {
+  const systemConfigService = require("../../src/domains/system/services/systemConfigService");
+  const otpProviderService = require("../../src/domains/system/services/otpProviderService");
+  const productApiService = require("../../src/domains/system/services/productApiService");
+  const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
+  const slot = { slot_key: "test_otp", name: "OTP", assigned_services: ["first", "second"] };
+  t.mock.method(systemConfigService, "get", () => [slot]);
+  const routing = t.mock.method(productApiService, "findRoutingProviderForInput", async () => null);
+  const probe = t.mock.method(otpProviderService, "probeOtpForEmail", async () => ({ found: false }));
+  const request = { slotKey: slot.slot_key, input: "user@example.test" };
+
+  await assert.rejects(dispatcher.dispatchSlotRequest(request), /Không xác định được provider/);
+  assert.equal(probe.mock.callCount(), 0);
+  slot.default_service_key = "second";
+  slot.assigned_services = ["second"];
+  await assert.rejects(dispatcher.dispatchSlotRequest(request), /Không xác định được provider/);
+  assert.equal(probe.mock.callCount(), 0);
+
+  routing.mock.mockImplementation(async () => ({ provider_key: "first" }));
+  probe.mock.mockImplementation(async () => { throw new Error("fixture provider error"); });
+  const matched = await dispatcher.dispatchSlotRequest(request);
+  assert.deepEqual(matched.attempted_services, ["first"]);
+  assert.deepEqual(probe.mock.calls.map(({ arguments: [payload] }) => payload.serviceKey), ["first"]);
 });
 
 
@@ -265,31 +336,15 @@ test("probe requires an explicit service key and does not fall back to HDSD", as
   );
 });
 
-test("registering a new portal slot does not inject vendor fallback services", async () => {
-  const systemConfigService = require("../../src/domains/system/services/systemConfigService");
-  const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
-  const originalGet = systemConfigService.get;
-  const originalSet = systemConfigService.set;
-  let savedValue = null;
-  systemConfigService.get = () => JSON.stringify([]);
-  systemConfigService.set = async (_key, value) => {
-    savedValue = JSON.parse(value);
-  };
+test("public OTP router exposes slot reads only", () => {
+  const router = require("../../src/domains/system/routes/publicOtpRoutes");
+  const routes = router.stack
+    .map((layer) => layer.route)
+    .filter((route) => [route?.path].flat().some((path) => path?.startsWith("/otp-portal-slots")));
 
-  try {
-    const slots = await dispatcher.registerSlotsFromPortal([{
-      slot_key: "new_unconfigured_slot",
-      name: "New slot",
-      enabled: true,
-    }]);
-    const created = slots.find((slot) => slot.slot_key === "new_unconfigured_slot");
-    assert.deepEqual(created.assigned_services, []);
-    assert.equal(created.primary_service_key, null);
-    assert.ok(savedValue.some((slot) => slot.slot_key === "new_unconfigured_slot"));
-  } finally {
-    systemConfigService.get = originalGet;
-    systemConfigService.set = originalSet;
-  }
+  assert.equal(routes.length, 1);
+  assert.equal(routes[0].path, "/otp-portal-slots");
+  assert.deepEqual(Object.keys(routes[0].methods), ["get"]);
 });
 
 
@@ -336,7 +391,9 @@ test("PACKAGE_WAREHOUSE_ACCOUNT cấp và trả thông tin tài khoản từ mã
     activationKeyService.activateKeyWithTransaction = originalActivate;
   }
 });
-test("dispatcher trả dữ liệu tài khoản từ provider Kho Gói Sản Phẩm", { concurrency: false }, async () => {
+test("dispatcher trả dữ liệu tài khoản từ provider Kho Gói Sản Phẩm", { concurrency: false }, async (t) => {
+  t.mock.method(require("../../src/domains/system/services/productApiService"), "findRoutingProviderForInput",
+    async () => ({ provider_key: "package_warehouse" }));
   const systemConfigService = require("../../src/domains/system/services/systemConfigService");
   const otpProviderService = require("../../src/domains/system/services/otpProviderService");
   const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");

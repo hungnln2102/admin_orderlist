@@ -6,12 +6,12 @@ class EventBus extends EventEmitter {
     this.setMaxListeners(30);
   }
 
-  async emitAsync(eventName, payload) {
+  async emitAsync(eventName, payload, context) {
     const listeners = this.listeners(eventName);
     const results = [];
 
     for (const listener of listeners) {
-      results.push(await listener(payload));
+      results.push(await listener(payload, context));
     }
 
     return results;

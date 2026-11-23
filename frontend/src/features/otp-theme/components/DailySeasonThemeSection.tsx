@@ -1,5 +1,6 @@
 import React from "react";
 import { Sun, Sparkles, CheckCircle2, ShieldCheck, CalendarRange } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { ThemeScheduleConfig } from "../../../shared/utils/themeSchedule";
 import { ThemeItem } from "../types";
 
@@ -139,18 +140,18 @@ export const DailySeasonThemeSection: React.FC<DailySeasonThemeSectionProps> = (
               <ShieldCheck className="w-4 h-4 text-cyan-400" />
               Theme Cố Định Được Áp Dụng Cho Mọi Ngày Thường:
             </span>
-            <div className="flex items-center gap-2">
-              <select
+            <div className="w-56">
+              <CustomSelect
                 value={schedule.defaultTheme}
-                onChange={(e) => setSchedule((curr) => ({ ...curr, defaultTheme: e.target.value }))}
-                className="rounded-lg border border-cyan-500/60 bg-slate-900 px-3 py-1.5 text-xs font-bold text-cyan-300 focus:outline-none shadow-inner"
-              >
-                {themesList.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.icon} {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSchedule((curr) => ({ ...curr, defaultTheme: val }))}
+                size="sm"
+                accent="cyan"
+                className="bg-slate-900 font-bold"
+                options={themesList.map((t) => ({
+                  value: t.id,
+                  label: `${t.icon} ${t.name}`,
+                }))}
+              />
             </div>
           </div>
           <p className="text-[11px] text-slate-400">
@@ -253,22 +254,22 @@ export const DailySeasonThemeSection: React.FC<DailySeasonThemeSectionProps> = (
 
                 <div>
                   <span className="text-[9px] text-slate-400 block mb-0.5">Theme áp dụng cho mùa:</span>
-                  <select
+                  <CustomSelect
                     value={rule.theme}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setSchedule((curr) => ({
                         ...curr,
-                        seasonRules: curr.seasonRules.map((r) => (r.id === rule.id ? { ...r, theme: e.target.value } : r)),
+                        seasonRules: curr.seasonRules.map((r) => (r.id === rule.id ? { ...r, theme: val } : r)),
                       }))
                     }
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-white font-semibold focus:outline-none focus:border-cyan-500"
-                  >
-                    {themesList.map((theme) => (
-                      <option key={theme.id} value={theme.id}>
-                        {theme.icon} {theme.name}
-                      </option>
-                    ))}
-                  </select>
+                    size="sm"
+                    accent="cyan"
+                    className="bg-slate-900 font-semibold"
+                    options={themesList.map((theme) => ({
+                      value: theme.id,
+                      label: `${theme.icon} ${theme.name}`,
+                    }))}
+                  />
                 </div>
               </div>
             );

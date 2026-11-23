@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, KeyRound, Sparkles, Loader2, Info } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { CatalogProductOption, CreateActivationKeyPayload } from "../types";
 
 interface Props {
@@ -16,7 +17,6 @@ export const CreateActivationKeyModal: React.FC<Props> = ({
   products,
 }) => {
   const [formData, setFormData] = useState<CreateActivationKeyPayload>({
-    prefix: "GPT",
     product_name_id: products[0]?.id || 0,
     quantity: 1,
     id_order: "",
@@ -49,25 +49,6 @@ export const CreateActivationKeyModal: React.FC<Props> = ({
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleProductSelect = (id: number) => {
-    const selected = products.find((p) => p.id === id);
-    let autoPrefix = "GPT";
-    if (selected) {
-      const n = selected.name.toUpperCase();
-      if (n.includes("GPT") || n.includes("CHAT")) autoPrefix = "GPT";
-      else if (n.includes("NETFLIX")) autoPrefix = "NFLX";
-      else if (n.includes("ADOBE")) autoPrefix = "ADBE";
-      else if (n.includes("CLAUDE")) autoPrefix = "CLD";
-      else autoPrefix = n.substring(0, 4).replace(/[^A-Z0-9]/g, "") || "KEY";
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      product_name_id: id,
-      prefix: autoPrefix,
-    }));
   };
 
   return (
@@ -107,54 +88,33 @@ export const CreateActivationKeyModal: React.FC<Props> = ({
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
               Sản Phẩm Áp Dụng <span className="text-rose-400">*</span>
             </label>
-            <select
-              value={formData.product_name_id}
-              onChange={(e) => handleProductSelect(Number(e.target.value))}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 transition-colors"
-            >
-              <option value={0} disabled>-- Chọn sản phẩm kho --</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              value={formData.product_name_id ? String(formData.product_name_id) : ""}
+              onChange={(val) => setFormData({ ...formData, product_name_id: Number(val) || 0 })}
+              accent="cyan"
+              placeholder="-- Chọn sản phẩm kho --"
+              className="bg-slate-950 border-slate-800"
+              options={products.map((p) => ({
+                value: String(p.id),
+                label: p.name,
+              }))}
+            />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Tiền tố mã (Prefix) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Tiền Tố (Prefix)
-              </label>
-              <input
-                type="text"
-                value={formData.prefix}
-                onChange={(e) =>
-                  setFormData({ ...formData, prefix: e.target.value.toUpperCase() })
-                }
-                placeholder="VD: GPT, NFLX..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 font-mono uppercase focus:outline-none focus:border-cyan-500 transition-colors"
-              />
-            </div>
-
-            {/* Số lượng mã sinh ra */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Số Lượng Key
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-cyan-500 transition-colors"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Số Lượng Key
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={formData.quantity}
+              onChange={(e) =>
+                setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })
+              }
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-cyan-500 transition-colors"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -208,7 +168,7 @@ export const CreateActivationKeyModal: React.FC<Props> = ({
               Định dạng mẫu:
             </span>
             <span className="font-mono font-bold text-white">
-              {formData.prefix || "KEY"}-A8F291-C4092E
+              MAVKEYA8F291
             </span>
           </div>
 

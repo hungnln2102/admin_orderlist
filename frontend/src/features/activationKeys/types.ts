@@ -1,4 +1,4 @@
-export type ActivationKeyStatus = "AVAILABLE" | "ACTIVATED" | "REVOKED" | "EXPIRED";
+export type ActivationKeyStatus = "INACTIVE" | "ACTIVATED" | "REVOKED" | "EXPIRED";
 
 export interface ActivationKeyItem {
   id: number;
@@ -22,14 +22,13 @@ export interface ActivationKeyItem {
 
 export interface ActivationKeyCounts {
   total: number;
-  available: number;
+  inactive: number;
   activated: number;
   revoked: number;
   expired: number;
 }
 
 export interface CreateActivationKeyPayload {
-  prefix?: string;
   product_name_id: number;
   product_id?: number | null;
   id_order?: string;

@@ -8,7 +8,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { DateInputVN } from "@/shared/components";
+import { CustomSelect, DateInputVN } from "@/shared/components";
 import { PaymentAccount, StoreExpenseItem, ExpenseFormData } from "../types";
 
 interface ExternalImportEditModalProps {
@@ -92,21 +92,23 @@ export const ExternalImportEditModal: React.FC<ExternalImportEditModalProps> = (
           {/* Tài khoản chi */}
           <div>
             <label className="block text-slate-400 mb-1 font-semibold">Tài Khoản Chi Tiền (Khấu Trừ Số Dư)</label>
-            <select
+            <CustomSelect
               value={formData.shop_bank_account_id}
-              onChange={(e) => setFormData((prev) => ({ ...prev, shop_bank_account_id: e.target.value }))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500 cursor-pointer"
-            >
-              <option value="">💵 Tiền mặt / Ví cá nhân (Không tính biến động tháng của Shop)</option>
-              {accounts.map((acc) => {
-                const isShop = acc.accountScope === "SHOP";
-                return (
-                  <option key={acc.id} value={acc.id}>
-                    {isShop ? "🏦" : "💼"} {acc.bankShortCode || acc.label} — {acc.accountNumber} ({formatVND(acc.balance)}) {isShop ? "[Tài Khoản Shop: Có Biến Động Tháng]" : "[Ví Cá Nhân: Không Biến Động]"}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={(val) => setFormData((prev) => ({ ...prev, shop_bank_account_id: val }))}
+              size="sm"
+              accent="cyan"
+              className="bg-slate-800 border-slate-700"
+              options={[
+                { value: "", label: "💵 Tiền mặt / Ví cá nhân (Không tính biến động tháng của Shop)" },
+                ...accounts.map((acc) => {
+                  const isShop = acc.accountScope === "SHOP";
+                  return {
+                    value: String(acc.id),
+                    label: `${isShop ? "🏦" : "💼"} ${acc.bankShortCode || acc.label} — ${acc.accountNumber} (${formatVND(acc.balance)}) ${isShop ? "[Tài Khoản Shop: Có Biến Động Tháng]" : "[Ví Cá Nhân: Không Biến Động]"}`,
+                  };
+                }),
+              ]}
+            />
 
             <div className="mt-2 p-2 rounded-xl border text-[11px] space-y-1 bg-slate-950/60 border-slate-800">
               {selectedAccount?.accountScope === "SHOP" ? (

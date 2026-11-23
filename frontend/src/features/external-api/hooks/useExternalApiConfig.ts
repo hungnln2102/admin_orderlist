@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNotification } from "@/shared/context/NotificationContext";
-import { externalApiClient } from "@/features/external-api/api/externalApiClient";
+import { externalApiClient, type PortalSlotChange } from "@/features/external-api/api/externalApiClient";
 import type {
   PortalSlotItem,
   PortalSlotRoutingRule,
@@ -12,6 +12,7 @@ import type {
 export interface Provider {
   key: string;
   name: string;
+  displayName?: string | null;
   category: string;
   description: string;
   input: string;
@@ -42,7 +43,9 @@ export function useExternalApiConfig() {
   const [supplierVariants, setSupplierVariants] = useState<SupplierVariantOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [savingSlots, setSavingSlots] = useState(false);
+  const [updatingSlot, setUpdatingSlot] = useState(false);
+  const [removingSlotProvider, setRemovingSlotProvider] = useState<{ slotKey: string; serviceKey: string } | null>(null);
+  const slotWriteInProgress = useRef(false);
 
   // Search & Filter States
   const [providerSearch, setProviderSearch] = useState("");
@@ -51,6 +54,7 @@ export function useExternalApiConfig() {
   const [productFilter, setProductFilter] = useState<"ALL" | "ASSIGNED" | "UNASSIGNED">("ALL");
 
   const load = async (isManualRefresh = false) => {
+    if (isManualRefresh && slotWriteInProgress.current) return;
     if (isManualRefresh) {
       setRefreshing(true);
     } else {
@@ -59,7 +63,7 @@ export function useExternalApiConfig() {
 
     try {
       const [providerResponse, mappingResponse, slotResponse, ruleResponse] = await Promise.all([
-        fetch("/api/system/providers", { credentials: "include" }).then((response) => response.json()),
+        externalApiClient.getProviders().then((response) => response.json()),
         externalApiClient.getProductApis().then((response) => response.json()),
         externalApiClient.getPortalSlots().then((response) => response.json()),
         externalApiClient
@@ -78,7 +82,7 @@ export function useExternalApiConfig() {
       setSuppliers(ruleResponse.suppliers || []);
       setSupplierVariants(ruleResponse.supplierVariants || []);
       const loadedSlots = (slotResponse.slots || []).map((slot: PortalSlotItem) => {
-        const assigned = Array.isArray(slot.assigned_services) && slot.assigned_services.length > 0
+        const assigned = Array.isArray(slot.assigned_services)
           ? slot.assigned_services
           : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
         return {
@@ -178,6 +182,24 @@ export function useExternalApiConfig() {
     }
   };
 
+  const renameProvider = async (key: string, displayName: string | null) => {
+    try {
+      const response = await externalApiClient.updateProviderDisplayName(key, displayName);
+      const data = await response.json();
+      if (!response.ok || data.success !== true || data.provider?.key !== key) {
+        throw new Error(data.error || "Không thể đổi tên hiển thị của cổng.");
+      }
+      setProviders((current) => current.map((provider) =>
+        provider.key === key ? { ...provider, ...data.provider } : provider
+      ));
+      showToast("success", "Đã cập nhật tên hiển thị của cổng.");
+      return true;
+    } catch (error: unknown) {
+      showToast("error", error instanceof Error ? error.message : "Không thể đổi tên hiển thị của cổng.");
+      return false;
+    }
+  };
+
   const setDefaultProvider = async (mappingId: number) => {
     try {
       const response = await externalApiClient.setDefaultProductApi(mappingId);
@@ -206,131 +228,61 @@ export function useExternalApiConfig() {
     }
   };
 
-  const addServiceToSlot = (slotKey: string, serviceKey: string) => {
-    if (!serviceKey) return;
-    setSlots((current) =>
-      current.map((slot) => {
-        if (slot.slot_key !== slotKey) return slot;
-        const currentAssigned = Array.isArray(slot.assigned_services)
-          ? [...slot.assigned_services]
-          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
-
-        if (currentAssigned.includes(serviceKey)) return slot;
-        const newAssigned = [...currentAssigned, serviceKey];
-        return {
-          ...slot,
-          assigned_services: newAssigned,
-          primary_service_key: newAssigned[0],
-          fallback_service_key: newAssigned[1] || null,
-        };
-      })
-    );
-  };
-
-  const removeServiceFromSlot = (slotKey: string, serviceKey: string) => {
-    setSlots((current) =>
-      current.map((slot) => {
-        if (slot.slot_key !== slotKey) return slot;
-        const currentAssigned = Array.isArray(slot.assigned_services)
-          ? [...slot.assigned_services]
-          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
-
-        const newAssigned = currentAssigned.filter((k) => k !== serviceKey);
-        return {
-          ...slot,
-          assigned_services: newAssigned,
-          primary_service_key: newAssigned[0] || undefined,
-          fallback_service_key: newAssigned[1] || null,
-        };
-      })
-    );
-  };
-
-  const moveServiceInSlot = (slotKey: string, fromIndex: number, toIndex: number) => {
-    setSlots((current) =>
-      current.map((slot) => {
-        if (slot.slot_key !== slotKey) return slot;
-        const currentAssigned = Array.isArray(slot.assigned_services)
-          ? [...slot.assigned_services]
-          : [slot.primary_service_key, slot.fallback_service_key].filter((k): k is string => Boolean(k));
-
-        if (fromIndex < 0 || fromIndex >= currentAssigned.length || toIndex < 0 || toIndex >= currentAssigned.length) {
-          return slot;
-        }
-
-        const newAssigned = [...currentAssigned];
-        const [moved] = newAssigned.splice(fromIndex, 1);
-        newAssigned.splice(toIndex, 0, moved);
-
-        return {
-          ...slot,
-          assigned_services: newAssigned,
-          primary_service_key: newAssigned[0],
-          fallback_service_key: newAssigned[1] || null,
-        };
-      })
-    );
-  };
-
-  const toggleSlotEnabled = (slotKey: string, enabled: boolean) => {
-    setSlots((current) =>
-      current.map((slot) => {
-        if (slot.slot_key !== slotKey) return slot;
-        return { ...slot, enabled };
-      })
-    );
-  };
-
-  const updateSlot = (
-    slotKey: string,
-    field: "primary_service_key" | "fallback_service_key",
-    value: string
-  ) => {
-    setSlots((current) =>
-      current.map((slot) => {
-        if (slot.slot_key !== slotKey) return slot;
-
-        if (field === "primary_service_key") {
-          const newPrimary = value || undefined;
-          const assigned = [
-            value,
-            ...(slot.fallback_service_key && slot.fallback_service_key !== value ? [slot.fallback_service_key] : []),
-          ].filter((item): item is string => Boolean(item));
-
-          return {
-            ...slot,
-            primary_service_key: newPrimary,
-            assigned_services: assigned,
-          };
-        } else {
-          const newFallback = value || null;
-          const assigned = [slot.primary_service_key, value].filter((item): item is string => Boolean(item));
-
-          return {
-            ...slot,
-            fallback_service_key: newFallback,
-            assigned_services: assigned,
-          };
-        }
-      })
-    );
-  };
-
-  const saveSlots = async () => {
-    setSavingSlots(true);
+  const removeServiceFromSlot = async (slotKey: string, serviceKey: string) => {
+    if (slotWriteInProgress.current || refreshing) return;
+    slotWriteInProgress.current = true;
+    setRemovingSlotProvider({ slotKey, serviceKey });
     try {
-      const response = await externalApiClient.savePortalSlots({ value: JSON.stringify(slots) });
+      const response = await externalApiClient.removePortalSlotProvider(slotKey, serviceKey);
       const data = await response.json();
-      if (!response.ok || data.success === false) {
-        throw new Error(data.error || "Không thể lưu mapping ô input.");
+      if (!response.ok || data.success !== true) {
+        throw new Error(data.error || "Không thể gỡ cổng xử lý.");
       }
-      showToast("success", "Đã lưu thành công cấu hình cổng OTP.");
-    } catch (error: any) {
-      showToast("error", error.message || "Không thể lưu mapping ô input.");
+      setSlots((current) => current.map((slot) => {
+        if (slot.slot_key !== slotKey) return slot;
+        return {
+          ...slot,
+          assigned_services: slot.assigned_services?.filter((key) => key !== serviceKey),
+          primary_service_key: slot.primary_service_key === serviceKey ? undefined : slot.primary_service_key,
+          fallback_service_key: slot.fallback_service_key === serviceKey ? null : slot.fallback_service_key,
+        };
+      }));
+      showToast("success", "Đã gỡ cổng xử lý khỏi ô nhập.");
+    } catch (error: unknown) {
+      showToast("error", error instanceof Error ? error.message : "Không thể gỡ cổng xử lý.");
     } finally {
-      setSavingSlots(false);
+      slotWriteInProgress.current = false;
+      setRemovingSlotProvider(null);
     }
   };
+
+  const updateSlot = async (slotKey: string, change: PortalSlotChange) => {
+    if (slotWriteInProgress.current || refreshing) return;
+    slotWriteInProgress.current = true;
+    setUpdatingSlot(true);
+    try {
+      const response = await externalApiClient.updatePortalSlot(slotKey, change);
+      const data = await response.json();
+      const failureMessage = "Không thể cập nhật cấu hình cổng OTP.";
+      if (!response.ok || data.success !== true || data.slot?.slot_key !== slotKey) {
+        throw new Error(data.error || failureMessage);
+      }
+      const updatedSlot: PortalSlotItem = data.slot;
+      setSlots((current) => current.map((slot) => slot.slot_key === slotKey ? updatedSlot : slot));
+      showToast("success", "Đã cập nhật cấu hình cổng OTP.");
+    } catch (error: unknown) {
+      showToast("error", error instanceof Error ? error.message : "Không thể cập nhật cấu hình cổng OTP.");
+    } finally {
+      slotWriteInProgress.current = false;
+      setUpdatingSlot(false);
+    }
+  };
+
+  const addServiceToSlot = (slotKey: string, serviceKey: string) =>
+    updateSlot(slotKey, { action: "addProvider", serviceKey });
+
+  const toggleSlotEnabled = (slotKey: string, enabled: boolean) =>
+    updateSlot(slotKey, { action: "setEnabled", enabled });
 
   // CRUD Routing Rules (Phương Án A)
   const createRoutingRule = async (ruleData: {
@@ -519,16 +471,15 @@ export function useExternalApiConfig() {
     availableApis,
     assignProvider,
     setDefaultProvider,
+    renameProvider,
     removeMapping,
 
     slots,
-    updateSlot,
     addServiceToSlot,
     removeServiceFromSlot,
-    moveServiceInSlot,
     toggleSlotEnabled,
-    saveSlots,
-    savingSlots,
+    updatingSlot,
+    removingSlotProvider,
 
     routingRules,
     suppliers,

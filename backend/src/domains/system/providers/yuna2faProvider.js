@@ -43,7 +43,7 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
  * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
  * - Hoặc tra cứu mã 2FA từ secret (get_manual)
  */
-async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = {}) {
+async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, orderOnly = false } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
   const query = String(queryInput).trim();
 
@@ -57,7 +57,7 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
     }
 
     const form = new URLSearchParams();
-    const isBase32Secret = /^[A-Z2-7]{16,32}$/i.test(query);
+    const isBase32Secret = !orderOnly && /^[A-Z2-7]{16,32}$/i.test(query);
 
     if (isBase32Secret) {
       form.append("action", "get_manual");

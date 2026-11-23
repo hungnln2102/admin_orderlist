@@ -187,6 +187,7 @@ const COLS = {
     WAS_PAID: "was_paid",
     CREDIT_PAID_AMOUNT: "credit_paid_amount",
     CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
   },
   ACCOUNTS: {
     ID: "id",

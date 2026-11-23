@@ -22,6 +22,9 @@ const { processOutboundReceiptInTrx } = require("./webhookOutboundReceiptService
 const { processInboundReceiptInTrx } = require("./webhookInboundOrderService");
 
 const getReceiptTable = (trx = db) => trx(TABLES.PAYMENT_RECEIPT);
+const R = COLS.PAYMENT_RECEIPT;
+const L = COLS.FINANCIAL_ACCOUNT_LEDGER;
+const normalizeAccountNumber = (value) => String(value || "").replace(/\s+/g, "");
 
 
 /**
@@ -74,15 +77,70 @@ async function processPaymentWebhook(payload = {}) {
     amount: transferAmount,
     status: receipt.status,
   });
+  const handleExistingReceipt = (existing) => {
+    if (!isOutbound || existing[R.TRANSFER_TYPE] !== TRANSFER_TYPE.OUT) {
+      return toDuplicateResult(existing);
+    }
+
+    return withTransaction(async (trx) => {
+      const receipt = await getReceiptTable(trx)
+        .where(R.SEPAY_TRANSACTION_ID, bankTransactionId)
+        .forUpdate()
+        .first();
+      if (!receipt) return toDuplicateResult(existing);
+
+      const accountNumber = normalizeAccountNumber(receipt[R.SENDER]);
+      if (
+        receipt[R.TRANSFER_TYPE] !== TRANSFER_TYPE.OUT
+        || receipt[R.STATUS] !== RECEIPT_STATUS.UNALLOCATED
+        || receipt[R.FINANCIAL_ACCOUNT_ID] != null
+        || receipt[R.SHOP_OUT_EXPENSE_ID] != null
+        || Number(receipt[R.AMOUNT]) !== transferAmount
+        || Number(receipt[R.UNALLOCATED_AMOUNT]) !== transferAmount
+        || !accountNumber
+        || accountNumber !== normalizeAccountNumber(payload.accountNumber)
+        || String(receipt[R.GATEWAY]).toUpperCase() !== String(gateway).toUpperCase()
+      ) return toDuplicateResult(receipt);
+
+      const receiptId = receipt[R.ID];
+      const ledger = await trx(TABLES.FINANCIAL_ACCOUNT_LEDGER)
+        .where(L.REFERENCE_TYPE, "payment_receipt")
+        .whereIn(L.REFERENCE_ID, [bankTransactionId, `receipt:${receiptId}`, String(receiptId)])
+        .first(L.ID);
+      if (ledger) return toDuplicateResult(receipt);
+
+      const payment = await processOutboundReceiptInTrx({
+        trx, payload: { accountNumber }, receipt, receiptId, transferAmount, bankTransactionId,
+        gateway: receipt[R.GATEWAY], noteContent: receipt[R.NOTE], isReplay: true,
+      });
+      if (payment.reason === "ACCOUNT_NOT_RESOLVED" || payment.reason === "DEBIT_NOT_APPLIED") {
+        return toDuplicateResult(receipt);
+      }
+
+      const afterState = await getReceiptTable(trx).where(R.ID, receiptId).first();
+      await publishEventInTrx(trx, {
+        eventName: EVENTS.PAYMENT_RECEIPT_MUTATED,
+        aggregateType: "PAYMENT_RECEIPT",
+        aggregateId: receiptId,
+        action: "WEBHOOK_OUT_REPLAYED",
+        beforeState: receipt,
+        afterState,
+        source: "PAYMENT_WEBHOOK",
+        idempotencyKey: `webhook-out-replay:${receiptId}`,
+        payload: { receiptId, amount: transferAmount, transferType: TRANSFER_TYPE.OUT, status: afterState[R.STATUS] },
+      });
+      return { ...payment, replayed: true };
+    });
+  };
 
   // 1. Kiểm tra trùng lặp (Idempotency check)
   if (bankTransactionId) {
     const existing = await getReceiptTable()
-      .where("sepay_transaction_id", bankTransactionId)
+      .where(R.SEPAY_TRANSACTION_ID, bankTransactionId)
       .first();
 
     if (existing) {
-      return toDuplicateResult(existing);
+      return handleExistingReceipt(existing);
     }
   }
 
@@ -148,8 +206,8 @@ async function processPaymentWebhook(payload = {}) {
     });
   } catch (error) {
     if (bankTransactionId && error?.code === "23505") {
-      const existing = await getReceiptTable().where("sepay_transaction_id", bankTransactionId).first();
-      if (existing) return toDuplicateResult(existing);
+      const existing = await getReceiptTable().where(R.SEPAY_TRANSACTION_ID, bankTransactionId).first();
+      if (existing) return handleExistingReceipt(existing);
     }
     throw error;
   }

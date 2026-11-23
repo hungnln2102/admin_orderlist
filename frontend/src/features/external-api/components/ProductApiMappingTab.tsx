@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ToggleSwitch } from "@/shared/components";
+import { CustomSelect, ToggleSwitch } from "@/shared/components";
 import {
   Search,
   Plus,
@@ -278,18 +278,22 @@ export const ProductApiMappingTab: React.FC<ProductApiMappingTabProps> = ({
         {/* Filter Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Filter theo Ô Input */}
-          <select
-            value={selectedSlotFilter}
-            onChange={(e) => setSelectedSlotFilter(e.target.value)}
-            className="text-xs font-semibold bg-slate-950 border border-slate-700 hover:border-cyan-500/60 text-slate-200 rounded-xl px-3 py-1.5 outline-none focus:ring-1 focus:ring-cyan-500 transition-all cursor-pointer"
-          >
-            <option value="ALL">Tất cả Ô Input ({slots.length})</option>
-            {slots.map((slot) => (
-              <option key={slot.slot_key} value={slot.slot_key}>
-                {slot.name} ({slot.slot_key})
-              </option>
-            ))}
-          </select>
+          <div className="w-full sm:w-56">
+            <CustomSelect
+              value={selectedSlotFilter}
+              onChange={setSelectedSlotFilter}
+              size="sm"
+              accent="cyan"
+              className="bg-slate-950 font-semibold"
+              options={[
+                { value: "ALL", label: `Tất cả Ô Input (${slots.length})` },
+                ...slots.map((slot) => ({
+                  value: slot.slot_key,
+                  label: `${slot.name} (${slot.slot_key})`,
+                })),
+              ]}
+            />
+          </div>
 
           {/* Status Filter Chips */}
           <div className="flex items-center gap-1">

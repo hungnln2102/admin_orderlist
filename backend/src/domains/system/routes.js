@@ -3,7 +3,7 @@ const router = express.Router();
 const systemConfigService = require("./services/systemConfigService");
 const cronJobService = require("./services/cronJobService");
 const systemLogService = require("./services/systemLogService");
-const { listProviderCatalog } = require("./providers/registry");
+const { getProviderCatalogEntry, listProviderCatalog, PROVIDER_KEYS } = require("./providers/registry");
 const otpProviderService = require("./services/otpProviderService");
 const totpController = require("./controllers/totpController");
 const productApiController = require("./controllers/productApiController");
@@ -42,6 +42,27 @@ router.put("/configs/:key", async (req, res) => {
   } catch (err) {
     console.error(`[System API] Lỗi cập nhật cấu hình ${req.params.key}:`, err);
     res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật cấu hình.") });
+  }
+});
+
+router.patch("/configs/otp-portal-slots/:slotKey", async (req, res) => {
+  try {
+    const updatedBy = req.session?.user?.username || "ADMIN";
+    const slot = await systemConfigService.patchOtpSlot(req.params.slotKey, req.body, updatedBy);
+    res.json({ success: true, slot });
+  } catch (err) {
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể cập nhật ô OTP.") });
+  }
+});
+
+router.delete("/configs/otp-portal-slots/:slotKey/providers/:serviceKey", async (req, res) => {
+  try {
+    const { slotKey, serviceKey } = req.params;
+    const updatedBy = req.session?.user?.username || "ADMIN";
+    await systemConfigService.removeOtpSlotProvider(slotKey, serviceKey, updatedBy);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể gỡ cổng OTP.") });
   }
 });
 
@@ -142,9 +163,29 @@ router.get("/audit-logs/:id", async (req, res) => {
 // EXTERNAL APIS & OTP SERVICES
 // ==========================================
 
-// GET /api/system/providers - Danh mục provider hard-code
+// GET /api/system/providers - Danh mục provider
 router.get("/providers", (_req, res) => {
   res.json({ success: true, providers: listProviderCatalog() });
+});
+
+router.patch("/providers/:key/display-name", async (req, res) => {
+  const { key } = req.params;
+  const { displayName } = req.body || {};
+  if (!PROVIDER_KEYS.includes(key)) {
+    return res.status(404).json({ error: "Không tìm thấy provider." });
+  }
+  const name = typeof displayName === "string" ? displayName.trim().normalize("NFC") : displayName;
+  if (name !== null && (typeof name !== "string" || !name || [...name].length > 80 ||
+      /[\p{Cc}\p{Zl}\p{Zp}]/u.test(displayName))) {
+    return res.status(400).json({ error: "Tên hiển thị phải có từ 1 đến 80 ký tự trên một dòng." });
+  }
+  try {
+    await systemConfigService.setProviderDisplayName(key, name, req.session?.user?.username || "ADMIN");
+    res.json({ success: true, provider: getProviderCatalogEntry(key) });
+  } catch (err) {
+    console.error("[System API] Lỗi cập nhật tên hiển thị provider:", err);
+    res.status(500).json({ error: "Không thể cập nhật tên hiển thị provider." });
+  }
 });
 
 // POST /api/system/providers/:key/test - Kiểm tra provider bằng input do người dùng nhập

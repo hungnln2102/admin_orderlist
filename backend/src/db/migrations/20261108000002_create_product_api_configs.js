@@ -59,6 +59,7 @@ exports.up = async function (knex) {
 
     const productRows = await knex(`${BUSINESS_SCHEMA}.product`).select("id", "package_name");
     const productMap = new Map(productRows.map((p) => [String(p.package_name || "").toLowerCase().trim(), p.id]));
+    const productIds = new Set(productRows.map((p) => String(p.id)));
 
     const initialMappings = [
       // Adobe (id = 1 hoặc tìm theo package_name 'Adobe')
@@ -97,7 +98,7 @@ exports.up = async function (knex) {
     const recordsToInsert = [];
     for (const group of initialMappings) {
       const prodId = productMap.get(group.productKey) || group.fallbackProductId;
-      if (!prodId) continue;
+      if (!prodId || !productIds.has(String(prodId))) continue;
 
       for (const api of group.apis) {
         const apiId = apiMap.get(api.key);

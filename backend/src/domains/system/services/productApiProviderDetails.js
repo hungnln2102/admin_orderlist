@@ -1,4 +1,5 @@
 const { getProviderConfig } = require("../providers/registry");
+const { getProviderDisplayName } = require("./systemConfigService");
 
 const normalizeKey = (value) =>
   String(value || "")
@@ -11,7 +12,7 @@ function providerDetails(providerKey) {
   if (!provider) return null;
   return {
     service_key: provider.service_key,
-    service_name: provider.service_name,
+    service_name: getProviderDisplayName(provider.service_key),
     category: provider.category,
     description: provider.description || "",
     base_url: provider.base_url || "",

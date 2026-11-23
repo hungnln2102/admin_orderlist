@@ -16,6 +16,8 @@ const C_REC = COLS.EMAIL_INGESTION_RECEIPTS;
 const C_CHK = COLS.EMAIL_SYNC_CHECKPOINTS;
 const C_MAP = COLS.BANK_INSTRUMENT_MAPPINGS;
 const C_ASSET = COLS.PERSONAL_ASSETS;
+const C_DEBT = COLS.DEBT_PAYMENT_LOGS;
+const C_FA = COLS.FINANCIAL_ACCOUNTS;
 
 function sha256(str) {
   if (!str) return null;
@@ -58,37 +60,38 @@ async function resolveInstrumentMappingInTrx(trx, { instrumentKind, maskedSuffix
   const baseQuery = trx(TABLES.BANK_INSTRUMENT_MAPPINGS).where({
     [C_MAP.PROVIDER]: "VPBANK",
     [C_MAP.STATUS]: "ACTIVE",
+    [C_MAP.INSTRUMENT_KIND]: instrumentKind,
   });
   if (accountNumber) {
-    const exact = await baseQuery.clone().where(C_MAP.ACCOUNT_NUMBER, accountNumber).first();
-    if (exact) return exact;
+    const exact = await baseQuery.clone().where(C_MAP.ACCOUNT_NUMBER, accountNumber).limit(2);
+    if (exact.length) return { mapping: exact.length === 1 ? exact[0] : null, ambiguous: exact.length > 1 };
   }
-  if (!maskedSuffix) return null;
+  if (!maskedSuffix) return {};
   const cleanSuffix = String(maskedSuffix).replace(/^\*/, "").trim();
-  return baseQuery
-    .where(C_MAP.INSTRUMENT_KIND, instrumentKind)
-    .where((builder) => {
-      builder.where(C_MAP.MASKED_SUFFIX, cleanSuffix).orWhere(C_MAP.MASKED_SUFFIX, `*${cleanSuffix}`);
-    })
-    .first();
+  const matches = await baseQuery.whereIn(C_MAP.MASKED_SUFFIX, [cleanSuffix, `*${cleanSuffix}`]).limit(2);
+  if (matches.length !== 1) return { ambiguous: matches.length > 1 };
+  const [mapping] = matches;
+  if (!accountNumber) return { mapping };
+  if (normalizeAccountNumber(mapping[C_MAP.ACCOUNT_NUMBER]) || !mapping[C_MAP.LINKED_FINANCIAL_ACCOUNT_ID]) return {};
+  const linkedAccount = await trx(TABLES.FINANCIAL_ACCOUNTS)
+    .where(C_FA.ID, mapping[C_MAP.LINKED_FINANCIAL_ACCOUNT_ID])
+    .first(C_FA.ACCOUNT_NUMBER);
+  return normalizeAccountNumber(linkedAccount?.[C_FA.ACCOUNT_NUMBER]) === accountNumber ? { mapping } : {};
 }
 
 async function resolvePersonalDebtAssetInTrx(trx, { maskedSuffix, sourceAccountNumber }) {
   const accountNumber = normalizeAccountNumber(sourceAccountNumber);
+  const candidates = trx(TABLES.PERSONAL_ASSETS)
+    .where(C_ASSET.TYPE, "DEBT_PAYABLE")
+    .whereILike(C_ASSET.BANK_NAME, "%VPBank%");
   if (accountNumber) {
-    const assets = await trx(TABLES.PERSONAL_ASSETS)
-      .where({ [C_ASSET.TYPE]: "DEBT_PAYABLE", [C_ASSET.DEBT_ACCOUNT_NUMBER]: accountNumber })
-      .forUpdate();
-    if (assets.length === 1) return assets[0];
-    if (assets.length > 1) return null;
+    const assets = await candidates.where(C_ASSET.DEBT_ACCOUNT_NUMBER, accountNumber).limit(2).forUpdate();
+    return { asset: assets.length === 1 ? assets[0] : null, ambiguous: assets.length > 1 };
   }
-  if (!maskedSuffix) return null;
+  if (!maskedSuffix) return {};
   const cleanSuffix = String(maskedSuffix).replace(/^\*/, "").trim();
-  const assets = await trx(TABLES.PERSONAL_ASSETS)
-    .where({ [C_ASSET.TYPE]: "DEBT_PAYABLE", [C_ASSET.CARD_LAST_DIGITS]: cleanSuffix })
-    .whereILike(C_ASSET.BANK_NAME, "%VPBank%")
-    .forUpdate();
-  return assets.length === 1 ? assets[0] : null;
+  const assets = await candidates.where(C_ASSET.CARD_LAST_DIGITS, cleanSuffix).limit(2).forUpdate();
+  return { asset: assets.length === 1 ? assets[0] : null, ambiguous: assets.length > 1 };
 }
 function observedValueNote(parsed) {
   if (Number.isFinite(Number(parsed.availableLimitObserved))) {
@@ -142,9 +145,10 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
   // 2. Chạy bộ bóc tách Pure Parser
   const parsed = parseVpbankEmail(emailData);
   const subject = String(emailData.subject || "").trim();
-  const bodyText = String(emailData.text || emailData.html || "").trim();
+  const bodyText = String(emailData.text || "").trim();
+  const bodyHtml = String(emailData.html || "").trim();
   const subjectHash = sha256(subject);
-  const bodyHash = sha256(bodyText);
+  const bodyHash = sha256(bodyText && bodyHtml ? JSON.stringify([bodyText, bodyHtml]) : bodyText || bodyHtml);
   const rawSender = emailData.from ? (typeof emailData.from === "object" ? (emailData.from.text || emailData.from.value?.[0]?.address) : String(emailData.from)) : "";
 
   // 3. Khởi tạo / cập nhật receipt dạng PARSED
@@ -217,7 +221,7 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
 
   // 6. Tìm mapping thẻ trong database
   // Resolve the full debit account first; suffix matching remains legacy fallback only.
-  const resolvedDebtAsset = await resolvePersonalDebtAssetInTrx(trx, {
+  const { asset: resolvedDebtAsset, ambiguous: ambiguousDebtAsset } = await resolvePersonalDebtAssetInTrx(trx, {
     maskedSuffix: parsed.maskedSuffix,
     sourceAccountNumber: parsed.sourceAccountNumber,
   });
@@ -225,21 +229,57 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
     && !["CREDIT_CARD", "OVERDRAFT"].includes(resolvedDebtAsset[C_ASSET.DEBT_KIND])
     ? resolvedDebtAsset
     : null;
-  let mapping = await resolveInstrumentMappingInTrx(trx, {
+  const { mapping: configuredMapping, ambiguous: ambiguousMapping } = await resolveInstrumentMappingInTrx(trx, {
     instrumentKind: parsed.instrumentKind,
     maskedSuffix: parsed.maskedSuffix,
     sourceAccountNumber: parsed.sourceAccountNumber,
   });
-  if (resolvedDebtAsset && ["CREDIT_CARD", "OVERDRAFT"].includes(resolvedDebtAsset[C_ASSET.DEBT_KIND])) {
+  let mapping = configuredMapping;
+  let failureCode = ambiguousDebtAsset || ambiguousMapping ? "AMBIGUOUS_BANK_INSTRUMENT" : null;
+  if (resolvedDebtAsset && !personalDebtAsset) {
     const linkedCreditAccount = await trx(TABLES.CREDIT_ACCOUNTS)
       .where(COLS.CREDIT_ACCOUNTS.PERSONAL_ASSET_ID, resolvedDebtAsset[C_ASSET.ID])
       .first();
     if (linkedCreditAccount) {
-      mapping = { ...(mapping || {}), linked_credit_account_id: linkedCreditAccount.id };
+      const linkedId = linkedCreditAccount[COLS.CREDIT_ACCOUNTS.ID];
+      if (mapping && String(mapping[C_MAP.LINKED_CREDIT_ACCOUNT_ID]) !== String(linkedId)) {
+        failureCode = "AMBIGUOUS_BANK_INSTRUMENT";
+      } else if (!mapping) {
+        mapping = { [C_MAP.LINKED_CREDIT_ACCOUNT_ID]: linkedId };
+      }
     }
   }
-  if (!mapping && (!personalDebtAsset || !canRecordPersonalDebtMovement(parsed))) {
-    const failureCode = personalDebtAsset ? "PAYMENT_SOURCE_ACCOUNT_REQUIRED" : "UNMAPPED_BANK_INSTRUMENT";
+  let existingDebtLog = null;
+  if (!failureCode && personalDebtAsset) {
+    if (mapping) {
+      failureCode = "AMBIGUOUS_BANK_INSTRUMENT";
+    } else if (!canRecordPersonalDebtMovement(parsed)) {
+      failureCode = "PAYMENT_SOURCE_ACCOUNT_REQUIRED";
+    } else if (!parsed.referenceCode) {
+      failureCode = "PERSONAL_DEBT_REFERENCE_REQUIRED";
+    } else {
+      // The debt log reference is globally unique, including across different mailboxes and assets.
+      await trx.raw("SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))", ["vpbank-personal-debt", parsed.referenceCode]);
+      existingDebtLog = await trx(TABLES.DEBT_PAYMENT_LOGS).where(C_DEBT.REFERENCE_CODE, parsed.referenceCode).first();
+      if (existingDebtLog) {
+        const matchesAsset = existingDebtLog[C_DEBT.TARGET_TYPE] === "PERSONAL_DEBT_BORROW"
+          && String(existingDebtLog[C_DEBT.TARGET_ID]) === String(personalDebtAsset[C_ASSET.ID])
+          && Number(existingDebtLog[C_DEBT.AMOUNT]) === parsed.amount;
+        const priorReceipt = matchesAsset && bodyHash && await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
+          .where({
+            [C_REC.STATUS]: "APPLIED",
+            [C_REC.PERSONAL_DEBT_PAYMENT_LOG_ID]: existingDebtLog[C_DEBT.ID],
+            [C_REC.SUBJECT_HASH]: subjectHash,
+            [C_REC.BODY_HASH]: bodyHash,
+            [C_REC.TRANSACTION_KIND]: parsed.transactionKind,
+          })
+          .first(C_REC.ID);
+        if (!priorReceipt) failureCode = "PERSONAL_DEBT_REFERENCE_CONFLICT";
+      }
+    }
+  }
+  if (!failureCode && !mapping && !personalDebtAsset) failureCode = "UNMAPPED_BANK_INSTRUMENT";
+  if (failureCode) {
     await trx(TABLES.EMAIL_INGESTION_RECEIPTS)
       .where("id", receiptId)
       .update({
@@ -272,16 +312,16 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
   let personalDebtPaymentLogId = null;
 
   // 8. Hạch toán theo Loại Dụng Cụ (Credit Card vs Debit Card)
-  if (personalDebtAsset) {
-    const debtBusinessKey = parsed.referenceCode
-      ? `PERSONAL_DEBT:${personalDebtAsset[C_ASSET.ID]}:${parsed.referenceCode}`
-      : `VPBANK_EMAIL_${receiptId}`;
+  if (existingDebtLog) {
+    personalDebtPaymentLogId = existingDebtLog[C_DEBT.ID];
+  } else if (personalDebtAsset) {
+    const debtBusinessKey = `PERSONAL_DEBT:${personalDebtAsset[C_ASSET.ID]}:${parsed.referenceCode}`;
     const observations = observedValueNote(parsed);
     const debtResult = await borrowPersonalAssetInTrx(trx, personalDebtAsset[C_ASSET.ID], {
       amount: parsed.amount,
       merchantName: parsed.merchantNormalized,
       effectiveAt: parsed.occurredAt,
-      referenceCode: parsed.referenceCode || debtBusinessKey,
+      referenceCode: parsed.referenceCode,
       idempotencyKey: debtBusinessKey,
       directExpense: true,
       note: [
@@ -290,6 +330,9 @@ async function processEmailMessageInTrx(trx, emailData, options = {}) {
         observations,
       ].filter(Boolean).join(" | "),
     });
+    if (debtResult.alreadyProcessed) {
+      throw new Error("Personal debt reference appeared during ingestion. Retry for reconciliation.");
+    }
     personalDebtPaymentLogId = debtResult.logId;
   } else if (mapping?.linked_credit_account_id) {
     const creditAccountId = Number(mapping.linked_credit_account_id);

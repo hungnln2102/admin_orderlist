@@ -182,7 +182,7 @@ async function executeOtpConfig(config, input, options = {}) {
   return handler(config, input, options);
 }
 
-async function probeOtpForEmail({ email, serviceKey, ...options }) {
+async function probeOtpForEmail({ email, serviceKey, requiredExecutionMode, ...options }) {
   if (!email) throw new Error("Vui lòng cung cấp email hoặc mã đơn hàng cần kiểm tra.");
 
   if (!serviceKey) throw new Error("OTP_PROVIDER_NOT_FOUND: service_key is required.");
@@ -191,6 +191,9 @@ async function probeOtpForEmail({ email, serviceKey, ...options }) {
   if (!serviceConfig) throw new Error(`OTP_PROVIDER_NOT_FOUND: no active OTP configuration for service_key '${serviceKey}'.`);
 
   const executionMode = String(serviceConfig.execution_mode || "").trim().toUpperCase();
+  if (requiredExecutionMode && executionMode !== requiredExecutionMode) {
+    throw new Error("OTP_PROVIDER_EXECUTION_MODE_MISMATCH");
+  }
   const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_2FA", "PACKAGE_WAREHOUSE_ACCOUNT"].includes(executionMode);
   if (!acceptsNonEmailInput && !queryInput.includes("@")) {
     throw new Error("Vui lòng cung cấp email hợp lệ (vd: user@domain.com).");

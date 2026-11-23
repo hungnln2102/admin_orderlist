@@ -6,7 +6,7 @@ const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { isMavrykSupplier } = require("@/domains/suppliers/utils/supplierCheck");
 const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
-const { generateOrderActivationKey } = require("@/domains/products/services/activationKeyService");
+const { generateOrderActivationKey, resolveOrderActivationRule } = require("@/domains/products/services/activationKeyService");
 const { listImportWarehouseTags } = require("@/domains/warehouse/services/importWarehouseTagService");
 const { ensureSupplierCostLog } = require("./supplierCostLogService");
 
@@ -96,19 +96,6 @@ async function resolveSupplyId(trx, supplyInput) {
 /**
  * Tạo đơn hàng mới + phát event ORDER_CREATED (Bọc Transaction)
  */
-
-async function incrementVariantOrderCount(trx, variantId) {
-  if (!variantId) return;
-  const numId = Number(variantId);
-  if (isNaN(numId) || numId <= 0) return;
-  try {
-    await trx(TABLES.VARIANT)
-      .where({ [COLS.VARIANT.ID]: numId })
-      .increment(COLS.VARIANT.COUNT, 1);
-  } catch (err) {
-    console.error(`[incrementVariantOrderCount] Lỗi tăng số đơn cho variant ${numId}:`, err.message);
-  }
-}
 
 async function createOrder(payload) {
   return await withTransaction(async (trx) => {
@@ -204,122 +191,43 @@ async function createOrder(payload) {
       throw error;
     }
 
-    // Tự động kiểm tra hoặc tạo bản ghi Activation Key trong warehouse.activation_keys (nếu đơn hàng bán có tạo mã key hoặc khớp rule)
     if (!isMavn) {
-      let matchedRule = null;
-      try {
-        let finalKeyCode = null;
-        let targetProductNameId = null;
-        let sysProductId = null;
+      const { adobeSource, rule } = await resolveOrderActivationRule({
+        variantId: newOrderData.id_product,
+        supplierId: newOrderData.supply_id,
+      }, trx);
+      if (payload.require_activation_key_rule === true && !rule) {
+        throw new Error("Quy t\u1eafc c\u1ea5p key \u0111\u00e3 thay \u0111\u1ed5i. Vui l\u00f2ng ch\u1ecdn l\u1ea1i s\u1ea3n ph\u1ea9m v\u00e0 NCC.");
+      }
 
-        // 1. Kiểm tra quy tắc khớp trong TABLES.ACTIVATION_KEY_RULES theo Variant + NCC
-        if (newOrderData.id_product && newOrderData.supply_id) {
-          matchedRule = await trx(TABLES.ACTIVATION_KEY_RULES)
-            .join(`${TABLES.VARIANT} as v`, "v.id", `${TABLES.ACTIVATION_KEY_RULES}.variant_id`)
-            .leftJoin(`${TABLES.PRODUCT} as p`, "p.id", "v.product_id")
-            .select(
-              `${TABLES.ACTIVATION_KEY_RULES}.*`,
-              "v.variant_name",
-              "v.display_name as variant_display_name",
-              "p.id as parent_product_id",
-              "p.package_name as product_name"
-            )
-            .where(`${TABLES.ACTIVATION_KEY_RULES}.variant_id`, Number(newOrderData.id_product))
-            .where(`${TABLES.ACTIVATION_KEY_RULES}.supplier_id`, Number(newOrderData.supply_id))
-            .where(`${TABLES.ACTIVATION_KEY_RULES}.is_active`, true)
-            .whereNotNull(`${TABLES.ACTIVATION_KEY_RULES}.${COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG}`)
-            .first();
+      const currentInfo = String(createdOrder.information_order || "").trim();
+      if (adobeSource && !rule &&
+          (!currentInfo || (adobeSource === "ades" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentInfo)))) {
+        throw new Error("Vui l\u00f2ng nh\u1eadp th\u00f4ng tin t\u00e0i kho\u1ea3n Adobe do nh\u00e0 cung c\u1ea5p c\u1ea5p.");
+      }
+
+      if (rule) {
+        const K = COLS.ACTIVATION_KEYS;
+        const R = COLS.ACTIVATION_KEY_RULES;
+        const keyCode = /^MAVKEY[A-Z0-9]{6}$/i.test(currentInfo)
+          ? currentInfo.toUpperCase() : generateOrderActivationKey();
+        if (createdOrder.information_order !== keyCode) {
+          await getOrderTable(trx).where(O_COLS.ID, createdOrder.id).update({ [O_COLS.INFORMATION_ORDER]: keyCode });
+          createdOrder.information_order = keyCode;
         }
 
-        if (payload.require_activation_key_rule === true && !matchedRule) {
-          throw new Error("Quy tắc cấp key đã thay đổi. Vui lòng chọn lại sản phẩm và NCC.");
-        }
-
-        if (matchedRule) {
-          targetProductNameId = matchedRule.product_name_id;
-          sysProductId = matchedRule.parent_product_id || null;
-
-          // Ưu tiên lấy key từ information_order (do frontend tự động điền)
-          const currentInfo = String(createdOrder.information_order || "").trim();
-          if (currentInfo) {
-            finalKeyCode = currentInfo.toUpperCase();
-          } else {
-            // Nếu information_order đang rỗng -> Tự động sinh key và lưu vào information_order
-            finalKeyCode = generateOrderActivationKey();
-            await getOrderTable(trx).where("id", createdOrder.id).update({ information_order: finalKeyCode });
-            createdOrder.information_order = finalKeyCode;
-          }
-        } else if (payload.activation_key) {
-          finalKeyCode = String(payload.activation_key).trim().toUpperCase();
-        }
-
-        if (finalKeyCode) {
-          if (!targetProductNameId) {
-            const prodIdToLookup = newOrderData.id_product || payload.id_product;
-            if (prodIdToLookup) {
-              const numProdId = Number(prodIdToLookup);
-              const variantRow = await trx(TABLES.VARIANT)
-                .leftJoin(TABLES.PRODUCT, `${TABLES.PRODUCT}.id`, `${TABLES.VARIANT}.product_id`)
-                .select(
-                  `${TABLES.VARIANT}.id as variant_id`,
-                  `${TABLES.VARIANT}.display_name as variant_display`,
-                  `${TABLES.VARIANT}.variant_name as variant_name`,
-                  `${TABLES.PRODUCT}.id as parent_product_id`,
-                  `${TABLES.PRODUCT}.package_name as parent_package_name`
-                )
-                .where(function() {
-                  if (!isNaN(numProdId) && numProdId > 0) {
-                    this.where(`${TABLES.VARIANT}.id`, numProdId);
-                  } else {
-                    this.whereILike(`${TABLES.VARIANT}.display_name`, String(prodIdToLookup))
-                        .orWhereILike(`${TABLES.VARIANT}.variant_name`, String(prodIdToLookup));
-                  }
-                })
-                .first();
-
-              if (variantRow) {
-                sysProductId = variantRow.parent_product_id || null;
-                const targetName = (variantRow.parent_package_name || variantRow.variant_name || variantRow.variant_display || "").trim().toLowerCase();
-                const pNameRow = await trx(TABLES.PRODUCT_NAMES)
-                  .whereRaw("LOWER(name) = ?", [targetName])
-                  .first();
-                targetProductNameId = pNameRow?.id || null;
-              }
-            }
-          }
-
-          if (!targetProductNameId) {
-            const defaultPn = await trx(TABLES.PRODUCT_NAMES).first();
-            targetProductNameId = defaultPn?.id || null;
-          }
-
-          if (targetProductNameId) {
-            const insertKey = trx(TABLES.ACTIVATION_KEYS)
-              .insert({
-                key_code: finalKeyCode,
-                product_name_id: targetProductNameId,
-                [COLS.ACTIVATION_KEYS.TARGET_VARIANT_TAG]:
-                  matchedRule?.[COLS.ACTIVATION_KEY_RULES.TARGET_VARIANT_TAG] || null,
-                product_id: sysProductId,
-                id_order: createdOrder.id_order,
-                status: "AVAILABLE",
-                customer_info: `${createdOrder.customer || ""}${createdOrder.contact ? " (" + createdOrder.contact + ")" : ""}`.trim() || null,
-                note: payload.note || (matchedRule ? `Tự động cấp theo quy tắc Variant #${matchedRule.variant_id} + NCC #${matchedRule.supplier_id}` : `Tự động sinh từ đơn hàng #${createdOrder.id_order}`),
-                created_by: matchedRule ? "AutoRule" : "Admin",
-                created_at: db.fn.now(),
-                updated_at: db.fn.now(),
-              });
-            if (matchedRule) {
-              await insertKey;
-            } else {
-              await insertKey.onConflict("key_code").merge();
-            }
-            console.log(`🔑 [ActivationKey] Đã lưu mã key ${finalKeyCode} vào kho (product_name_id: ${targetProductNameId}) cho đơn #${createdOrder.id_order}`);
-          }
-        }
-      } catch (keyErr) {
-        if (matchedRule || payload.require_activation_key_rule === true) throw keyErr;
-        console.error("[OrderService] Lỗi tạo Activation Key liên kết:", keyErr.message);
+        await trx(TABLES.ACTIVATION_KEYS).insert({
+          [K.KEY_CODE]: keyCode,
+          [K.PRODUCT_NAME_ID]: rule[R.PRODUCT_NAME_ID],
+          [K.TARGET_VARIANT_TAG]: rule[R.TARGET_VARIANT_TAG],
+          [K.PRODUCT_ID]: rule.parent_product_id || null,
+          [K.ID_ORDER]: createdOrder.id_order,
+          [K.CUSTOMER_INFO]: [createdOrder.customer, createdOrder.contact && `(${createdOrder.contact})`].filter(Boolean).join(" ") || null,
+          [K.NOTE]: payload.note || `T\u1ef1 \u0111\u1ed9ng c\u1ea5p theo quy t\u1eafc Variant #${rule[R.VARIANT_ID]} + NCC #${rule[R.SUPPLIER_ID]}`,
+          [K.CREATED_BY]: "AutoRule",
+          [K.CREATED_AT]: db.fn.now(),
+          [K.UPDATED_AT]: db.fn.now(),
+        });
       }
     }
 
@@ -1065,7 +973,7 @@ async function processOrderToProcessing(id) {
     const warehouseSync = await syncExistingImportOrderToWarehouseInTrx(trx, {
       existingOrder,
       updatedOrder,
-      payload,
+      payload: updateFields,
     });
     if (warehouseSync) {
       await emitOrderEvent(trx, EVENTS.WAREHOUSE_STOCK_UPDATED, {

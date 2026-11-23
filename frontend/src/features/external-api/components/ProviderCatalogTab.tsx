@@ -19,7 +19,9 @@ import {
   List,
   ShieldCheck,
   Cpu,
+  Pencil,
 } from "lucide-react";
+import { BaseModal } from "@/shared/components";
 import type { Provider, TestState } from "@/features/external-api/hooks/useExternalApiConfig";
 
 interface ProviderCatalogTabProps {
@@ -33,6 +35,7 @@ interface ProviderCatalogTabProps {
   testInputs: Record<string, TestState>;
   onInputChange: (key: string, value: string) => void;
   onTestProvider: (provider: Provider) => void;
+  onRenameProvider: (key: string, name: string | null) => Promise<boolean>;
 }
 
 export const ProviderCatalogTab: React.FC<ProviderCatalogTabProps> = ({
@@ -46,7 +49,11 @@ export const ProviderCatalogTab: React.FC<ProviderCatalogTabProps> = ({
   testInputs,
   onInputChange,
   onTestProvider,
+  onRenameProvider,
 }) => {
+  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "READY" | "NOT_CONFIGURED">("ALL");
@@ -362,6 +369,12 @@ export const ProviderCatalogTab: React.FC<ProviderCatalogTabProps> = ({
                       <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40 shrink-0">
                         {provider.key}
                       </span>
+                      <button type="button" aria-label={`Đổi tên hiển thị của ${provider.name}`} title="Đổi tên hiển thị" className="rounded-md p-1 text-slate-400 hover:text-cyan-300" onClick={() => {
+                        setDisplayName(provider.displayName ?? provider.name);
+                        setEditingProvider(provider);
+                      }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
 
@@ -534,6 +547,29 @@ export const ProviderCatalogTab: React.FC<ProviderCatalogTabProps> = ({
           })}
         </div>
       )}
+      <BaseModal
+        isOpen={Boolean(editingProvider)}
+        onClose={() => { if (!renaming) setEditingProvider(null); }}
+        title="Đổi tên hiển thị"
+        subtitle={editingProvider?.key}
+        size="sm"
+        footer={<button type="submit" form="provider-display-name-form" disabled={renaming} className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{renaming ? "Đang lưu…" : "Lưu tên hiển thị"}</button>}
+      >
+        <form id="provider-display-name-form" onSubmit={async (event) => {
+          event.preventDefault();
+          if (!editingProvider || renaming) return;
+          setRenaming(true);
+          try {
+            if (await onRenameProvider(editingProvider.key, displayName.trim() || null)) setEditingProvider(null);
+          } finally {
+            setRenaming(false);
+          }
+        }}>
+          <label htmlFor="provider-display-name" className="block text-sm text-slate-200">Tên hiển thị</label>
+          <input id="provider-display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={renaming} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100" />
+          <p className="mt-2 text-xs text-slate-400">Để trống để dùng tên mặc định.</p>
+        </form>
+      </BaseModal>
     </div>
   );
 };

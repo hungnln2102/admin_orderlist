@@ -1,3 +1,4 @@
+import { useWarehouseProviderNames } from "./WarehouseProviderCatalog";
 import { SlotProviderControls } from "./SlotProviderControls";
 import { CopyButton, DateInputVN, QuickDateAddButtons, ToggleSwitch } from "@/shared/components";
 import React, { useState, useEffect, useMemo } from "react";
@@ -49,6 +50,7 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const providerNames = useWarehouseProviderNames();
   const [formData, setFormData] = useState<WarehouseSlotEditFormData>({
     accountUsername: "",
     serviceName: "",
@@ -201,19 +203,19 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
       const key = api.service_key || api.key;
       if (key && !seen.has(key)) {
         seen.add(key);
-        list.push({ value: key, label: `${api.service_name || key} (${key})` });
+        list.push({ value: key, label: providerNames[key] || key });
       }
     });
 
     AVAILABLE_OTP_PROVIDERS.forEach((prov) => {
       if (!seen.has(prov.value)) {
         seen.add(prov.value);
-        list.push({ value: prov.value, label: prov.label });
+        list.push({ value: prov.value, label: providerNames[prov.value] || prov.value });
       }
     });
 
     return list;
-  }, [availableOtpApis]);
+  }, [availableOtpApis, providerNames]);
 
   if (!open || !slot || !account) return null;
 

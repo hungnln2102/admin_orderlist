@@ -252,6 +252,46 @@ async function main() {
       });
       assert(second.duplicate === true, "Same transaction_id retry must be duplicate");
     });
+    await runTest("TC-05: SePay OUT replay requires a verified mapping and debits once", async () => {
+      const txId = `TX-OUT-REPLAY-${Date.now()}`;
+      const accountNumber = `UNMAPPED${Date.now()}`;
+      const amount = 91357;
+      const payload = {
+        transaction_id: txId,
+        transferAmount: amount,
+        transferType: TRANSFER_TYPE.OUT,
+        content: "Outbound mapping replay",
+        gateway: "MBBANK",
+        accountNumber,
+      };
+      const ledgerQuery = () => db(TABLES.SHOP_BANK_ACCOUNT_LEDGER)
+        .where({ reference_type: "payment_receipt", reference_id: txId });
+      const accountQuery = () => db(TABLES.SHOP_BANK_ACCOUNTS).where({ id: testAccountId });
+      const before = await accountQuery().first();
+      const initial = await processPaymentWebhook(payload);
+      createdReceiptIds.push(initial.receiptId);
+      assert(initial.reason === "ACCOUNT_NOT_RESOLVED", "Missing mapping must leave the OUT receipt pending");
+      assert((await processPaymentWebhook(payload)).duplicate, "Replay without a mapping must stay pending");
+      assert((await ledgerQuery()).length === 0, "Pending receipt must not create a ledger entry");
+
+      try {
+        await accountQuery().update({ account_number: accountNumber });
+        const mismatch = await processPaymentWebhook({ ...payload, transferAmount: amount + 1 });
+        assert(mismatch.duplicate && (await ledgerQuery()).length === 0, "Changed payload must not debit");
+
+        const retries = await Promise.all([processPaymentWebhook(payload), processPaymentWebhook(payload)]);
+        assert(retries.every((result) => result.receiptId === initial.receiptId), "Retries must reuse the original receipt");
+        assert(retries.filter((result) => result.replayed).length === 1, "Exactly one retry must process the receipt");
+        assert(retries.filter((result) => result.duplicate).length === 1, "Concurrent retry must be a duplicate");
+
+        const ledger = await ledgerQuery();
+        const after = await accountQuery().first();
+        assert(ledger.length === 1 && ledger[0].entry_type === "receipt_out", "One OUT ledger entry must be written");
+        assert(Number(after.balance) === Number(before.balance) - amount, "Balance must be debited once");
+      } finally {
+        await accountQuery().update({ account_number: testAccountNumber });
+      }
+    });
   } finally {
     await cleanup();
     await db.destroy();

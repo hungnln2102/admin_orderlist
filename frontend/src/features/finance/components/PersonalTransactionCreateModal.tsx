@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
+import { CustomSelect } from "@/shared/components";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
 import {
@@ -223,20 +224,21 @@ export const PersonalTransactionCreateModal: React.FC<Props> = ({
 
             {/* Danh mục (Động từ DB) */}
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-300 block">
                 Danh mục chi tiêu *
               </label>
-              <select
-                value={selectedCategoryId || ""}
-                onChange={(e) => setSelectedCategoryId(Number(e.target.value) || null)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={selectedCategoryId ? String(selectedCategoryId) : ""}
+                onChange={(val) => setSelectedCategoryId(val ? Number(val) : null)}
+                size="sm"
+                accent="cyan"
+                className="bg-slate-950 border-slate-800"
+                placeholder="Chọn danh mục..."
+                options={categories.map((c) => ({
+                  value: String(c.id),
+                  label: c.name,
+                }))}
+              />
             </div>
           </div>
 
@@ -244,20 +246,21 @@ export const PersonalTransactionCreateModal: React.FC<Props> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Tài khoản nguồn */}
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-300 block">
                 Tài khoản / Thẻ
               </label>
-              <select
-                value={selectedAccountId || ""}
-                onChange={(e) => setSelectedAccountId(Number(e.target.value) || null)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500"
-              >
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name} ({formatVND(account.balance)})
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={selectedAccountId ? String(selectedAccountId) : ""}
+                onChange={(val) => setSelectedAccountId(val ? Number(val) : null)}
+                size="sm"
+                accent="cyan"
+                className="bg-slate-950 border-slate-800"
+                placeholder="Chọn tài khoản..."
+                options={accounts.map((account) => ({
+                  value: String(account.id),
+                  label: `${account.name} (${formatVND(account.balance)})`,
+                }))}
+              />
             </div>
 
             {/* Thời gian */}

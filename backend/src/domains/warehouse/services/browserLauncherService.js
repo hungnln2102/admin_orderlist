@@ -194,12 +194,6 @@ const getConfiguredSessionCookieNames = () => new Set(
     .filter(Boolean)
 );
 
-const cookieMatchesHostname = (cookieDomain, hostname) => {
-  const normalizedDomain = String(cookieDomain || "").replace(/^\./, "").toLowerCase();
-  const normalizedHostname = String(hostname || "").toLowerCase();
-  return normalizedHostname === normalizedDomain || normalizedHostname.endsWith(`.${normalizedDomain}`);
-};
-
 const hasSessionCookieForUrl = (cookies, targetUrl, nowSeconds = Date.now() / 1000) => {
   const configuredNames = getConfiguredSessionCookieNames();
   if (configuredNames.size === 0) return false;

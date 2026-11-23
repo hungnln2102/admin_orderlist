@@ -17,6 +17,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { CustomSelect } from "@/shared/components";
 import { ActivationKeyRule, CatalogProductOption, SaveActivationKeyRulePayload } from "../types";
 
 interface Props {
@@ -767,30 +768,27 @@ export const ActivationKeyRuleModal: React.FC<Props> = ({
 
               {/* Field: Tag kho đích */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Tag kho đích <span className="text-rose-400">*</span>
+                <label className="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Tag kho đích <span className="text-rose-400">*</span></span>
                 </label>
-                <div className="relative">
-                  <Tag className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <select
-                    value={selectedTargetTag}
-                    onChange={(event) => setSelectedTargetTag(event.target.value)}
-                    disabled={!selectedWarehouseId || availableTargetTags.length === 0}
-                    required
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[42px]"
-                  >
-                    <option value="">
-                      {availableTargetTags.length > 0
-                        ? "-- Chọn tag dùng để cấp slot --"
-                        : "-- Kho này chưa có tag khả dụng --"}
-                    </option>
-                    {availableTargetTags.map((tag) => (
-                      <option key={tag} value={tag}>
-                        {tag}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomSelect
+                  value={selectedTargetTag}
+                  onChange={setSelectedTargetTag}
+                  disabled={!selectedWarehouseId || availableTargetTags.length === 0}
+                  size="sm"
+                  accent="amber"
+                  className="bg-slate-900 border-slate-800 min-h-[42px]"
+                  placeholder={
+                    availableTargetTags.length > 0
+                      ? "-- Chọn tag dùng để cấp slot --"
+                      : "-- Kho này chưa có tag khả dụng --"
+                  }
+                  options={availableTargetTags.map((tag) => ({
+                    value: tag,
+                    label: tag,
+                  }))}
+                />
                 <p className="text-[11px] text-slate-500">
                   Hệ thống chỉ cấp slot còn trống thuộc đúng tag đã chọn.
                 </p>

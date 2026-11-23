@@ -19,6 +19,7 @@ import {
   getFixedCosts,
   getMatchableOrders,
 } from "../api/invoicesApiClient";
+import { CustomSelect } from "@/shared/components";
 
 interface InvoiceReceipt {
   id: number;
@@ -563,18 +564,18 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                   Chưa có khoản chi phí cố định nào đang kích hoạt trong Trung Tâm Tài Chính.
                 </div>
               ) : (
-                <select
+                <CustomSelect
                   value={selectedFixedCostId}
-                  onChange={(e) => setSelectedFixedCostId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-purple-300 font-semibold focus:outline-none focus:border-purple-500 text-xs"
-                >
-                  <option value="">-- Chọn khoản chi phí (Server, Mặt bằng, Tool...) --</option>
-                  {fixedCosts.map((f: any) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name} • {formatCurrency(f.amount)} {f.isPaidThisMonth ? "✓ (Đã trả tháng này)" : "⚠️ (Chưa thanh toán)"}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedFixedCostId}
+                  size="sm"
+                  accent="purple"
+                  placeholder="-- Chọn khoản chi phí (Server, Mặt bằng, Tool...) --"
+                  className="bg-slate-950/80 border-slate-800 font-semibold"
+                  options={fixedCosts.map((f: any) => ({
+                    value: String(f.id),
+                    label: `${f.name} • ${formatCurrency(f.amount)} ${f.isPaidThisMonth ? "✓ (Đã trả tháng này)" : "⚠️ (Chưa thanh toán)"}`,
+                  }))}
+                />
               )}
               <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-300">
                 💡 Khớp với Chi phí cố định sẽ bảo toàn 100% Tài Sản Ròng và không bị trừ double vào Lợi Nhuận P&L.
@@ -595,25 +596,24 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                   Không có khoản nợ cá nhân nào còn dư nợ trong Trung Tâm Tài Chính.
                 </div>
               ) : (
-                <select
+                <CustomSelect
                   value={selectedDebtId}
-                  onChange={(e) => {
-                    const dId = e.target.value;
+                  onChange={(dId) => {
                     setSelectedDebtId(dId);
                     const found = debts.find((d) => String(d.id) === dId);
                     if (found && Number(found.amount) > 0) {
                       setAmount(String(Math.min(availableAmount, Number(found.amount))));
                     }
                   }}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-rose-300 font-semibold focus:outline-none focus:border-rose-500 text-xs"
-                >
-                  <option value="">-- Chọn khoản nợ cá nhân / thẻ tín dụng --</option>
-                  {debts.map((d: any) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} • Dư nợ: {formatCurrency(d.amount)} {d.debtDueDay ? `(Hạn ngày ${d.debtDueDay})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  size="sm"
+                  accent="rose"
+                  placeholder="-- Chọn khoản nợ cá nhân / thẻ tín dụng --"
+                  className="bg-slate-950/80 border-slate-800 font-semibold"
+                  options={debts.map((d: any) => ({
+                    value: String(d.id),
+                    label: `${d.name} • Dư nợ: ${formatCurrency(d.amount)} ${d.debtDueDay ? `(Hạn ngày ${d.debtDueDay})` : ""}`,
+                  }))}
+                />
               )}
               <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
                 💡 Trả bớt nợ sẽ tự động làm giảm Dư nợ trong Tài Sản Ròng (Net Worth), không tính vào chi phí Shop P&L.
@@ -634,25 +634,24 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                   Không có hợp đồng trả góp nào đang kích hoạt trong Trung Tâm Tài Chính.
                 </div>
               ) : (
-                <select
+                <CustomSelect
                   value={selectedInstallmentId}
-                  onChange={(e) => {
-                    const instId = e.target.value;
+                  onChange={(instId) => {
                     setSelectedInstallmentId(instId);
                     const found = installments.find((i) => String(i.id) === instId);
                     if (found && Number(found.monthlyAmount) > 0) {
                       setAmount(String(Math.min(availableAmount, Number(found.monthlyAmount))));
                     }
                   }}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-cyan-300 font-semibold focus:outline-none focus:border-cyan-500 text-xs"
-                >
-                  <option value="">-- Chọn hợp đồng trả góp --</option>
-                  {installments.map((inst: any) => (
-                    <option key={inst.id} value={inst.id}>
-                      {inst.name} • Đóng tháng: {formatCurrency(inst.monthlyAmount)} (Kỳ {inst.currentPeriod || 1}/{inst.totalPeriods})
-                    </option>
-                  ))}
-                </select>
+                  size="sm"
+                  accent="cyan"
+                  placeholder="-- Chọn hợp đồng trả góp --"
+                  className="bg-slate-950/80 border-slate-800 font-semibold"
+                  options={installments.map((inst: any) => ({
+                    value: String(inst.id),
+                    label: `${inst.name} • Đóng tháng: ${formatCurrency(inst.monthlyAmount)} (Kỳ ${inst.currentPeriod || 1}/${inst.totalPeriods})`,
+                  }))}
+                />
               )}
               <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300">
                 💡 Ghi nhận kỳ thanh toán tháng và bảo toàn tính toàn vẹn của báo cáo Net Worth.

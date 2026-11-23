@@ -1,3 +1,4 @@
+import { useWarehouseProviderNames } from "./WarehouseProviderCatalog";
 import React from "react";
 import { CopyButton } from "@/shared/components";
 import {
@@ -57,6 +58,7 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
   onVerifySession,
   openingSlotId,
 }) => {
+  const providerNames = useWarehouseProviderNames();
   const services = account.services || [];
   const categorySummary =
     services
@@ -233,16 +235,18 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                           </span>
                         )}
                         {(srv.provider_key || srv.otp_type) && (() => {
-                          const prov = getProviderDetails(srv.provider_key || srv.otp_type);
+                          const key = srv.provider_key || srv.otp_type || "";
+                          const providerName = providerNames[key] || key;
+                          const prov = getProviderDetails(key);
                           return (
                             <span
                               className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border tracking-normal inline-flex items-center gap-1 ${
                                 prov ? prov.badgeClass : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
                               }`}
-                              title={`Cổng OTP: ${prov ? prov.label : srv.provider_key || srv.otp_type}`}
+                              title={`Cổng OTP: ${providerName}`}
                             >
                               <Sparkles className="w-2.5 h-2.5" />
-                              {prov ? prov.shortLabel : srv.provider_key || srv.otp_type}
+                              {providerName}
                             </span>
                           );
                         })()}

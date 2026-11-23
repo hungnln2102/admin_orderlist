@@ -1,3 +1,4 @@
+import { WarehouseProviderCatalog } from "@/features/warehouse/components/WarehouseProviderCatalog";
 import React, { useState, lazy, Suspense } from "react";
 import {
   RefreshCw,
@@ -156,7 +157,7 @@ export const WarehousePage: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto animate-fadeIn">
+    <WarehouseProviderCatalog><div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto animate-fadeIn">
       {/* HEADER PAGE */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/40 border border-slate-800/80 p-5 rounded-3xl backdrop-blur-xl shadow-2xl">
         <div className="space-y-1">
@@ -485,7 +486,7 @@ export const WarehousePage: React.FC = () => {
           />
         )}
       </Suspense>
-    </div>
+    </div></WarehouseProviderCatalog>
   );
 };
 

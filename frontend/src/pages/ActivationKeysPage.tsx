@@ -29,7 +29,7 @@ export const ActivationKeysPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(20);
   const [counts, setCounts] = useState<ActivationKeyCounts>({
     total: 0,
-    available: 0,
+    inactive: 0,
     activated: 0,
     revoked: 0,
     expired: 0,

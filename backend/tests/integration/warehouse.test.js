@@ -250,7 +250,10 @@ test("Warehouse Integration Tests (V2)", async (t) => {
       const slot = createdAccount?.services[0];
       assert.ok(slot, "Created warehouse account should have a service slot");
 
-      await warehouseService.updateWarehouseServiceSlot(slot.id, { provider_key: "tinyhost" });
+      await warehouseService.updateWarehouseServiceSlot(slot.id, {
+        provider_key: "tinyhost",
+        otpEnabled: true,
+      });
 
       const accountRoute = await productApiService.findRoutingProviderForInput({
         slotKey: "otp",
@@ -258,8 +261,9 @@ test("Warehouse Integration Tests (V2)", async (t) => {
       });
       assert.deepEqual(accountRoute, {
         provider_key: "tinyhost",
-        match_type: "DIRECT_SLOT_PROVIDER",
-        source: "WAREHOUSE_SLOT",
+        resolved_email: accountEmail,
+        order_code: null,
+        match_type: "EXACT_WAREHOUSE_CAPABILITY",
       });
 
       await db(TABLES.ACTIVATION_KEYS).insert({

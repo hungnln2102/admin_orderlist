@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { CustomSelect } from "@/shared/components";
 import {
   AlarmClock,
   Clock,
@@ -482,21 +483,23 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
                 </div>
 
                 {/* Dropdown Chu Kỳ */}
-                <select
-                  value={job.frequency}
-                  disabled={!job.enabled}
-                  onChange={(e) => handleFrequencyChange(job.id, e.target.value as any)}
-                  className={`text-[10px] font-bold rounded-lg px-2 py-1 bg-slate-900 border focus:outline-none ${
-                    job.enabled
-                      ? "text-slate-300 border-slate-700 hover:border-cyan-500/40"
-                      : "text-slate-500 border-slate-800 cursor-not-allowed"
-                  }`}
-                >
-                  <option value="daily">Hàng ngày</option>
-                  <option value="weekdays">T2 - T6</option>
-                  <option value="hourly">Mỗi giờ</option>
-                  <option value="custom">Tùy chọn</option>
-                </select>
+                <div className="w-28 shrink-0">
+                  <CustomSelect
+                    value={job.frequency}
+                    disabled={!job.enabled}
+                    onChange={(val) => handleFrequencyChange(job.id, val as any)}
+                    size="sm"
+                    accent="cyan"
+                    searchable={false}
+                    className="!px-2 !py-1 !text-[10px] font-bold !rounded-lg bg-slate-900"
+                    options={[
+                      { value: "daily", label: "Hàng ngày" },
+                      { value: "weekdays", label: "T2 - T6" },
+                      { value: "hourly", label: "Mỗi giờ" },
+                      { value: "custom", label: "Tùy chọn" },
+                    ]}
+                  />
+                </div>
               </div>
 
               {/* ── 3 Stats Indicators Y Hệt Bên Gói Sản Phẩm ── */}
@@ -659,32 +662,40 @@ export const CronSchedulerTab: React.FC<CronSchedulerTabProps> = ({ onShowToast 
 
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">Tần suất</label>
-                  <select
+                  <CustomSelect
                     value={newJobFrequency}
-                    onChange={(e) => setNewJobFrequency(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="daily">Hàng ngày</option>
-                    <option value="weekdays">Thứ 2 - Thứ 6</option>
-                    <option value="hourly">Mỗi giờ</option>
-                    <option value="custom">Tùy chọn</option>
-                  </select>
+                    onChange={(val) => setNewJobFrequency(val as any)}
+                    size="sm"
+                    accent="cyan"
+                    searchable={false}
+                    className="bg-slate-950"
+                    options={[
+                      { value: "daily", label: "Hàng ngày" },
+                      { value: "weekdays", label: "Thứ 2 - Thứ 6" },
+                      { value: "hourly", label: "Mỗi giờ" },
+                      { value: "custom", label: "Tùy chọn" },
+                    ]}
+                  />
                 </div>
               </div>
 
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Nhóm nghiệp vụ</label>
-                <select
+                <CustomSelect
                   value={newJobGroup}
-                  onChange={(e) => setNewJobGroup(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="orders">ĐƠN HÀNG & VẬN HÀNH</option>
-                  <option value="notifications">THÔNG BÁO KHÁCH HÀNG</option>
-                  <option value="finance">TÀI CHÍNH & TÍN DỤNG</option>
-                  <option value="summary">BÁO CÁO & KẾ TOÁN</option>
-                  <option value="backup">SAO LƯU HỆ THỐNG</option>
-                </select>
+                  onChange={(val) => setNewJobGroup(val as any)}
+                  size="sm"
+                  accent="cyan"
+                  searchable={false}
+                  className="bg-slate-950"
+                  options={[
+                    { value: "orders", label: "ĐƠN HÀNG & VẬN HÀNH" },
+                    { value: "notifications", label: "THÔNG BÁO KHÁCH HÀNG" },
+                    { value: "finance", label: "TÀI CHÍNH & TÍN DỤNG" },
+                    { value: "summary", label: "BÁO CÁO & KẾ TOÁN" },
+                    { value: "backup", label: "SAO LƯU HỆ THỐNG" },
+                  ]}
+                />
               </div>
             </div>
 

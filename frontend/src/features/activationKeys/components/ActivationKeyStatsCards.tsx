@@ -24,9 +24,9 @@ export const ActivationKeyStatsCards: React.FC<Props> = ({
       textColor: "text-blue-400",
     },
     {
-      id: "available",
-      label: "Chưa Kích Hoạt (Khả dụng)",
-      count: counts.available,
+      id: "inactive",
+      label: "Chưa kích hoạt",
+      count: counts.inactive,
       icon: Clock,
       color: "from-emerald-500/20 to-teal-500/10 border-emerald-500/30 text-emerald-400",
       activeRing: "ring-2 ring-emerald-500",
@@ -34,7 +34,7 @@ export const ActivationKeyStatsCards: React.FC<Props> = ({
     },
     {
       id: "activated",
-      label: "Đã Kích Hoạt (Đã cấp slot)",
+      label: "Đã kích hoạt",
       count: counts.activated,
       icon: CheckCircle2,
       color: "from-purple-500/20 to-indigo-500/10 border-purple-500/30 text-purple-400",

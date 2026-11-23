@@ -636,3 +636,22 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Sửa parser VPBank và đối soát lại bản ghi #602.
 - [x] Đóng gói `<CustomSelect />` vào `@/shared/components` (React Portal, auto-flip, keyboard + search) và thay sạch 100% `<select>` gốc phân hệ Kho Hàng (`0` còn sót), cùng `FixedCostModal`, `WalletCreateEditModal`, `ReceiptsPage`.
 - [x] Thay nốt toàn bộ 7 checkbox On/Off còn lại sang `<ToggleSwitch />` (chỉ còn 1 checkbox multi-select dòng đơn trong `CreateReceiptModal`). `tsc && vite build` đạt 0 lỗi (4,74s).
+
+- [x] ?? g? hai h?m n?i b? kh?ng c? ?i?m g?i: `incrementVariantOrderCount` trong `orderService.js` v? `cookieMatchesHostname` trong `browserLauncherService.js`. Ki?m tra c? ph?p, qu?t tham chi?u v? 16 unit test li?n quan ??u ??t.
+
+- [x] ?? s?a Nginx tr?n VPS ?? gi? ti?n t? `/browser/` khi proxy t?i Selkies. Ki?m tra `nginx -t` ??t, backend health tr? HTTP 200. Route v? asset tr? HTTP 401 khi ch?a c? phi?n qu?n tr?. C?n ki?m tra giao di?n v? k?t n?i WebSocket b?ng phi?n admin.
+
+- [x] ??t 1 r? so?t n? k? thu?t: chuy?n Product API sang integration, mock resolver ??nh tuy?n trong unit test OTP, th?m unit test backend v?o CI, chuy?n Pricing/Suppliers qua apiClient v? d?ng BaseModal cho x?c nh?n x?a s?n ph?m. Unit test 161/161 v?i PostgreSQL kh?ng kh? d?ng, frontend build ??t.
+
+### Đợt ưu tiên sau kiểm toán Hiến pháp 22/11/2026
+
+- [x] Chuyển toàn bộ quyền ghi cấu hình slot OTP về API quản trị hiện có và bỏ yêu cầu đồng bộ từ trình duyệt khách.
+- [x] Kiểm chứng rollback ghi kho và phát lại Outbox khi gia hạn trên PostgreSQL 16 cục bộ.
+- [x] Kiểm chứng đối chiếu VPBank và xử lý lại webhook SePay OUT có mapping hợp lệ trên PostgreSQL 16 cục bộ.
+- [x] Thêm PostgreSQL test và hai bộ kiểm thử đối soát vào cổng CI trước deploy.
+- [ ] Xác nhận workflow GitHub Actions trên bản cập nhật.
+
+- [x] Đồng bộ kích hoạt key theo thanh toán, tách trạng thái cấp slot và gộp mục lấy, kiểm tra tài khoản Adobe. Migration local đã chạy và kiểm thử đồng thời trên PostgreSQL 16 đạt.
+- [x] Bỏ thứ tự ưu tiên provider OTP và thêm lựa chọn cổng mặc định. Đã xác nhận migration local qua API, chạy unit test backend và build frontend.
+- [x] Lưu ngay thao tác gỡ provider khỏi ô OTP. Đã kiểm tra ghi và đọc lại trên PostgreSQL thử nghiệm.
+- [x] Bỏ nút lưu chung và tự lưu các thao tác cấu hình ô OTP.

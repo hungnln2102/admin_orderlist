@@ -5,13 +5,14 @@ const PN = COLS.PRODUCT_NAMES;
 const PRD = COLS.PRODUCT;
 const V = COLS.VARIANT;
 const SS = COLS.ACCOUNT_SLOTS;
+const ACC = COLS.ACCOUNTS;
 const RR = COLS.PORTAL_SLOT_ROUTING_RULES;
 const SUP = COLS.SUPPLIER;
 const SC = COLS.SUPPLIER_COST;
 const ORD = COLS.ORDER_LIST;
 const AK = COLS.ACTIVATION_KEYS;
 
-const { normalizeKey, providerDetails } = require("./productApiProviderDetails");
+const { providerDetails } = require("./productApiProviderDetails");
 
 async function listRoutingRules() {
   const [rules, suppliers, supplierVariants] = await Promise.all([
@@ -257,261 +258,102 @@ async function deleteSupplierVariant({ supplierCostId, supplierId, variantId }) 
     };
   });
 }
+function selectUniqueProviderRule(rules, providerColumn) {
+  const providers = new Set(rules.map((rule) => rule[providerColumn]));
+  if (providers.size > 1) throw new Error("Xung đột cấu hình provider cho cùng một liên kết OTP.");
+  return rules[0];
+}
+
+function requireUniqueMatch(rows) {
+  if (rows.length > 1) throw new Error("Có nhiều đơn hàng hoặc tài khoản khớp thông tin đã nhập.");
+  return rows[0];
+}
+
 async function findRoutingProviderForInput({ slotKey, input }) {
   if (!slotKey || !input) return null;
-  const rawInput = String(input).trim();
-  const cleanInput = rawInput.toLowerCase();
+  const cleanInput = String(input).trim().toLowerCase();
   if (!cleanInput) return null;
 
-  try {
-    const slotSelect = () => db(TABLES.STOCK_SERVICES + " as ss")
-      .leftJoin(TABLES.ACCOUNTS + " as a", "a.id", "ss." + SS.ACCOUNT_ID)
-      .select(
-        "ss." + SS.ID + " as slot_id",
-        "ss." + SS.NAME_ID + " as name_id",
-        "ss." + SS.VARIANT_TAG + " as variant_tag",
-        "ss." + SS.PROVIDER_KEY + " as slot_provider_key",
-        "ss." + SS.OTP_ENABLED,
-        "ss." + SS.STATUS_CHECK_ENABLED,
-        "ss." + SS.STATUS_PROVIDER_KEY,
-        "a.account_username as slot_email",
-        "a.product_name_id as account_product_name_id"
-      );
+  const activationKey = requireUniqueMatch(await db(TABLES.ACTIVATION_KEYS)
+    .select(AK.ACCOUNT_SLOT_ID, AK.ID_ORDER)
+    .whereRaw("LOWER(TRIM(??)) = ?", [AK.KEY_CODE, cleanInput])
+    .limit(2));
 
-    const activationKey = await db(TABLES.ACTIVATION_KEYS)
-      .select(AK.ACCOUNT_SLOT_ID, AK.ASSIGNED_ACCOUNT, AK.PRODUCT_NAME_ID, AK.ID_ORDER)
-      .whereRaw("UPPER(TRIM(" + AK.KEY_CODE + ")) = ?", [rawInput.toUpperCase()])
-      .first();
+  const orderSelect = () => db(TABLES.ORDER_LIST)
+    .select(ORD.ID_ORDER, ORD.ID_PRODUCT, ORD.SUPPLY_ID, ORD.INFORMATION_ORDER, ORD.STATUS);
+  const boundOrderCode = activationKey?.[AK.ID_ORDER];
+  const orderCodeInput = boundOrderCode ? String(boundOrderCode).trim().toLowerCase() : cleanInput;
+  let order = requireUniqueMatch(await orderSelect()
+    .whereRaw("LOWER(TRIM(??)) = ?", [ORD.ID_ORDER, orderCodeInput])
+    .limit(2));
 
-    let matchedSlot = null;
-    let matchedProductNameId = Number(activationKey?.[AK.PRODUCT_NAME_ID]) || null;
-    let matchedSupplierId = null;
+  if (boundOrderCode && !order) return null;
+  if (order && ["CANCELED", "REFUNDED"].includes(order[ORD.STATUS])) return null;
+  if (!order && !activationKey) {
+    order = requireUniqueMatch(await orderSelect()
+      .whereRaw("LOWER(TRIM(??)) = ?", [ORD.INFORMATION_ORDER, cleanInput])
+      .whereNotIn(ORD.STATUS, ["CANCELED", "REFUNDED"])
+      .limit(2));
+  }
+
+  const orderCode = order?.[ORD.ID_ORDER] || null;
+  const capability = slotKey === "adobe_check" ? "status" : /(^|_)otp$|^netflix_/.test(slotKey) ? "otp" : null;
+  if (capability) {
+    const enabledColumn = capability === "status" ? SS.STATUS_CHECK_ENABLED : SS.OTP_ENABLED;
+    const providerColumn = capability === "status" ? SS.STATUS_PROVIDER_KEY : SS.PROVIDER_KEY;
+    const slotQuery = db(TABLES.STOCK_SERVICES + " as ss")
+      .leftJoin(TABLES.ACCOUNTS + " as a", "a." + ACC.ID, "ss." + SS.ACCOUNT_ID)
+      .select("ss." + enabledColumn, "ss." + providerColumn, "a." + ACC.ACCOUNT_USERNAME + " as slot_email");
 
     if (activationKey?.[AK.ACCOUNT_SLOT_ID]) {
-      matchedSlot = await slotSelect()
-        .where("ss." + SS.ID, Number(activationKey[AK.ACCOUNT_SLOT_ID]))
-        .first();
+      slotQuery.where("ss." + SS.ID, activationKey[AK.ACCOUNT_SLOT_ID]);
+    } else if (orderCode) {
+      slotQuery.where("ss." + SS.ID_ORDER, orderCode);
+    } else {
+      slotQuery.where(function () {
+        this.whereRaw("LOWER(TRIM(??)) = ?", ["ss." + SS.CUSTOMER, cleanInput])
+          .orWhereRaw("LOWER(TRIM(??)) = ?", ["ss." + SS.CONTACT, cleanInput])
+          .orWhereRaw("LOWER(TRIM(??)) = ?", ["a." + ACC.ACCOUNT_USERNAME, cleanInput]);
+      });
     }
 
-    if (!matchedSlot && activationKey?.[AK.ASSIGNED_ACCOUNT]) {
-      const assignedAccount = String(activationKey[AK.ASSIGNED_ACCOUNT]).trim().toLowerCase();
-      if (assignedAccount) {
-        const assignedSlotQuery = slotSelect()
-          .whereRaw("LOWER(a.account_username) = ?", [assignedAccount])
-          .orderBy("ss." + SS.ID, "desc");
-        if (matchedProductNameId) {
-          assignedSlotQuery.where("a.product_name_id", matchedProductNameId);
-        }
-        matchedSlot = await assignedSlotQuery.first();
-      }
-    }
-
-    if (!matchedSlot) {
-      matchedSlot = await slotSelect()
-        .where(function () {
-          this.whereRaw("LOWER(ss." + SS.CUSTOMER + ") = ?", [cleanInput])
-            .orWhereRaw("LOWER(ss." + SS.CONTACT + ") = ?", [cleanInput])
-            .orWhereRaw("LOWER(a.account_username) = ?", [cleanInput]);
-        })
-        .orderBy("ss." + SS.ID, "desc")
-        .first();
-    }
-
-    if (matchedSlot) {
-      const capability = slotKey === "adobe_check" ? "status"
-        : /_otp$|^netflix_/.test(slotKey) ? "otp" : null;
-      const enabled = capability === "status" ? matchedSlot[SS.STATUS_CHECK_ENABLED]
-        : capability === "otp" ? matchedSlot[SS.OTP_ENABLED] : null;
-      if (enabled === false) return { disabled: true };
-      const provider = capability === "status" ? matchedSlot[SS.STATUS_PROVIDER_KEY]
-        : capability === "otp" ? matchedSlot.slot_provider_key : null;
-      if (enabled === true && provider) return { provider_key: provider, resolved_email: matchedSlot.slot_email };
-      matchedProductNameId = Number(matchedSlot.name_id || matchedSlot.account_product_name_id)
-        || matchedProductNameId;
-    }
-
-    const linkedOrderId = activationKey?.[AK.ID_ORDER];
-    const matchedOrders = await db(TABLES.ORDER_LIST)
-      .select(ORD.ID, ORD.ID_ORDER, ORD.ID_PRODUCT, ORD.SUPPLY_ID, ORD.INFORMATION_ORDER, ORD.SLOT, ORD.STATUS)
-      .where(function () {
-        this.whereRaw("LOWER(" + ORD.INFORMATION_ORDER + ") = ?", [cleanInput])
-          .orWhereRaw("LOWER(" + ORD.ID_ORDER + ") = ?", [cleanInput])
-          .orWhereRaw("LOWER(" + ORD.SLOT + ") LIKE ?", [`%${cleanInput}%`]);
-        if (linkedOrderId) this.orWhere(ORD.ID_ORDER, linkedOrderId);
-      })
-      .whereNotIn(ORD.STATUS, ["CANCELED", "REFUNDED"])
-      .orderBy(ORD.ID, "desc")
-      .limit(15);
-
-    // Ưu tiên chọn đơn hàng có NCC/Variant đã được cấu hình cho slot_key này
-    const slotRules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
-      .where({ [RR.SLOT_KEY]: slotKey, [RR.IS_ACTIVE]: true })
-      .whereNotNull(RR.VARIANT_ID);
-    const configuredSuppliers = new Set(slotRules.map((r) => Number(r[RR.SUPPLIER_ID])));
-    const configuredVariants = new Set(slotRules.map((r) => Number(r[RR.VARIANT_ID])));
-
-    let matchedOrder = matchedOrders.find(
-      (o) => configuredSuppliers.has(Number(o[ORD.SUPPLY_ID])) && configuredVariants.has(Number(o[ORD.ID_PRODUCT]))
-    );
-    if (!matchedOrder) {
-      matchedOrder = matchedOrders.find((o) => configuredSuppliers.has(Number(o[ORD.SUPPLY_ID])));
-    }
-    if (!matchedOrder) {
-      matchedOrder = matchedOrders[0] || null;
-    }
-
-    const resolvedEmail = matchedOrder?.[ORD.INFORMATION_ORDER] || matchedSlot?.customer || null;
-    const orderCode = matchedOrder?.[ORD.ID_ORDER] || linkedOrderId || null;
-    const orderVariantId = matchedOrder?.[ORD.ID_PRODUCT] ? Number(matchedOrder[ORD.ID_PRODUCT]) : null;
-
-    if (matchedOrder?.[ORD.SUPPLY_ID]) {
-      matchedSupplierId = Number(matchedOrder[ORD.SUPPLY_ID]);
-    }
-
-    let matchedParentProductId = null;
-    if (orderVariantId) {
-      const matchedVariant = await db(TABLES.VARIANT).where(V.ID, orderVariantId).first();
-      if (matchedVariant) {
-        matchedParentProductId = matchedVariant[V.PRODUCT_ID] ? Number(matchedVariant[V.PRODUCT_ID]) : null;
-      }
-    }
-
-    if (!matchedParentProductId && matchedProductNameId) {
-      const productName = await db(TABLES.PRODUCT_NAMES)
-        .select(PN.PRODUCT_ID)
-        .where(PN.ID, matchedProductNameId)
-        .first();
-      matchedParentProductId = productName?.[PN.PRODUCT_ID]
-        ? Number(productName[PN.PRODUCT_ID])
-        : null;
-    }
-
-    if (matchedSupplierId) {
-      const supplierRules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES + " as r")
-        .leftJoin(TABLES.VARIANT + " as v", "v." + V.ID, "r." + RR.VARIANT_ID)
-        .where({
-          ["r." + RR.SLOT_KEY]: slotKey,
-          ["r." + RR.SUPPLIER_ID]: matchedSupplierId,
-          ["r." + RR.IS_ACTIVE]: true,
-        })
-        .whereNotNull("r." + RR.VARIANT_ID)
-        .select(
-          "r." + RR.ID + " as rule_id",
-          "r." + RR.PROVIDER_KEY + " as provider_key",
-          "r." + RR.VARIANT_ID + " as variant_id",
-          "v." + V.PRODUCT_ID + " as product_id",
-          "v." + V.VARIANT_NAME + " as variant_name",
-          "v." + V.DISPLAY_NAME + " as variant_display_name"
-        )
-        .orderBy("r." + RR.ID, "asc");
-
-      if (supplierRules.length > 0) {
-        // [Ưu tiên 1]: Khớp chính xác theo variant_id của đơn hàng
-        if (orderVariantId) {
-          const exactOrderRule = supplierRules.find((rule) => Number(rule.variant_id) === orderVariantId);
-          if (exactOrderRule) {
-            return {
-              provider_key: exactOrderRule.provider_key,
-              rule_id: Number(exactOrderRule.rule_id),
-              match_type: "EXACT_ORDER_VARIANT",
-              supplier_id: matchedSupplierId,
-              variant_id: orderVariantId,
-              resolved_email: resolvedEmail,
-              order_code: orderCode,
-            };
-          }
-        }
-
-        // [Ưu tiên 2]: Khớp theo variant_tag của kho
-        const normalizedVariantTag = normalizeKey(matchedSlot?.variant_tag);
-        if (normalizedVariantTag) {
-          const exactTagRule = supplierRules.find((rule) =>
-            normalizeKey(rule.variant_name) === normalizedVariantTag
-            || normalizeKey(rule.variant_display_name) === normalizedVariantTag
-          );
-          if (exactTagRule) {
-            return {
-              provider_key: exactTagRule.provider_key,
-              rule_id: Number(exactTagRule.rule_id),
-              match_type: "EXACT_SLOT_TAG_VARIANT",
-              supplier_id: matchedSupplierId,
-              variant_tag: matchedSlot?.variant_tag || null,
-              resolved_email: resolvedEmail,
-              order_code: orderCode,
-            };
-          }
-        }
-
-        // [Ưu tiên 3]: Khớp theo sản phẩm cha (product_id)
-        if (matchedParentProductId) {
-          const productRules = supplierRules.filter((rule) => Number(rule.product_id) === matchedParentProductId);
-          if (productRules.length > 0) {
-            return {
-              provider_key: productRules[0].provider_key,
-              rule_id: Number(productRules[0].rule_id),
-              match_type: "PRODUCT_VARIANT_FALLBACK",
-              supplier_id: matchedSupplierId,
-              product_id: matchedParentProductId,
-              resolved_email: resolvedEmail,
-              order_code: orderCode,
-            };
-          }
-        }
-
-        // [Ưu tiên 4]: Fallback về cổng duy nhất nếu toàn bộ variant của NCC trỏ cùng 1 provider
-        const uniqueProviderKeys = [...new Set(supplierRules.map((r) => r.provider_key))];
-        if (uniqueProviderKeys.length === 1) {
-          return {
-            provider_key: uniqueProviderKeys[0],
-            rule_id: Number(supplierRules[0].rule_id),
-            match_type: "SUPPLIER_SINGLE_PROVIDER_FALLBACK",
-            supplier_id: matchedSupplierId,
-            resolved_email: resolvedEmail,
-            order_code: orderCode,
-          };
-        }
-      }
-    }
-
-    if (matchedProductNameId) {
-      const legacyRules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
-        .where({
-          [RR.SLOT_KEY]: slotKey,
-          [RR.PRODUCT_NAME_ID]: matchedProductNameId,
-          [RR.IS_ACTIVE]: true,
-        })
-        .whereNull(RR.VARIANT_ID)
-        .orderBy(RR.ID, "asc");
-      const exactSupplierRule = matchedSupplierId
-        ? legacyRules.find((rule) => Number(rule[RR.SUPPLIER_ID]) === matchedSupplierId)
-        : null;
-      const defaultRule = legacyRules.find((rule) => !rule[RR.SUPPLIER_ID]);
-      const legacyRule = exactSupplierRule || defaultRule || legacyRules[0];
-      if (legacyRule) {
-        return {
-          provider_key: legacyRule[RR.PROVIDER_KEY],
-          rule_id: Number(legacyRule[RR.ID]),
-          match_type: exactSupplierRule ? "LEGACY_EXACT_SUPPLIER" : "LEGACY_FALLBACK",
-          supplier_id: matchedSupplierId,
-          product_name_id: matchedProductNameId,
-        };
-      }
-    }
-
-    const directProviderKey = slotKey === "adobe_check" && matchedSlot?.[SS.STATUS_CHECK_ENABLED] === true
-      ? "" : String(matchedSlot?.slot_provider_key || "").trim();
-    if (directProviderKey) {
+    const slot = requireUniqueMatch(await slotQuery.limit(2));
+    if (slot?.[enabledColumn] === false) return { disabled: true };
+    if (slot?.[enabledColumn] === true && slot[providerColumn]) {
       return {
-        provider_key: directProviderKey,
-        match_type: "DIRECT_SLOT_PROVIDER_FALLBACK",
-        source: "WAREHOUSE_SLOT",
+        provider_key: slot[providerColumn],
+        resolved_email: slot.slot_email,
+        order_code: orderCode,
+        match_type: "EXACT_WAREHOUSE_CAPABILITY",
       };
     }
-    return null;
-  } catch (err) {
-    console.warn("[ProductApi Service] Lỗi findRoutingProviderForInput:", err.message);
-    throw err;
   }
+
+  const supplierId = order?.[ORD.SUPPLY_ID];
+  const variantId = order?.[ORD.ID_PRODUCT];
+  if (!supplierId || !variantId) return null;
+
+  const rules = await db(TABLES.PORTAL_SLOT_ROUTING_RULES)
+    .select(RR.ID, RR.PROVIDER_KEY)
+    .where({
+      [RR.SLOT_KEY]: slotKey,
+      [RR.SUPPLIER_ID]: supplierId,
+      [RR.VARIANT_ID]: variantId,
+      [RR.IS_ACTIVE]: true,
+    })
+    .orderBy(RR.ID, "asc");
+  const rule = selectUniqueProviderRule(rules, RR.PROVIDER_KEY);
+  if (!rule) return null;
+
+  return {
+    provider_key: rule[RR.PROVIDER_KEY],
+    rule_id: Number(rule[RR.ID]),
+    match_type: "EXACT_ORDER_VARIANT",
+    supplier_id: Number(supplierId),
+    variant_id: Number(variantId),
+    resolved_email: order[ORD.INFORMATION_ORDER],
+    order_code: orderCode,
+  };
 }
 module.exports = {
   listRoutingRules,

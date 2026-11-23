@@ -14,7 +14,7 @@ import {
   Hash,
   Layers as LayersIcon,
 } from "lucide-react";
-import { DateInputVN, SearchableCombobox, ToggleSwitch } from "@/shared/components";
+import { CustomSelect, DateInputVN, SearchableCombobox, ToggleSwitch } from "@/shared/components";
 import { PackageItem, PackageFormData, PackageCategory } from "../types";
 
 interface PackageCreateEditModalProps {
@@ -100,23 +100,23 @@ export const PackageCreateEditModal: React.FC<PackageCreateEditModalProps> = ({
                 <Layers className="w-3.5 h-3.5 text-indigo-400" />
                 Loại Gói Sản Phẩm *
               </label>
-              <select
+              <CustomSelect
                 value={currentCategory}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
-                required
-              >
-                {categoriesList.map((c) => (
-                  <option key={c.id} value={c.name} className="bg-[#0a1225]">
-                    {c.name} {c.requiresStorage ? "★ (Cần Storage)" : ""}
-                  </option>
-                ))}
-                {!categoriesList.some((c) => c.name.toLowerCase() === currentCategory.toLowerCase()) && currentCategory && (
-                  <option value={currentCategory} className="bg-[#0a1225]">
-                    {currentCategory}
-                  </option>
-                )}
-              </select>
+                onChange={handleCategoryChange}
+                size="sm"
+                accent="cyan"
+                placeholder="Chọn loại gói sản phẩm..."
+                className="bg-slate-950 border-slate-800"
+                options={[
+                  ...categoriesList.map((c) => ({
+                    value: c.name,
+                    label: `${c.name}${c.requiresStorage ? " ★ (Cần Storage)" : ""}`,
+                  })),
+                  ...(!categoriesList.some((c) => c.name.toLowerCase() === currentCategory.toLowerCase()) && currentCategory
+                    ? [{ value: currentCategory, label: currentCategory }]
+                    : []),
+                ]}
+              />
             </div>
 
             <div>

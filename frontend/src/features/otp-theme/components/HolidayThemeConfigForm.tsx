@@ -1,5 +1,6 @@
 import React from "react";
 import { Sparkles, X, Sun, Moon, Check, Save, Trash2 } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { HolidayFormState, RangeSelection, ThemeItem } from "../types";
 
 interface HolidayThemeConfigFormProps {
@@ -71,10 +72,9 @@ export const HolidayThemeConfigForm: React.FC<HolidayThemeConfigFormProps> = ({
           <label className="text-[11px] font-bold text-slate-300 block">
             Chọn Theme Giao Diện Lễ Hội:
           </label>
-          <select
+          <CustomSelect
             value={holidayForm.theme}
-            onChange={(e) => {
-              const themeKey = e.target.value;
+            onChange={(themeKey) => {
               const meta = themesList.find((t) => t.id === themeKey);
               setHolidayForm((curr) => ({
                 ...curr,
@@ -82,14 +82,14 @@ export const HolidayThemeConfigForm: React.FC<HolidayThemeConfigFormProps> = ({
                 holidayName: meta?.name || curr.holidayName,
               }));
             }}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-          >
-            {themesList.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.icon} {t.name}
-              </option>
-            ))}
-          </select>
+            size="sm"
+            accent="amber"
+            className="bg-slate-950 font-bold"
+            options={themesList.map((t) => ({
+              value: t.id,
+              label: `${t.icon} ${t.name}`,
+            }))}
+          />
         </div>
 
         {/* Loại Lịch: Dương Lịch vs Âm Lịch */}

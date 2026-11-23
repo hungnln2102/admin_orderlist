@@ -1,3 +1,4 @@
+import { apiClient } from "@/shared/api/apiClient";
 import React, { useState, useEffect, useCallback } from "react";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { useRealtimeEvent } from "@/shared/context/RealtimeContext";
@@ -74,7 +75,7 @@ export const SuppliersPage: React.FC = () => {
   const fetchSuppliersOverview = useCallback(async () => {
     setLoadingOverview(true);
     try {
-      const res = await fetch(
+      const res = await apiClient(
         `/api/suppliers/overview?search=${encodeURIComponent(
           searchOverview
         )}&activeFilter=${activeFilter}&sortBy=${sortBy}`
@@ -101,7 +102,7 @@ export const SuppliersPage: React.FC = () => {
       [supplierId]: { logs: prev[supplierId]?.logs || [], loading: true },
     }));
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/logs`);
+      const res = await apiClient(`/api/suppliers/${supplierId}/logs`);
       const data = await res.json();
       if (res.ok) {
         setSupplierLogsMap((prev) => ({
@@ -121,7 +122,7 @@ export const SuppliersPage: React.FC = () => {
   const fetchSupplierDetail = async (supplierId: number) => {
     setLoadingDetail(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/detail`);
+      const res = await apiClient(`/api/suppliers/${supplierId}/detail`);
       const data = await res.json();
       if (res.ok) {
         setSupplierDetail(data || null);
@@ -201,7 +202,7 @@ export const SuppliersPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/suppliers", {
+      const res = await apiClient("/api/suppliers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -227,7 +228,7 @@ export const SuppliersPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/suppliers/${editingSupplier.id}`, {
+      const res = await apiClient(`/api/suppliers/${editingSupplier.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -250,7 +251,7 @@ export const SuppliersPage: React.FC = () => {
   const handleToggleStatus = async (supplier: SupplierItem) => {
     const updatedStatus = !supplier.active_supply;
     try {
-      const res = await fetch(`/api/suppliers/${supplier.id}`, {
+      const res = await apiClient(`/api/suppliers/${supplier.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -278,7 +279,7 @@ export const SuppliersPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/suppliers/${deletingSupplier.id}`, {
+      const res = await apiClient(`/api/suppliers/${deletingSupplier.id}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -301,7 +302,7 @@ export const SuppliersPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/suppliers/${selectedSupplierDetailId}/pay-debt`, {
+      const res = await apiClient(`/api/suppliers/${selectedSupplierDetailId}/pay-debt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });

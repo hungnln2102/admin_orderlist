@@ -1,3 +1,4 @@
+import { useWarehouseProviderNames } from "./WarehouseProviderCatalog";
 import { AVAILABLE_OTP_PROVIDERS } from "../providerConstants";
 import { CustomSelect, ToggleSwitch } from "@/shared/components";
 
@@ -16,11 +17,12 @@ export function SlotProviderControls({
   enabled,
   provider,
   status = false,
-  providers = AVAILABLE_OTP_PROVIDERS,
+  providers,
   onToggle,
   onProviderChange,
 }: Props) {
-  const options = providers.filter(({ value }) => (value === "fix_ades_status") === status);
+  const providerNames = useWarehouseProviderNames();
+  const options = (providers ?? AVAILABLE_OTP_PROVIDERS.map(({ value }) => ({ value, label: providerNames[value] || value }))).filter(({ value }) => (value === "fix_ades_status") === status);
 
   return (
     <div

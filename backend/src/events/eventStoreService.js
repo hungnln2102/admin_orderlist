@@ -77,7 +77,12 @@ async function markEventDispatchFailed(eventId, error, connection) {
     .update({ [E.ERROR_MESSAGE]: error.message || String(error) });
 }
 
-async function dispatchStoredEventWith(event, { emitAsync, markPublishedFn, markFailedFn }) {
+async function dispatchStoredEventWith(event, {
+  emitAsync,
+  markPublishedFn,
+  markFailedFn,
+  withSavepoint = (work) => work(),
+}) {
   const payload = {
     ...(event[E.PAYLOAD] || {}),
     auditEventId: event[E.ID],
@@ -85,8 +90,10 @@ async function dispatchStoredEventWith(event, { emitAsync, markPublishedFn, mark
   };
 
   try {
-    await emitAsync(event[E.EVENT_NAME], payload);
-    await markPublishedFn(event[E.ID]);
+    await withSavepoint(async (dispatchTrx) => {
+      await emitAsync(event[E.EVENT_NAME], payload, { trx: dispatchTrx });
+      await markPublishedFn(event[E.ID], dispatchTrx);
+    });
   } catch (error) {
     await markFailedFn(event[E.ID], error);
     throw error;
@@ -105,8 +112,9 @@ async function dispatchStoredEvent(event) {
     try {
       await dispatchStoredEventWith(pending, {
         emitAsync: eventBus.emitAsync.bind(eventBus),
-        markPublishedFn: (id) => markEventPublished(id, trx),
+        markPublishedFn: markEventPublished,
         markFailedFn: (id, error) => markEventDispatchFailed(id, error, trx),
+        withSavepoint: (work) => trx.transaction(work),
       });
       return { published: true };
     } catch (error) {
@@ -165,12 +173,12 @@ async function replayPendingEvents(events, dispatch = dispatchStoredEvent) {
   return published;
 }
 
-async function recordEvent(input) {
+async function recordEvent(input, connection = db) {
   if (input?.payload?.auditEventId) {
     return { [E.ID]: input.payload.auditEventId, alreadyRecorded: true };
   }
   if (!input?.eventName) throw new Error("eventName is required");
-  return insertEvent(db, input, "PUBLISHED");
+  return insertEvent(connection, input, "PUBLISHED");
 }
 
 module.exports = {

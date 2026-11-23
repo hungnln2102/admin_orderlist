@@ -10,7 +10,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { DateInputVN } from "@/shared/components";
+import { CustomSelect, DateInputVN } from "@/shared/components";
 import { PaymentAccount, ExpenseFormData } from "../types";
 
 interface ExternalImportCreateModalProps {
@@ -107,26 +107,23 @@ export const ExternalImportCreateModal: React.FC<ExternalImportCreateModalProps>
                 </span>
               )}
             </label>
-            <div className="relative">
-              <select
-                value={formData.shop_bank_account_id}
-                onChange={(e) => setFormData((prev) => ({ ...prev, shop_bank_account_id: e.target.value }))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xs focus:outline-none focus:border-cyan-500 cursor-pointer appearance-none pr-8"
-              >
-                <option value="">💵 Tiền mặt / Ví cá nhân (Không tính biến động tháng của Shop)</option>
-                {accounts.map((acc) => {
+            <CustomSelect
+              value={formData.shop_bank_account_id}
+              onChange={(val) => setFormData((prev) => ({ ...prev, shop_bank_account_id: val }))}
+              size="sm"
+              accent="cyan"
+              className="bg-slate-800 border-slate-700"
+              options={[
+                { value: "", label: "💵 Tiền mặt / Ví cá nhân (Không tính biến động tháng của Shop)" },
+                ...accounts.map((acc) => {
                   const isShop = acc.accountScope === "SHOP";
-                  return (
-                    <option key={acc.id} value={acc.id}>
-                      {isShop ? "🏦" : "💼"} {acc.bankShortCode || acc.label} — {acc.accountNumber} ({formatVND(acc.balance)}) {isShop ? "[Tài Khoản Shop: Có Biến Động Tháng]" : "[Ví Cá Nhân: Không Biến Động]"}
-                    </option>
-                  );
-                })}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                <ChevronDown className="w-4 h-4" />
-              </div>
-            </div>
+                  return {
+                    value: String(acc.id),
+                    label: `${isShop ? "🏦" : "💼"} ${acc.bankShortCode || acc.label} — ${acc.accountNumber} (${formatVND(acc.balance)}) ${isShop ? "[Tài Khoản Shop: Có Biến Động Tháng]" : "[Ví Cá Nhân: Không Biến Động]"}`,
+                  };
+                }),
+              ]}
+            />
 
             {/* Ghi chú trực quan về biến động tháng */}
             <div className="mt-2 p-2 rounded-xl border text-[11px] space-y-1 bg-slate-950/60 border-slate-800">

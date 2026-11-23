@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Layers, X, Plus, List, Sparkles, HardDrive } from "lucide-react";
-import { ToggleSwitch } from "@/shared/components";
+import { CustomSelect, ToggleSwitch } from "@/shared/components";
 
 interface CategoryModalProps {
   open: boolean;
@@ -72,20 +72,20 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
           {!isCustomMode ? (
             <div>
               <div className="flex gap-2 items-center">
-                <select
-                  value={categoryName}
-                  onChange={(e) => onNameChange(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
-                >
-                  <option value="" className="bg-[#0a1225] text-slate-400">
-                    -- Chọn sản phẩm từ Master Catalog --
-                  </option>
-                  {catalogNames.map((name) => (
-                    <option key={name} value={name} className="bg-[#0a1225] text-white">
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex-1 min-w-0">
+                  <CustomSelect
+                    value={categoryName}
+                    onChange={onNameChange}
+                    size="sm"
+                    accent="cyan"
+                    placeholder="-- Chọn sản phẩm từ Master Catalog --"
+                    className="bg-slate-950 border-slate-800"
+                    options={catalogNames.map((name) => ({
+                      value: name,
+                      label: name,
+                    }))}
+                  />
+                </div>
 
                 <button
                   type="button"

@@ -104,7 +104,7 @@ const deleteActivationKeyRule = async (req, res) => {
 const checkMatchingKeyRule = async (req, res) => {
   try {
     const { variantId, supplierId } = req.query;
-    const rule = await activationKeyService.findMatchingKeyRule({ variantId, supplierId });
+    const { rule } = await activationKeyService.resolveOrderActivationRule({ variantId, supplierId });
     const previewKey = rule ? activationKeyService.generateOrderActivationKey() : null;
     return res.set("Cache-Control", "no-store").json({
       success: true, matched: Boolean(rule), rule, previewKey,

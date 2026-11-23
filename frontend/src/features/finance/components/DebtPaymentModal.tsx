@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Installment, PersonalAsset } from "../types";
 import { X, CreditCard, DollarSign, Calendar, FileText, PlusCircle, MinusCircle, Wallet, Receipt } from "lucide-react";
 import { formatVND } from "@/shared/utils";
+import { CustomSelect } from "@/shared/components";
 import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
@@ -389,18 +390,17 @@ export const DebtPaymentModal: React.FC<Props> = ({
                 ) : accounts.length === 0 ? (
                   <div className="text-xs text-rose-400 py-2">Không tìm thấy tài khoản ngân hàng hoặc ví nào đang hoạt động.</div>
                 ) : (
-                  <select
-                    value={selectedAccountId}
-                    onChange={(e) => setSelectedAccountId(Number(e.target.value))}
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
-                  >
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.label} ({acc.detail})
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={selectedAccountId ? String(selectedAccountId) : ""}
+                    onChange={(val) => setSelectedAccountId(val ? Number(val) : "")}
+                    accent="emerald"
+                    className="bg-slate-950 border-slate-800"
+                    placeholder="Chọn tài khoản thanh khoản..."
+                    options={accounts.map((acc) => ({
+                      value: String(acc.id),
+                      label: `${acc.label} (${acc.detail})`,
+                    }))}
+                  />
                 )
               )}
 
@@ -408,29 +408,28 @@ export const DebtPaymentModal: React.FC<Props> = ({
                 unallocatedReceipts.length === 0 ? (
                   <div className="text-xs text-rose-400 py-2">Không có biên lai ngân hàng nào chưa phân bổ (unallocated).</div>
                 ) : (
-                  <select
-                    value={selectedReceiptId}
-                    onChange={(e) => {
-                      const rId = Number(e.target.value);
-                      setSelectedReceiptId(rId);
+                  <CustomSelect
+                    value={selectedReceiptId ? String(selectedReceiptId) : ""}
+                    onChange={(val) => {
+                      const rId = Number(val);
+                      setSelectedReceiptId(rId || "");
                       const found = unallocatedReceipts.find((r: any) => Number(r.id) === rId);
                       if (found) {
                         const avail = Number(found.unallocated_amount !== undefined ? found.unallocated_amount : found.amount);
                         if (avail > 0) setAmount(String(avail));
                       }
                     }}
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 cursor-pointer"
-                  >
-                    {unallocatedReceipts.map((rec: any) => {
+                    accent="cyan"
+                    className="bg-slate-950 border-slate-800 font-mono"
+                    placeholder="Chọn biên lai ngân hàng..."
+                    options={unallocatedReceipts.map((rec: any) => {
                       const avail = Number(rec.unallocated_amount !== undefined ? rec.unallocated_amount : rec.amount);
-                      return (
-                        <option key={rec.id} value={rec.id}>
-                          [{rec.sepay_transaction_id || rec.reference_code || `REC-${rec.id}`}] {rec.sender || "Khách"} - {formatVND(avail)} (Khả dụng) - "{rec.note || ""}"
-                        </option>
-                      );
+                      return {
+                        value: String(rec.id),
+                        label: `[${rec.sepay_transaction_id || rec.reference_code || `REC-${rec.id}`}] ${rec.sender || "Khách"} - ${formatVND(avail)} (Khả dụng) - "${rec.note || ""}"`,
+                      };
                     })}
-                  </select>
+                  />
                 )
               )}
             </div>
@@ -469,28 +468,27 @@ export const DebtPaymentModal: React.FC<Props> = ({
                 ) : accounts.length === 0 ? (
                   <div className="text-xs text-rose-400 py-2">Không tìm thấy tài khoản ngân hàng hoặc ví nào đang hoạt động.</div>
                 ) : (
-                  <select
-                    value={selectedAccountId}
-                    onChange={(e) => setSelectedAccountId(Number(e.target.value))}
-                    required={fundingSource === "ACCOUNT"}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
-                  >
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.label} ({acc.detail})
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={selectedAccountId ? String(selectedAccountId) : ""}
+                    onChange={(val) => setSelectedAccountId(val ? Number(val) : "")}
+                    accent="emerald"
+                    className="bg-slate-950 border-slate-800"
+                    placeholder="Chọn tài khoản thanh khoản..."
+                    options={accounts.map((acc) => ({
+                      value: String(acc.id),
+                      label: `${acc.label} (${acc.detail})`,
+                    }))}
+                  />
                 )
               ) : (
                 unallocatedReceipts.length === 0 ? (
                   <div className="text-xs text-rose-400 py-2">Không có biên lai ngân hàng nào chưa phân bổ (unallocated).</div>
                 ) : (
-                  <select
-                    value={selectedReceiptId}
-                    onChange={(e) => {
-                      const rId = Number(e.target.value);
-                      setSelectedReceiptId(rId);
+                  <CustomSelect
+                    value={selectedReceiptId ? String(selectedReceiptId) : ""}
+                    onChange={(val) => {
+                      const rId = Number(val);
+                      setSelectedReceiptId(rId || "");
                       const found = unallocatedReceipts.find((r: any) => Number(r.id) === rId);
                       if (found) {
                         const avail = Number(found.unallocated_amount !== undefined ? found.unallocated_amount : found.amount);
@@ -499,18 +497,17 @@ export const DebtPaymentModal: React.FC<Props> = ({
                         }
                       }
                     }}
-                    required={fundingSource === "RECEIPT"}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 cursor-pointer"
-                  >
-                    {unallocatedReceipts.map((rec: any) => {
+                    accent="cyan"
+                    className="bg-slate-950 border-slate-800 font-mono"
+                    placeholder="Chọn biên lai ngân hàng..."
+                    options={unallocatedReceipts.map((rec: any) => {
                       const avail = Number(rec.unallocated_amount !== undefined ? rec.unallocated_amount : rec.amount);
-                      return (
-                        <option key={rec.id} value={rec.id}>
-                          [{rec.sepay_transaction_id || rec.reference_code || `REC-${rec.id}`}] {rec.sender || "Khách"} - {formatVND(avail)} (Khả dụng) - "{rec.note || ""}"
-                        </option>
-                      );
+                      return {
+                        value: String(rec.id),
+                        label: `[${rec.sepay_transaction_id || rec.reference_code || `REC-${rec.id}`}] ${rec.sender || "Khách"} - ${formatVND(avail)} (Khả dụng) - "${rec.note || ""}"`,
+                      };
                     })}
-                  </select>
+                  />
                 )
               )}
             </div>

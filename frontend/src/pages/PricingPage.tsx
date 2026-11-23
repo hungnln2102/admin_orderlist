@@ -1,3 +1,4 @@
+import { apiClient } from "@/shared/api/apiClient";
 import React, { useState, useEffect, useCallback } from "react";
 import { TablePagination } from "@/shared/components/TablePagination";
 import { useNotification } from "@/shared/context/NotificationContext";
@@ -72,7 +73,7 @@ export const PricingPage: React.FC = () => {
   const fetchPricingData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(
+      const res = await apiClient(
         `/api/products/prices?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&status=${activeTab}`
       );
       const data = await res.json();
@@ -105,7 +106,7 @@ export const PricingPage: React.FC = () => {
 
   const fetchAllSuppliers = useCallback(async () => {
     try {
-      const res = await fetch("/api/products/all-suppliers");
+      const res = await apiClient("/api/products/all-suppliers");
       const data = await res.json();
       if (res.ok) {
         setAllSuppliers(Array.isArray(data) ? data : data.data || []);
@@ -118,7 +119,7 @@ export const PricingPage: React.FC = () => {
   const fetchSupplierCosts = async (productId: number) => {
     setLoadingSuppliers((prev) => ({ ...prev, [productId]: true }));
     try {
-      const res = await fetch(`/api/products/${productId}/suppliers`);
+      const res = await apiClient(`/api/products/${productId}/suppliers`);
       const data = await res.json();
       if (res.ok) {
         setSupplierCosts((prev) => ({
@@ -184,7 +185,7 @@ export const PricingPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/products", {
+      const res = await apiClient("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...productForm, san_pham: productForm.name, package_product: productForm.variant_name }),
@@ -222,7 +223,7 @@ export const PricingPage: React.FC = () => {
     setTogglingId(item.id);
     const newStatus = !item.is_active;
     try {
-      const res = await fetch(`/api/products/${item.id}`, {
+      const res = await apiClient(`/api/products/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_active: newStatus }),
@@ -265,7 +266,7 @@ export const PricingPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/products/${editingItem.id}`, {
+      const res = await apiClient(`/api/products/${editingItem.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...productForm, san_pham: productForm.name, package_product: productForm.variant_name }),
@@ -290,7 +291,7 @@ export const PricingPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/products/${deletingItem.id}`, {
+      const res = await apiClient(`/api/products/${deletingItem.id}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -318,7 +319,7 @@ export const PricingPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/products/${addSupplierProductId}/suppliers`, {
+      const res = await apiClient(`/api/products/${addSupplierProductId}/suppliers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(supplierForm),
@@ -346,7 +347,7 @@ export const PricingPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/products/suppliers/${editingSupplierCost.supplierCostId}`, {
+      const res = await apiClient(`/api/products/suppliers/${editingSupplierCost.supplierCostId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ price: editingSupplierCost.price }),
@@ -369,7 +370,7 @@ export const PricingPage: React.FC = () => {
 
   const handleDeleteSupplierCost = async (productId: number, supplierCostId: number) => {
     try {
-      const res = await fetch(`/api/products/suppliers/${supplierCostId}`, {
+      const res = await apiClient(`/api/products/suppliers/${supplierCostId}`, {
         method: "DELETE",
       });
       const data = await res.json();

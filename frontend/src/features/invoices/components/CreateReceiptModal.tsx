@@ -26,6 +26,7 @@ import {
 import { BatchDetailModal } from "./BatchDetailModal";
 import { BatchSubOrdersModal } from "./BatchSubOrdersModal";
 import { StatusBadge } from "@/features/orders/components/StatusBadge";
+import { CustomSelect } from "@/shared/components";
 import { ORDER_STATUS } from "@/features/orders/constants/orderStatus";
 import {
   createInvoiceBatch,
@@ -524,18 +525,22 @@ export const CreateReceiptModal: React.FC<CreateReceiptModalProps> = ({
 
             {/* Bank selector mini */}
             <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>STK nhận:</span>
-              <select
-                value={selectedBankId}
-                onChange={(e) => setSelectedBankId(e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-cyan-500 font-medium"
-              >
-                {(Array.isArray(bankAccounts) ? bankAccounts : []).map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.bankShortCode || b.bankDisplayName} - {b.accountNumber} ({b.accountHolder}) {b.isDefault ? "★" : ""}
-                  </option>
-                ))}
-              </select>
+              <span className="shrink-0">STK nhận:</span>
+              <div className="w-60 sm:w-72">
+                <CustomSelect
+                  value={String(selectedBankId || "")}
+                  onChange={(val) => setSelectedBankId(val)}
+                  size="sm"
+                  accent="cyan"
+                  searchable={false}
+                  className="bg-slate-800 border-slate-700 font-medium !py-1.5"
+                  placeholder="Chọn STK nhận..."
+                  options={(Array.isArray(bankAccounts) ? bankAccounts : []).map((b) => ({
+                    value: String(b.id),
+                    label: `${b.bankShortCode || b.bankDisplayName} - ${b.accountNumber} (${b.accountHolder}) ${b.isDefault ? "★" : ""}`,
+                  }))}
+                />
+              </div>
             </div>
           </div>
 

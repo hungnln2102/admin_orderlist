@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import {
-  Save,
   Loader2,
   ShieldAlert,
   Layers,
@@ -8,8 +7,6 @@ import {
   Search,
   Plus,
   Trash2,
-  ArrowUp,
-  ArrowDown,
   CheckCircle2,
   Power,
   Tv,
@@ -25,28 +22,28 @@ import {
 } from "lucide-react";
 import type { PortalSlotItem } from "@/features/external-api/types";
 import type { Provider } from "@/features/external-api/hooks/useExternalApiConfig";
+import { CustomSelect } from "@/shared/components";
 
 interface OtpPortalSlotsTabProps {
   slots: PortalSlotItem[];
   providers: Provider[];
-  savingSlots: boolean;
+  updatingSlot: boolean;
+  removingSlotProvider: { slotKey: string; serviceKey: string } | null;
   onAddService: (slotKey: string, serviceKey: string) => void;
-  onRemoveService: (slotKey: string, serviceKey: string) => void;
-  onMoveService: (slotKey: string, fromIndex: number, toIndex: number) => void;
+  onRemoveService: (slotKey: string, serviceKey: string) => Promise<void>;
   onToggleEnabled: (slotKey: string, enabled: boolean) => void;
-  onSaveSlots: () => void;
 }
 
 export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
   slots,
   providers,
-  savingSlots,
+  updatingSlot,
+  removingSlotProvider,
   onAddService,
   onRemoveService,
-  onMoveService,
   onToggleEnabled,
-  onSaveSlots,
 }) => {
+  const slotControlsDisabled = updatingSlot || Boolean(removingSlotProvider);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ENABLED" | "DISABLED">("ALL");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -184,8 +181,7 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-400 max-w-3xl leading-relaxed">
-            Mỗi ô input trên cổng OTP có thể gán chuỗi nhiều Cổng Dịch Vụ / NCC khác nhau không giới hạn.
-            Hệ thống sẽ lần lượt xử lý theo <strong className="text-slate-200">thứ tự ưu tiên từ trên xuống dưới</strong> (bấm nút mũi tên để đảo vị trí).
+            Gán các cổng xử lý cho từng ô nhập.
           </p>
         </div>
 
@@ -214,24 +210,12 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={onSaveSlots}
-            disabled={savingSlots}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 whitespace-nowrap cursor-pointer"
-          >
-            {savingSlots ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang lưu...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>Lưu Cấu Hình Cổng</span>
-              </>
-            )}
-          </button>
+          {updatingSlot && (
+            <span role="status" className="inline-flex items-center gap-2 text-xs text-slate-300">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Đang cập nhật cổng OTP…</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -392,6 +376,7 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
                   {/* Nút công tắc Bật/Tắt */}
                   <button
                     type="button"
+                    disabled={slotControlsDisabled}
                     onClick={() => onToggleEnabled(slot.slot_key, !isEnabled)}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 ${
                       isEnabled
@@ -446,39 +431,40 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
 
 
                     {/* Ô Gán thêm Provider / NCC nằm đúng ngữ cảnh danh sách */}
-                    <div className="relative shrink-0">
-                      <Plus className="w-3.5 h-3.5 text-cyan-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <select
+                    <div className="shrink-0 w-full sm:w-56">
+                      <CustomSelect
                         value=""
-                        disabled={availableToAdd.length === 0}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            onAddService(slot.slot_key, e.target.value);
+                        disabled={slotControlsDisabled || availableToAdd.length === 0}
+                        onChange={(val) => {
+                          if (val) {
+                            onAddService(slot.slot_key, val);
                           }
                         }}
-                        className="w-full sm:w-auto text-xs font-semibold bg-slate-950 border border-slate-700 hover:border-cyan-500/60 text-slate-200 rounded-xl pl-7 pr-3 py-1.5 outline-none focus:ring-1 focus:ring-cyan-500 transition-all cursor-pointer disabled:opacity-40"
-                      >
-                        <option value="">
-                          {availableToAdd.length === 0
+                        size="sm"
+                        accent="cyan"
+                        className="bg-slate-950 font-semibold"
+                        placeholder={
+                          availableToAdd.length === 0
                             ? "Đã gán đủ cổng"
-                            : "+ Gán thêm NCC..."}
-                        </option>
-                        {availableToAdd.map((p) => (
-                          <option key={p.key} value={p.key}>
-                            + {p.name} ({p.key}) • {p.category} {p.configured ? "✓" : "⚠️"}
-                          </option>
-                        ))}
-                      </select>
+                            : "+ Gán thêm NCC..."
+                        }
+                        options={availableToAdd.map((p) => ({
+                          value: p.key,
+                          label: `+ ${p.name} (${p.key}) • ${p.category} ${p.configured ? "✓" : "⚠️"}`,
+                        }))}
+                      />
                     </div>
                   </div>
 
                   {assignedServices.length === 0 ? (
                     <div className="p-3.5 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 text-center text-xs text-amber-300">
-                      Chưa có Cổng / NCC nào được gắn cho ô input này. Hãy chọn cổng ở góc trên để thêm vào chuỗi xử lý.
+                      Chưa có cổng nào được gán cho ô nhập này.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {assignedServices.map((serviceKey, idx) => {
+                      {assignedServices.map((serviceKey) => {
+                        const isRemoving = removingSlotProvider?.slotKey === slot.slot_key
+                          && removingSlotProvider.serviceKey === serviceKey;
                         const provider = providers.find((p) => p.key === serviceKey);
                         const isConfigured = provider ? provider.configured : false;
                         const catMeta = getCategoryMeta(provider?.category || "");
@@ -490,10 +476,6 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
                             className="group flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-slate-950/80 border-slate-800 hover:border-slate-700 transition-all"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs flex items-center justify-center shrink-0">
-                                #{idx + 1}
-                              </span>
-
                               <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 text-cyan-400">
                                 <CatIcon className="w-4 h-4" />
                               </div>
@@ -533,33 +515,16 @@ export const OtpPortalSlotsTab: React.FC<OtpPortalSlotsTabProps> = ({
                               </div>
                             </div>
 
-                            {/* Bộ nút Reorder & Delete */}
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="shrink-0">
                               <button
                                 type="button"
-                                disabled={idx === 0}
-                                onClick={() => onMoveService(slot.slot_key, idx, idx - 1)}
-                                title="Tăng độ ưu tiên (Lên)"
-                                className="p-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 disabled:opacity-20 disabled:pointer-events-none transition-all cursor-pointer"
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={idx === assignedServices.length - 1}
-                                onClick={() => onMoveService(slot.slot_key, idx, idx + 1)}
-                                title="Giảm độ ưu tiên (Xuống)"
-                                className="p-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 disabled:opacity-20 disabled:pointer-events-none transition-all cursor-pointer"
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => onRemoveService(slot.slot_key, serviceKey)}
+                                onClick={() => void onRemoveService(slot.slot_key, serviceKey)}
+                                disabled={slotControlsDisabled}
                                 title="Gỡ cổng này khỏi ô input"
-                                className="p-1 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-950/50 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer"
+                                aria-label={isRemoving ? "Đang gỡ cổng" : `Gỡ cổng ${provider?.name || serviceKey}`}
+                                className="p-1 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-950/50 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer disabled:opacity-50"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                {isRemoving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                               </button>
                             </div>
                           </div>

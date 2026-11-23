@@ -1,5 +1,6 @@
 import React from "react";
 import { PlusCircle, Pencil, X } from "lucide-react";
+import { CustomSelect } from "@/shared/components";
 import { Supplier, EditingSupplierCostState } from "../types";
 
 interface SupplierCostModalProps {
@@ -51,18 +52,18 @@ export const SupplierCostModal: React.FC<SupplierCostModalProps> = ({
           <form onSubmit={onAddSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block text-slate-400 mb-1 font-semibold">Chọn Nhà Cung Cấp *</label>
-              <select
-                value={supplierForm.supplier_id}
-                onChange={(e) => setSupplierForm({ ...supplierForm, supplier_id: Number(e.target.value) })}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500"
-              >
-                <option value={0}>-- Chọn nhà cung cấp --</option>
-                {allSuppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.supplier_name} {s.number_bank ? `(${s.number_bank})` : ""}
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={supplierForm.supplier_id ? String(supplierForm.supplier_id) : ""}
+                onChange={(val) => setSupplierForm({ ...supplierForm, supplier_id: Number(val) || 0 })}
+                size="sm"
+                accent="cyan"
+                placeholder="-- Chọn nhà cung cấp --"
+                className="bg-slate-900 border-slate-800"
+                options={allSuppliers.map((s) => ({
+                  value: String(s.id),
+                  label: `${s.supplier_name}${s.number_bank ? ` (${s.number_bank})` : ""}`,
+                }))}
+              />
             </div>
 
             <div>

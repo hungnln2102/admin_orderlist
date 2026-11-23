@@ -1,6 +1,6 @@
 import React from "react";
 import { Sparkles, Search, Plus, Eye, Trash2 } from "lucide-react";
-import { ToggleSwitch } from "@/shared/components";
+import { CustomSelect, ToggleSwitch } from "@/shared/components";
 import { ThemeDateRule, ThemeScheduleConfig } from "../../../shared/utils/themeSchedule";
 import { RuleCalendarFilter, ThemeItem } from "../types";
 
@@ -164,35 +164,39 @@ export const HolidayRulesTable: React.FC<HolidayRulesTableProps> = ({
                     <td className="p-2.5">
                       <div className="flex items-center gap-2">
                         <span className="text-lg shrink-0">{themeMeta?.icon || "✨"}</span>
-                        <select
+                        <CustomSelect
                           value={rule.theme}
-                          onChange={(e) => updateHolidayRule(rule.id, { theme: e.target.value })}
-                          className="w-full rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs font-semibold text-white focus:outline-none focus:border-cyan-500"
-                        >
-                          {themesList.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => updateHolidayRule(rule.id, { theme: val })}
+                          size="sm"
+                          accent="cyan"
+                          className="bg-slate-900 font-semibold"
+                          options={themesList.map((t) => ({
+                            value: t.id,
+                            label: t.name,
+                          }))}
+                        />
                       </div>
                     </td>
 
                     <td className="p-2.5 text-center">
-                      <select
+                      <CustomSelect
                         value={rule.calendarType}
-                        onChange={(e) =>
-                          updateHolidayRule(rule.id, { calendarType: e.target.value as ThemeDateRule["calendarType"] })
+                        onChange={(val) =>
+                          updateHolidayRule(rule.id, { calendarType: val as ThemeDateRule["calendarType"] })
                         }
-                        className={`rounded px-2 py-1 text-xs font-bold border focus:outline-none ${
+                        size="sm"
+                        accent={rule.calendarType === "lunar" ? "purple" : "cyan"}
+                        searchable={false}
+                        className={`font-bold ${
                           rule.calendarType === "lunar"
-                            ? "bg-purple-950/80 text-purple-300 border-purple-700/60"
-                            : "bg-cyan-950/80 text-cyan-300 border-cyan-700/60"
+                            ? "bg-purple-950/80 border-purple-700/60"
+                            : "bg-cyan-950/80 border-cyan-700/60"
                         }`}
-                      >
-                        <option value="lunar" className="bg-slate-900 text-purple-300">🌙 Lịch Âm</option>
-                        <option value="solar" className="bg-slate-900 text-cyan-300">🌞 Dương Lịch</option>
-                      </select>
+                        options={[
+                          { value: "lunar", label: "🌙 Lịch Âm" },
+                          { value: "solar", label: "🌞 Dương Lịch" },
+                        ]}
+                      />
                     </td>
 
                     <td className="p-2.5">

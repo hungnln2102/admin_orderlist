@@ -4,7 +4,10 @@
  */
 
 const { db, TABLES, withTransaction } = require("@/db");
+const { COLS } = require("@/db/tables");
 const { publishEventInTrx, EVENTS } = require("@/events");
+
+const PROVIDER_DISPLAY_NAMES_KEY = "OTP_PROVIDER_DISPLAY_NAMES";
 
 // In-Memory Cache lưu cấu hình để tránh query DB liên tục
 let configCache = {};
@@ -107,11 +110,14 @@ const getInteger = (key, defaultValue, min, max) => {
  * @param {string} rawValue - Giá trị dưới dạng chuỗi (Sẽ được lưu vào text)
  * @param {string} updatedBy - Tên người cập nhật (Mặc định 'ADMIN')
  */
-const set = async (key, rawValue, updatedBy = 'ADMIN') => withTransaction(async (trx) => {
+const writeConfig = async (key, resolveValue, updatedBy) => withTransaction(async (trx) => {
+  const C = COLS.SYSTEM_CONFIGS;
+  const existing = await trx(TABLES.SYSTEM_CONFIGS).where(C.CONFIG_KEY, key).forUpdate().first();
+  const rawValue = resolveValue(existing);
+  if (rawValue === undefined) return { success: true, key };
   const isObject = typeof rawValue === 'object' && rawValue !== null;
   const stringValue = isObject ? JSON.stringify(rawValue) : rawValue;
 
-  const existing = await trx(TABLES.SYSTEM_CONFIGS).where({ config_key: key }).forUpdate().first();
   if (!existing) {
     const isJson = isObject || (typeof stringValue === 'string' && (stringValue.startsWith('{') || stringValue.startsWith('[')));
     const dataType = isJson ? 'JSON' : 'STRING';
@@ -167,6 +173,89 @@ const set = async (key, rawValue, updatedBy = 'ADMIN') => withTransaction(async 
 
   return { success: true, key, value: newValueParsed };
 });
+
+const set = (key, rawValue, updatedBy = "ADMIN") => {
+  if (key === PROVIDER_DISPLAY_NAMES_KEY) {
+    throw new Error("Hãy cập nhật tên hiển thị từ danh mục provider.");
+  }
+  return writeConfig(key, () => rawValue, updatedBy);
+};
+
+const getProviderDisplayName = (key) => {
+  const names = get(PROVIDER_DISPLAY_NAMES_KEY, {});
+  return names && Object.hasOwn(names, key) && typeof names[key] === "string" && names[key]
+    ? names[key]
+    : key;
+};
+
+const setProviderDisplayName = (key, displayName, updatedBy) =>
+  writeConfig(PROVIDER_DISPLAY_NAMES_KEY, (existing) => {
+    if (!existing) throw new Error("Chưa khởi tạo danh mục tên hiển thị provider.");
+    const names = JSON.parse(existing[COLS.SYSTEM_CONFIGS.CONFIG_VALUE]);
+    if (!names || typeof names !== "object" || Array.isArray(names)) {
+      throw new Error("Cấu hình tên hiển thị provider không hợp lệ.");
+    }
+    if (displayName === null) {
+      if (!Object.hasOwn(names, key)) return undefined;
+      delete names[key];
+    } else {
+      if (names[key] === displayName) return undefined;
+      names[key] = displayName;
+    }
+    return names;
+  }, updatedBy);
+
+const updateOtpSlot = async (slotKey, change, updatedBy) => {
+  let slot;
+  await writeConfig("OTP_PORTAL_SLOTS_CONFIG", (existing) => {
+    const C = COLS.SYSTEM_CONFIGS;
+    const slots = existing
+      ? JSON.parse(existing[C.CONFIG_VALUE])
+      : require("./otpPortalDispatcher").DEFAULT_SLOTS;
+    if (!Array.isArray(slots)) throw new Error("Cấu hình ô OTP không hợp lệ.");
+    const index = slots.findIndex((slot) => slot?.slot_key === slotKey);
+    if (index < 0) throw new Error("Không tìm thấy ô OTP.");
+
+    slot = change(slots[index]);
+    if (slot === slots[index]) return undefined;
+    return slots.map((item, i) => i === index ? slot : item);
+  }, updatedBy);
+  return slot;
+};
+
+const assignedOtpProviders = (slot) => Array.isArray(slot.assigned_services)
+  ? slot.assigned_services
+  : [slot.primary_service_key, slot.fallback_service_key].filter(Boolean);
+
+const patchOtpSlot = (slotKey, change, updatedBy = "ADMIN") =>
+  updateOtpSlot(slotKey, (slot) => {
+    const { action, serviceKey, enabled } = change || {};
+    const assigned = assignedOtpProviders(slot);
+    if (action === "addProvider" && typeof serviceKey === "string" && serviceKey.trim() &&
+        serviceKey === serviceKey.trim() && serviceKey !== "none") {
+      return assigned.includes(serviceKey) ? slot : { ...slot, assigned_services: [...assigned, serviceKey] };
+    }
+    if (action === "setEnabled" && typeof enabled === "boolean") {
+      return slot.enabled === enabled ? slot : { ...slot, enabled };
+    }
+    throw new Error("Thay đổi cấu hình ô OTP không hợp lệ.");
+  }, updatedBy);
+
+const removeOtpSlotProvider = (slotKey, providerKey, updatedBy = "ADMIN") =>
+  updateOtpSlot(slotKey, (slot) => {
+    const assigned = assignedOtpProviders(slot);
+    const next = {
+      ...slot,
+      assigned_services: assigned.filter((key) => key !== providerKey),
+    };
+    for (const field of ["primary_service_key", "fallback_service_key"]) {
+      if (next[field] === providerKey) next[field] = null;
+    }
+    if (next.assigned_services.length === assigned.length &&
+        next.primary_service_key === slot.primary_service_key &&
+        next.fallback_service_key === slot.fallback_service_key) return slot;
+    return next;
+  }, updatedBy);
 
 /**
  * 4. Lấy toàn bộ danh sách cấu hình (Dùng cho giao diện Admin)
@@ -226,6 +315,10 @@ module.exports = {
   get,
   getInteger,
   set,
+  getProviderDisplayName,
+  setProviderDisplayName,
+  patchOtpSlot,
+  removeOtpSlotProvider,
   getAllConfigs,
   getNotificationLogs
 };
