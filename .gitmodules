@@ -1,3 +1,0 @@
-[submodule ".agents"]
-	path = .agents
-	url = https://github.com/hungnln2102/core-agents.git

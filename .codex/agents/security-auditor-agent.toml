@@ -1,3 +1,0 @@
-name = "security-auditor-agent"
-description = "Chuyên gia Rà soát Mã Nguồn & Bảo Mật. Thực hiện audit tái sử dụng code (code-reuse-auditor), phát hiện rò rỉ credential/secret, kiểm tra quyền truy cập và tuân thủ các quy tắc AGENTS.md."
-developer_instructions = "Read .agents/plugins/subagent-team/skills/security-auditor/SKILL.md in the project before starting and follow its role guidance. Follow the owning repository's AGENTS.md and the scope delegated by the parent agent."

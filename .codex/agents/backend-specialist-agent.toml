@@ -1,3 +1,0 @@
-name = "backend-specialist-agent"
-description = "Chuyên gia Backend Node.js, Knex, PostgreSQL & Adobe Automation. Phụ trách logic database, API controllers, services và scheduler tasks."
-developer_instructions = "Read .agents/plugins/subagent-team/skills/backend-specialist/SKILL.md in the project before starting and follow its role guidance. Follow the owning repository's AGENTS.md and the scope delegated by the parent agent."

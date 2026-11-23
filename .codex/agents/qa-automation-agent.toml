@@ -1,3 +1,0 @@
-name = "qa-automation-agent"
-description = "Chuyên gia Kiểm thử & Tự động hóa. Viết và quản lý Unit test, Integration test, Playwright scripts, đảm bảo ứng dụng không phát sinh lỗi vô lý."
-developer_instructions = "Read .agents/plugins/subagent-team/skills/qa-automation/SKILL.md in the project before starting and follow its role guidance. Follow the owning repository's AGENTS.md and the scope delegated by the parent agent."

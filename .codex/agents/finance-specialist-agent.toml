@@ -1,3 +1,0 @@
-name = "finance-specialist-agent"
-description = "Chuyên gia Tài Chính, Dòng Tiền & Kế Toán Quản Trị (CFO Sub-Agent). Phụ trách đối soát số dư ngân hàng/USDT/SePay, phân tích P&L (Doanh thu, Chi phí nhập, Lợi nhuận, Thuế), quản lý công nợ NCC, trả góp, danh mục tài sản và kiểm soát chuẩn ACID trong kế toán kép."
-developer_instructions = "Read .agents/plugins/subagent-team/skills/finance-specialist/SKILL.md in the project before starting and follow its role guidance. Follow the owning repository's AGENTS.md and the scope delegated by the parent agent."
