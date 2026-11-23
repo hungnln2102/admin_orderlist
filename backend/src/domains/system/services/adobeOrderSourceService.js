@@ -6,10 +6,22 @@ const O = COLS.ORDER_LIST;
 const R = COLS.PORTAL_SLOT_ROUTING_RULES;
 const K = COLS.ACTIVATION_KEYS;
 
+function adobeOrderRules({ variantId, supplierId }, connection) {
+  return connection(TABLES.PORTAL_SLOT_ROUTING_RULES)
+    .where({ [R.VARIANT_ID]: Number(variantId), [R.SUPPLIER_ID]: Number(supplierId), [R.IS_ACTIVE]: true });
+}
+
+async function findAdobeStatusProvider({ variantId, supplierId }, connection = db) {
+  if (!Number(variantId) || !Number(supplierId)) return null;
+  const rule = await adobeOrderRules({ variantId, supplierId }, connection)
+    .where({ [R.SLOT_KEY]: "adobe_check", [R.PROVIDER_KEY]: "fix_ades_status" })
+    .first(R.PROVIDER_KEY);
+  return rule?.[R.PROVIDER_KEY] || null;
+}
+
 async function findDirectAdobeSource({ variantId, supplierId }, connection = db) {
   if (!Number(variantId) || !Number(supplierId)) return null;
-  const rules = await connection(TABLES.PORTAL_SLOT_ROUTING_RULES)
-    .where({ [R.VARIANT_ID]: Number(variantId), [R.SUPPLIER_ID]: Number(supplierId), [R.IS_ACTIVE]: true })
+  const rules = await adobeOrderRules({ variantId, supplierId }, connection)
     .whereIn([R.SLOT_KEY, R.PROVIDER_KEY], [
       ["adobe_account", "yuna_2fa"],
       ["adobe_check", "fix_ades_status"],
@@ -62,4 +74,4 @@ async function resolveAdobeRecoveryOrder({ code, contact }) {
   return { source, providerKey: source === "yuna" ? "yuna_2fa" : "fix_ades_status", providerInput };
 }
 
-module.exports = { findDirectAdobeSource, resolveAdobeRecoveryOrder };
+module.exports = { findAdobeStatusProvider, findDirectAdobeSource, resolveAdobeRecoveryOrder };

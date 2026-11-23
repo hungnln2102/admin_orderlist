@@ -67,3 +67,13 @@
 - Backend dùng liên kết hiện hành của gói để đọc tài khoản, đồng bộ đơn và mã kích hoạt trong transaction, tự cấp suất phù hợp khi mất liên kết.
 - Kiểm thử tích hợp PostgreSQL local đạt 6/6, gồm đổi liên kết, hết kho và hai yêu cầu đồng thời. Build OTP portal đạt.
 - API local xác nhận mã đã báo trả email hiện hành và giữ nguyên slot. Slot hiện thiếu mật khẩu và cấu hình xác minh tình trạng.
+
+## Kiểm tra Adobe theo provider đã cấu hình cho đơn
+
+- Khi slot chưa chỉ định provider, luồng mã kích hoạt lấy quy tắc adobe_check đang bật theo biến thể và nhà cung cấp.
+- Kiểm thử tích hợp PostgreSQL local đạt 6/6. Đối chiếu mã đã báo trên API local xác nhận chọn fix_ades_status và Ades trả found=true, state=normal. Portal hiện hiển thị chưa xác minh được vì chỉ phân loại active và inactive.
+
+## Phân loại trạng thái tài khoản và tổ chức Ades
+
+- API local trả `status_type: active` và Đang hoạt động khi Ades trả tài khoản active và tổ chức normal.
+- Kiểm tra bốn trường hợp phản hồi đạt, gồm tổ chức inactive, thiếu trạng thái tài khoản và lỗi nhà cung cấp.

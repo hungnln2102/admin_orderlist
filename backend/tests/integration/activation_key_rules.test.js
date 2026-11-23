@@ -149,8 +149,12 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
     const expiredAt = new Date(Date.now() + 2 * 86_400_000);
     const [product] = await db(TABLES.PRODUCT_NAMES)
       .insert({ name: `Adobe Test ${suffix}` }).returning("id");
+    const statusRule = {
+      slot_key: "adobe_check", provider_key: "fix_ades_status", variant_id: variant.id, supplier_id: supplier.id,
+    };
 
     try {
+      await db(TABLES.PORTAL_SLOT_ROUTING_RULES).insert({ ...statusRule, is_active: true });
       const addSlot = async (label, tag = suffix) => {
         const account = `${label}-${suffix}@example.test`;
         const password = `test-${label}`;
@@ -171,7 +175,10 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       const original = await addSlot("original");
       const updated = await addSlot("updated");
       const packageId = await addPackage(original);
-      await db(TABLES.ORDER_LIST).insert({ id_order: orderCode, contact, status: "UNPAID", expired_at: expiredAt });
+      await db(TABLES.ORDER_LIST).insert({
+        id_order: orderCode, contact, status: "UNPAID", expired_at: expiredAt,
+        id_product: variant.id, supply_id: supplier.id,
+      });
       const [key] = await activationKeyService.createActivationKeys({ product_name_id: product.id, id_order: orderCode });
       const keyQuery = () => db(TABLES.ACTIVATION_KEYS).where("id", key.id);
       const orderQuery = () => db(TABLES.ORDER_LIST).where("id_order", orderCode);
@@ -182,13 +189,29 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
         orderContact: byOrder ? contact : undefined,
         recovery,
       });
-      assert.equal((await recover("check")).account, original.account);
+      const initial = await recover("check");
+      assert.equal(initial.account, original.account);
+      assert.equal(initial.statusProviderKey, "fix_ades_status");
       const initialKey = await keyQuery().first();
       assert.equal(initialKey.package_product_id, packageId);
 
       await db(TABLES.PACKAGE_PRODUCT).where("id", packageId)
         .update({ account_id: updated.accountId, account_slot_id: updated.id });
-      assert.equal((await recover("lookup", true)).account, updated.account);
+      const lookup = await recover("lookup", true);
+      assert.equal(lookup.account, updated.account);
+      assert.equal(lookup.statusProviderKey, "fix_ades_status");
+      await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).update({ is_active: false });
+      assert.equal((await recover("lookup", true)).statusProviderKey, null);
+      await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).update({ is_active: true });
+      await orderQuery().update({ supply_id: null });
+      assert.equal((await recover("lookup", true)).statusProviderKey, null);
+      await orderQuery().update({ supply_id: supplier.id });
+      const updatedSlot = () => db(TABLES.ACCOUNT_SLOTS).where("id", updated.id);
+      await updatedSlot().update({ status_check_enabled: true, status_provider_key: "test-slot-provider" });
+      assert.equal((await recover("lookup", true)).statusProviderKey, "test-slot-provider");
+      await updatedSlot().update({ status_check_enabled: false });
+      assert.equal((await recover("lookup", true)).statusProviderKey, null);
+      await updatedSlot().update({ status_provider_key: null });
       assert.equal((await keyQuery().first()).account_slot_id, original.id);
       assert.equal((await orderQuery().first()).slot, original.account);
       const refreshed = await recover("check", true);
@@ -217,6 +240,7 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       for (const result of results) {
         assert.equal(result.account, replacement.account);
         assert.equal(result.password, replacement.password);
+        assert.equal(result.statusProviderKey, "fix_ades_status");
       }
       assert.equal(results.filter((result) => result.replaced).length, 1);
       const finalKey = await keyQuery().first();
@@ -228,6 +252,7 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
     } finally {
       await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).del();
       await db(TABLES.ORDER_LIST).where("id_order", orderCode).del();
+      await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).del();
       await db(TABLES.PRODUCT_NAMES).where("id", product.id).del();
     }
   });

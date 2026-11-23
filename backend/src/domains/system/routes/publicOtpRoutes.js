@@ -73,8 +73,12 @@ async function checkAdobeAccount(email, providerKey) {
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "")) return { status_type: "unknown" };
   const result = await fetchFixAdesStatus(email, { config: providerConfig(providerKey) });
   const data = result.rawData;
-  const state = String(data?.organizationStatus?.status || data?.organization_status || data?.status || "").toLowerCase();
-  if (result.error || !["active", "inactive"].includes(state)) return { status_type: "unknown" };
+  if (result.error) return { status_type: "unknown" };
+  const accountState = String(data?.status || "").trim().toLowerCase();
+  const organizationState = String(data?.organizationStatus?.status || data?.organization_status || "").trim().toLowerCase();
+  const states = [accountState, organizationState];
+  const state = states.includes("inactive") ? "inactive" : states.find((value) => value === "active");
+  if (!state) return { status_type: "unknown" };
   return {
     status: state === "active" ? "ĐANG HOẠT ĐỘNG" : "CẦN CHUYỂN TEAM",
     status_type: state,

@@ -4,6 +4,7 @@ const { TABLES, COLS } = require("@/db/tables");
 const { getPackageProducts } = require("./packageProductService");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
+const { findAdobeStatusProvider, findDirectAdobeSource } = require("@/domains/system/services/adobeOrderSourceService");
 
 function matchesPackageTag(pack, targetTag) {
   return pack.variantTags?.includes(targetTag);
@@ -331,6 +332,12 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     });
 
     const packageManaged = Boolean(targetTag || previousPackageId);
+    const resolveStatusProvider = (slot) => {
+      if (slot[S.STATUS_PROVIDER_KEY]) {
+        return slot[S.STATUS_CHECK_ENABLED] ? slot[S.STATUS_PROVIDER_KEY] : null;
+      }
+      return findAdobeStatusProvider({ variantId: order[O.ID_PRODUCT], supplierId: order[O.SUPPLY_ID] }, trx);
+    };
     const lockedPackages = recovery && recovery !== "lookup" && targetTag ? await lockPackages() : null;
     if (recovery) {
       const currentPackage = lockedPackages
@@ -365,7 +372,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           if (orderChanged) await updateOrderAccount(assignedAccount);
           if (keyChanged || orderChanged) await publishOrderUpdated();
         }
-        const statusProviderKey = assignedSlot[S.STATUS_CHECK_ENABLED] ? assignedSlot[S.STATUS_PROVIDER_KEY] : null;
+        const statusProviderKey = await resolveStatusProvider(assignedSlot);
         return { account: assignedAccount, password: assignedSlot[S.PASSWORD] || "", statusProviderKey };
       }
       if (recovery === "lookup" || (recovery === "check" && wasAssigned && !packageManaged)) {
@@ -494,7 +501,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
 
     if (order) await publishOrderUpdated();
     if (recovery) {
-      const statusProviderKey = availableSlot[S.STATUS_CHECK_ENABLED] ? availableSlot[S.STATUS_PROVIDER_KEY] : null;
+      const statusProviderKey = await resolveStatusProvider(availableSlot);
       return { account: assignedAccount, password: availableSlot.slot_password || "", replaced: wasAssigned, statusProviderKey };
     }
 
@@ -696,7 +703,6 @@ const findMatchingKeyRule = async ({ variantId, supplierId }, connection = db) =
 };
 
 const resolveOrderActivationRule = async (selection, connection = db) => {
-  const { findDirectAdobeSource } = require("@/domains/system/services/adobeOrderSourceService");
   const adobeSource = await findDirectAdobeSource(selection, connection);
   const rule = adobeSource === "yuna" ? null : await findMatchingKeyRule(selection, connection);
   return { adobeSource, rule };
