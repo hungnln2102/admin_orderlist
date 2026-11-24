@@ -40,18 +40,41 @@ test("GENERIC_HTTP configurations are rejected because providers own their endpo
   );
 });
 
-test("Yuna Check sends only get_order and strips vendor OTP fields", async () => {
+test("Yuna Check uses account_user and strips vendor credentials and OTP fields", async () => {
   const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
   const key = "JBSWY3DPEHPK3PXP";
   const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_check", auth_config: { defaultToken: "fixture" } };
   await withMockedExternalFetch(async (_url, options) => {
     if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
     assert.equal(options.body, new URLSearchParams({ action: "get_order", order_code: key }).toString());
-    return Response.json({ items: [{ name: "user@example.test", code: "654321" }] });
+    return Response.json({ items: [{
+      name: "Adobe (display@example.test)",
+      account_user: " user@example.test ",
+      account_pass: "fixture-password",
+      code: "654321",
+    }] });
   }, async () => {
     const result = await executeOtpConfig(config, key);
     assert.equal(result.otp, null);
-    assert.deepEqual(result.raw_data.items, [{ name: "user@example.test", group: undefined, expires_at_str: undefined }]);
+    assert.equal(result.extra_fields.find((field) => field.key === "account_email")?.value, "user@example.test");
+    assert.deepEqual(result.raw_data.items, [{
+      name: "Adobe (display@example.test)",
+      account_user: "user@example.test",
+      group: undefined,
+      expires_at_str: undefined,
+    }]);
+  });
+});
+
+test("Yuna Check does not use the display name when account_user is missing", async () => {
+  const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_check_missing_account" };
+  await withMockedExternalFetch(async (_url, options) => {
+    if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
+    return Response.json({ items: [{ name: "display@example.test" }] });
+  }, async () => {
+    const result = await executeOtpConfig(config, "fixture-order");
+    assert.equal(result.extra_fields.some((field) => field.key === "account_email"), false);
   });
 });
 

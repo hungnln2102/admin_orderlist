@@ -85,11 +85,16 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
 
     const extraFields = [];
     const items = Array.isArray(data.items) ? data.items : [];
-    if (items.length > 0) {
-      // Lấy tài khoản đầu tiên
-      const primaryItem = data.items[0];
-      if (primaryItem.name) {
-        extraFields.push({ key: "account_email", label: "Email Tài Khoản", value: String(primaryItem.name), path: "items[0].name" });
+    const accounts = items.map(({ name, account_user, group, expires_at_str }) => ({
+      name,
+      account_user: typeof account_user === "string" ? account_user.trim() : undefined,
+      group,
+      expires_at_str,
+    }));
+    const [primaryItem] = accounts;
+    if (primaryItem) {
+      if (primaryItem.account_user) {
+        extraFields.push({ key: "account_email", label: "Email Tài Khoản", value: primaryItem.account_user, path: "items[0].account_user" });
       }
       if (primaryItem.group) {
         extraFields.push({ key: "product_plan", label: "Gói Dịch Vụ", value: String(primaryItem.group), path: "items[0].group" });
@@ -99,7 +104,6 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
       }
     }
 
-    const accounts = items.map(({ name, group, expires_at_str }) => ({ name, group, expires_at_str }));
     return { extra_fields: extraFields, raw_data: { items: accounts } };
   } catch (err) {
     return { otp: null, extra_fields: [], error: err.message };
