@@ -44,3 +44,11 @@
 - Đã cập nhật kỳ vọng theo hệ điều hành và giữ phép so sánh toàn bộ danh sách tham số.
 - Windows, Node.js 24.11.0: test riêng 11/11 và toàn bộ backend 163/163.
 - Mô phỏng `process.platform = "linux"` trong tiến trình Node.js trên Windows: test riêng 11/11. Chờ xác nhận trên runner Ubuntu của GitHub Actions sau khi bản sửa được đưa lên GitHub.
+
+## Sửa migration hoàn tiền nhà cung cấp trong CI PostgreSQL
+
+- Migration tạo bảng dùng schema mặc định `business`, còn migration xóa `refund_amount` dùng mặc định `partner`, khiến CI dừng trước bước kiểm thử đối soát.
+- Đồng bộ thứ tự chọn schema trong cả `up` và `down` với migration tạo bảng.
+- PostgreSQL 16 trống trên Windows chạy đủ 61 migration. Kiểm thử VPBank đạt 1/1, SePay đạt 5/5 và unit test backend đạt 163/163.
+- Kiểm tra trên schema đối tác tùy chỉnh: khoản hoàn 12.500 chuyển thành `import_cost = -12500`, khoản chi thường giữ nguyên và rollback khôi phục dữ liệu mẫu.
+- Chờ xác nhận trên GitHub Actions sau khi bản sửa được đưa lên GitHub.
