@@ -1,41 +1,22 @@
 import React, { useState } from "react";
-import { Loader2, Radio, Package, Layers, Zap } from "lucide-react";
+import { Loader2, Radio, Layers, Zap } from "lucide-react";
 import { useExternalApiConfig } from "@/features/external-api/hooks/useExternalApiConfig";
 import { ExternalApiHeader } from "@/features/external-api/components/ExternalApiHeader";
-import { ProviderCatalogTab } from "@/features/external-api/components/ProviderCatalogTab";
 import { ProductApiMappingTab } from "@/features/external-api/components/ProductApiMappingTab";
 import { OtpPortalSlotsTab } from "@/features/external-api/components/OtpPortalSlotsTab";
 
-type ActiveTab = "providers" | "products" | "slots";
+type ActiveTab = "slots" | "products";
 
 export const ExternalApiConfigController: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("providers");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("slots");
 
   const {
     providers,
-    filteredProviders,
     configuredCount,
     unconfiguredCount,
-    categories,
-    selectedCategory,
-    setSelectedCategory,
-    providerSearch,
-    setProviderSearch,
     testInputs,
     setInput,
     testProvider,
-
-    products,
-    filteredProducts,
-    productSearch,
-    setProductSearch,
-    productFilter,
-    setProductFilter,
-    availableApis,
-    assignProvider,
-    setDefaultProvider,
-    renameProvider,
-    removeMapping,
 
     slots,
     addServiceToSlot,
@@ -47,6 +28,7 @@ export const ExternalApiConfigController: React.FC = () => {
     routingRules,
     suppliers,
     supplierVariants,
+    availableApis,
     createRoutingRule,
     updateRoutingRule,
     deleteRoutingRule,
@@ -79,35 +61,35 @@ export const ExternalApiConfigController: React.FC = () => {
         onRefresh={() => void load(true)}
       />
 
-      {/* Modern Navigation Tabs */}
+      {/* Modern Navigation Tabs (Gom thành 2 tab tinh gọn) */}
       <div className="border-b border-slate-800/80">
         <nav className="flex space-x-2 sm:space-x-4 overflow-x-auto pb-px scrollbar-none" aria-label="Tabs">
           <button
             type="button"
-            onClick={() => setActiveTab("providers")}
-            className={`group inline-flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
-              activeTab === "providers"
+            onClick={() => setActiveTab("slots")}
+            className={`group inline-flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-sm transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "slots"
                 ? "border-cyan-400 text-cyan-400 bg-cyan-500/5 rounded-t-xl"
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
             }`}
           >
-            <Radio className={`w-4 h-4 ${activeTab === "providers" ? "text-cyan-400 animate-pulse" : "text-slate-500 group-hover:text-slate-400"}`} />
-            <span>Cổng Dịch Vụ & Thử Nghiệm</span>
+            <Radio className={`w-4 h-4 ${activeTab === "slots" ? "text-cyan-400 animate-pulse" : "text-slate-500 group-hover:text-slate-400"}`} />
+            <span>Cổng Dịch Vụ & Ô Input OTP</span>
             <span
               className={`ml-1 text-xs px-2 py-0.5 rounded-full ${
-                activeTab === "providers"
+                activeTab === "slots"
                   ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
                   : "bg-slate-800 text-slate-400"
               }`}
             >
-              {providers.length}
+              {slots.length} Ô Input
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("products")}
-            className={`group inline-flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+            className={`group inline-flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-sm transition-all whitespace-nowrap cursor-pointer ${
               activeTab === "products"
                 ? "border-cyan-400 text-cyan-400 bg-cyan-500/5 rounded-t-xl"
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
@@ -122,29 +104,7 @@ export const ExternalApiConfigController: React.FC = () => {
                   : "bg-slate-800 text-slate-400"
               }`}
             >
-              {routingRules.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("slots")}
-            className={`group inline-flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
-              activeTab === "slots"
-                ? "border-cyan-400 text-cyan-400 bg-cyan-500/5 rounded-t-xl"
-                : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
-            }`}
-          >
-            <Layers className={`w-4 h-4 ${activeTab === "slots" ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-400"}`} />
-            <span>Cấu Hình Ô Input Cổng OTP</span>
-            <span
-              className={`ml-1 text-xs px-2 py-0.5 rounded-full ${
-                activeTab === "slots"
-                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                  : "bg-slate-800 text-slate-400"
-              }`}
-            >
-              {slots.length}
+              {routingRules.length} Quy tắc
             </span>
           </button>
         </nav>
@@ -152,16 +112,15 @@ export const ExternalApiConfigController: React.FC = () => {
 
       {/* Tab Panels */}
       <main className="transition-all duration-200">
-        {activeTab === "providers" && (
-          <ProviderCatalogTab
-            onRenameProvider={renameProvider}
+        {activeTab === "slots" && (
+          <OtpPortalSlotsTab
+            slots={slots}
             providers={providers}
-            filteredProviders={filteredProviders}
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-            searchQuery={providerSearch}
-            onSearchChange={setProviderSearch}
+            updatingSlot={updatingSlot}
+            removingSlotProvider={removingSlotProvider}
+            onAddService={addServiceToSlot}
+            onRemoveService={removeServiceFromSlot}
+            onToggleEnabled={toggleSlotEnabled}
             testInputs={testInputs}
             onInputChange={setInput}
             onTestProvider={testProvider}
@@ -181,18 +140,6 @@ export const ExternalApiConfigController: React.FC = () => {
             onDeleteRoutingRule={deleteRoutingRule}
             onToggleRoutingRuleActive={toggleRoutingRuleActive}
             onDeleteSupplierVariant={deleteSupplierVariant}
-          />
-        )}
-
-        {activeTab === "slots" && (
-          <OtpPortalSlotsTab
-            slots={slots}
-            providers={providers}
-            updatingSlot={updatingSlot}
-            removingSlotProvider={removingSlotProvider}
-            onAddService={addServiceToSlot}
-            onRemoveService={removeServiceFromSlot}
-            onToggleEnabled={toggleSlotEnabled}
           />
         )}
       </main>

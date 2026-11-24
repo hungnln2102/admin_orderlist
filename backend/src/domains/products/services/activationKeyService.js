@@ -313,7 +313,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .where(pack.PRODUCT_NAME_ID, key[keyCols.PRODUCT_NAME_ID])
       .orderBy(pack.ID, "asc")
       .forUpdate()
-      .select(pack.ID, pack.ACCOUNT_SLOT_ID);
+      .select(pack.ID, pack.ACCOUNT_SLOT_ID, pack.PROVIDER_BY_SLOT);
 
     const updateOrderAccount = async (assignedAccount) => {
       if (!order || order[O.SLOT] === assignedAccount) return;
@@ -332,7 +332,13 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     });
 
     const packageManaged = Boolean(targetTag || previousPackageId);
-    const resolveStatusProvider = (slot) => {
+    const resolveStatusProvider = (slot, providerBySlot) => {
+      const configured = providerBySlot?.adobe_check;
+      if (configured) {
+        const { getActiveSlots } = require("@/domains/system/services/otpPortalDispatcher");
+        const input = getActiveSlots().find((item) => item.slot_key === "adobe_check" && item.enabled !== false);
+        if (input?.assigned_services?.includes(configured)) return configured;
+      }
       if (slot[S.STATUS_PROVIDER_KEY]) {
         return slot[S.STATUS_CHECK_ENABLED] ? slot[S.STATUS_PROVIDER_KEY] : null;
       }
@@ -346,7 +352,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         ? await trx(TABLES.PACKAGE_PRODUCT)
           .where({ [pack.ID]: previousPackageId, [pack.PRODUCT_NAME_ID]: key[keyCols.PRODUCT_NAME_ID] })
           .forShare()
-          .first(pack.ACCOUNT_SLOT_ID)
+          .first(pack.ACCOUNT_SLOT_ID, pack.PROVIDER_BY_SLOT)
         : null;
       const slotId = packageManaged ? currentPackage?.[pack.ACCOUNT_SLOT_ID] : key[keyCols.ACCOUNT_SLOT_ID];
       const assignedSlot = slotId && await trx({ slot: TABLES.ACCOUNT_SLOTS })
@@ -372,7 +378,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           if (orderChanged) await updateOrderAccount(assignedAccount);
           if (keyChanged || orderChanged) await publishOrderUpdated();
         }
-        const statusProviderKey = await resolveStatusProvider(assignedSlot);
+        const statusProviderKey = await resolveStatusProvider(assignedSlot, currentPackage?.[pack.PROVIDER_BY_SLOT]);
         return { account: assignedAccount, password: assignedSlot[S.PASSWORD] || "", statusProviderKey };
       }
       if (recovery === "lookup" || (recovery === "check" && wasAssigned && !packageManaged)) {
@@ -469,7 +475,8 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       );
     }
 
-    const packageId = availablePackages.find((item) => String(item.warehouseSlotId) === String(availableSlot.slot_id))?.id ?? null;
+    const selectedPackage = availablePackages.find((item) => String(item.warehouseSlotId) === String(availableSlot.slot_id));
+    const packageId = selectedPackage?.id ?? null;
     const assignedAccount = availableSlot.account_username;
     const finalCustomer = String(customerInfo || key.customer_info || "").trim();
 
@@ -501,7 +508,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
 
     if (order) await publishOrderUpdated();
     if (recovery) {
-      const statusProviderKey = await resolveStatusProvider(availableSlot);
+      const statusProviderKey = await resolveStatusProvider(availableSlot, selectedPackage?.providerBySlot);
       return { account: assignedAccount, password: availableSlot.slot_password || "", replaced: wasAssigned, statusProviderKey };
     }
 

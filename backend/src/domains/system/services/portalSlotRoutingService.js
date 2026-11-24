@@ -275,7 +275,7 @@ async function findRoutingProviderForInput({ slotKey, input }) {
   if (!cleanInput) return null;
 
   const activationKey = requireUniqueMatch(await db(TABLES.ACTIVATION_KEYS)
-    .select(AK.ACCOUNT_SLOT_ID, AK.ID_ORDER)
+    .select(AK.ACCOUNT_SLOT_ID, AK.ID_ORDER, AK.PACKAGE_PRODUCT_ID)
     .whereRaw("LOWER(TRIM(??)) = ?", [AK.KEY_CODE, cleanInput])
     .limit(2));
 
@@ -297,6 +297,32 @@ async function findRoutingProviderForInput({ slotKey, input }) {
   }
 
   const orderCode = order?.[ORD.ID_ORDER] || null;
+  const packageId = activationKey?.[AK.PACKAGE_PRODUCT_ID] ?? (orderCode
+    ? requireUniqueMatch(await db(TABLES.ACTIVATION_KEYS)
+      .select(AK.PACKAGE_PRODUCT_ID)
+      .where(AK.ID_ORDER, orderCode)
+      .whereNotNull(AK.PACKAGE_PRODUCT_ID)
+      .limit(2))?.[AK.PACKAGE_PRODUCT_ID]
+    : null);
+  if (packageId) {
+    const P = COLS.PACKAGE_PRODUCT;
+    const packageSlot = await db({ p: TABLES.PACKAGE_PRODUCT })
+      .join({ ss: TABLES.ACCOUNT_SLOTS }, `ss.${SS.ID}`, `p.${P.ACCOUNT_SLOT_ID}`)
+      .join({ a: TABLES.ACCOUNTS }, `a.${ACC.ID}`, `ss.${SS.ACCOUNT_ID}`)
+      .where(`p.${P.ID}`, packageId)
+      .first(`p.${P.PROVIDER_BY_SLOT}`, `a.${ACC.ACCOUNT_USERNAME}`);
+    const providerKey = packageSlot?.[P.PROVIDER_BY_SLOT]?.[slotKey];
+    const { getActiveSlots } = require("./otpPortalDispatcher");
+    const configuredSlot = getActiveSlots().find((item) => item.slot_key === slotKey && item.enabled !== false);
+    if (providerKey && configuredSlot?.assigned_services?.includes(providerKey)) {
+      return {
+        provider_key: providerKey,
+        resolved_email: packageSlot[ACC.ACCOUNT_USERNAME],
+        order_code: orderCode,
+        match_type: "EXACT_PACKAGE_SLOT",
+      };
+    }
+  }
   const capability = slotKey === "adobe_check" ? "status" : /(^|_)otp$|^netflix_/.test(slotKey) ? "otp" : null;
   if (capability) {
     const enabledColumn = capability === "status" ? SS.STATUS_CHECK_ENABLED : SS.OTP_ENABLED;

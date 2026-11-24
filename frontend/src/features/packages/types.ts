@@ -30,6 +30,8 @@ export interface PackageItem {
   supplier: string;
   costPrice: number;
   expiredAt: string;
+  providerKey?: string | null;
+  providerBySlot?: Record<string, string> | null;
   note: string;
   matchRule?: "information" | "slot" | "both";
   status: "active" | "warning" | "expired";
@@ -60,6 +62,7 @@ export interface PackageFormData {
   supplier: string;
   costPrice: number;
   expiredAt: string;
+  providerBySlot: Record<string, string | null>;
   note: string;
   matchRule?: "information" | "slot" | "both";
 }

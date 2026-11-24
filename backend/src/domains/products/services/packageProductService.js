@@ -3,6 +3,29 @@ const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getVietnamDateString } = require("@/utils/time");
 
+function validateProviderBySlot(value, productName) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Cấu hình nhà cung cấp theo tính năng phải là một đối tượng.");
+  }
+  const entries = Object.entries(value);
+  if (!entries.length) return {};
+  const { getActiveSlots } = require("@/domains/system/services/otpPortalDispatcher");
+  const normalizedName = String(productName || "").trim().toLowerCase();
+  const category = normalizedName.split(/[\s_-]+/, 1)[0];
+  const slots = getActiveSlots().filter((slot) =>
+    slot.enabled !== false && slot.slot_key !== "adobe_account" && slot.category === category);
+  for (const [slotKey, providerKey] of entries) {
+    const slot = slots.find((entry) => entry.slot_key === slotKey);
+    const providers = Array.isArray(slot?.assigned_services)
+      ? slot.assigned_services
+      : [slot?.primary_service_key, slot?.fallback_service_key];
+    if (!slot || typeof providerKey !== "string" || !providerKey || providerKey === "none" || !providers.includes(providerKey)) {
+      throw new Error(`Nhà cung cấp hoặc tính năng OTP không hợp lệ cho gói này (${slotKey}).`);
+    }
+  }
+  return Object.fromEntries(entries);
+}
+
 async function requirePackageSlot(trx, accountId, nameId, slotId) {
   const S = COLS.ACCOUNT_SLOTS;
   const rows = await trx(TABLES.ACCOUNT_SLOTS)
@@ -34,6 +57,9 @@ const getPackageProducts = async ({ connection = db, productNameId = null, usage
       acc_slot.two_fa,
       acc_slot.backup_email,
       acc_slot.${slot.EXPIRED_AT} AS warehouse_expired_at,
+      acc_slot.${slot.PROVIDER_KEY} AS provider_key,
+      pp.${pack.PROVIDER_BY_SLOT} AS provider_by_slot,
+      acc_slot.${slot.OTP_ENABLED} AS otp_enabled,
       ARRAY_REMOVE(ARRAY[NULLIF(BTRIM(acc_slot.${slot.VARIANT_TAG}), '')], NULL) AS variant_tags,
       storage_acc.account_username AS storage_account_info,
       COALESCE(storage_slot.password, storage_acc.password) AS storage_password,
@@ -388,6 +414,9 @@ const getPackageProducts = async ({ connection = db, productNameId = null, usage
           remainingCapacity: capacityLimit ? remainingCapacity : null,
           usedSlots,
           warehouseSlotId: Number(r.warehouse_slot_id),
+          providerKey: r.provider_key || null,
+          providerBySlot: r.provider_by_slot,
+          otpEnabled: Boolean(r.otp_enabled),
           totalSlots,
           supplier: r.supplier,
           costPrice,
@@ -702,6 +731,16 @@ const createPackageProduct = async (payload) => withTransaction(async (trx) => {
   // 2. Tìm hoặc tạo Tài khoản gốc trong warehouse.accounts
   const mainAccount = await findOrCreateAccount(trx, mainAccUser);
   const warehouseSlot = await requirePackageSlot(trx, mainAccount.id, pnRecord.id, payload.accountSlotId);
+  const providerBySlot = payload.providerBySlot === undefined ? null : validateProviderBySlot(payload.providerBySlot, pnRecord.name);
+
+  if (payload.providerKey !== undefined) {
+    const pKey = payload.providerKey ? String(payload.providerKey).trim() : null;
+    await trx(TABLES.ACCOUNT_SLOTS).where(COLS.ACCOUNT_SLOTS.ID, warehouseSlot.id).update({
+      [COLS.ACCOUNT_SLOTS.PROVIDER_KEY]: pKey,
+      [COLS.ACCOUNT_SLOTS.OTP_ENABLED]: Boolean(pKey),
+      [COLS.ACCOUNT_SLOTS.UPDATED_AT]: trx.fn.now(),
+    });
+  }
 
   // 3. Tìm hoặc tạo Tài khoản dung lượng/liên kết (nếu có)
   const storageAccUser = storageAccountUsername || storageAccountInfo;
@@ -716,6 +755,7 @@ const createPackageProduct = async (payload) => withTransaction(async (trx) => {
       product_name_id: pnRecord.id,
       account_id: mainAccount.id,
       [COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID]: warehouseSlot.id,
+      [COLS.PACKAGE_PRODUCT.PROVIDER_BY_SLOT]: providerBySlot,
       supplier: supplier || "Mavryk",
       cost: parseFloat(costPrice || 0),
       slot: parseInt(totalSlots || 2, 10),
@@ -737,6 +777,8 @@ const createPackageProduct = async (payload) => withTransaction(async (trx) => {
     accountInfo: mainAccount.account_username,
     storageAccountInfo: storageAccount ? storageAccount.account_username : null,
     storageTotal: inserted.storage_total || null,
+    providerKey: payload.providerKey !== undefined ? (payload.providerKey ? String(payload.providerKey).trim() : null) : (warehouseSlot.provider_key || null),
+    providerBySlot,
     usedSlots: 0,
     totalSlots: inserted.slot,
     supplier: inserted.supplier,
@@ -759,7 +801,7 @@ const updatePackageProduct = async (id, payload) => withTransaction(async (trx) 
   const pkgId = parseInt(id, 10);
   if (!pkgId) throw new Error("ID gói không hợp lệ!");
 
-  const existing = await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
+  const existing = await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).forUpdate().first();
   if (!existing) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
 
   const {
@@ -820,11 +862,29 @@ const updatePackageProduct = async (id, payload) => withTransaction(async (trx) 
 
   const nextAccountId = updateFields.account_id ?? existing.account_id;
   const nextNameId = updateFields.product_name_id ?? existing.product_name_id;
+  const providerColumn = COLS.PACKAGE_PRODUCT.PROVIDER_BY_SLOT;
+  if (payload.providerBySlot !== undefined || Number(nextNameId) !== Number(existing.product_name_id)) {
+    const productName = targetPnRecord || await trx(TABLES.PRODUCT_NAMES)
+      .where(COLS.PRODUCT_NAMES.ID, nextNameId).first(COLS.PRODUCT_NAMES.NAME);
+    updateFields[providerColumn] = validateProviderBySlot(
+      payload.providerBySlot === undefined ? (existing[providerColumn] || {}) : payload.providerBySlot,
+      productName?.[COLS.PRODUCT_NAMES.NAME]
+    );
+  }
   const sameIdentity = Number(nextAccountId) === Number(existing.account_id)
     && Number(nextNameId) === Number(existing.product_name_id);
   const warehouseSlot = await requirePackageSlot(trx, nextAccountId, nextNameId,
     payload.accountSlotId || (sameIdentity ? existing[COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID] : null));
   updateFields[COLS.PACKAGE_PRODUCT.ACCOUNT_SLOT_ID] = warehouseSlot.id;
+
+  if (payload.providerKey !== undefined) {
+    const pKey = payload.providerKey ? String(payload.providerKey).trim() : null;
+    await trx(TABLES.ACCOUNT_SLOTS).where(COLS.ACCOUNT_SLOTS.ID, warehouseSlot.id).update({
+      [COLS.ACCOUNT_SLOTS.PROVIDER_KEY]: pKey,
+      [COLS.ACCOUNT_SLOTS.OTP_ENABLED]: Boolean(pKey),
+      [COLS.ACCOUNT_SLOTS.UPDATED_AT]: trx.fn.now(),
+    });
+  }
 
   const [updated] = await trx(TABLES.PACKAGE_PRODUCT)
     .where("id", pkgId)
@@ -846,6 +906,8 @@ const updatePackageProduct = async (id, payload) => withTransaction(async (trx) 
     accountInfo: mainAcc ? mainAcc.account_username : "",
     storageAccountInfo: storageAcc ? storageAcc.account_username : null,
     storageTotal: updated.storage_total || null,
+    providerKey: payload.providerKey !== undefined ? (payload.providerKey ? String(payload.providerKey).trim() : null) : (warehouseSlot.provider_key || null),
+    providerBySlot: updated[providerColumn],
     usedSlots: payload.usedSlots !== undefined ? payload.usedSlots : 0,
     totalSlots: updated.slot,
     supplier: updated.supplier,

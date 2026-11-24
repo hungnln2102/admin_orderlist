@@ -135,11 +135,15 @@ test("browser kho mở cửa sổ nhỏ theo kích thước cấu hình", () => 
   process.env.WAREHOUSE_BROWSER_WINDOW_HEIGHT = "600";
 
   try {
-    assert.deepEqual(getBrowserWindowArgs(), [
+    const expectedArgs = [
       "--no-first-run",
       "--no-default-browser-check",
       "--window-size=820,600",
-    ]);
+    ];
+    if (process.platform === "linux") {
+      expectedArgs.push("--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage");
+    }
+    assert.deepEqual(getBrowserWindowArgs(), expectedArgs);
   } finally {
     if (originalWidth === undefined) delete process.env.WAREHOUSE_BROWSER_WINDOW_WIDTH;
     else process.env.WAREHOUSE_BROWSER_WINDOW_WIDTH = originalWidth;

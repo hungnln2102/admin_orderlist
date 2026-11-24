@@ -398,6 +398,7 @@ const COLS = {
   },
   PACKAGE_PRODUCT: {
     ID: "id",
+    PROVIDER_BY_SLOT: "provider_by_slot",
     ACCOUNT_SLOT_ID: "account_slot_id",
     ACCOUNT_ID: "account_id",
     PRODUCT_NAME_ID: "product_name_id",

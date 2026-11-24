@@ -77,3 +77,22 @@
 
 - API local trả `status_type: active` và Đang hoạt động khi Ades trả tài khoản active và tổ chức normal.
 - Kiểm tra bốn trường hợp phản hồi đạt, gồm tổ chức inactive, thiếu trạng thái tài khoản và lỗi nhà cung cấp.
+
+## [22:40] Thiết Kế Lại Form Gói Sản Phẩm (Form Ngang) & Tích Hợp Cổng Provider OTP
+
+- **Trạng thái nghiệm thu**: PASS 100% (Backend 7/7 tests passed, Frontend build đạt 0 lỗi).
+- **Vấn đề đã xử lý**:
+  - **Khảo sát vị trí lưu trữ Provider**: Đã điều tra chính xác `provider_key` được lưu ở **Kho Hàng** (`warehouse.account_slots.provider_key`), liên kết với gói sản phẩm qua `account_slot_id` (`warehouse.package_products.account_slot_id = warehouse.account_slots.id`).
+  - **Thiết kế lại giao diện Modal Form Ngang (Horizontal Layout)**:
+    - Mở rộng container từ `max-w-xl` thành `max-w-4xl lg:max-w-5xl`.
+    - Bố cục chia thành 2 cột ngang đối xứng (`grid grid-cols-1 lg:grid-cols-2 gap-4.5`):
+      - **Cột Trái (Loại Gói, Tài Khoản Gốc & Cổng Provider)**: Nhóm Loại Gói (`CustomSelect`) & Tên gói; Khối Tài Khoản Gốc (`SearchableCombobox`, NCC, Giá nhập); Khối Cổng Provider OTP (`CustomSelect` sử dụng danh mục chuẩn `AVAILABLE_OTP_PROVIDERS`, có tùy chọn tự động/không gán).
+      - **Cột Phải (Match Rule, Slot, Storage & Ghi Chú)**: Khối 3 thẻ Match Rule (Khớp Info, Khớp Slot, Cả Info & Slot); Khối Tổng Slot & Ngày hết hạn (`DateInputVN`); Khối Toggle Storage Account & Email/Dung lượng liên kết; Ghi chú gói.
+  - **Tích hợp luồng dữ liệu Backend & Frontend**:
+    - [backend/src/domains/products/services/packageProductService.js](file:///e:/Project/admin_store/admin_orderlist/backend/src/domains/products/services/packageProductService.js): `getPackageProducts` lấy `acc_slot.provider_key` và map `providerKey`, `createPackageProduct` và `updatePackageProduct` tự động cập nhật `provider_key` và `otp_enabled` vào slot liên kết trong Knex transaction theo chuẩn ACID.
+    - [frontend/src/features/packages/types.ts](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/packages/types.ts): Thêm `providerKey?: string | null;` vào `PackageItem` và `PackageFormData`.
+    - [frontend/src/features/packages/components/PackageCreateEditModal.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/packages/components/PackageCreateEditModal.tsx): Bố cục form ngang 2 cột hiện đại, thân thiện người dùng và tích hợp chọn Provider OTP.
+    - [frontend/src/features/packages/PackageManagementPage.tsx](file:///e:/Project/admin_store/admin_orderlist/frontend/src/features/packages/PackageManagementPage.tsx): Truyền nhận `providerKey` khi mở form thêm/sửa và gửi payload lên API.
+- **Kiểm tra kỹ thuật**:
+  - `node --test backend/tests/integration/productApiService.test.js`: PASS 7/7 tests (0 fails).
+  - `npm run build` trong `frontend/`: PASS 100% (0 errors, 1794 modules transformed, 7.31s).

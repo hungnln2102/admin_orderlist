@@ -16,14 +16,6 @@ const PROVIDER_KEY_ALIASES: Record<string, string> = {
 
 const canonicalProviderKey = (providerKey: string) => PROVIDER_KEY_ALIASES[providerKey] || providerKey;
 
-const ADOBE_ACCOUNT_SLOT: PortalSlotItem = {
-  slot_key: "adobe_account",
-  name: "Adobe — Lấy tài khoản (Yuna)",
-  category: "adobe",
-  assigned_services: ["yuna_2fa"],
-  enabled: true,
-};
-
 interface SlotProductSupplierRuleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,20 +58,17 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const mappingSlots = useMemo(() => slots.some((slot) => slot.slot_key === ADOBE_ACCOUNT_SLOT.slot_key)
-    ? slots
-    : [...slots, ADOBE_ACCOUNT_SLOT], [slots]);
-  const selectedSlot = mappingSlots.find((slot) => slot.slot_key === slotKey);
-  const slotOptions = useMemo(() => mappingSlots
-    .filter((slot) => slot.slot_key === editingRule?.slot_key || slot.enabled !== false)
-    .map((slot) => ({
-      value: slot.slot_key,
-      label: slot.slot_key === "adobe_check"
-        ? "Adobe — Kiểm tra tài khoản (Ades)"
-        : slot.slot_key === ADOBE_ACCOUNT_SLOT.slot_key
-          ? ADOBE_ACCOUNT_SLOT.name
-          : `${slot.name} (${slot.slot_key})`,
-    })), [editingRule?.slot_key, mappingSlots]);
+  const selectedSlot = slots.find((slot) => slot.slot_key === slotKey);
+  const slotIdentifier = [slotKey, selectedSlot?.name, selectedSlot?.category].join(" ").toLowerCase();
+  const slotOptions = useMemo(() => {
+    const options = slots
+      .filter((slot) => slot.slot_key === editingRule?.slot_key || slot.enabled !== false)
+      .map((slot) => ({ value: slot.slot_key, label: slot.name }));
+    if (editingRule && !options.some((option) => option.value === editingRule.slot_key)) {
+      options.push({ value: editingRule.slot_key, label: editingRule.slot_key });
+    }
+    return options;
+  }, [editingRule, slots]);
   const providerOptions = useMemo(() => {
     const assignedKeys = new Set(
       (selectedSlot?.assigned_services || [selectedSlot?.primary_service_key, selectedSlot?.fallback_service_key])
@@ -101,15 +90,23 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
         category: String(api.category || "OTP"),
       });
     });
-    return [...catalog.values()].filter((provider) => selectedSlot?.slot_key === ADOBE_ACCOUNT_SLOT.slot_key
-      ? provider.key === "yuna_2fa"
-      : assignedKeys.has(provider.key));
-  }, [availableApis, providers, selectedSlot]);
+    if (editingRule) {
+      const key = editingRule.provider_key;
+      assignedKeys.add(key);
+      if (!catalog.has(key)) {
+        catalog.set(key, {
+          key,
+          name: editingRule.provider_name || key,
+          category: editingRule.provider_category,
+        });
+      }
+    }
+    return [...catalog.values()].filter((provider) => assignedKeys.has(provider.key));
+  }, [availableApis, editingRule, providers, selectedSlot]);
 
   // Lọc danh sách NCC theo Ô Input: chỉ hiển thị các NCC có sản phẩm tương ứng với slot
   const filteredSuppliers = useMemo(() => {
-    if (!selectedSlot) return suppliers.map((s) => ({ ...s, variantCount: 0 }));
-    const slotIdentifier = `${selectedSlot.slot_key} ${selectedSlot.name} ${selectedSlot.category || ""}`.toLowerCase();
+    if (!slotKey) return suppliers.map((s) => ({ ...s, variantCount: 0 }));
 
     const relevantVariants = supplierVariants.filter((v) => {
       const pName = (v.product_name || "").toLowerCase();
@@ -137,12 +134,10 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
         ...supplier,
         variantCount: variantCountBySupplier.get(supplier.id) || 0,
       }));
-  }, [selectedSlot, supplierVariants, suppliers]);
+  }, [slotIdentifier, slotKey, supplierVariants, suppliers]);
 
   const selectedVariants = useMemo(() => {
     const list = supplierVariants.filter((variant) => variant.supplier_id === Number(supplierId));
-    if (!selectedSlot) return list;
-    const slotIdentifier = `${selectedSlot.slot_key} ${selectedSlot.name} ${selectedSlot.category || ""}`.toLowerCase();
     if (slotIdentifier.includes("adobe")) {
       return list.filter((v) => (v.product_name || "").toLowerCase().includes("adobe") || (v.variant_display_name || "").toLowerCase().includes("adobe"));
     }
@@ -157,8 +152,8 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
       });
     }
     return list;
-  }, [selectedSlot, supplierId, supplierVariants]);
-  const isSharedTwoFactor = selectedSlot?.slot_key === "two_factor_totp";
+  }, [slotIdentifier, supplierId, supplierVariants]);
+  const isSharedTwoFactor = slotKey === "two_factor_totp" && !editingRule;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -166,11 +161,11 @@ export const SlotProductSupplierRuleModal: React.FC<SlotProductSupplierRuleModal
       const group = routingRules.filter((rule) =>
         rule.slot_key === editingRule.slot_key
         && rule.supplier_id === editingRule.supplier_id
-        && canonicalProviderKey(rule.provider_key) === canonicalProviderKey(editingRule.provider_key)
+        && rule.provider_key === editingRule.provider_key
       );
       setSlotKey(editingRule.slot_key);
       setSupplierId(editingRule.supplier_id);
-      setProviderKey(canonicalProviderKey(editingRule.provider_key));
+      setProviderKey(editingRule.provider_key);
       setVariantIds(group.map((rule) => rule.variant_id));
       setIsActive(editingRule.is_active !== false);
     } else {

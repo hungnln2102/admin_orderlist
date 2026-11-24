@@ -52,6 +52,7 @@ export const PackageManagementPage: React.FC = () => {
     supplier: "Mavryk",
     costPrice: 95000,
     expiredAt: "",
+    providerBySlot: {},
     note: "",
     matchRule: "information",
   });
@@ -237,6 +238,7 @@ export const PackageManagementPage: React.FC = () => {
       supplier: "Mavryk",
       costPrice: 95000,
       expiredAt: new Date(Date.now() + 365 * 86400000).toISOString().split("T")[0],
+      providerBySlot: {},
       note: "",
       matchRule: "information",
     });
@@ -255,13 +257,17 @@ export const PackageManagementPage: React.FC = () => {
       supplier: item.supplier,
       costPrice: item.costPrice,
       expiredAt: item.expiredAt,
+      providerBySlot: item.providerBySlot ?? {},
       note: item.note,
       matchRule: item.matchRule || "information",
     });
     setIsItemModalOpen(true);
   };
 
-  const handleSaveItem = async (e: React.FormEvent) => {
+  const handleSaveItem = async (
+    e: React.FormEvent,
+    providerBySlot?: Record<string, string>,
+  ) => {
     e.preventDefault();
     try {
       const payload = {
@@ -276,6 +282,7 @@ export const PackageManagementPage: React.FC = () => {
         supplier: itemFormData.supplier,
         costPrice: itemFormData.costPrice,
         expiredAt: itemFormData.expiredAt,
+        providerBySlot,
         note: itemFormData.note,
         matchRule: itemFormData.matchRule || "information",
       };
