@@ -383,26 +383,6 @@ const listCatalogItems = async () => {
     .groupBy("name_id", "variant_tag")
     .orderBy("variant_tag", "asc");
 
-  const productIds = pNames.map((p) => p.product_id).filter(Boolean);
-  const systemVariants = productIds.length > 0
-    ? await db(TABLES.VARIANT)
-        .select("product_id", "variant_name")
-        .whereIn("product_id", productIds)
-        .whereNotNull("variant_name")
-        .where("is_active", true)
-        .orderBy("variant_name", "asc")
-    : [];
-
-  const systemVariantsByProduct = new Map();
-  systemVariants.forEach((v) => {
-    const pId = Number(v.product_id);
-    if (!systemVariantsByProduct.has(pId)) {
-      systemVariantsByProduct.set(pId, new Set());
-    }
-    const name = String(v.variant_name || "").trim();
-    if (name) systemVariantsByProduct.get(pId).add(name);
-  });
-
   const statMap = new Map();
   accountStats.forEach((st) => {
     statMap.set(st.name_id, {
@@ -432,10 +412,6 @@ const listCatalogItems = async () => {
         existingTagsSet.add(String(v.tag).trim());
       }
     });
-    if (p.product_id && systemVariantsByProduct.has(Number(p.product_id))) {
-      systemVariantsByProduct.get(Number(p.product_id)).forEach((t) => existingTagsSet.add(t));
-    }
-
     return {
       id: p.id,
       name: p.name,
@@ -640,124 +616,53 @@ const getSystemProducts = async () => {
     .select("id", "package_name as name", "is_active")
     .orderBy("package_name", "asc");
 
-  const variants = await db(TABLES.VARIANT)
-    .select("product_id", "variant_name")
-    .whereNotNull("variant_name")
-    .where("is_active", true)
-    .orderBy("variant_name", "asc");
-
-  const variantsByProduct = new Map();
-  variants.forEach((v) => {
-    const pId = Number(v.product_id);
-    if (!variantsByProduct.has(pId)) {
-      variantsByProduct.set(pId, new Set());
-    }
-    const name = String(v.variant_name || "").trim();
-    if (name) variantsByProduct.get(pId).add(name);
-  });
-
   return list.map((p) => ({
     id: Number(p.id),
     name: p.name || "",
     isActive: Boolean(p.is_active),
-    tags: Array.from(variantsByProduct.get(Number(p.id)) || []),
   }));
 };
 
-/**
- * Đổi tên tag trên toàn hệ thống (business.variant, warehouse.product_names, warehouse.account_slots)
- */
-const renameCatalogTag = async ({ productId, oldTag, newTag }) => {
+async function updateCatalogTag(catalogId, tag, replacement) {
+  const id = Number(catalogId);
+  if (!Number.isSafeInteger(id) || id <= 0 || !tag) {
+    throw new Error("Cần chọn dịch vụ kho và nhập tag hợp lệ.");
+  }
+  const { PRODUCT_NAMES: P, ACCOUNT_SLOTS: S, ACTIVATION_KEY_RULES: R, ACTIVATION_KEYS: K } = COLS;
+  const normalized = tag.toLowerCase();
+  return withTransaction(async (trx) => {
+    const catalog = await trx(TABLES.PRODUCT_NAMES).where(P.ID, id).forUpdate().first();
+    if (!catalog) throw new Error("Không tìm thấy dịch vụ kho.");
+    const hasReference = (table, C) => trx(table)
+      .where(C.PRODUCT_NAME_ID, id)
+      .whereRaw("LOWER(TRIM(??)) = ?", [C.TARGET_VARIANT_TAG, normalized])
+      .first(C.ID);
+    if (await hasReference(TABLES.ACTIVATION_KEY_RULES, R) ||
+        await hasReference(TABLES.ACTIVATION_KEYS, K)) {
+      throw new Error("Tag đang được quy tắc cấp key hoặc key sử dụng.");
+    }
+    await trx(TABLES.PRODUCT_NAMES).where(P.ID, id)
+      .whereRaw("LOWER(TRIM(??)) = ?", [P.CATEGORY, normalized])
+      .update({ [P.CATEGORY]: replacement, [P.UPDATED_AT]: trx.fn.now() });
+    await trx(TABLES.ACCOUNT_SLOTS).where(S.NAME_ID, id)
+      .whereRaw("LOWER(TRIM(??)) = ?", [S.VARIANT_TAG, normalized])
+      .update({ [S.VARIANT_TAG]: replacement, [S.UPDATED_AT]: trx.fn.now() });
+    await publishWarehouseEvent(trx, EVENTS.WAREHOUSE_CATALOG_UPDATED, { id });
+  });
+}
+
+const renameCatalogTag = async ({ catalogId, oldTag, newTag }) => {
   const oldName = String(oldTag || "").trim();
   const newName = String(newTag || "").trim();
-  if (!oldName || !newName) {
-    throw new Error("Tên tag cũ và tên tag mới không được để trống!");
-  }
-
-  return await withTransaction(async (trx) => {
-    // 1. Cập nhật trong business.variant
-    const vQuery = trx(TABLES.VARIANT)
-      .where(function () {
-        this.whereRaw("LOWER(TRIM(variant_name)) = ?", [oldName.toLowerCase()])
-          .orWhereRaw("LOWER(TRIM(variant_name)) LIKE ?", [`%${oldName.toLowerCase()}%`]);
-      });
-    if (productId) {
-      vQuery.andWhere("product_id", Number(productId));
-    }
-    await vQuery.update({
-      variant_name: newName,
-      updated_at: new Date(),
-    });
-
-    // 2. Cập nhật trong warehouse.product_names
-    await trx(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(TRIM(category)) = ?", [oldName.toLowerCase()])
-      .update({
-        category: newName,
-        updated_at: new Date(),
-      });
-
-    // 3. Cập nhật trong warehouse.account_slots
-    await trx(TABLES.STOCK_SERVICES)
-      .whereRaw("LOWER(TRIM(variant_tag)) = ?", [oldName.toLowerCase()])
-      .update({
-        variant_tag: newName,
-        updated_at: new Date(),
-      });
-
-    return {
-      success: true,
-      oldTag: oldName,
-      newTag: newName,
-    };
-  });
+  if (!newName) throw new Error("Tên tag mới không được để trống.");
+  await updateCatalogTag(catalogId, oldName, newName);
+  return { success: true, oldTag: oldName, newTag: newName };
 };
 
-/**
- * Xóa tag khỏi hệ thống (vô hiệu hóa trong business.variant, xóa khỏi warehouse.product_names và account_slots)
- */
-const deleteCatalogTag = async ({ productId, tag }) => {
+const deleteCatalogTag = async ({ catalogId, tag }) => {
   const targetTag = String(tag || "").trim();
-  if (!targetTag) {
-    throw new Error("Tên tag cần xóa không được để trống!");
-  }
-
-  return await withTransaction(async (trx) => {
-    // 1. Vô hiệu hóa trong business.variant (is_active = false)
-    const vQuery = trx(TABLES.VARIANT)
-      .where(function () {
-        this.whereRaw("LOWER(TRIM(variant_name)) = ?", [targetTag.toLowerCase()])
-          .orWhereRaw("LOWER(TRIM(variant_name)) LIKE ?", [`%${targetTag.toLowerCase()}%`]);
-      });
-    if (productId) {
-      vQuery.andWhere("product_id", Number(productId));
-    }
-    await vQuery.update({
-      is_active: false,
-      updated_at: new Date(),
-    });
-
-    // 2. Gỡ tag trong warehouse.product_names nếu trùng
-    await trx(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(TRIM(category)) = ?", [targetTag.toLowerCase()])
-      .update({
-        category: null,
-        updated_at: new Date(),
-      });
-
-    // 3. Gỡ tag trong warehouse.account_slots nếu trùng
-    await trx(TABLES.STOCK_SERVICES)
-      .whereRaw("LOWER(TRIM(variant_tag)) = ?", [targetTag.toLowerCase()])
-      .update({
-        variant_tag: null,
-        updated_at: new Date(),
-      });
-
-    return {
-      success: true,
-      deletedTag: targetTag,
-    };
-  });
+  await updateCatalogTag(catalogId, targetTag, null);
+  return { success: true, deletedTag: targetTag };
 };
 
 /**

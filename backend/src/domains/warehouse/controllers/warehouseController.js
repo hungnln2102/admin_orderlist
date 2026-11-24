@@ -139,8 +139,8 @@ const getSystemProducts = async (req, res) => {
 
 const renameCatalogTag = async (req, res) => {
   try {
-    const { productId, oldTag, newTag } = req.body || {};
-    const result = await warehouseService.renameCatalogTag({ productId, oldTag, newTag });
+    const { catalogId, oldTag, newTag } = req.body || {};
+    const result = await warehouseService.renameCatalogTag({ catalogId, oldTag, newTag });
     return res.json({ success: true, message: `Đã đổi tên tag thành "${newTag}" thành công!`, data: result });
   } catch (err) {
     console.error("[WarehouseController] renameCatalogTag error:", err);
@@ -150,8 +150,8 @@ const renameCatalogTag = async (req, res) => {
 
 const deleteCatalogTag = async (req, res) => {
   try {
-    const { productId, tag } = req.body || {};
-    const result = await warehouseService.deleteCatalogTag({ productId, tag });
+    const { catalogId, tag } = req.body || {};
+    const result = await warehouseService.deleteCatalogTag({ catalogId, tag });
     return res.json({ success: true, message: `Đã xóa tag "${tag}" thành công!`, data: result });
   } catch (err) {
     console.error("[WarehouseController] deleteCatalogTag error:", err);

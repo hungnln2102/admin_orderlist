@@ -24,9 +24,10 @@ export const SearchableProductDropdown: React.FC<SearchableProductDropdownProps>
   );
 
   const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products;
+    const activeProducts = products.filter((product) => product.is_active !== false);
+    if (!search.trim()) return activeProducts;
     const term = search.toLowerCase().trim();
-    return products.filter(
+    return activeProducts.filter(
       (p) =>
         (p.package_product && p.package_product.toLowerCase().includes(term)) ||
         (p.san_pham && p.san_pham.toLowerCase().includes(term))

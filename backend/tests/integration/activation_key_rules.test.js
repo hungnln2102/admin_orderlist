@@ -54,6 +54,10 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       const rule = { slot_key: slot, provider_key: provider, variant_id: variant.id, supplier_id: supplier.id };
       await db(TABLES.PORTAL_SLOT_ROUTING_RULES).insert({ ...rule, is_active: true });
       try {
+        await activationKeyService.saveActivationKeyRule({
+          variant_id: variant.id, supplier_id: supplier.id, product_name_id: target.product_name_id,
+          target_variant_tag: target.variant_tag, is_active: true,
+        });
         const order = await orderService.createOrder({
           id_order: orderCode, id_product: variant.id, supply_id: supplier.id, information_order: info,
           contact, status: "PAID", expired_at: "2099-01-01",
@@ -70,6 +74,7 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
         await db(TABLES.ORDER_LIST).where("id_order", orderCode).update({ status: "UNPAID" });
         assert.equal(await resolveAdobeRecoveryOrder({ code: info, contact }), null);
       } finally {
+        await db(TABLES.ACTIVATION_KEY_RULES).where({ variant_id: variant.id, supplier_id: supplier.id }).del();
         await db(TABLES.ORDER_LIST).where("id_order", orderCode).del();
         await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(rule).del();
       }
@@ -194,6 +199,18 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       assert.equal(initial.statusProviderKey, "fix_ades_status");
       const initialKey = await keyQuery().first();
       assert.equal(initialKey.package_product_id, packageId);
+
+      await keyQuery().update({ package_product_id: null, target_variant_tag: null });
+      const packageQuery = () => db(TABLES.PACKAGE_PRODUCT).where("id", packageId);
+      await packageQuery().update({ provider_by_slot: { adobe_check: "fix_ades_status" } });
+      await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).update({ is_active: false });
+      const legacy = await recover("check");
+      assert.equal(legacy.account, original.account);
+      assert.equal(legacy.statusProviderKey, "fix_ades_status");
+      assert.equal((await keyQuery().first()).package_product_id, packageId);
+      await packageQuery().update({ provider_by_slot: null });
+      await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).update({ is_active: true });
+      await keyQuery().update({ target_variant_tag: suffix });
 
       await db(TABLES.PACKAGE_PRODUCT).where("id", packageId)
         .update({ account_id: updated.accountId, account_slot_id: updated.id });
@@ -374,7 +391,7 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       // 3. Kiểm tra bản ghi trong activation_keys
       const keyRow = await db(TABLES.ACTIVATION_KEYS).where("key_code", createdOrder.information_order).first();
       assert.ok(keyRow, "Mã key phải tồn tại trong warehouse.activation_keys");
-      assert.equal(keyRow.status, "INACTIVE");
+      assert.equal(keyRow.status, "AVAILABLE");
       assert.equal(Number(keyRow.product_name_id), Number(target.product_name_id));
       assert.equal(keyRow.target_variant_tag, target.variant_tag.trim());
       assert.equal(keyRow.id_order, testOrderId);
@@ -386,6 +403,9 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       const paidKey = await db(TABLES.ACTIVATION_KEYS).where("key_code", previewKey).first();
       assert.equal(paidKey.status, "ACTIVATED");
       assert.equal(paidKey.account_slot_id, null);
+      await db(TABLES.ORDER_LIST).where("id_order", testOrderId).update({ status: "UNPAID" });
+      assert.equal((await db(TABLES.ACTIVATION_KEYS).where("id", keyRow.id).first()).status, "AVAILABLE");
+      await db(TABLES.ORDER_LIST).where("id_order", testOrderId).update({ status: "PAID" });
 
       // 4. Nếu có slot trong kho, thử kích hoạt và kiểm tra order_list.slot được cập nhật
       const availableSlot = await db(TABLES.ACCOUNT_SLOTS)

@@ -52,3 +52,21 @@
 - PostgreSQL 16 trống trên Windows chạy đủ 61 migration. Kiểm thử VPBank đạt 1/1, SePay đạt 5/5 và unit test backend đạt 163/163.
 - Kiểm tra trên schema đối tác tùy chỉnh: khoản hoàn 12.500 chuyển thành `import_cost = -12500`, khoản chi thường giữ nguyên và rollback khôi phục dữ liệu mẫu.
 - Chờ xác nhận trên GitHub Actions sau khi bản sửa được đưa lên GitHub.
+
+## Nghiệm thu deploy production qua GitHub Actions
+
+- Run `45359756504`, lần chạy 2, deploy commit `fbe8f6ac` thành công. Job validate và deploy đều đạt.
+- Bản sửa parser VPBank trên VPS trùng với blob trong commit triển khai. Đã sao lưu diff riêng và đồng bộ file theo Git để bỏ nguyên nhân chặn deploy.
+- Workflow áp dụng 5 migration. Đã xác nhận migration xóa `refund_amount` có trong lịch sử PostgreSQL và health check production trả `status=ok`, `database=connected`.
+
+## Adobe theo quy tắc Variant và nhà cung cấp
+
+- Đơn Adobe trực tiếp giữ định danh của Ades hoặc Yuna theo cấu hình. Key tự sinh theo quy tắc ở trạng thái `AVAILABLE` khi đơn chưa thanh toán và chuyển sang `ACTIVATED` khi thanh toán.
+- Kiểm tra lại dùng slot hiện hành của gói đã cấp. Key cũ có thể khớp một gói duy nhất từ slot và lưu lại liên kết. Khi gói mất, cấp lại trong cùng sản phẩm và tag đích nếu còn chỗ.
+- PostgreSQL 16 chạy 62 migration. Kiểm thử tích hợp Adobe đạt 6/6, unit test đạt 163/163 và frontend build thành công. Chưa triển khai bản sửa lên production.
+
+## Tách tag kho khỏi Variant bán hàng
+
+- Lưu, đổi tên và xóa tag chỉ cập nhật đúng dịch vụ kho. Danh sách gợi ý lấy tag mặc định và tag trên slot. Quy tắc cấp key theo Variant + NCC tiếp tục chọn đích kho qua tag đã cấu hình.
+- PostgreSQL 16 xác nhận lưu tag không tạo Variant, đổi hoặc xóa tag không ảnh hưởng Variant và dịch vụ kho khác. Tích hợp Adobe đạt 6/6, unit test 163/163 và frontend build thành công.
+- Đã vô hiệu hóa riêng Variant Adobe `Paid` #267 trên production sau khi kiểm tra tham chiếu. Bản sửa mã nguồn và lọc Variant ngừng hoạt động trên form tạo đơn đang ở workspace.

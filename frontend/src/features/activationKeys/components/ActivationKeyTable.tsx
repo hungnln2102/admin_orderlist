@@ -37,6 +37,7 @@ export const ActivationKeyTable: React.FC<Props> = ({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "AVAILABLE":
       case "INACTIVE":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -254,7 +255,7 @@ export const ActivationKeyTable: React.FC<Props> = ({
                 <td className="py-3 px-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1.5">
                     {/* Thu hồi key */}
-                    {item.status === "INACTIVE" && (
+                    {["AVAILABLE", "INACTIVE"].includes(item.status) && (
                       <button
                         type="button"
                         onClick={() => onRevoke(item)}

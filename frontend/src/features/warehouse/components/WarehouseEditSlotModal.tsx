@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import {
   ServiceNameCategoryItem,
-  SystemProduct,
   WarehouseAccountItem,
   WarehouseServiceSlot,
   WarehouseSlotEditFormData,
@@ -34,7 +33,6 @@ interface WarehouseEditSlotModalProps {
   account: WarehouseAccountItem | null;
   slot: WarehouseServiceSlot | null;
   catalogItems?: ServiceNameCategoryItem[];
-  systemProducts?: SystemProduct[];
   isSubmitting?: boolean;
   onClose: () => void;
   onSubmit: (formData: WarehouseSlotEditFormData) => Promise<void>;
@@ -45,7 +43,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
   account,
   slot,
   catalogItems = [],
-  systemProducts = [],
   isSubmitting = false,
   onClose,
   onSubmit,
@@ -129,11 +126,6 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
   }, [slot, catalogItems]);
 
   // Tìm sản phẩm hệ thống tương ứng nếu có
-  const matchingSystemProduct = useMemo(() => {
-    if (!matchingCatalog?.productId || !systemProducts?.length) return null;
-    return systemProducts.find((p) => p.id === matchingCatalog.productId) || null;
-  }, [matchingCatalog, systemProducts]);
-
   // Tổng hợp danh sách tag có sẵn của sản phẩm này
   const availableServiceTags = useMemo(() => {
     const set = new Set<string>();
@@ -157,20 +149,13 @@ export const WarehouseEditSlotModal: React.FC<WarehouseEditSlotModalProps> = ({
       if (trimmed) set.add(trimmed);
     }
 
-    if (matchingSystemProduct?.tags) {
-      matchingSystemProduct.tags.forEach((t) => {
-        const trimmed = String(t || "").trim();
-        if (trimmed) set.add(trimmed);
-      });
-    }
-
     if (slot?.variant_tag) {
       const trimmed = String(slot.variant_tag || "").trim();
       if (trimmed) set.add(trimmed);
     }
 
     return Array.from(set);
-  }, [matchingCatalog, matchingSystemProduct, slot]);
+  }, [matchingCatalog, slot]);
 
   // Kiểm tra tag đang gõ có phải là tag mới chưa từng có hay không
   const trimmedCurrentTag = formData.variantTag.trim();

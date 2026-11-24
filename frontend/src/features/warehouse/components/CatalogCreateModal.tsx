@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { Layers, X, Package, Tag } from "lucide-react";
 import { CustomSelect } from "@/shared/components";
 import { CatalogFormData, SystemProduct } from "../types";
@@ -20,17 +20,6 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
   onFormChange,
   onSubmit,
 }) => {
-  // Lấy các tag đang lưu có sẵn của sản phẩm hệ thống được chọn
-  const productTags = useMemo(() => {
-    if (!formData.productId) return [];
-    const sp = systemProducts.find((p) => p.id === Number(formData.productId));
-    const set = new Set<string>();
-    (sp?.tags || []).forEach((t) => {
-      if (t && t.trim()) set.add(t.trim());
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [formData.productId, systemProducts]);
-
   if (!open) return null;
 
   return (
@@ -94,12 +83,12 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
             </p>
           </div>
 
-          {/* Tag Phân Loại / Biến Thể */}
+          {/* Tag phân loại kho */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-medium text-slate-300 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-purple-400" />
-                <span>Tag Phân Loại / Biến Thể (*)</span>
+                <span>Tag phân loại kho (*)</span>
               </label>
               {formData.category && (
                 <span className="text-[11px] text-purple-400 font-mono">
@@ -110,49 +99,12 @@ export const CatalogCreateModal: React.FC<CatalogCreateModalProps> = ({
             <div className="relative">
               <input
                 type="text"
-                placeholder="Nhập hoặc chọn tag của sản phẩm này (VD: 5Tb, 1PC Cố Định...)"
+                placeholder="Nhập tag kho (VD: 5Tb, 1PC Cố Định...)"
                 value={formData.category || ""}
                 onChange={(e) => onFormChange({ ...formData, category: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500 font-mono text-xs sm:text-sm [&::-webkit-calendar-picker-indicator]:hidden"
               />
             </div>
-
-            {/* Danh sách Tag đang lưu có sẵn của sản phẩm đó */}
-            {productTags.length > 0 ? (
-              <div className="mt-2 space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                  <span>Tag có sẵn của sản phẩm này:</span>
-                  <span className="text-[10px] text-purple-400/80 font-normal lowercase">
-                    (bấm để điền & sửa đổi tùy ý)
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar p-1.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
-                  {productTags.map((t) => {
-                    const isSelected =
-                      (formData.category || "").toLowerCase().trim() === t.toLowerCase().trim();
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => onFormChange({ ...formData, category: t })}
-                        className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-purple-600 text-white font-bold border border-purple-400 shadow-sm shadow-purple-600/30 scale-105"
-                            : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60"
-                        }`}
-                        title="Bấm để đưa tag này vào ô nhập và chỉnh sửa tùy ý"
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : formData.productId ? (
-              <p className="mt-1.5 text-[11px] text-slate-500 italic">
-                Sản phẩm hệ thống này chưa có tag biến thể lưu sẵn. Master có thể tự do nhập tag mới ở ô trên.
-              </p>
-            ) : null}
 
             {/* Live Preview Badge */}
             <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">

@@ -199,35 +199,10 @@ const updateWarehouseServiceSlot = async (slotId, payload) => {
       const cleanTag = String(variantTag || "").trim();
       updateData.variant_tag = cleanTag || null;
 
-      // Tự động ghi nhận tag mới vào hệ thống kho dịch vụ
-      if (cleanTag) {
-        const pn = await trx(TABLES.PRODUCT_NAMES).where("id", existingSlot.name_id).first();
-        if (pn && pn.product_id) {
-          const existingVariant = await trx(TABLES.VARIANT)
-            .where("product_id", pn.product_id)
-            .whereRaw("LOWER(TRIM(variant_name)) = ?", [cleanTag.toLowerCase()])
-            .first();
-
-          if (!existingVariant) {
-            await trx(TABLES.VARIANT).insert({
-              product_id: pn.product_id,
-              variant_name: cleanTag,
-              is_active: true,
-              created_at: now,
-              updated_at: now,
-            });
-          } else if (!existingVariant.is_active) {
-            await trx(TABLES.VARIANT)
-              .where("id", existingVariant.id)
-              .update({ is_active: true, updated_at: now });
-          }
-        }
-
-        if (payload?.saveTagToCatalog) {
-          await trx(TABLES.PRODUCT_NAMES)
-            .where("id", existingSlot.name_id)
-            .update({ category: cleanTag, updated_at: now });
-        }
+      if (cleanTag && payload?.saveTagToCatalog) {
+        await trx(TABLES.PRODUCT_NAMES)
+          .where(COLS.PRODUCT_NAMES.ID, existingSlot.name_id)
+          .update({ [COLS.PRODUCT_NAMES.CATEGORY]: cleanTag, [COLS.PRODUCT_NAMES.UPDATED_AT]: now });
       }
     }
     if (hasProviderKey) updateData[SS.PROVIDER_KEY] = String(rawProviderKey || "").trim() || null;

@@ -96,15 +96,8 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
       }
     });
 
-    // 3. Tag từ sản phẩm hệ thống được liên kết
-    const activeProductId = productId !== null ? productId : item?.productId;
-    if (activeProductId) {
-      const sp = systemProducts.find((p) => p.id === activeProductId);
-      (sp?.tags || []).forEach(addTag);
-    }
-
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [item, productId, systemProducts, renamedTags, deletedTags]);
+  }, [item, renamedTags, deletedTags]);
 
   const isRenameMode = Boolean(
     selectedPillTag &&
@@ -112,13 +105,13 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
       category.trim().toLowerCase() !== selectedPillTag.toLowerCase()
   );
 
-  // Xóa vĩnh viễn tag khỏi hệ thống (Dùng popup xác nhận dự án)
+  // Xóa tag khỏi dịch vụ kho (Dùng popup xác nhận dự án)
   const handleDeleteTagDirect = (tagToDelete: string) => {
-    const activeProductId = productId !== null ? productId : item?.productId;
+    if (!item) return;
 
     notify.confirm({
       title: "Xác Nhận Xóa Vĩnh Viễn Tag",
-      message: `Master có chắc chắn muốn XÓA VĨNH VIỄN tag "${tagToDelete}" khỏi toàn bộ các slot kho và sản phẩm trong hệ thống không?`,
+      message: `Master có chắc chắn muốn XÓA VĨNH VIỄN tag "${tagToDelete}" khỏi dịch vụ kho này không?`,
       confirmText: "Xóa Vĩnh Viễn",
       cancelText: "Hủy Bỏ",
       danger: true,
@@ -132,7 +125,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              productId: activeProductId,
+              catalogId: item.id,
               tag: tagToDelete,
             }),
           });
@@ -142,8 +135,8 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
           }
 
           setDeletedTags((prev) => new Set(prev).add(tagToDelete));
-          notify.success(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi toàn bộ hệ thống!`, "Xóa Thành Công");
-          setTagActionMessage(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi toàn bộ hệ thống!`);
+          notify.success(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi dịch vụ kho này!`, "Xóa Thành Công");
+          setTagActionMessage(`Đã xóa vĩnh viễn tag "${tagToDelete}" khỏi dịch vụ kho này!`);
           if (category.trim().toLowerCase() === tagToDelete.toLowerCase()) {
             setCategory("");
           }
@@ -161,10 +154,10 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
     });
   };
 
-  // Đổi tên tag trên toàn hệ thống
+  // Đổi tên tag trong dịch vụ kho
   const handleConfirmRename = async () => {
     if (!selectedPillTag || !isRenameMode || isTagActionLoading) return;
-    const activeProductId = productId !== null ? productId : item?.productId;
+    if (!item) return;
     const oldName = selectedPillTag;
     const newTagName = category.trim();
 
@@ -177,7 +170,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: activeProductId,
+          catalogId: item.id,
           oldTag: oldName,
           newTag: newTagName,
         }),
@@ -311,7 +304,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-purple-400" />
-                <span>Tag Phân Loại / Biến Thể Mặc Định</span>
+                <span>Tag phân loại kho mặc định</span>
               </label>
               {category.trim() ? (
                 <span className="text-[11px] text-purple-300 font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30">
@@ -350,7 +343,7 @@ export const CatalogEditModal: React.FC<CatalogEditModalProps> = ({
               )}
             </div>
 
-            {/* Banner gợi ý Đổi tên tag trên toàn hệ thống nếu Master sửa khác tag đang chọn */}
+            {/* Banner gợi ý Đổi tên tag trong dịch vụ kho nếu Master sửa khác tag đang chọn */}
             {isRenameMode && (
               <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs animate-in fade-in">
                 <span className="text-[11px] leading-tight">

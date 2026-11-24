@@ -12,19 +12,15 @@ async function listImportWarehouseTags(variantId, connection = db) {
   const product = await connection(TABLES.PRODUCT).where(PRODUCT.ID, productId).first();
   const productName = product?.[PRODUCT.PACKAGE_NAME] ||
     variant[VARIANT.VARIANT_NAME] || variant[VARIANT.DISPLAY_NAME];
-  const [variants, catalog] = await Promise.all([
-    connection(TABLES.VARIANT).where(VARIANT.PRODUCT_ID, productId)
-      .where(VARIANT.IS_ACTIVE, true).pluck(VARIANT.VARIANT_NAME),
-    connection(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(??) = ?", [PRODUCT_NAMES.NAME, String(productName || "").trim().toLowerCase()])
-      .first(),
-  ]);
+  const catalog = await connection(TABLES.PRODUCT_NAMES)
+    .whereRaw("LOWER(??) = ?", [PRODUCT_NAMES.NAME, String(productName || "").trim().toLowerCase()])
+    .first();
   const slotTags = catalog
     ? await connection(TABLES.ACCOUNT_SLOTS)
       .where(ACCOUNT_SLOTS.NAME_ID, catalog[PRODUCT_NAMES.ID]).distinct(ACCOUNT_SLOTS.VARIANT_TAG)
       .pluck(ACCOUNT_SLOTS.VARIANT_TAG)
     : [];
-  return [...new Set([...variants, ...slotTags, catalog?.[PRODUCT_NAMES.CATEGORY]]
+  return [...new Set([...slotTags, catalog?.[PRODUCT_NAMES.CATEGORY]]
     .map((tag) => String(tag || "").trim()).filter(Boolean))].sort();
 }
 

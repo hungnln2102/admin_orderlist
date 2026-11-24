@@ -427,7 +427,6 @@ export const WarehousePage: React.FC = () => {
             account={editingSlotData.account}
             slot={editingSlotData.slot}
             catalogItems={catalog}
-            systemProducts={systemProducts}
             isSubmitting={isUpdatingSlot}
             onClose={() => setEditingSlotData(null)}
             onSubmit={async (formData) => {

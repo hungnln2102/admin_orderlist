@@ -55,9 +55,9 @@ const listActivationKeys = async ({
 
   if (status && status !== "all") {
     const requestedStatus = status.toUpperCase();
-    const keyStatus = requestedStatus === "AVAILABLE" ? "INACTIVE" : requestedStatus;
-    query = query.where("ak.status", keyStatus);
-    countQuery = countQuery.where("ak.status", keyStatus);
+    const keyStatuses = requestedStatus === "AVAILABLE" ? ["AVAILABLE", "INACTIVE"] : [requestedStatus];
+    query = query.whereIn("ak.status", keyStatuses);
+    countQuery = countQuery.whereIn("ak.status", keyStatuses);
   }
 
   if (productNameId) {
@@ -106,8 +106,9 @@ const listActivationKeys = async ({
     counts.total += c;
     if (st === "inactive") {
       counts.inactive = c;
-      counts.available = c;
+      counts.available += c;
     }
+    if (st === "available") counts.available += c;
     else if (st === "activated") counts.activated = c;
     else if (st === "revoked") counts.revoked = c;
     else if (st === "expired") counts.expired = c;
@@ -307,7 +308,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       throw new Error("Mã kích hoạt này đã hết hạn sử dụng!");
     }
 
-    const targetTag = key[keyCols.TARGET_VARIANT_TAG];
+    let targetTag = key[keyCols.TARGET_VARIANT_TAG];
     const previousPackageId = key[keyCols.PACKAGE_PRODUCT_ID];
     const lockPackages = () => trx(TABLES.PACKAGE_PRODUCT)
       .where(pack.PRODUCT_NAME_ID, key[keyCols.PRODUCT_NAME_ID])
@@ -331,6 +332,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       payload: { id: order[O.ID], id_order: orderCode },
     });
 
+    const orderSlot = String(order?.[O.SLOT] || "").trim().toLowerCase();
     const packageManaged = Boolean(targetTag || previousPackageId);
     const resolveStatusProvider = (slot, providerBySlot) => {
       const configured = providerBySlot?.adobe_check;
@@ -346,7 +348,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     };
     const lockedPackages = recovery && recovery !== "lookup" && targetTag ? await lockPackages() : null;
     if (recovery) {
-      const currentPackage = lockedPackages
+      let currentPackage = lockedPackages
         ? lockedPackages.find((entry) => String(entry[pack.ID]) === String(previousPackageId))
         : previousPackageId
         ? await trx(TABLES.PACKAGE_PRODUCT)
@@ -354,7 +356,37 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           .forShare()
           .first(pack.ACCOUNT_SLOT_ID, pack.PROVIDER_BY_SLOT)
         : null;
-      const slotId = packageManaged ? currentPackage?.[pack.ACCOUNT_SLOT_ID] : key[keyCols.ACCOUNT_SLOT_ID];
+      if (!currentPackage && !previousPackageId && (orderSlot || key[keyCols.ACCOUNT_SLOT_ID])) {
+        const matches = await trx({ p: TABLES.PACKAGE_PRODUCT })
+          .join({ ss: TABLES.ACCOUNT_SLOTS }, `ss.${S.ID}`, `p.${pack.ACCOUNT_SLOT_ID}`)
+          .join({ a: TABLES.ACCOUNTS }, `a.${A.ID}`, `ss.${S.ACCOUNT_ID}`)
+          .where(`p.${pack.PRODUCT_NAME_ID}`, key[keyCols.PRODUCT_NAME_ID])
+          .where(`ss.${S.NAME_ID}`, key[keyCols.PRODUCT_NAME_ID])
+          .modify((query) => {
+            if (targetTag) query.whereRaw("BTRIM(??) = ?", [`ss.${S.VARIANT_TAG}`, targetTag]);
+          })
+          .modify((query) => {
+            if (orderSlot) query.whereRaw("LOWER(TRIM(??)) = ?", [`a.${A.ACCOUNT_USERNAME}`, orderSlot]);
+            else query.where(`ss.${S.ID}`, key[keyCols.ACCOUNT_SLOT_ID]);
+          })
+          .limit(2)
+          .forShare("p")
+          .select(`p.${pack.ID}`, `p.${pack.ACCOUNT_SLOT_ID}`, `p.${pack.PROVIDER_BY_SLOT}`);
+        if (matches.length > 1) throw new Error("Ambiguous Adobe package for order slot.");
+        [currentPackage] = matches;
+      }
+      if (!currentPackage && !targetTag && (previousPackageId || orderSlot)) {
+        const R = COLS.ACTIVATION_KEY_RULES;
+        const rule = await findMatchingKeyRule({
+          variantId: order[O.ID_PRODUCT],
+          supplierId: order[O.SUPPLY_ID],
+        }, trx);
+        if (String(rule?.[R.PRODUCT_NAME_ID]) === String(key[keyCols.PRODUCT_NAME_ID])) {
+          targetTag = rule[R.TARGET_VARIANT_TAG];
+        }
+      }
+      const slotId = currentPackage?.[pack.ACCOUNT_SLOT_ID] ||
+        (!packageManaged && !targetTag && key[keyCols.ACCOUNT_SLOT_ID]);
       const assignedSlot = slotId && await trx({ slot: TABLES.ACCOUNT_SLOTS })
         .join({ account: TABLES.ACCOUNTS }, `account.${A.ID}`, `slot.${S.ACCOUNT_ID}`)
         .where(`slot.${S.ID}`, slotId)
@@ -366,12 +398,14 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         const assignedAccount = assignedSlot[A.ACCOUNT_USERNAME];
         if (recovery !== "lookup") {
           const keyChanged = String(key[keyCols.ACCOUNT_SLOT_ID]) !== String(slotId) ||
-            key[keyCols.ASSIGNED_ACCOUNT] !== assignedAccount;
+            key[keyCols.ASSIGNED_ACCOUNT] !== assignedAccount ||
+            Boolean(currentPackage && String(previousPackageId) !== String(currentPackage[pack.ID]));
           const orderChanged = order[O.SLOT] !== assignedAccount;
           if (keyChanged) {
             await trx(TABLES.ACTIVATION_KEYS).where(keyCols.ID, key[keyCols.ID]).update({
               [keyCols.ACCOUNT_SLOT_ID]: slotId,
               [keyCols.ASSIGNED_ACCOUNT]: assignedAccount,
+              ...(currentPackage ? { [keyCols.PACKAGE_PRODUCT_ID]: currentPackage[pack.ID] } : {}),
               [keyCols.UPDATED_AT]: trx.fn.now(),
             });
           }
@@ -381,7 +415,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         const statusProviderKey = await resolveStatusProvider(assignedSlot, currentPackage?.[pack.PROVIDER_BY_SLOT]);
         return { account: assignedAccount, password: assignedSlot[S.PASSWORD] || "", statusProviderKey };
       }
-      if (recovery === "lookup" || (recovery === "check" && wasAssigned && !packageManaged)) {
+      if (recovery === "lookup" || (recovery === "check" && wasAssigned && !packageManaged && !targetTag)) {
         return { replacementRequired: true };
       }
       if (packageManaged && !targetTag) return { replacementRequired: wasAssigned, outOfStock: true };
@@ -499,7 +533,10 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .update({
         status: "ACTIVATED",
         account_slot_id: availableSlot.slot_id,
-        ...(packageId ? { [keyCols.PACKAGE_PRODUCT_ID]: packageId } : {}),
+        ...(packageId ? {
+          [keyCols.PACKAGE_PRODUCT_ID]: packageId,
+          [keyCols.TARGET_VARIANT_TAG]: targetTag,
+        } : {}),
         assigned_account: assignedAccount,
         customer_info: finalCustomer || null,
         [keyCols.ACTIVATED_AT]: key[keyCols.ACTIVATED_AT] || trx.fn.now(),
@@ -711,7 +748,7 @@ const findMatchingKeyRule = async ({ variantId, supplierId }, connection = db) =
 
 const resolveOrderActivationRule = async (selection, connection = db) => {
   const adobeSource = await findDirectAdobeSource(selection, connection);
-  const rule = adobeSource === "yuna" ? null : await findMatchingKeyRule(selection, connection);
+  const rule = adobeSource ? null : await findMatchingKeyRule(selection, connection);
   return { adobeSource, rule };
 };
 
