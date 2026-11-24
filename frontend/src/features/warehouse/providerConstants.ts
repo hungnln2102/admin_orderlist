@@ -26,14 +26,14 @@ export const AVAILABLE_OTP_PROVIDERS: OtpProviderOption[] = [
     category: "TOOL",
   },
   {
-    value: "yuna_mail",
+    value: "yuna_otp",
     badgeClass: "bg-blue-500/15 text-blue-300 border-blue-500/30",
-    category: "EMAIL",
+    category: "OTP",
   },
   {
-    value: "yuna_2fa",
+    value: "yuna_check",
     badgeClass: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
-    category: "2FA",
+    category: "TOOL",
   },
   {
     value: "vivarocky_household",

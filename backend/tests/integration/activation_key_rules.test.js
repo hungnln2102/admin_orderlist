@@ -47,7 +47,7 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
     const tag = randomUUID();
     const contact = "customer@example.test";
     for (const [source, slot, provider, info] of [
-      ["yuna", "adobe_account", "yuna_2fa", `Yuna-${tag}`],
+      ["yuna", "adobe_check", "yuna_check", `Yuna-${tag}`],
       ["ades", "adobe_check", "fix_ades_status", `ades-${tag}@example.test`],
     ]) {
       const orderCode = `TEST-${source}-${tag}`.toUpperCase();

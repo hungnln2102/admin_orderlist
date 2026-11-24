@@ -1,6 +1,6 @@
 const { requestProviderApi } = require("./providerRequest");
 const { readExternalResponse } = require("@/utils/safeExternalRequest");
-const { extractOtpCode, parseJsonResponse } = require("./otpProviderUtils");
+const { parseJsonResponse } = require("./otpProviderUtils");
 
 const yunaSessionCache = new Map();
 
@@ -41,9 +41,8 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
 /**
  * Luồng Yuna 2FA Center (mmo.yunagrp.com/2fa/):
  * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
- * - Hoặc tra cứu mã 2FA từ secret (get_manual)
  */
-async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, orderOnly = false } = {}) {
+async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
   const query = String(queryInput).trim();
 
@@ -56,16 +55,7 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, ord
       return { otp: null, extra_fields: [], error: "Không thể lấy token xác thực từ Yuna 2FA." };
     }
 
-    const form = new URLSearchParams();
-    const isBase32Secret = !orderOnly && /^[A-Z2-7]{16,32}$/i.test(query);
-
-    if (isBase32Secret) {
-      form.append("action", "get_manual");
-      form.append("secret", query);
-    } else {
-      form.append("action", "get_order");
-      form.append("order_code", query);
-    }
+    const form = new URLSearchParams({ action: "get_order", order_code: query });
 
     const headers = {
       "X-API-Token": session.token,
@@ -88,30 +78,14 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, ord
       // Invalidate session cache if 403
       yunaSessionCache.delete(config.service_key || config.base_url);
     }
+    if (!response.ok) return { extra_fields: [], error: `Yuna Check HTTP ${response.status}` };
 
     const data = await parseJsonResponse(response);
     if (!data) return { otp: null, extra_fields: [] };
 
-    let foundOtp = extractOtpCode(data.code) || null;
     const extraFields = [];
-
-    // Nếu là get_manual: có code và time_left
-    if (data.code) {
-      extraFields.push({ key: "code", label: "Mã 2FA / OTP", value: String(data.code), path: "code" });
-    }
-    if (data.time_left !== undefined) {
-      extraFields.push({ key: "time_left", label: "Thời gian còn lại (s)", value: String(data.time_left), path: "time_left" });
-    }
-
-    // Nếu là get_order: trả về danh sách tài khoản (items)
-    if (Array.isArray(data.items) && data.items.length > 0) {
-      extraFields.push({
-        key: "items",
-        label: "Danh Sách Tài Khoản",
-        value: JSON.stringify(data.items),
-        path: "items",
-      });
-
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (items.length > 0) {
       // Lấy tài khoản đầu tiên
       const primaryItem = data.items[0];
       if (primaryItem.name) {
@@ -123,13 +97,10 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, ord
       if (primaryItem.expires_at_str) {
         extraFields.push({ key: "expires_at", label: "Hạn Sử Dụng", value: String(primaryItem.expires_at_str), path: "items[0].expires_at_str" });
       }
-      if (primaryItem.code && !foundOtp) {
-        foundOtp = extractOtpCode(primaryItem.code);
-        extraFields.push({ key: "otp", label: "Mã OTP 2FA", value: String(primaryItem.code), path: "items[0].code" });
-      }
     }
 
-    return { otp: foundOtp, extra_fields: extraFields, raw_data: data };
+    const accounts = items.map(({ name, group, expires_at_str }) => ({ name, group, expires_at_str }));
+    return { extra_fields: extraFields, raw_data: { items: accounts } };
   } catch (err) {
     return { otp: null, extra_fields: [], error: err.message };
   }

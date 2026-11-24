@@ -23,11 +23,14 @@ async function findDirectAdobeSource({ variantId, supplierId }, connection = db)
   if (!Number(variantId) || !Number(supplierId)) return null;
   const rules = await adobeOrderRules({ variantId, supplierId }, connection)
     .whereIn([R.SLOT_KEY, R.PROVIDER_KEY], [
-      ["adobe_account", "yuna_2fa"],
+      ["adobe_check", "yuna_check"],
+      ["adobe_account", "yuna_check"],
       ["adobe_check", "fix_ades_status"],
     ])
-    .select(R.SLOT_KEY);
-  const sources = new Set(rules.map((rule) => rule[R.SLOT_KEY] === "adobe_account" ? "yuna" : "ades"));
+    .select(R.SLOT_KEY, R.PROVIDER_KEY);
+  const configuredRules = rules.filter((rule) => rule[R.SLOT_KEY] === "adobe_check");
+  const sources = new Set((configuredRules.length ? configuredRules : rules)
+    .map((rule) => rule[R.PROVIDER_KEY] === "yuna_check" ? "yuna" : "ades"));
   if (sources.size > 1) throw new Error("Đơn có nhiều cấu hình nguồn Adobe.");
   return sources.values().next().value || null;
 }
@@ -71,7 +74,7 @@ async function resolveAdobeRecoveryOrder({ code, contact }) {
   if (!providerInput || (source === "ades" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(providerInput))) {
     throw new Error("Thiếu thông tin tài khoản Adobe trên đơn.");
   }
-  return { source, providerKey: source === "yuna" ? "yuna_2fa" : "fix_ades_status", providerInput };
+  return { source, providerKey: source === "yuna" ? "yuna_check" : "fix_ades_status", providerInput };
 }
 
 module.exports = { findAdobeStatusProvider, findDirectAdobeSource, resolveAdobeRecoveryOrder };

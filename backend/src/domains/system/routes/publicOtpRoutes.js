@@ -97,7 +97,7 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
     }
     if (result.source === "yuna") {
       const response = await fetchYunaAccountOrder(result.providerInput, {
-        config: providerConfig(result.providerKey), orderOnly: true,
+        config: providerConfig(result.providerKey),
       });
       const fields = response.extra_fields || [];
       const account = fields.find((field) => field.key === "account_email")?.value;

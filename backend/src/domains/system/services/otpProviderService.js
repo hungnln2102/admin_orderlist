@@ -160,8 +160,8 @@ const OTP_EXECUTION_HANDLERS = Object.freeze({
   MAILBOX_REST: async (config, input) => normalizeExecutionResult(await fetchOtpFromTinyHost(input, { config, includeDetails: true })),
   AUTHENTICATED_OTP: async (config, input) => normalizeExecutionResult(await fetchOtpFromFixAdes(input, { config, includeDetails: true })),
   FIX_ADES_STATUS: async (config, input) => normalizeExecutionResult(await fetchFixAdesStatus(input, { config })),
-  YUNA_2FA: async (config, input) => normalizeExecutionResult(await fetchYunaAccountOrder(input, { config })),
-  YUNA_MAIL: async (config, input) => normalizeExecutionResult(await fetchOtpFromYunaMail(input, { config, includeDetails: true })),
+  YUNA_CHECK: async (config, input) => normalizeExecutionResult(await fetchYunaAccountOrder(input, { config })),
+  YUNA_OTP: async (config, input) => normalizeExecutionResult(await fetchOtpFromYunaMail(input, { config, includeDetails: true })),
   VIVAROCKY_HTML: async (config, input, options) => normalizeExecutionResult(await fetchOtpFromVivaRocky(input, {
     config,
     serviceKey: config.service_key,
@@ -194,7 +194,7 @@ async function probeOtpForEmail({ email, serviceKey, requiredExecutionMode, ...o
   if (requiredExecutionMode && executionMode !== requiredExecutionMode) {
     throw new Error("OTP_PROVIDER_EXECUTION_MODE_MISMATCH");
   }
-  const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_2FA", "PACKAGE_WAREHOUSE_ACCOUNT"].includes(executionMode);
+  const acceptsNonEmailInput = ["INTERNAL_TOTP", "INTERNAL_WAREHOUSE_2FA", "YUNA_CHECK", "PACKAGE_WAREHOUSE_ACCOUNT"].includes(executionMode);
   if (!acceptsNonEmailInput && !queryInput.includes("@")) {
     throw new Error("Vui lòng cung cấp email hợp lệ (vd: user@domain.com).");
   }

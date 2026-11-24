@@ -11,7 +11,7 @@ const DEFAULT_SLOTS = [
     slot_key: "adobe_account",
     name: "Adobe: Tra Cứu Tài Khoản",
     category: "adobe",
-    assigned_services: ["yuna_2fa"],
+    assigned_services: ["yuna_check"],
     cooldown_seconds: 15,
     btn_text: "Tra Cứu Thông Tin",
     input_placeholder: "Nhập Email hoặc Mã Đơn Hàng...",
@@ -21,7 +21,7 @@ const DEFAULT_SLOTS = [
     slot_key: "adobe_check",
     name: "Adobe: Kiểm Tra Tài Khoản",
     category: "adobe",
-    assigned_services: ["fix_ades_status", "ades", "tinyhost"],
+    assigned_services: ["fix_ades_status", "yuna_check", "ades", "tinyhost"],
     cooldown_seconds: 15,
     btn_text: "Kiểm Tra Bản Quyền",
     input_placeholder: "Nhập Email tài khoản Adobe cần kiểm tra...",
@@ -81,7 +81,7 @@ const DEFAULT_SLOTS = [
     slot_key: "gpt_account",
     name: "ChatGPT: Tra Cứu Tài Khoản",
     category: "gpt",
-    assigned_services: ["package_warehouse", "warehouse_2fa", "yuna_2fa"],
+    assigned_services: ["package_warehouse", "warehouse_2fa"],
     cooldown_seconds: 15,
     btn_text: "Tra Cứu Tài Khoản",
     input_placeholder: "Nhập Email mua hàng hoặc Mã đơn hàng...",
@@ -91,7 +91,7 @@ const DEFAULT_SLOTS = [
     slot_key: "two_factor_totp",
     name: "2FA: Sinh Mã TOTP",
     category: "2fa",
-    assigned_services: ["totp", "yuna_2fa"],
+    assigned_services: ["totp"],
     cooldown_seconds: 10,
     btn_text: "Lấy Mã 2FA (6 Số)",
     input_placeholder: "Nhập Secret Key 2FA (VD: JBSWY3DPEHPK3PXP)...",
@@ -184,6 +184,12 @@ async function dispatchSlotRequest({ slotKey, input }) {
     : String(matchedRoutingRule?.provider_key || "").trim();
   if (!serviceUsed) {
     throw new Error(`Không xác định được provider khớp cấu hình cho ô '${slotKey}'.`);
+  }
+  if (serviceUsed === "yuna_check" && slotKey !== "adobe_check" && !slotKey.endsWith("_account")) {
+    throw new Error("OTP_PROVIDER_EXECUTION_MODE_MISMATCH");
+  }
+  if (serviceUsed === "yuna_otp" && (slotKey === "adobe_check" || slotKey.endsWith("_account"))) {
+    throw new Error("OTP_PROVIDER_EXECUTION_MODE_MISMATCH");
   }
 
   // Xác định email thực tế để probe: nếu input là mã đơn hàng, ưu tiên lấy resolved_email từ đơn hàng

@@ -40,6 +40,33 @@ test("GENERIC_HTTP configurations are rejected because providers own their endpo
   );
 });
 
+test("Yuna Check sends only get_order and strips vendor OTP fields", async () => {
+  const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const key = "JBSWY3DPEHPK3PXP";
+  const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_check", auth_config: { defaultToken: "fixture" } };
+  await withMockedExternalFetch(async (_url, options) => {
+    if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
+    assert.equal(options.body, new URLSearchParams({ action: "get_order", order_code: key }).toString());
+    return Response.json({ items: [{ name: "user@example.test", code: "654321" }] });
+  }, async () => {
+    const result = await executeOtpConfig(config, key);
+    assert.equal(result.otp, null);
+    assert.deepEqual(result.raw_data.items, [{ name: "user@example.test", group: undefined, expires_at_str: undefined }]);
+  });
+});
+
+test("Yuna OTP reads its mailbox API using the account email", async () => {
+  await withMockedExternalFetch(async (url, options) => {
+    if (options.method === "GET") return Response.json({ success: true, rules: [] });
+    assert.ok(String(url).endsWith("/api-nnm.php"));
+    assert.match(String(options.body), /user(%40|@)example\.test/);
+    return Response.json({ status: true, data: { latest: { code: "654321" } } });
+  }, async () => {
+    const result = await probeOtpForEmail({ email: "user@example.test", serviceKey: "yuna_otp" });
+    assert.equal(result.otp, "654321");
+  });
+});
+
 test("VIVAROCKY_HTML preserves form transport for household, six-digit, and sign-in requests", { concurrency: false }, async () => {
   const calls = [];
   await withMockedExternalFetch(async (url, options) => {
@@ -212,7 +239,8 @@ test("provider catalog and name seed keep Ades OTP and Fix-Ades status distinct"
     }),
   });
   const catalog = listProviderCatalog();
-  assert.deepEqual(Object.keys(seededNames), catalog.map(({ key }) => key));
+  const renamed = { yuna_2fa: "yuna_check", yuna_mail: "yuna_otp" };
+  assert.deepEqual(Object.keys(seededNames).map((key) => renamed[key] || key), catalog.map(({ key }) => key));
   assert.equal(seededNames.ades, "Ades-otp");
   assert.equal(seededNames.fix_ades_status, "Fix-Ades");
   assert.equal(catalog.find((provider) => provider.key === "ades")?.name, "ades");
@@ -275,7 +303,7 @@ test("provider rejects a TOTP secret when the selected service is external", asy
   await assert.rejects(
     require("../../src/domains/system/services/otpProviderService").probeOtpForEmail({
       email: "JBSWY3DPEHPK3PXP",
-      serviceKey: "yuna_2fa",
+      serviceKey: "yuna_check",
       requiredExecutionMode: "INTERNAL_TOTP",
     }),
     /OTP_PROVIDER_EXECUTION_MODE_MISMATCH/

@@ -92,3 +92,8 @@
 - Đơn nhập `MAVNRKYHZ` và `MAVNP9BTV` lưu gói và Outbox thành công. Cả hai gói lưu Fix-Ades cho kiểm tra và Ades cho OTP.
 - Đơn bán Mavryk `MAVCHL4VX` và `MAVCF6ZXF` tự sinh key `AVAILABLE`. Webhook SePay giả lập trả HTTP 200, đưa đơn sang `PAID` và key sang `ACTIVATED`.
 - Playwright trên portal cổng 3005 xác nhận cấp đúng gói Renew, ghi đúng slot và hiển thị đúng active/inactive với phản hồi Ades mô phỏng. Nút chuyển team xuất hiện ở ca inactive. Không gửi thêm yêu cầu chuyển team thật.
+
+## Yuna Check và Yuna OTP cho Adobe
+
+- Quy tắc adobe_check theo Variant + NCC nhận yuna_check. Provider kiểm tra chỉ gửi get_order và không trả mã OTP từ phản hồi tra cứu.
+- yuna_otp thay yuna_mail và tiếp tục lấy OTP qua API mail. PostgreSQL 16 chạy 63 migration, kiểm tra dữ liệu cũ và quy tắc trùng đạt. Adobe tích hợp 6/6, unit test 165/165, frontend build thành công. Chưa deploy production.
