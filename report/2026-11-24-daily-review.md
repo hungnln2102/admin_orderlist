@@ -70,3 +70,25 @@
 - Lưu, đổi tên và xóa tag chỉ cập nhật đúng dịch vụ kho. Danh sách gợi ý lấy tag mặc định và tag trên slot. Quy tắc cấp key theo Variant + NCC tiếp tục chọn đích kho qua tag đã cấu hình.
 - PostgreSQL 16 xác nhận lưu tag không tạo Variant, đổi hoặc xóa tag không ảnh hưởng Variant và dịch vụ kho khác. Tích hợp Adobe đạt 6/6, unit test 163/163 và frontend build thành công.
 - Đã vô hiệu hóa riêng Variant Adobe `Paid` #267 trên production sau khi kiểm tra tham chiếu. Bản sửa mã nguồn và lọc Variant ngừng hoạt động trên form tạo đơn đang ở workspace.
+
+## Nghiệm thu Adobe qua webhook và portal local
+
+- PostgreSQL 16 cô lập chạy đủ 62 migration. Playwright mở portal cổng 3005 và chuyển các yêu cầu API của phiên test về backend loopback dùng database thử nghiệm.
+- Case 1 dừng ở tạo đơn nhập có lưu kho. Knex savepoint thiếu `afterCommit`, khiến `publishEventInTrx` báo lỗi và transaction rollback. Dùng fixture kho riêng để kiểm tra phần sau. Hai đơn Mavryk sinh key `AVAILABLE`, webhook HTTP 200 đưa đơn về `PAID` và key sang `ACTIVATED`. Portal cấp đúng gói, ghi đúng slot và hiển thị đúng active/inactive.
+- Case 2 đạt. Hai đơn Ades trực tiếp được webhook ghi nhận thanh toán và portal xác minh liên hệ, trả đúng active/inactive. Kết quả inactive có nút chuyển team.
+- Đã bấm chuyển team thật một lần. Ades trả HTTP 200 và chuyển trạng thái `waiting` → `sending` → `done`. Kiểm tra lại qua Ades xác nhận tài khoản active, tổ chức normal. Chưa lưu được bằng chứng giao diện tự đổi thẻ trạng thái.
+- Các PostgreSQL test đã dừng. Lệnh xóa các thư mục dữ liệu tạm bị công cụ thực thi chặn.
+
+## Sửa lỗi lưu kho đơn nhập và đổi tên tag đang được sử dụng
+
+- Đơn nhập, slot, gói và Outbox dùng chung transaction. Đã ép lỗi ghi gói sau khi ghi Outbox và xác nhận tất cả dữ liệu cùng rollback.
+- Đổi tên tag cập nhật danh mục, slot, quy tắc và key trong cùng dịch vụ kho. Xóa tag còn tham chiếu vẫn bị chặn.
+- Chạy lại trên PostgreSQL 16 và portal local với phản hồi trạng thái Ades mô phỏng. Hai đơn nhập đã lưu được gói. Hai đơn Mavryk sinh key, thanh toán qua webhook, cấp đúng slot sau khi đổi tag và trả đúng trạng thái. Hai đơn Ades trực tiếp cũng đạt khi tra bằng mã đơn.
+- Tích hợp Adobe đạt 6/6 và unit test đạt 163/163. Chưa triển khai production.
+
+## Chạy lại Case 1 Adobe với tag Renew
+
+- Tạo tag mặc định `Renew` qua dịch vụ danh mục kho trên PostgreSQL 16 cô lập và xác nhận form nhập có thể chọn tag này.
+- Đơn nhập `MAVNRKYHZ` và `MAVNP9BTV` lưu gói và Outbox thành công. Cả hai gói lưu Fix-Ades cho kiểm tra và Ades cho OTP.
+- Đơn bán Mavryk `MAVCHL4VX` và `MAVCF6ZXF` tự sinh key `AVAILABLE`. Webhook SePay giả lập trả HTTP 200, đưa đơn sang `PAID` và key sang `ACTIVATED`.
+- Playwright trên portal cổng 3005 xác nhận cấp đúng gói Renew, ghi đúng slot và hiển thị đúng active/inactive với phản hồi Ades mô phỏng. Nút chuyển team xuất hiện ở ca inactive. Không gửi thêm yêu cầu chuyển team thật.

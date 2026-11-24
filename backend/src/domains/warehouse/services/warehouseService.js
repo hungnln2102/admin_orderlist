@@ -633,13 +633,25 @@ async function updateCatalogTag(catalogId, tag, replacement) {
   return withTransaction(async (trx) => {
     const catalog = await trx(TABLES.PRODUCT_NAMES).where(P.ID, id).forUpdate().first();
     if (!catalog) throw new Error("Không tìm thấy dịch vụ kho.");
-    const hasReference = (table, C) => trx(table)
+    const references = (table, C) => trx(table)
       .where(C.PRODUCT_NAME_ID, id)
-      .whereRaw("LOWER(TRIM(??)) = ?", [C.TARGET_VARIANT_TAG, normalized])
-      .first(C.ID);
-    if (await hasReference(TABLES.ACTIVATION_KEY_RULES, R) ||
-        await hasReference(TABLES.ACTIVATION_KEYS, K)) {
-      throw new Error("Tag đang được quy tắc cấp key hoặc key sử dụng.");
+      .whereRaw("LOWER(TRIM(??)) = ?", [C.TARGET_VARIANT_TAG, normalized]);
+    const rules = references(TABLES.ACTIVATION_KEY_RULES, R);
+    const keys = references(TABLES.ACTIVATION_KEYS, K);
+    if (replacement === null) {
+      if (await rules.first(R.ID) || await keys.first(K.ID)) {
+        throw new Error("Tag đang được quy tắc cấp key hoặc key sử dụng.");
+      }
+    } else {
+      const target = replacement.toLowerCase();
+      if (target !== normalized &&
+          (String(catalog[P.CATEGORY] || "").trim().toLowerCase() === target ||
+           await trx(TABLES.ACCOUNT_SLOTS).where(S.NAME_ID, id)
+             .whereRaw("LOWER(TRIM(??)) = ?", [S.VARIANT_TAG, target]).first(S.ID))) {
+        throw new Error("Tên tag đã tồn tại trong dịch vụ kho.");
+      }
+      await rules.update({ [R.TARGET_VARIANT_TAG]: replacement, [R.UPDATED_AT]: trx.fn.now() });
+      await keys.update({ [K.TARGET_VARIANT_TAG]: replacement, [K.UPDATED_AT]: trx.fn.now() });
     }
     await trx(TABLES.PRODUCT_NAMES).where(P.ID, id)
       .whereRaw("LOWER(TRIM(??)) = ?", [P.CATEGORY, normalized])
