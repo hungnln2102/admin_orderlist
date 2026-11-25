@@ -660,3 +660,4 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Tra cứu Adobe theo slot hiện hành của Kho Gói Sản Phẩm và tự cấp lại khi mất liên kết. Kiểm thử tích hợp 6/6 ca đạt.
 - [x] Trả mặt hàng, hạn sử dụng, tài khoản và mật khẩu cho đơn Adobe Yuna sau khi xác minh liên hệ. Portal hiển thị kết quả, cho sao chép và mở mục Nhận OTP. Kiểm thử handler giả lập và build đạt.
 - [ ] Xác minh luồng Adobe Yuna trên môi trường tích hợp có schema PostgreSQL cập nhật.
+- [x] Khôi phục tra cứu bằng mã Yuna khớp chính xác. Đối chiếu mã thật trên DB production ở chế độ chỉ đọc và xác nhận handler trả đủ bốn trường với dữ liệu Yuna giả lập.

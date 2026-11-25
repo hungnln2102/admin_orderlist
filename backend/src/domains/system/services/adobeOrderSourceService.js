@@ -64,10 +64,13 @@ async function resolveAdobeRecoveryOrder({ code, contact }) {
   if (!source) return null;
 
   const providerInput = String(order[O.INFORMATION_ORDER] || "").trim();
-  const providedContact = String(contact || "").trim().toLowerCase();
-  if (!providedContact) return { contactRequired: true };
-  if (providedContact !== String(order[O.CONTACT] || "").trim().toLowerCase()) {
-    throw new Error("Không xác minh được quyền sử dụng tài khoản.");
+  const hasExactYunaCode = source === "yuna" && providerInput === input;
+  if (!hasExactYunaCode) {
+    const providedContact = String(contact || "").trim().toLowerCase();
+    if (!providedContact) return { contactRequired: true };
+    if (providedContact !== String(order[O.CONTACT] || "").trim().toLowerCase()) {
+      throw new Error("Không xác minh được quyền sử dụng tài khoản.");
+    }
   }
   if (!providerInput || (source === "ades" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(providerInput))) {
     throw new Error("Thiếu thông tin tài khoản Adobe trên đơn.");

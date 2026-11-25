@@ -64,11 +64,18 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
         });
         assert.equal(order.information_order, info);
         assert.equal(await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).first(), undefined);
-        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info }), { contactRequired: true });
-        await assert.rejects(resolveAdobeRecoveryOrder({ code: info, contact: "wrong" }));
-        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info, contact }), {
-          source, providerKey: provider, providerInput: info,
-        });
+        const expected = { source, providerKey: provider, providerInput: info };
+        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: orderCode }), { contactRequired: true });
+        await assert.rejects(resolveAdobeRecoveryOrder({ code: orderCode, contact: "wrong" }));
+        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: orderCode, contact }), expected);
+        if (source === "yuna") {
+          assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info }), expected);
+          assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info.toLowerCase() }), { contactRequired: true });
+        } else {
+          assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info }), { contactRequired: true });
+          await assert.rejects(resolveAdobeRecoveryOrder({ code: info, contact: "wrong" }));
+          assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info, contact }), expected);
+        }
         await db(TABLES.ORDER_LIST).where("id_order", orderCode).update({ status: "UNPAID" });
         assert.equal(await resolveAdobeRecoveryOrder({ code: info, contact }), null);
       } finally {
