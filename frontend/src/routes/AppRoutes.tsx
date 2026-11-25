@@ -22,6 +22,7 @@ const ExternalImportsPage = React.lazy(routeLoaders["/external-imports"]);
 const SystemLogsPage = React.lazy(routeLoaders["/system-logs"]);
 const ExternalApiConfigPage = React.lazy(routeLoaders["/external-api-config"]);
 const OtpThemeConfigPage = React.lazy(routeLoaders["/otp-theme-config"]);
+const WebsiteUrlConfigPage = React.lazy(routeLoaders["/website-urls"]);
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -98,14 +99,17 @@ export const AppRoutes: React.FC = () => {
           <Route path="/external-imports" element={<ExternalImportsPage />} />
           <Route path="/warehouse" element={<WarehousePage />} />
 
-          {/* 5. Hệ thống & Ví */}
+          {/* 5. Quản lý Website */}
+          <Route path="/website-urls" element={<WebsiteUrlConfigPage />} />
+          <Route path="/otp-theme-config" element={<OtpThemeConfigPage />} />
+
+          {/* 6. Hệ thống & Ví */}
           <Route path="/system-config" element={<SystemPage />} />
           <Route path="/system-logs" element={<SystemLogsPage />} />
           <Route path="/shop-bank-accounts" element={<PaymentWalletsPage />} />
           <Route path="/payment-accounts" element={<Navigate to="/shop-bank-accounts" replace />} />
           <Route path="/usdt-wallets" element={<Navigate to="/shop-bank-accounts" replace />} />
           <Route path="/external-api-config" element={<ExternalApiConfigPage />} />
-          <Route path="/otp-theme-config" element={<OtpThemeConfigPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

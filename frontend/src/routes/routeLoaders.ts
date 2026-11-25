@@ -21,6 +21,7 @@ export const routeLoaders: Record<string, RouteImporter> = {
   "/shop-bank-accounts": () => import("@/pages/PaymentWalletsPage").then((module) => ({ default: module.PaymentWalletsPage })),
   "/external-api-config": () => import("@/pages/ExternalApiConfigPage").then((module) => ({ default: module.ExternalApiConfigPage })),
   "/otp-theme-config": () => import("@/pages/OtpThemeConfigPage").then((module) => ({ default: module.OtpThemeConfigPage })),
+  "/website-urls": () => import("@/pages/WebsiteUrlConfigPage").then((module) => ({ default: module.WebsiteUrlConfigPage })),
 };
 
 const preloadedPaths = new Set<string>();

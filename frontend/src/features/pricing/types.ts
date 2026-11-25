@@ -6,10 +6,24 @@ export interface PricingCounts {
   inactive: number;
 }
 
+export const PRODUCT_CATEGORIES = [
+  "AI & Trợ lý",
+  "Thiết kế & Đồ họa",
+  "Video & Âm thanh",
+  "Giải trí & Streaming",
+  "Học tập & Văn phòng",
+  "Bảo mật & Tiện ích",
+  "Khác",
+] as const;
+
 export interface PricingItem {
   id: number;
   san_pham: string;
   package_product: string;
+  parent_package_name?: string;
+  category?: string;
+  description?: string;
+  image_url?: string | null;
   base_price: number;
   cost_price?: number;
   retail_price: number;
@@ -44,6 +58,8 @@ export interface Supplier {
 export interface ProductFormData {
   name: string;
   variant_name: string;
+  category?: string;
+  description?: string;
   base_price: number;
   retail_price: number;
   ctv_price: number;

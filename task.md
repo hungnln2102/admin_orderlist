@@ -661,3 +661,10 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Trả mặt hàng, hạn sử dụng, tài khoản và mật khẩu cho đơn Adobe Yuna sau khi xác minh liên hệ. Portal hiển thị kết quả, cho sao chép và mở mục Nhận OTP. Kiểm thử handler giả lập và build đạt.
 - [ ] Xác minh luồng Adobe Yuna trên môi trường tích hợp có schema PostgreSQL cập nhật.
 - [x] Khôi phục tra cứu bằng mã Yuna khớp chính xác. Đối chiếu mã thật trên DB production ở chế độ chỉ đọc và xác nhận handler trả đủ bốn trường với dữ liệu Yuna giả lập.
+
+- [x] D?n ba c?t V1 d? th?a v? gi? URL ?nh s?n ph?m, bi?n th?. Migration v? ki?m th? PostgreSQL local ?? ??t.
+
+- [x] N?i n?t m? t? danh m?c v? slot kho v?i Chromium ?ang ???c stream. ?? ki?m th? Chrome local, unit test backend v? build frontend.
+- [ ] X?c nh?n hai n?t m? GoogleOne qua c?a s? /browser/ sau khi tri?n khai VPS.
+
+- [x] Tách luồng mở trình duyệt Kho Hàng cho Vite local và VPS. Đã kiểm tra cả hai nút trên Chrome và launcher dùng profile thử nghiệm.

@@ -1,93 +1,123 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNotification } from "@/shared/context/NotificationContext";
 import { ThemeItem } from "../types";
 import { THEMES_LIST } from "../constants/themesList";
-import { DEFAULT_THEME_SCHEDULE, normalizeThemeSchedule, ThemeScheduleConfig } from "../../../shared/utils/themeSchedule";
-import { fetchRemoteThemesCatalog, fetchSystemConfigs, saveSystemThemeConfig } from "../api/otpThemeApi";
+import {
+  DEFAULT_THEME_SCHEDULE,
+  normalizeThemeSchedule,
+  resolveScheduledThemeForDate,
+  ThemeScheduleConfig,
+} from "../../../shared/utils/themeSchedule";
+import {
+  fetchRemoteThemesCatalog,
+  fetchSystemConfigs,
+  saveSystemThemeConfig,
+} from "../api/otpThemeApi";
 
 export function useOtpThemeConfig() {
+  const notify = useNotification();
   const [themesList, setThemesList] = useState<ThemeItem[]>(THEMES_LIST);
-  const [mode, setMode] = useState<"auto" | "fixed">("auto");
-  const [selectedTheme, setSelectedTheme] = useState<string>("modern");
   const [schedule, setSchedule] = useState<ThemeScheduleConfig>(DEFAULT_THEME_SCHEDULE);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const showToast = (type: "success" | "error", message: string, duration = 3500) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), duration);
-  };
-
-  // Đồng bộ catalog themes từ backend
   useEffect(() => {
     fetchRemoteThemesCatalog().then((themes) => {
       if (themes) setThemesList(themes);
     });
   }, []);
 
-  // Tải cấu hình từ database
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     try {
       setLoading(true);
       const configs = await fetchSystemConfigs();
       const themeConfig = configs.find((c) => c.config_key === "OTP_PORTAL_THEME");
+
+      let nextSchedule = DEFAULT_THEME_SCHEDULE;
       if (themeConfig?.config_value) {
-        const parsed = typeof themeConfig.config_value === "string"
-          ? JSON.parse(themeConfig.config_value)
-          : themeConfig.config_value;
-        if (parsed.mode) setMode(parsed.mode);
-        if (parsed.theme) setSelectedTheme(parsed.theme);
-        if (parsed.schedule || parsed.holidayRules || parsed.defaultTheme) {
-          setSchedule(normalizeThemeSchedule(parsed.schedule || parsed));
-        }
+        const parsed =
+          typeof themeConfig.config_value === "string"
+            ? JSON.parse(themeConfig.config_value)
+            : themeConfig.config_value;
+        nextSchedule = normalizeThemeSchedule(
+          parsed.schedule || parsed,
+          parsed.mode,
+          parsed.theme
+        );
       }
+
+      setSchedule(nextSchedule);
+      setSavedSnapshot(JSON.stringify(nextSchedule));
     } catch (err: any) {
-      console.error("[useOtpThemeConfig] Lỗi tải cấu hình theme:", err);
+      notify.error(err?.message || "Không thể tải cấu hình theme.", "Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }
-  };
+  }, [notify]);
 
   useEffect(() => {
-    fetchConfig();
-  }, []);
+    void fetchConfig();
+  }, [fetchConfig]);
 
-  // Lưu cấu hình toàn diện
-  const handleSave = async (overrideSchedule?: ThemeScheduleConfig) => {
-    try {
-      setSaving(true);
-      const targetSchedule = overrideSchedule || schedule;
-      await saveSystemThemeConfig({
-        mode,
-        theme: mode === "fixed" ? selectedTheme : null,
-        schedule: targetSchedule,
-      });
-      showToast("success", "Đã lưu toàn bộ cấu hình Theme OTP lên hệ thống thành công!");
-    } catch (err: any) {
-      showToast("error", err.message || "Lỗi lưu cấu hình");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const isDirty = useMemo(() => {
+    if (!savedSnapshot) return false;
+    return JSON.stringify(schedule) !== savedSnapshot;
+  }, [schedule, savedSnapshot]);
 
-  const activeThemeMeta = themesList.find((t) => t.id === selectedTheme) || themesList[0] || THEMES_LIST[0];
+  const handleSave = useCallback(
+    async (overrideSchedule?: ThemeScheduleConfig) => {
+      const target = overrideSchedule || schedule;
+      if (
+        target.backgroundMode === "cycle_loop" &&
+        (!target.cycleConfig.themes || target.cycleConfig.themes.length === 0)
+      ) {
+        notify.warning(
+          "Vui lòng tick chọn ít nhất 1 theme trong danh sách xoay vòng trước khi lưu.",
+          "Chưa chọn theme"
+        );
+        return;
+      }
+
+      try {
+        setSaving(true);
+        await saveSystemThemeConfig(target);
+        setSavedSnapshot(JSON.stringify(target));
+        notify.success("Đã lưu cấu hình Theme Website thành công!", "Đã lưu");
+      } catch (err: any) {
+        notify.error(err?.message || "Không thể lưu cấu hình theme.", "Lỗi lưu cấu hình");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [schedule, notify]
+  );
+
+  const todayActiveTheme = useMemo(() => {
+    const now = new Date();
+    const resolved = resolveScheduledThemeForDate(
+      schedule,
+      now.getDate(),
+      now.getMonth() + 1,
+      now.getFullYear()
+    );
+    const meta = themesList.find((t) => t.id === resolved.themeKey) || themesList[0];
+    return {
+      theme: meta,
+      ruleType: resolved.ruleType,
+      sourceLabel: resolved.label,
+    };
+  }, [schedule, themesList]);
 
   return {
     themesList,
-    setThemesList,
-    mode,
-    setMode,
-    selectedTheme,
-    setSelectedTheme,
     schedule,
     setSchedule,
     loading,
     saving,
-    toast,
-    showToast,
+    isDirty,
+    todayActiveTheme,
     fetchConfig,
     handleSave,
-    activeThemeMeta,
   };
 }
-

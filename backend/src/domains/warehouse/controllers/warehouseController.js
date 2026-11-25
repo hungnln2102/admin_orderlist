@@ -1,4 +1,5 @@
 const warehouseService = require("../services/warehouseService");
+const { navigateCloudBrowser: navigateBrowser, CloudBrowserError } = require("../services/cloudBrowserService");
 const slotCostService = require("../services/slotCostService");
 const slotCostLogService = require("../services/slotCostLogService");
 const slotCostBackfillService = require("../services/slotCostBackfillService");
@@ -84,6 +85,19 @@ const openAccountBrowser = async (req, res) => {
   } catch (err) {
     console.error("[WarehouseController] openAccountBrowser error:", err);
     return res.status(400).json({ error: getClientErrorMessage(err, "Không thể mở trình duyệt cho tài khoản kho.") });
+  }
+};
+
+const navigateCloudBrowser = async (req, res) => {
+  try {
+    const result = await navigateBrowser(req.body);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof CloudBrowserError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    console.error("[WarehouseController] navigateCloudBrowser error:", err);
+    return res.status(500).json({ error: "Không thể mở trang trong trình duyệt đám mây." });
   }
 };
 
@@ -236,6 +250,7 @@ module.exports = {
   updateCatalogItem,
   deleteCatalogItem,
   openAccountBrowser,
+  navigateCloudBrowser,
   getSystemProducts,
   renameCatalogTag,
   deleteCatalogTag,

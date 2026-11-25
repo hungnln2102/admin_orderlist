@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const systemConfigService = require("./services/systemConfigService");
+const portalUrlConfigService = require("./services/portalUrlConfigService");
 const cronJobService = require("./services/cronJobService");
 const systemLogService = require("./services/systemLogService");
 const { getProviderCatalogEntry, listProviderCatalog, PROVIDER_KEYS } = require("./providers/registry");
@@ -240,5 +241,36 @@ router.put("/product-apis/:id/default", productApiController.setDefault);
 
 // DELETE /api/system/product-apis/:id - Gỡ bỏ API khỏi sản phẩm
 router.delete("/product-apis/:id", productApiController.remove);
+
+// ==========================================
+// QUẢN LÝ URL WEBSITE (OTP PORTAL ROUTES)
+// ==========================================
+router.get("/portal-urls", (req, res) => {
+  res.json({
+    success: true,
+    config: portalUrlConfigService.getPortalUrlConfig(),
+    defaults: portalUrlConfigService.buildDefaultPortalUrlsConfig(),
+  });
+});
+
+router.put("/portal-urls", async (req, res) => {
+  try {
+    const updatedBy = req.session?.user?.username || "ADMIN";
+    const config = await portalUrlConfigService.savePortalUrlConfig(req.body, updatedBy);
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể lưu cấu hình URL.") });
+  }
+});
+
+router.post("/portal-urls/reset", async (req, res) => {
+  try {
+    const updatedBy = req.session?.user?.username || "ADMIN";
+    const config = await portalUrlConfigService.resetPortalUrlConfig(updatedBy);
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(400).json({ error: getClientErrorMessage(err, "Không thể khôi phục cấu hình URL mặc định.") });
+  }
+});
 
 module.exports = router;

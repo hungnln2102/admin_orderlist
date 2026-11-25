@@ -1,7 +1,7 @@
 import React from "react";
 import { Plus, Pencil, X, Tag, DollarSign, TrendingUp, AlertTriangle, Layers, Power, CheckCircle2, XCircle } from "lucide-react";
-import { PricingItem, ProductFormData } from "../types";
-import { CurrencyInputVN } from "@/shared/components/CurrencyInputVN";
+import { PricingItem, ProductFormData, PRODUCT_CATEGORIES } from "../types";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 
 interface PricingCreateEditModalProps {
   isOpen: boolean;
@@ -109,6 +109,31 @@ export const PricingCreateEditModal: React.FC<PricingCreateEditModalProps> = ({
                   className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 text-xs transition-colors"
                 />
                 <span className="text-[10px] text-slate-500 mt-1 block">Tên hiển thị thân thiện trên hóa đơn & đơn hàng</span>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Danh Mục (Bảng Giá Public)</label>
+                <CustomSelect
+                  value={productForm.category || "Khác"}
+                  onChange={(val) => setProductForm({ ...productForm, category: val })}
+                  options={PRODUCT_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                  placeholder="Chọn danh mục..."
+                  size="sm"
+                  accent="cyan"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">Áp dụng cho nhóm sản phẩm trên mavrykpremium.com/price</span>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-400 mb-1 font-semibold">Mô Tả Ngắn (Cột Desc)</label>
+                <textarea
+                  rows={2}
+                  placeholder="VD: Chính chủ nâng cấp trực tiếp, bảo hành trọn thời hạn gói..."
+                  value={productForm.description || ""}
+                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 text-xs transition-colors resize-none"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">Hiển thị tại cột Desc trên bảng giá công khai (để trống sẽ tự hiển thị theo thời hạn gói)</span>
               </div>
             </div>
           </div>

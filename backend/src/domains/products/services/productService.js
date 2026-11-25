@@ -46,7 +46,10 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       v.${V_COLS.ID},
       v.${V_COLS.DISPLAY_NAME} AS san_pham,
       v.${V_COLS.VARIANT_NAME} AS package_product,
+      v.${V_COLS.DESCRIPTION} AS description,
       p.${P_COLS.PACKAGE_NAME} AS parent_package_name,
+      p.${P_COLS.CATEGORY} AS category,
+      COALESCE(NULLIF(BTRIM(v.${V_COLS.IMAGE_URL}), ''), NULLIF(BTRIM(p.${P_COLS.IMAGE_URL}), '')) AS image_url,
       v.${V_COLS.BASE_PRICE},
       v.${V_COLS.IS_ACTIVE},
       COALESCE(p_retail.${VP_COLS.PRICE}, v.${V_COLS.BASE_PRICE}, 0) AS retail_price,
@@ -158,6 +161,10 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       id: r.id,
       san_pham: r.san_pham || r.package_product || "N/A",
       package_product: r.package_product || "",
+      parent_package_name: r.parent_package_name || "",
+      category: r.category || "Khác",
+      description: r.description || "",
+      image_url: r.image_url || null,
       base_price: basePrice,
       cost_price: costPrice,
       retail_price: retailPrice,
@@ -248,6 +255,8 @@ const createProduct = async (data) => withTransaction(async (trx) => {
   const {
     san_pham,
     package_product,
+    category,
+    description,
     base_price = 0,
     retail_price = 0,
     ctv_price = 0,
@@ -258,6 +267,8 @@ const createProduct = async (data) => withTransaction(async (trx) => {
 
   const displayName = san_pham || package_product;
   const variantName = package_product || san_pham;
+  const normalizedCategory = typeof category === "string" && category.trim() ? category.trim() : null;
+  const normalizedDescription = typeof description === "string" && description.trim() ? description.trim() : null;
 
   // Tim hoac tao product_id trong catalog product
   let catalogProduct = await trx(TABLES.PRODUCT)
@@ -272,6 +283,7 @@ const createProduct = async (data) => withTransaction(async (trx) => {
       const [newP] = await trx(TABLES.PRODUCT)
         .insert({
           [P_COLS.PACKAGE_NAME]: variantName || displayName,
+          [P_COLS.CATEGORY]: normalizedCategory || "Khác",
           [P_COLS.IS_ACTIVE]: true,
           [P_COLS.CREATED_AT]: trx.fn.now(),
           [P_COLS.UPDATED_AT]: trx.fn.now(),
@@ -279,6 +291,10 @@ const createProduct = async (data) => withTransaction(async (trx) => {
         .returning("*");
       catalogProduct = newP;
     }
+  } else if (normalizedCategory && catalogProduct[P_COLS.CATEGORY] !== normalizedCategory) {
+    await trx(TABLES.PRODUCT)
+      .where({ [P_COLS.ID]: catalogProduct[P_COLS.ID] })
+      .update({ [P_COLS.CATEGORY]: normalizedCategory, [P_COLS.UPDATED_AT]: trx.fn.now() });
   }
 
   const [insertedVariant] = await trx(TABLES.VARIANT)
@@ -286,6 +302,7 @@ const createProduct = async (data) => withTransaction(async (trx) => {
       [V_COLS.PRODUCT_ID]: catalogProduct[P_COLS.ID],
       [V_COLS.DISPLAY_NAME]: displayName,
       [V_COLS.VARIANT_NAME]: variantName,
+      [V_COLS.DESCRIPTION]: normalizedDescription,
       [V_COLS.BASE_PRICE]: base_price || null,
       [V_COLS.IS_ACTIVE]: is_active ?? true,
       [V_COLS.CREATED_AT]: trx.fn.now(),
@@ -351,14 +368,24 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
   };
   const san_pham = data.san_pham !== undefined ? data.san_pham : data.name;
   const package_product = data.package_product !== undefined ? data.package_product : data.variant_name;
-  const { base_price, retail_price, ctv_price, student_price, promo_price, is_active } = data;
+  const { base_price, retail_price, ctv_price, student_price, promo_price, is_active, description, category } = data;
 
   const updateFields = { [V_COLS.UPDATED_AT]: trx.fn.now() };
   if (san_pham !== undefined) updateFields[V_COLS.DISPLAY_NAME] = san_pham;
   if (package_product !== undefined) updateFields[V_COLS.VARIANT_NAME] = package_product;
+  if (description !== undefined) {
+    updateFields[V_COLS.DESCRIPTION] = typeof description === "string" && description.trim() ? description.trim() : null;
+  }
   if (base_price !== undefined) updateFields[V_COLS.BASE_PRICE] = base_price || null;
   if (is_active !== undefined) updateFields[V_COLS.IS_ACTIVE] = is_active;
   await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).update(updateFields);
+
+  if (category !== undefined && oldVariant[V_COLS.PRODUCT_ID]) {
+    const normalizedCat = typeof category === "string" && category.trim() ? category.trim() : "Khác";
+    await trx(TABLES.PRODUCT)
+      .where({ [P_COLS.ID]: oldVariant[V_COLS.PRODUCT_ID] })
+      .update({ [P_COLS.CATEGORY]: normalizedCat, [P_COLS.UPDATED_AT]: trx.fn.now() });
+  }
 
   const upsertPrice = async (tierId, price) => {
     if (price === undefined) return;

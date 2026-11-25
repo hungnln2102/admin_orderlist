@@ -30,7 +30,6 @@ export interface WarehouseMobileAccountCardProps {
   onDeleteAccount: (acc: WarehouseAccountItem) => void;
   onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   loggedSlotsMap?: Record<number, boolean>;
-  onVerifySession?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   openingSlotId?: number | null;
 }
 
@@ -47,7 +46,6 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
   onDeleteAccount,
   onOpenBrowser,
   loggedSlotsMap,
-  onVerifySession,
   openingSlotId,
 }) => {
   const services = account.services || [];
@@ -200,11 +198,7 @@ export const WarehouseMobileAccountCard: React.FC<WarehouseMobileAccountCardProp
                             onClick={(e) => {
                               e.stopPropagation();
                               if (isOpening) return;
-                              if (onVerifySession) {
-                                onVerifySession(account, srv);
-                              } else {
-                                onOpenBrowser(account, srv);
-                              }
+                              onOpenBrowser(account, srv);
                             }}
                             className={`flex h-6 w-6 items-center justify-center rounded-lg border transition-all ${
                               isOpening

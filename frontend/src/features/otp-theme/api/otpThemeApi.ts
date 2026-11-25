@@ -38,18 +38,20 @@ export async function fetchSystemConfigs(): Promise<SystemConfigItem[]> {
   return res.json();
 }
 
-export async function saveSystemThemeConfig(payload: {
-  mode: "auto" | "fixed";
-  theme: string | null;
-  schedule: ThemeScheduleConfig;
-}): Promise<void> {
+export async function saveSystemThemeConfig(schedule: ThemeScheduleConfig): Promise<void> {
+  const isStrictSingleFixed =
+    schedule.backgroundMode === "fixed_default" && !schedule.respectHolidays;
+
   const payloadValue = JSON.stringify({
-    mode: payload.mode,
-    theme: payload.theme,
-    schedule: payload.schedule,
-    defaultTheme: payload.schedule.defaultTheme,
-    seasonRules: payload.schedule.seasonRules,
-    holidayRules: payload.schedule.holidayRules,
+    mode: isStrictSingleFixed ? "fixed" : "auto",
+    theme: isStrictSingleFixed ? schedule.defaultTheme : null,
+    schedule,
+    backgroundMode: schedule.backgroundMode,
+    respectHolidays: schedule.respectHolidays,
+    defaultTheme: schedule.defaultTheme,
+    cycleConfig: schedule.cycleConfig,
+    seasonRules: schedule.seasonRules,
+    holidayRules: schedule.holidayRules,
   });
 
   const res = await fetch("/api/system/configs/OTP_PORTAL_THEME", {
@@ -63,4 +65,3 @@ export async function saveSystemThemeConfig(payload: {
     throw new Error(data.error || "Không thể lưu cấu hình OTP Portal Theme");
   }
 }
-

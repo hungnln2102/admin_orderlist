@@ -1,13 +1,15 @@
 const { db } = require("@/db");
-const { TABLES } = require("@/db/tables");
+const { TABLES, COLS } = require("@/db/tables");
 const browserLauncherService = require("./browserLauncherService");
 
-const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } = {}) => {
+const { ACCOUNTS: ACCOUNT, ACCOUNT_SLOTS: SLOT, PRODUCT_NAMES: CATALOG } = COLS;
+
+const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent, openConfiguredUrl } = {}) => {
   if (!accountId) {
     throw new Error("ID tài khoản kho không được để trống!");
   }
 
-  const account = await db(TABLES.PRODUCT_KEYS).where("id", accountId).first();
+  const account = await db(TABLES.ACCOUNTS).where(ACCOUNT.ID, accountId).first();
   if (!account) {
     throw new Error(`Không tìm thấy tài khoản kho với ID ${accountId}!`);
   }
@@ -18,15 +20,15 @@ const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } 
   // 1. Nếu có slotId, truy vấn để lấy login_url từ warehouse.product_names
   let verifiedSlotId = null;
   if (slotId) {
-    const slot = await db(TABLES.STOCK_SERVICES)
-      .where({ id: slotId, account_id: account.id })
+    const slot = await db(TABLES.ACCOUNT_SLOTS)
+      .where({ [SLOT.ID]: slotId, [SLOT.ACCOUNT_ID]: account[ACCOUNT.ID] })
       .first();
-    if (slot && slot.name_id) {
-      verifiedSlotId = slot.id;
-      const pName = await db(TABLES.PRODUCT_NAMES).where("id", slot.name_id).first();
+    if (slot && slot[SLOT.NAME_ID]) {
+      verifiedSlotId = slot[SLOT.ID];
+      const pName = await db(TABLES.PRODUCT_NAMES).where(CATALOG.ID, slot[SLOT.NAME_ID]).first();
       if (pName) {
-        customUrl = pName.login_url;
-        resolvedServiceName = resolvedServiceName || pName.name;
+        customUrl = pName[CATALOG.LOGIN_URL];
+        resolvedServiceName = resolvedServiceName || pName[CATALOG.NAME];
       }
     }
   }
@@ -34,10 +36,10 @@ const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } 
   // 2. Nếu chưa có customUrl, thử tìm theo resolvedServiceName
   if (!customUrl && resolvedServiceName) {
     const pName = await db(TABLES.PRODUCT_NAMES)
-      .whereRaw("LOWER(name) = ?", [resolvedServiceName.trim().toLowerCase()])
+      .whereRaw("LOWER(??) = ?", [CATALOG.NAME, resolvedServiceName.trim().toLowerCase()])
       .first();
-    if (pName && pName.login_url) {
-      customUrl = pName.login_url;
+    if (pName && pName[CATALOG.LOGIN_URL]) {
+      customUrl = pName[CATALOG.LOGIN_URL];
     }
   }
 
@@ -46,20 +48,21 @@ const openAccountBrowser = async (accountId, { serviceName, slotId, userAgent } 
   }
 
   const launchResult = await browserLauncherService.launchAccountBrowser({
-    accountId: account.id,
-    accountUsername: account.account_username,
+    accountId: account[ACCOUNT.ID],
+    accountUsername: account[ACCOUNT.ACCOUNT_USERNAME],
     serviceName: resolvedServiceName,
     customUrl,
     userAgent,
+    openConfiguredUrl,
   });
 
-  if (verifiedSlotId) {
-    await db(TABLES.STOCK_SERVICES)
-      .where("id", verifiedSlotId)
+  if (verifiedSlotId && launchResult.data?.sessionVerified === true) {
+    await db(TABLES.ACCOUNT_SLOTS)
+      .where(SLOT.ID, verifiedSlotId)
       .update({
-        session_is_authenticated: launchResult.data?.hasAuthenticatedSession === true,
-        session_checked_at: new Date(),
-        updated_at: new Date(),
+        [SLOT.SESSION_IS_AUTHENTICATED]: launchResult.data.hasAuthenticatedSession === true,
+        [SLOT.SESSION_CHECKED_AT]: new Date(),
+        [SLOT.UPDATED_AT]: new Date(),
       });
   }
 

@@ -10,4 +10,6 @@ export const apiEndpoints = {
   portalSlotProbe: "/api/public/otp/probe-slot",
   systemConfigs: "/api/system/configs",
   providers: "/api/system/providers",
+  portalUrls: "/api/system/portal-urls",
+  portalUrlsReset: "/api/system/portal-urls/reset",
 } as const;

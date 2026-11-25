@@ -38,7 +38,6 @@ export interface WarehouseSlotSubTableProps {
   onDeleteAccount: (acc: WarehouseAccountItem) => void;
   onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   loggedSlotsMap?: Record<number, boolean>;
-  onVerifySession?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   openingSlotId?: number | null;
 }
 
@@ -55,7 +54,6 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
   onDeleteAccount,
   onOpenBrowser,
   loggedSlotsMap,
-  onVerifySession,
   openingSlotId,
 }) => {
   const providerNames = useWarehouseProviderNames();
@@ -396,11 +394,7 @@ export const WarehouseSlotSubTable: React.FC<WarehouseSlotSubTableProps> = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (isOpening) return;
-                                if (onVerifySession) {
-                                  onVerifySession(account, srv);
-                                } else {
-                                  onOpenBrowser(account, srv);
-                                }
+                                onOpenBrowser(account, srv);
                               }}
                               className={`flex h-7 w-7 items-center justify-center rounded-xl border transition-all ${
                                 isOpening

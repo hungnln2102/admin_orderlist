@@ -50,6 +50,8 @@ export const PricingPage: React.FC = () => {
   const [productForm, setProductForm] = useState<ProductFormData>({
     name: "",
     variant_name: "",
+    category: "Khác",
+    description: "",
     base_price: 0,
     retail_price: 0,
     ctv_price: 0,
@@ -166,6 +168,8 @@ export const PricingPage: React.FC = () => {
     setProductForm({
       name: "",
       variant_name: "",
+      category: "Khác",
+      description: "",
       base_price: 0,
       retail_price: 0,
       ctv_price: 0,
@@ -210,6 +214,8 @@ export const PricingPage: React.FC = () => {
     setProductForm({
       name: item.san_pham,
       variant_name: item.package_product || item.san_pham,
+      category: item.category || "Khác",
+      description: item.description || "",
       base_price: item.base_price || 0,
       retail_price: item.retail_price || 0,
       ctv_price: item.ctv_price || 0,

@@ -7,9 +7,31 @@ const { resolveAdobeRecoveryOrder } = require("../services/adobeOrderSourceServi
 const { providerConfig } = require("../providers/providerConfig");
 const { fetchYunaAccountOrder } = require("../providers/yuna2faProvider");
 const { fetchFixAdesStatus } = require("../providers/fixAdesStatusProvider");
+const { getPortalUrlConfig } = require("../services/portalUrlConfigService");
+const { getPublicPriceList } = require("@/domains/products/services/publicPricingService");
 
 const router = express.Router();
 const supportMessage = "Vui lòng liên hệ admin.";
+
+router.get("/price-list", async (req, res) => {
+  try {
+    const data = await getPublicPriceList();
+    res.set("Cache-Control", "public, max-age=60");
+    return res.json({ success: true, ...data });
+  } catch (err) {
+    console.error("[Public Price List API] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      error: "Không thể tải bảng giá sản phẩm.",
+      message: "Không thể tải bảng giá sản phẩm.",
+    });
+  }
+});
+
+router.get("/portal-urls", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  return res.json({ success: true, config: getPortalUrlConfig() });
+});
 
 router.get("/otp-portal-slots", async (req, res) => {
   try {

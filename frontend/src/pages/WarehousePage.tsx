@@ -109,7 +109,7 @@ export const WarehousePage: React.FC = () => {
     updateCatalogItem,
     deleteCatalogItem,
     toggleCatalogPackage,
-    openBrowserForUrl,
+    openBrowserForCatalog,
     openBrowserForSlot,
   } = useWarehouseData();
 
@@ -323,7 +323,6 @@ export const WarehousePage: React.FC = () => {
           }
           onOpenBrowser={openBrowserForSlot}
           loggedSlotsMap={loggedSlotsMap}
-          onVerifySession={openBrowserForSlot}
           openingSlotId={openingSlotId}
         />
       )}
@@ -336,7 +335,7 @@ export const WarehousePage: React.FC = () => {
             onOpenCreateCatalog={handleOpenCreateCatalog}
             onEditCatalog={handleOpenEditCatalog}
             onDeleteCatalog={(cat) => setDeletingCatalogItem(cat)}
-            onOpenBrowserWithUrl={openBrowserForUrl}
+            onOpenBrowser={openBrowserForCatalog}
             onTogglePackage={toggleCatalogPackage}
           />
         )}

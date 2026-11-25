@@ -61,6 +61,7 @@ export function useWarehouseData() {
   const [loading, setLoading] = useState(false);
 
   const systemProductsLoadedRef = useRef(false);
+  const cloudBrowserQueueRef = useRef(Promise.resolve());
 
   // Lazy-fetch /api/warehouse/system-products chỉ khi cần (mở tab Danh mục hoặc mở modal liên quan)
   const ensureSystemProducts = useCallback(async (forceRefresh = false) => {
@@ -398,106 +399,138 @@ export function useWarehouseData() {
     [notification, invalidateAndReload]
   );
 
-  const openBrowserForUrl = useCallback(
-    (url: string, serviceName: string) => {
-      const rawUrl = url.trim();
-      if (!rawUrl) {
-        notification.warning(
-          `Dịch vụ ${serviceName} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng.`,
-          "Thiếu đường link"
-        );
-        return;
-      }
-      const targetUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-      if (targetUrl && navigator?.clipboard?.writeText) {
-        navigator.clipboard.writeText(targetUrl).catch(() => {});
-      }
+  const navigateCloudBrowser = useCallback(
+    (
+      target: { catalogId: number } | { accountId: number; slotId: number },
+      verifySession?: () => Promise<void>
+    ) => {
       const browserWindow = window.open(
         "/browser/",
         "MavrykCloudBrowser",
         "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
       );
-      if (browserWindow) browserWindow.focus();
-      notification.info(
-        `Đang mở Trình duyệt Đám Mây cho ${serviceName}. Link (${targetUrl}) đã được sao chép vào bộ nhớ tạm để dán trong cửa sổ stream.`,
-        "Trình Duyệt Đám Mây"
-      );
+      if (!browserWindow) {
+        notification.error("Hãy cho phép cửa sổ bật lên để mở Trình Duyệt Đám Mây.");
+        return;
+      }
+      browserWindow.focus();
+
+      cloudBrowserQueueRef.current = cloudBrowserQueueRef.current.then(async () => {
+        if ("slotId" in target) setOpeningSlotId(target.slotId);
+        try {
+          const res = await fetch("/api/warehouse/cloud-browser/navigate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(target),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            notification.error(data?.error || "Không thể mở trang đăng nhập trong Trình Duyệt Đám Mây.");
+            return;
+          }
+          await verifySession?.();
+        } catch {
+          notification.error("Không thể kết nối với Trình Duyệt Đám Mây.");
+        } finally {
+          if ("slotId" in target) setOpeningSlotId(null);
+        }
+      });
     },
     [notification]
   );
 
-  const openBrowserForSlot = useCallback(
-    async (account: WarehouseAccountItem, service: any) => {
-      if (openingSlotId) return;
-      setOpeningSlotId(service.id);
+  const openBrowserForCatalog = useCallback(
+    (item: ServiceNameCategoryItem) => {
+      if (!import.meta.env.DEV) {
+        navigateCloudBrowser({ catalogId: item.id });
+        return;
+      }
+
+      const loginUrl = item.loginUrl?.trim() || "";
+      const isAbsolute = /^[a-z][a-z\d+.-]*:/i.test(loginUrl);
+      const isDomain = /^(?:[a-z\d-]+\.)+[a-z\d-]+(?::\d+)?(?:[/?#]|$)/i.test(loginUrl);
+      const normalizedUrl = isDomain ? `https://${loginUrl}` : loginUrl;
+      const url = (isAbsolute || isDomain) && URL.canParse(normalizedUrl) ? new URL(normalizedUrl) : null;
+      if (!url || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+        notification.error("Đường dẫn đăng nhập phải là URL HTTP hoặc HTTPS hợp lệ.");
+        return;
+      }
+
+      const browserWindow = window.open("", "_blank");
+      if (!browserWindow) {
+        notification.error("Hãy cho phép cửa sổ bật lên để mở trang đăng nhập.");
+        return;
+      }
+      browserWindow.opener = null;
+      browserWindow.location.replace(url.href);
+    },
+    [navigateCloudBrowser, notification]
+  );
+
+  const verifySlotSession = useCallback(
+    async (account: WarehouseAccountItem, service: WarehouseServiceSlot, openConfiguredUrl = false) => {
+      const errorMessage = openConfiguredUrl
+        ? "Không thể mở trang đăng nhập."
+        : "Không thể xác minh phiên đăng nhập.";
       try {
-        const rawUrl =
-          (service.login_url || "").trim() ||
-          (
-            catalog.find((c) => c.name === service.display_name || c.name === service.category)
-              ?.loginUrl || ""
-          ).trim();
-
-        const targetUrl = rawUrl
-          ? rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
-            ? rawUrl
-            : `https://${rawUrl}`
-          : "";
-
-        if (!targetUrl) {
-          notification.warning(
-            `Dịch vụ ${service.display_name || service.category} chưa có đường link đăng nhập. Vui lòng cấu hình trong Danh mục Kho Hàng.`,
-            "Thiếu đường link"
-          );
-          return;
-        }
-
-        if (targetUrl && navigator?.clipboard?.writeText) {
-          navigator.clipboard.writeText(targetUrl).catch(() => {});
-        }
-
-        const browserWindow = window.open(
-          "/browser/",
-          "MavrykCloudBrowser",
-          "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-        );
-        if (browserWindow) browserWindow.focus();
-
-        notification.info(
-          `Đã mở Trình duyệt Đám Mây cho tài khoản ${account.account} (${service.display_name || service.category}). Link đăng nhập (${targetUrl}) đã được chép vào bộ nhớ tạm. Hãy thao tác trực tiếp trên cửa sổ vừa mở; Profile sẽ được lưu vĩnh viễn trên VPS.`,
-          "Trình Duyệt Đám Mây"
-        );
-
         const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             serviceName: service.display_name || service.category,
             slotId: service.id,
+            ...(openConfiguredUrl ? { openConfiguredUrl: true } : {}),
           }),
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
-          setLoggedSlotsMap((previous) => ({
-            ...previous,
-            [service.id]: hasAuthenticatedSession,
-          }));
-          if (hasAuthenticatedSession) {
-            notification.success(
-              "Đã xác minh phiên đăng nhập của tài khoản này.",
-              "Đã Đăng Nhập"
-            );
-          }
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          notification.error(data?.error || errorMessage);
+          return;
         }
-      } catch (err: any) {
-        console.warn("Lưu ý probe session:", err);
-      } finally {
-        setOpeningSlotId(null);
+        if (openConfiguredUrl && (data?.success === false || data?.data?.navigationError)) {
+          notification.error(data.message || errorMessage);
+          return;
+        }
+        if (!data) {
+          notification.error(errorMessage);
+          return;
+        }
+        if (openConfiguredUrl && data.data?.sessionVerified !== true) return;
+
+        const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
+        setLoggedSlotsMap((previous) => ({
+          ...previous,
+          [service.id]: hasAuthenticatedSession,
+        }));
+        if (hasAuthenticatedSession) {
+          notification.success(
+            "Đã xác minh phiên đăng nhập của tài khoản này.",
+            "Đã Đăng Nhập"
+          );
+        }
+      } catch {
+        notification.error(errorMessage);
       }
     },
-    [openingSlotId, catalog, notification]
+    [notification]
+  );
+
+  const openBrowserForSlot = useCallback(
+    (account: WarehouseAccountItem, service: WarehouseServiceSlot) => {
+      if (import.meta.env.DEV) {
+        setOpeningSlotId(service.id);
+        void verifySlotSession(account, service, true).finally(() => {
+          setOpeningSlotId((current) => current === service.id ? null : current);
+        });
+        return;
+      }
+      navigateCloudBrowser(
+        { accountId: account.id, slotId: service.id },
+        () => verifySlotSession(account, service)
+      );
+    },
+    [navigateCloudBrowser, verifySlotSession]
   );
 
   return {
@@ -535,7 +568,7 @@ export function useWarehouseData() {
     updateCatalogItem,
     deleteCatalogItem,
     toggleCatalogPackage,
-    openBrowserForUrl,
+    openBrowserForCatalog,
     openBrowserForSlot,
   };
 }

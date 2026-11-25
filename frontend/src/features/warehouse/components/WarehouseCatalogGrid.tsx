@@ -21,7 +21,7 @@ interface WarehouseCatalogGridProps {
   onOpenCreateCatalog: () => void;
   onEditCatalog: (item: ServiceNameCategoryItem) => void;
   onDeleteCatalog?: (item: ServiceNameCategoryItem) => void;
-  onOpenBrowserWithUrl?: (url: string, serviceName: string) => void;
+  onOpenBrowser: (item: ServiceNameCategoryItem) => void;
   onTogglePackage?: (item: ServiceNameCategoryItem) => void;
 }
 
@@ -30,7 +30,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
   onOpenCreateCatalog,
   onEditCatalog,
   onDeleteCatalog,
-  onOpenBrowserWithUrl,
+  onOpenBrowser,
   onTogglePackage,
 }) => {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -59,14 +59,9 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleOpenLink = (url: string, serviceName: string, e: React.MouseEvent) => {
+  const handleOpenLink = (item: ServiceNameCategoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    const clean = getCleanUrl(url);
-    if (onOpenBrowserWithUrl) {
-      onOpenBrowserWithUrl(clean, serviceName);
-    } else {
-      window.open(clean, "_blank", "noopener,noreferrer");
-    }
+    onOpenBrowser(item);
   };
 
   return (
@@ -209,7 +204,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                       {hasLink ? (
                         <span
                           className="font-mono text-cyan-300 text-[11px] truncate block select-all cursor-pointer hover:underline"
-                          onClick={(e) => handleOpenLink(cat.loginUrl!, cat.name, e)}
+                          onClick={(e) => handleOpenLink(cat, e)}
                           title={`Bấm để mở: ${cat.loginUrl}`}
                         >
                           {getDisplayUrl(cat.loginUrl)}
@@ -238,7 +233,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={(e) => handleOpenLink(cat.loginUrl!, cat.name, e)}
+                            onClick={(e) => handleOpenLink(cat, e)}
                             className="p-1 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer"
                             title="Mở trình duyệt cho dịch vụ này"
                           >
@@ -406,7 +401,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                       {hasLink ? (
                         <div className="inline-flex items-center gap-2 max-w-[280px]">
                           <span
-                            onClick={(e) => handleOpenLink(cat.loginUrl!, cat.name, e)}
+                            onClick={(e) => handleOpenLink(cat, e)}
                             className="font-mono text-cyan-300 text-[11px] truncate block select-all cursor-pointer hover:underline"
                             title={cat.loginUrl!}
                           >
@@ -426,7 +421,7 @@ export const WarehouseCatalogGrid: React.FC<WarehouseCatalogGridProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={(e) => handleOpenLink(cat.loginUrl!, cat.name, e)}
+                            onClick={(e) => handleOpenLink(cat, e)}
                             className="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer shrink-0"
                             title="Mở trình duyệt"
                           >

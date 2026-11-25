@@ -413,7 +413,6 @@ async function importData(targetDb, sourceDb, source, report) {
       payment_method: row.payment_method,
       usdt_amount_usd: row.usdt_amount_usd,
       usdt_exchange_rate: row.usdt_exchange_rate,
-      usdt_wallet_id: null,
       created_at: keepWallTimeAsVietnam(row.created_at),
       updated_at: keepWallTimeAsVietnam(row.updated_at || row.created_at),
     };
@@ -439,7 +438,7 @@ async function importData(targetDb, sourceDb, source, report) {
     await upsert(trx, TARGET.variants, source.variants.map((row) => ({
       id: row.id, product_id: row.product_id, variant_name: row.variant_name, display_name: row.display_name,
       base_price: row.base_price, is_active: row.is_active, form_id: row.form_id, image_url: row.image_url,
-      id_desc: row.id_desc, created_at: row.created_at, updated_at: row.updated_at || row.created_at,
+      created_at: row.created_at, updated_at: row.updated_at || row.created_at,
     })), 'id');
     await upsert(trx, TARGET.variantPrices, source.variantPrices.map((row) => ({
       variant_id: row.variant_id, tier_id: row.tier_id, price: row.price, margin_ratio: row.margin_ratio,
@@ -461,7 +460,7 @@ async function importData(targetDb, sourceDb, source, report) {
     })), 'id');
     await upsert(trx, TARGET.accounts, source.accounts.map((row) => ({
       id: row.id, product_name_id: null, account_username: row.account_username || `V1 account ${row.id}`,
-      account_identifier: row.account_username || `V1 account ${row.id}`, password: null, key_hint: row.key_hint,
+      password: null, key_hint: row.key_hint,
       status: row.status || 'AVAILABLE', id_order: row.id_order,
       note: row.order_list_id ? `V1 order_list_id=${row.order_list_id}` : null,
       created_at: row.created_at, updated_at: row.updated_at || row.created_at,

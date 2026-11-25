@@ -26,7 +26,6 @@ export interface WarehouseAccountsTableProps {
   onDeleteAccount: (acc: WarehouseAccountItem) => void;
   onOpenBrowser?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   loggedSlotsMap?: Record<number, boolean>;
-  onVerifySession?: (account: WarehouseAccountItem, service: WarehouseServiceSlot) => void;
   openingSlotId?: number | null;
 }
 
@@ -45,7 +44,6 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
   onDeleteAccount,
   onOpenBrowser,
   loggedSlotsMap,
-  onVerifySession,
   openingSlotId,
 }) => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -299,7 +297,6 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
                           onDeleteAccount={onDeleteAccount}
                           onOpenBrowser={onOpenBrowser}
                           loggedSlotsMap={loggedSlotsMap}
-                          onVerifySession={onVerifySession}
                           openingSlotId={openingSlotId}
                         />
                       </td>
@@ -347,7 +344,6 @@ export const WarehouseAccountsTable: React.FC<WarehouseAccountsTableProps> = ({
               onDeleteAccount={onDeleteAccount}
               onOpenBrowser={onOpenBrowser}
               loggedSlotsMap={loggedSlotsMap}
-              onVerifySession={onVerifySession}
               openingSlotId={openingSlotId}
             />
           );

@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { chromium } = require("playwright");
 require("module-alias/register");
 
 const {
@@ -14,10 +15,11 @@ const {
   getSessionProbeUrl,
   hasSessionCookieForUrl,
   isLoginFlowUrl,
-  isAllowedLoginUrl,
   isVerifiedSessionUrl,
   resolveBrowserChannel,
   resolveLoginUrl,
+  launchAccountBrowser,
+  closeAllBrowserContexts,
 } = require("@/domains/warehouse/services/browserLauncherService");
 
 const EDGE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
@@ -49,11 +51,11 @@ test("thử trình duyệt ưu tiên trước rồi mới tới trình duyệt d
   assert.deepEqual(getChannelCandidates("msedge"), ["msedge", "chrome", "chromium"]);
 });
 
-test("chấp nhận URL http hoặc https hợp lệ", () => {
-  assert.equal(isAllowedLoginUrl("https://accounts.google.com/signin"), true);
-  assert.equal(isAllowedLoginUrl("http://canva.com/"), true);
-  assert.equal(isAllowedLoginUrl("https://example.com"), true);
-  assert.equal(isAllowedLoginUrl("invalid-url"), false);
+test("chuẩn hóa tên miền và chấp nhận URL HTTP hoặc HTTPS hợp lệ", () => {
+  assert.equal(resolveLoginUrl("", "  accounts.google.com/signin  "), "https://accounts.google.com/signin");
+  assert.equal(resolveLoginUrl("", "http://canva.com/"), "http://canva.com/");
+  assert.equal(resolveLoginUrl("", "https://example.com"), "https://example.com/");
+  assert.throws(() => resolveLoginUrl("", "https://user:pass@example.com"), /URL đăng nhập không hợp lệ/);
 });
 
 test("chỉ xác nhận đăng nhập khi profile có session cookie hợp lệ của đúng hostname", () => {
@@ -87,6 +89,55 @@ test("Adobe chỉ được xác minh khi session probe vẫn ở trang profile",
   assert.equal(isVerifiedSessionUrl("https://auth.services.adobe.com/en_US/deeplink.html", probeUrl), false);
   assert.equal(isVerifiedSessionUrl("https://account.adobe.com/", probeUrl), false);
   assert.equal(isVerifiedSessionUrl("https://account.adobe.com/profile", probeUrl), true);
+});
+
+test("mở URL cấu hình trên trình duyệt cục bộ và giữ URL profile cho xác minh Adobe", async (t) => {
+  const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), "admin-orderlist-browser-navigation-"));
+  const originalValue = process.env.WAREHOUSE_BROWSER_PROFILE_DIR;
+  process.env.WAREHOUSE_BROWSER_PROFILE_DIR = profileRoot;
+  t.after(async () => {
+    await closeAllBrowserContexts();
+    fs.rmSync(profileRoot, { recursive: true, force: true });
+    if (originalValue === undefined) delete process.env.WAREHOUSE_BROWSER_PROFILE_DIR;
+    else process.env.WAREHOUSE_BROWSER_PROFILE_DIR = originalValue;
+  });
+
+  const destinations = [];
+  let shouldFail = false;
+  let reads = 0;
+  const page = {
+    async goto(url) {
+      destinations.push(url);
+      if (shouldFail) throw new Error("ERR_NAME_NOT_RESOLVED");
+    },
+    url: () => destinations.at(-1),
+    waitForURL: async () => {},
+    evaluate: async () => true,
+    bringToFront: async () => {},
+  };
+  t.mock.method(chromium, "launchPersistentContext", async () => ({
+    pages: () => [page],
+    once: () => {},
+    close: async () => {},
+    cookies: async () => { reads += 1; return []; },
+  }));
+
+  const options = { accountId: 123, customUrl: "account.adobe.com/overview?from=kho" };
+  const opened = await launchAccountBrowser({ ...options, openConfiguredUrl: true });
+  assert.equal(opened.success, true);
+  assert.equal(opened.data.sessionVerified, false);
+  assert.equal(reads, 0);
+  const probe = await launchAccountBrowser({ ...options, openConfiguredUrl: "true" });
+  assert.equal(probe.data.sessionVerified, true);
+  assert.equal(reads, 1);
+  assert.deepEqual(destinations, ["https://account.adobe.com/overview?from=kho", "https://account.adobe.com/profile"]);
+
+  shouldFail = true;
+  const failed = await launchAccountBrowser({ ...options, openConfiguredUrl: true });
+  assert.equal(failed.success, false);
+  assert.equal(failed.data.navigationError, "ERR_NAME_NOT_RESOLVED");
+  assert.equal(failed.data.sessionVerified, false);
+  assert.equal(reads, 1);
 });
 
 test("custom URL không hợp lệ bị chặn", () => {

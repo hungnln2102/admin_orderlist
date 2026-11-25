@@ -2,6 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { chromium } = require("playwright");
+const { normalizeWarehouseLoginUrl } = require("./warehouseLoginUrl");
 
 const activeContexts = new Map();
 const launchingContexts = new Map();
@@ -96,25 +97,16 @@ const getAllowedLoginHosts = () => {
   return new Set([...DEFAULT_ALLOWED_LOGIN_HOSTS, ...configuredHosts]);
 };
 
-const isAllowedLoginUrl = (value) => {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-};
-
 /**
  * Phân giải URL đăng nhập với fallback nhận biết tự động.
  */
 const resolveLoginUrl = (serviceName = "", customUrl = null) => {
   if (customUrl && typeof customUrl === "string" && customUrl.trim()) {
-    const trimmedUrl = customUrl.trim();
-    if (!isAllowedLoginUrl(trimmedUrl)) {
-      throw new Error("URL đăng nhập không hợp lệ. Phải bắt đầu bằng http:// hoặc https://");
+    const normalizedUrl = normalizeWarehouseLoginUrl(customUrl);
+    if (!normalizedUrl) {
+      throw new Error("URL đăng nhập không hợp lệ. Hãy nhập tên miền hoặc đường dẫn HTTP/HTTPS.");
     }
-    return trimmedUrl;
+    return normalizedUrl;
   }
 
   const normalized = (serviceName || "").toLowerCase();
@@ -343,7 +335,7 @@ const closeAllBrowserContexts = async () => {
   await Promise.allSettled(contexts.map((context) => context.close()));
 };
 
-const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, customUrl, userAgent }) => {
+const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, customUrl, userAgent, openConfiguredUrl }) => {
   if (!accountId) throw new Error("ID tài khoản không được để trống!");
 
   const targetUrl = resolveLoginUrl(serviceName, customUrl);
@@ -355,24 +347,27 @@ const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, c
   const page = context.pages()[0] || await context.newPage();
   const { timeout, executablePath } = getLaunchConfig();
   const sessionProbeUrl = getSessionProbeUrl(targetUrl);
+  const openConfigured = openConfiguredUrl === true;
+  const navigationUrl = openConfigured ? targetUrl : sessionProbeUrl;
+  const shouldVerifySession = navigationUrl === sessionProbeUrl;
   let navigationError = null;
   try {
-    await page.goto(sessionProbeUrl, { waitUntil: "domcontentloaded", timeout });
-    await Promise.race([
-      page.waitForURL(
+    await page.goto(navigationUrl, { waitUntil: "domcontentloaded", timeout });
+    if (shouldVerifySession) {
+      await page.waitForURL(
         (url) => isLoginFlowUrl(url.href) || isVerifiedSessionUrl(url.href, sessionProbeUrl),
         { timeout: 3_000 }
-      ).catch(() => null),
-      page.waitForTimeout(3_000),
-    ]);
+      ).catch(() => null);
+    }
   } catch (error) {
     navigationError = error;
-    console.warn(`[BrowserLauncher] Đã mở browser nhưng không thể tự điều hướng đến ${targetUrl}: ${error.message}`);
+    console.warn(`[BrowserLauncher] Đã mở browser nhưng không thể tự điều hướng đến ${navigationUrl}: ${error.message}`);
   }
   await page.bringToFront();
   const currentUrl = page.url();
-  const hasSessionCookie = hasSessionCookieForUrl(await context.cookies(), targetUrl);
-  const loginFormVisible = await hasVisibleLoginForm(page);
+  const sessionVerified = shouldVerifySession && !navigationError;
+  const hasSessionCookie = sessionVerified && hasSessionCookieForUrl(await context.cookies(), targetUrl);
+  const loginFormVisible = sessionVerified && await hasVisibleLoginForm(page);
   const hasAuthenticatedSession = hasSessionCookie && !loginFormVisible && isVerifiedSessionUrl(currentUrl, sessionProbeUrl);
 
   const payload = {
@@ -386,6 +381,7 @@ const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, c
     browserExecutable: executablePath ? path.basename(executablePath) : browserLabel,
     openedAt: new Date().toISOString(),
     navigationError: navigationError ? navigationError.message : null,
+    sessionVerified,
     hasSessionCookie,
     loginFormVisible,
     hasAuthenticatedSession,
@@ -393,12 +389,12 @@ const launchAccountBrowser = async ({ accountId, accountUsername, serviceName, c
   };
 
   return {
-    success: true,
+    success: !(openConfigured && navigationError),
     message: navigationError
       ? `Đã mở ${browserLabel} cho tài khoản ${accountUsername || accountId}, nhưng không thể tự điều hướng đến trang đăng nhập. Bạn có thể nhập URL trong cửa sổ vừa mở; cookie vẫn được lưu trong profile riêng.`
       : hasAuthenticatedSession
         ? `Đã xác minh phiên đăng nhập trong profile riêng của ${accountUsername || accountId}.`
-        : `Đã mở ${browserLabel} (Profile riêng: account_${accountId}) cho tài khoản ${accountUsername || accountId}. Hãy đăng nhập trong cửa sổ này, sau đó bấm lại để xác minh phiên.`,
+        : `Đã mở ${browserLabel} (Profile riêng: account_${accountId}) cho tài khoản ${accountUsername || accountId}. Hãy đăng nhập trong cửa sổ này.${openConfigured ? "" : " Sau đó bấm lại để xác minh phiên."}`,
     data: payload,
   };
 };
@@ -412,7 +408,6 @@ module.exports = {
   getAccountProfileDir,
   getProfileBaseDir,
   resolveBrowserChannel,
-  isAllowedLoginUrl,
   hasSessionCookieForUrl,
   hasVisibleLoginForm,
   getSessionProbeUrl,
