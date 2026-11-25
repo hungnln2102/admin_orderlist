@@ -658,3 +658,5 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Dùng quy tắc kiểm tra Adobe của đơn khi slot chưa cấu hình provider. Kiểm thử tích hợp 6/6 ca đạt.
 - [x] Đọc riêng trạng thái tài khoản và tổ chức từ Ades. API local trả Đang hoạt động cho mã đã báo.
 - [x] Tra cứu Adobe theo slot hiện hành của Kho Gói Sản Phẩm và tự cấp lại khi mất liên kết. Kiểm thử tích hợp 6/6 ca đạt.
+- [x] Trả mặt hàng, hạn sử dụng, tài khoản và mật khẩu cho đơn Adobe Yuna sau khi xác minh liên hệ. Portal hiển thị kết quả, cho sao chép và mở mục Nhận OTP. Kiểm thử handler giả lập và build đạt.
+- [ ] Xác minh luồng Adobe Yuna trên môi trường tích hợp có schema PostgreSQL cập nhật.

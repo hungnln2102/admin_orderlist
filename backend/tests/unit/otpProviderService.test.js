@@ -42,6 +42,7 @@ test("GENERIC_HTTP configurations are rejected because providers own their endpo
 
 test("Yuna Check uses account_user and strips vendor credentials and OTP fields", async () => {
   const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const { fetchYunaAccountOrder } = require("../../src/domains/system/providers/yuna2faProvider");
   const key = "JBSWY3DPEHPK3PXP";
   const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_check", auth_config: { defaultToken: "fixture" } };
   await withMockedExternalFetch(async (_url, options) => {
@@ -56,6 +57,7 @@ test("Yuna Check uses account_user and strips vendor credentials and OTP fields"
   }, async () => {
     const result = await executeOtpConfig(config, key);
     assert.equal(result.otp, null);
+    assert.doesNotMatch(JSON.stringify(result), /fixture-password|654321/);
     assert.equal(result.extra_fields.find((field) => field.key === "account_email")?.value, "user@example.test");
     assert.deepEqual(result.raw_data.items, [{
       name: "Adobe (display@example.test)",
@@ -63,6 +65,10 @@ test("Yuna Check uses account_user and strips vendor credentials and OTP fields"
       group: undefined,
       expires_at_str: undefined,
     }]);
+    const recovery = await fetchYunaAccountOrder(key, { config, includePassword: true });
+    assert.equal(recovery.account_password, "fixture-password");
+    assert.deepEqual(recovery.raw_data, result.raw_data);
+    assert.deepEqual(recovery.extra_fields, result.extra_fields);
   });
 });
 

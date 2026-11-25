@@ -42,7 +42,7 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
  * Luồng Yuna 2FA Center (mmo.yunagrp.com/2fa/):
  * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
  */
-async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = {}) {
+async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, includePassword = false } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
   const query = String(queryInput).trim();
 
@@ -104,7 +104,11 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig } = 
       }
     }
 
-    return { extra_fields: extraFields, raw_data: { items: accounts } };
+    const result = { extra_fields: extraFields, raw_data: { items: accounts } };
+    if (includePassword && items.length === 1 && typeof items[0].account_pass === "string") {
+      result.account_password = items[0].account_pass;
+    }
+    return result;
   } catch (err) {
     return { otp: null, extra_fields: [], error: err.message };
   }

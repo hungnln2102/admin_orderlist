@@ -98,14 +98,25 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
     if (result.source === "yuna") {
       const response = await fetchYunaAccountOrder(result.providerInput, {
         config: providerConfig(result.providerKey),
+        includePassword: true,
       });
-      const fields = response.extra_fields || [];
-      const account = fields.find((field) => field.key === "account_email")?.value;
-      if (response.error || response.raw_data?.items?.length !== 1 ||
+      const items = response.raw_data?.items;
+      const item = items?.[0];
+      const account = item?.account_user;
+      if (response.error || items?.length !== 1 ||
           !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account || "")) {
         return res.status(400).json({ success: false, error: supportMessage });
       }
-      return res.json({ success: true, source: "yuna", data: { account } });
+      return res.json({
+        success: true,
+        source: "yuna",
+        data: {
+          account,
+          password: response.account_password,
+          plan: typeof item.group === "string" ? item.group : undefined,
+          expired_at: typeof item.expires_at_str === "string" ? item.expires_at_str : undefined,
+        },
+      });
     }
     const account = result.account || result.providerInput;
     const details = await checkAdobeAccount(account, result.providerKey).catch(() => ({ status_type: "unknown" }));

@@ -64,11 +64,9 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
         });
         assert.equal(order.information_order, info);
         assert.equal(await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).first(), undefined);
-        if (source === "ades") {
-          assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info }), { contactRequired: true });
-          await assert.rejects(resolveAdobeRecoveryOrder({ code: info, contact: "wrong" }));
-        }
-        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info, contact: source === "ades" ? contact : undefined }), {
+        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info }), { contactRequired: true });
+        await assert.rejects(resolveAdobeRecoveryOrder({ code: info, contact: "wrong" }));
+        assert.deepEqual(await resolveAdobeRecoveryOrder({ code: info, contact }), {
           source, providerKey: provider, providerInput: info,
         });
         await db(TABLES.ORDER_LIST).where("id_order", orderCode).update({ status: "UNPAID" });
