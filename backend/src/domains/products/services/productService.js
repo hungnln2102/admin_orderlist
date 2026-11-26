@@ -4,17 +4,29 @@ const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getVietnamDateString } = require("@/utils/time");
 
 const V_COLS = COLS.VARIANT;
+const R_COLS = COLS.VARIANT_DESCRIPTION_REVISION;
 const VP_COLS = COLS.VARIANT_PRICE;
 const SC_COLS = COLS.SUPPLIER_COST;
 const S_COLS = COLS.SUPPLIER;
 const P_COLS = COLS.PRODUCT;
 const O_COLS = COLS.ORDER_LIST;
 
+const normalizeDescription = (description) =>
+  typeof description === "string" && description.trim() ? description.trim() : null;
+
+const assertLegacyDescriptionChangeAllowed = (variant, description) => {
+  if (variant[V_COLS.EDITORIAL_VERSION] > 0 && description !== variant[V_COLS.DESCRIPTION]) {
+    throw Object.assign(new Error("Mô tả đã được quản lý trong quy trình biên tập."), { statusCode: 409 });
+  }
+};
+
 /**
  * Service lấy danh sách giá sản phẩm (Bảng giá Niêm yết)
  * Bao gồm Giá Gốc, Giá Bán Lẻ, Giá CTV, Giá Sinh Viên, Giá Khuyến Mãi & % Lợi Nhuận
  */
-const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly = false, status = "all" } = {}) => {
+const getProductPrices = async ({
+  page = 1, limit = 15, search = "", activeOnly = false, status = "all", editorialStatus = "all", category,
+} = {}) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, Math.min(1000, parseInt(limit, 10) || 15));
   const offset = (pageNum - 1) * limitNum;
@@ -29,15 +41,28 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
     whereClause += ` AND (v.${V_COLS.IS_ACTIVE} = false OR v.${V_COLS.IS_ACTIVE} IS NULL)`;
   }
 
+  if (editorialStatus === "unstarted") {
+    whereClause += ` AND v.${V_COLS.EDITORIAL_STATUS} IS NULL`;
+  } else if (["draft", "in_review", "changes_requested", "published"].includes(editorialStatus)) {
+    whereClause += ` AND v.${V_COLS.EDITORIAL_STATUS} = ?`;
+    params.push(editorialStatus);
+  }
+
   if (search && search.trim()) {
     whereClause += ` AND (v.${V_COLS.DISPLAY_NAME} ILIKE ? OR v.${V_COLS.VARIANT_NAME} ILIKE ?)`;
     const term = `%${search.trim()}%`;
     params.push(term, term);
   }
 
+  if (typeof category === "string" && category.trim()) {
+    whereClause += ` AND COALESCE(NULLIF(BTRIM(p.${P_COLS.CATEGORY}), ''), 'Khác') = ?`;
+    params.push(category.trim());
+  }
+
   const countSql = `
     SELECT COUNT(*) AS total
     FROM ${TABLES.VARIANT} v
+    LEFT JOIN ${TABLES.PRODUCT} p ON p.${P_COLS.ID} = v.${V_COLS.PRODUCT_ID}
     ${whereClause}
   `;
 
@@ -47,6 +72,13 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       v.${V_COLS.DISPLAY_NAME} AS san_pham,
       v.${V_COLS.VARIANT_NAME} AS package_product,
       v.${V_COLS.DESCRIPTION} AS description,
+      v.${V_COLS.EDITORIAL_STATUS} AS editorial_status,
+      v.${V_COLS.EDITORIAL_VERSION} AS editorial_version,
+      COALESCE(v.${V_COLS.DESCRIPTION_PUBLISHED_VERSION},
+        CASE WHEN NULLIF(BTRIM(v.${V_COLS.DESCRIPTION}), '') IS NOT NULL THEN 0 END
+      ) AS published_version,
+      draft_revision.${R_COLS.CREATED_AT} AS editorial_updated_at,
+      published_revision.${R_COLS.CREATED_AT} AS published_at,
       p.${P_COLS.PACKAGE_NAME} AS parent_package_name,
       p.${P_COLS.CATEGORY} AS category,
       COALESCE(NULLIF(BTRIM(v.${V_COLS.IMAGE_URL}), ''), NULLIF(BTRIM(p.${P_COLS.IMAGE_URL}), '')) AS image_url,
@@ -63,6 +95,13 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       v.${V_COLS.UPDATED_AT}
     FROM ${TABLES.VARIANT} v
     LEFT JOIN ${TABLES.PRODUCT} p ON p.${P_COLS.ID} = v.${V_COLS.PRODUCT_ID}
+    LEFT JOIN ${TABLES.VARIANT_DESCRIPTION_REVISION} draft_revision
+      ON draft_revision.${R_COLS.VARIANT_ID} = v.${V_COLS.ID}
+      AND draft_revision.${R_COLS.VERSION} = v.${V_COLS.EDITORIAL_VERSION}
+      AND v.${V_COLS.EDITORIAL_VERSION} > 0
+    LEFT JOIN ${TABLES.VARIANT_DESCRIPTION_REVISION} published_revision
+      ON published_revision.${R_COLS.VARIANT_ID} = v.${V_COLS.ID}
+      AND published_revision.${R_COLS.VERSION} = v.${V_COLS.DESCRIPTION_PUBLISHED_VERSION}
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_retail ON p_retail.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_retail.${VP_COLS.TIER_ID} = 2
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_ctv ON p_ctv.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_ctv.${VP_COLS.TIER_ID} = 1
     LEFT JOIN ${TABLES.VARIANT_PRICE} p_student ON p_student.${VP_COLS.VARIANT_ID} = v.${V_COLS.ID} AND p_student.${VP_COLS.TIER_ID} = 4
@@ -164,6 +203,11 @@ const getProductPrices = async ({ page = 1, limit = 15, search = "", activeOnly 
       parent_package_name: r.parent_package_name || "",
       category: r.category || "Khác",
       description: r.description || "",
+      editorial_status: r.editorial_status,
+      editorial_version: r.editorial_version,
+      editorial_updated_at: r.editorial_updated_at,
+      published_at: r.published_at,
+      published_version: r.published_version,
       image_url: r.image_url || null,
       base_price: basePrice,
       cost_price: costPrice,
@@ -268,7 +312,7 @@ const createProduct = async (data) => withTransaction(async (trx) => {
   const displayName = san_pham || package_product;
   const variantName = package_product || san_pham;
   const normalizedCategory = typeof category === "string" && category.trim() ? category.trim() : null;
-  const normalizedDescription = typeof description === "string" && description.trim() ? description.trim() : null;
+  const normalizedDescription = normalizeDescription(description);
 
   // Tim hoac tao product_id trong catalog product
   let catalogProduct = await trx(TABLES.PRODUCT)
@@ -348,7 +392,7 @@ const createProduct = async (data) => withTransaction(async (trx) => {
  */
 const updateProduct = async (id, data) => withTransaction(async (trx) => {
   const variantId = parseInt(id, 10);
-  const oldVariant = await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).first();
+  const oldVariant = await trx(TABLES.VARIANT).where({ [V_COLS.ID]: variantId }).forUpdate().first();
   if (!oldVariant) throw new Error("Sản phẩm không tồn tại");
 
   const oldPrices = await trx(TABLES.VARIANT_PRICE).where({ [VP_COLS.VARIANT_ID]: variantId });
@@ -374,7 +418,11 @@ const updateProduct = async (id, data) => withTransaction(async (trx) => {
   if (san_pham !== undefined) updateFields[V_COLS.DISPLAY_NAME] = san_pham;
   if (package_product !== undefined) updateFields[V_COLS.VARIANT_NAME] = package_product;
   if (description !== undefined) {
-    updateFields[V_COLS.DESCRIPTION] = typeof description === "string" && description.trim() ? description.trim() : null;
+    const normalizedDescription = normalizeDescription(description);
+    assertLegacyDescriptionChangeAllowed(oldVariant, normalizedDescription);
+    if (normalizedDescription !== oldVariant[V_COLS.DESCRIPTION]) {
+      updateFields[V_COLS.DESCRIPTION] = normalizedDescription;
+    }
   }
   if (base_price !== undefined) updateFields[V_COLS.BASE_PRICE] = base_price || null;
   if (is_active !== undefined) updateFields[V_COLS.IS_ACTIVE] = is_active;
@@ -650,7 +698,48 @@ const {
   deletePackageProduct,
 } = require("./packageProductService");
 
+const updateVariantDescription = async (id, value) => {
+  const variantId = Number(id);
+  if (!/^\d+$/.test(id) || !Number.isSafeInteger(variantId) || variantId <= 0) {
+    throw Object.assign(new Error("Mã biến thể không hợp lệ."), { statusCode: 400 });
+  }
+  if (value !== null && typeof value !== "string") {
+    throw Object.assign(new Error("Mô tả phải là văn bản hoặc null."), { statusCode: 400 });
+  }
+
+  return withTransaction(async (trx) => {
+    const variants = trx(TABLES.VARIANT).where(V_COLS.ID, variantId);
+    const current = await variants.clone().forUpdate().first(V_COLS.DESCRIPTION, V_COLS.EDITORIAL_VERSION);
+    if (!current) {
+      throw Object.assign(new Error("Không tìm thấy biến thể."), { statusCode: 404 });
+    }
+    const description = normalizeDescription(value);
+    assertLegacyDescriptionChangeAllowed(current, description);
+    const result = { id: variantId, description };
+    if (current[V_COLS.DESCRIPTION] === description) return result;
+
+    await variants.update({
+      [V_COLS.DESCRIPTION]: description,
+      [V_COLS.UPDATED_AT]: trx.fn.now(),
+    });
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.PRODUCT_UPDATED,
+      aggregateType: "PRODUCT",
+      aggregateId: variantId,
+      source: "PRODUCT",
+      payload: {
+        ...result,
+        changed_fields: ["description"],
+        changes: { description: { old: current[V_COLS.DESCRIPTION], new: description } },
+        summary: "Cập nhật mô tả sản phẩm",
+      },
+    });
+    return result;
+  });
+};
+
 module.exports = {
+  updateVariantDescription,
   getProductPrices,
   getPackageProducts,
   getPackageCategories,

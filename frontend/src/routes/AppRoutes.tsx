@@ -23,6 +23,7 @@ const SystemLogsPage = React.lazy(routeLoaders["/system-logs"]);
 const ExternalApiConfigPage = React.lazy(routeLoaders["/external-api-config"]);
 const OtpThemeConfigPage = React.lazy(routeLoaders["/otp-theme-config"]);
 const WebsiteUrlConfigPage = React.lazy(routeLoaders["/website-urls"]);
+const WebsiteProductsPage = React.lazy(routeLoaders["/website-products"]);
 
 const PageLoadingSpinner = () => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
@@ -101,6 +102,7 @@ export const AppRoutes: React.FC = () => {
 
           {/* 5. Quản lý Website */}
           <Route path="/website-urls" element={<WebsiteUrlConfigPage />} />
+          <Route path="/website-products" element={<WebsiteProductsPage />} />
           <Route path="/otp-theme-config" element={<OtpThemeConfigPage />} />
 
           {/* 6. Hệ thống & Ví */}

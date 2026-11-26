@@ -95,6 +95,7 @@ async function checkAdobeAccount(email, providerKey) {
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "")) return { status_type: "unknown" };
   const result = await fetchFixAdesStatus(email, { config: providerConfig(providerKey) });
   const data = result.rawData;
+  if (data?.found === false) return { status_type: "not_found" };
   if (result.error) return { status_type: "unknown" };
   const accountState = String(data?.status || "").trim().toLowerCase();
   const organizationState = String(data?.organizationStatus?.status || data?.organization_status || "").trim().toLowerCase();
@@ -113,7 +114,7 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
   const recovery = req.path.endsWith("/claim") ? "claim" : "check";
   const statusOnly = recovery === "check" && req.body?.statusOnly === true;
   try {
-    const result = statusOnly
+    let result = statusOnly
       ? await resolveAdobeRecoveryOrder({ code: req.body?.code, contact: req.body?.contact })
       : await resolveAdobeAccount(req.body, recovery);
     if (statusOnly && result?.source !== "yuna") {
@@ -150,8 +151,33 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
         },
       });
     }
-    const account = result.account || result.providerInput;
-    const details = await checkAdobeAccount(account, result.providerKey).catch(() => ({ status_type: "unknown" }));
+    let account = result.account || result.providerInput;
+    let details = await checkAdobeAccount(account, result.providerKey).catch(() => ({ status_type: "unknown" }));
+    if (details.status_type === "not_found" && result.packageBacked && result.slotId) {
+      const replacement = await activateKeyWithTransaction({
+        keyCode: req.body?.code,
+        orderContact: req.body?.contact,
+        recovery: "replace",
+        rejectedSlot: { id: result.slotId, account },
+      });
+      if (replacement.outOfStock || replacement.replacementRequired) {
+        return res.json({
+          success: true, source: "ades",
+          replacementRequired: replacement.replacementRequired, outOfStock: replacement.outOfStock,
+        });
+      }
+      result = replacement;
+      account = result.account;
+      details = await checkAdobeAccount(account, result.statusProviderKey).catch(() => ({ status_type: "unknown" }));
+    }
+    if (details.status_type === "not_found") {
+      if (result.packageBacked && result.slotId) {
+        return res.json({ success: true, source: "ades", replacementRequired: true });
+      }
+      return res.json({ success: true, source: "ades", data: {
+        account, status_type: "unknown", status: "KHÔNG TÌM THẤY ĐĂNG KÝ",
+      } });
+    }
     return res.json({
       success: true,
       source: "ades",
@@ -235,7 +261,25 @@ router.post("/otp/adobe/switch-team/status", async (req, res) => {
   try {
     const email = await resolveSwitchTeamEmail(req.body);
     const result = await otpPortalDispatcher.getAdobeSwitchTeamStatus(email);
-    return res.json({ success: true, ...result });
+    const status = String(result.status || "").trim().toLowerCase();
+    if (status !== "success" && status !== "completed") {
+      return res.json({ success: true, ...result });
+    }
+
+    const accountStatus = await checkAdobeAccount(email, "fix_ades_status").catch((error) => {
+      console.warn("[Adobe Switch Team] Không xác minh được kết quả.", { reason: error.message });
+      return null;
+    });
+    const expectedOrg = String(result.newOrgName || "").trim();
+    const actualOrg = String(accountStatus?.organization || "").trim();
+    const verified = accountStatus?.status_type === "active" &&
+      (!expectedOrg || actualOrg.toLowerCase() === expectedOrg.toLowerCase());
+    return res.json({
+      ...result,
+      success: true,
+      status: verified ? "completed" : "verifying",
+      ...(verified && { accountResult: { account: email, ...accountStatus } }),
+    });
   } catch {
     console.warn("[Adobe Switch Team] Không đọc được trạng thái.");
     return res.status(400).json({ success: false, error: supportMessage, message: supportMessage });

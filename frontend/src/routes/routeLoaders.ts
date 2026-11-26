@@ -22,6 +22,7 @@ export const routeLoaders: Record<string, RouteImporter> = {
   "/external-api-config": () => import("@/pages/ExternalApiConfigPage").then((module) => ({ default: module.ExternalApiConfigPage })),
   "/otp-theme-config": () => import("@/pages/OtpThemeConfigPage").then((module) => ({ default: module.OtpThemeConfigPage })),
   "/website-urls": () => import("@/pages/WebsiteUrlConfigPage").then((module) => ({ default: module.WebsiteUrlConfigPage })),
+  "/website-products": () => import("@/features/website-products/WebsiteProductsPage").then((module) => ({ default: module.WebsiteProductsPage })),
 };
 
 const preloadedPaths = new Set<string>();

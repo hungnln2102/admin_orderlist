@@ -332,6 +332,23 @@ test("FIX_ADES_STATUS returns the upstream missing-subscription message", { conc
   });
 });
 
+test("Fix-Ades distinguishes a confirmed missing subscription from HTTP failures", async () => {
+  const { fetchFixAdesStatus } = require("../../src/domains/system/providers/fixAdesStatusProvider");
+  const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const config = providerConfig("fix_ades_status");
+  for (const [status, body, missing] of [
+    [404, { found: false, error: "No subscription found for this email" }, true],
+    [404, { error: "Route not found" }, false],
+    [503, { found: false }, false],
+  ]) {
+    await withMockedExternalFetch(async () => Response.json(body, { status }), async () => {
+      const request = fetchFixAdesStatus("missing@example.test", { config });
+      if (missing) assert.equal((await request).rawData.found, false);
+      else await assert.rejects(request, new RegExp(`HTTP ${status}`));
+    });
+  }
+});
+
 test("provider catalog and name seed keep Ades OTP and Fix-Ades status distinct", async () => {
   const migration = require("../../src/db/migrations/20261123000004_seed_provider_display_names");
   let seededNames;
@@ -537,6 +554,124 @@ test("public Adobe report and status-only lookup require proof and omit credenti
   assert.deepEqual(reportOrder.mock.calls[0].arguments[1].reason, { reason_code: "expired", reason_detail: "" });
 });
 
+
+test("Adobe recovery replaces only a verified missing subscription", async (t) => {
+  const routesPath = require.resolve("../../src/domains/system/routes/publicOtpRoutes");
+  const source = require("../../src/domains/system/services/adobeOrderSourceService");
+  const activation = require("../../src/domains/products/services/activationKeyService");
+  const provider = require("../../src/domains/system/providers/fixAdesStatusProvider");
+  const email = "missing@example.test";
+  const nextEmail = "replacement@example.test";
+  const proof = { code: "fixture-code", contact: "fixture-contact" };
+  let outcome = "inactive";
+  let outOfStock = false;
+  t.mock.method(source, "resolveAdobeRecoveryOrder", async () => null);
+  const allocate = t.mock.method(activation, "activateKeyWithTransaction", async ({ recovery, rejectedSlot }) => {
+    if (recovery === "check") {
+      return { account: email, password: "old-password", slotId: 1, packageBacked: true, statusProviderKey: "fix_ades_status" };
+    }
+    assert.equal(recovery, "replace");
+    assert.deepEqual(rejectedSlot, { id: 1, account: email });
+    if (outOfStock) return { replacementRequired: true, outOfStock: true };
+    return { account: nextEmail, password: "new-password", slotId: 2, packageBacked: true, replaced: true, statusProviderKey: "fix_ades_status" };
+  });
+  t.mock.method(provider, "fetchFixAdesStatus", async (account) => {
+    if (account === nextEmail) return { rawData: { status: "active" } };
+    if (outcome === "timeout") throw new Error("timeout");
+    if (outcome === "missing") return { rawData: { found: false }, error: "No subscription" };
+    return { rawData: { status: outcome } };
+  });
+  const originalRoutes = require.cache[routesPath];
+  delete require.cache[routesPath];
+  t.after(() => {
+    if (originalRoutes) require.cache[routesPath] = originalRoutes;
+    else delete require.cache[routesPath];
+  });
+  const router = require(routesPath);
+  const path = "/otp/adobe/recovery/check";
+  const route = router.stack.find((layer) => [].concat(layer.route?.path).includes(path)).route;
+  async function request() {
+    const response = {
+      set() {},
+      status(value) { assert.fail(`Unexpected HTTP ${value}`); },
+      json(payload) { this.payload = payload; return this; },
+    };
+    await route.stack[0].handle({ path, body: { ...proof, email: "untrusted@example.test" } }, response);
+    return response.payload;
+  }
+  assert.equal((await request()).data.status_type, "inactive");
+  outcome = "timeout";
+  assert.equal((await request()).data.status_type, "unknown");
+  assert.deepEqual(allocate.mock.calls.map((call) => call.arguments[0].recovery), ["check", "check"]);
+  outcome = "missing";
+  const replaced = await request();
+  assert.equal(replaced.replaced, true);
+  assert.deepEqual(replaced.data, {
+    account: nextEmail, password: "new-password", status_type: "active", status: "ĐANG HOẠT ĐỘNG", organization: undefined,
+  });
+  outOfStock = true;
+  assert.deepEqual(await request(), { success: true, source: "ades", replacementRequired: true, outOfStock: true });
+});
+
+test("public Adobe switch status verifies the new team only after completion", async (t) => {
+  const routesPath = require.resolve("../../src/domains/system/routes/publicOtpRoutes");
+  const source = require("../../src/domains/system/services/adobeOrderSourceService");
+  const provider = require("../../src/domains/system/providers/fixAdesStatusProvider");
+  const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");
+  const email = "user@example.test";
+  const newOrgName = "New Team";
+  let status = "sending";
+  let accountState = "inactive";
+  let organization = "Old Team";
+  t.mock.method(source, "resolveAdobeRecoveryOrder", async ({ code, contact }) => (
+    code === "fixture-code" && contact === "fixture-contact"
+      ? { source: "ades", providerKey: "fix_ades_status", account: email }
+      : { contactRequired: true }
+  ));
+  const progress = t.mock.method(dispatcher, "getAdobeSwitchTeamStatus", async () => ({ status, newOrgName }));
+  const check = t.mock.method(provider, "fetchFixAdesStatus", async () => ({
+    rawData: { status: accountState, organization: { name: organization } },
+  }));
+  const originalRoutes = require.cache[routesPath];
+  delete require.cache[routesPath];
+  t.after(() => {
+    if (originalRoutes) require.cache[routesPath] = originalRoutes;
+    else delete require.cache[routesPath];
+  });
+  const router = require(routesPath);
+  const route = router.stack.find((layer) => layer.route?.path === "/otp/adobe/switch-team/status").route;
+  async function request(overrides) {
+    const response = {
+      statusCode: 200,
+      set() {},
+      status(value) { this.statusCode = value; return this; },
+      json(payload) { this.payload = payload; return this; },
+    };
+    await route.stack[0].handle({
+      body: { code: "fixture-code", contact: "fixture-contact", email, ...overrides },
+    }, response);
+    return response;
+  }
+
+  assert.equal((await request({ email: "other@example.test" })).statusCode, 400);
+  assert.equal(progress.mock.callCount(), 0);
+  assert.deepEqual((await request()).payload, { success: true, status: "sending", newOrgName });
+  status = "failed";
+  assert.equal((await request()).payload.status, "failed");
+  assert.equal(check.mock.callCount(), 0);
+  status = "completed";
+  assert.equal((await request()).payload.status, "verifying");
+  accountState = "active";
+  assert.equal((await request()).payload.status, "verifying");
+  organization = newOrgName;
+  assert.deepEqual((await request()).payload, {
+    success: true,
+    status: "completed",
+    newOrgName,
+    accountResult: { account: email, status: "ĐANG HOẠT ĐỘNG", status_type: "active", organization },
+  });
+  assert.ok(check.mock.calls.every((call) => call.arguments[0] === email));
+});
 
 test("dispatcher uses hard-coded slots when the portal slot config is missing and rejects malformed overrides", { concurrency: false }, () => {
   const dispatcher = require("../../src/domains/system/services/otpPortalDispatcher");

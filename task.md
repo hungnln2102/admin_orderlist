@@ -670,3 +670,33 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] Tách luồng mở trình duyệt Kho Hàng cho Vite local và VPS. Đã kiểm tra cả hai nút trên Chrome và launcher dùng profile thử nghiệm.
 
 - [x] Thêm luồng báo lỗi Adobe Yuna với năm lý do và khóa nút khi chờ bảo hành. Kiểm thử backend và kiểm thử gửi một lần, tra cứu lại trên portal bằng mock đạt.
+
+## Qu?n l? th?ng tin s?n ph?m v? ?nh R2
+
+- [x] Th?m menu v? hai tab, l?u m? t? bi?n th? v? t?ch h?p S3 trong backend. ?? ki?m tra tr?nh duy?t v?i API gi? l?p.
+- [x] ??i chi?u 26 ?nh c?ng khai v?i SHA-256 th? m?c ngu?n.
+- [ ] Ki?m tra thao t?c qu?n tr? v?i R2 th?t sau khi c?u h?nh kh?a.
+
+## 2026-11-26 – CMS biên tập mô tả biến thể
+
+- [x] Hoàn thiện trình soạn thảo, tự lưu, xem trước, duyệt, xuất bản và lịch sử tại `/website-products`.
+- [x] Kết nối mô tả đã xuất bản với website và bảo vệ luồng sửa từ Bảng giá.
+- [x] Nghiệm thu trên PostgreSQL 18 cô lập và Chromium. Áp dụng migration CMS cho cơ sở dữ liệu dev local.
+- [x] Mở rộng thanh công cụ biên tập với định dạng, căn lề, bảng, chỉnh ảnh và liên kết. Đồng bộ định dạng ở trình soạn thảo, backend và website.
+
+## 2026-11-26 – Kết quả chuyển team Adobe
+
+- [x] Dùng endpoint trạng thái chuyển team để xác minh và hiển thị kết quả tài khoản.
+- [x] Kiểm thử backend, build portal và kiểm tra luồng giao diện trên Chromium với API mô phỏng.
+
+## 2026-11-27 – Thay slot Adobe Ades và cảnh báo Telegram
+
+- [x] Tự cấp lại từ kho gói khi Fix-Ades xác nhận slot đã gán không còn đăng ký.
+- [x] Thêm cấu hình topic Telegram và ghi cảnh báo qua outbox chống trùng.
+- [x] Kiểm thử backend, PostgreSQL cô lập, TypeScript quản trị và portal với API mô phỏng.
+
+## 2026-11-26 – Profile Chromium Kho hàng trên Cloudflare R2
+
+- [x] Tách profile Chromium và quyền viewer theo tài khoản Kho, kiểm tra hai profile và WebSocket trong Docker.
+- [x] Lưu profile mã hóa, xác minh trước khi cập nhật bản hiện hành và giữ bản cục bộ khi R2 lỗi. Kiểm thử kho R2 giả lập và vòng đời profile đã đạt.
+- [ ] Nghiệm thu với bucket R2 thử nghiệm và tài khoản Google thử nghiệm trước khi trình triển khai production.

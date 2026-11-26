@@ -124,7 +124,11 @@ export const PricingCreateEditModal: React.FC<PricingCreateEditModalProps> = ({
                 <span className="text-[10px] text-slate-500 mt-1 block">Áp dụng cho nhóm sản phẩm trên mavrykpremium.com/price</span>
               </div>
 
-              <div className="sm:col-span-2">
+              {editingItem?.editorial_status ? (
+                <p className="sm:col-span-2 text-xs text-slate-400">
+                  Mô tả của biến thể này được quản lý tại Website → Mô tả biến thể.
+                </p>
+              ) : <div className="sm:col-span-2">
                 <label className="block text-slate-400 mb-1 font-semibold">Mô Tả Ngắn (Cột Desc)</label>
                 <textarea
                   rows={2}
@@ -134,7 +138,7 @@ export const PricingCreateEditModal: React.FC<PricingCreateEditModalProps> = ({
                   className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 text-xs transition-colors resize-none"
                 />
                 <span className="text-[10px] text-slate-500 mt-1 block">Hiển thị tại cột Desc trên bảng giá công khai (để trống sẽ tự hiển thị theo thời hạn gói)</span>
-              </div>
+              </div>}
             </div>
           </div>
 

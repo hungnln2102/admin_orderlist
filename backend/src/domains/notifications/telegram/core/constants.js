@@ -45,6 +45,7 @@ const getTopicId = (configKey, envVal, defaultVal) => {
 };
 
 module.exports = {
+  ADOBE_MISSING_SUBSCRIPTION: "ADOBE_MISSING_SUBSCRIPTION",
   get HTTP_TIMEOUT_MS() { return HTTP_TIMEOUT_MS; },
   get TELEGRAM_BOT_TOKEN() { return getConfigVal("TELEGRAM_BOT_TOKEN", process.env.TELEGRAM_BOT_TOKEN); },
   get TELEGRAM_CHAT_ID() { return getConfigVal("TELEGRAM_CHAT_ID", process.env.TELEGRAM_CHAT_ID); },
@@ -59,6 +60,9 @@ module.exports = {
   get TELEGRAM_IMPORT_ORDER_TOPIC_ID() { return getTopicId("TELEGRAM_IMPORT_ORDER_TOPIC_ID", process.env.TELEGRAM_IMPORT_ORDER_TOPIC_ID); },
   get TELEGRAM_FINANCE_TOPIC_ID() { return getTopicId("TELEGRAM_FINANCE_TOPIC_ID", process.env.TELEGRAM_FINANCE_TOPIC_ID, "7009"); },
   get TELEGRAM_RENEWAL_TOPIC_ID() { return getTopicId("TELEGRAM_RENEWAL_TOPIC_ID", process.env.TELEGRAM_RENEWAL_TOPIC_ID, "2"); },
+  get TELEGRAM_ADOBE_MISSING_SUBSCRIPTION_TOPIC_ID() {
+    return systemConfigService.getInteger("TELEGRAM_ADOBE_MISSING_SUBSCRIPTION_TOPIC_ID", NaN, 1, Number.MAX_SAFE_INTEGER);
+  },
   get ERROR_TOPIC_ID() { return getTopicId("TELEGRAM_SYSTEM_ALERT_TOPIC_ID", process.env.ERROR_TOPIC_ID, "6"); },
   get ZERO_DAYS_TOPIC_ID() { return getTopicId("ZERO_DAYS_TOPIC_ID", process.env.ZERO_DAYS_TOPIC_ID, "2563"); },
   get FOUR_DAYS_TOPIC_ID() { return getTopicId("FOUR_DAYS_TOPIC_ID", process.env.FOUR_DAYS_TOPIC_ID, "12"); },

@@ -1,0 +1,130 @@
+.editorial-prose {
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+
+.editorial-prose :where(h2, h3, h4) {
+  margin: 1.1em 0 0.35em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.editorial-prose h2 { font-size: 1.5em; }
+.editorial-prose h3 { font-size: 1.25em; }
+.editorial-prose h4 { font-size: 1.1em; }
+.editorial-prose p { margin: 0.5em 0; }
+.editorial-prose ul { list-style: disc; }
+.editorial-prose ol { list-style: decimal; }
+.editorial-prose :where(ul, ol) { padding-inline-start: 1.6em; }
+.editorial-prose :where(li > p) { margin: 0; }
+.editorial-prose a { color: currentColor; text-decoration: underline; }
+.editorial-prose img { max-width: 100%; height: auto; margin-block: 1em; }
+.editorial-prose blockquote {
+  margin: 1em 0;
+  border-inline-start: 3px solid #0891b2;
+  padding-inline-start: 1em;
+}
+
+.editorial-prose hr {
+  margin-block: 1.5em;
+  border-color: #64748b;
+}
+
+.editorial-prose figure {
+  margin-block: 1em;
+}
+
+.editorial-prose figure img {
+  display: inline-block;
+  margin: 0;
+}
+
+.editorial-prose figcaption {
+  margin-top: 0.4em;
+  color: #475569;
+  font-size: 0.875em;
+}
+
+.editorial-input figcaption {
+  color: #cbd5e1;
+}
+
+.editorial-prose table {
+  width: 100%;
+  margin-block: 1em;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.editorial-table-scroll,
+.editorial-input .tableWrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.editorial-table-scroll table {
+  min-width: var(--editorial-table-width, 24rem);
+}
+
+.editorial-input .tableWrapper table {
+  min-width: 24rem;
+}
+
+.editorial-table-scroll:focus-visible {
+  outline: 2px solid #0891b2;
+  outline-offset: 2px;
+}
+
+.editorial-prose :where(th, td) {
+  border: 1px solid #94a3b8;
+  padding: 0.45em 0.6em;
+  vertical-align: top;
+}
+
+.editorial-prose th {
+  background: rgb(148 163 184 / 20%);
+  font-weight: 700;
+}
+
+.editorial-input :where(th, td).selectedCell {
+  background: rgb(34 211 238 / 15%);
+}
+
+.editorial-input figure.ProseMirror-selectednode {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+.editorial-input span[style*="rgb(17, 24, 39)"] { color: #f1f5f9 !important; }
+.editorial-input span[style*="rgb(55, 65, 81)"] { color: #cbd5e1 !important; }
+.editorial-input span[style*="rgb(220, 38, 38)"] { color: #fca5a5 !important; }
+.editorial-input span[style*="rgb(194, 65, 12)"] { color: #fdba74 !important; }
+.editorial-input span[style*="rgb(21, 128, 61)"] { color: #86efac !important; }
+.editorial-input span[style*="rgb(29, 78, 216)"] { color: #93c5fd !important; }
+.editorial-input span[style*="rgb(126, 34, 206)"] { color: #d8b4fe !important; }
+.editorial-prose :where(mark, mark span, mark a) { color: #020617 !important; }
+.editorial-input mark span[style] { color: #020617 !important; }
+
+.editorial-input {
+  min-height: 24rem;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  outline: none;
+}
+
+.editorial-input:focus-visible {
+  box-shadow: inset 0 0 0 1px #22d3ee;
+}
+
+.editorial-empty {
+  position: relative;
+}
+
+.editorial-empty::before {
+  position: absolute;
+  inset-block-start: calc(clamp(1rem, 4vw, 2.5rem) + 0.5em);
+  inset-inline-start: clamp(1rem, 4vw, 2.5rem);
+  pointer-events: none;
+  content: "Nhập nội dung mô tả…";
+  color: #94a3b8;
+  line-height: 1.75;
+}

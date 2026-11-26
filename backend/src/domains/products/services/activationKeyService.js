@@ -244,7 +244,7 @@ const deleteActivationKey = async (id) => {
  * - Cập nhật activation_keys sang ACTIVATED.
  * - Trả về tài khoản cho khách.
  */
-const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery, orderContact }) => {
+const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery, orderContact, rejectedSlot }) => {
   const code = String(keyCode || "").trim().toUpperCase();
   if (!code) {
     throw new Error("Vui lòng nhập mã key kích hoạt!");
@@ -334,6 +334,16 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
 
     const orderSlot = String(order?.[O.SLOT] || "").trim().toLowerCase();
     const packageManaged = Boolean(targetTag || previousPackageId);
+    let missingSubscription;
+    const enqueueMissingSubscription = async (replaced) => {
+      if (!missingSubscription) return;
+      const { enqueueAdobeMissingSubscription } = require("@/domains/notifications/telegram/dispatchers/adobeRecoveryNotifier");
+      await enqueueAdobeMissingSubscription({ trx, orderCode, ...missingSubscription, replaced });
+    };
+    const outOfStock = async () => {
+      await enqueueMissingSubscription(false);
+      return { replacementRequired: wasAssigned, outOfStock: true };
+    };
     const resolveStatusProvider = (slot, providerBySlot) => {
       const configured = providerBySlot?.adobe_check;
       if (configured) {
@@ -346,9 +356,10 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       }
       return findAdobeStatusProvider({ variantId: order[O.ID_PRODUCT], supplierId: order[O.SUPPLY_ID] }, trx);
     };
-    const lockedPackages = recovery && recovery !== "lookup" && targetTag ? await lockPackages() : null;
+    const lockedPackages = recovery === "replace" || (recovery && recovery !== "lookup" && targetTag)
+      ? await lockPackages() : null;
     if (recovery) {
-      let currentPackage = lockedPackages
+      let currentPackage = lockedPackages && previousPackageId
         ? lockedPackages.find((entry) => String(entry[pack.ID]) === String(previousPackageId))
         : previousPackageId
         ? await trx(TABLES.PACKAGE_PRODUCT)
@@ -391,12 +402,33 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         .join({ account: TABLES.ACCOUNTS }, `account.${A.ID}`, `slot.${S.ACCOUNT_ID}`)
         .where(`slot.${S.ID}`, slotId)
         .where(`slot.${S.NAME_ID}`, key[keyCols.PRODUCT_NAME_ID])
-        .forShare()
+        .modify((query) => {
+          if (recovery === "replace") query.forUpdate("slot");
+          else query.forShare();
+        })
         .first(`slot.${S.PASSWORD}`, `slot.${S.STATUS_CHECK_ENABLED}`,
-          `slot.${S.STATUS_PROVIDER_KEY}`, `account.${A.ACCOUNT_USERNAME}`);
+          `slot.${S.STATUS_PROVIDER_KEY}`, `slot.${S.VARIANT_TAG}`, `account.${A.ACCOUNT_USERNAME}`);
       if (assignedSlot) {
         const assignedAccount = assignedSlot[A.ACCOUNT_USERNAME];
-        if (recovery !== "lookup") {
+        const normalizedAccount = String(assignedAccount || "").trim().toLowerCase();
+        const statusProviderKey = await resolveStatusProvider(assignedSlot, currentPackage?.[pack.PROVIDER_BY_SLOT]);
+        if (recovery === "replace" && currentPackage && statusProviderKey === "fix_ades_status" && normalizedAccount &&
+            String(rejectedSlot?.id) === String(slotId) &&
+            String(rejectedSlot?.account || "").trim().toLowerCase() === normalizedAccount) {
+          targetTag ||= String(assignedSlot[S.VARIANT_TAG] || "").trim();
+          if (!targetTag) {
+            const R = COLS.ACTIVATION_KEY_RULES;
+            const rule = await findMatchingKeyRule({ variantId: order[O.ID_PRODUCT], supplierId: order[O.SUPPLY_ID] }, trx);
+            if (String(rule?.[R.PRODUCT_NAME_ID]) === String(key[keyCols.PRODUCT_NAME_ID])) {
+              targetTag = rule[R.TARGET_VARIANT_TAG];
+            }
+          }
+          missingSubscription = { slotId, account: assignedAccount };
+          await trx(TABLES.ACCOUNT_SLOTS).where(S.ID, slotId).update({
+            [S.STATUS]: "UNAVAILABLE",
+            [S.UPDATED_AT]: trx.fn.now(),
+          });
+        } else if (recovery !== "lookup" && recovery !== "replace") {
           const keyChanged = String(key[keyCols.ACCOUNT_SLOT_ID]) !== String(slotId) ||
             key[keyCols.ASSIGNED_ACCOUNT] !== assignedAccount ||
             Boolean(currentPackage && String(previousPackageId) !== String(currentPackage[pack.ID]));
@@ -412,13 +444,21 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           if (orderChanged) await updateOrderAccount(assignedAccount);
           if (keyChanged || orderChanged) await publishOrderUpdated();
         }
-        const statusProviderKey = await resolveStatusProvider(assignedSlot, currentPackage?.[pack.PROVIDER_BY_SLOT]);
-        return { account: assignedAccount, password: assignedSlot[S.PASSWORD] || "", statusProviderKey };
+        if (!missingSubscription) {
+          return {
+            account: assignedAccount,
+            password: assignedSlot[S.PASSWORD] || "",
+            statusProviderKey,
+            slotId,
+            packageBacked: Boolean(currentPackage),
+          };
+        }
       }
-      if (recovery === "lookup" || (recovery === "check" && wasAssigned && !packageManaged && !targetTag)) {
+      if (recovery === "lookup" || (recovery === "replace" && !missingSubscription) ||
+          (recovery === "check" && wasAssigned && !packageManaged && !targetTag)) {
         return { replacementRequired: true };
       }
-      if (packageManaged && !targetTag) return { replacementRequired: wasAssigned, outOfStock: true };
+      if ((packageManaged || missingSubscription) && !targetTag) return outOfStock();
     }
 
     if (!recovery && key.status === "ACTIVATED" && wasAssigned) {
@@ -482,12 +522,18 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .where("ss.name_id", key.product_name_id)
       .modify((builder) => {
         if (recovery) {
-          if (!packageManaged) builder.whereNot(`acc.${A.ACCOUNT_USERNAME}`, key[keyCols.ASSIGNED_ACCOUNT] || "");
+          if (missingSubscription) {
+            builder.whereNot(`ss.${S.ID}`, missingSubscription.slotId)
+              .whereRaw("LOWER(BTRIM(??)) <> ?", [`acc.${A.ACCOUNT_USERNAME}`, missingSubscription.account.trim().toLowerCase()]);
+          } else if (!packageManaged) {
+            builder.whereNot(`acc.${A.ACCOUNT_USERNAME}`, key[keyCols.ASSIGNED_ACCOUNT] || "");
+          }
           builder.where((expiry) => expiry.whereNull(`ss.${S.EXPIRED_AT}`).orWhere(`ss.${S.EXPIRED_AT}`, ">", trx.fn.now()));
         }
       })
       .modify((builder) => {
         if (targetTag) {
+          builder.whereRaw("UPPER(??) IS DISTINCT FROM ?", [`ss.${S.STATUS}`, "UNAVAILABLE"]);
           builder.whereRaw(`BTRIM(ss.${COLS.ACCOUNT_SLOTS.VARIANT_TAG}) = ?`, [targetTag]);
           const slotIds = availablePackages.map((item) => item.warehouseSlotId);
           builder.whereIn(`ss.${S.ID}`, slotIds);
@@ -503,7 +549,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .first();
 
     if (!availableSlot) {
-      if (recovery) return { replacementRequired: wasAssigned, outOfStock: true };
+      if (recovery) return outOfStock();
       throw new Error(
         "Hiện tại kho đã hết slot trống cho sản phẩm này. Vui lòng liên hệ Admin qua kênh hỗ trợ để được nạp thêm tài khoản!"
       );
@@ -545,8 +591,16 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
 
     if (order) await publishOrderUpdated();
     if (recovery) {
+      await enqueueMissingSubscription(true);
       const statusProviderKey = await resolveStatusProvider(availableSlot, selectedPackage?.providerBySlot);
-      return { account: assignedAccount, password: availableSlot.slot_password || "", replaced: wasAssigned, statusProviderKey };
+      return {
+        account: assignedAccount,
+        password: availableSlot.slot_password || "",
+        replaced: wasAssigned,
+        statusProviderKey,
+        slotId: availableSlot.slot_id,
+        packageBacked: Boolean(packageId),
+      };
     }
 
     return {
@@ -594,11 +648,20 @@ const listActivationKeyRules = async () => {
     .orderBy("akr.id", "desc");
 
   if (!rules.length) return rules;
-  const packages = await getPackageProducts();
+  const S = COLS.ACCOUNT_SLOTS;
+  const [packages, unavailableSlots] = await Promise.all([
+    getPackageProducts(),
+    db(TABLES.ACCOUNT_SLOTS)
+      .whereIn(S.NAME_ID, rules.map((rule) => rule.product_name_id))
+      .whereRaw("UPPER(??) = ?", [S.STATUS, "UNAVAILABLE"])
+      .pluck(S.ID),
+  ]);
+  const unavailableSlotIds = new Set(unavailableSlots.map(Number));
   return rules.map((rule) => ({
     ...rule,
     available_slots_count: packages.reduce((count, item) =>
-      item.productNameId === Number(rule.product_name_id) && matchesPackageTag(item, rule.target_variant_tag)
+      item.productNameId === Number(rule.product_name_id) && matchesPackageTag(item, rule.target_variant_tag) &&
+        !unavailableSlotIds.has(item.warehouseSlotId)
         ? count + Math.max(0, item.totalSlots - item.usedSlots)
         : count, 0),
   }));

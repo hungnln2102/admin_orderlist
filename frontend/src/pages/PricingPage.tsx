@@ -270,12 +270,15 @@ export const PricingPage: React.FC = () => {
     e.preventDefault();
     if (!editingItem) return;
 
+    const description = editingItem.editorial_status || productForm.description === (editingItem.description || "")
+      ? undefined
+      : productForm.description;
     setSubmitting(true);
     try {
       const res = await apiClient(`/api/products/${editingItem.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...productForm, san_pham: productForm.name, package_product: productForm.variant_name }),
+        body: JSON.stringify({ ...productForm, description, san_pham: productForm.name, package_product: productForm.variant_name }),
       });
       const data = await res.json();
       if (res.ok) {

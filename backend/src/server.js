@@ -14,7 +14,9 @@ const { PORT, DATABASE_URL } = require("@/config/env");
 const { db, SCHEMAS } = require("@/db");
 const { registerAllSubscribers } = require("@/events");
 const { requireAuthenticatedUser } = require("@/domains/auth/middleware/requireAuthenticatedUser");
-const { requireAdmin } = require("@/domains/auth/middleware/requireAdmin");
+const { requireAdmin, ADMIN_ROLES } = require("@/domains/auth/middleware/requireAdmin");
+const { attachViewerUpgrade } = require("@/domains/warehouse/routes/cloudBrowserViewer");
+const { drain: drainCloudBrowsers, startRecovery } = require("@/domains/warehouse/services/cloudBrowserSessions");
 const { getClientErrorMessage } = require("@/utils/clientError");
 
 const app = express();
@@ -69,8 +71,7 @@ app.use((req, res, next) => {
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
-app.use(
-  session({
+const sessionMiddleware = session({
     name: "admin_orderlist_v2.sid",
     secret: sessionSecret,
     store: new PgSessionStore({
@@ -89,8 +90,8 @@ app.use(
       sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000,
     },
-  })
-);
+});
+app.use(sessionMiddleware);
 
 // Khởi chạy và đăng ký Event Subscribers, Cấu hình, Scheduler & Outbox Worker khi khởi động Server
 registerAllSubscribers();
@@ -159,6 +160,7 @@ app.get(["/api/public/theme", "/api/public/themes"], async (req, res) => {
 
 // Public API cho OTP Portal.
 app.use("/api/public", require("@/domains/system/routes/publicOtpRoutes"));
+app.use("/api/public/product-descriptions", require("@/domains/products/routes/publicVariantDescriptionRoutes"));
 
 app.use("/api", requireAuthenticatedUser, requireAdmin);
 app.use("/api", requireTrustedMutationOrigin);
@@ -198,10 +200,21 @@ app.use((err, req, res, next) => {
   return res.status(status).json({ success: false, error: message, message });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`=================================`);
   console.log(`🚀 Admin Order List Backend running on port ${PORT}`);
   console.log(`=================================`);
 });
+attachViewerUpgrade(server, sessionMiddleware, ADMIN_ROLES, isAllowedOrigin);
+void startRecovery().catch(() => console.error("[CloudBrowser] Profile recovery could not complete."));
+
+async function stopServer() {
+  server.close();
+  const results = await drainCloudBrowsers();
+  server.closeAllConnections();
+  process.exit(results.some((result) => result.status === "rejected") ? 1 : 0);
+}
+process.once("SIGTERM", stopServer);
+process.once("SIGINT", stopServer);
 
 module.exports = app;

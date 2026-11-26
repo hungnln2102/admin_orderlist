@@ -17,6 +17,10 @@ const O = COLS.NOTIFICATIONS_OUTBOX;
  * Tra cứu topic ID mặc định theo topicKey nghiệp vụ
  */
 function resolveTopicRecipient(topicKey, fallbackRecipient) {
+  if (topicKey === constants.ADOBE_MISSING_SUBSCRIPTION) {
+    const topicId = constants.TELEGRAM_ADOBE_MISSING_SUBSCRIPTION_TOPIC_ID;
+    return Number.isSafeInteger(topicId) && topicId > 0 ? String(topicId) : "";
+  }
   if (fallbackRecipient) return String(fallbackRecipient);
 
   switch (topicKey) {
@@ -80,7 +84,11 @@ async function dispatch(options = {}) {
   if (!idempotencyKey) throw new Error("NotificationHub: idempotencyKey là bắt buộc để bảo đảm chống gửi trùng.");
   if (!renderedContent) throw new Error("NotificationHub: renderedContent không được để trống.");
 
-  const targetRecipient = resolveTopicRecipient(topicKey, recipient);
+  const requiredTopicKey = eventType === constants.ADOBE_MISSING_SUBSCRIPTION ? eventType : null;
+  const targetRecipient = resolveTopicRecipient(requiredTopicKey || topicKey, recipient);
+  if (requiredTopicKey && !targetRecipient) {
+    return { queued: false, id: null, skipped: true, reason: "TOPIC_NOT_CONFIGURED" };
+  }
 
   let mediaBase64 = null;
   if (hasMedia && mediaBuffer) {
@@ -95,7 +103,7 @@ async function dispatch(options = {}) {
     [O.CHANNEL]: channel,
     [O.EVENT_TYPE]: eventType,
     [O.IDEMPOTENCY_KEY]: String(idempotencyKey).trim(),
-    [O.TOPIC_KEY]: topicKey || null,
+    [O.TOPIC_KEY]: requiredTopicKey || topicKey || null,
     [O.RECIPIENT]: targetRecipient,
     [O.PRIORITY]: Number(priority) || 3,
     [O.PAYLOAD]: payload ? JSON.stringify(payload) : null,

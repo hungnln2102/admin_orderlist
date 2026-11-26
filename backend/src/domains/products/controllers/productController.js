@@ -3,9 +3,9 @@ const { getClientErrorMessage } = require("@/utils/clientError");
 
 const getProductPrices = async (req, res) => {
   try {
-    const { page, limit, search, activeOnly, status } = req.query;
+    const { page, limit, search, activeOnly, status, editorialStatus, category } = req.query;
     const isActiveOnly = activeOnly === "true" || activeOnly === "1";
-    const result = await productService.getProductPrices({ page, limit, search, activeOnly: isActiveOnly, status });
+    const result = await productService.getProductPrices({ page, limit, search, activeOnly: isActiveOnly, status, editorialStatus, category });
     res.json(result);
   } catch (error) {
     console.error("Lỗi getProductPrices:", error);
@@ -144,6 +144,7 @@ const updateProduct = async (req, res) => {
     const result = await productService.updateProduct(productId, req.body);
     res.json({ message: "Cập nhật sản phẩm thành công", data: result });
   } catch (error) {
+    if (error.statusCode === 409) return res.status(409).json({ error: error.message });
     console.error("Lỗi updateProduct:", error);
     res.status(500).json({ error: getClientErrorMessage(error, "Cập nhật sản phẩm thất bại") });
   }

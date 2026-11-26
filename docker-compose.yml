@@ -79,16 +79,18 @@ services:
       APP_ENV: docker
       TRUST_PROXY: "1"
       NODE_ENV: production
-      WAREHOUSE_CLOUD_BROWSER_CDP_URL: http://warehouse-browser-control:9223
+      WAREHOUSE_PROFILE_WORK_DIR: /var/lib/warehouse-browser
       TZ: Asia/Ho_Chi_Minh
     ports:
       - "127.0.0.1:3001:3001" # Main API
       - "127.0.0.1:5000:3001" # Webhook port (forward trực tiếp vào backend để tương thích Nginx host)
     volumes:
       - ./warehouse_profiles:/root/.admin_orderlist/warehouse_browser_profiles
+      - warehouse_browser_work:/var/lib/warehouse-browser
+    stop_grace_period: 5m
+    shm_size: "512mb"
     networks:
       - app-network
-      - browser-control
     healthcheck:
       test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" ]
       interval: 30s
@@ -127,50 +129,14 @@ services:
           memory: 128M
           cpus: '0.5'
 
-  # ==========================================
-  # 5. CLOUD BROWSER (KasmVNC Web-Streamed Chromium)
-  # Phục vụ đăng nhập tài khoản kho trực tiếp trên Web & lưu Profile vĩnh viễn
-  # ==========================================
-  cloud-browser:
-    container_name: admin_orderlist-cloud-browser
-    build:
-      context: ./cloud-browser
-    restart: always
-    security_opt:
-      - seccomp:unconfined
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Asia/Ho_Chi_Minh
-      - CUSTOM_USER=admin
-      - PASSWORD=${CLOUD_BROWSER_PASSWORD:-mavryk_store_cloud_2026}
-      - CHROME_CLI=--no-sandbox --disable-dev-shm-usage --user-data-dir=/config/.config/chromium --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 about:blank
-      - SUBFOLDER=/browser/
-    volumes:
-      - ./warehouse_profiles:/config
-    ports:
-      - "127.0.0.1:3088:3000"
-    shm_size: "1gb"
-    networks:
-      app-network:
-      browser-control:
-        aliases:
-          - warehouse-browser-control
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-
 # ==========================================
 # NETWORKS & VOLUMES
 # ==========================================
 networks:
   app-network:
     driver: bridge
-  browser-control:
-    internal: true
 
 volumes:
+  warehouse_browser_work:
   postgres_data:
   redis_data:

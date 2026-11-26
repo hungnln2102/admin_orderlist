@@ -1,4 +1,5 @@
 const { db, TABLES, COLS } = require("@/db");
+const { convert: htmlToText } = require("html-to-text");
 
 const P_COLS = COLS.PRODUCT;
 const V_COLS = COLS.VARIANT;
@@ -92,6 +93,7 @@ async function getPublicPriceList() {
       COALESCE(NULLIF(BTRIM(v.${V_COLS.VARIANT_NAME}), ''), NULLIF(BTRIM(v.${V_COLS.DISPLAY_NAME}), ''), p.${P_COLS.PACKAGE_NAME}) AS variant_name,
       v.${V_COLS.DISPLAY_NAME} AS display_name,
       v.${V_COLS.DESCRIPTION} AS description,
+      v.${V_COLS.DESCRIPTION_PUBLISHED_VERSION} AS published_version,
       COALESCE(p_retail.${VP_COLS.PRICE}, 0) AS retail_price,
       COALESCE(p_promo.${VP_COLS.PRICE}, 0) AS promo_price
     FROM ${TABLES.VARIANT} v
@@ -136,7 +138,15 @@ async function getPublicPriceList() {
       variant_group: variantGroup,
       duration,
       duration_months: durationMonths,
-      desc: String(row.description || "").trim(),
+      desc: row.published_version
+        ? htmlToText(row.description || "", {
+          wordwrap: false,
+          selectors: [
+            { selector: "a", options: { ignoreHref: true } },
+            { selector: "img", format: "skip" },
+          ],
+        }).trim()
+        : String(row.description || "").trim(),
       price: retailPrice,
       promo_price: promoPrice,
     };

@@ -2,7 +2,6 @@ require("module-alias/register");
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { chromium } = require("playwright");
 const { TABLES, COLS } = require("../../src/db/tables");
 
 const dbPath = require.resolve("../../src/db");
@@ -35,6 +34,22 @@ require.cache[dbPath] = {
   },
 };
 
+const sessionsPath = require.resolve("../../src/domains/warehouse/services/cloudBrowserSessions");
+const calls = [];
+require.cache[sessionsPath] = {
+  exports: {
+    CloudBrowserError: class extends Error {
+      constructor(status, message) {
+        super(message);
+        this.status = status;
+      }
+    },
+    async openSession(input) {
+      calls.push(input);
+      return { success: true };
+    },
+  },
+};
 const { navigateCloudBrowser } = require("../../src/domains/warehouse/services/cloudBrowserService");
 
 test("cloud browser rejects invalid selectors and invalid stored destinations", async () => {
@@ -45,34 +60,11 @@ test("cloud browser rejects invalid selectors and invalid stored destinations", 
   await assert.rejects(navigateCloudBrowser({ catalogId: 4 }), { status: 422 });
 });
 
-test("cloud browser serializes catalog and slot navigation and disconnects each attachment", async (t) => {
-  const envKey = "WAREHOUSE_CLOUD_BROWSER_CDP_URL";
-  const previousEndpoint = process.env[envKey];
-  process.env[envKey] = "ws://cloud-browser:9223/devtools/browser/test";
-  t.after(() => {
-    if (previousEndpoint === undefined) delete process.env[envKey];
-    else process.env[envKey] = previousEndpoint;
-  });
-
-  const calls = [];
-  t.mock.method(chromium, "connectOverCDP", async (endpoint) => {
-    calls.push(endpoint);
-    return {
-      contexts: () => [{
-        pages: () => [{
-          bringToFront: async () => calls.push("front"),
-          goto: async (url) => calls.push(url),
-        }],
-      }],
-      close: async () => calls.push("disconnect"),
-    };
-  });
-  await Promise.all([
-    navigateCloudBrowser({ catalogId: "1", url: "https://ignored.example" }),
-    navigateCloudBrowser({ accountId: 10, slotId: 20 }),
-  ]);
-  assert.deepEqual(calls, [
-    process.env[envKey], "front", "https://example.com/login", "disconnect",
-    process.env[envKey], "front", "https://example.org/login", "disconnect",
+test("cloud browser selects a persistent profile by warehouse account and separates catalog navigation", async () => {
+  await navigateCloudBrowser({ catalogId: "1", url: "https://ignored.example" }, "admin-session");
+  await navigateCloudBrowser({ accountId: 10, slotId: 20 }, "admin-session");
+  assert.deepEqual(calls.map(({ key, owner, loginUrl, persistent }) => ({ key, owner, loginUrl, persistent })), [
+    { key: "catalog", owner: "admin-session", loginUrl: "https://example.com/login", persistent: false },
+    { key: "account-10", owner: "admin-session", loginUrl: "https://example.org/login", persistent: true },
   ]);
 });

@@ -19,6 +19,7 @@ router.put("/catalog/:id", controller.updateCatalogItem);
 router.put("/catalog/:id/toggle-package", controller.toggleCatalogPackage);
 router.post("/accounts/:id/open-browser", controller.openAccountBrowser);
 router.post("/cloud-browser/navigate", controller.navigateCloudBrowser);
+router.use("/cloud-browser/sessions", require("./cloudBrowserViewer").viewer);
 router.post("/accounts/:id/services", controller.addServiceSlotToAccount);
 router.put("/services/:id", controller.updateWarehouseServiceSlot);
 router.delete("/services/:id", controller.deleteWarehouseServiceSlot);

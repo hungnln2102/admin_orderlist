@@ -90,7 +90,7 @@ const openAccountBrowser = async (req, res) => {
 
 const navigateCloudBrowser = async (req, res) => {
   try {
-    const result = await navigateBrowser(req.body);
+    const result = await navigateBrowser(req.body, req.sessionID);
     return res.json(result);
   } catch (err) {
     if (err instanceof CloudBrowserError) {

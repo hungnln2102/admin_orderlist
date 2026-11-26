@@ -8,6 +8,14 @@ const { COLS } = require("@/db/tables");
 const { publishEventInTrx, EVENTS } = require("@/events");
 
 const PROVIDER_DISPLAY_NAMES_KEY = "OTP_PROVIDER_DISPLAY_NAMES";
+const ADOBE_TOPIC_KEY = "TELEGRAM_ADOBE_MISSING_SUBSCRIPTION_TOPIC_ID";
+const ADOBE_TOPIC_DEFAULT = {
+  config_key: ADOBE_TOPIC_KEY,
+  config_value: "",
+  data_type: "STRING",
+  group_name: "NOTIFY",
+  description: "ID của topic nhận cảnh báo tài khoản Adobe không còn gói đăng ký",
+};
 
 // In-Memory Cache lưu cấu hình để tránh query DB liên tục
 let configCache = {};
@@ -122,20 +130,22 @@ const writeConfig = async (key, resolveValue, updatedBy) => withTransaction(asyn
     const isJson = isObject || (typeof stringValue === 'string' && (stringValue.startsWith('{') || stringValue.startsWith('[')));
     const dataType = isJson ? 'JSON' : 'STRING';
     const normalizedValue = typeof stringValue === 'string' ? stringValue : JSON.stringify(stringValue);
+    const isAdobeTopic = key === ADOBE_TOPIC_KEY;
+    const group = isAdobeTopic ? ADOBE_TOPIC_DEFAULT.group_name : 'OTP_PORTAL';
     const [inserted] = await trx(TABLES.SYSTEM_CONFIGS)
       .insert({
         config_key: key,
         config_value: normalizedValue,
         data_type: dataType,
-        group_name: 'OTP_PORTAL',
-        description: 'Cấu hình tự động khởi tạo: ' + key,
+        group_name: group,
+        description: isAdobeTopic ? ADOBE_TOPIC_DEFAULT.description : 'Cấu hình tự động khởi tạo: ' + key,
         updated_at: trx.fn.now(),
         updated_by: updatedBy,
       })
       .returning("*");
     
     trx.afterCommit(() => {
-      configCache[key] = { value: isObject ? rawValue : parseValue(normalizedValue, dataType), dataType, group: 'OTP_PORTAL' };
+      configCache[key] = { value: isObject ? rawValue : parseValue(normalizedValue, dataType), dataType, group };
     });
     return inserted;
   }
@@ -177,6 +187,13 @@ const writeConfig = async (key, resolveValue, updatedBy) => withTransaction(asyn
 const set = (key, rawValue, updatedBy = "ADMIN") => {
   if (key === PROVIDER_DISPLAY_NAMES_KEY) {
     throw new Error("Hãy cập nhật tên hiển thị từ danh mục provider.");
+  }
+  if (key === ADOBE_TOPIC_KEY) {
+    const value = validateValue(key, rawValue, ADOBE_TOPIC_DEFAULT.data_type);
+    if (value && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1)) {
+      throw new Error("ID topic Telegram cần là số nguyên dương hoặc để trống.");
+    }
+    return writeConfig(key, () => value, updatedBy);
   }
   return writeConfig(key, () => rawValue, updatedBy);
 };
@@ -262,6 +279,9 @@ const removeOtpSlotProvider = (slotKey, providerKey, updatedBy = "ADMIN") =>
  */
 const getAllConfigs = async () => {
   const rows = await db(TABLES.SYSTEM_CONFIGS).orderBy('group_name', 'asc').orderBy('config_key', 'asc');
+  if (!rows.some((row) => row.config_key === ADOBE_TOPIC_KEY)) {
+    rows.push(ADOBE_TOPIC_DEFAULT);
+  }
   return rows.map(r => ({
     id: r.id,
     config_key: r.config_key,

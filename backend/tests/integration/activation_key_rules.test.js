@@ -3,10 +3,11 @@ const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 const { db } = require("../../src/db");
-const { TABLES } = require("../../src/db/tables");
+const { TABLES, COLS } = require("../../src/db/tables");
 const activationKeyService = require("../../src/domains/products/services/activationKeyService");
 const orderService = require("../../src/domains/orders/services/orderService");
 const { resolveAdobeRecoveryOrder } = require("../../src/domains/system/services/adobeOrderSourceService");
+const systemConfigService = require("../../src/domains/system/services/systemConfigService");
 
 describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
   let catalogProduct;
@@ -162,8 +163,15 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
     const statusRule = {
       slot_key: "adobe_check", provider_key: "fix_ades_status", variant_id: variant.id, supplier_id: supplier.id,
     };
+    const topicKey = "TELEGRAM_ADOBE_MISSING_SUBSCRIPTION_TOPIC_ID";
+    const previousTopic = systemConfigService.get(topicKey, "");
+    const outboxCols = COLS.NOTIFICATIONS_OUTBOX;
+    const outboxQuery = () => db(TABLES.NOTIFICATIONS_OUTBOX)
+      .where(outboxCols.EVENT_TYPE, "ADOBE_MISSING_SUBSCRIPTION")
+      .where(outboxCols.IDEMPOTENCY_KEY, "like", `ADOBE_MISSING_SUBSCRIPTION:${orderCode}:%`);
 
     try {
+      await systemConfigService.set(topicKey, "7244");
       await db(TABLES.PORTAL_SLOT_ROUTING_RULES).insert({ ...statusRule, is_active: true });
       const addSlot = async (label, tag = suffix) => {
         const account = `${label}-${suffix}@example.test`;
@@ -271,7 +279,39 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
       assert.equal(finalKey.assigned_account, replacement.account);
       assert.deepEqual(finalKey.activated_at, initialKey.activated_at);
       assert.equal((await orderQuery().first()).slot, replacement.account);
+
+      const replace = (previous) => activationKeyService.activateKeyWithTransaction({
+        keyCode: orderCode, orderContact: contact, recovery: "replace", rejectedSlot: previous,
+      });
+      const rejected = { id: results[0].slotId, account: results[0].account };
+      assert.equal(String(rejected.id), String(replacement.id));
+      const stale = await replace({ id: updated.id, account: updated.account });
+      assert.equal(stale.account, replacement.account);
+      assert.deepEqual(await outboxQuery(), []);
+      assert.deepEqual(await replace(rejected), { replacementRequired: true, outOfStock: true });
+      assert.deepEqual(await keyQuery().first(), finalKey);
+      assert.equal((await orderQuery().first()).slot, replacement.account);
+      const rejectedSlotQuery = () => db(TABLES.ACCOUNT_SLOTS).where("id", replacement.id);
+      assert.equal((await rejectedSlotQuery().first()).status, "UNAVAILABLE");
+
+      const newSlot = await addSlot("new-account");
+      const newPackageId = await addPackage(newSlot);
+      const retried = await Promise.all([replace(rejected), replace(rejected)]);
+      assert.equal(retried.filter((result) => result.replaced).length, 1);
+      for (const result of retried) {
+        assert.equal(result.account, newSlot.account);
+        assert.equal(String(result.slotId), String(newSlot.id));
+      }
+      assert.equal((await keyQuery().first()).package_product_id, newPackageId);
+      assert.equal((await orderQuery().first()).slot, newSlot.account);
+      assert.equal((await rejectedSlotQuery().first()).status, "UNAVAILABLE");
+      const notifications = await outboxQuery();
+      assert.equal(notifications.length, 1);
+      assert.equal(notifications[0][outboxCols.RECIPIENT], "7244");
+      assert.equal(notifications[0][outboxCols.IDEMPOTENCY_KEY], `ADOBE_MISSING_SUBSCRIPTION:${orderCode}:${replacement.id}`);
     } finally {
+      await outboxQuery().del();
+      await systemConfigService.set(topicKey, previousTopic);
       await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).del();
       await db(TABLES.ORDER_LIST).where("id_order", orderCode).del();
       await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).del();

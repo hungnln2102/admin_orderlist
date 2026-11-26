@@ -1,8 +1,16 @@
 const express = require("express");
 const productController = require("../controllers/productController");
 const activationKeyController = require("../controllers/activationKeyController");
+const productImageRoutes = require("./productImageRoutes");
+const variantDescriptionController = require("../controllers/variantDescriptionController");
 
 const router = express.Router();
+
+router.use("/images", productImageRoutes);
+router.patch("/variants/:id/description", variantDescriptionController.updateVariantDescription);
+router.get("/variants/:id/editorial", variantDescriptionController.getEditorial);
+router.patch("/variants/:id/editorial", variantDescriptionController.saveEditorial);
+router.post("/variants/:id/editorial/actions", variantDescriptionController.takeEditorialAction);
 
 // Quản lý Mã Kích Hoạt Key (Activation Keys)
 router.get("/activation-keys", activationKeyController.getActivationKeys);

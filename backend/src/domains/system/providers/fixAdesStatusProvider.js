@@ -12,9 +12,10 @@ async function fetchFixAdesStatus(email, { config } = {}) {
     body: { email: cleanEmail },
     timeoutMs: Number(config.auth_config?.timeoutMs) || 12_000,
   });
-  if (!response.ok) throw new Error(`Fix-Ades returned HTTP ${response.status}.`);
+  if (!response.ok && response.status !== 404) throw new Error(`Fix-Ades returned HTTP ${response.status}.`);
 
   const rawData = await parseJsonResponse(response);
+  if (!response.ok && rawData?.found !== false) throw new Error(`Fix-Ades returned HTTP ${response.status}.`);
   if (!rawData || typeof rawData !== "object") throw new Error("Fix-Ades returned an invalid status response.");
   return { rawData, error: rawData.found === false ? String(rawData.error || "No subscription found for this email") : null };
 }

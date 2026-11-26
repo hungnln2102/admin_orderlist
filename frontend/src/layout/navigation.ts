@@ -81,6 +81,7 @@ export const NAVIGATION_GROUPS: MenuGroup[] = [
     accent: "sky",
     items: [
       { name: "Quản lý URL", path: "/website-urls", icon: Link2 },
+      { name: "Thông tin sản phẩm", path: "/website-products", icon: Package },
       { name: "Cấu hình Theme OTP", path: "/otp-theme-config", icon: Sparkles },
     ],
   },

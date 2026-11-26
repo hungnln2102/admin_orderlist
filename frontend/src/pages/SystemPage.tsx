@@ -531,6 +531,7 @@ export const SystemPage: React.FC = () => {
                 { key: "TELEGRAM_RENEWAL_TOPIC_ID", label: "Gia Hạn Thành Công", desc: "Thread nhận tin báo gia hạn đơn hàng thành công" },
                 { key: "TELEGRAM_FINANCE_TOPIC_ID", label: "Biến Động Số Dư", desc: "Thread nhận tin báo tiền chuyển vào/ra tài khoản ngân hàng" },
                 { key: "TELEGRAM_SYSTEM_ALERT_TOPIC_ID", label: "Cảnh Báo Lỗi Khẩn Cấp", desc: "Thread nhận tin báo sự cố hệ thống nghiêm trọng" },
+                { key: "TELEGRAM_ADOBE_MISSING_SUBSCRIPTION_TOPIC_ID", label: "Tài khoản Adobe không còn đăng ký", desc: "Topic nhận cảnh báo tài khoản Adobe không còn gói đăng ký" },
               ].map((item) => (
                 <div key={item.key} className="p-4 bg-slate-900/70 rounded-2xl border border-slate-800/90 space-y-2.5 shadow-xl">
                   <label className="text-xs font-bold text-white block">{item.label}</label>

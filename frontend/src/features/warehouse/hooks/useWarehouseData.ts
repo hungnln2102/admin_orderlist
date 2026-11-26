@@ -61,7 +61,7 @@ export function useWarehouseData() {
   const [loading, setLoading] = useState(false);
 
   const systemProductsLoadedRef = useRef(false);
-  const cloudBrowserQueueRef = useRef(Promise.resolve());
+  const cloudBrowserOpeningRef = useRef(false);
 
   // Lazy-fetch /api/warehouse/system-products chỉ khi cần (mở tab Danh mục hoặc mở modal liên quan)
   const ensureSystemProducts = useCallback(async (forceRefresh = false) => {
@@ -122,6 +122,16 @@ export function useWarehouseData() {
 
   useEffect(() => {
     void loadWarehouseData();
+  }, [loadWarehouseData]);
+
+  useEffect(() => {
+    const refreshCloudBrowserSession = (event: MessageEvent) => {
+      if (event.origin === window.location.origin && event.data?.type === "warehouse-cloud-browser-closed") {
+        void loadWarehouseData();
+      }
+    };
+    window.addEventListener("message", refreshCloudBrowserSession);
+    return () => window.removeEventListener("message", refreshCloudBrowserSession);
   }, [loadWarehouseData]);
 
   const invalidateAndReload = useCallback(async () => {
@@ -400,41 +410,47 @@ export function useWarehouseData() {
   );
 
   const navigateCloudBrowser = useCallback(
-    (
-      target: { catalogId: number } | { accountId: number; slotId: number },
-      verifySession?: () => Promise<void>
-    ) => {
+    async (target: { catalogId: number } | { accountId: number; slotId: number }) => {
+      if (cloudBrowserOpeningRef.current) return;
       const browserWindow = window.open(
-        "/browser/",
-        "MavrykCloudBrowser",
+        "",
+        "_blank",
         "width=1280,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
       );
       if (!browserWindow) {
         notification.error("Hãy cho phép cửa sổ bật lên để mở Trình Duyệt Đám Mây.");
         return;
       }
-      browserWindow.focus();
-
-      cloudBrowserQueueRef.current = cloudBrowserQueueRef.current.then(async () => {
-        if ("slotId" in target) setOpeningSlotId(target.slotId);
-        try {
-          const res = await fetch("/api/warehouse/cloud-browser/navigate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(target),
-          });
-          if (!res.ok) {
-            const data = await res.json().catch(() => null);
-            notification.error(data?.error || "Không thể mở trang đăng nhập trong Trình Duyệt Đám Mây.");
-            return;
-          }
-          await verifySession?.();
-        } catch {
-          notification.error("Không thể kết nối với Trình Duyệt Đám Mây.");
-        } finally {
-          if ("slotId" in target) setOpeningSlotId(null);
+      browserWindow.document.title = "Trình duyệt đám mây";
+      browserWindow.document.body.textContent = "Đang tải profile và mở Chromium…";
+      cloudBrowserOpeningRef.current = true;
+      if ("slotId" in target) setOpeningSlotId(target.slotId);
+      try {
+        const res = await fetch("/api/warehouse/cloud-browser/navigate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(target),
+        });
+        const data = await res.json().catch(() => null);
+        const viewerUrl = data?.viewerUrl;
+        if (
+          !res.ok ||
+          data?.success !== true ||
+          typeof viewerUrl !== "string" ||
+          !/^\/api\/warehouse\/cloud-browser\/sessions\/[a-zA-Z0-9_-]+\/viewer$/.test(viewerUrl)
+        ) {
+          browserWindow.close();
+          notification.error(data?.error || "Không thể mở trang đăng nhập trong Trình Duyệt Đám Mây.");
+          return;
         }
-      });
+        if (!browserWindow.closed) browserWindow.location.replace(viewerUrl);
+      } catch {
+        browserWindow.close();
+        notification.error("Không thể kết nối với Trình Duyệt Đám Mây.");
+      } finally {
+        cloudBrowserOpeningRef.current = false;
+        if ("slotId" in target) setOpeningSlotId(null);
+      }
     },
     [notification]
   );
@@ -442,7 +458,7 @@ export function useWarehouseData() {
   const openBrowserForCatalog = useCallback(
     (item: ServiceNameCategoryItem) => {
       if (!import.meta.env.DEV) {
-        navigateCloudBrowser({ catalogId: item.id });
+        void navigateCloudBrowser({ catalogId: item.id });
         return;
       }
 
@@ -468,10 +484,8 @@ export function useWarehouseData() {
   );
 
   const verifySlotSession = useCallback(
-    async (account: WarehouseAccountItem, service: WarehouseServiceSlot, openConfiguredUrl = false) => {
-      const errorMessage = openConfiguredUrl
-        ? "Không thể mở trang đăng nhập."
-        : "Không thể xác minh phiên đăng nhập.";
+    async (account: WarehouseAccountItem, service: WarehouseServiceSlot) => {
+      const errorMessage = "Không thể mở trang đăng nhập.";
       try {
         const res = await fetch(`/api/warehouse/accounts/${account.id}/open-browser`, {
           method: "POST",
@@ -479,7 +493,7 @@ export function useWarehouseData() {
           body: JSON.stringify({
             serviceName: service.display_name || service.category,
             slotId: service.id,
-            ...(openConfiguredUrl ? { openConfiguredUrl: true } : {}),
+            openConfiguredUrl: true,
           }),
         });
 
@@ -488,7 +502,7 @@ export function useWarehouseData() {
           notification.error(data?.error || errorMessage);
           return;
         }
-        if (openConfiguredUrl && (data?.success === false || data?.data?.navigationError)) {
+        if (data?.success === false || data?.data?.navigationError) {
           notification.error(data.message || errorMessage);
           return;
         }
@@ -496,7 +510,7 @@ export function useWarehouseData() {
           notification.error(errorMessage);
           return;
         }
-        if (openConfiguredUrl && data.data?.sessionVerified !== true) return;
+        if (data.data?.sessionVerified !== true) return;
 
         const hasAuthenticatedSession = data.data?.hasAuthenticatedSession === true;
         setLoggedSlotsMap((previous) => ({
@@ -520,15 +534,12 @@ export function useWarehouseData() {
     (account: WarehouseAccountItem, service: WarehouseServiceSlot) => {
       if (import.meta.env.DEV) {
         setOpeningSlotId(service.id);
-        void verifySlotSession(account, service, true).finally(() => {
+        void verifySlotSession(account, service).finally(() => {
           setOpeningSlotId((current) => current === service.id ? null : current);
         });
         return;
       }
-      navigateCloudBrowser(
-        { accountId: account.id, slotId: service.id },
-        () => verifySlotSession(account, service)
-      );
+      void navigateCloudBrowser({ accountId: account.id, slotId: service.id });
     },
     [navigateCloudBrowser, verifySlotSession]
   );

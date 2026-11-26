@@ -23,6 +23,7 @@ export interface PricingItem {
   parent_package_name?: string;
   category?: string;
   description?: string;
+  editorial_status?: string | null;
   image_url?: string | null;
   base_price: number;
   cost_price?: number;

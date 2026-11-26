@@ -11,7 +11,7 @@
 
 const { db, TABLES, COLS } = require("@/db");
 const { rawPostToTelegram, preparePayload } = require("@/domains/notifications/telegram/core/telegramClient");
-const { TELEGRAM_CHAT_ID } = require("@/domains/notifications/telegram/core/constants");
+const { ADOBE_MISSING_SUBSCRIPTION, TELEGRAM_CHAT_ID } = require("@/domains/notifications/telegram/core/constants");
 const systemConfigService = require("@/domains/system/services/systemConfigService");
 
 const O = COLS.NOTIFICATIONS_OUTBOX;
@@ -73,6 +73,14 @@ async function processOutboxItem(item) {
 
   const threadId = item.recipient ? Number(item.recipient) : NaN;
   const isThreadValid = Number.isFinite(threadId);
+  const requiresDedicatedTopic = item[O.EVENT_TYPE] === ADOBE_MISSING_SUBSCRIPTION;
+  if (requiresDedicatedTopic && (!/^\d+$/.test(String(item[O.RECIPIENT])) || !Number.isSafeInteger(threadId) || threadId < 1)) {
+    const reason = "TOPIC_NOT_CONFIGURED";
+    await db(TABLES.NOTIFICATIONS_OUTBOX)
+      .where(O.ID, item[O.ID])
+      .update({ [O.STATUS]: "CANCELLED", [O.LAST_ERROR]: reason, [O.UPDATED_AT]: db.fn.now() });
+    return { success: false, skipped: true, reason };
+  }
 
   let payload = {};
   if (item.has_media && item.media_buffer_base64) {
@@ -117,7 +125,7 @@ async function processOutboxItem(item) {
     console.error(`[OutboxDispatcher] Lỗi khi gửi tin #${item.id}:`, errMsg);
 
     // Fallback: nếu lỗi do thread không tồn tại -> thử gửi lại không thread
-    if (errMsg.includes("message thread not found") && isThreadValid) {
+    if (errMsg.includes("message thread not found") && isThreadValid && !requiresDedicatedTopic) {
       console.warn(`[OutboxDispatcher] Topic #${threadId} không tồn tại, fallback về Chat chung...`);
       delete payload.message_thread_id;
       try {
