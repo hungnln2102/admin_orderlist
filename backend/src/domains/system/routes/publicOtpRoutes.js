@@ -5,7 +5,7 @@ const otpPortalDispatcher = require("@/domains/system/services/otpPortalDispatch
 const { activateKeyWithTransaction } = require("@/domains/products/services/activationKeyService");
 const { resolveAdobeRecoveryOrder } = require("../services/adobeOrderSourceService");
 const { providerConfig } = require("../providers/providerConfig");
-const { fetchYunaAccountOrder } = require("../providers/yuna2faProvider");
+const { fetchYunaAccountOrder, parseYunaReportReason, reportYunaAccountOrder } = require("../providers/yuna2faProvider");
 const { fetchFixAdesStatus } = require("../providers/fixAdesStatusProvider");
 const { getPortalUrlConfig } = require("../services/portalUrlConfigService");
 const { getPublicPriceList } = require("@/domains/products/services/publicPricingService");
@@ -111,8 +111,14 @@ async function checkAdobeAccount(email, providerKey) {
 router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (req, res) => {
   res.set("Cache-Control", "no-store");
   const recovery = req.path.endsWith("/claim") ? "claim" : "check";
+  const statusOnly = recovery === "check" && req.body?.statusOnly === true;
   try {
-    const result = await resolveAdobeAccount(req.body, recovery);
+    const result = statusOnly
+      ? await resolveAdobeRecoveryOrder({ code: req.body?.code, contact: req.body?.contact })
+      : await resolveAdobeAccount(req.body, recovery);
+    if (statusOnly && result?.source !== "yuna") {
+      return res.status(400).json({ success: false, error: supportMessage });
+    }
     if (result.contactRequired) return res.json({ success: true, contactRequired: true });
     if (result.replacementRequired || result.outOfStock) {
       return res.json({ success: true, source: result.source, replacementRequired: result.replacementRequired, outOfStock: result.outOfStock });
@@ -120,7 +126,7 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
     if (result.source === "yuna") {
       const response = await fetchYunaAccountOrder(result.providerInput, {
         config: providerConfig(result.providerKey),
-        includePassword: true,
+        includePassword: !statusOnly,
       });
       const items = response.raw_data?.items;
       const item = items?.[0];
@@ -128,6 +134,9 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
       if (response.error || items?.length !== 1 ||
           !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account || "")) {
         return res.status(400).json({ success: false, error: supportMessage });
+      }
+      if (statusOnly) {
+        return res.json({ success: true, source: "yuna", data: { report_status: item.report_status } });
       }
       return res.json({
         success: true,
@@ -137,6 +146,7 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
           password: response.account_password,
           plan: typeof item.group === "string" ? item.group : undefined,
           expired_at: typeof item.expires_at_str === "string" ? item.expires_at_str : undefined,
+          report_status: item.report_status,
         },
       });
     }
@@ -155,6 +165,28 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
     });
   } catch {
     console.warn("[Adobe Recovery] Không lấy được tài khoản.");
+    return res.status(400).json({ success: false, error: supportMessage });
+  }
+});
+
+router.post("/otp/adobe/recovery/report", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const reason = parseYunaReportReason(req.body?.reason, req.body?.details);
+  if (!reason) {
+    return res.status(400).json({ success: false, error: "Vui lòng chọn lý do báo lỗi hợp lệ." });
+  }
+  try {
+    const result = await resolveAdobeRecoveryOrder({ code: req.body?.code, contact: req.body?.contact });
+    if (result?.source !== "yuna" || !result.providerInput) {
+      return res.status(400).json({ success: false, error: supportMessage });
+    }
+    const report_status = await reportYunaAccountOrder(result.providerInput, {
+      config: providerConfig(result.providerKey),
+      reason,
+    });
+    return res.json({ success: true, report_status });
+  } catch {
+    console.warn("[Adobe Recovery] Không xác nhận được yêu cầu báo lỗi Yuna.");
     return res.status(400).json({ success: false, error: supportMessage });
   }
 });

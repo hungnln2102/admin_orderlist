@@ -668,3 +668,5 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [ ] X?c nh?n hai n?t m? GoogleOne qua c?a s? /browser/ sau khi tri?n khai VPS.
 
 - [x] Tách luồng mở trình duyệt Kho Hàng cho Vite local và VPS. Đã kiểm tra cả hai nút trên Chrome và launcher dùng profile thử nghiệm.
+
+- [x] Thêm luồng báo lỗi Adobe Yuna với năm lý do và khóa nút khi chờ bảo hành. Kiểm thử backend và kiểm thử gửi một lần, tra cứu lại trên portal bằng mock đạt.

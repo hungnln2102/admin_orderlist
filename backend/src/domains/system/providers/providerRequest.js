@@ -21,7 +21,8 @@ async function requestProviderApi(config, { method = "GET", body = null, endpoin
   try {
     const request = { method: String(method).toUpperCase(), headers, signal: controller.signal };
     if (body != null) {
-      if (body instanceof URLSearchParams || typeof body === "string") { if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded"; request.body = body; }
+      if (body instanceof FormData) { request.body = body; }
+      else if (body instanceof URLSearchParams || typeof body === "string") { if (!headers["Content-Type"]) headers["Content-Type"] = "application/x-www-form-urlencoded"; request.body = body; }
       else { if (!headers["Content-Type"]) headers["Content-Type"] = "application/json"; request.body = JSON.stringify(body); }
     }
     return await fetchSafeExternal(targetUrl, request);

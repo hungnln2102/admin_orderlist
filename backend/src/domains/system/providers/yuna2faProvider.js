@@ -3,6 +3,9 @@ const { readExternalResponse } = require("@/utils/safeExternalRequest");
 const { parseJsonResponse } = require("./otpProviderUtils");
 
 const yunaSessionCache = new Map();
+const yunaReportLocks = new Map();
+const yunaAcceptedReports = new Map();
+const yunaReportReasons = new Set(["expired", "credentials", "otp", "inactive", "other"]);
 
 async function getYuna2FaSession(config, timeoutMs = 10000) {
   const cacheKey = config.service_key || config.base_url;
@@ -38,59 +41,64 @@ async function getYuna2FaSession(config, timeoutMs = 10000) {
   return session;
 }
 
-/**
- * Luồng Yuna 2FA Center (mmo.yunagrp.com/2fa/):
- * - Tra cứu theo đơn hàng (order_code) -> LẤY DANH SÁCH TÀI KHOẢN (items)
- */
-async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, includePassword = false } = {}) {
+async function requestYunaOrder(config, body, timeoutMs = Number(config.auth_config?.timeoutMs) || 12_000) {
+  const session = await getYuna2FaSession(config, Number(config.auth_config?.timeoutMs) || 12_000);
+  if (!session.token) throw new Error("Không thể lấy token xác thực từ Yuna 2FA.");
+  const headers = {
+    "X-API-Token": session.token,
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+  };
+  if (session.cookie) headers.Cookie = session.cookie;
+  const response = await requestProviderApi(config, {
+    method: "POST",
+    endpoint: config.endpoints?.get_otp || config.endpoints?.path || "",
+    body,
+    headers,
+    timeoutMs,
+  });
+  if (response.status === 403) yunaSessionCache.delete(config.service_key || config.base_url);
+  if (!response.ok) throw new Error(`Yuna Check HTTP ${response.status}`);
+  return parseJsonResponse(response);
+}
+
+function yunaOrderKey(config, orderCode) {
+  return JSON.stringify([config.service_key || config.base_url, orderCode]);
+}
+
+function getYunaReportStatus(item, key) {
+  const reported = item.report_status || "none";
+  if (reported !== "none") {
+    yunaAcceptedReports.delete(key);
+    return reported;
+  }
+  return yunaAcceptedReports.get(key)?.status || reported;
+}
+
+async function readYunaOrder(orderCode, config) {
+  const body = new URLSearchParams({ action: "get_order", order_code: orderCode });
+  const data = await requestYunaOrder(config, body.toString());
+  if (data?.success !== true) throw new Error("Yuna không trả kết quả tra cứu tài khoản.");
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+async function fetchYunaAccountOrder(queryInput, { config, includePassword = false } = {}) {
   if (!queryInput) return { otp: null, extra_fields: [] };
+  if (!config) throw new Error("Yuna 2FA provider configuration is missing.");
   const query = String(queryInput).trim();
-
-  const config = configuredConfig; if (!config) throw new Error("Yuna 2FA provider configuration is missing.");
-  const timeoutMs = Number(config.auth_config?.timeoutMs) || 12_000;
-
   try {
-    const session = await getYuna2FaSession(config, timeoutMs);
-    if (!session.token) {
-      return { otp: null, extra_fields: [], error: "Không thể lấy token xác thực từ Yuna 2FA." };
-    }
-
-    const form = new URLSearchParams({ action: "get_order", order_code: query });
-
-    const headers = {
-      "X-API-Token": session.token,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    };
-    if (session.cookie) {
-      headers["Cookie"] = session.cookie;
-    }
-
-    const response = await requestProviderApi(config, {
-      method: "POST",
-      endpoint: config.endpoints?.get_otp || config.endpoints?.path || "",
-      body: form.toString(),
-      headers,
-      timeoutMs,
-    });
-
-    if (response.status === 403) {
-      // Invalidate session cache if 403
-      yunaSessionCache.delete(config.service_key || config.base_url);
-    }
-    if (!response.ok) return { extra_fields: [], error: `Yuna Check HTTP ${response.status}` };
-
-    const data = await parseJsonResponse(response);
-    if (!data) return { otp: null, extra_fields: [] };
-
     const extraFields = [];
-    const items = Array.isArray(data.items) ? data.items : [];
-    const accounts = items.map(({ name, account_user, group, expires_at_str }) => ({
-      name,
-      account_user: typeof account_user === "string" ? account_user.trim() : undefined,
-      group,
-      expires_at_str,
-    }));
+    const items = await readYunaOrder(query, config);
+    const key = yunaOrderKey(config, query);
+    const accounts = items.map((item) => {
+      const { name, account_user, account_pass, group, expires_at_str } = item;
+      return {
+        name: account_pass && typeof name === "string" && name.includes(account_pass) ? account_user : name,
+        account_user: typeof account_user === "string" ? account_user.trim() : undefined,
+        group,
+        expires_at_str,
+        report_status: getYunaReportStatus(item, key),
+      };
+    });
     const [primaryItem] = accounts;
     if (primaryItem) {
       if (primaryItem.account_user) {
@@ -114,4 +122,65 @@ async function fetchYunaAccountOrder(queryInput, { config: configuredConfig, inc
   }
 }
 
-module.exports = { fetchYunaAccountOrder };
+function parseYunaReportReason(reason, details) {
+  if (!yunaReportReasons.has(reason)) return null;
+  const description = typeof details === "string" ? details.trim() : "";
+  if (reason === "other" && (!description || description.length > 400)) return null;
+  return { reason_code: reason, reason_detail: reason === "other" ? description : "" };
+}
+
+async function readSingleYunaReportAccount(orderCode, config) {
+  const items = await readYunaOrder(orderCode, config);
+  const [item] = items;
+  if (items.length !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(item.account_user || "").trim()) ||
+      typeof item.group !== "string" || typeof item.name !== "string" ||
+      !Number.isInteger(item.item_index) || item.item_index < 0) {
+    throw new Error("Yuna không trả tài khoản hợp lệ để báo lỗi.");
+  }
+  return item;
+}
+
+async function submitYunaReport(orderCode, reason, config, key) {
+  const item = await readSingleYunaReportAccount(orderCode, config);
+  const existing = getYunaReportStatus(item, key);
+  if (existing !== "none") return existing;
+  const form = new FormData();
+  for (const [field, value] of Object.entries({
+    action: "report_error",
+    order_code: orderCode,
+    group: item.group,
+    name: item.name,
+    item_index: item.item_index,
+    ...reason,
+    client_public_ip: "",
+  })) form.append(field, value);
+
+  const result = await requestYunaOrder(config, form, 45_000).catch(() => null);
+  if (result?.success === true) {
+    // The submit reply may arrive before the order lookup reflects its new status.
+    const fallback = { status: result.auto_fulfilled ? "cooldown" : "adobe_renewing" };
+    yunaAcceptedReports.set(key, fallback);
+    const cooldownSeconds = Math.min(180, Math.max(3, Number(result.cooldown_remaining) || 180));
+    setTimeout(() => {
+      if (yunaAcceptedReports.get(key) === fallback) yunaAcceptedReports.delete(key);
+    }, cooldownSeconds * 1000).unref();
+  }
+  const current = await readSingleYunaReportAccount(orderCode, config).catch(() => null);
+  const status = current ? getYunaReportStatus(current, key) : yunaAcceptedReports.get(key)?.status;
+  if (status && status !== "none") return status;
+  throw new Error("Yuna chưa xác nhận yêu cầu báo lỗi.");
+}
+
+async function reportYunaAccountOrder(orderCode, { config, reason }) {
+  const key = yunaOrderKey(config, orderCode);
+  if (yunaReportLocks.has(key)) return yunaReportLocks.get(key);
+  const request = submitYunaReport(orderCode, reason, config, key);
+  yunaReportLocks.set(key, request);
+  try {
+    return await request;
+  } finally {
+    yunaReportLocks.delete(key);
+  }
+}
+
+module.exports = { fetchYunaAccountOrder, parseYunaReportReason, reportYunaAccountOrder };

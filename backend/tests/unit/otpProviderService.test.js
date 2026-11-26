@@ -48,11 +48,12 @@ test("Yuna Check uses account_user and strips vendor credentials and OTP fields"
   await withMockedExternalFetch(async (_url, options) => {
     if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
     assert.equal(options.body, new URLSearchParams({ action: "get_order", order_code: key }).toString());
-    return Response.json({ items: [{
+    return Response.json({ success: true, items: [{
       name: "Adobe (display@example.test)",
       account_user: " user@example.test ",
       account_pass: "fixture-password",
       code: "654321",
+      report_status: "pending",
     }] });
   }, async () => {
     const result = await executeOtpConfig(config, key);
@@ -64,6 +65,7 @@ test("Yuna Check uses account_user and strips vendor credentials and OTP fields"
       account_user: "user@example.test",
       group: undefined,
       expires_at_str: undefined,
+      report_status: "pending",
     }]);
     const recovery = await fetchYunaAccountOrder(key, { config, includePassword: true });
     assert.equal(recovery.account_password, "fixture-password");
@@ -77,10 +79,86 @@ test("Yuna Check does not use the display name when account_user is missing", as
   const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_check_missing_account" };
   await withMockedExternalFetch(async (_url, options) => {
     if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
-    return Response.json({ items: [{ name: "display@example.test" }] });
+    return Response.json({ success: true, items: [{ name: "display@example.test" }] });
   }, async () => {
     const result = await executeOtpConfig(config, "fixture-order");
     assert.equal(result.extra_fields.some((field) => field.key === "account_email"), false);
+  });
+});
+
+test("Yuna report sends the verified vendor item once and confirms pending on subsequent lookup", async () => {
+  const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const { fetchYunaAccountOrder, parseYunaReportReason, reportYunaAccountOrder } = require("../../src/domains/system/providers/yuna2faProvider");
+  const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_report" };
+  const order = "fixture-order";
+  const reason = parseYunaReportReason("other", "  Fixture description  ");
+  assert.equal(parseYunaReportReason("other", " "), null);
+  assert.equal(parseYunaReportReason("other", "a".repeat(401)), null);
+  assert.equal(parseYunaReportReason("unexpected"), null);
+  let submissions = 0;
+  await withMockedExternalFetch(async (url, options) => {
+    if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
+    assert.equal(String(url), "https://mmo.yunagrp.com/2fa/");
+    if (options.body instanceof FormData) {
+      submissions += 1;
+      assert.equal(options.headers["Content-Type"], undefined);
+      assert.deepEqual(Object.fromEntries(options.body), {
+        action: "report_error",
+        order_code: order,
+        group: "Adobe Account",
+        name: "user@example.test|fixture-password",
+        item_index: "0",
+        reason_code: "other",
+        reason_detail: "Fixture description",
+        client_public_ip: "",
+      });
+      return Response.json({ success: true, adobe_auto_renew: true, cooldown_remaining: 180 });
+    }
+    return Response.json({ success: true, items: [{
+      account_user: "user@example.test",
+      account_pass: "fixture-password",
+      name: "user@example.test|fixture-password",
+      group: "Adobe Account",
+      item_index: 0,
+      report_status: submissions ? "pending" : "none",
+    }] });
+  }, async () => {
+    const submit = () => reportYunaAccountOrder(order, { config, reason });
+    assert.deepEqual(await Promise.all([submit(), submit()]), ["pending", "pending"]);
+    assert.equal(await submit(), "pending");
+    assert.equal(submissions, 1);
+    const lookup = await fetchYunaAccountOrder(order, { config });
+    assert.equal(lookup.raw_data.items[0].report_status, "pending");
+    assert.doesNotMatch(JSON.stringify(lookup), /fixture-password/);
+  });
+});
+
+test("Yuna report verifies status after a lost response and rejects failed lookups", async () => {
+  const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
+  const { fetchYunaAccountOrder, parseYunaReportReason, reportYunaAccountOrder } = require("../../src/domains/system/providers/yuna2faProvider");
+  const config = { ...providerConfig("yuna_check"), service_key: "test_yuna_lost_report_response" };
+  const reason = parseYunaReportReason("expired");
+  let submissions = 0;
+  await withMockedExternalFetch(async (_url, options) => {
+    if (options.method === "GET") return new Response('<meta name="api-token" content="fixture">');
+    if (options.body instanceof FormData) {
+      submissions += 1;
+      throw new Error("Simulated lost response");
+    }
+    const query = new URLSearchParams(options.body);
+    return Response.json({ success: query.get("order_code") === "valid-order", items: [{
+      account_user: "user@example.test",
+      name: "fixture name",
+      group: "Adobe Account",
+      item_index: 0,
+      report_status: submissions ? "pending" : "none",
+    }] });
+  }, async () => {
+    assert.equal(await reportYunaAccountOrder("valid-order", { config, reason }), "pending");
+    assert.equal(await reportYunaAccountOrder("valid-order", { config, reason }), "pending");
+    assert.ok((await fetchYunaAccountOrder("invalid-order", { config })).error);
+    await assert.rejects(reportYunaAccountOrder("invalid-order", { config, reason }));
+    assert.equal(submissions, 1);
   });
 });
 
@@ -402,6 +480,61 @@ test("public OTP router exposes slot reads only", () => {
   assert.equal(routes.length, 1);
   assert.equal(routes[0].path, "/otp-portal-slots");
   assert.deepEqual(Object.keys(routes[0].methods), ["get"]);
+});
+
+test("public Adobe report and status-only lookup require proof and omit credentials", async (t) => {
+  const routesPath = require.resolve("../../src/domains/system/routes/publicOtpRoutes");
+  const sourceService = require("../../src/domains/system/services/adobeOrderSourceService");
+  const provider = require("../../src/domains/system/providers/yuna2faProvider");
+  const proof = { code: "portal-order", contact: "fixture-contact" };
+  const resolve = t.mock.method(sourceService, "resolveAdobeRecoveryOrder", async ({ code, contact }) => (
+    code === proof.code && contact === proof.contact
+      ? { source: "yuna", providerKey: "yuna_check", providerInput: "vendor-order" }
+      : { contactRequired: true }
+  ));
+  const fetchOrder = t.mock.method(provider, "fetchYunaAccountOrder", async () => ({
+    raw_data: { items: [{ account_user: "user@example.test", report_status: "pending" }] },
+    account_password: "fixture-password",
+  }));
+  const reportOrder = t.mock.method(provider, "reportYunaAccountOrder", async () => "pending");
+
+  const originalRoutes = require.cache[routesPath];
+  delete require.cache[routesPath];
+  t.after(() => {
+    if (originalRoutes) require.cache[routesPath] = originalRoutes;
+    else delete require.cache[routesPath];
+  });
+  const router = require(routesPath);
+  async function request(path, body) {
+    const route = router.stack.find((layer) => [layer.route?.path].flat().includes(path)).route;
+    const response = {
+      statusCode: 200,
+      set(name, value) { assert.equal(name, "Cache-Control"); assert.equal(value, "no-store"); },
+      status(value) { this.statusCode = value; return this; },
+      json(payload) { this.payload = payload; return this; },
+    };
+    await route.stack[0].handle({ path, body }, response);
+    return { status: response.statusCode, payload: response.payload };
+  }
+
+  const checkPath = "/otp/adobe/recovery/check";
+  const reportPath = "/otp/adobe/recovery/report";
+  assert.equal((await request(reportPath, { ...proof, reason: "other" })).status, 400);
+  assert.equal(resolve.mock.callCount(), 0);
+  assert.equal((await request(checkPath, { code: proof.code, statusOnly: true })).status, 400);
+  assert.equal((await request(reportPath, { code: proof.code, reason: "expired" })).status, 400);
+  assert.equal(fetchOrder.mock.callCount(), 0);
+  assert.equal(reportOrder.mock.callCount(), 0);
+
+  assert.deepEqual((await request(checkPath, { ...proof, statusOnly: true })).payload, {
+    success: true, source: "yuna", data: { report_status: "pending" },
+  });
+  assert.equal(fetchOrder.mock.calls[0].arguments[1].includePassword, false);
+  assert.deepEqual((await request(reportPath, { ...proof, reason: "expired", account: "untrusted" })).payload, {
+    success: true, report_status: "pending",
+  });
+  assert.equal(reportOrder.mock.calls[0].arguments[0], "vendor-order");
+  assert.deepEqual(reportOrder.mock.calls[0].arguments[1].reason, { reason_code: "expired", reason_detail: "" });
 });
 
 
