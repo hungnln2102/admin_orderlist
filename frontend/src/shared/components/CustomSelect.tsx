@@ -18,6 +18,9 @@ export interface CustomSelectProps {
   disabled?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
+  onSearchChange?: (search: string) => void;
+  selectedLabel?: string;
+  emptyMessage?: string;
   accent?: CustomSelectAccent;
   size?: "sm" | "md";
   ariaLabel?: string;
@@ -82,6 +85,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   disabled = false,
   searchable,
   searchPlaceholder = "Tìm kiếm...",
+  onSearchChange,
+  selectedLabel,
+  emptyMessage = "Không tìm thấy lựa chọn phù hợp",
   accent = "cyan",
   size = "md",
   ariaLabel,
@@ -107,10 +113,11 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   );
 
   const filteredOptions = useMemo(() => {
+    if (onSearchChange) return options;
     const q = search.trim().toLowerCase();
     if (!q) return options;
     return options.filter((opt) => opt.label.toLowerCase().includes(q));
-  }, [options, search]);
+  }, [onSearchChange, options, search]);
 
   const updatePosition = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -143,7 +150,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   useLayoutEffect(() => {
     if (!isOpen) {
-      setSearch("");
+      if (!onSearchChange) setSearch("");
       return;
     }
     updatePosition();
@@ -154,6 +161,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       requestAnimationFrame(() => searchInputRef.current?.focus());
     }
   }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (isOpen && onSearchChange) updatePosition();
+  }, [isOpen, onSearchChange, options.length]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -195,8 +206,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return;
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && isOpen) {
       e.preventDefault();
+      e.stopPropagation();
       setIsOpen(false);
       triggerRef.current?.focus();
       return;
@@ -251,8 +263,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           isOpen ? accentStyle.openBorder : "hover:border-slate-600"
         } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${className}`}
       >
-        <span className={`truncate ${selectedOption ? "text-slate-100" : "text-slate-500"}`}>
-          {selectedOption ? selectedOption.label : placeholder}
+        <span className={`truncate ${selectedOption || selectedLabel ? "text-slate-100" : "text-slate-500"}`}>
+          {selectedOption?.label ?? selectedLabel ?? placeholder}
         </span>
         <ChevronDown
           className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
@@ -280,10 +292,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   <input
                     ref={searchInputRef}
                     type="text"
+                    aria-label={searchPlaceholder}
                     value={search}
                     onChange={(e) => {
                       setSearch(e.target.value);
                       setHighlightedIndex(0);
+                      onSearchChange?.(e.target.value);
                     }}
                     placeholder={searchPlaceholder}
                     className={`w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none ${accentStyle.focusSearch}`}
@@ -294,8 +308,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
             <div className="max-h-60 overflow-y-auto custom-scrollbar p-1.5 space-y-0.5">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-3 text-center text-xs text-slate-500">
-                  Không tìm thấy lựa chọn phù hợp
+                <div role="status" className="px-3 py-3 text-center text-xs text-slate-400">
+                  {emptyMessage}
                 </div>
               ) : (
                 filteredOptions.map((opt, idx) => {

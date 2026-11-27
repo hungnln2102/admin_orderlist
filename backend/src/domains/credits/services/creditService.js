@@ -152,6 +152,52 @@ function mapCreditRow(row) {
   };
 }
 
+async function getCreditApplications({ search, page = 1, limit = 20 }) {
+  page = Math.max(1, parseInt(page, 10) || 1);
+  limit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+
+  const history = db({ application: TABLES.REFUND_CREDIT_APPLICATIONS })
+    .join({ credit: TABLES.REFUND_CREDIT_NOTES }, `credit.${RCN.ID}`, `application.${RCA.CREDIT_NOTE_ID}`)
+    .select({
+      id: `application.${RCA.ID}`,
+      credit_code: `credit.${RCN.CREDIT_CODE}`,
+      target_order_code: `application.${RCA.TARGET_ORDER_CODE}`,
+      applied_amount: `application.${RCA.APPLIED_AMOUNT}`,
+      applied_at: `application.${RCA.APPLIED_AT}`,
+    })
+    .select(db.raw(
+      `?? - SUM(??) OVER (PARTITION BY ?? ORDER BY ?? ROWS UNBOUNDED PRECEDING) AS remaining_amount`,
+      [`credit.${RCN.REFUND_AMOUNT}`, `application.${RCA.APPLIED_AMOUNT}`,
+        `application.${RCA.CREDIT_NOTE_ID}`, `application.${RCA.ID}`],
+    ))
+    .as("history");
+
+  const query = db.from(history);
+  if (typeof search === "string" && search.trim()) {
+    const pattern = `%${search.trim().replace(/[\\%_]/g, "\\$&")}%`;
+    query.where((builder) => {
+      builder.whereILike("credit_code", pattern).orWhereILike("target_order_code", pattern);
+    });
+  }
+
+  const [count, rows] = await Promise.all([
+    query.clone().count({ total: "*" }).first(),
+    query.clone().select("*").orderBy("applied_at", "desc").orderBy("id", "desc")
+      .limit(limit).offset((page - 1) * limit),
+  ]);
+  const total = toNumber(count?.total);
+
+  return {
+    items: rows.map((row) => ({
+      ...row,
+      applied_amount: toNumber(row.applied_amount),
+      remaining_amount: toNumber(row.remaining_amount),
+    })),
+    pagination: { page, limit, total, total_pages: Math.max(1, Math.ceil(total / limit)) },
+  };
+}
+
 module.exports = {
   getCreditNotes,
+  getCreditApplications,
 };

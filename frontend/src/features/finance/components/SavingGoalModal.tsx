@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { SavingGoalItem } from "../types";
 import { X, Save, Target } from "lucide-react";
+import { CurrencyInputVN } from "@/shared/components";
 import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
@@ -10,13 +11,6 @@ interface Props {
   editingItem?: SavingGoalItem | null;
 }
 
-const formatAmountInput = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  return digits ? Number(digits).toLocaleString("vi-VN") : "";
-};
-
-const parseAmountInput = (value: string) => Number(value.replace(/\D/g, ""));
-
 export const SavingGoalModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -25,48 +19,27 @@ export const SavingGoalModal: React.FC<Props> = ({
 }) => {
   const notify = useNotification();
   const [name, setName] = useState("");
-  const [targetAmount, setTargetAmount] = useState("");
-  const amountInputRef = useRef<HTMLInputElement>(null);
+  const [targetAmount, setTargetAmount] = useState<number>(0);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (editingItem) {
       setName(editingItem.name);
-      setTargetAmount(formatAmountInput(String(editingItem.targetAmount)));
+      setTargetAmount(Number(editingItem.targetAmount) || 0);
       setNote(editingItem.note || "");
     } else {
       setName("");
-      setTargetAmount("");
+      setTargetAmount(0);
       setNote("");
     }
   }, [editingItem, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value;
-    const caretPosition = event.target.selectionStart ?? rawValue.length;
-    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
-    const formattedValue = formatAmountInput(rawValue);
-
-    setTargetAmount(formattedValue);
-    requestAnimationFrame(() => {
-      const input = amountInputRef.current;
-      if (!input) return;
-      let nextCaret = 0;
-      let digitCount = 0;
-      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
-        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
-        nextCaret += 1;
-      }
-      input.setSelectionRange(nextCaret, nextCaret);
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amountVal = parseAmountInput(targetAmount);
+    const amountVal = targetAmount;
     if (!name.trim() || amountVal <= 0) {
       notify.warning("Vui lòng nhập tên mục tiêu và số tiền lớn hơn 0", "Thiếu Thông Tin");
       return;
@@ -128,19 +101,15 @@ export const SavingGoalModal: React.FC<Props> = ({
             <label className="text-xs font-semibold text-slate-300 block mb-1.5">
               Số tiền đích cần đạt (₫) <span className="text-cyan-400">*</span>
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="50.000.000"
-                ref={amountInputRef}
-                value={targetAmount}
-                onChange={handleAmountChange}
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400 pl-9 font-mono"
-              />
-              <span className="absolute left-3 top-2.5 text-sm text-slate-500">₫</span>
-            </div>
+            <CurrencyInputVN
+              value={targetAmount}
+              onChange={setTargetAmount}
+              accentColor="cyan"
+              suffix="₫"
+              required
+              placeholder="50.000.000"
+              className="px-4 py-2.5 text-sm"
+            />
           </div>
 
           <div>

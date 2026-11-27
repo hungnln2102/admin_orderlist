@@ -92,6 +92,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   const toggleOpen = () => {
     if (!isOpen) {
+      const base = startDate ? parseIso(startDate) : new Date();
+      setViewYear(base.getFullYear());
+      setViewMonth(base.getMonth());
+      setActivePicking("start");
       updateCoords();
       setIsOpen(true);
     } else {
@@ -168,7 +172,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
     if (activePicking === "start") {
       if (endD && selectedDate > endD) {
-        const newEnd = new Date(selectedDate.getTime() + 365 * 24 * 60 * 60 * 1000);
+        const newEnd = new Date(viewYear, viewMonth, dayNum + 364);
         onChange(selectedIso, formatIso(newEnd), "start");
       } else {
         onChange(selectedIso, endDate || selectedIso, "start");

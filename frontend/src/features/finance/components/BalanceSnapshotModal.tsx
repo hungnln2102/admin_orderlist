@@ -1,7 +1,7 @@
 import React from "react";
 import { Landmark, Loader2, Plus, Trash2, Wallet, XCircle } from "lucide-react";
 import { formatVND } from "@/shared/utils";
-import { DateInputVN, ToggleSwitch } from "@/shared/components";
+import { CurrencyInputVN, DateInputVN, ToggleSwitch } from "@/shared/components";
 
 export interface BalanceSnapshotFormItem {
   id?: string;
@@ -111,16 +111,16 @@ export const BalanceSnapshotModal: React.FC<BalanceSnapshotModalProps> = ({
                         className="flex-1 bg-slate-900 border border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
                       />
 
-                      <div className="relative w-44">
-                        <input
-                          type="text"
-                          placeholder="0 ₫"
-                          value={item.amountStr}
-                          onChange={(e) => onItemChange(idx, "amountStr", e.target.value)}
+                      <div className="w-44">
+                        <CurrencyInputVN
+                          value={Number(item.amountStr.replace(/\D/g, "")) || 0}
+                          onChange={(val) => onItemChange(idx, "amountStr", val > 0 ? String(val) : "")}
+                          accentColor="emerald"
+                          suffix="₫"
                           required
-                          className="w-full bg-slate-900 border border-slate-700/60 rounded-lg pl-2.5 pr-6 py-1.5 text-xs font-mono font-bold text-emerald-300 text-right focus:outline-none focus:border-cyan-500"
+                          placeholder="0"
+                          className="bg-slate-900 border-slate-700/60 rounded-lg py-1.5 text-xs text-right"
                         />
-                        <span className="absolute right-2 top-1.5 text-xs text-slate-500 font-bold">₫</span>
                       </div>
 
                       {formItems.length > 1 && (

@@ -267,7 +267,7 @@ export const ActivationKeyTable: React.FC<Props> = ({
                     )}
 
                     {/* Xóa key chưa kích hoạt */}
-                    {item.status !== "ACTIVATED" && (
+                    {item.status !== "ACTIVATED" && !item.id_order?.trim() && (
                       <button
                         type="button"
                         onClick={() => onDelete(item)}

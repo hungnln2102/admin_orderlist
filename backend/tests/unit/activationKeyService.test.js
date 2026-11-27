@@ -21,15 +21,19 @@ describe("Activation Key Generation & Format Suite", () => {
     );
   });
 
-  it("createActivationKeys ném lỗi khi không chọn product_name_id", async () => {
+  it("createActivationKeys yêu cầu rule_id và id_order, từ chối tham số cũ", async () => {
     await assert.rejects(
       async () => {
         await activationKeyService.createActivationKeys({ product_name_id: null });
       },
       {
-        message: "Vui lòng chọn Sản phẩm / Dịch vụ áp dụng!",
+        message: "Vui lòng chọn quy tắc cấp key.",
       }
     );
+    await assert.rejects(activationKeyService.createActivationKeys({ rule_id: 1 }), /Vui lòng chọn đơn hàng/);
+    await assert.rejects(activationKeyService.createActivationKeys({
+      rule_id: 1, id_order: "TEST-ORDER", quantity: 2,
+    }), /Chỉ nhận quy tắc cấp key và mã đơn hàng/);
   });
 
   it("saveActivationKeyRule ném lỗi khi thiếu variant_id, supplier_id, product_name_id hoặc target_variant_tag", async () => {

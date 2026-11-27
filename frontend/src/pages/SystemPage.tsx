@@ -20,6 +20,7 @@ import {
 import { CronSchedulerTab } from "@/features/system/components/CronSchedulerTab";
 import { VpbankMailboxTab } from "@/features/system/components/VpbankMailboxTab";
 import { TotpGeneratorTab } from "@/features/system/components/TotpGeneratorTab";
+import { CurrencyInputVN } from "@/shared/components";
 
 interface SystemConfig {
   id: number;
@@ -582,12 +583,14 @@ export const SystemPage: React.FC = () => {
                   Tỷ giá USDT (USDT_EXCHANGE_RATE)
                 </label>
                 <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    step="100"
-                    value={formData["USDT_EXCHANGE_RATE"] ?? 25400}
-                    onChange={(e) => handleChange("USDT_EXCHANGE_RATE", e.target.value)}
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition-all font-mono"
+                  <CurrencyInputVN
+                    value={Number(formData["USDT_EXCHANGE_RATE"] ?? 25400) || 0}
+                    onChange={(val) => handleChange("USDT_EXCHANGE_RATE", val)}
+                    accentColor="cyan"
+                    suffix="VNĐ"
+                    placeholder="25.400"
+                    containerClassName="flex-1"
+                    className="pr-12"
                   />
                   <button
                     onClick={() => handleSaveConfig("USDT_EXCHANGE_RATE")}

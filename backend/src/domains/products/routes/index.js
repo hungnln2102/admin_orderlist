@@ -14,6 +14,7 @@ router.post("/variants/:id/editorial/actions", variantDescriptionController.take
 
 // Quản lý Mã Kích Hoạt Key (Activation Keys)
 router.get("/activation-keys", activationKeyController.getActivationKeys);
+router.get("/activation-keys/eligible-orders", activationKeyController.getEligibleOrders);
 router.post("/activation-keys", activationKeyController.createActivationKeys);
 router.post("/activation-keys/:id/revoke", activationKeyController.revokeActivationKey);
 router.delete("/activation-keys/:id", activationKeyController.deleteActivationKey);

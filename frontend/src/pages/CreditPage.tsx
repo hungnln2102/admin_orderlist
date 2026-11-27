@@ -10,7 +10,6 @@ import {
   CreditCard,
   Loader2,
   Eye,
-  AlertTriangle,
 } from "lucide-react";
 
 interface CreditNote {
@@ -49,6 +48,24 @@ interface CreditResponse {
   };
   stats: CreditStats;
 }
+
+interface CreditApplicationResponse {
+  items: {
+    id: string | number;
+    credit_code: string;
+    target_order_code: string | null;
+    applied_amount: number;
+    remaining_amount: number;
+    applied_at: string;
+  }[];
+  pagination: CreditResponse["pagination"];
+}
+
+const applicationDateTime = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "Asia/Bangkok",
+});
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("vi-VN").format(v) + " ₫";
@@ -98,6 +115,12 @@ export const CreditPage: React.FC = () => {
   const [loadingAvailable, setLoadingAvailable] = useState(false);
   const [loadingUnavailable, setLoadingUnavailable] = useState(false);
   const [selectedCredit, setSelectedCredit] = useState<CreditNote | null>(null);
+  const [showHistory, setShowHistory] = useState(true);
+  const [history, setHistory] = useState<CreditApplicationResponse | null>(null);
+  const [historyError, setHistoryError] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
 
   const LIMIT = 10;
 
@@ -149,10 +172,32 @@ export const CreditPage: React.FC = () => {
     fetchUnavailable();
   }, [fetchUnavailable]);
 
-  const refreshAll = () => {
-    fetchAvailable();
-    fetchUnavailable();
-  };
+  useEffect(() => {
+    if (!showHistory) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      page: String(historyPage),
+      limit: String(LIMIT),
+      search: historySearch.trim(),
+    });
+    setHistoryLoading(true);
+    setHistoryError(false);
+    fetch(`/api/credits/applications?${params}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<CreditApplicationResponse>;
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) setHistory(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setHistoryError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      });
+    return () => controller.abort();
+  }, [showHistory, historyPage, historySearch]);
 
   // Debounced search
   useEffect(() => {
@@ -399,31 +444,78 @@ export const CreditPage: React.FC = () => {
         {renderPagination(availableData?.pagination, pageAvailable, setPageAvailable)}
       </div>
 
-      {/* Form 2: Credit Không Khả Dụng / Đã Áp Dụng */}
       <div className="bg-[#1a1b23] border border-white/[0.06] rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-            <AlertTriangle size={14} />
-            Credit Không Khả Dụng & Đã Áp Dụng
-            {stats.unavailable_count > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-zinc-500/20 text-zinc-400 rounded-full">
-                {stats.unavailable_count}
-              </span>
-            )}
-          </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.06]">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={showHistory} onClick={() => setShowHistory(true)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${showHistory ? "bg-cyan-500/10 text-cyan-400" : "text-zinc-400 hover:bg-white/[0.05]"}`}>
+              Lịch sử sử dụng credit
+            </button>
+            <button type="button" aria-pressed={!showHistory} onClick={() => setShowHistory(false)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${!showHistory ? "bg-cyan-500/10 text-cyan-400" : "text-zinc-400 hover:bg-white/[0.05]"}`}>
+              Credit không khả dụng
+            </button>
+          </div>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
-              placeholder="Tìm kiếm credit..."
-              value={searchUnavailable}
-              onChange={(e) => setSearchUnavailable(e.target.value)}
+              aria-label={showHistory ? "Tìm theo mã credit hoặc mã đơn nhận" : "Tìm kiếm credit"}
+              placeholder={showHistory ? "Tìm mã credit hoặc mã đơn" : "Tìm kiếm credit..."}
+              value={showHistory ? historySearch : searchUnavailable}
+              onChange={(e) => {
+                if (showHistory) {
+                  setHistorySearch(e.target.value);
+                  setHistoryPage(1);
+                } else {
+                  setSearchUnavailable(e.target.value);
+                }
+              }}
               className="pl-9 pr-3 py-1.5 text-xs bg-white/[0.04] border border-white/[0.08] rounded-lg text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-cyan-500/40 w-56 transition-colors"
             />
           </div>
         </div>
-        {renderCreditTable(unavailableData?.items || [], loadingUnavailable, false)}
-        {renderPagination(unavailableData?.pagination, pageUnavailable, setPageUnavailable)}
+        {showHistory ? (
+          <>
+            {historyLoading || historyError || !history?.items.length ? (
+              <div role="status" className="px-4 py-12 text-center text-sm text-zinc-400">
+                {historyLoading ? "Đang tải lịch sử…" : historyError
+                  ? "Không thể tải lịch sử sử dụng credit." : "Không có giao dịch sử dụng credit."}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table aria-label="Lịch sử sử dụng credit" className="w-full whitespace-nowrap text-left text-sm">
+                  <thead className="border-b border-white/[0.06] text-xs uppercase text-zinc-400">
+                    <tr>
+                      <th scope="col" className="px-4 py-3">Mã credit gốc</th>
+                      <th scope="col" className="px-4 py-3">Đơn nhận credit</th>
+                      <th scope="col" className="px-4 py-3 text-right">Số tiền đã áp dụng</th>
+                      <th scope="col" className="px-4 py-3 text-right">Còn lại sau lần này</th>
+                      <th scope="col" className="px-4 py-3">Thời điểm áp dụng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.06]">
+                    {history.items.map((item) => (
+                      <tr key={item.id} className="hover:bg-white/[0.03]">
+                        <th scope="row" className="px-4 py-3 font-mono font-semibold text-cyan-400">{item.credit_code}</th>
+                        <td className="px-4 py-3 font-mono text-zinc-200">{item.target_order_code || "—"}</td>
+                        <td className="px-4 py-3 text-right font-mono text-amber-400">{formatCurrency(item.applied_amount)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-emerald-400">{formatCurrency(item.remaining_amount)}</td>
+                        <td className="px-4 py-3 text-zinc-300">{applicationDateTime.format(new Date(item.applied_at))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!historyLoading && !historyError && renderPagination(history?.pagination, historyPage, setHistoryPage)}
+          </>
+        ) : (
+          <>
+            {renderCreditTable(unavailableData?.items || [], loadingUnavailable, false)}
+            {renderPagination(unavailableData?.pagination, pageUnavailable, setPageUnavailable)}
+          </>
+        )}
       </div>
 
       {/* Detail Modal */}

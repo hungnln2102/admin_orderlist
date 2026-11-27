@@ -15,6 +15,7 @@ export interface CurrencyInputVNProps
   onChange: (val: number) => void;
   accentColor?: CurrencyAccentColor;
   suffix?: string;
+  showZero?: boolean;
   containerClassName?: string;
 }
 
@@ -67,37 +68,55 @@ const COLOR_MAP: Record<
 };
 
 /** Chuyển số nguyên sang chuỗi phân cách hàng nghìn bằng dấu chấm (VD: 640000 -> "640.000") */
-const formatNumberWithDots = (num: number | null | undefined): string => {
-  if (num === null || num === undefined || isNaN(num) || num === 0) return "";
+const formatNumberWithDots = (
+  num: number | null | undefined,
+  showZero = false
+): string => {
+  if (num === null || num === undefined || isNaN(num)) return showZero ? "0" : "";
+  if (num === 0) return showZero ? "0" : "";
   return Math.round(num).toLocaleString("vi-VN");
+};
+
+const normalizeNumericValue = (num: number | null | undefined): number => {
+  if (num === null || num === undefined || isNaN(num)) return 0;
+  return Math.round(num);
 };
 
 export const CurrencyInputVN: React.FC<CurrencyInputVNProps> = ({
   value,
   onChange,
   accentColor = "default",
-  suffix = "đ",
+  suffix = "₫",
+  showZero = false,
   containerClassName = "",
   className = "",
   placeholder,
   disabled = false,
   required = false,
+  readOnly = false,
   ...rest
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isFocusedRef = useRef(false);
+  const lastNumericRef = useRef<number>(normalizeNumericValue(value));
 
   // Hiển thị định dạng dấu chấm
-  const [displayValue, setDisplayValue] = useState<string>(() => formatNumberWithDots(value));
+  const [displayValue, setDisplayValue] = useState<string>(() =>
+    formatNumberWithDots(value, showZero)
+  );
 
-  // Đồng bộ từ props khi giá trị bên ngoài thay đổi (nếu người dùng không đang tập trung gõ)
+  // Đồng bộ từ props khi giá trị bên ngoài thay đổi (kể cả khi bấm nút chọn nhanh)
   useEffect(() => {
-    if (!isFocusedRef.current) {
-      setDisplayValue(formatNumberWithDots(value));
+    const normalizedProp = normalizeNumericValue(value);
+    if (!isFocusedRef.current || normalizedProp !== lastNumericRef.current) {
+      lastNumericRef.current = normalizedProp;
+      setDisplayValue(formatNumberWithDots(value, showZero));
     }
-  }, [value]);
+  }, [value, showZero]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly || disabled) return;
+
     const rawValue = e.target.value;
     const caretPosition = e.target.selectionStart ?? rawValue.length;
     const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
@@ -105,8 +124,9 @@ export const CurrencyInputVN: React.FC<CurrencyInputVNProps> = ({
     // Chỉ giữ lại các chữ số
     const digitsOnly = rawValue.replace(/\D/g, "");
     const numericValue = digitsOnly ? parseInt(digitsOnly, 10) : 0;
-    const formatted = digitsOnly ? parseInt(digitsOnly, 10).toLocaleString("vi-VN") : "";
+    const formatted = digitsOnly ? numericValue.toLocaleString("vi-VN") : "";
 
+    lastNumericRef.current = numericValue;
     setDisplayValue(formatted);
     onChange(numericValue);
 
@@ -134,7 +154,8 @@ export const CurrencyInputVN: React.FC<CurrencyInputVNProps> = ({
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     isFocusedRef.current = false;
     // Đồng bộ lại chuẩn khi blur
-    setDisplayValue(formatNumberWithDots(value));
+    lastNumericRef.current = normalizeNumericValue(value);
+    setDisplayValue(formatNumberWithDots(value, showZero));
     if (rest.onBlur) rest.onBlur(e);
   };
 
@@ -153,6 +174,7 @@ export const CurrencyInputVN: React.FC<CurrencyInputVNProps> = ({
         placeholder={placeholder}
         disabled={disabled}
         required={required}
+        readOnly={readOnly}
         className={`w-full bg-slate-950/80 border rounded-xl pl-3 pr-8 py-2 font-bold font-mono text-sm focus:outline-none transition-colors placeholder:text-slate-600 placeholder:font-normal placeholder:text-xs ${colorStyle.border} ${colorStyle.text} ${colorStyle.ring} ${className}`}
         {...rest}
       />

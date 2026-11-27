@@ -4,5 +4,6 @@ const creditController = require("../controllers/creditController");
 
 // GET /api/credits?group=available|unavailable&search=...&page=1&limit=20
 router.get("/", creditController.getCreditNotes);
+router.get("/applications", creditController.getCreditApplications);
 
 module.exports = router;

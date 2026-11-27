@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    optimizeDeps: {
+      exclude: ["maplibre-gl"],
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -22,6 +25,7 @@ export default defineConfig(({ mode }) => {
             if (!id.includes("node_modules")) return undefined;
             if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/react-router")) return "react-vendor";
             if (id.includes("node_modules/lucide-react/")) return "icons";
+            if (id.includes("node_modules/maplibre-gl/")) return "maplibre";
             if (id.includes("node_modules/@google-analytics/")) return "analytics-sdk";
             return undefined;
           },

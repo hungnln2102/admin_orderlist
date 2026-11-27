@@ -39,9 +39,8 @@ test("zero-day notification only selects renew-required orders", async () => {
     const result = await notifyZeroDaysTask("test");
 
     assert.equal(result.count, 1);
-    assert.deepEqual(rawCalls[0].bindings, ["business.order_list", "expired_at", "expired_at", "status", ORDER_STATUS.RENEW_REQUIRED, "id"]);
-    assert.match(rawCalls[0].sql, /WHERE \?\? >=/);
-    assert.match(rawCalls[0].sql, /AND \?\? </);
+    assert.deepEqual(rawCalls[0].bindings, ["business.order_list", "expired_at", "status", ORDER_STATUS.RENEW_REQUIRED, "id"]);
+    assert.match(rawCalls[0].sql, /WHERE \?\?::date =/);
     assert.doesNotMatch(rawCalls[0].sql, /EXPIRED/);
     assert.deepEqual(notifiedBatches, [[{ id_order: "RENEW-0", status: ORDER_STATUS.RENEW_REQUIRED }]]);
   } finally {

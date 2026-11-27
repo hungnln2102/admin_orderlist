@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { db, withTransaction } = require("@/db");
 const { TABLES, COLS } = require("@/db/tables");
-const { getPackageProducts } = require("./packageProductService");
+const { getPackageProducts, deletePackageProduct } = require("./packageProductService");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { findAdobeStatusProvider, findDirectAdobeSource } = require("@/domains/system/services/adobeOrderSourceService");
@@ -27,7 +27,17 @@ const listActivationKeys = async ({
   const l = Math.max(1, Math.min(100, Number(limit) || 20));
   const offset = (p - 1) * l;
 
-  let query = db(`${TABLES.ACTIVATION_KEYS} as ak`)
+  const K = COLS.ACTIVATION_KEYS;
+  const O = COLS.ORDER_LIST;
+  const keyScope = () => db({ ak: TABLES.ACTIVATION_KEYS })
+    .leftJoin({ o: TABLES.ORDER_LIST }, `o.${O.ID_ORDER}`, `ak.${K.ID_ORDER}`);
+  const effectiveStatus = db.raw("CASE WHEN ?? = ? AND ?? <> ? THEN ? ELSE ?? END", [
+    `o.${O.STATUS}`, ORDER_STATUS.EXPIRED, `ak.${K.STATUS}`, "REVOKED", "EXPIRED", `ak.${K.STATUS}`,
+  ]);
+  const effectiveCustomer = db.raw("CASE WHEN ?? IS NULL THEN ?? ELSE NULLIF(CONCAT_WS(' ', NULLIF(??, ''), CASE WHEN NULLIF(??, '') IS NOT NULL THEN CONCAT('(', ??, ')') END), '') END", [
+    `o.${O.ID}`, `ak.${K.CUSTOMER_INFO}`, `o.${O.CUSTOMER}`, `o.${O.CONTACT}`, `o.${O.CONTACT}`,
+  ]);
+  let query = keyScope()
     .leftJoin(`${TABLES.PRODUCT_NAMES} as pn`, "pn.id", "ak.product_name_id")
     .leftJoin(`${TABLES.ACCOUNT_SLOTS} as ss`, "ss.id", "ak.account_slot_id")
     .select(
@@ -37,12 +47,14 @@ const listActivationKeys = async ({
       `ak.${COLS.ACTIVATION_KEYS.TARGET_VARIANT_TAG}`,
       "pn.name as product_name",
       "ak.id_order",
-      "ak.status",
+      { status: effectiveStatus },
       "ak.account_slot_id",
       "ak.assigned_account",
-      "ak.customer_info",
+      { customer_info: effectiveCustomer },
       "ak.activated_at",
-      "ak.expired_at",
+      db.raw("CASE WHEN ?? IS NULL THEN ?? ELSE ?? END AS ??", [
+        `ak.${K.ID_ORDER}`, `ak.${K.EXPIRED_AT}`, `o.${O.EXPIRED_AT}`, K.EXPIRED_AT,
+      ]),
       "ak.note",
       "ak.created_by",
       "ak.created_at",
@@ -51,13 +63,13 @@ const listActivationKeys = async ({
       "ss.password as slot_password"
     );
 
-  let countQuery = db(`${TABLES.ACTIVATION_KEYS} as ak`);
+  let countQuery = keyScope();
 
   if (status && status !== "all") {
     const requestedStatus = status.toUpperCase();
     const keyStatuses = requestedStatus === "AVAILABLE" ? ["AVAILABLE", "INACTIVE"] : [requestedStatus];
-    query = query.whereIn("ak.status", keyStatuses);
-    countQuery = countQuery.whereIn("ak.status", keyStatuses);
+    query = query.whereIn(effectiveStatus, keyStatuses);
+    countQuery = countQuery.whereIn(effectiveStatus, keyStatuses);
   }
 
   if (productNameId) {
@@ -71,7 +83,7 @@ const listActivationKeys = async ({
       this.whereRaw("LOWER(ak.key_code) LIKE ?", [s])
         .orWhereRaw("LOWER(COALESCE(ak.id_order, '')) LIKE ?", [s])
         .orWhereRaw("LOWER(COALESCE(ak.assigned_account, '')) LIKE ?", [s])
-        .orWhereRaw("LOWER(COALESCE(ak.customer_info, '')) LIKE ?", [s]);
+        .orWhereRaw("LOWER(COALESCE(?, '')) LIKE ?", [effectiveCustomer, s]);
     };
     query = query.where(searchFilter);
     countQuery = countQuery.where(searchFilter);
@@ -86,10 +98,10 @@ const listActivationKeys = async ({
   const totalPages = Math.ceil(total / l) || 1;
 
   // Thống kê nhanh counts
-  const countsRaw = await db(TABLES.ACTIVATION_KEYS)
-    .select("status")
-    .count("id as count")
-    .groupBy("status");
+  const countsRaw = await keyScope()
+    .select({ status: effectiveStatus })
+    .count(`ak.${K.ID} as count`)
+    .groupByRaw("1");
 
   const counts = {
     total: 0,
@@ -126,70 +138,107 @@ const listActivationKeys = async ({
   };
 };
 
-/**
- * Tạo mới một hoặc nhiều mã kích hoạt
- */
+const parseRuleId = (value) => {
+  const ruleId = Number(value);
+  if (!["string", "number"].includes(typeof value) || !Number.isSafeInteger(ruleId) || ruleId < 1) {
+    throw new Error("Vui lòng chọn quy tắc cấp key.");
+  }
+  return ruleId;
+};
+
+const eligibleOrderQuery = (connection) => {
+  const O = COLS.ORDER_LIST;
+  const K = COLS.ACTIVATION_KEYS;
+  return connection({ o: TABLES.ORDER_LIST })
+    .whereNotIn(`o.${O.STATUS}`, [ORDER_STATUS.CANCELED, ORDER_STATUS.EXPIRED])
+    .whereRaw("UPPER(BTRIM(??)) NOT LIKE ?", [`o.${O.ID_ORDER}`, "MAVN%"])
+    .whereRaw("COALESCE(BTRIM(??), '') = ''", [`o.${O.INFORMATION_ORDER}`])
+    .whereNotExists(connection({ ak: TABLES.ACTIVATION_KEYS })
+      .select(`ak.${K.ID}`)
+      .whereRaw("UPPER(BTRIM(??)) = UPPER(BTRIM(??))", [`ak.${K.ID_ORDER}`, `o.${O.ID_ORDER}`]));
+};
+
+const listEligibleOrders = async ({ rule_id, search } = {}) => {
+  const ruleId = parseRuleId(rule_id);
+  const R = COLS.ACTIVATION_KEY_RULES;
+  const O = COLS.ORDER_LIST;
+  const selection = await db(TABLES.ACTIVATION_KEY_RULES).where(R.ID, ruleId)
+    .first(R.VARIANT_ID, R.SUPPLIER_ID);
+  if (!selection) return [];
+
+  const { rule } = await resolveOrderActivationRule({
+    variantId: selection[R.VARIANT_ID], supplierId: selection[R.SUPPLIER_ID],
+  });
+  if (Number(rule?.[R.ID]) !== ruleId) return [];
+
+  const term = typeof search === "string" ? search.trim().toLowerCase() : "";
+  return eligibleOrderQuery(db)
+    .where({ [`o.${O.ID_PRODUCT}`]: rule[R.VARIANT_ID], [`o.${O.SUPPLY_ID}`]: rule[R.SUPPLIER_ID] })
+    .modify((query) => {
+      if (term) query.where((filter) => filter
+        .whereRaw("STRPOS(LOWER(??), ?) > 0", [`o.${O.ID_ORDER}`, term])
+        .orWhereRaw("STRPOS(LOWER(??), ?) > 0", [`o.${O.CUSTOMER}`, term]));
+    })
+    .orderBy(`o.${O.ID}`, "desc")
+    .limit(50)
+    .select(`o.${O.ID_ORDER}`, `o.${O.CUSTOMER}`);
+};
+
 const createActivationKeys = async (payload, user = null) => {
-  const {
-    product_name_id,
-    product_id = null,
-    id_order = null,
-    customer_info = null,
-    quantity = 1,
-    expired_at = null,
-    note = null,
-  } = payload || {};
-
-  const qty = Math.max(1, Math.min(100, Number(quantity) || 1));
-  const pNameId = Number(product_name_id);
-  if (!pNameId) {
-    throw new Error("Vui lòng chọn Sản phẩm / Dịch vụ áp dụng!");
+  const { rule_id, id_order } = payload || {};
+  const ruleId = parseRuleId(rule_id);
+  const orderCode = typeof id_order === "string" ? id_order.trim() : "";
+  if (!orderCode) throw new Error("Vui lòng chọn đơn hàng.");
+  if (Object.keys(payload).some((field) => !["rule_id", "id_order"].includes(field))) {
+    throw new Error("Chỉ nhận quy tắc cấp key và mã đơn hàng.");
   }
 
-  // Xác minh product_name_id tồn tại
-  const pName = await db(TABLES.PRODUCT_NAMES).where("id", pNameId).first();
-  if (!pName) {
-    throw new Error(`Không tìm thấy Sản phẩm kho với ID ${pNameId}`);
-  }
+  return withTransaction(async (trx) => {
+    const K = COLS.ACTIVATION_KEYS;
+    const R = COLS.ACTIVATION_KEY_RULES;
+    const O = COLS.ORDER_LIST;
+    const order = await eligibleOrderQuery(trx)
+      .whereRaw("UPPER(BTRIM(??)) = ?", [`o.${O.ID_ORDER}`, orderCode.toUpperCase()])
+      .forUpdate("o")
+      .first();
+    if (!order) throw new Error("Đơn hàng không đủ điều kiện cấp key.");
 
-  const keysToInsert = [];
-  const now = new Date();
-  const createdBy = user?.username || user?.email || "Admin";
-
-  for (let i = 0; i < qty; i++) {
-    keysToInsert.push({
-      [COLS.ACTIVATION_KEYS.KEY_CODE]: generateOrderActivationKey(),
-      product_name_id: pNameId,
-      product_id: product_id ? Number(product_id) : null,
-      id_order: id_order ? String(id_order).trim() : null,
-      status: "INACTIVE",
-      customer_info: customer_info ? String(customer_info).trim() : null,
-      expired_at: expired_at ? new Date(expired_at) : null,
-      note: note ? String(note).trim() : null,
-      created_by: createdBy,
-      created_at: now,
-      updated_at: now,
-    });
-  }
-
-  return db.transaction(async (trx) => {
-    const inserted = [];
-    const keyColumn = COLS.ACTIVATION_KEYS.KEY_CODE;
-    let pending = keysToInsert;
-    for (let attempt = 0; attempt < 5 && pending.length; attempt++) {
-      const batch = await trx(TABLES.ACTIVATION_KEYS)
-        .insert(pending)
-        .onConflict(keyColumn)
-        .ignore()
-        .returning("*");
-      inserted.push(...batch);
-      pending = pending.slice(batch.length).map((key) => ({
-        ...key,
-        [keyColumn]: generateOrderActivationKey(),
-      }));
+    const { rule } = await resolveOrderActivationRule({
+      variantId: order[O.ID_PRODUCT], supplierId: order[O.SUPPLY_ID],
+    }, trx);
+    if (Number(rule?.[R.ID]) !== ruleId) {
+      throw new Error("Quy tắc cấp key không còn phù hợp với đơn hàng.");
     }
-    if (pending.length) throw new Error("Không thể tạo mã kích hoạt.");
-    return inserted;
+
+    let key;
+    for (let attempt = 0; attempt < 5 && !key; attempt++) {
+      [key] = await trx(TABLES.ACTIVATION_KEYS)
+        .insert({
+          [K.KEY_CODE]: generateOrderActivationKey(),
+          [K.ID_ORDER]: order[O.ID_ORDER],
+          [K.PRODUCT_NAME_ID]: rule[R.PRODUCT_NAME_ID],
+          [K.TARGET_VARIANT_TAG]: rule[R.TARGET_VARIANT_TAG],
+          [K.PRODUCT_ID]: rule.parent_product_id || null,
+          [K.CREATED_BY]: user?.username || user?.email || "Admin",
+        })
+        .onConflict(K.KEY_CODE).ignore().returning("*");
+    }
+    if (!key) throw new Error("Không thể tạo mã kích hoạt.");
+
+    await trx(TABLES.ORDER_LIST).where(O.ID, order[O.ID]).update({
+      [O.INFORMATION_ORDER]: key[K.KEY_CODE],
+      [O.UPDATED_AT]: trx.fn.now(),
+    });
+    await publishEventInTrx(trx, {
+      eventName: EVENTS.ORDER_UPDATED,
+      aggregateType: "ORDER",
+      aggregateId: order[O.ID],
+      action: "UPDATE",
+      source: "ACTIVATION_KEY",
+      changedFields: [O.INFORMATION_ORDER],
+      payload: { orderId: order[O.ID], id_order: order[O.ID_ORDER], changed_fields: [O.INFORMATION_ORDER] },
+    });
+    return [key];
   });
 };
 
@@ -226,6 +275,9 @@ const deleteActivationKey = async (id) => {
     const K = COLS.ACTIVATION_KEYS;
     const key = await trx(TABLES.ACTIVATION_KEYS).where(K.ID, keyId).forUpdate().first();
     if (!key) throw new Error(`Không tìm thấy mã key #${keyId}`);
+    if (key[K.ID_ORDER]) {
+      throw new Error("Không thể xóa mã key đã gắn đơn hàng. Vui lòng chọn Thu hồi thay vì Xóa!");
+    }
     if (key[K.STATUS] === "ACTIVATED") {
       throw new Error("Không thể xóa mã key đã kích hoạt. Vui lòng chọn Thu hồi thay vì Xóa!");
     }
@@ -244,13 +296,14 @@ const deleteActivationKey = async (id) => {
  * - Cập nhật activation_keys sang ACTIVATED.
  * - Trả về tài khoản cho khách.
  */
-const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery, orderContact, rejectedSlot }) => {
+const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery, orderContact, rejectedSlot, validateReplacement }) => {
   const code = String(keyCode || "").trim().toUpperCase();
   if (!code) {
     throw new Error("Vui lòng nhập mã key kích hoạt!");
   }
 
-  return withTransaction(async (trx) => {
+  const validations = new Map();
+  const runAllocation = async (trx) => {
     const keyCols = COLS.ACTIVATION_KEYS;
     const O = COLS.ORDER_LIST;
     const S = COLS.ACCOUNT_SLOTS;
@@ -259,7 +312,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     const findKey = (column) => trx(TABLES.ACTIVATION_KEYS)
       .whereRaw("UPPER(TRIM(??)) = ?", [column, code])
       .orderBy(keyCols.ID, "desc")
-      .first(keyCols.ID, keyCols.ID_ORDER);
+      .first(keyCols.ID, keyCols.ID_ORDER, keyCols.PRODUCT_NAME_ID);
     const candidate = await findKey(keyCols.KEY_CODE) || await findKey(keyCols.ID_ORDER);
     if (!candidate) {
       throw new Error(`Mã kích hoạt hoặc Mã đơn hàng "${code}" không tồn tại trên hệ thống!`);
@@ -267,6 +320,10 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
 
     // Luồng cập nhật thanh toán cũng khóa đơn hàng trước mã key.
     const orderCode = candidate[keyCols.ID_ORDER];
+    // Package removal can update keys from other orders of the same product.
+    await trx.raw("SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))", [
+      "activation_key_package_allocation", String(candidate[keyCols.PRODUCT_NAME_ID]),
+    ]);
     const order = orderCode
       ? await trx(TABLES.ORDER_LIST).where(O.ID_ORDER, orderCode).forUpdate().first()
       : null;
@@ -277,6 +334,9 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     }
 
     const wasAssigned = Boolean(key[keyCols.ACCOUNT_SLOT_ID] || key[keyCols.ASSIGNED_ACCOUNT]);
+    if (order?.[O.STATUS] === ORDER_STATUS.EXPIRED) {
+      throw new Error("Đơn hàng đã hết hạn sử dụng!");
+    }
     const paidOrder = order && [ORDER_STATUS.PAID, ORDER_STATUS.RENEW_REQUIRED].includes(order[O.STATUS]);
     const checkKey = String(key[keyCols.KEY_CODE] || "").trim().toUpperCase() === code;
     if (recovery) {
@@ -304,7 +364,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       }
     }
 
-    if (key.status === "EXPIRED" || (key.expired_at && new Date(key.expired_at) <= new Date())) {
+    if (!orderCode && (key.status === "EXPIRED" || (key.expired_at && new Date(key.expired_at) <= new Date()))) {
       throw new Error("Mã kích hoạt này đã hết hạn sử dụng!");
     }
 
@@ -335,13 +395,40 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
     const orderSlot = String(order?.[O.SLOT] || "").trim().toLowerCase();
     const packageManaged = Boolean(targetTag || previousPackageId);
     let missingSubscription;
+    let rejectedPackageId;
     const enqueueMissingSubscription = async (replaced) => {
       if (!missingSubscription) return;
       const { enqueueAdobeMissingSubscription } = require("@/domains/notifications/telegram/dispatchers/adobeRecoveryNotifier");
       await enqueueAdobeMissingSubscription({ trx, orderCode, ...missingSubscription, replaced });
     };
+    const quarantinePackage = async (packageId, slotId) => {
+      await trx(TABLES.ACCOUNT_SLOTS).where(S.ID, slotId).update({
+        [S.STATUS]: "UNAVAILABLE",
+        [S.UPDATED_AT]: trx.fn.now(),
+      });
+      // The tag survives the FK reset and gives subsequent requests the same allocation scope.
+      await trx(TABLES.ACTIVATION_KEYS).where(keyCols.PACKAGE_PRODUCT_ID, packageId).update({
+        [keyCols.TARGET_VARIANT_TAG]: trx.raw("COALESCE(NULLIF(BTRIM(??), ''), ?)", [keyCols.TARGET_VARIANT_TAG, targetTag || null]),
+        [keyCols.ACCOUNT_SLOT_ID]: slotId,
+        [keyCols.UPDATED_AT]: trx.fn.now(),
+      });
+      await deletePackageProduct(packageId, trx);
+    };
+    const quarantineRejectedPackage = async (replaced) => {
+      if (!missingSubscription) return;
+      // Legacy keys can be linked through the order slot instead of the package FK.
+      if (targetTag && !previousPackageId && !replaced) {
+        await trx(TABLES.ACTIVATION_KEYS).where(keyCols.ID, key[keyCols.ID]).update({
+          [keyCols.TARGET_VARIANT_TAG]: targetTag,
+          [keyCols.ACCOUNT_SLOT_ID]: missingSubscription.slotId,
+          [keyCols.UPDATED_AT]: trx.fn.now(),
+        });
+      }
+      await quarantinePackage(rejectedPackageId, missingSubscription.slotId);
+      await enqueueMissingSubscription(replaced);
+    };
     const outOfStock = async () => {
-      await enqueueMissingSubscription(false);
+      await quarantineRejectedPackage(false);
       return { replacementRequired: wasAssigned, outOfStock: true };
     };
     const resolveStatusProvider = (slot, providerBySlot) => {
@@ -365,7 +452,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
         ? await trx(TABLES.PACKAGE_PRODUCT)
           .where({ [pack.ID]: previousPackageId, [pack.PRODUCT_NAME_ID]: key[keyCols.PRODUCT_NAME_ID] })
           .forShare()
-          .first(pack.ACCOUNT_SLOT_ID, pack.PROVIDER_BY_SLOT)
+          .first(pack.ID, pack.ACCOUNT_SLOT_ID, pack.PROVIDER_BY_SLOT)
         : null;
       if (!currentPackage && !previousPackageId && (orderSlot || key[keyCols.ACCOUNT_SLOT_ID])) {
         const matches = await trx({ p: TABLES.PACKAGE_PRODUCT })
@@ -407,12 +494,13 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           else query.forShare();
         })
         .first(`slot.${S.PASSWORD}`, `slot.${S.STATUS_CHECK_ENABLED}`,
-          `slot.${S.STATUS_PROVIDER_KEY}`, `slot.${S.VARIANT_TAG}`, `account.${A.ACCOUNT_USERNAME}`);
-      if (assignedSlot) {
+          `slot.${S.STATUS_PROVIDER_KEY}`, `slot.${S.VARIANT_TAG}`, `slot.${S.STATUS}`, `account.${A.ACCOUNT_USERNAME}`);
+      if (assignedSlot && String(assignedSlot[S.STATUS] || "").toUpperCase() !== "UNAVAILABLE") {
         const assignedAccount = assignedSlot[A.ACCOUNT_USERNAME];
         const normalizedAccount = String(assignedAccount || "").trim().toLowerCase();
         const statusProviderKey = await resolveStatusProvider(assignedSlot, currentPackage?.[pack.PROVIDER_BY_SLOT]);
         if (recovery === "replace" && currentPackage && statusProviderKey === "fix_ades_status" && normalizedAccount &&
+            ["expired", "not_found"].includes(rejectedSlot?.reason) &&
             String(rejectedSlot?.id) === String(slotId) &&
             String(rejectedSlot?.account || "").trim().toLowerCase() === normalizedAccount) {
           targetTag ||= String(assignedSlot[S.VARIANT_TAG] || "").trim();
@@ -423,11 +511,8 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
               targetTag = rule[R.TARGET_VARIANT_TAG];
             }
           }
-          missingSubscription = { slotId, account: assignedAccount };
-          await trx(TABLES.ACCOUNT_SLOTS).where(S.ID, slotId).update({
-            [S.STATUS]: "UNAVAILABLE",
-            [S.UPDATED_AT]: trx.fn.now(),
-          });
+          missingSubscription = { slotId, account: assignedAccount, reason: rejectedSlot.reason };
+          rejectedPackageId = currentPackage[pack.ID];
         } else if (recovery !== "lookup" && recovery !== "replace") {
           const keyChanged = String(key[keyCols.ACCOUNT_SLOT_ID]) !== String(slotId) ||
             key[keyCols.ASSIGNED_ACCOUNT] !== assignedAccount ||
@@ -454,7 +539,7 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           };
         }
       }
-      if (recovery === "lookup" || (recovery === "replace" && !missingSubscription) ||
+      if (recovery === "lookup" || (recovery === "replace" && !missingSubscription && !targetTag) ||
           (recovery === "check" && wasAssigned && !packageManaged && !targetTag)) {
         return { replacementRequired: true };
       }
@@ -466,10 +551,13 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       const assignedSlot = key.account_slot_id
         ? await trx(TABLES.ACCOUNT_SLOTS)
           .select(COLS.ACCOUNT_SLOTS.PASSWORD, COLS.ACCOUNT_SLOTS.BACKUP_EMAIL, COLS.ACCOUNT_SLOTS.TWO_FA, COLS.ACCOUNT_SLOTS.EXPIRED_AT,
-            COLS.ACCOUNT_SLOTS.STATUS_CHECK_ENABLED, COLS.ACCOUNT_SLOTS.STATUS_PROVIDER_KEY)
+            S.STATUS)
           .where(COLS.ACCOUNT_SLOTS.ID, key.account_slot_id)
           .first()
         : null;
+      if (String(assignedSlot?.[S.STATUS] || "").toUpperCase() === "UNAVAILABLE") {
+        throw new Error("Tài khoản đã ngừng cấp. Vui lòng sử dụng luồng khôi phục tài khoản.");
+      }
       return {
         success: true,
         already_activated: true,
@@ -499,11 +587,16 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       const packages = await getPackageProducts({ connection: trx, productNameId: key.product_name_id });
       availablePackages = packages.filter((item) =>
         matchesPackageTag(item, targetTag) && item.usedSlots < item.totalSlots &&
-        (!wasAssigned || String(item.id) !== String(previousPackageId))
+        (!wasAssigned || String(item.id) !== String(previousPackageId)) &&
+        String(item.id) !== String(rejectedPackageId)
       );
     }
 
-    const availableSlot = (targetTag && !availablePackages.length) ? null : await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
+    const needsValidation = Boolean(recovery && targetTag);
+    if (needsValidation && typeof validateReplacement !== "function") {
+      throw new Error("Thiếu bước xác minh tài khoản Adobe thay thế.");
+    }
+    const availableSlots = (targetTag && !availablePackages.length) ? [] : await trx(`${TABLES.ACCOUNT_SLOTS} as ss`)
       .join(`${TABLES.PRODUCT_KEYS} as acc`, "acc.id", "ss.account_id")
       .select(
         "ss.id as slot_id",
@@ -525,8 +618,9 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
           if (missingSubscription) {
             builder.whereNot(`ss.${S.ID}`, missingSubscription.slotId)
               .whereRaw("LOWER(BTRIM(??)) <> ?", [`acc.${A.ACCOUNT_USERNAME}`, missingSubscription.account.trim().toLowerCase()]);
-          } else if (!packageManaged) {
-            builder.whereNot(`acc.${A.ACCOUNT_USERNAME}`, key[keyCols.ASSIGNED_ACCOUNT] || "");
+          } else if (wasAssigned) {
+            builder.whereRaw("LOWER(BTRIM(??)) <> ?", [`acc.${A.ACCOUNT_USERNAME}`,
+              String(key[keyCols.ASSIGNED_ACCOUNT] || orderSlot).trim().toLowerCase()]);
           }
           builder.where((expiry) => expiry.whereNull(`ss.${S.EXPIRED_AT}`).orWhere(`ss.${S.EXPIRED_AT}`, ">", trx.fn.now()));
         }
@@ -546,23 +640,59 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       })
       .orderBy("ss.id", "asc")
       .forUpdate()
-      .first();
+      .modify((builder) => {
+        if (!needsValidation) builder.limit(1);
+      });
 
-    if (!availableSlot) {
+    let validatedStatus;
+    let [slot] = availableSlots;
+    if (needsValidation) {
+      slot = null;
+      const rejectedPackages = [];
+      for (const candidate of availableSlots) {
+        const candidatePackage = availablePackages.find((entry) => String(entry.warehouseSlotId) === String(candidate.slot_id));
+        const statusProviderKey = await resolveStatusProvider(candidate, candidatePackage?.providerBySlot);
+        if (statusProviderKey !== "fix_ades_status") {
+          if (wasAssigned || missingSubscription) continue;
+          slot = candidate;
+          break;
+        }
+        const validationKey = JSON.stringify([candidatePackage?.id, candidate.slot_id, candidate.account_username, statusProviderKey]);
+        if (!validations.has(validationKey)) {
+          return { candidate: { validationKey, account: candidate.account_username, statusProviderKey } };
+        }
+        const status = validations.get(validationKey);
+        if (["expired", "not_found"].includes(status?.status_type)) {
+          rejectedPackages.push({ packageId: candidatePackage.id, slotId: candidate.slot_id });
+        }
+        if (status?.status_type !== "active") continue;
+        slot = candidate;
+        validatedStatus = status;
+        break;
+      }
+      for (const rejected of rejectedPackages) {
+        await quarantinePackage(rejected.packageId, rejected.slotId);
+      }
+    }
+
+    if (!slot) {
       if (recovery) return outOfStock();
       throw new Error(
         "Hiện tại kho đã hết slot trống cho sản phẩm này. Vui lòng liên hệ Admin qua kênh hỗ trợ để được nạp thêm tài khoản!"
       );
     }
 
-    const selectedPackage = availablePackages.find((item) => String(item.warehouseSlotId) === String(availableSlot.slot_id));
+    const selectedPackage = availablePackages.find((item) => String(item.warehouseSlotId) === String(slot.slot_id));
     const packageId = selectedPackage?.id ?? null;
-    const assignedAccount = availableSlot.account_username;
-    const finalCustomer = String(customerInfo || key.customer_info || "").trim();
+    const assignedAccount = slot.account_username;
+    const orderCustomer = order
+      ? [order[O.CUSTOMER], order[O.CONTACT] && `(${order[O.CONTACT]})`].filter(Boolean).join(" ")
+      : null;
+    const finalCustomer = String(order ? orderCustomer : (customerInfo || key.customer_info || "")).trim();
 
     // 3. Cập nhật slot trong Kho thành IN_USE
     if (!packageId) await trx(TABLES.ACCOUNT_SLOTS)
-      .where("id", availableSlot.slot_id)
+      .where("id", slot.slot_id)
       .update({
         status: "IN_USE",
         id_order: key.id_order || null,
@@ -578,43 +708,52 @@ const activateKeyWithTransaction = async ({ keyCode, customerInfo = "", recovery
       .where("id", key.id)
       .update({
         status: "ACTIVATED",
-        account_slot_id: availableSlot.slot_id,
+        account_slot_id: slot.slot_id,
         ...(packageId ? {
           [keyCols.PACKAGE_PRODUCT_ID]: packageId,
           [keyCols.TARGET_VARIANT_TAG]: targetTag,
         } : {}),
         assigned_account: assignedAccount,
-        customer_info: finalCustomer || null,
+        ...(!orderCode ? { [keyCols.CUSTOMER_INFO]: finalCustomer || null } : {}),
         [keyCols.ACTIVATED_AT]: key[keyCols.ACTIVATED_AT] || trx.fn.now(),
         updated_at: trx.fn.now(),
       });
 
     if (order) await publishOrderUpdated();
     if (recovery) {
-      await enqueueMissingSubscription(true);
-      const statusProviderKey = await resolveStatusProvider(availableSlot, selectedPackage?.providerBySlot);
+      await quarantineRejectedPackage(true);
+      const statusProviderKey = await resolveStatusProvider(slot, selectedPackage?.providerBySlot);
       return {
         account: assignedAccount,
-        password: availableSlot.slot_password || "",
+        password: slot.slot_password || "",
         replaced: wasAssigned,
         statusProviderKey,
-        slotId: availableSlot.slot_id,
+        slotId: slot.slot_id,
         packageBacked: Boolean(packageId),
+        ...(validatedStatus ? { validatedStatus } : {}),
       };
     }
 
     return {
       success: true,
       account: assignedAccount,
-      password: availableSlot.slot_password || "",
-      backup_email: availableSlot.backup_email || "",
-      two_fa: availableSlot.two_fa || "",
-      slot_index: availableSlot.slot_index,
-      expired_at: availableSlot.expired_at,
+      password: slot.slot_password || "",
+      backup_email: slot.backup_email || "",
+      two_fa: slot.two_fa || "",
+      slot_index: slot.slot_index,
+      expired_at: slot.expired_at,
       id_order: key.id_order,
       message: `Kích hoạt thành công! Bạn đã được cấp tài khoản: ${assignedAccount}`,
     };
-  });
+  };
+
+  while (true) {
+    const result = await withTransaction(runAllocation);
+    if (!result.candidate) return result;
+    const { validationKey, account, statusProviderKey } = result.candidate;
+    const status = await validateReplacement({ account, statusProviderKey });
+    validations.set(validationKey, status);
+  }
 };
 
 /**
@@ -818,6 +957,7 @@ const resolveOrderActivationRule = async (selection, connection = db) => {
 module.exports = {
   generateOrderActivationKey,
   listActivationKeys,
+  listEligibleOrders,
   createActivationKeys,
   revokeActivationKey,
   deleteActivationKey,

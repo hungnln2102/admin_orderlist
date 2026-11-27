@@ -107,12 +107,28 @@ export function calculateExpirationDate(baseDateInput?: string | Date | null, da
 
 
 /**
+ * Tính số ngày sử dụng bao gồm cả ngày bắt đầu và ngày kết thúc (inclusive).
+ * Ví dụ: 28/11/2026 -> 27/11/2027 = 365 ngày.
+ */
+export function calculateInclusiveDays(
+  startDateInput?: string | Date | null,
+  endDateInput?: string | Date | null
+): number {
+  const start = parseDateToMidnight(startDateInput);
+  const end = parseDateToMidnight(endDateInput);
+  if (!start || !end) return 1;
+  const startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  return Math.max(1, Math.round((endUtc - startUtc) / (1000 * 60 * 60 * 24)) + 1);
+}
+
+/**
  * Tự động tính ngày hết hạn và số ngày từ ngày bắt đầu dựa theo chu kỳ gói sản phẩm (hoặc số ngày fallback).
  * Hỗ trợ các định dạng:
  * - Tháng: "--1m", "--3m", "--6m", "--12m", "1 tháng", "3 tháng", "6 tháng", "12 tháng"
  * - Năm: "--1y", "--2y", "1 năm", "2 năm"
  * - Ngày: "--30d", "30 ngày"...
- * - Ngày hết hạn bao gồm ngày bắt đầu; ví dụ 27/10 + 1 tháng sẽ hết hạn 26/11.
+ * - Ngày hết hạn bao gồm ngày bắt đầu; ví dụ 27/10 + 1 tháng sẽ hết hạn 26/11 (31 ngày) và 28/11 + 12 tháng hết hạn 27/11 năm sau (365 ngày).
  * - An toàn ngày cuối tháng (Ví dụ: 31/01 + 1 tháng -> 27/02 không bị tràn sang tháng 3).
  */
 export function calculateExpirationDateFromStart(
@@ -151,7 +167,7 @@ export function calculateExpirationDateFromStart(
     targetDay = Math.min(d, maxDays);
   } else if (matchD && Number(matchD[1]) > 0) {
     const daysToAdd = Number(matchD[1]);
-    const expDate = new Date(start.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const expDate = new Date(y, m - 1, d + daysToAdd - 1, 0, 0, 0, 0);
     return {
       expired_at: formatDateYYYYMMDD(expDate),
       days: daysToAdd,
@@ -160,7 +176,7 @@ export function calculateExpirationDateFromStart(
     // Fallback theo parsePackageDuration hoặc fallbackDays
     const duration = parsePackageDuration(variantOrText);
     const daysToAdd = duration.days > 0 ? duration.days : (fallbackDays > 0 ? fallbackDays : 365);
-    const expDate = new Date(start.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const expDate = new Date(y, m - 1, d + daysToAdd - 1, 0, 0, 0, 0);
     return {
       expired_at: formatDateYYYYMMDD(expDate),
       days: daysToAdd,
@@ -171,8 +187,7 @@ export function calculateExpirationDateFromStart(
   const targetDate = new Date(targetYear, targetMonth - 1, targetDay, 0, 0, 0, 0);
   const expiryDate = new Date(targetDate);
   expiryDate.setDate(expiryDate.getDate() - 1);
-  const diffTime = expiryDate.getTime() - start.getTime();
-  const diffDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+  const diffDays = calculateInclusiveDays(start, expiryDate);
 
   return {
     expired_at: formatDateYYYYMMDD(expiryDate),

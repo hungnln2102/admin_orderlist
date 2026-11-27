@@ -1,0 +1,8 @@
+# Nghiệm thu ngày 2026-11-28
+
+## Nâng cấp bản đồ IP / Visitor Geography sang MapLibre GL JS
+
+- Thay thế bản đồ SVG tĩnh (`worldPaths.json`) trong [TrafficGeography.tsx](frontend/src/features/traffic/components/TrafficGeography.tsx) bằng bản đồ tương tác WebGL **MapLibre GL JS** ([TrafficMapCanvas.tsx](frontend/src/features/traffic/components/TrafficMapCanvas.tsx)) nền tối (`OpenFreeMap Dark` vector style không cần API key, tự động fallback sang OpenStreetMap raster làm tối nếu style vector lỗi), cấu hình `optimizeDeps.exclude: ["maplibre-gl"]` để Vite dev tải đúng worker và tách chunk riêng `maplibre` trong [vite.config.ts](frontend/vite.config.ts).
+- Bổ sung bảng tọa độ chuẩn hóa [geoCoordinates.ts](frontend/src/features/traffic/geoCoordinates.ts) hỗ trợ định vị thành phố/tỉnh Việt Nam và quốc tế từ GA4; hỗ trợ lớp **Heatmap** mật độ (bật/tắt bằng `ToggleSwitch`), bong bóng phát sáng kèm tooltip glassmorphism, tự động `flyTo` khi chọn quốc gia/thành phố và sửa lỗi hiển thị `{scale}?` thành `{zoom.toFixed(1)}×`.
+- Mở rộng [trafficIpService.js](backend/src/domains/traffic/services/trafficIpService.js) và [trafficRoutes.js](backend/src/domains/traffic/routes/trafficRoutes.js) với endpoint chỉ đọc `GET /api/traffic/ip-map?days=30` tổng hợp tọa độ MaxMind GeoIP theo cụm `0.01°` (không lộ IP thô), phục vụ chế độ chuyển đổi `Phiên GA4` ↔ `Bản đồ IP`.
+- Kiểm thử: `npm --prefix backend test` đạt **201/201** (gồm 3 bài test mới trong [trafficIpMap.test.js](backend/tests/unit/trafficIpMap.test.js)); `npm --prefix frontend run build` (`tsc && vite build`) thành công (`TrafficMapCanvas` + `maplibre` tách chunk riêng). Chưa kiểm thử trực tiếp trên trình duyệt với dữ liệu GA4/GeoLite2 thật tại production.

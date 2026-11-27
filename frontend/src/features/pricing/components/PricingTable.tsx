@@ -413,6 +413,7 @@ export const PricingTable: React.FC<PricingTableProps> = ({
                                                   supplierCostId: c.id,
                                                   supplierName: c.supplier_name,
                                                   price: c.price,
+                                                  originalPrice: c.price,
                                                 })
                                               }
                                               className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-all"

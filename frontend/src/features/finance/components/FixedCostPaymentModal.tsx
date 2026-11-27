@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FixedCost } from "../types";
 import { X, CreditCard, DollarSign, Calendar, FileText, CheckCircle2, Wallet, Receipt, AlertCircle, RefreshCw, Banknote } from "lucide-react";
 import { formatVND } from "@/shared/utils";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 
 interface Props {
   isOpen: boolean;
@@ -327,11 +327,13 @@ export const FixedCostPaymentModal: React.FC<Props> = ({
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 SỐ TIỀN THANH TOÁN (VNĐ) *
               </label>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-emerald-300 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
+              <CurrencyInputVN
+                value={Number(amount) || 0}
+                onChange={(val) => setAmount(val > 0 ? String(val) : "")}
+                accentColor="emerald"
+                suffix="₫"
+                placeholder="0"
+                className="px-4 py-2.5 rounded-2xl text-xs"
               />
             </div>
           </div>

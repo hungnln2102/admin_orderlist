@@ -5,6 +5,7 @@
 
 const systemConfigService = require("./systemConfigService");
 const otpProviderService = require("./otpProviderService");
+const { classifyFixAdesStatus } = require("../providers/fixAdesStatusProvider");
 
 const DEFAULT_SLOTS = [
   {
@@ -227,7 +228,17 @@ async function dispatchSlotRequest({ slotKey, input }) {
     let statusType = "active";
     let statusText = "ĐANG HOẠT ĐỘNG";
 
-    if (!probeResult || probeResult.found === false) {
+    if (slotKey === "adobe_check" && serviceUsed === "fix_ades_status") {
+      const state = classifyFixAdesStatus(probeResult?.raw_data);
+      statusType = state === "expired" ? "not_found" : state;
+      statusText = {
+        active: "ĐANG HOẠT ĐỘNG",
+        inactive: "CẦN CHUYỂN TEAM",
+        expired: "ĐÃ HẾT HẠN",
+        not_found: "KHÔNG TỒN TẠI",
+        unknown: "CHƯA XÁC MINH ĐƯỢC",
+      }[state];
+    } else if (!probeResult || probeResult.found === false) {
       statusType = "not_found";
       statusText = "KHÔNG TỒN TẠI";
     } else if (String(rawOrgStatus || "").toLowerCase() === "inactive") {

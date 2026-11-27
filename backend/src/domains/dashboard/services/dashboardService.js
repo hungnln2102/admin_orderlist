@@ -185,9 +185,9 @@ async function getDashboardSummary(params = {}) {
     // Với mốc xem trong ngày (24 giờ), phân rã chi tiết theo khung giờ từ order_list để đảm bảo realtime
     chartSubtitle = "Xu hướng biến động theo 24 giờ";
     const hourRows = await db(TABLES.ORDER_LIST)
-      .whereBetween("order_date", [start.toISOString(), end.toISOString()])
+      .whereBetween("created_at", [start.toISOString(), end.toISOString()])
       .select(
-        db.raw("EXTRACT(HOUR FROM order_date::timestamp)::integer as bucket"),
+        db.raw("EXTRACT(HOUR FROM (created_at AT TIME ZONE 'Asia/Ho_Chi_Minh'))::integer as bucket"),
         db.raw("COUNT(*)::integer as orders"),
         db.raw("COUNT(*) FILTER (WHERE status = 'CANCELED')::integer as canceled"),
         db.raw("COALESCE(SUM(CASE WHEN status != 'CANCELED' THEN price ELSE 0 END), 0)::numeric as revenue"),

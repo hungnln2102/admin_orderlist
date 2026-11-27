@@ -29,13 +29,13 @@ export interface ActivationKeyCounts {
 }
 
 export interface CreateActivationKeyPayload {
-  product_name_id: number;
-  product_id?: number | null;
-  id_order?: string;
-  customer_info?: string;
-  quantity?: number;
-  expired_at?: string;
-  note?: string;
+  rule_id: number;
+  id_order: string;
+}
+
+export interface EligibleActivationOrder {
+  id_order: string;
+  customer?: string | null;
 }
 
 export interface CatalogProductOption {

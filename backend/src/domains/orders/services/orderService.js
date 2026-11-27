@@ -9,6 +9,7 @@ const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = requi
 const { generateOrderActivationKey, resolveOrderActivationRule } = require("@/domains/products/services/activationKeyService");
 const { listImportWarehouseTags } = require("@/domains/warehouse/services/importWarehouseTagService");
 const { ensureSupplierCostLog } = require("./supplierCostLogService");
+const { normalizeDateOnly, calculateRemainingDaysVietnam } = require("@/utils/time");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -150,8 +151,8 @@ async function createOrder(payload) {
       payment_method: payload.payment_method || "bank",
       note: payload.note || "",
       days: payload.days ? Number(payload.days) : 365,
-      order_date: payload.order_date || null,
-      expired_at: payload.expired_at || null,
+      order_date: normalizeDateOnly(payload.order_date),
+      expired_at: normalizeDateOnly(payload.expired_at),
       supply_id: await resolveSupplyId(trx, payload.supply_id),
       created_at: db.fn.now(),
     };
@@ -222,7 +223,6 @@ async function createOrder(payload) {
           [K.TARGET_VARIANT_TAG]: rule[R.TARGET_VARIANT_TAG],
           [K.PRODUCT_ID]: rule.parent_product_id || null,
           [K.ID_ORDER]: createdOrder.id_order,
-          [K.CUSTOMER_INFO]: [createdOrder.customer, createdOrder.contact && `(${createdOrder.contact})`].filter(Boolean).join(" ") || null,
           [K.NOTE]: payload.note || `T\u1ef1 \u0111\u1ed9ng c\u1ea5p theo quy t\u1eafc Variant #${rule[R.VARIANT_ID]} + NCC #${rule[R.SUPPLIER_ID]}`,
           [K.CREATED_BY]: "AutoRule",
           [K.CREATED_AT]: db.fn.now(),
@@ -465,9 +465,15 @@ async function createOrder(payload) {
     const statusLabel = getOrderStatusLabel(createdOrder.status);
     const summary = `Tạo mới đơn hàng #${createdOrder.id_order} cho khách "${createdOrder.customer}" với tổng tiền ${formatMoney(createdOrder.price)} [Trạng thái: ${statusLabel}]`;
 
+    const normalizedCreatedOrder = {
+      ...createdOrder,
+      order_date: normalizeDateOnly(createdOrder.order_date) || createdOrder.order_date,
+      expired_at: normalizeDateOnly(createdOrder.expired_at) || createdOrder.expired_at,
+    };
+
     // Phát event Domain: ORDER_CREATED
     await emitOrderEvent(trx, EVENTS.ORDER_CREATED, {
-      ...createdOrder,
+      ...normalizedCreatedOrder,
       orderId: createdOrder.id,
       summary,
       action: "CREATE",
@@ -479,7 +485,7 @@ async function createOrder(payload) {
         id_order: createdOrder.id_order,
         orderCode: createdOrder.id_order,
         cost: Number(createdOrder.cost),
-        order_date: createdOrder.order_date,
+        order_date: normalizedCreatedOrder.order_date,
         created_at: createdOrder.created_at,
         customer: createdOrder.customer,
         isSupplierMavryk,
@@ -589,8 +595,8 @@ async function updateOrder(id, payload) {
     if (payload.payment_method !== undefined) updateFields.payment_method = payload.payment_method;
     if (payload.note !== undefined) updateFields.note = payload.note;
     if (payload.days !== undefined) updateFields.days = Number(payload.days);
-    if (payload.order_date !== undefined) updateFields.order_date = payload.order_date || null;
-    if (payload.expired_at !== undefined) updateFields.expired_at = payload.expired_at || null;
+    if (payload.order_date !== undefined) updateFields.order_date = normalizeDateOnly(payload.order_date);
+    if (payload.expired_at !== undefined) updateFields.expired_at = normalizeDateOnly(payload.expired_at);
     const oldSupplyId = existingOrder.supply_id ? Number(existingOrder.supply_id) : null;
     let resolvedNewSupplyId = oldSupplyId;
     if (payload.supply_id !== undefined) {
@@ -604,20 +610,10 @@ async function updateOrder(id, payload) {
     const isOrderPaid = existingOrder.status === ORDER_STATUS.PAID || Boolean(existingOrder.was_paid);
 
     if (isOrderPaid && isSupplierChanged) {
-      // 1. Tính số ngày còn lại của gói dịch vụ
+      // 1. Tính số ngày còn lại của gói dịch vụ theo ngày lịch YYYY-MM-DD (UTC+7)
       const totalDays = Math.max(Number(existingOrder.days || 365), 1);
-      let remainingDays = 0;
       const targetExpiryStr = updateFields.expired_at !== undefined ? updateFields.expired_at : existingOrder.expired_at;
-      if (targetExpiryStr) {
-        const expiry = new Date(targetExpiryStr);
-        if (!isNaN(expiry.getTime())) {
-          expiry.setHours(0, 0, 0, 0);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const diffTime = expiry.getTime() - today.getTime();
-          remainingDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-        }
-      }
+      const remainingDays = calculateRemainingDaysVietnam(targetExpiryStr);
 
       // 2. Với NCC cũ (oldSupplyId): nếu là NCC ngoài (khác Mavryk/ID 1)
       const isOldMavryk = !oldSupplyId || oldSupplyId === 1;
@@ -736,14 +732,18 @@ async function updateOrder(id, payload) {
 
     const isMoneyField = (f) => ["price", "gross_selling_price", "cost"].includes(f);
 
+    const isDateField = (f) => ["order_date", "expired_at"].includes(f);
+
     for (const [key, newVal] of Object.entries(updateFields)) {
       const oldVal = existingOrder[key];
-      const oldCompare = oldVal == null ? "" : String(oldVal).trim();
-      const newCompare = newVal == null ? "" : String(newVal).trim();
+      const normalizedOld = isDateField(key) ? (normalizeDateOnly(oldVal) || "") : oldVal;
+      const normalizedNew = isDateField(key) ? (normalizeDateOnly(newVal) || "") : newVal;
+      const oldCompare = normalizedOld == null ? "" : String(normalizedOld).trim();
+      const newCompare = normalizedNew == null ? "" : String(normalizedNew).trim();
 
       if (oldCompare !== newCompare) {
         changedFields.push(key);
-        changes[key] = { old: oldVal, new: newVal };
+        changes[key] = { old: normalizedOld, new: normalizedNew };
         const label = labels[key] || key;
 
         if (isMoneyField(key)) {
@@ -751,7 +751,7 @@ async function updateOrder(id, payload) {
         } else if (key === "status") {
           summaryParts.push(`${label}: "${getOrderStatusLabel(oldVal)}" ➔ "${getOrderStatusLabel(newVal)}"`);
         } else {
-          summaryParts.push(`${label}: "${oldVal ?? ""}" ➔ "${newVal ?? ""}"`);
+          summaryParts.push(`${label}: "${normalizedOld ?? ""}" ➔ "${normalizedNew ?? ""}"`);
         }
       }
     }
@@ -821,9 +821,19 @@ async function deleteOrder(id) {
     );
 
     const { excludeOrderFromPendingBatches } = require("@/domains/invoices/services/batchPaymentService");
+    const ensureOrderCanBeDeleted = async () => {
+      const K = COLS.ACTIVATION_KEYS;
+      const issuedKey = await trx(TABLES.ACTIVATION_KEYS)
+        .where(K.ID_ORDER, existingOrder[O_COLS.ID_ORDER])
+        .first(K.ID_ORDER);
+      if (issuedKey) {
+        throw new Error("Đơn hàng đã được cấp mã kích hoạt nên không thể xóa vĩnh viễn.");
+      }
+    };
 
     // Xử lý riêng cho Đơn Nhập Hàng (MAVN... / Mavryk)
     if (isMavn) {
+      await ensureOrderCanBeDeleted();
       const remainingAmount = calculateOrderRemainingValue(existingOrder);
       await trx(TABLES.SUPPLIER_ORDER_COST_LOG).where({ order_list_id: Number(id) }).del();
       await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();
@@ -912,6 +922,7 @@ async function deleteOrder(id) {
     }
 
     // 3. Đơn Chưa Thanh Toán (UNPAID) hoặc đơn nháp khác -> Xóa vĩnh viễn (Hard Delete)
+    await ensureOrderCanBeDeleted();
     await excludeOrderFromPendingBatches(trx, existingOrder.id_order, "Đơn chưa thanh toán bị xóa");
 
     await trx(TABLES.ORDER_LIST).where({ id: Number(id) }).del();

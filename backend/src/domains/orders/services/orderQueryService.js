@@ -3,6 +3,7 @@ const { getAvailableSuffix, applySuffixToPrice, extractSlotSuffix } = require("@
 const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = require("@/domains/products/services/catalogPricingService");
+const { getVietnamDateString } = require("@/utils/time");
 
 const O_COLS = COLS.ORDER_LIST;
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
@@ -447,7 +448,7 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
   const [countResult] = await query.clone().count("id as total");
   const total = Number(countResult?.total || 0);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getVietnamDateString();
 
   let summary;
   if (shouldIncludeStats) {
@@ -484,7 +485,7 @@ async function getOrders({ page = 1, limit = 20, search = "", status = "", tab =
           WHERE status = '${ORDER_STATUS.CANCELED}'
         ) as "canceledCount",
         COUNT(*) FILTER (
-          WHERE order_date::text LIKE '${todayStr}%' OR created_at::text LIKE '${todayStr}%'
+          WHERE order_date::date = '${todayStr}'::date OR (created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = '${todayStr}'::date
         ) as "todayCount"
       `)
     );

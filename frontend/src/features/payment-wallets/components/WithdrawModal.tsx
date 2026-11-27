@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowUpRight, XCircle, Loader2 } from "lucide-react";
+import { CurrencyInputVN } from "@/shared/components";
 import { WalletTarget } from "../types";
 
 interface WithdrawModalProps {
@@ -13,6 +14,26 @@ interface WithdrawModalProps {
   onNoteChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
+
+/** Định dạng chuỗi số USDT (hỗ trợ phần thập phân dấu chấm, phân cách hàng nghìn dấu phẩy) */
+const formatUsdtInput = (raw: string): string => {
+  if (!raw) return "";
+  const hasDot = raw.includes(".");
+  const [intPartRaw, ...decParts] = raw.split(".");
+  const intDigits = intPartRaw.replace(/\D/g, "");
+  const formattedInt = intDigits ? Number(intDigits).toLocaleString("en-US") : "";
+  if (!hasDot) return formattedInt;
+  const decDigits = decParts.join("").replace(/\D/g, "");
+  return `${formattedInt || "0"}.${decDigits}`;
+};
+
+/** Chuẩn hóa chuỗi người dùng nhập USDT thành chuỗi số sạch (VD: "1,250.5" -> "1250.5") */
+const sanitizeUsdtInput = (input: string): string => {
+  const cleaned = input.replace(/[^0-9.]/g, "");
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot === -1) return cleaned;
+  return `${cleaned.slice(0, firstDot + 1)}${cleaned.slice(firstDot + 1).replace(/\./g, "")}`;
+};
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({
   open,
@@ -49,15 +70,32 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               Số tiền rút {target.type === "bank" ? "(VND)" : "(USDT)"} *
             </label>
-            <input
-              type="number"
-              required
-              step="any"
-              placeholder={target.type === "bank" ? "VD: 5000000" : "VD: 100"}
-              value={amount}
-              onChange={(e) => onAmountChange(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none font-mono"
-            />
+            {target.type === "bank" ? (
+              <CurrencyInputVN
+                value={Number(amount) || 0}
+                onChange={(val) => onAmountChange(val > 0 ? String(val) : "")}
+                accentColor="emerald"
+                suffix="₫"
+                required
+                placeholder="VD: 5.000.000"
+                className="py-2 text-xs"
+              />
+            ) : (
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  placeholder="VD: 100.50"
+                  value={formatUsdtInput(amount)}
+                  onChange={(e) => onAmountChange(sanitizeUsdtInput(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3 pr-14 py-2 text-xs font-bold text-emerald-400 focus:border-emerald-500 focus:outline-none font-mono"
+                />
+                <span className="absolute right-3 text-[11px] font-mono font-bold text-emerald-400/80 select-none pointer-events-none">
+                  USDT
+                </span>
+              </div>
+            )}
           </div>
 
           <div>

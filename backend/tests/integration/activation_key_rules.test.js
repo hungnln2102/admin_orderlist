@@ -34,6 +34,71 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
     });
   });
 
+  it("Cấp thủ công đúng một key cho đơn khớp quy tắc, ghi outbox và theo dõi hạn của đơn", async () => {
+    const suffix = randomUUID();
+    const orderCode = `TEST-MANUAL-${suffix}`;
+    const preservedCode = `TEST-PROVIDER-${suffix}`;
+    const expiredAt = new Date(Date.now() + 86_400_000);
+    const outboxQuery = () => db(TABLES.DOMAIN_EVENT_STORE)
+      .whereRaw("?? ->> 'id_order' = ?", [COLS.DOMAIN_EVENT_STORE.PAYLOAD, orderCode]);
+    const rule = await activationKeyService.saveActivationKeyRule({
+      variant_id: variant.id, supplier_id: supplier.id, product_name_id: target.product_name_id,
+      target_variant_tag: target.variant_tag, is_active: true,
+    });
+    try {
+      await db(TABLES.ORDER_LIST).insert([
+        { id_order: orderCode, customer: `Khách ${suffix}`, status: "PAID", expired_at: expiredAt,
+          id_product: variant.id, supply_id: supplier.id },
+        { id_order: preservedCode, information_order: "provider@example.test", status: "PAID",
+          id_product: variant.id, supply_id: supplier.id },
+      ]);
+      const payload = { rule_id: rule.id, id_order: orderCode };
+      assert.deepEqual(await activationKeyService.listEligibleOrders({ rule_id: rule.id, search: suffix }), [
+        { id_order: orderCode, customer: `Khách ${suffix}` },
+      ]);
+      await assert.rejects(
+        activationKeyService.createActivationKeys({ ...payload, id_order: preservedCode }),
+        /không đủ điều kiện/,
+      );
+      const results = await Promise.allSettled([
+        activationKeyService.createActivationKeys(payload),
+        activationKeyService.createActivationKeys({ ...payload, id_order: ` ${orderCode.toUpperCase()} ` }),
+      ]);
+      assert.deepEqual(results.map(({ status }) => status).sort(), ["fulfilled", "rejected"]);
+      const [key] = results.find(({ status }) => status === "fulfilled").value;
+      assert.match(key.key_code, /^MAVKEY[A-Z0-9]{6}$/);
+      assert.equal(key.target_variant_tag, target.variant_tag);
+      assert.equal(key.customer_info, null);
+      const orderQuery = () => db(TABLES.ORDER_LIST).where("id_order", orderCode);
+      assert.equal((await orderQuery().first()).information_order, key.key_code);
+      assert.equal((await outboxQuery()).length, 1);
+      await assert.rejects(db(TABLES.ACTIVATION_KEYS).insert({
+        key_code: activationKeyService.generateOrderActivationKey(), id_order: orderCode,
+      }), { code: "23505", constraint: "uq_activation_key_order" });
+      await assert.rejects(db(TABLES.ACTIVATION_KEYS).insert({
+        key_code: activationKeyService.generateOrderActivationKey(), id_order: `ORPHAN-${suffix}`,
+      }), { code: "23503", constraint: "fk_activation_key_order" });
+      assert.deepEqual(await activationKeyService.listEligibleOrders({ rule_id: rule.id, search: suffix }), []);
+      await assert.rejects(activationKeyService.deleteActivationKey(key.id), /đã gắn đơn hàng/);
+
+      await orderQuery().update({ status: "EXPIRED" });
+      await assert.rejects(activationKeyService.activateKeyWithTransaction({ keyCode: key.key_code }), /Đơn hàng đã hết hạn/);
+      const expired = await activationKeyService.listActivationKeys({ search: suffix, status: "EXPIRED" });
+      assert.equal(expired.pagination.total, 1);
+      assert.equal(expired.data[0].status, "EXPIRED");
+      assert.equal(expired.data[0].customer_info, `Khách ${suffix}`);
+      assert.equal(new Date(expired.data[0].expired_at).toISOString().slice(0, 10), expiredAt.toISOString().slice(0, 10));
+      assert.ok(expired.counts.expired >= 1);
+      const available = await activationKeyService.listActivationKeys({ search: suffix, status: "AVAILABLE" });
+      assert.equal(available.pagination.total, 0);
+    } finally {
+      await outboxQuery().del();
+      await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).del();
+      await db(TABLES.ORDER_LIST).whereIn("id_order", [orderCode, preservedCode]).del();
+      await db(TABLES.ACTIVATION_KEY_RULES).where("id", rule.id).del();
+    }
+  });
+
   after(async () => {
     try {
       if (target) await db(TABLES.PRODUCT_NAMES).where("id", target.product_name_id).del();
@@ -101,10 +166,11 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
         status: "UNPAID",
         expired_at: new Date(Date.now() + 86_400_000),
       });
-      const [key] = await activationKeyService.createActivationKeys({
+      const [key] = await db(TABLES.ACTIVATION_KEYS).insert({
+        key_code: activationKeyService.generateOrderActivationKey(),
         product_name_id: product.id,
         id_order: orderCode,
-      });
+      }).returning("*");
       assert.equal(key.status, "INACTIVE");
       await assert.rejects(activationKeyService.activateKeyWithTransaction({
         keyCode: key.key_code, recovery: "check",
@@ -156,6 +222,7 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
   it("Khôi phục Adobe theo slot hiện tại của gói và tự cấp lại khi gói bị xóa", async () => {
     const suffix = randomUUID();
     const orderCode = `TEST-ADOBE-PACKAGE-${suffix}`;
+    const sharedOrderCode = `TEST-ADOBE-SHARED-${suffix}`;
     const contact = "package-customer@example.test";
     const expiredAt = new Date(Date.now() + 2 * 86_400_000);
     const [product] = await db(TABLES.PRODUCT_NAMES)
@@ -197,17 +264,33 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
         id_order: orderCode, contact, status: "UNPAID", expired_at: expiredAt,
         id_product: variant.id, supply_id: supplier.id,
       });
-      const [key] = await activationKeyService.createActivationKeys({ product_name_id: product.id, id_order: orderCode });
+      const [key] = await db(TABLES.ACTIVATION_KEYS).insert({
+        key_code: activationKeyService.generateOrderActivationKey(),
+        product_name_id: product.id,
+        id_order: orderCode,
+      }).returning("*");
       const keyQuery = () => db(TABLES.ACTIVATION_KEYS).where("id", key.id);
       const orderQuery = () => db(TABLES.ORDER_LIST).where("id_order", orderCode);
       await keyQuery().update({ target_variant_tag: suffix });
       await orderQuery().update({ status: "PAID" });
+      const checkedCandidates = [];
+      const validateReplacement = async ({ account, statusProviderKey }) => {
+        assert.equal(statusProviderKey, "fix_ades_status");
+        checkedCandidates.push(account);
+        return { status_type: account.includes("expired-candidate") ? "expired" : "active" };
+      };
       const recover = (recovery, byOrder = false) => activationKeyService.activateKeyWithTransaction({
         keyCode: byOrder ? orderCode : key.key_code,
         orderContact: byOrder ? contact : undefined,
         recovery,
+        validateReplacement,
       });
+      const initialExpired = await addSlot("expired-candidate-initial");
+      const initialExpiredPackageId = await addPackage(initialExpired);
       const initial = await recover("check");
+      assert.equal(initial.validatedStatus.status_type, "active");
+      assert.ok(checkedCandidates.includes(initialExpired.account));
+      assert.deepEqual(await db(TABLES.PACKAGE_PRODUCT).where("id", initialExpiredPackageId), []);
       assert.equal(initial.account, original.account);
       assert.equal(initial.statusProviderKey, "fix_ades_status");
       const initialKey = await keyQuery().first();
@@ -282,28 +365,75 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
 
       const replace = (previous) => activationKeyService.activateKeyWithTransaction({
         keyCode: orderCode, orderContact: contact, recovery: "replace", rejectedSlot: previous,
+        validateReplacement,
       });
-      const rejected = { id: results[0].slotId, account: results[0].account };
+      const rejected = { id: results[0].slotId, account: results[0].account, reason: "not_found" };
       assert.equal(String(rejected.id), String(replacement.id));
+      await db(TABLES.ORDER_LIST).insert({
+        id_order: sharedOrderCode, contact, status: "PAID", expired_at: expiredAt,
+        id_product: variant.id, supply_id: supplier.id, slot: replacement.account,
+      });
+      const [sharedKey] = await db(TABLES.ACTIVATION_KEYS).insert({
+        key_code: activationKeyService.generateOrderActivationKey(),
+        product_name_id: product.id,
+        id_order: sharedOrderCode,
+        status: "ACTIVATED",
+        package_product_id: replacementPackageId,
+        account_slot_id: replacement.id,
+        assigned_account: replacement.account,
+      }).returning("*");
       const stale = await replace({ id: updated.id, account: updated.account });
       assert.equal(stale.account, replacement.account);
       assert.deepEqual(await outboxQuery(), []);
       assert.deepEqual(await replace(rejected), { replacementRequired: true, outOfStock: true });
-      assert.deepEqual(await keyQuery().first(), finalKey);
+      const quarantinedKey = await keyQuery().first();
+      assert.equal(quarantinedKey.package_product_id, null);
+      assert.equal(quarantinedKey.account_slot_id, replacement.id);
+      assert.equal(quarantinedKey.target_variant_tag, suffix);
+      const sharedKeyQuery = () => db(TABLES.ACTIVATION_KEYS).where("id", sharedKey.id);
+      const quarantinedShared = await sharedKeyQuery().first();
+      assert.equal(quarantinedShared.package_product_id, null);
+      assert.equal(quarantinedShared.account_slot_id, replacement.id);
+      assert.equal(quarantinedShared.target_variant_tag, suffix);
+      assert.deepEqual(await db(TABLES.PACKAGE_PRODUCT).where("id", replacementPackageId), []);
+      assert.equal((await db(TABLES.ACCOUNTS).where("id", replacement.accountId).first()).account_username, replacement.account);
+      const { findRoutingProviderForInput } = require("@/domains/system/services/portalSlotRoutingService");
+      for (const input of [orderCode, key.key_code]) {
+        assert.deepEqual(await findRoutingProviderForInput({ slotKey: "adobe_otp", input }), { disabled: true });
+      }
       assert.equal((await orderQuery().first()).slot, replacement.account);
       const rejectedSlotQuery = () => db(TABLES.ACCOUNT_SLOTS).where("id", replacement.id);
       assert.equal((await rejectedSlotQuery().first()).status, "UNAVAILABLE");
+      await assert.rejects(
+        activationKeyService.activateKeyWithTransaction({ keyCode: key.key_code }),
+        /đã ngừng cấp/
+      );
+
+      const expiredCandidate = await addSlot("expired-candidate");
+      const expiredPackageId = await addPackage(expiredCandidate);
+      const retry = (keyCode, orderContact) => activationKeyService.activateKeyWithTransaction({
+        keyCode, orderContact, recovery: "check", validateReplacement,
+      });
+      assert.deepEqual(await retry(orderCode, contact), { replacementRequired: true, outOfStock: true });
+      assert.ok(checkedCandidates.includes(expiredCandidate.account));
+      assert.deepEqual(await db(TABLES.PACKAGE_PRODUCT).where("id", expiredPackageId), []);
+      assert.equal((await db(TABLES.ACCOUNT_SLOTS).where("id", expiredCandidate.id).first()).status, "UNAVAILABLE");
 
       const newSlot = await addSlot("new-account");
       const newPackageId = await addPackage(newSlot);
-      const retried = await Promise.all([replace(rejected), replace(rejected)]);
+      const retried = await Promise.all([retry(orderCode, contact), retry(key.key_code)]);
       assert.equal(retried.filter((result) => result.replaced).length, 1);
       for (const result of retried) {
         assert.equal(result.account, newSlot.account);
         assert.equal(String(result.slotId), String(newSlot.id));
       }
+      assert.equal(retried.find((result) => result.replaced).validatedStatus.status_type, "active");
       assert.equal((await keyQuery().first()).package_product_id, newPackageId);
       assert.equal((await orderQuery().first()).slot, newSlot.account);
+      const sharedReplacement = await addSlot("shared-replacement");
+      const sharedPackageId = await addPackage(sharedReplacement);
+      assert.equal((await retry(sharedOrderCode, contact)).account, sharedReplacement.account);
+      assert.equal((await sharedKeyQuery().first()).package_product_id, sharedPackageId);
       assert.equal((await rejectedSlotQuery().first()).status, "UNAVAILABLE");
       const notifications = await outboxQuery();
       assert.equal(notifications.length, 1);
@@ -312,6 +442,8 @@ describe("Activation Key Rules & Order Auto-Provisioning Suite", () => {
     } finally {
       await outboxQuery().del();
       await systemConfigService.set(topicKey, previousTopic);
+      await db(TABLES.ACTIVATION_KEYS).where("id_order", sharedOrderCode).del();
+      await db(TABLES.ORDER_LIST).where("id_order", sharedOrderCode).del();
       await db(TABLES.ACTIVATION_KEYS).where("id_order", orderCode).del();
       await db(TABLES.ORDER_LIST).where("id_order", orderCode).del();
       await db(TABLES.PORTAL_SLOT_ROUTING_RULES).where(statusRule).del();

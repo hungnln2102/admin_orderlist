@@ -9,6 +9,15 @@ const getActivationKeys = async (req, res) => {
   }
 };
 
+const getEligibleOrders = async (req, res) => {
+  try {
+    const data = await activationKeyService.listEligibleOrders(req.query);
+    return res.set("Cache-Control", "no-store").json({ data });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message, message: err.message });
+  }
+};
+
 const createActivationKeys = async (req, res) => {
   try {
     const items = await activationKeyService.createActivationKeys(req.body, req.user);
@@ -116,6 +125,7 @@ const checkMatchingKeyRule = async (req, res) => {
 
 module.exports = {
   getActivationKeys,
+  getEligibleOrders,
   createActivationKeys,
   revokeActivationKey,
   deleteActivationKey,

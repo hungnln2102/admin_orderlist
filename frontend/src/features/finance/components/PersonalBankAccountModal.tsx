@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Building2, XCircle, Loader2 } from "lucide-react";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
@@ -89,11 +89,6 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
         bankBin: found.bin,
       });
     }
-  };
-
-  const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatAmountInput(e.target.value);
-    setFormData({ ...formData, balance: formatted });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -206,18 +201,20 @@ export const PersonalBankAccountModal: React.FC<Props> = ({ isOpen, onClose, onS
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Số Dư / Số Tiền (₫) *</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-xs text-slate-500 font-mono">₫</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  required
-                  placeholder="0"
-                  value={formData.balance}
-                  onChange={handleBalanceChange}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2 pl-7 pr-3 text-xs font-mono font-bold text-emerald-400 focus:border-cyan-500 focus:outline-none"
-                />
-              </div>
+              <CurrencyInputVN
+                value={parseAmountInput(formData.balance)}
+                onChange={(val) =>
+                  setFormData({
+                    ...formData,
+                    balance: val > 0 ? val.toLocaleString("vi-VN") : "",
+                  })
+                }
+                accentColor="emerald"
+                suffix="₫"
+                required
+                placeholder="0"
+                className="py-2 text-xs"
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Nhãn Hiển Thị / Ghi Chú</label>

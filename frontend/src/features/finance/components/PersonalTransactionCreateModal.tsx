@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
 import {
@@ -70,11 +70,6 @@ export const PersonalTransactionCreateModal: React.FC<Props> = ({
   });
 
   if (!isOpen) return null;
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, "");
-    setAmountStr(raw);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,23 +182,15 @@ export const PersonalTransactionCreateModal: React.FC<Props> = ({
             <label className="text-xs font-semibold text-slate-300">
               Số tiền (VND) *
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                autoFocus
-                placeholder="0"
-                value={amountStr ? Number(amountStr).toLocaleString("vi-VN") : ""}
-                onChange={handleAmountChange}
-                className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-lg font-bold font-mono focus:outline-none transition-colors ${
-                  direction === "OUTFLOW"
-                    ? "border-rose-500/50 text-rose-300 focus:border-rose-500"
-                    : "border-emerald-500/50 text-emerald-300 focus:border-emerald-500"
-                }`}
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
-                VND
-              </span>
-            </div>
+            <CurrencyInputVN
+              value={Number(amountStr.replace(/\D/g, "")) || 0}
+              onChange={(val) => setAmountStr(val > 0 ? String(val) : "")}
+              accentColor={direction === "OUTFLOW" ? "rose" : "emerald"}
+              suffix="VND"
+              autoFocus
+              placeholder="0"
+              className="px-4 py-3 text-lg pr-12"
+            />
           </div>
 
           {/* 3. Nơi Giao Dịch & Danh Mục */}

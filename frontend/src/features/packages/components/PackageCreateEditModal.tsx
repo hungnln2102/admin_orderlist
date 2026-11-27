@@ -14,7 +14,7 @@ import {
   Hash,
   Cpu,
 } from "lucide-react";
-import { CustomSelect, DateInputVN, SearchableCombobox, ToggleSwitch } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect, DateInputVN, SearchableCombobox, ToggleSwitch } from "@/shared/components";
 import { externalApiClient } from "@/features/external-api/api/externalApiClient";
 import type { Provider } from "@/features/external-api/hooks/useExternalApiConfig";
 import type { PortalSlotItem } from "@/features/external-api/types";
@@ -234,12 +234,13 @@ export const PackageCreateEditModal: React.FC<PackageCreateEditModalProps> = ({
                       <DollarSign className="w-3 h-3 text-emerald-400" />
                       Giá Nhập (₫)
                     </label>
-                    <input
-                      type="number"
-                      min={0}
+                    <CurrencyInputVN
                       value={formData.costPrice}
-                      onChange={(e) => onFormChange({ ...formData, costPrice: Number(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none focus:border-cyan-500"
+                      onChange={(val) => onFormChange({ ...formData, costPrice: val })}
+                      accentColor="emerald"
+                      suffix="₫"
+                      placeholder="0"
+                      className="py-2 text-xs"
                     />
                   </div>
                 </div>

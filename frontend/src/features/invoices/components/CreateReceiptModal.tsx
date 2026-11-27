@@ -26,7 +26,7 @@ import {
 import { BatchDetailModal } from "./BatchDetailModal";
 import { BatchSubOrdersModal } from "./BatchSubOrdersModal";
 import { StatusBadge } from "@/features/orders/components/StatusBadge";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 import { ORDER_STATUS } from "@/features/orders/constants/orderStatus";
 import {
   createInvoiceBatch,
@@ -790,16 +790,13 @@ export const CreateReceiptModal: React.FC<CreateReceiptModalProps> = ({
                       <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">
                         Số Tiền Cần Thu (VND)
                       </label>
-                      <input
-                        type="text"
-                        placeholder="VD: 500,000"
-                        value={
-                          customAmount
-                            ? Number(customAmount.replace(/\D/g, "")).toLocaleString("vi-VN")
-                            : ""
-                        }
-                        onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                        className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl px-4 text-lg font-mono font-bold text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                      <CurrencyInputVN
+                        value={Number(customAmount.replace(/\D/g, "")) || 0}
+                        onChange={(val) => setCustomAmount(val > 0 ? String(val) : "")}
+                        accentColor="cyan"
+                        suffix="₫"
+                        placeholder="VD: 500.000"
+                        className="h-12 px-4 text-lg"
                       />
                     </div>
 

@@ -5,6 +5,7 @@ const { isRenewalOrder, calculateNewExpiry } = require("./orderPaymentService");
 const { getDefaultShopBank } = require("./orderQueryService");
 const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 const { ensureSupplierCostLog } = require("./supplierCostLogService");
+const { calculateRemainingDaysVietnam } = require("@/utils/time");
 
 const getOrderTable = (trx) => (trx || db)(TABLES.ORDER_LIST);
 
@@ -38,15 +39,7 @@ function calculateOrderRemainingValue(order, baseAmount) {
   if (cost <= 0) return 0;
   if (!order.expired_at) return cost;
 
-  const expiry = new Date(order.expired_at);
-  if (isNaN(expiry.getTime())) return cost;
-  expiry.setHours(0, 0, 0, 0);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const diffTime = expiry.getTime() - today.getTime();
-  const remainingDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+  const remainingDays = calculateRemainingDaysVietnam(order.expired_at);
   if (remainingDays <= 0) return 0;
 
   const totalDays = Math.max(Number(order.days || 365), 1);

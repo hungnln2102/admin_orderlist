@@ -56,16 +56,42 @@ function getVietnamDateTimeString(date = new Date()) {
 
 function formatDateDisplay(dateVal) {
   if (!dateVal) return "";
-  try {
-    const date = new Date(dateVal);
-    if (isNaN(date.getTime())) return String(dateVal);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  } catch {
-    return String(dateVal);
+  const ymd = getVietnamDateString(dateVal);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return String(dateVal);
+  const [year, month, day] = ymd.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Chuẩn hóa giá trị đầu vào thành chuỗi ngày thuần YYYY-MM-DD theo giờ Việt Nam (UTC+7).
+ * Trả về null nếu rỗng hoặc không hợp lệ.
+ */
+function normalizeDateOnly(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const dmyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2]}-${dmyMatch[1]}`;
   }
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA", { timeZone: VIETNAM_TZ });
+}
+
+/**
+ * Tính số ngày còn lại (>= 0) giữa ngày hết hạn và ngày tham chiếu theo lịch Việt Nam (YYYY-MM-DD).
+ */
+function calculateRemainingDaysVietnam(expiredAt, referenceDate = new Date()) {
+  const expStr = normalizeDateOnly(expiredAt);
+  if (!expStr) return 0;
+  const todayStr = getVietnamDateString(referenceDate);
+  const [ey, em, ed] = expStr.split("-").map(Number);
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const expUtc = Date.UTC(ey, em - 1, ed);
+  const todayUtc = Date.UTC(ty, tm - 1, td);
+  return Math.max(0, Math.floor((expUtc - todayUtc) / (1000 * 60 * 60 * 24)));
 }
 
 /**
@@ -98,5 +124,7 @@ module.exports = {
   getVietnamMonthString,
   getVietnamDateTimeString,
   formatDateDisplay,
+  normalizeDateOnly,
+  calculateRemainingDaysVietnam,
   addDaysVietnam,
 };

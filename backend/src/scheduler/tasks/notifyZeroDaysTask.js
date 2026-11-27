@@ -33,11 +33,10 @@ async function notifyZeroDaysTask(trigger = "cron") {
       const result = await db.raw(`
         SELECT *, 0 AS days_left
         FROM ??
-        WHERE ?? >= (${todaySql}::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')
-          AND ?? < ((${todaySql} + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')
+        WHERE ??::date = ${todaySql}
           AND ?? = ?
         ORDER BY ?? DESC;
-      `, [TARGET_TABLE, ORDER.EXPIRED_AT, ORDER.EXPIRED_AT, ORDER.STATUS, ORDER_STATUS.RENEW_REQUIRED, ORDER.ID]);
+      `, [TARGET_TABLE, ORDER.EXPIRED_AT, ORDER.STATUS, ORDER_STATUS.RENEW_REQUIRED, ORDER.ID]);
 
       const orders = result.rows || [];
       console.log(`[CRON 0-DAYS] Tìm thấy ${orders.length} đơn hàng đúng 0 ngày còn lại.`);

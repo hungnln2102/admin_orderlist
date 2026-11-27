@@ -19,6 +19,7 @@ import {
   Package,
 } from "lucide-react";
 import { useNotification } from "@/shared/context/NotificationContext";
+import { formatDateDisplay } from "@/features/orders/types";
 
 interface BatchOrderDetail {
   id: number;
@@ -406,7 +407,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       )}
 
                       <div className="flex items-center justify-between text-[10px] text-slate-500">
-                        <span>Ngày đặt: {o.order_date || "—"}</span>
+                        <span>Ngày đặt: {formatDateDisplay(o.order_date)}</span>
                         <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
                           {o.status}
                         </span>

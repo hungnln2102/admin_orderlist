@@ -74,4 +74,5 @@ export interface EditingSupplierCostState {
   supplierCostId: number;
   supplierName: string;
   price: number;
+  originalPrice?: number;
 }

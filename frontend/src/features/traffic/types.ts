@@ -40,10 +40,32 @@ export interface DeviceItem {
 
 export interface LocationItem {
   city: string;
+  countryCode: string;
   country: string;
   sessions: number;
   users: number;
   share: number;
+}
+
+export interface IpMapPoint {
+  lat: number;
+  lng: number;
+  city: string | null;
+  country: string | null;
+  countryCode: string | null;
+  ipCount: number;
+  hits: number;
+  lastSeen: string;
+}
+
+export interface IpMapResponse {
+  available: boolean;
+  reason?: string;
+  geoAvailable?: boolean;
+  points?: IpMapPoint[];
+  totalIps?: number;
+  mappedIps?: number;
+  totalHits?: number;
 }
 
 export interface TrafficApiResponse {
@@ -72,5 +94,6 @@ export interface TrafficApiResponse {
   topPages: TopPageItem[];
   deviceData: DeviceItem[];
   locationData: LocationItem[];
+  countryData: Pick<LocationItem, "country" | "countryCode" | "sessions" | "share">[];
   newVsReturning: { name: string; value: number; share: number; color?: string }[];
 }

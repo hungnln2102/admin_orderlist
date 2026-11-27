@@ -21,6 +21,17 @@ const getCreditNotes = async (req, res) => {
   }
 };
 
+const getCreditApplications = async (req, res) => {
+  try {
+    const { search, page, limit } = req.query;
+    res.json(await creditService.getCreditApplications({ search, page, limit }));
+  } catch (error) {
+    console.error("Lỗi getCreditApplications:", error);
+    res.status(500).json({ error: getClientErrorMessage(error, "Không thể tải lịch sử sử dụng credit.") });
+  }
+};
+
 module.exports = {
   getCreditNotes,
+  getCreditApplications,
 };

@@ -292,6 +292,25 @@ test("dispatcher classifies inactive organizationStatus as CẦN CHUYỂN TEAM",
   });
 });
 
+test("Adobe status dispatcher uses the active response for expiring-soon and hides expired account actions", async (t) => {
+  t.mock.method(require("../../src/domains/system/services/productApiService"), "findRoutingProviderForInput",
+    async () => ({ provider_key: "fix_ades_status" }));
+  const { dispatchSlotRequest } = require("../../src/domains/system/services/otpPortalDispatcher");
+  let status = "expiring-soon";
+  await withMockedExternalFetch(async () => new Response(JSON.stringify({
+    found: true, status, organizationStatus: { status: "normal" },
+  })), async () => {
+    const request = () => dispatchSlotRequest({ slotKey: "adobe_check", input: "user@example.com" });
+    const expiring = await request();
+    assert.equal(expiring.data.status_type, "active");
+    assert.equal(expiring.data.account, "user@example.com");
+    status = "expired";
+    const expired = await request();
+    assert.equal(expired.data.status_type, "not_found");
+    assert.equal(expired.data.status, "ĐÃ HẾT HẠN");
+  });
+});
+
 test("switchOrgAdes and getSwitchOrgStatusAdes call upstream org-switch endpoints", { concurrency: false }, async () => {
   const { switchOrgAdes, getSwitchOrgStatusAdes } = require("../../src/domains/system/providers/fixAdesStatusProvider");
   const { providerConfig } = require("../../src/domains/system/providers/providerConfig");
@@ -555,7 +574,7 @@ test("public Adobe report and status-only lookup require proof and omit credenti
 });
 
 
-test("Adobe recovery replaces only a verified missing subscription", async (t) => {
+test("Adobe recovery delivers expiring-soon and replaces only confirmed expired or missing subscriptions", async (t) => {
   const routesPath = require.resolve("../../src/domains/system/routes/publicOtpRoutes");
   const source = require("../../src/domains/system/services/adobeOrderSourceService");
   const activation = require("../../src/domains/products/services/activationKeyService");
@@ -566,17 +585,18 @@ test("Adobe recovery replaces only a verified missing subscription", async (t) =
   let outcome = "inactive";
   let outOfStock = false;
   t.mock.method(source, "resolveAdobeRecoveryOrder", async () => null);
-  const allocate = t.mock.method(activation, "activateKeyWithTransaction", async ({ recovery, rejectedSlot }) => {
+  const allocate = t.mock.method(activation, "activateKeyWithTransaction", async ({ recovery, rejectedSlot, validateReplacement }) => {
     if (recovery === "check") {
       return { account: email, password: "old-password", slotId: 1, packageBacked: true, statusProviderKey: "fix_ades_status" };
     }
     assert.equal(recovery, "replace");
-    assert.deepEqual(rejectedSlot, { id: 1, account: email });
+    assert.deepEqual(rejectedSlot, { id: 1, account: email, reason: outcome === "expired" ? "expired" : "not_found" });
     if (outOfStock) return { replacementRequired: true, outOfStock: true };
-    return { account: nextEmail, password: "new-password", slotId: 2, packageBacked: true, replaced: true, statusProviderKey: "fix_ades_status" };
+    const validatedStatus = await validateReplacement({ account: nextEmail, statusProviderKey: "fix_ades_status" });
+    return { account: nextEmail, password: "new-password", slotId: 2, packageBacked: true, replaced: true, statusProviderKey: "fix_ades_status", validatedStatus };
   });
   t.mock.method(provider, "fetchFixAdesStatus", async (account) => {
-    if (account === nextEmail) return { rawData: { status: "active" } };
+    if (account === nextEmail) return { rawData: { status: "expiring-soon" } };
     if (outcome === "timeout") throw new Error("timeout");
     if (outcome === "missing") return { rawData: { found: false }, error: "No subscription" };
     return { rawData: { status: outcome } };
@@ -602,13 +622,20 @@ test("Adobe recovery replaces only a verified missing subscription", async (t) =
   assert.equal((await request()).data.status_type, "inactive");
   outcome = "timeout";
   assert.equal((await request()).data.status_type, "unknown");
-  assert.deepEqual(allocate.mock.calls.map((call) => call.arguments[0].recovery), ["check", "check"]);
+  outcome = "expiring-soon";
+  const expiring = await request();
+  assert.equal(expiring.data.status_type, "active");
+  assert.equal(expiring.data.account, email);
+  assert.equal(expiring.data.password, "old-password");
+  assert.deepEqual(allocate.mock.calls.map((call) => call.arguments[0].recovery), ["check", "check", "check"]);
   outcome = "missing";
   const replaced = await request();
   assert.equal(replaced.replaced, true);
   assert.deepEqual(replaced.data, {
     account: nextEmail, password: "new-password", status_type: "active", status: "ĐANG HOẠT ĐỘNG", organization: undefined,
   });
+  outcome = "expired";
+  assert.equal((await request()).data.account, nextEmail);
   outOfStock = true;
   assert.deepEqual(await request(), { success: true, source: "ades", replacementRequired: true, outOfStock: true });
 });
@@ -628,7 +655,9 @@ test("public Adobe switch status verifies the new team only after completion", a
       ? { source: "ades", providerKey: "fix_ades_status", account: email }
       : { contactRequired: true }
   ));
-  const progress = t.mock.method(dispatcher, "getAdobeSwitchTeamStatus", async () => ({ status, newOrgName }));
+  const progress = t.mock.method(dispatcher, "getAdobeSwitchTeamStatus", async () => ({
+    status, newOrgName, ...(status === "sending" && { position: 0, etaSeconds: 15 }),
+  }));
   const check = t.mock.method(provider, "fetchFixAdesStatus", async () => ({
     rawData: { status: accountState, organization: { name: organization } },
   }));
@@ -655,7 +684,7 @@ test("public Adobe switch status verifies the new team only after completion", a
 
   assert.equal((await request({ email: "other@example.test" })).statusCode, 400);
   assert.equal(progress.mock.callCount(), 0);
-  assert.deepEqual((await request()).payload, { success: true, status: "sending", newOrgName });
+  assert.deepEqual((await request()).payload, { success: true, status: "sending", newOrgName, position: 0, etaSeconds: 15 });
   status = "failed";
   assert.equal((await request()).payload.status, "failed");
   assert.equal(check.mock.callCount(), 0);
@@ -670,6 +699,17 @@ test("public Adobe switch status verifies the new team only after completion", a
     newOrgName,
     accountResult: { account: email, status: "ĐANG HOẠT ĐỘNG", status_type: "active", organization },
   });
+  status = "done";
+  accountState = "unknown";
+  assert.equal((await request()).payload.status, "verifying");
+  accountState = "inactive";
+  organization = "Old Team";
+  const done = (await request()).payload;
+  assert.equal(done.status, "completed");
+  assert.equal(done.accountResult.status_type, "inactive");
+  assert.equal(done.accountResult.organization, organization);
+  accountState = "active";
+  assert.equal((await request()).payload.accountResult.status_type, "active");
   assert.ok(check.mock.calls.every((call) => call.arguments[0] === email));
 });
 

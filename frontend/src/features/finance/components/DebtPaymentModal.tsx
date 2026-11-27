@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Installment, PersonalAsset } from "../types";
-import { X, CreditCard, DollarSign, Calendar, FileText, PlusCircle, MinusCircle, Wallet, Receipt } from "lucide-react";
+import { X, CreditCard, Calendar, FileText, PlusCircle, MinusCircle, Wallet, Receipt } from "lucide-react";
 import { formatVND } from "@/shared/utils";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 import { useNotification } from "@/shared/context/NotificationContext";
 
 interface Props {
@@ -518,17 +518,15 @@ export const DebtPaymentModal: React.FC<Props> = ({
               <label className="text-xs font-semibold text-slate-300 block mb-1.5">
                 Số Tiền (₫) <span className="text-rose-400">*</span>
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={Number(amount.replace(/\D/g, "") || 0).toLocaleString("vi-VN")}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 py-2.5 text-sm font-mono text-emerald-300 focus:outline-none focus:border-emerald-400"
-                />
-                <DollarSign className="w-4 h-4 text-slate-500 absolute left-2.5 top-3" />
-              </div>
+              <CurrencyInputVN
+                value={Number(amount.replace(/\D/g, "")) || 0}
+                onChange={(val) => setAmount(val > 0 ? String(val) : "")}
+                accentColor="emerald"
+                suffix="₫"
+                required
+                placeholder="0"
+                className="py-2.5 text-sm"
+              />
             </div>
 
             {mode === "INSTALLMENT" && (

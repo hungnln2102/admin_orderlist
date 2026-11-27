@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { DebtKind, DebtRepaymentFrequency, PersonalAsset, PersonalAssetType, ProfitDestination, ProfitFrequency } from "../types";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { DateInputVN } from "@/shared/components/DateInputVN";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 import { PersonalAssetPreview } from "./PersonalAssetPreview";
 import {
   Calendar,
@@ -64,7 +64,6 @@ export const PersonalAssetsModal: React.FC<Props> = ({
   defaultType = "SAVINGS",
 }) => {
   const notify = useNotification();
-  const amountInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -188,26 +187,6 @@ export const PersonalAssetsModal: React.FC<Props> = ({
       cancelled = true;
     };
   }, [isOpen, profitEnabled]);
-
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value;
-    const caretPosition = event.target.selectionStart ?? rawValue.length;
-    const digitsBeforeCaret = rawValue.slice(0, caretPosition).replace(/\D/g, "").length;
-    const formattedValue = formatAmountInput(rawValue);
-
-    setAmount(formattedValue);
-    requestAnimationFrame(() => {
-      const input = amountInputRef.current;
-      if (!input) return;
-      let nextCaret = 0;
-      let digitCount = 0;
-      while (nextCaret < formattedValue.length && digitCount < digitsBeforeCaret) {
-        if (/\d/.test(formattedValue[nextCaret])) digitCount += 1;
-        nextCaret += 1;
-      }
-      input.setSelectionRange(nextCaret, nextCaret);
-    });
-  };
 
   const setQuickDuration = (months: number) => {
     const d = new Date();
@@ -448,19 +427,25 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                   <label className="mb-1.5 block text-xs font-semibold text-slate-300">
                     Số tiền (₫) <span className="text-rose-400">*</span>
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-sm text-slate-500 font-mono font-bold">₫</span>
-                    <input
-                      ref={amountInputRef}
-                      type="text"
-                      inputMode="numeric"
-                      value={amount}
-                      onChange={handleAmountChange}
-                      placeholder="0"
-                      required
-                      className={`w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-8 pr-3.5 font-mono text-sm font-bold text-white ${theme.focusBorder} focus:outline-none`}
-                    />
-                  </div>
+                  <CurrencyInputVN
+                    value={amountValue}
+                    onChange={(val) => setAmount(val > 0 ? String(val) : "")}
+                    accentColor={
+                      type === "DEBT_PAYABLE"
+                        ? "rose"
+                        : type === "DEBT_RECEIVABLE"
+                        ? "emerald"
+                        : type === "GOLD_INVESTMENT"
+                        ? "amber"
+                        : type === "SAVINGS"
+                        ? "purple"
+                        : "cyan"
+                    }
+                    suffix="₫"
+                    required
+                    placeholder="0"
+                    className="py-2.5 text-sm"
+                  />
                 </div>
               </div>
 
@@ -593,9 +578,33 @@ export const PersonalAssetsModal: React.FC<Props> = ({
                             ]}
                           />
                         </div>
-                        <label className="text-[11px] text-slate-300 font-medium">{debtKind === "PERSONAL_EXTERNAL" ? "STK đối chiếu (nếu có)" : debtKind === "CREDIT_CARD" ? "Hạn mức tín dụng" : "Hạn mức thấu chi"}
-                          <input type={debtKind === "PERSONAL_EXTERNAL" ? "text" : "number"} min={debtKind === "PERSONAL_EXTERNAL" ? undefined : "1"} required={debtKind !== "PERSONAL_EXTERNAL"} value={debtKind === "PERSONAL_EXTERNAL" ? debtAccountNumber : debtInitialLimit} onChange={(event) => debtKind === "PERSONAL_EXTERNAL" ? setDebtAccountNumber(event.target.value.replace(/\D/g, "")) : setDebtInitialLimit(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
-                        </label>
+                        <div>
+                          <label className="mb-1 block text-[11px] text-slate-300 font-medium">
+                            {debtKind === "PERSONAL_EXTERNAL"
+                              ? "STK đối chiếu (nếu có)"
+                              : debtKind === "CREDIT_CARD"
+                              ? "Hạn mức tín dụng"
+                              : "Hạn mức thấu chi"}
+                          </label>
+                          {debtKind === "PERSONAL_EXTERNAL" ? (
+                            <input
+                              type="text"
+                              value={debtAccountNumber}
+                              onChange={(event) => setDebtAccountNumber(event.target.value.replace(/\D/g, ""))}
+                              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none"
+                            />
+                          ) : (
+                            <CurrencyInputVN
+                              value={Number(debtInitialLimit) || 0}
+                              onChange={(val) => setDebtInitialLimit(val > 0 ? String(val) : "")}
+                              accentColor="rose"
+                              suffix="₫"
+                              required
+                              placeholder="VD: 30.000.000"
+                              className="py-2 text-xs"
+                            />
+                          )}
+                        </div>
                         {debtKind !== "PERSONAL_EXTERNAL" && <label className="text-[11px] text-slate-300 font-medium">STK trích nợ để đối chiếu
                           <input type="text" value={debtAccountNumber} onChange={(event) => setDebtAccountNumber(event.target.value.replace(/\D/g, ""))} className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white focus:border-rose-400 focus:outline-none" />
                         </label>}

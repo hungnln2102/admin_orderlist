@@ -18,6 +18,7 @@ function createUnavailableTrafficData(days, reason) {
     topPages: [],
     deviceData: [],
     locationData: [],
+    countryData: [],
     newVsReturning: [],
   };
 }
@@ -88,13 +89,10 @@ const getTrafficStatsService = async (days = 30) => {
         : [{ startDate: `${days}daysAgo`, endDate: "today" }];
 
       const dimensionFilter = {
-        notExpression: {
-          filter: {
-            fieldName: "hostName",
-            stringFilter: {
-              matchType: "EXACT",
-              value: "admin.mavrykpremium.com",
-            },
+        filter: {
+          fieldName: "hostName",
+          inListFilter: {
+            values: ["mavrykpremium.com", "www.mavrykpremium.com"],
           },
         },
       };
@@ -102,7 +100,7 @@ const getTrafficStatsService = async (days = 30) => {
       const timeDimensions = isHourly ? [{ name: "hour" }] : [{ name: "date" }];
       const timeOrderBys = isHourly ? [{ dimension: { dimensionName: "hour" } }] : [{ dimension: { dimensionName: "date" } }];
 
-      const [timeResult, sourceResult, deviceResult, pagesResult, newReturningResult, locationResult] = await Promise.all([
+      const [timeResult, sourceResult, deviceResult, pagesResult, newReturningResult, locationResult, countryResult] = await Promise.all([
         client.runReport({
           property: `properties/${propertyId}`,
           dateRanges,
@@ -152,10 +150,18 @@ const getTrafficStatsService = async (days = 30) => {
         client.runReport({
           property: `properties/${propertyId}`,
           dateRanges,
-          dimensions: [{ name: "city" }, { name: "country" }],
+          dimensions: [{ name: "city" }, { name: "country" }, { name: "countryId" }],
           metrics: [{ name: "sessions" }, { name: "activeUsers" }],
           dimensionFilter,
-          limit: 15,
+          limit: 1000,
+          orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+        }),
+        client.runReport({
+          property: `properties/${propertyId}`,
+          dateRanges,
+          dimensions: [{ name: "country" }, { name: "countryId" }],
+          metrics: [{ name: "sessions" }],
+          dimensionFilter,
           orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
         }),
       ]);
@@ -327,11 +333,22 @@ const getTrafficStatsService = async (days = 30) => {
         const sCount = parseInt(row.metricValues[0].value, 10);
         const uCount = parseInt(row.metricValues[1].value, 10);
         return {
-          city: cityName === "(not set)" ? countryName : cityName,
+          city: cityName,
+          countryCode: row.dimensionValues[2].value,
           country: countryName,
           sessions: sCount,
           users: uCount,
           share: totalSess > 0 ? Number(((sCount / totalSess) * 100).toFixed(1)) : 0,
+        };
+      });
+
+      const countryData = (countryResult[0].rows || []).map((row) => {
+        const sessions = Number(row.metricValues[0].value);
+        return {
+          country: row.dimensionValues[0].value,
+          countryCode: row.dimensionValues[1].value,
+          sessions,
+          share: totalSess > 0 ? (sessions / totalSess) * 100 : 0,
         };
       });
 
@@ -360,6 +377,7 @@ const getTrafficStatsService = async (days = 30) => {
         topPages,
         deviceData,
         locationData,
+        countryData,
         newVsReturning: [
           { name: "Khách Mới (New Visitors)", value: newUsersCount, share: Number((100 - returningRate).toFixed(1)) },
           { name: "Khách Quay Lại (Returning)", value: retUsersCount, share: returningRate },

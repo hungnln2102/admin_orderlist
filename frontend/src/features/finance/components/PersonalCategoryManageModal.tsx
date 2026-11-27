@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { GlassCard } from "@/shared/components/GlassCard";
+import { CurrencyInputVN } from "@/shared/components";
 import { formatVND } from "@/shared/utils";
 import { useNotification } from "@/shared/context/NotificationContext";
 import { PersonalSpendingCategory } from "../types";
@@ -350,12 +351,13 @@ export const PersonalCategoryManageModal: React.FC<Props> = ({
                 <span>Ngân sách chi tiêu tháng (VND)</span>
                 <span className="text-[10px] text-slate-400 font-normal">Tùy chọn</span>
               </label>
-              <input
-                type="text"
-                placeholder="VD: 2.000.000 đ"
-                value={monthlyBudgetStr ? Number(monthlyBudgetStr.replace(/\D/g, "")).toLocaleString("vi-VN") : ""}
-                onChange={(e) => setMonthlyBudgetStr(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-emerald-300 font-mono font-bold placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+              <CurrencyInputVN
+                value={Number(monthlyBudgetStr.replace(/\D/g, "")) || 0}
+                onChange={(val) => setMonthlyBudgetStr(val > 0 ? String(val) : "")}
+                accentColor="emerald"
+                suffix="₫"
+                placeholder="VD: 2.000.000"
+                className="px-3.5 py-2.5 text-xs"
               />
             </div>
 

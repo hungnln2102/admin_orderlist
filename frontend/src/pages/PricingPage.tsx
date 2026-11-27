@@ -480,6 +480,11 @@ export const PricingPage: React.FC = () => {
         onCloseEditModal={() => setEditingSupplierCost(null)}
         setEditingSupplierCost={setEditingSupplierCost}
         onEditSubmit={handleEditSupplierCostSubmit}
+        product={
+          items.find(
+            (it) => it.id === (addSupplierProductId ?? editingSupplierCost?.productId)
+          ) || null
+        }
         submitting={submitting}
       />
     </div>

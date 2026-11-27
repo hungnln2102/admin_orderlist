@@ -6,7 +6,8 @@ import { useTrafficData } from "./hooks/useTrafficData";
 import { TrafficHeader } from "./components/TrafficHeader";
 import { TrafficKpiGrid } from "./components/TrafficKpiGrid";
 import { TrafficChart } from "./components/TrafficChart";
-import { TrafficDataTable } from "./components/TrafficDataTable";
+import { TrafficGeography } from "./components/TrafficGeography";
+import { TrafficDataTable, type TrafficTab } from "./components/TrafficDataTable";
 import {
   Eye,
   Users,
@@ -41,7 +42,7 @@ export const TrafficPage: React.FC = () => {
   const { data, loading, errorMsg, refresh: fetchTrafficData } = useTrafficData(days);
 
   // Active Tab cho 5 bảng stat
-  const [activeTab, setActiveTab] = useState<"daily" | "sources" | "pages" | "devices" | "locations">("daily");
+  const [activeTab, setActiveTab] = useState<TrafficTab>("daily");
 
   // Search filter trong bảng
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -230,9 +231,17 @@ export const TrafficPage: React.FC = () => {
 
   const baselineY = paddingTop + usableH;
 
-  if (data?.available === false) {
-    return (
-      <div className="space-y-6 pb-12 font-sans animate-fade-in text-slate-100">
+  const pageviewArea = pageviewPoints.length
+    ? `${pageviewLine} L ${pageviewPoints[pageviewPoints.length - 1].x},${baselineY} L ${pageviewPoints[0].x},${baselineY} Z`
+    : "";
+  const visitorArea = visitorPoints.length
+    ? `${visitorLine} L ${visitorPoints[visitorPoints.length - 1].x},${baselineY} L ${visitorPoints[0].x},${baselineY} Z`
+    : "";
+
+  return (
+    <div className="space-y-6 pb-12 font-sans animate-fade-in text-slate-100">
+      <TrafficHeader days={days} setDays={setDays} fetchTrafficData={fetchTrafficData} loading={loading} />
+      {data?.available === false ? (
         <GlassCard className="border-amber-500/40 bg-amber-500/10">
           <div className="flex items-start gap-3 p-5 text-amber-100">
             <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
@@ -245,22 +254,14 @@ export const TrafficPage: React.FC = () => {
             </div>
           </div>
         </GlassCard>
-      </div>
-    );
-  }
-  const pageviewArea = pageviewPoints.length
-    ? `${pageviewLine} L ${pageviewPoints[pageviewPoints.length - 1].x},${baselineY} L ${pageviewPoints[0].x},${baselineY} Z`
-    : "";
-  const visitorArea = visitorPoints.length
-    ? `${visitorLine} L ${visitorPoints[visitorPoints.length - 1].x},${baselineY} L ${visitorPoints[0].x},${baselineY} Z`
-    : "";
-
-  return (
-    <div className="space-y-6 pb-12 font-sans animate-fade-in text-slate-100">
-      <TrafficHeader days={days} setDays={setDays} fetchTrafficData={fetchTrafficData} loading={loading} />
-      <TrafficKpiGrid data={data} />
-      <TrafficChart data={data} days={days} chartPoints={chartPoints} hoveredChartIdx={hoveredChartIdx} setHoveredChartIdx={setHoveredChartIdx} maxVal={maxVal} getPtX={getPtX} getPtY={getPtY} pageviewLine={pageviewLine} visitorLine={visitorLine} baselineY={baselineY} pageviewArea={pageviewArea} visitorArea={visitorArea} />
-      <TrafficDataTable data={data} activeTab={activeTab} setActiveTab={setActiveTab} searchTerm={searchTerm} setSearchTerm={setSearchTerm} handleExportCSV={handleExportCSV} handleSort={handleSort} paginatedData={paginatedData} loading={loading} totalPages={totalPages} currentPage={currentPage} pageSize={pageSize} setCurrentPage={setCurrentPage} setPageSize={setPageSize} maxVal={maxVal} />
+      ) : (
+        <>
+          <TrafficKpiGrid data={data} />
+          {data && data.days === days && <TrafficGeography data={data} days={days} />}
+          <TrafficChart data={data} days={days} chartPoints={chartPoints} hoveredChartIdx={hoveredChartIdx} setHoveredChartIdx={setHoveredChartIdx} maxVal={maxVal} getPtX={getPtX} getPtY={getPtY} pageviewLine={pageviewLine} visitorLine={visitorLine} baselineY={baselineY} pageviewArea={pageviewArea} visitorArea={visitorArea} />
+        </>
+      )}
+      <TrafficDataTable days={days} data={data} activeTab={activeTab} setActiveTab={setActiveTab} searchTerm={searchTerm} setSearchTerm={setSearchTerm} handleExportCSV={handleExportCSV} handleSort={handleSort} paginatedData={paginatedData} loading={loading} totalPages={totalPages} currentPage={currentPage} pageSize={pageSize} setCurrentPage={setCurrentPage} setPageSize={setPageSize} maxVal={maxVal} />
     </div>
   );
 };

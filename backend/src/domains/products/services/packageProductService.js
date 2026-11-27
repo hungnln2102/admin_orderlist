@@ -258,11 +258,10 @@ const getPackageProducts = async ({ connection = db, productNameId = null, usage
       if (String(o.customer || "").trim().toLowerCase() === "mavryk") return false;
       if (String(o.status || "").toLowerCase().includes("nhập hàng")) return false;
 
-      // 3. Tuyệt đối không khớp đơn đã hết hạn theo mốc ngày thực tế
+      // 3. Tuyệt đối không khớp đơn đã hết hạn theo mốc ngày thực tế (YYYY-MM-DD, UTC+7)
       if (o.expired_at) {
-        const expDate = new Date(o.expired_at);
-        const now = new Date();
-        if (expDate.setHours(0, 0, 0, 0) < now.setHours(0, 0, 0, 0)) {
+        const expStr = getVietnamDateString(o.expired_at);
+        if (expStr && expStr < todayStr) {
           return false;
         }
       }
@@ -925,23 +924,25 @@ const updatePackageProduct = async (id, payload) => withTransaction(async (trx) 
 /**
  * Xóa Gói Sản Phẩm khỏi warehouse.package_products
  */
-const deletePackageProduct = async (id) => withTransaction(async (trx) => {
+const deletePackageProduct = async (id, connection) => {
   const pkgId = parseInt(id, 10);
   if (!pkgId) throw new Error("ID gói không hợp lệ!");
 
-  const existing = await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).first();
-  if (!existing) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
+  const remove = async (trx) => {
+    const deleted = await trx(TABLES.PACKAGE_PRODUCT).where(COLS.PACKAGE_PRODUCT.ID, pkgId).del();
+    if (!deleted) throw new Error(`Không tìm thấy gói sản phẩm #${pkgId}`);
 
-  await trx(TABLES.PACKAGE_PRODUCT).where("id", pkgId).del();
+    const result = {
+      success: true,
+      id: pkgId,
+    };
 
-  const result = {
-    success: true,
-    id: pkgId,
+    await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_PRODUCT_DELETED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
+    return result;
   };
 
-  await publishEventInTrx(trx, { eventName: EVENTS.PACKAGE_PRODUCT_DELETED, aggregateType: "PRODUCT", aggregateId: result.id, source: "PRODUCT", payload: result });
-  return result;
-});
+  return connection ? remove(connection) : withTransaction(remove);
+};
 
 /**
  * Lấy toàn bộ danh sách tên sản phẩm trong bảng Master Catalog (warehouse.product_names)

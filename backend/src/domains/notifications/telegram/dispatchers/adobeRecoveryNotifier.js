@@ -2,8 +2,10 @@ const { dispatch } = require("@/domains/notifications/hub/notificationHubService
 const { ADOBE_MISSING_SUBSCRIPTION } = require("@/domains/notifications/telegram/core/constants");
 const { escapeHtml } = require("@/domains/notifications/telegram/builders/formatters");
 
-function enqueueAdobeMissingSubscription({ trx, orderCode, slotId, account, replaced }) {
-  const renderedTitle = "Tài khoản Adobe không còn gói đăng ký";
+function enqueueAdobeMissingSubscription({ trx, orderCode, slotId, account, replaced, reason }) {
+  const renderedTitle = reason === "expired"
+    ? "Gói đăng ký Adobe đã hết hạn"
+    : "Tài khoản Adobe không còn gói đăng ký";
   const outcome = replaced ? "Đã cấp tài khoản thay thế." : "Kho đã hết tài khoản thay thế.";
 
   return dispatch({

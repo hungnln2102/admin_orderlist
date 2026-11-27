@@ -1,6 +1,16 @@
 const { requestProviderApi } = require("./providerRequest");
 const { parseJsonResponse } = require("./otpProviderUtils");
 
+function classifyFixAdesStatus(data) {
+  if (data?.found === false) return "not_found";
+  const account = String(data?.status || "").trim().toLowerCase();
+  const organization = String(data?.organizationStatus?.status || data?.organization_status || "").trim().toLowerCase();
+  if (account === "expired") return "expired";
+  if (account === "inactive" || organization === "inactive") return "inactive";
+  if (["active", "expiring-soon"].includes(account) || organization === "active") return "active";
+  return "unknown";
+}
+
 async function fetchFixAdesStatus(email, { config } = {}) {
   const cleanEmail = String(email || "").trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes("@")) throw new Error("Invalid email for Fix-Ades status lookup.");
@@ -57,6 +67,7 @@ async function getSwitchOrgStatusAdes(email, { config } = {}) {
 }
 
 module.exports = {
+  classifyFixAdesStatus,
   fetchFixAdesStatus,
   switchOrgAdes,
   getSwitchOrgStatusAdes,

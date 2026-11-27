@@ -8,7 +8,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { CustomSelect, DateInputVN } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect, DateInputVN } from "@/shared/components";
 import { PaymentAccount, StoreExpenseItem, ExpenseFormData } from "../types";
 
 interface ExternalImportEditModalProps {
@@ -132,18 +132,18 @@ export const ExternalImportEditModal: React.FC<ExternalImportEditModalProps> = (
           {/* Số tiền */}
           <div>
             <label className="block text-slate-400 mb-1 font-semibold">Số Tiền (₫) *</label>
-            <input
-              type="text"
-              required
-              value={formData.amount}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, "");
+            <CurrencyInputVN
+              value={Number(formData.amount.replace(/\D/g, "")) || 0}
+              onChange={(val) =>
                 setFormData((prev) => ({
                   ...prev,
-                  amount: raw ? Number(raw).toLocaleString("vi-VN") : "",
-                }));
-              }}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-cyan-500"
+                  amount: val > 0 ? val.toLocaleString("vi-VN") : "",
+                }))
+              }
+              accentColor="cyan"
+              suffix="₫"
+              required
+              className="bg-slate-800 border-slate-700 text-sm"
             />
           </div>
 

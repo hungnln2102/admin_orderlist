@@ -19,7 +19,7 @@ import {
   getFixedCosts,
   getMatchableOrders,
 } from "../api/invoicesApiClient";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 
 interface InvoiceReceipt {
   id: number;
@@ -761,12 +761,13 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                 </button>
               </div>
             </div>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+            <CurrencyInputVN
+              value={Number(amount) || 0}
+              onChange={(val) => setAmount(val > 0 ? String(val) : "")}
+              accentColor="emerald"
+              suffix="₫"
               placeholder="Nhập số tiền..."
-              className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-emerald-400 font-mono font-bold placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm transition-all"
+              className="px-4 py-3 rounded-2xl text-sm"
             />
           </div>
 

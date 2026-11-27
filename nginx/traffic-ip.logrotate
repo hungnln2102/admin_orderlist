@@ -1,0 +1,13 @@
+/var/log/traffic/traffic.log {
+    daily
+    rotate 29
+    maxage 29
+    missingok
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        /usr/sbin/nginx -s reopen
+    endscript
+}

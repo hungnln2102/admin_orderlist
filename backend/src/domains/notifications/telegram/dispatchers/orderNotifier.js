@@ -6,6 +6,7 @@ const {
   buildExpiredOrderMessage 
 } = require("@/domains/notifications/telegram/builders/orderMessageBuilder");
 const { db, TABLES } = require("@/db");
+const { getVietnamDateString } = require("@/utils/time");
 const { listBankAccounts } = require("@/domains/wallets/services/walletService");
 
 async function resolveDefaultShopBankAccount() {
@@ -138,7 +139,7 @@ async function sendBulkTelegramOrders(orders = [], config) {
       const price = Number(order.price) || 0;
 
       const orderCode = String(order?.id_order ?? order?.idOrder ?? order?.id ?? "").trim();
-      const expDateStr = order.expired_at ? new Date(order.expired_at).toISOString().slice(0, 10) : "";
+      const expDateStr = order.expired_at ? getVietnamDateString(order.expired_at) : "";
       let orderIdempotencyKey = null;
       let eventType = "DUE_ORDER_NOTIFICATION";
 

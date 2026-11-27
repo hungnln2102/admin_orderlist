@@ -4,11 +4,11 @@ import { X, Plus, Edit2, DollarSign, Calendar, Clock, User, AlertCircle, Archive
 import { SearchableProductDropdown } from "./SearchableProductDropdown";
 import { SearchableSupplierDropdown } from "./SearchableSupplierDropdown";
 import { DateRangePicker } from "../../../shared/components/DateRangePicker";
-import { CustomSelect } from "@/shared/components";
+import { CurrencyInputVN, CustomSelect } from "@/shared/components";
 import { Order, CatalogProduct, CatalogSupplierCost, CatalogSupplier, OrderFormData } from "../types";
 import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../constants/orderStatus";
 import { ORDER_PREFIX, ORDER_PREFIX_CONFIGS } from "../constants/orderPrefix";
-import { parseDateToMidnight, calculateExpirationDateFromStart } from "../utils/durationUtils";
+import { parseDateToMidnight, calculateExpirationDateFromStart, calculateInclusiveDays } from "../utils/durationUtils";
 
 interface OrderCreateEditModalProps {
   isOpen: boolean;
@@ -208,14 +208,11 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
     changedField?: "start" | "end"
   ) => {
     if (changedField === "end") {
+      if (!end) return;
       const startDate = parseDateToMidnight(formData.order_date) || new Date();
       const selectedEndDate = parseDateToMidnight(end) || startDate;
       const expiredAt = selectedEndDate < startDate ? formData.order_date : end;
-      const endDate = parseDateToMidnight(expiredAt) || startDate;
-      const diffDays = Math.max(
-        1,
-        Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-      );
+      const diffDays = calculateInclusiveDays(startDate, expiredAt);
 
       setFormData({
         ...formData,
@@ -225,6 +222,7 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
       return;
     }
 
+    if (!start) return;
     const textToMatch = `${matchedProduct?.package_product || ""} ${formData.variant_name || ""} ${formData.display_name || ""} ${matchedProduct?.san_pham || ""} ${formData.id_product || ""}`;
     const autoCalc = calculateExpirationDateFromStart(start, textToMatch, formData.days);
     setFormData({
@@ -250,15 +248,15 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                     ? "Cập Nhật Thông Tin Đơn Nhập Hàng"
                     : "Cập Nhật Thông Tin Đơn Hàng"
                   : isImportMode
-                  ? "Tạo Đơn Nhập Hàng Mới (MAVN)"
-                  : "Tạo Đơn Bán Hàng Mới"}
+                    ? "Tạo Đơn Nhập Hàng Mới (MAVN)"
+                    : "Tạo Đơn Bán Hàng Mới"}
               </h3>
               <p className="text-xs text-slate-400">
                 {isImportMode
                   ? "Ghi nhận đơn mua hàng từ Nhà Cung Cấp (NCC), tự động ghi nhận số dư & chi phí nhập"
                   : isEdit
-                  ? "Điều chỉnh giá bán, trạng thái, ngày hết hạn hoặc thông tin khách hàng"
-                  : "Điền đầy đủ thông tin để tạo đơn bán hàng mới vào hệ thống"}
+                    ? "Điều chỉnh giá bán, trạng thái, ngày hết hạn hoặc thông tin khách hàng"
+                    : "Điền đầy đủ thông tin để tạo đơn bán hàng mới vào hệ thống"}
               </p>
             </div>
           </div>
@@ -431,15 +429,13 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                           save_to_warehouse: formData.save_to_warehouse === false ? true : false,
                         })
                       }
-                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,214,0.5)]" : "bg-slate-700"
-                      }`}
+                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${formData.save_to_warehouse !== false ? "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,214,0.5)]" : "bg-slate-700"
+                        }`}
                       title="Tự động đồng bộ tài khoản và mật khẩu vào hệ thống kho hàng"
                     >
                       <span
-                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          formData.save_to_warehouse !== false ? "translate-x-4" : "translate-x-0"
-                        }`}
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.save_to_warehouse !== false ? "translate-x-4" : "translate-x-0"
+                          }`}
                       />
                     </button>
                   </div>
@@ -457,15 +453,13 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                           save_to_warehouse: formData.save_to_package === false ? true : formData.save_to_warehouse,
                         })
                       }
-                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        formData.save_to_package !== false ? "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "bg-slate-700"
-                      }`}
+                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${formData.save_to_package !== false ? "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "bg-slate-700"
+                        }`}
                       title="Tự động đồng bộ gói sản phẩm trong kho gói"
                     >
                       <span
-                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          formData.save_to_package !== false ? "translate-x-4" : "translate-x-0"
-                        }`}
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.save_to_package !== false ? "translate-x-4" : "translate-x-0"
+                          }`}
                       />
                     </button>
                   </div>
@@ -489,11 +483,10 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                     placeholder="Ví dụ: noah.singh.b69642@vnglink.cc..."
                     value={previewKey ?? formData.information_order}
                     onChange={(e) => setFormData({ ...formData, information_order: e.target.value })}
-                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none ${
-                      matchedKeyRule
+                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-white placeholder:text-slate-600 focus:outline-none ${matchedKeyRule
                         ? "border-cyan-500/50 text-cyan-300 font-mono font-bold pr-9"
                         : "border-slate-800 focus:border-cyan-500"
-                    }`}
+                      }`}
                   />
                 </div>
               </div>
@@ -538,9 +531,9 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                         disabled={!warehouseTagVariantId || !currentWarehouseTags || currentWarehouseTags.failed || currentWarehouseTags.tags.length === 0}
                         placeholder={
                           !warehouseTagVariantId ? "Chọn sản phẩm trước" :
-                          !currentWarehouseTags ? "Đang tải tag…" :
-                          currentWarehouseTags.failed ? "Không thể tải tag sản phẩm" :
-                          currentWarehouseTags.tags.length === 0 ? "Sản phẩm chưa có tag" : "Chọn tag sản phẩm"
+                            !currentWarehouseTags ? "Đang tải tag…" :
+                              currentWarehouseTags.failed ? "Không thể tải tag sản phẩm" :
+                                currentWarehouseTags.tags.length === 0 ? "Sản phẩm chưa có tag" : "Chọn tag sản phẩm"
                         }
                         className="bg-slate-900 border-slate-800"
                         options={(currentWarehouseTags?.tags || []).map((tag) => ({
@@ -708,23 +701,29 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
                 <label className="block text-slate-400 mb-1 font-medium">
                   Giá Bán ({currentPrefix === "MAVC" ? "CTV" : currentPrefix === "MAVL" ? "Bán Lẻ" : currentPrefix === "MAVK" ? "Khuyến Mãi" : currentPrefix === "MAVS" ? "Sinh Viên" : currentPrefix === "MAVT" ? "Quà Tặng" : "Nhập Hàng"}) (₫) *
                 </label>
-                <input
-                  type="number"
+                <CurrencyInputVN
+                  value={Number(formData.price) || 0}
+                  onChange={() => { }}
+                  accentColor="emerald"
+                  suffix="₫"
+                  showZero
                   required
                   readOnly
-                  value={formData.price}
-                  className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none cursor-not-allowed opacity-90 select-none"
+                  className="bg-slate-950/80 border-slate-800/80 py-2 text-xs cursor-not-allowed opacity-90 select-none"
                 />
               </div>
 
               <div>
                 <label className="block text-slate-400 mb-1 font-medium">Giá Vốn Nhập NCC (₫) *</label>
-                <input
-                  type="number"
+                <CurrencyInputVN
+                  value={Number(formData.cost) || 0}
+                  onChange={() => { }}
+                  accentColor="purple"
+                  suffix="₫"
+                  showZero
                   required
                   readOnly
-                  value={formData.cost}
-                  className="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-3 py-2 text-purple-300 font-bold font-mono focus:outline-none cursor-not-allowed opacity-90 select-none"
+                  className="bg-slate-950/80 border-slate-800/80 py-2 text-xs cursor-not-allowed opacity-90 select-none"
                 />
               </div>
             </div>
@@ -774,11 +773,10 @@ export const OrderCreateEditModal: React.FC<OrderCreateEditModalProps> = ({
               type="submit"
               disabled={checkingKeyRule || currentRuleCheck?.error || (!selectedProductId && !formData.id_product) || !formData.supply_id}
               title={(!selectedProductId && !formData.id_product) ? "Vui lòng chọn sản phẩm" : !formData.supply_id ? "Vui lòng chọn nhà cung cấp" : ""}
-              className={`px-5 py-2 text-slate-950 rounded-xl font-bold transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                isEdit
+              className={`px-5 py-2 text-slate-950 rounded-xl font-bold transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${isEdit
                   ? "bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 shadow-amber-500/20"
                   : "bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 shadow-cyan-500/20"
-              }`}
+                }`}
             >
               {isEdit ? "Cập Nhật Đơn Hàng" : "Tạo Đơn Hàng Mới"}
             </button>

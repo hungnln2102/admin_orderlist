@@ -317,7 +317,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
       return;
     }
     const today = formatDateYYYYMMDD(new Date());
-    const nextYear = calculateExpirationDateFromStart(today, "--1y", 365).expired_at;
+    const defaultDuration = calculateExpirationDateFromStart(today, "--1y", 365);
     setSelectedProductId(null);
     setProductSuppliersCatalog([]);
     setIsCustomPriceMode(false);
@@ -328,7 +328,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         status: ORDER_STATUS.PAID,
         customer: "Mavryk",
         order_date: today,
-        expired_at: nextYear,
+        expired_at: defaultDuration.expired_at,
+        days: defaultDuration.days,
         save_to_warehouse: true,
         save_to_package: true,
       });
@@ -338,7 +339,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialTab = "active" })
         order_prefix: ORDER_PREFIX.MAVC,
         status: ORDER_STATUS.UNPAID,
         order_date: today,
-        expired_at: nextYear,
+        expired_at: defaultDuration.expired_at,
+        days: defaultDuration.days,
         save_to_warehouse: false,
         save_to_package: false,
       });

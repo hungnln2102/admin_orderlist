@@ -6,7 +6,7 @@ const { activateKeyWithTransaction } = require("@/domains/products/services/acti
 const { resolveAdobeRecoveryOrder } = require("../services/adobeOrderSourceService");
 const { providerConfig } = require("../providers/providerConfig");
 const { fetchYunaAccountOrder, parseYunaReportReason, reportYunaAccountOrder } = require("../providers/yuna2faProvider");
-const { fetchFixAdesStatus } = require("../providers/fixAdesStatusProvider");
+const { classifyFixAdesStatus, fetchFixAdesStatus } = require("../providers/fixAdesStatusProvider");
 const { getPortalUrlConfig } = require("../services/portalUrlConfigService");
 const { getPublicPriceList } = require("@/domains/products/services/publicPricingService");
 
@@ -85,7 +85,7 @@ async function resolveAdobeAccount(body, recovery) {
   const direct = await resolveAdobeRecoveryOrder(proof);
   if (direct) return direct;
   const allocation = await activateKeyWithTransaction({
-    keyCode: proof.code, orderContact: proof.contact, recovery,
+    keyCode: proof.code, orderContact: proof.contact, recovery, validateReplacement: validateAdobeSlot,
   });
   return { source: "ades", providerKey: allocation.statusProviderKey, ...allocation };
 }
@@ -95,18 +95,21 @@ async function checkAdobeAccount(email, providerKey) {
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "")) return { status_type: "unknown" };
   const result = await fetchFixAdesStatus(email, { config: providerConfig(providerKey) });
   const data = result.rawData;
-  if (data?.found === false) return { status_type: "not_found" };
-  if (result.error) return { status_type: "unknown" };
-  const accountState = String(data?.status || "").trim().toLowerCase();
-  const organizationState = String(data?.organizationStatus?.status || data?.organization_status || "").trim().toLowerCase();
-  const states = [accountState, organizationState];
-  const state = states.includes("inactive") ? "inactive" : states.find((value) => value === "active");
-  if (!state) return { status_type: "unknown" };
+  const state = classifyFixAdesStatus(data);
+  if (state !== "active" && state !== "inactive") return { status_type: state };
   return {
     status: state === "active" ? "ĐANG HOẠT ĐỘNG" : "CẦN CHUYỂN TEAM",
     status_type: state,
     organization: typeof data?.organization?.name === "string" ? data.organization.name : undefined,
   };
+}
+
+function validateAdobeSlot({ account, statusProviderKey }) {
+  return checkAdobeAccount(account, statusProviderKey).catch(() => ({ status_type: "unknown" }));
+}
+
+function isRejectedAdobeStatus(details) {
+  return details.status_type === "not_found" || details.status_type === "expired";
 }
 
 router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (req, res) => {
@@ -152,13 +155,14 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
       });
     }
     let account = result.account || result.providerInput;
-    let details = await checkAdobeAccount(account, result.providerKey).catch(() => ({ status_type: "unknown" }));
-    if (details.status_type === "not_found" && result.packageBacked && result.slotId) {
+    let details = result.validatedStatus || await validateAdobeSlot({ account, statusProviderKey: result.providerKey });
+    if (isRejectedAdobeStatus(details) && result.packageBacked && result.slotId) {
       const replacement = await activateKeyWithTransaction({
         keyCode: req.body?.code,
         orderContact: req.body?.contact,
         recovery: "replace",
-        rejectedSlot: { id: result.slotId, account },
+        rejectedSlot: { id: result.slotId, account, reason: details.status_type },
+        validateReplacement: validateAdobeSlot,
       });
       if (replacement.outOfStock || replacement.replacementRequired) {
         return res.json({
@@ -168,14 +172,15 @@ router.post(["/otp/adobe/recovery/check", "/otp/adobe/recovery/claim"], async (r
       }
       result = replacement;
       account = result.account;
-      details = await checkAdobeAccount(account, result.statusProviderKey).catch(() => ({ status_type: "unknown" }));
+      details = result.validatedStatus || await validateAdobeSlot({ account, statusProviderKey: result.statusProviderKey });
     }
-    if (details.status_type === "not_found") {
+    if (isRejectedAdobeStatus(details)) {
       if (result.packageBacked && result.slotId) {
         return res.json({ success: true, source: "ades", replacementRequired: true });
       }
       return res.json({ success: true, source: "ades", data: {
-        account, status_type: "unknown", status: "KHÔNG TÌM THẤY ĐĂNG KÝ",
+        account, status_type: "unknown",
+        status: details.status_type === "expired" ? "ĐÃ HẾT HẠN" : "KHÔNG TÌM THẤY ĐĂNG KÝ",
       } });
     }
     return res.json({
@@ -262,7 +267,7 @@ router.post("/otp/adobe/switch-team/status", async (req, res) => {
     const email = await resolveSwitchTeamEmail(req.body);
     const result = await otpPortalDispatcher.getAdobeSwitchTeamStatus(email);
     const status = String(result.status || "").trim().toLowerCase();
-    if (status !== "success" && status !== "completed") {
+    if (status !== "success" && status !== "completed" && status !== "done") {
       return res.json({ success: true, ...result });
     }
 
@@ -272,8 +277,10 @@ router.post("/otp/adobe/switch-team/status", async (req, res) => {
     });
     const expectedOrg = String(result.newOrgName || "").trim();
     const actualOrg = String(accountStatus?.organization || "").trim();
-    const verified = accountStatus?.status_type === "active" &&
-      (!expectedOrg || actualOrg.toLowerCase() === expectedOrg.toLowerCase());
+    const verified = status === "done"
+      ? ["active", "inactive"].includes(accountStatus?.status_type)
+      : accountStatus?.status_type === "active" &&
+        (!expectedOrg || actualOrg.toLowerCase() === expectedOrg.toLowerCase());
     return res.json({
       ...result,
       success: true,

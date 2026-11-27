@@ -1,4 +1,5 @@
 const { db, TABLES, COLS, withTransaction } = require("@/db");
+const { ORDER_STATUS } = require("@/constants/orderStatus");
 const { getProviderConfig } = require("../providers/registry");
 
 const PN = COLS.PRODUCT_NAMES;
@@ -288,15 +289,29 @@ async function findRoutingProviderForInput({ slotKey, input }) {
     .limit(2));
 
   if (boundOrderCode && !order) return null;
-  if (order && ["CANCELED", "REFUNDED"].includes(order[ORD.STATUS])) return null;
+  const canceledStatuses = [ORDER_STATUS.CANCELED, "REFUNDED"];
+  if (order && canceledStatuses.includes(order[ORD.STATUS])) return null;
   if (!order && !activationKey) {
     order = requireUniqueMatch(await orderSelect()
       .whereRaw("LOWER(TRIM(??)) = ?", [ORD.INFORMATION_ORDER, cleanInput])
-      .whereNotIn(ORD.STATUS, ["CANCELED", "REFUNDED"])
+      .whereNotIn(ORD.STATUS, canceledStatuses)
       .limit(2));
   }
+  if (order?.[ORD.STATUS] === ORDER_STATUS.EXPIRED) return null;
 
   const orderCode = order?.[ORD.ID_ORDER] || null;
+  if (slotKey === "adobe_otp") {
+    const boundSlotId = activationKey?.[AK.ACCOUNT_SLOT_ID] ?? (orderCode
+      ? requireUniqueMatch(await db(TABLES.ACTIVATION_KEYS)
+        .select(AK.ACCOUNT_SLOT_ID)
+        .where(AK.ID_ORDER, orderCode)
+        .limit(2))?.[AK.ACCOUNT_SLOT_ID]
+      : null);
+    if (boundSlotId) {
+      const boundSlot = await db(TABLES.ACCOUNT_SLOTS).where(SS.ID, boundSlotId).first(SS.STATUS);
+      if (String(boundSlot?.[SS.STATUS] || "").toUpperCase() === "UNAVAILABLE") return { disabled: true };
+    }
+  }
   const packageId = activationKey?.[AK.PACKAGE_PRODUCT_ID] ?? (orderCode
     ? requireUniqueMatch(await db(TABLES.ACTIVATION_KEYS)
       .select(AK.PACKAGE_PRODUCT_ID)

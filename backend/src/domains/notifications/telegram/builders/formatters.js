@@ -2,6 +2,8 @@
  * Format số, tiền, ngày, chuỗi an toàn cho Telegram (HTML escape, inline code).
  */
 
+const { getVietnamDateString } = require("@/utils/time");
+
 const formatYMDToDMY = (value) => {
   if (!value) return "";
   const str = String(value).trim();
@@ -69,22 +71,20 @@ const formatCurrency = (value) => {
 const formatDateDMY = (value) => {
   if (!value) return "";
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const day = String(value.getDate()).padStart(2, "0");
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const year = value.getFullYear();
+    const ymd = getVietnamDateString(value);
+    const [year, month, day] = ymd.split("-");
     return `${day}/${month}/${year}`;
   }
   const direct = toSafeString(value).trim();
   if (!direct) return "";
-  const ymdMatch = direct.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  const ymdMatch = direct.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
   if (ymdMatch) return `${ymdMatch[3]}/${ymdMatch[2]}/${ymdMatch[1]}`;
-  const dmyMatch = direct.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  const dmyMatch = direct.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
   if (dmyMatch) return `${dmyMatch[1]}/${dmyMatch[2]}/${dmyMatch[3]}`;
   const parsed = new Date(direct);
   if (!Number.isNaN(parsed.getTime())) {
-    const day = String(parsed.getDate()).padStart(2, "0");
-    const month = String(parsed.getMonth() + 1).padStart(2, "0");
-    const year = parsed.getFullYear();
+    const ymd = getVietnamDateString(parsed);
+    const [year, month, day] = ymd.split("-");
     return `${day}/${month}/${year}`;
   }
   const fromYmd = formatYMDToDMY(direct);

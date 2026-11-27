@@ -295,12 +295,12 @@ export const ActivationKeysPage: React.FC = () => {
           )}
 
           {/* Modal Tạo Key Mới */}
-          <CreateActivationKeyModal
-            isOpen={isCreateModalOpen}
-            onClose={() => setIsCreateModalOpen(false)}
-            onSubmit={handleCreateSubmit}
-            products={products}
-          />
+          {isCreateModalOpen && (
+            <CreateActivationKeyModal
+              onClose={() => setIsCreateModalOpen(false)}
+              onSubmit={handleCreateSubmit}
+            />
+          )}
         </>
       ) : (
         <ActivationKeyRulesTab warehouseProducts={products} />

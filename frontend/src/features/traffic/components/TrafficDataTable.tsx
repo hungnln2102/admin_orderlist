@@ -4,9 +4,12 @@ import { GlassCard } from "@/shared/components/GlassCard";
 import { TablePagination } from "@/shared/components/TablePagination";
 import { DailyTrafficItem, DeviceItem, LocationItem, SourceItem, TopPageItem, TrafficApiResponse } from "../types";
 
-type TrafficTab = "daily" | "sources" | "pages" | "devices" | "locations";
+import { TrafficIpTable } from "./TrafficIpTable";
+
+export type TrafficTab = "daily" | "sources" | "pages" | "devices" | "locations" | "ips";
 
 interface TrafficDataTableProps {
+  days: number;
   data: TrafficApiResponse | null;
   activeTab: TrafficTab;
   setActiveTab: React.Dispatch<React.SetStateAction<TrafficTab>>;
@@ -24,7 +27,7 @@ interface TrafficDataTableProps {
   maxVal: number;
 }
 
-export const TrafficDataTable: React.FC<TrafficDataTableProps> = ({ data, activeTab, setActiveTab, searchTerm, setSearchTerm, handleExportCSV, handleSort, paginatedData, loading, totalPages, currentPage, pageSize, setCurrentPage, setPageSize, maxVal }) => (
+export const TrafficDataTable: React.FC<TrafficDataTableProps> = ({ days, data, activeTab, setActiveTab, searchTerm, setSearchTerm, handleExportCSV, handleSort, paginatedData, loading, totalPages, currentPage, pageSize, setCurrentPage, setPageSize, maxVal }) => (
   <>
       {/* 4. HỆ THỐNG 5 BẢNG STAT ĐẦY ĐỦ (Tabbed Multi-Dimension Tables) */}
       <GlassCard className="!p-6 space-y-5">
@@ -38,13 +41,16 @@ export const TrafficDataTable: React.FC<TrafficDataTableProps> = ({ data, active
               { id: "pages", label: "Trang Phổ Biến", icon: FileText, count: data?.topPages?.length || 0 },
               { id: "devices", label: "Thiết Bị & Nền Tảng", icon: Monitor, count: data?.deviceData?.length || 0 },
               { id: "locations", label: "Vị Trí & Khu Vực", icon: MapPin, count: data?.locationData?.length || 0 },
+              { id: "ips", label: "Chi tiết IP", icon: Globe, count: null },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setActiveTab(tab.id as TrafficTab)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                     isActive
                       ? "bg-gradient-to-r from-sky-500/20 to-blue-500/20 text-sky-300 border border-sky-500/40 shadow-lg shadow-sky-500/10"
@@ -53,16 +59,16 @@ export const TrafficDataTable: React.FC<TrafficDataTableProps> = ({ data, active
                 >
                   <Icon className={`w-4 h-4 ${isActive ? "text-sky-400" : "text-slate-400"}`} />
                   <span>{tab.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${isActive ? "bg-sky-500/30 text-white" : "bg-slate-800 text-slate-400"}`}>
+                  {tab.count !== null && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${isActive ? "bg-sky-500/30 text-white" : "bg-slate-800 text-slate-400"}`}>
                     {tab.count}
-                  </span>
+                  </span>}
                 </button>
               );
             })}
           </div>
 
           {/* Ô Search & Nút Export CSV */}
-          <div className="flex items-center gap-3">
+          {activeTab !== "ips" && <div className="flex items-center gap-3">
             <div className="relative flex-1 sm:w-64">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -82,9 +88,10 @@ export const TrafficDataTable: React.FC<TrafficDataTableProps> = ({ data, active
               <Download className="w-3.5 h-3.5 text-sky-400" />
               <span className="hidden sm:inline">Xuất CSV</span>
             </button>
-          </div>
+          </div>}
         </div>
 
+        {activeTab === "ips" ? <TrafficIpTable key={days} days={days} /> : <>
         {/* Nội Dung Bảng Tương Ứng Với Tab Được Chọn */}
         <div className="overflow-x-auto min-h-[320px]">
           {/* TAB 1: BẢNG THEO NGÀY */}
@@ -381,6 +388,7 @@ export const TrafficDataTable: React.FC<TrafficDataTableProps> = ({ data, active
             />
           </div>
         )}
+        </>}
       </GlassCard>
   </>
 );

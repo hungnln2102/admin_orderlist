@@ -1,132 +1,78 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
-// We test the logic of calculateExpirationDateFromStart directly
-function parsePackageDuration(text) {
-  if (!text) return { days: 365, durationText: "" };
-  const lower = String(text).toLowerCase();
+const durationUtilsUrl = pathToFileURL(
+  path.resolve(__dirname, "../../../frontend/src/features/orders/utils/durationUtils.ts")
+).href;
 
-  const matchM = lower.match(/--(\d+)m/i) || lower.match(/(\d+)\s*(tháng|month|m\b)/i);
-  const matchY = lower.match(/--(\d+)y/i) || lower.match(/(\d+)\s*(năm|year|y\b)/i);
-  const matchD = lower.match(/(\d+)\s*(ngày|day|d\b)/i);
-
-  if (matchM && Number(matchM[1]) > 0) {
-    const months = Number(matchM[1]);
-    const days = months === 12 ? 365 : months * 30;
-    return { days, durationText: `${months} tháng` };
+let durationUtilsPromise;
+function loadDurationUtils() {
+  if (!durationUtilsPromise) {
+    durationUtilsPromise = import(durationUtilsUrl);
   }
-  if (matchY && Number(matchY[1]) > 0) {
-    const years = Number(matchY[1]);
-    return { days: years * 365, durationText: `${years} năm` };
-  }
-  if (matchD && Number(matchD[1]) > 0) {
-    const days = Number(matchD[1]);
-    return { days, durationText: `${days} ngày` };
-  }
-  return { days: 365, durationText: "" };
+  return durationUtilsPromise;
 }
 
-function parseDateToMidnight(dateInput) {
-  if (!dateInput) return null;
-  const str = String(dateInput).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split("-").map(Number);
-    return new Date(y, m - 1, d, 0, 0, 0, 0);
-  }
-  return new Date(str);
-}
+test("calculateExpirationDateFromStart: Zoom 12 months starts 2026-11-28 -> ends 2027-11-27 with 365 inclusive days", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
+  const result = calculateExpirationDateFromStart("2026-11-28", "Zoom 100 Người (12 tháng)");
+  assert.equal(result.expired_at, "2027-11-27");
+  assert.equal(result.days, 365);
+});
 
-function formatDateYYYYMMDD(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function calculateExpirationDateFromStart(startDateInput, variantOrText, fallbackDays = 365) {
-  const start = parseDateToMidnight(startDateInput) || new Date();
-  start.setHours(0, 0, 0, 0);
-
-  const y = start.getFullYear();
-  const m = start.getMonth() + 1; // 1..12
-  const d = start.getDate();
-
-  const text = String(variantOrText || "").toLowerCase();
-  const matchM = text.match(/--(\d+)m/i) || text.match(/(\d+)\s*(tháng|month|m\b)/i);
-  const matchY = text.match(/--(\d+)y/i) || text.match(/(\d+)\s*(năm|year|y\b)/i);
-  const matchD = text.match(/(\d+)\s*(ngày|day|d\b)/i);
-
-  let targetYear = y;
-  let targetMonth = m;
-  let targetDay = d;
-
-  if (matchM && Number(matchM[1]) > 0) {
-    const months = Number(matchM[1]);
-    const totalMonths = (m - 1) + months;
-    targetYear = y + Math.floor(totalMonths / 12);
-    targetMonth = (totalMonths % 12) + 1;
-    const maxDays = new Date(targetYear, targetMonth, 0).getDate();
-    targetDay = Math.min(d, maxDays);
-  } else if (matchY && Number(matchY[1]) > 0) {
-    const years = Number(matchY[1]);
-    targetYear = y + years;
-    const maxDays = new Date(targetYear, targetMonth, 0).getDate();
-    targetDay = Math.min(d, maxDays);
-  } else if (matchD && Number(matchD[1]) > 0) {
-    const daysToAdd = Number(matchD[1]);
-    const expDate = new Date(start.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-    return {
-      expired_at: formatDateYYYYMMDD(expDate),
-      days: daysToAdd,
-    };
-  } else {
-    const duration = parsePackageDuration(variantOrText);
-    const daysToAdd = duration.days > 0 ? duration.days : (fallbackDays > 0 ? fallbackDays : 365);
-    const expDate = new Date(start.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-    return {
-      expired_at: formatDateYYYYMMDD(expDate),
-      days: daysToAdd,
-    };
-  }
-
-  const targetDate = new Date(targetYear, targetMonth - 1, targetDay, 0, 0, 0, 0);
-  const expiryDate = new Date(targetDate);
-  expiryDate.setDate(expiryDate.getDate() - 1);
-  const diffTime = expiryDate.getTime() - start.getTime();
-  const diffDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
-
-  return {
-    expired_at: formatDateYYYYMMDD(expiryDate),
-    days: diffDays,
-  };
-}
-
-test("calculateExpirationDateFromStart: Youtube_Fam--3m includes the start date and ends the day before the next cycle", () => {
+test("calculateExpirationDateFromStart: Youtube_Fam--3m includes the start date and ends the day before the next cycle", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
   const result = calculateExpirationDateFromStart("2026-10-09", "Youtube_Fam--3m");
   assert.equal(result.expired_at, "2027-01-08");
-  assert.equal(result.days, 91);
+  assert.equal(result.days, 92);
 });
 
-test("calculateExpirationDateFromStart: 1 month package starts on 2026-10-09 and ends on 2026-11-08", () => {
+test("calculateExpirationDateFromStart: 1 month package starts on 2026-10-09 and ends on 2026-11-08 (31 inclusive days)", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
   const result = calculateExpirationDateFromStart("2026-10-09", "Adobe_Renew--1m");
   assert.equal(result.expired_at, "2026-11-08");
-  assert.equal(result.days, 30);
+  assert.equal(result.days, 31);
 });
 
-test("calculateExpirationDateFromStart: 1 year package starts on 2026-10-09 and ends on 2027-10-08", () => {
+test("calculateExpirationDateFromStart: 1 year package starts on 2026-10-09 and ends on 2027-10-08 (365 inclusive days)", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
   const result = calculateExpirationDateFromStart("2026-10-09", "Canva Pro --1y");
   assert.equal(result.expired_at, "2027-10-08");
-  assert.equal(result.days, 364);
+  assert.equal(result.days, 365);
 });
 
-test("calculateExpirationDateFromStart: 27/10 + 1 month ends on 26/11", () => {
+test("calculateExpirationDateFromStart: 27/10 + 1 month ends on 26/11 (31 inclusive days)", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
   const result = calculateExpirationDateFromStart("2026-10-27", "Adobe_Renew2--1m");
   assert.equal(result.expired_at, "2026-11-26");
+  assert.equal(result.days, 31);
+});
+
+test("calculateExpirationDateFromStart: 12/11 + 1 month ends on 11/12 (30 inclusive days)", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
+  const result = calculateExpirationDateFromStart("2026-11-12", "Adobe_Renew2--1m");
+  assert.equal(result.expired_at, "2026-12-11");
   assert.equal(result.days, 30);
 });
 
-test("calculateExpirationDateFromStart: End of month edge case (31/01 -> 27/02 in non-leap year)", () => {
+test("calculateExpirationDateFromStart: End of month edge case (31/01 -> 27/02 in non-leap year)", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
   const result = calculateExpirationDateFromStart("2026-01-31", "--1m");
   assert.equal(result.expired_at, "2026-02-27");
+  assert.equal(result.days, 28);
 });
 
+test("calculateExpirationDateFromStart: day-based package (--30d) ends inclusively on start + 29 days", async () => {
+  const { calculateExpirationDateFromStart } = await loadDurationUtils();
+  const result = calculateExpirationDateFromStart("2026-11-01", "Trial --30d");
+  assert.equal(result.expired_at, "2026-11-30");
+  assert.equal(result.days, 30);
+});
+
+test("calculateInclusiveDays: manual end-date selection matches inclusive day count", async () => {
+  const { calculateInclusiveDays } = await loadDurationUtils();
+  assert.equal(calculateInclusiveDays("2026-11-28", "2027-11-27"), 365);
+  assert.equal(calculateInclusiveDays("2026-11-28", "2026-11-28"), 1);
+});
