@@ -153,12 +153,14 @@ export const SuppliersPage: React.FC = () => {
       "SUPPLIER_DELETED",
       "WEBHOOK_MONEY_IN",
       "WEBHOOK_MONEY_OUT",
+      "PAYMENT_RECEIPT_MUTATED",
     ],
-    () => {
+    (event) => {
+      if (event.type === "PAYMENT_RECEIPT_MUTATED" && event.payload?.allocationType !== "SUPPLIER_ORDER") return;
       fetchSuppliersOverview();
+      expandedSupplierIds.forEach(fetchSupplierLogs);
       if (selectedSupplierDetailId !== null) {
         fetchSupplierDetail(selectedSupplierDetailId);
-        fetchSupplierLogs(selectedSupplierDetailId);
       }
     }
   );

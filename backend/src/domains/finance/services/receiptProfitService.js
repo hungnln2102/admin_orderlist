@@ -43,7 +43,9 @@ async function syncReceiptProfit(trx, receiptId) {
   const allocation = COLS.PAYMENT_RECEIPT_ALLOCATIONS;
   const expense = COLS.STORE_PROFIT_EXPENSES;
   const allocations = await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).where(allocation.RECEIPT_ID, receipt.id);
-  const covered = allocations.reduce((total, row) => total + Number(row.allocation_type === ALLOCATION_TYPE.SUPPLIER ? row.amount : row.profit_covered_amount || 0), 0);
+  const supplierTypes = [ALLOCATION_TYPE.SUPPLIER, ALLOCATION_TYPE.SUPPLIER_ORDER];
+  const covered = allocations.reduce((total, row) =>
+    total + Number(supplierTypes.includes(row.allocation_type) ? row.amount : row.profit_covered_amount || 0), 0);
   const classified = await trx(TABLES.STORE_PROFIT_EXPENSES)
     .where(expense.PAYMENT_RECEIPT_ID, receipt.id).whereNot(expense.ID, receipt.shop_out_expense_id)
     .where(expense.STATUS, "completed").sum({ total: expense.AMOUNT }).first();

@@ -20,6 +20,8 @@ export interface SupplierCostLogItem {
   id_order: string;
   supplier_name: string;
   import_cost: number;
+  remaining_debt: number;
+  receipt_allocations: { receipt_id: number; amount: number }[];
   refund_amount?: number;
   ncc_payment_status: string;
   logged_at: string;

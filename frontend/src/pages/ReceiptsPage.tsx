@@ -48,6 +48,7 @@ interface InvoiceAllocation {
   receipt_id: number;
   allocation_type: string;
   target_code: string | null;
+  supplier_order_code?: string | null;
   amount: number;
   remaining_balance: number;
   note: string | null;
@@ -738,11 +739,11 @@ export const ReceiptsPage: React.FC = () => {
                                           <td className="py-2.5 px-3 font-mono text-slate-500 font-bold">#{aIdx + 1}</td>
                                           <td className="py-2.5 px-3">
                                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
-                                              {alloc.allocation_type}
+                                              {alloc.allocation_type === "SUPPLIER_ORDER" ? "Thanh toán NCC" : alloc.allocation_type}
                                             </span>
                                           </td>
                                           <td className="py-2.5 px-3 font-mono font-bold text-slate-200">
-                                            {alloc.target_code || "—"}
+                                            {alloc.supplier_order_code || alloc.target_code || "—"}
                                           </td>
                                           <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
                                             {formatCurrency(alloc.amount)}

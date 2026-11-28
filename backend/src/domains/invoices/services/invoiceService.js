@@ -17,6 +17,16 @@ const { extractSlotSuffix, applySuffixToPrice } = require("@/domains/payments/se
 const receiptAllocationService = require("./receiptAllocationService");
 
 const getReceiptTable = () => db(TABLES.PAYMENT_RECEIPT);
+const allocations = COLS.PAYMENT_RECEIPT_ALLOCATIONS;
+const costLog = COLS.SUPPLIER_ORDER_COST_LOG;
+
+function joinSupplierOrder(query, allocationTable) {
+  return query.leftJoin(`${TABLES.SUPPLIER_ORDER_COST_LOG} as supplier_order`, function () {
+    this.on(db.raw("?? = ??::text", [
+      `${allocationTable}.${allocations.TARGET_CODE}`, `supplier_order.${costLog.ID}`,
+    ])).andOnVal(`${allocationTable}.${allocations.ALLOCATION_TYPE}`, ALLOCATION_TYPE.SUPPLIER_ORDER);
+  });
+}
 
 // Shared by Finance Hub payment commands so all receipt mutations keep one transaction contract.
 const allocateReceiptInTrx = (...args) => receiptAllocationService.allocateReceiptInTrx(...args);
@@ -88,8 +98,9 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
   };
 
   // 2. Truy vấn danh sách biên lai
-  let query = getReceiptTable()
-    .leftJoin(TABLES.PAYMENT_RECEIPT_ALLOCATIONS, `${TABLES.PAYMENT_RECEIPT}.id`, `${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.receipt_id`)
+  let query = joinSupplierOrder(getReceiptTable()
+    .leftJoin(TABLES.PAYMENT_RECEIPT_ALLOCATIONS, `${TABLES.PAYMENT_RECEIPT}.id`, `${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.receipt_id`),
+    TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
     .leftJoin(TABLES.ORDER_LIST, `${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.target_code`, `${TABLES.ORDER_LIST}.id_order`)
     .select(
       `${TABLES.PAYMENT_RECEIPT}.id`,
@@ -104,7 +115,9 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
       `${TABLES.PAYMENT_RECEIPT}.sepay_transaction_id`,
       `${TABLES.PAYMENT_RECEIPT}.transfer_type`,
       `${TABLES.PAYMENT_RECEIPT}.note`,
-      db.raw(`MAX(${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.target_code) as id_order`),
+      db.raw("MAX(COALESCE(??, ??)) as id_order", [
+        `supplier_order.${costLog.ID_ORDER}`, `${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.${allocations.TARGET_CODE}`,
+      ]),
       db.raw(`MAX(${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.allocation_type) as allocation_type`),
       db.raw(`MAX(${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.note) as alloc_note`),
       db.raw(`MAX(${TABLES.ORDER_LIST}.customer) as order_customer`),
@@ -140,6 +153,7 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
     const s = `%${search.trim()}%`;
     query = query.where((b) => {
       b.whereILike(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS}.target_code`, s)
+       .orWhereILike(`supplier_order.${costLog.ID_ORDER}`, s)
        .orWhereILike(`${TABLES.PAYMENT_RECEIPT}.sender`, s)
        .orWhereILike(`${TABLES.PAYMENT_RECEIPT}.reference_code`, s)
        .orWhereILike(`${TABLES.PAYMENT_RECEIPT}.sepay_transaction_id`, s)
@@ -165,9 +179,10 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
   // 3. Đính kèm danh sách phân bổ con (allocations) cho từng biên lai để phục vụ dropdown list
   const receiptIds = data.map((r) => r.id);
   if (receiptIds.length > 0) {
-    const rawAllocations = await db(TABLES.PAYMENT_RECEIPT_ALLOCATIONS)
-      .whereIn("receipt_id", receiptIds)
-      .orderBy("id", "asc");
+    const rawAllocations = await joinSupplierOrder(db(`${TABLES.PAYMENT_RECEIPT_ALLOCATIONS} as a`), "a")
+      .select("a.*", `supplier_order.${costLog.ID_ORDER} as supplier_order_code`)
+      .whereIn(`a.${allocations.RECEIPT_ID}`, receiptIds)
+      .orderBy(`a.${allocations.ID}`, "asc");
 
     const allocMap = {};
     for (const alloc of rawAllocations) {
@@ -179,6 +194,7 @@ async function getInvoices({ page = 1, limit = 20, search = "", tab = "all", typ
         receipt_id: Number(alloc.receipt_id),
         allocation_type: alloc.allocation_type,
         target_code: alloc.target_code,
+        supplier_order_code: alloc.supplier_order_code,
         amount: Number(alloc.amount || 0),
         remaining_balance: Number(alloc.remaining_balance || 0),
         note: alloc.note,

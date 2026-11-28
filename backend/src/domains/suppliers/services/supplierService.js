@@ -4,10 +4,22 @@ const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { RECEIPT_STATUS, TRANSFER_TYPE } = require("@/constants/receiptStatus");
 const { buildVietQrImageUrl } = require("@/utils/qrUrl");
 const { settleSupplierDebtTransaction } = require("./supplierSettlementService");
+const {
+  supplierOrderPaymentsSql,
+  supplierOrderRemainingSql,
+  selectSupplierOrderRemaining,
+  assertSupplierCostLogsUnallocated,
+} = require("./supplierOrderDebt");
 const { getDefaultShopBank } = require("@/domains/orders/services/orderService");
 
 const S_COLS = COLS.SUPPLIER;
 const LOG_COLS = COLS.SUPPLIER_ORDER_COST_LOG;
+const remainingDebtSql = supplierOrderRemainingSql("l");
+const paidCostSql = `CASE
+  WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN l.${LOG_COLS.IMPORT_COST}
+  WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}'
+    THEN l.${LOG_COLS.IMPORT_COST} - ${remainingDebtSql}
+  ELSE 0 END`;
 
 /**
  * Lấy dữ liệu 4 Stat Cards & Danh sách BẢNG TỔNG Nhà cung cấp (Tab 1)
@@ -72,7 +84,7 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
     SELECT
       COUNT(l.${LOG_COLS.ID}) AS total_orders,
       COALESCE(SUM(l.${LOG_COLS.IMPORT_COST}), 0) AS total_import_cost,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_unpaid_cost
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN ${remainingDebtSql} ELSE 0 END), 0) AS total_unpaid_cost
     FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l
     LEFT JOIN ${TABLES.SUPPLIER} s ON s.${S_COLS.ID} = l.${LOG_COLS.SUPPLY_ID}
     WHERE (s.${S_COLS.ID} != 1 AND LOWER(COALESCE(s.${S_COLS.SUPPLIER_NAME}, '')) != 'mavryk');
@@ -93,8 +105,8 @@ const getSuppliersOverview = async ({ search = "", activeFilter = "", sortBy = "
       COUNT(CASE WHEN l.${LOG_COLS.LOGGED_AT} >= DATE_TRUNC('month', CURRENT_DATE) THEN l.${LOG_COLS.ID} END) AS current_month_orders,
       COALESCE(SUM(CASE WHEN l.${LOG_COLS.LOGGED_AT} >= DATE_TRUNC('month', CURRENT_DATE) THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS current_month_cost,
       MAX(l.${LOG_COLS.LOGGED_AT}) AS last_order_date,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN l.${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_debt
+      COALESCE(SUM(${paidCostSql}), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN ${remainingDebtSql} ELSE 0 END), 0) AS total_debt
     FROM ${TABLES.SUPPLIER} s
     LEFT JOIN ${TABLES.SUPPLIER_ORDER_COST_LOG} l ON l.${LOG_COLS.SUPPLY_ID} = s.${S_COLS.ID}
     ${whereClause}
@@ -141,6 +153,7 @@ const getSupplierCostLogs = async ({
   orderCodeSearch = "",
   page = 1,
   limit = 20,
+  outstandingOnly = false,
 } = {}) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
@@ -155,8 +168,18 @@ const getSupplierCostLogs = async ({
   }
 
   if (orderCodeSearch && orderCodeSearch.trim()) {
-    whereClause += ` AND l.${LOG_COLS.ID_ORDER} ILIKE ?`;
-    params.push(`%${orderCodeSearch.trim()}%`);
+    whereClause += outstandingOnly
+      ? ` AND UPPER(l.${LOG_COLS.ID_ORDER}) = UPPER(?)`
+      : ` AND l.${LOG_COLS.ID_ORDER} ILIKE ?`;
+    params.push(outstandingOnly ? orderCodeSearch.trim() : `%${orderCodeSearch.trim()}%`);
+  }
+  if (outstandingOnly) {
+    whereClause += ` AND l.${LOG_COLS.NCC_PAYMENT_STATUS} = ? AND ${remainingDebtSql} > 0
+      AND l.${LOG_COLS.SUPPLY_ID} NOT IN (1, 22)
+      AND EXISTS (SELECT 1 FROM ${TABLES.SUPPLIER} s
+        WHERE s.${S_COLS.ID} = l.${LOG_COLS.SUPPLY_ID}
+          AND LOWER(TRIM(s.${S_COLS.SUPPLIER_NAME})) <> 'mavryk')`;
+    params.push(SUPPLIER_PAYMENT_STATUS.UNPAID);
   }
 
   const countSql = `
@@ -175,6 +198,11 @@ const getSupplierCostLogs = async ({
       l.${LOG_COLS.SUPPLY_ID},
       l.${LOG_COLS.ID_ORDER},
       COALESCE(l.${LOG_COLS.IMPORT_COST}, 0) AS import_cost,
+      CASE WHEN l.${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}'
+        THEN ${remainingDebtSql} ELSE 0 END AS remaining_debt,
+      (SELECT jsonb_agg(jsonb_build_object('receipt_id', p.${COLS.PAYMENT_RECEIPT_ALLOCATIONS.RECEIPT_ID},
+        'amount', p.${COLS.PAYMENT_RECEIPT_ALLOCATIONS.AMOUNT}) ORDER BY p.${COLS.PAYMENT_RECEIPT_ALLOCATIONS.ID})
+        FROM (${supplierOrderPaymentsSql("l")}) p) AS receipt_allocations,
       COALESCE(l.${LOG_COLS.NCC_PAYMENT_STATUS}, '${SUPPLIER_PAYMENT_STATUS.UNPAID}') AS ncc_payment_status,
       l.${LOG_COLS.LOGGED_AT},
       s.${S_COLS.SUPPLIER_NAME}
@@ -194,6 +222,8 @@ const getSupplierCostLogs = async ({
     id_order: r[LOG_COLS.ID_ORDER],
     supplier_name: r[S_COLS.SUPPLIER_NAME] || "N/A",
     import_cost: parseFloat(r.import_cost || 0),
+    remaining_debt: Number(r.remaining_debt),
+    receipt_allocations: r.receipt_allocations || [],
     ncc_payment_status: r.ncc_payment_status,
     logged_at: r[LOG_COLS.LOGGED_AT],
   }));
@@ -236,9 +266,9 @@ const getSupplierDetailById = async (id) => {
       COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN 1 END) AS paid_orders,
       COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN 1 END) AS unpaid_orders,
       COUNT(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.CANCELED}' OR ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.CANCEL}' THEN 1 END) AS canceled_orders,
-      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.PAID}' THEN ${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN ${LOG_COLS.IMPORT_COST} ELSE 0 END), 0) AS remaining_debt
-    FROM ${TABLES.SUPPLIER_ORDER_COST_LOG}
+      COALESCE(SUM(${paidCostSql}), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN ${LOG_COLS.NCC_PAYMENT_STATUS} = '${SUPPLIER_PAYMENT_STATUS.UNPAID}' THEN ${remainingDebtSql} ELSE 0 END), 0) AS remaining_debt
+    FROM ${TABLES.SUPPLIER_ORDER_COST_LOG} l
     WHERE ${LOG_COLS.SUPPLY_ID} = ?;
   `, [supplierId]);
 
@@ -378,11 +408,14 @@ const paySupplierDebt = async (id) => {
       .first();
     if (!supplier) throw new Error("Không tìm thấy nhà cung cấp.");
 
-    const unpaidLogs = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
-      .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
-      .forUpdate();
+    const unpaidLogs = await selectSupplierOrderRemaining(
+      trx(`${TABLES.SUPPLIER_ORDER_COST_LOG} as l`)
+        .where({ [LOG_COLS.SUPPLY_ID]: supplierId, [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID })
+        .forUpdate(),
+      trx
+    );
     const settledDebt = unpaidLogs.reduce(
-      (total, log) => total + Number(log[LOG_COLS.IMPORT_COST] || 0),
+      (total, log) => total + Number(log.remaining_debt),
       0
     );
     if (settledDebt === 0) {
@@ -615,6 +648,7 @@ const deleteSupplier = async (id) => {
       throw new Error("Không tìm thấy Nhà cung cấp cần xóa");
     }
 
+    await assertSupplierCostLogsUnallocated(trx, { [LOG_COLS.SUPPLY_ID]: supplierId });
     await trx(TABLES.SUPPLIER_COST).where({ supplier_id: supplierId }).del();
     await trx(TABLES.SUPPLIER_ORDER_COST_LOG).where({ supply_id: supplierId }).del();
     await trx(TABLES.SUPPLIER).where({ [S_COLS.ID]: supplierId }).del();

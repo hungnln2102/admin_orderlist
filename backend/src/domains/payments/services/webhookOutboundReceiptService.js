@@ -3,6 +3,7 @@ const { TRANSFER_TYPE } = require("@/constants/receiptStatus");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
 const { debitFinancialAccount } = require("@/domains/wallets/services/walletService");
 const { settleSupplierDebtTransaction } = require("@/domains/suppliers/services/supplierSettlementService");
+const { supplierOrderRemainingSql } = require("@/domains/suppliers/services/supplierOrderDebt");
 const { resolveWebhookAccount, startReceiptProfit } = require("@/domains/finance/services/receiptProfitService");
 
 
@@ -42,7 +43,7 @@ const candidateSuppliers = await trx(`${TABLES.SUPPLIER} as s`)
   .where(`l.${COLS.SUPPLIER_ORDER_COST_LOG.NCC_PAYMENT_STATUS}`, SUPPLIER_PAYMENT_STATUS.UNPAID)
   .groupBy(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`)
   .havingRaw(
-    `COALESCE(SUM(l.${COLS.SUPPLIER_ORDER_COST_LOG.IMPORT_COST}), 0) = ? + s.${COLS.SUPPLIER.ID}`,
+    `COALESCE(SUM(${supplierOrderRemainingSql("l")}), 0) = ? + s.${COLS.SUPPLIER.ID}`,
     [transferAmount]
   )
   .select(`s.${COLS.SUPPLIER.ID}`, `s.${COLS.SUPPLIER.NUMBER_BANK}`);

@@ -9,6 +9,7 @@ const { resolveOrderCatalogPricing, getOrderPrefix, selectCatalogPrice } = requi
 const { generateOrderActivationKey, resolveOrderActivationRule } = require("@/domains/products/services/activationKeyService");
 const { listImportWarehouseTags } = require("@/domains/warehouse/services/importWarehouseTagService");
 const { ensureSupplierCostLog } = require("./supplierCostLogService");
+const { assertSupplierCostLogsUnallocated } = require("@/domains/suppliers/services/supplierOrderDebt");
 const { normalizeDateOnly, calculateRemainingDaysVietnam } = require("@/utils/time");
 
 const O_COLS = COLS.ORDER_LIST;
@@ -677,6 +678,8 @@ async function updateOrder(id, payload) {
         updateFields.cost = 0;
       }
     } else if (!isOrderPaid && isSupplierChanged && resolvedNewSupplyId) {
+      const supplierLogColumns = COLS.SUPPLIER_ORDER_COST_LOG;
+      await assertSupplierCostLogsUnallocated(trx, { [supplierLogColumns.ORDER_LIST_ID]: existingOrder.id });
       await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
         .where({ order_list_id: existingOrder.id, ncc_payment_status: SUPPLIER_PAYMENT_STATUS.UNPAID })
         .update({
@@ -829,6 +832,9 @@ async function deleteOrder(id) {
       if (issuedKey) {
         throw new Error("Đơn hàng đã được cấp mã kích hoạt nên không thể xóa vĩnh viễn.");
       }
+      await assertSupplierCostLogsUnallocated(trx, {
+        [COLS.SUPPLIER_ORDER_COST_LOG.ORDER_LIST_ID]: existingOrder[O_COLS.ID],
+      });
     };
 
     // Xử lý riêng cho Đơn Nhập Hàng (MAVN... / Mavryk)

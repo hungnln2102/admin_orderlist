@@ -2,7 +2,9 @@ const { db, TABLES, COLS, withTransaction } = require("@/db");
 const { syncReceiptProfit, coverReceiptObligation } = require("@/domains/finance/services/receiptProfitService");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { ORDER_STATUS } = require("@/constants/orderStatus");
-const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR } = require("@/constants/receiptStatus");
+const { RECEIPT_STATUS, ALLOCATION_TYPE, ALLOCATION_CREATOR, TRANSFER_TYPE } = require("@/constants/receiptStatus");
+const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
+const { lockAllocatableSupplierOrder } = require("@/domains/suppliers/services/supplierOrderDebt");
 const { processOrderPayment } = require("@/domains/orders/services/orderPaymentService");
 const { resolveOrdersWithCatalogPrices } = require("./batchPaymentService");
 const { resolveOrderCatalogPricing } = require("@/domains/products/services/catalogPricingService");
@@ -77,6 +79,36 @@ async function allocateReceipt(receiptId, payload) {
       throw new Error("Không tìm thấy biên lai thanh toán.");
     }
 
+    const resolvedAllocType = allocation_type || ALLOCATION_TYPE.ORDER;
+    const code = target_code ? String(target_code).trim() : null;
+    const isSupplierOrder = resolvedAllocType === ALLOCATION_TYPE.SUPPLIER_ORDER;
+    const allocation = COLS.PAYMENT_RECEIPT_ALLOCATIONS;
+    const log = COLS.SUPPLIER_ORDER_COST_LOG;
+    let supplierOrder = null;
+    if (isSupplierOrder) {
+      if (receipt.transfer_type !== TRANSFER_TYPE.OUT || !/^[1-9]\d*$/.test(code || "") || !Number.isSafeInteger(allocAmount)) {
+        throw new Error("Cần biên lai tiền ra, khoản công nợ NCC hợp lệ và số tiền nguyên đồng.");
+      }
+      const existing = await trx(TABLES.PAYMENT_RECEIPT_ALLOCATIONS).where({
+        [allocation.RECEIPT_ID]: id,
+        [allocation.ALLOCATION_TYPE]: resolvedAllocType,
+        [allocation.TARGET_CODE]: code,
+      }).first();
+      if (existing) {
+        if (Number(existing[allocation.AMOUNT]) !== allocAmount) {
+          throw new Error("Biên lai đã được gán cho khoản công nợ này với số tiền khác.");
+        }
+        return {
+          allocation_id: existing[allocation.ID],
+          receipt_id: id,
+          allocated_amount: allocAmount,
+          unallocated_amount: Number(receipt.unallocated_amount),
+          status: receipt.status,
+        };
+      }
+      supplierOrder = await lockAllocatableSupplierOrder(trx, code, allocAmount);
+    }
+
     const currentUnallocated = Number(receipt.unallocated_amount ?? receipt.amount ?? 0);
     if (allocAmount > currentUnallocated) {
       throw new Error(`Số tiền phân bổ (${allocAmount.toLocaleString("vi-VN")} ₫) vượt quá số dư khả dụng (${currentUnallocated.toLocaleString("vi-VN")} ₫).`);
@@ -84,8 +116,6 @@ async function allocateReceipt(receiptId, payload) {
 
     const newUnallocated = currentUnallocated - allocAmount;
     const newStatus = newUnallocated <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.PARTIALLY_ALLOCATED;
-    const resolvedAllocType = allocation_type || ALLOCATION_TYPE.ORDER;
-    const code = target_code ? target_code.trim() : null;
     if (receipt.shop_out_expense_id && [ALLOCATION_TYPE.ORDER, "OTHER_INCOME"].includes(resolvedAllocType)) {
       throw new Error("Outgoing receipt cannot be allocated as income");
     }
@@ -137,6 +167,11 @@ async function allocateReceipt(receiptId, payload) {
     }).returning("id");
 
     const allocationId = typeof allocId === "object" ? allocId.id : allocId;
+
+    if (supplierOrder && allocAmount === Number(supplierOrder.remaining_debt)) {
+      await trx(TABLES.SUPPLIER_ORDER_COST_LOG).where(log.ID, code)
+        .update({ [log.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.PAID });
+    }
 
     // 2. Cập nhật số dư và trạng thái Biên lai gốc
     const receiptUpdates = {
@@ -348,6 +383,10 @@ async function allocateReceipt(receiptId, payload) {
         amount: allocAmount,
         remainingBalance: newUnallocated,
         orderId: order?.id || null,
+        ...(supplierOrder && {
+          supplierId: supplierOrder[log.SUPPLY_ID],
+          orderCode: supplierOrder[log.ID_ORDER],
+        }),
       },
     });
 

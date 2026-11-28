@@ -19,6 +19,7 @@ const RECEIPT_STATUS = Object.freeze({
 const ALLOCATION_TYPE = Object.freeze({
   ORDER: "ORDER",                     // Gán vào Đơn hàng
   SUPPLIER: "SUPPLIER",               // Gán vào thanh toán NCC
+  SUPPLIER_ORDER: "SUPPLIER_ORDER",
   EXPENSE: "EXPENSE",                 // Gán vào chi phí vận hành
   MONTHLY_EXPENSE: "MONTHLY_EXPENSE", // Gán vào chi phí biến đổi tháng
   EXTERNAL_IMPORT: "EXTERNAL_IMPORT", // Gán vào nhập hàng ngoài luồng

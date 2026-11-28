@@ -353,6 +353,11 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
                                             </td>
                                             <td className="py-2.5 px-4 font-mono font-bold text-cyan-400">
                                               {log.id_order}
+                                              {log.receipt_allocations?.map((allocation) => (
+                                                <div key={allocation.receipt_id} className="mt-1 text-[11px] font-normal text-slate-400">
+                                                  Biên lai #{allocation.receipt_id} · {formatCurrency(allocation.amount)}
+                                                </div>
+                                              ))}
                                             </td>
                                             <td className="py-2.5 px-4 text-right font-bold">
                                               {log.import_cost < 0 ? (
@@ -361,6 +366,11 @@ export const SupplierOverviewTable: React.FC<SupplierOverviewTableProps> = ({
                                                 </span>
                                               ) : (
                                                 <span className="text-slate-200">{formatCurrency(log.import_cost)}</span>
+                                              )}
+                                              {log.remaining_debt > 0 && log.remaining_debt < log.import_cost && (
+                                                <div className="mt-1 text-[11px] text-amber-400">
+                                                  Còn phải trả {formatCurrency(log.remaining_debt)}
+                                                </div>
                                               )}
                                             </td>
                                             <td className="py-2.5 px-4 text-center">

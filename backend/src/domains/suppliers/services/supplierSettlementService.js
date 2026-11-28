@@ -1,6 +1,7 @@
 const { TABLES, COLS } = require("@/db");
 const { EVENTS, publishEventInTrx } = require("@/events");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
+const { selectSupplierOrderRemaining } = require("./supplierOrderDebt");
 const {
   RECEIPT_STATUS,
   ALLOCATION_TYPE,
@@ -59,15 +60,18 @@ async function settleSupplierDebtTransaction({
     };
   }
 
-  const unpaidLogs = await trx(TABLES.SUPPLIER_ORDER_COST_LOG)
-    .where({
-      [LOG_COLS.SUPPLY_ID]: numericSupplierId,
-      [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID,
-    })
-    .forUpdate();
+  const unpaidLogs = await selectSupplierOrderRemaining(
+    trx(`${TABLES.SUPPLIER_ORDER_COST_LOG} as l`)
+      .where({
+        [LOG_COLS.SUPPLY_ID]: numericSupplierId,
+        [LOG_COLS.NCC_PAYMENT_STATUS]: SUPPLIER_PAYMENT_STATUS.UNPAID,
+      })
+      .forUpdate(),
+    trx
+  );
 
   const settledDebt = unpaidLogs.reduce(
-    (total, log) => total + toAmount(log[LOG_COLS.IMPORT_COST]),
+    (total, log) => total + toAmount(log.remaining_debt),
     0
   );
 

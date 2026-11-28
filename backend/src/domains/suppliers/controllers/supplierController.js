@@ -14,12 +14,13 @@ const getOverview = async (req, res) => {
 
 const getCostLogs = async (req, res) => {
   try {
-    const { supplierId, orderCodeSearch, page, limit } = req.query;
+    const { supplierId, orderCodeSearch, page, limit, outstandingOnly } = req.query;
     const result = await supplierService.getSupplierCostLogs({
       supplierId,
       orderCodeSearch,
       page,
       limit,
+      outstandingOnly: outstandingOnly === "true",
     });
     res.json(result);
   } catch (error) {

@@ -8,6 +8,8 @@
  */
 
 const { db, TABLES, COLS } = require("@/db");
+const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
+const { supplierOrderRemainingSql } = require("@/domains/suppliers/services/supplierOrderDebt");
 const { getMonthlyObligations } = require("./profitObligationService");
 const fixedCostService = require("./fixedCostService");
 const installmentService = require("./installmentService");
@@ -457,9 +459,9 @@ async function getFinanceSummary(targetMonth, startDate, endDate, period = "mont
     .first();
   const shopBalanceTotal = toNumber(shopWallets?.total_balance || 0);
 
-  const supplierDebtLog = await db(TABLES.SUPPLIER_ORDER_COST_LOG)
-    .where("ncc_payment_status", "Chưa Thanh Toán")
-    .select(db.raw("COALESCE(SUM(import_cost), 0)::numeric as total_debt"))
+  const supplierDebtLog = await db(`${TABLES.SUPPLIER_ORDER_COST_LOG} as l`)
+    .where(COLS.SUPPLIER_ORDER_COST_LOG.NCC_PAYMENT_STATUS, SUPPLIER_PAYMENT_STATUS.UNPAID)
+    .select(db.raw(`COALESCE(SUM(${supplierOrderRemainingSql("l")}), 0)::numeric as total_debt`))
     .first();
   const supplierDebtTotal = toNumber(supplierDebtLog?.total_debt || 0);
 

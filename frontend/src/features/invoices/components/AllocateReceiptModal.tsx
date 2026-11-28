@@ -20,6 +20,8 @@ import {
   getMatchableOrders,
 } from "../api/invoicesApiClient";
 import { CurrencyInputVN, CustomSelect } from "@/shared/components";
+import { apiClient } from "@/shared/api/apiClient";
+import type { SupplierCostLogItem } from "@/features/suppliers/types";
 
 interface InvoiceReceipt {
   id: number;
@@ -46,6 +48,7 @@ interface AllocateReceiptModalProps {
 
 type AllocationType =
   | "ORDER"
+  | "SUPPLIER_ORDER"
   | "OPERATIONAL_EXPENSE"
   | "OTHER_INCOME"
   | "EXTERNAL_IMPORT"
@@ -78,12 +81,57 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [matchedOrder, setMatchedOrder] = useState<any | null>(null);
   const [searchingOrder, setSearchingOrder] = useState<boolean>(false);
+  const [supplierCosts, setSupplierCosts] = useState<SupplierCostLogItem[]>([]);
+  const [supplierCostId, setSupplierCostId] = useState("");
+  const [supplierLookup, setSupplierLookup] = useState<"idle" | "loading" | "loaded" | "error">("idle");
 
   const availableAmount = receipt
     ? Number(receipt.unallocated_amount !== undefined ? receipt.unallocated_amount : receipt.amount)
     : 0;
 
   const generateRandomImportId = () => `IMP-${Math.floor(100 + Math.random() * 900)}`;
+  const supplierCost = supplierCosts.find((cost) => String(cost.id) === supplierCostId);
+  const allocationLimit = allocationType === "SUPPLIER_ORDER"
+    ? Math.min(availableAmount, supplierCost?.remaining_debt ?? 0)
+    : availableAmount;
+
+  useEffect(() => {
+    setSupplierCosts([]);
+    setSupplierCostId("");
+    const code = targetCode.trim();
+    if (!isOpen || allocationType !== "SUPPLIER_ORDER" || !code) {
+      setSupplierLookup("idle");
+      return;
+    }
+
+    setSupplierLookup("loading");
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const response = await apiClient(
+          `/api/suppliers/cost-logs?outstandingOnly=true&limit=100&orderCodeSearch=${encodeURIComponent(code)}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) throw new Error();
+        const result = await response.json();
+        if (controller.signal.aborted) return;
+        const costs: SupplierCostLogItem[] = result.data;
+        setSupplierCosts(costs);
+        setSupplierLookup("loaded");
+        if (costs.length === 1) {
+          setSupplierCostId(String(costs[0].id));
+          setAmount(String(Math.min(availableAmount, costs[0].remaining_debt)));
+        }
+      } catch {
+        if (!controller.signal.aborted) setSupplierLookup("error");
+      }
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [allocationType, availableAmount, isOpen, targetCode]);
 
   useEffect(() => {
     if (allocationType !== "ORDER" || !targetCode.trim()) {
@@ -142,11 +190,10 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
             const matched = items.find((i: any) => Number(i.amount) === avail);
             if (matched) {
               setSelectedFixedCostId(String(matched.id));
-              setAllocationType("FIXED_COST");
             } else if (items.length > 0) {
               setSelectedFixedCostId(String(items[0].id));
             } else {
-              setAllocationType("OPERATIONAL_EXPENSE");
+              setAllocationType((current) => current === "FIXED_COST" ? "OPERATIONAL_EXPENSE" : current);
             }
           })
           .catch((err) => console.error("Lỗi nạp chi phí cố định:", err))
@@ -247,6 +294,12 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
       setError("Vui lòng nhập Mã đơn hàng.");
       return;
     }
+    if (allocationType === "SUPPLIER_ORDER" &&
+        (!supplierCost || supplierCost.id_order.toUpperCase() !== targetCode.trim().toUpperCase() ||
+          allocAmount > allocationLimit)) {
+      setError("Chọn khoản công nợ NCC và nhập số tiền trong giới hạn khả dụng.");
+      return;
+    }
 
     if (allocationType === "ORDER" && matchedOrder) {
       const orderPrice = Number(matchedOrder.price || matchedOrder.gross_selling_price || 0);
@@ -283,6 +336,8 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
         ? `INSTALLMENT_${selectedInstallmentId}`
         : allocationType === "EXTERNAL_IMPORT"
         ? (importId.trim() || generateRandomImportId())
+        : allocationType === "SUPPLIER_ORDER"
+        ? supplierCostId
         : (allocationType === "ORDER" ? targetCode.trim() : null);
 
       const res = await allocateInvoiceReceipt(receipt.id, {
@@ -307,11 +362,11 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
   };
 
   const handleSetFullAmount = () => {
-    setAmount(String(availableAmount));
+    setAmount(String(allocationLimit));
   };
 
   const handleSetHalfAmount = () => {
-    setAmount(String(Math.floor(availableAmount / 2)));
+    setAmount(String(Math.floor(allocationLimit / 2)));
   };
 
   const isOut = receipt.transfer_type === "out";
@@ -488,6 +543,25 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                     </div>
                   </button>
 
+                  <button
+                    type="button"
+                    aria-pressed={allocationType === "SUPPLIER_ORDER"}
+                    onClick={() => setAllocationType("SUPPLIER_ORDER")}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      allocationType === "SUPPLIER_ORDER"
+                        ? "bg-cyan-500/10 border-cyan-500/40"
+                        : "bg-slate-950/40 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+                      <Link2 className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-200">Thanh toán NCC</div>
+                      <div className="text-[10px] text-slate-400">Gán theo mã đơn</div>
+                    </div>
+                  </button>
+
                   {/* OPERATIONAL_EXPENSE */}
                   <button
                     type="button"
@@ -659,20 +733,20 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
             </div>
           )}
 
-          {/* Target Code Field (For ORDER) */}
-          {allocationType === "ORDER" && (
+          {(allocationType === "ORDER" || allocationType === "SUPPLIER_ORDER") && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  MÃ ĐƠN HÀNG KÍCH HOẠT *
+                <label htmlFor="allocate-receipt-order-code" className="text-xs font-semibold text-slate-300">
+                  {allocationType === "SUPPLIER_ORDER" ? "MÃ ĐƠN HÀNG *" : "MÃ ĐƠN HÀNG KÍCH HOẠT *"}
                 </label>
-                {searchingOrder && (
+                {(searchingOrder || supplierLookup === "loading") && (
                   <span className="text-[10px] text-cyan-400 animate-pulse">
                     Đang tra cứu đơn hàng...
                   </span>
                 )}
               </div>
               <input
+                id="allocate-receipt-order-code"
                 type="text"
                 value={targetCode}
                 onChange={(e) => setTargetCode(e.target.value.toUpperCase())}
@@ -680,7 +754,31 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                 className="w-full px-4 py-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-cyan-300 font-mono font-bold placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm uppercase transition-all"
               />
 
-              {matchedOrder && (
+              {allocationType === "SUPPLIER_ORDER" && supplierCosts.length > 0 && (
+                <div className="mt-2.5">
+                  <CustomSelect
+                    ariaLabel="Khoản công nợ NCC"
+                    placeholder="Chọn khoản công nợ NCC"
+                    value={supplierCostId}
+                    onChange={(id) => {
+                      setSupplierCostId(id);
+                      const cost = supplierCosts.find((item) => String(item.id) === id);
+                      if (cost) setAmount(String(Math.min(availableAmount, cost.remaining_debt)));
+                    }}
+                    options={supplierCosts.map((cost) => ({
+                      value: String(cost.id),
+                      label: `${cost.supplier_name} · ${formatCurrency(cost.remaining_debt)} · #${cost.id}`,
+                    }))}
+                  />
+                </div>
+              )}
+              {allocationType === "SUPPLIER_ORDER" && supplierLookup === "loaded" && !supplierCosts.length && (
+                <p role="status" className="mt-2 text-xs text-slate-400">Mã đơn này không có công nợ NCC cần thanh toán.</p>
+              )}
+              {allocationType === "SUPPLIER_ORDER" && supplierLookup === "error" && (
+                <p role="alert" className="mt-2 text-xs text-rose-400">Không thể tải công nợ NCC.</p>
+              )}
+              {allocationType === "ORDER" && matchedOrder && (
                 <div className="mt-2.5 p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs space-y-1 animate-fadeIn">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-cyan-300">
@@ -757,7 +855,7 @@ export const AllocateReceiptModal: React.FC<AllocateReceiptModalProps> = ({
                   onClick={handleSetFullAmount}
                   className="px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[10px] font-semibold border border-cyan-500/30 transition-all"
                 >
-                  100% Số Dư
+                  {allocationType === "SUPPLIER_ORDER" ? "Tối đa" : "100% Số Dư"}
                 </button>
               </div>
             </div>

@@ -7,7 +7,8 @@ if (!process.env.TEST_DATABASE_URL || process.env.DATABASE_URL !== process.env.T
 const { db, TABLES } = require("@/db");
 const { processPaymentWebhook } = require("@/domains/payments/services/webhookPaymentService");
 const { SUPPLIER_PAYMENT_STATUS } = require("@/constants/supplierStatus");
-const { allocateReceipt } = require("@/domains/invoices/services/invoiceService");
+const { allocateReceipt, getInvoices } = require("@/domains/invoices/services/invoiceService");
+const { deleteSupplier, getSupplierCostLogs, getSuppliersOverview, paySupplierDebt } = require("@/domains/suppliers/services/supplierService");
 const finance = require("@/domains/finance/services/financeHubService");
 const { getDashboardSummary } = require("@/domains/dashboard/services/dashboardService");
 const expenseService = require("@/domains/finance/services/storeProfitExpenseService");
@@ -24,7 +25,7 @@ beforeEach(async () => {
   const tables = [TABLES.PAYMENT_RECEIPT, TABLES.PAYMENT_RECEIPT_ALLOCATIONS, TABLES.STORE_PROFIT_EXPENSES,
     TABLES.PROFIT_OBLIGATION_SNAPSHOTS, TABLES.DEBT_PAYMENT_LOGS, TABLES.FINANCIAL_ACCOUNTS,
     TABLES.FIXED_COSTS, TABLES.INSTALLMENTS, TABLES.PERSONAL_ASSETS, TABLES.SUPPLIER,
-    TABLES.SUPPLIER_ORDER_COST_LOG, TABLES.DAILY_REVENUE_SUMMARY];
+    TABLES.SUPPLIER_ORDER_COST_LOG, TABLES.DAILY_REVENUE_SUMMARY, TABLES.DOMAIN_EVENT_STORE];
   await db.raw("TRUNCATE " + tables.map(() => "??").join(",") + " RESTART IDENTITY CASCADE", tables);
   [shop] = await db(TABLES.FINANCIAL_ACCOUNTS).insert({ account_number: "990001", account_scope: "SHOP", account_type: "bank", bank_short_code: "MB", balance: 10000000, is_active: true, is_deleted: false, is_default: true }).returning("*");
   [personal] = await db(TABLES.FINANCIAL_ACCOUNTS).insert({ account_number: "990002", account_scope: "PERSONAL", account_type: "bank", bank_short_code: "MB", balance: 10000000, is_active: true, is_deleted: false }).returning("*");
@@ -178,6 +179,86 @@ test("supplier settlement remains excluded from profit expenses", async () => {
   assert.equal(result.matched, true);
   assert.equal(await expenseTotal(result.receiptId), 0);
   assert.equal((await summary()).netProfit, 0);
+});
+
+async function supplierOrder() {
+  const [supplier] = await db(TABLES.SUPPLIER).insert({ id: 6, supplier_name: "Yuna test" }).returning("*");
+  const [cost] = await db(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+    supply_id: supplier.id,
+    id_order: "MAVL3DXJ1",
+    import_cost: 145000,
+    ncc_payment_status: SUPPLIER_PAYMENT_STATUS.UNPAID,
+  }).returning("*");
+  return { supplier, cost };
+}
+
+function assignSupplierOrder(receiptId, costId, amount) {
+  return allocateReceipt(receiptId, {
+    allocation_type: "SUPPLIER_ORDER",
+    target_code: String(costId),
+    amount,
+  });
+}
+
+test("a prior money-out settles only the selected supplier order and preserves the receipt remainder", async () => {
+  const result = await outgoing(160000);
+  const { supplier, cost } = await supplierOrder();
+  const [otherCost] = await db(TABLES.SUPPLIER_ORDER_COST_LOG).insert({
+    supply_id: supplier.id, id_order: "MAVOTHER", import_cost: 45000,
+    ncc_payment_status: SUPPLIER_PAYMENT_STATUS.UNPAID,
+  }).returning("*");
+  const lookup = await getSupplierCostLogs({ orderCodeSearch: "mavl3dxj1", outstandingOnly: true });
+  assert.equal(lookup.data.length, 1);
+  assert.equal(lookup.data[0].remaining_debt, 145000);
+
+  await assert.rejects(assignSupplierOrder(result.receiptId, cost.id, 145001), /vượt quá công nợ/);
+  const duplicateRequests = await Promise.all([
+    assignSupplierOrder(result.receiptId, cost.id, 145000),
+    assignSupplierOrder(result.receiptId, cost.id, 145000),
+  ]);
+  assert.equal(String(duplicateRequests[0].allocation_id), String(duplicateRequests[1].allocation_id));
+  assert.equal(duplicateRequests[1].unallocated_amount, 15000);
+  assert.equal(await expenseTotal(result.receiptId), 15000);
+  assert.equal(Number((await db(TABLES.FINANCIAL_ACCOUNTS).where("id", shop.id).first()).balance), 9840000);
+  const ledgerRows = await db(TABLES.FINANCIAL_ACCOUNT_LEDGER);
+  assert.equal(ledgerRows.length, 1);
+  const events = await db(TABLES.DOMAIN_EVENT_STORE).where({
+    event_name: "PAYMENT_RECEIPT_MUTATED", aggregate_id: String(result.receiptId), action: "ALLOCATE",
+  });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].payload.orderCode, "MAVL3DXJ1");
+
+  const history = await getSupplierCostLogs({ supplierId: supplier.id });
+  const settled = history.data.find((row) => row.id === cost.id);
+  assert.equal(settled.ncc_payment_status, SUPPLIER_PAYMENT_STATUS.PAID);
+  assert.equal(Number(settled.receipt_allocations[0].receipt_id), Number(result.receiptId));
+  assert.equal(settled.receipt_allocations[0].amount, 145000);
+  assert.equal(history.data.find((row) => row.id === otherCost.id).remaining_debt, 45000);
+  assert.equal((await getSuppliersOverview()).data.find((row) => row.id === supplier.id).total_debt, 45000);
+  await assert.rejects(deleteSupplier(supplier.id), /đã có biên lai/);
+  const invoices = await getInvoices({ tab: "unlisted", search: "MAVL3DXJ1" });
+  assert.equal(invoices.data[0].allocations[0].supplier_order_code, "MAVL3DXJ1");
+});
+
+test("concurrent allocations from different receipts cannot overpay a supplier order", async () => {
+  const first = await outgoing(100000);
+  const second = await outgoing(100000);
+  const { supplier, cost } = await supplierOrder();
+  const results = await Promise.allSettled([
+    assignSupplierOrder(first.receiptId, cost.id, 100000),
+    assignSupplierOrder(second.receiptId, cost.id, 100000),
+  ]);
+  assert.equal(results.filter(({ status }) => status === "fulfilled").length, 1);
+  assert.match(results.find(({ status }) => status === "rejected").reason.message, /vượt quá công nợ/);
+  const history = await getSupplierCostLogs({ supplierId: supplier.id });
+  assert.equal(history.data[0].remaining_debt, 45000);
+  assert.equal(history.data[0].ncc_payment_status, SUPPLIER_PAYMENT_STATUS.UNPAID);
+  const overview = (await getSuppliersOverview()).data.find((row) => row.id === supplier.id);
+  assert.equal(overview.total_paid, 100000);
+  assert.equal(overview.total_debt, 45000);
+  const settlement = await paySupplierDebt(supplier.id);
+  assert.equal(settlement.settledDebt, 45000);
+  assert.equal((await getSupplierCostLogs({ supplierId: supplier.id })).data[0].ncc_payment_status, SUPPLIER_PAYMENT_STATUS.PAID);
 });
 
 test("mixed fixed cost and food only add food to the original monthly burden", async () => {
